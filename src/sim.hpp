@@ -31,7 +31,8 @@ struct DynamicObject : public madrona::Archetype<
     Velocity,
     ObjectID,
     madrona::phys::CollisionAABB,
-    madrona::phys::broadphase::LeafID
+    madrona::phys::broadphase::LeafID,
+    madrona::phys::solver::InstanceState
 > {};
 
 struct Action {
