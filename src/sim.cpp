@@ -65,7 +65,7 @@ static void resetWorld(Engine &ctx)
 
         reinit_entity(dyn_entity, pos, rot, Scale(math::Vector3 {1, 1, 1}));
 
-        ctx.getUnsafe<render::ObjectID>(dyn_entity).idx = 0;
+        ctx.getUnsafe<ObjectID>(dyn_entity).idx = 0;
     }
 
     Entity agent_entity = ctx.data().agent;
