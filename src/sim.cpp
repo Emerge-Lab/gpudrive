@@ -85,7 +85,7 @@ static void resetWorld(Engine &ctx)
     const math::Quat agent_rot =
         math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
 
-    reinit_entity(agent_entity, math::Vector3 { 0, 0, 3 },
+    reinit_entity(agent_entity, math::Vector3 { 0, 0, 14 },
                   agent_rot, Optional<Scale>::none());
 
     bp_bvh.rebuild();
@@ -101,14 +101,14 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     resetWorld(ctx);
 }
 
-inline void actionSystem(Engine &, const Action &action,
+inline void actionSystem(Engine &, Action &action,
                          Position &pos, Rotation &rot)
 {
     constexpr float turn_angle = helpers::toRadians(10.f);
 
     switch(action.action) {
     case 0: {
-        // Implement stop
+        // Do nothing
     } break;
     case 1: {
         Vector3 fwd = rot.rotateDir(math::fwd);
@@ -137,6 +137,9 @@ inline void actionSystem(Engine &, const Action &action,
     default:
         break;
     }
+
+    // "Consume" the action
+    action.action = 0;
 
     printf("(%f %f %f) (%f %f %f %f)\n",
            pos.x, pos.y, pos.z,

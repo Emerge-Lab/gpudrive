@@ -34,9 +34,11 @@ def get_keyboard_action():
         elif key_action == 'z':
             return  6
         elif key_action == 'r':
-            return 0
-        elif key_action == 'q':
             return -1
+        elif key_action == 'q':
+            return -2
+        elif key_action == ' ':
+            return 0
         else:
             continue
 
@@ -59,9 +61,9 @@ while True:
 
     action = get_keyboard_action()
     
-    if action == 0:
+    if action == -1:
         resets[0] = 1
-    elif action == -1:
+    elif action == -2:
         break
     else:
         actions[0][0] = action
