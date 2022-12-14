@@ -28,12 +28,12 @@ void Sim::registerTypes(ECSRegistry &registry)
 
 static void resetWorld(Engine &ctx)
 {
+    RigidBodyPhysicsSystem::reset(ctx);
+
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
         episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
     ctx.data().rng = RNG::make(episode_idx);
-
-    auto &bp_bvh = ctx.getSingleton<broadphase::BVH>();
 
     auto reinit_entity = [&](Entity e,
                              Position pos,
@@ -45,19 +45,6 @@ static void resetWorld(Engine &ctx)
         if (scale.has_value()) {
             ctx.getUnsafe<Scale>(e) = *scale;
         }
-
-        // FIXME, currently we have to update all this BVH related state
-        // in preparation for the rebuild at the end of this function.
-        // That's a bit silly because these values are updated
-        // in parallel later by the task graph. Ideally the BVH refit
-        // node should instead switch to some kind of conditional rebuild refit
-        // and not of this manual setup would be needed
-        CollisionAABB &aabb = ctx.getUnsafe<CollisionAABB>(e);
-        aabb = CollisionAABB(pos, rot);
-
-        broadphase::LeafID &leaf_id = ctx.getUnsafe<broadphase::LeafID>(e);
-        bp_bvh.updateLeaf(e, leaf_id, aabb);
-
     };
 
     const math::Vector2 bounds { -10.f, 10.f };
@@ -87,8 +74,6 @@ static void resetWorld(Engine &ctx)
 
     reinit_entity(agent_entity, math::Vector3 { 0, 0, 14 },
                   agent_rot, Optional<Scale>::none());
-
-    bp_bvh.rebuild();
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
