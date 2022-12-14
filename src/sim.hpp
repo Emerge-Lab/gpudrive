@@ -15,6 +15,8 @@ namespace GPUHideSeek {
 using madrona::base::Position;
 using madrona::base::Rotation;
 using madrona::base::Scale;
+using madrona::base::ObjectID;
+using madrona::phys::Velocity;
 
 class Engine;
 
@@ -26,9 +28,10 @@ struct DynamicObject : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
+    Velocity,
+    ObjectID
     madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID,
-    madrona::render::ObjectID
 > {};
 
 struct Action {
@@ -40,8 +43,6 @@ static_assert(sizeof(Action) == sizeof(int32_t));
 struct Agent : public madrona::Archetype<
     Position,
     Rotation,
-    madrona::phys::CollisionAABB,
-    madrona::phys::broadphase::LeafID,
     madrona::render::ActiveView,
     Action
 > {};

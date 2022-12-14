@@ -7,7 +7,8 @@ using namespace madrona::math;
 
 namespace GPUHideSeek {
 
-static constexpr inline CountT max_instances = 45;
+constexpr inline CountT max_instances = 45;
+constexpr inline float deltaT = 1.f / 30.f;
 
 void Sim::registerTypes(ECSRegistry &registry)
 {
@@ -139,7 +140,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto action_sys = builder.parallelForNode<Engine, actionSystem,
         Action, Position, Rotation>({reset_sys});
 
-    auto phys_sys = RigidBodyPhysicsSystem::setupTasks(builder, {action_sys});
+    auto phys_sys = RigidBodyPhysicsSystem::setupTasks(builder, {action_sys}, 4);
 
     auto sim_done = phys_sys;
 
@@ -160,7 +161,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    RigidBodyPhysicsSystem::init(ctx, max_instances + 1, 100 * 50);
+    RigidBodyPhysicsSystem::init(ctx, deltaT, 4, max_instances + 1, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 
@@ -169,8 +170,6 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     agent = ctx.makeEntityNow<Agent>();
     ctx.getUnsafe<render::ActiveView>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, math::up * 0.5f);
-    ctx.getUnsafe<broadphase::LeafID>(agent) =
-        bp_bvh.reserveLeaf();
 
     dynObjects = (Entity *)rawAlloc(sizeof(Entity) * size_t(max_instances));
 
