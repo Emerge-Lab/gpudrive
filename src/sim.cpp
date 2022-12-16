@@ -13,7 +13,7 @@ constexpr inline float deltaT = 1.f / 30.f;
 void Sim::registerTypes(ECSRegistry &registry)
 {
     base::registerTypes(registry);
-    RigidBodyPhysicsSystem::registerTypes(registry);
+    phys::RigidBodyPhysicsSystem::registerTypes(registry);
     render::RenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
