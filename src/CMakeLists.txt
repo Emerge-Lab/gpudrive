@@ -22,6 +22,7 @@ target_link_libraries(gpu_hideseek_mgr PRIVATE
     madrona_mw_gpu
     madrona_common
     madrona_importer
+    madrona_physics_assets
     gpu_hideseek_gpu_srcs
 )
 

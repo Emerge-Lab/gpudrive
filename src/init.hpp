@@ -1,5 +1,7 @@
 #pragma once
 
+#include <madrona/physics.hpp>
+
 namespace GPUHideSeek {
 
 struct EpisodeManager {
@@ -8,6 +10,7 @@ struct EpisodeManager {
 
 struct WorldInit {
     EpisodeManager *episodeMgr;
+    madrona::phys::ObjectManager *rigidBodyObjMgr;
 };
 
 }

@@ -5,6 +5,7 @@
 #include <madrona/cuda_utils.hpp>
 #include <madrona/utils.hpp>
 #include <madrona/importer.hpp>
+#include <madrona/physics_assets.hpp>
 
 #include <charconv>
 #include <iostream>
@@ -13,12 +14,15 @@
 #include <string>
 
 using namespace madrona;
+using namespace madrona::math;
+using namespace madrona::phys;
 using namespace madrona::py;
 
 namespace GPUHideSeek {
 
 struct Manager::Impl {
     Config cfg;
+    PhysicsLoader physicsLoader;
     EpisodeManager *episodeMgr;
     TrainingExecutor mwGPU;
 
@@ -34,6 +38,21 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         FATAL("Failed to load sphere");
     }
 
+    PhysicsLoader phys_loader(PhysicsLoader::StorageType::CUDA, 10);
+
+    RigidBodyMetadata sphere_phys_metadata {
+        .invInertiaTensor = { 1.f, 1.f, 1.f },
+    };
+
+    AABB sphere_aabb {
+        .pMin = { -1, -1, -1 },
+        .pMax = { 1, 1, 1 },
+    };
+
+    phys_loader.loadObjects(&sphere_phys_metadata, &sphere_aabb, 1);
+
+    ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
+
     EpisodeManager *episode_mgr = 
         (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
     REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
@@ -43,6 +62,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
     for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
         world_inits[i] = WorldInit {
             episode_mgr,
+            phys_obj_mgr,
         };
     }
 
@@ -72,6 +92,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
     return new Impl {
         cfg,
+        std::move(phys_loader),
         episode_mgr,
         std::move(mwgpu_exec),
     };

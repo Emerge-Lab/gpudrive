@@ -2,7 +2,6 @@
 #include <madrona/mw_gpu_entry.hpp>
 
 using namespace madrona;
-using namespace madrona::phys;
 using namespace madrona::math;
 
 namespace GPUHideSeek {
@@ -29,7 +28,7 @@ void Sim::registerTypes(ECSRegistry &registry)
 
 static void resetWorld(Engine &ctx)
 {
-    RigidBodyPhysicsSystem::reset(ctx);
+    phys::RigidBodyPhysicsSystem::reset(ctx);
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
@@ -140,12 +139,13 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto action_sys = builder.parallelForNode<Engine, actionSystem,
         Action, Position, Rotation>({reset_sys});
 
-    auto phys_sys = RigidBodyPhysicsSystem::setupTasks(builder, {action_sys}, 4);
+    auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
+                                                             {action_sys}, 4);
 
     auto sim_done = phys_sys;
 
-    auto phys_cleanup_sys = RigidBodyPhysicsSystem::setupCleanupTasks(builder,
-        {sim_done});
+    auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+        builder, {sim_done});
 
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
@@ -161,12 +161,11 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    RigidBodyPhysicsSystem::init(ctx, deltaT, 4, max_instances + 1, 100 * 50);
+    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT, 4,
+                                       max_instances + 1, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 
-    broadphase::BVH &bp_bvh = ctx.getSingleton<broadphase::BVH>();
-    
     agent = ctx.makeEntityNow<Agent>();
     ctx.getUnsafe<render::ActiveView>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, math::up * 0.5f);
@@ -175,8 +174,8 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
 
     for (CountT i = 0; i < max_instances; i++) {
         dynObjects[i] = ctx.makeEntityNow<DynamicObject>();
-        ctx.getUnsafe<broadphase::LeafID>(dynObjects[i]) =
-            bp_bvh.reserveLeaf();
+        ctx.getUnsafe<phys::broadphase::LeafID>(dynObjects[i]) =
+            phys::RigidBodyPhysicsSystem::registerObject(ctx);
     }
 
     resetWorld(ctx);
