@@ -12,7 +12,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         num_worlds = num_worlds,
         render_width = 64,
         render_height = 64,
-        debug_compile = True,
+        debug_compile = False,
 )
 
 actions = sim.move_action_tensor().to_torch()
@@ -39,4 +39,4 @@ for i in range(num_steps):
 end = time.time()
 
 duration = end - start
-print(num_steps / duration, duration)
+print(num_worlds * num_steps / duration, duration)
