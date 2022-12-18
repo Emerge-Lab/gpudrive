@@ -6,13 +6,14 @@ import time
 
 num_worlds = int(sys.argv[1])
 num_steps = int(sys.argv[2])
+reset_chance = float(sys.argv[3])
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         gpu_id = 0,
         num_worlds = num_worlds,
         render_width = 64,
         render_height = 64,
-        debug_compile = False,
+        debug_compile = True,
 )
 
 actions = sim.move_action_tensor().to_torch()
@@ -24,8 +25,17 @@ print(rgb_observations.shape, rgb_observations.dtype)
 
 start = time.time()
 
+reset_no = torch.zeros_like(resets, dtype=torch.int32)
+reset_yes = torch.ones_like(resets, dtype=torch.int32)
+reset_rand = torch.zeros_like(resets, dtype=torch.float32)
+
 for i in range(num_steps):
     sim.step()
+
+    torch.rand(reset_rand.shape, out=reset_rand)
+
+    reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
+    resets.copy_(reset_cond)
 
     #action = get_keyboard_action()
     #
