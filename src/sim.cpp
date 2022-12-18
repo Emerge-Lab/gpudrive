@@ -115,10 +115,6 @@ inline void actionSystem(Engine &, Action &action,
 
     // "Consume" the action
     action.action = 0;
-
-    printf("(%f %f %f) (%f %f %f %f)\n",
-           pos.x, pos.y, pos.z,
-           rot.w, rot.x, rot.y, rot.z);
 }
 
 void Sim::setupTasks(TaskGraph::Builder &builder)

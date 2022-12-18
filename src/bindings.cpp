@@ -20,15 +20,16 @@ NB_MODULE(gpu_hideseek_python, m) {
     nb::class_<Manager> (m, "HideAndSeekSimulator")
         .def("__init__", [](Manager *self, int64_t gpu_id,
                             int64_t num_worlds, int64_t render_width,
-                            int64_t render_height) {
+                            int64_t render_height, bool debug_compile) {
             new (self) Manager(Manager::Config {
                 .gpuID = (int)gpu_id,
                 .numWorlds = (uint32_t)num_worlds,
                 .renderWidth = (uint32_t)render_width,
                 .renderHeight = (uint32_t)render_height,
+                .debugCompile = debug_compile,
             });
         }, nb::arg("gpu_id"), nb::arg("num_worlds"), nb::arg("render_width"),
-           nb::arg("render_height"))
+           nb::arg("render_height"), nb::arg("debug_compile") = true)
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)
         .def("move_action_tensor", &Manager::moveActionTensor)

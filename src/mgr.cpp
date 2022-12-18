@@ -125,7 +125,8 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         "",
         { GPU_HIDESEEK_SRC_LIST },
         { GPU_HIDESEEK_COMPILE_FLAGS },
-        CompileConfig::OptMode::Debug,
+        cfg.debugCompile ? CompileConfig::OptMode::Debug :
+            CompileConfig::OptMode::LTO,
         CompileConfig::Executor::TaskGraph,
     });
 

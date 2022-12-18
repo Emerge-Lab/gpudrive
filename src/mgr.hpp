@@ -13,6 +13,7 @@ public:
         uint32_t numWorlds;
         uint32_t renderWidth;
         uint32_t renderHeight;
+        bool debugCompile;
     };
 
     MADRONA_IMPORT Manager(const Config &cfg);
