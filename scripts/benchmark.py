@@ -13,7 +13,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         num_worlds = num_worlds,
         render_width = 64,
         render_height = 64,
-        debug_compile = True,
+        debug_compile = False,
 )
 
 actions = sim.move_action_tensor().to_torch()
