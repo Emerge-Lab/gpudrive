@@ -35,6 +35,15 @@ struct DynamicObject : public madrona::Archetype<
     madrona::phys::solver::InstanceState
 > {};
 
+struct StaticObject : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID,
+    madrona::phys::CollisionAABB,
+    madrona::phys::broadphase::LeafID
+> {};
+
 struct Action {
     int32_t action;
 };

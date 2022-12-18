@@ -29,8 +29,51 @@ struct Manager::Impl {
     static inline Impl * init(const Config &cfg);
 };
 
+static void loadPhysicsObjects(PhysicsLoader &loader)
+{
+    DynArray<RigidBodyMetadata> metadatas(0);
+    DynArray<AABB> aabbs(0);
+    DynArray<CollisionPrimitive> prims(0);
+
+    // Sphere: 
+    metadatas.push_back({
+        .invInertiaTensor = { 1.f, 1.f, 1.f },
+    });
+
+    aabbs.push_back({
+        .pMin = { -1, -1, -1 },
+        .pMax = { 1, 1, 1 },
+    });
+
+    prims.push_back({
+        .type = CollisionPrimitive::Type::Sphere,
+        .sphere = {
+            .radius = 1.f,
+        },
+    });
+
+    // Plane:
+    metadatas.push_back({
+        .invInertiaTensor = { 1.f, 1.f, 1.f },
+    });
+
+    aabbs.push_back({
+        .pMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX },
+        .pMax = { FLT_MAX, FLT_MAX, FLT_MAX },
+    });
+
+    prims.push_back({
+        .type = CollisionPrimitive::Type::Plane,
+        .plane = {},
+    });
+
+    loader.loadObjects(metadatas.data(), aabbs.data(),
+                       prims.data(), metadatas.size());
+}
+
 Manager::Impl * Manager::Impl::init(const Config &cfg)
 {
+    DynArray<imp::ImportedObject> imported_renderer_objs(0);
     auto sphere_obj = imp::ImportedObject::importObject(
         (std::filesystem::path(DATA_DIR) / "sphere.obj").c_str());
 
@@ -38,18 +81,20 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         FATAL("Failed to load sphere");
     }
 
+    imported_renderer_objs.emplace_back(std::move(*sphere_obj));
+
+    auto plane_obj = imp::ImportedObject::importObject(
+        (std::filesystem::path(DATA_DIR) / "plane.obj").c_str());
+
+    if (!plane_obj.has_value()) {
+        FATAL("Failed to load plane");
+    }
+
+    imported_renderer_objs.emplace_back(std::move(*plane_obj));
+
     PhysicsLoader phys_loader(PhysicsLoader::StorageType::CUDA, 10);
+    loadPhysicsObjects(phys_loader);
 
-    RigidBodyMetadata sphere_phys_metadata {
-        .invInertiaTensor = { 1.f, 1.f, 1.f },
-    };
-
-    AABB sphere_aabb {
-        .pMin = { -1, -1, -1 },
-        .pMax = { 1, 1, 1 },
-    };
-
-    phys_loader.loadObjects(&sphere_phys_metadata, &sphere_aabb, 1);
 
     ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
@@ -84,9 +129,13 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         CompileConfig::Executor::TaskGraph,
     });
 
-    DynArray<imp::SourceObject> renderer_objects({
-        imp::SourceObject { sphere_obj->meshes },
-    });
+    DynArray<imp::SourceObject> renderer_objects(0);
+
+    for (const auto &imported_obj : imported_renderer_objs) {
+        renderer_objects.push_back(imp::SourceObject {
+            imported_obj.meshes,
+        });
+    }
 
     mwgpu_exec.loadObjects(renderer_objects);
 

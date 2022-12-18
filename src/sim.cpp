@@ -20,6 +20,7 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerSingleton<WorldReset>();
 
     registry.registerArchetype<DynamicObject>();
+    registry.registerArchetype<StaticObject>();
     registry.registerArchetype<Agent>();
 
     registry.exportSingleton<WorldReset>(0);
@@ -34,18 +35,6 @@ static void resetWorld(Engine &ctx)
     uint32_t episode_idx =
         episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
     ctx.data().rng = RNG::make(episode_idx);
-
-    auto reinit_entity = [&](Entity e,
-                             Position pos,
-                             Rotation rot,
-                             Optional<Scale> scale) {
-        ctx.getUnsafe<Position>(e) = pos;
-        ctx.getUnsafe<Rotation>(e) = rot;
-
-        if (scale.has_value()) {
-            ctx.getUnsafe<Scale>(e) = *scale;
-        }
-    };
 
     const math::Vector2 bounds { -10.f, 10.f };
     float bounds_diff = bounds.y - bounds.x;
@@ -62,8 +51,9 @@ static void resetWorld(Engine &ctx)
 
         const auto rot = math::Quat::angleAxis(0, {0, 0, 1});
 
-        reinit_entity(dyn_entity, pos, rot, Scale(math::Vector3 {1, 1, 1}));
-
+        ctx.getUnsafe<Position>(dyn_entity) = pos;
+        ctx.getUnsafe<Rotation>(dyn_entity) = rot;
+        ctx.getUnsafe<Scale>(dyn_entity) = math::Vector3 {1, 1, 1};
         ctx.getUnsafe<ObjectID>(dyn_entity).idx = 0;
     }
 
@@ -72,8 +62,8 @@ static void resetWorld(Engine &ctx)
     const math::Quat agent_rot =
         math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
 
-    reinit_entity(agent_entity, math::Vector3 { 0, 0, 14 },
-                  agent_rot, Optional<Scale>::none());
+    ctx.getUnsafe<Position>(agent_entity) = math::Vector3 { 0, 0, 14 };
+    ctx.getUnsafe<Rotation>(agent_entity) = agent_rot;
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
@@ -162,7 +152,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
       episodeMgr(init.episodeMgr)
 {
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT, 4,
-                                       max_instances + 1, 100 * 50);
+                                       max_instances + 9, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 
@@ -177,6 +167,23 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
         ctx.getUnsafe<phys::broadphase::LeafID>(dynObjects[i]) =
             phys::RigidBodyPhysicsSystem::registerObject(ctx);
     }
+
+    auto makePlane = [&ctx](Vector3 offset, Quat rot) {
+        Entity plane = ctx.makeEntityNow<StaticObject>();
+        ctx.getUnsafe<Position>(plane) = offset;
+        ctx.getUnsafe<Rotation>(plane) = rot;
+        ctx.getUnsafe<Scale>(plane) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<ObjectID>(plane) = ObjectID { 1 };
+        ctx.getUnsafe<phys::broadphase::LeafID>(plane) =
+            phys::RigidBodyPhysicsSystem::registerObject(ctx);
+    };
+
+    makePlane({0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    makePlane({0, 0, 40}, Quat::angleAxis(math::pi, {1, 0, 0}));
+    makePlane({-20, 0, 0}, Quat::angleAxis(math::pi_d2, {0, 1, 0}));
+    makePlane({20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
+    makePlane({0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
+    makePlane({0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
 
     resetWorld(ctx);
     ctx.getSingleton<WorldReset>().resetNow = false;
