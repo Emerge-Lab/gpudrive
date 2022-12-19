@@ -67,10 +67,11 @@ struct Sim : public madrona::WorldBase {
     EpisodeManager *episodeMgr;
     RNG rng;
 
+    madrona::Entity *allEntities;
+    madrona::CountT numEntities;
     madrona::Entity agent;
-    madrona::Entity staticEntity;
-    madrona::Entity *dynObjects;
-    madrona::CountT numObjects;
+    madrona::CountT minEpisodeEntities;
+    madrona::CountT maxEpisodeEntities;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

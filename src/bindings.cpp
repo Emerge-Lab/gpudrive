@@ -18,18 +18,30 @@ namespace GPUHideSeek {
 
 NB_MODULE(gpu_hideseek_python, m) {
     nb::class_<Manager> (m, "HideAndSeekSimulator")
-        .def("__init__", [](Manager *self, int64_t gpu_id,
-                            int64_t num_worlds, int64_t render_width,
-                            int64_t render_height, bool debug_compile) {
+        .def("__init__", [](Manager *self,
+                            int64_t gpu_id,
+                            int64_t num_worlds,
+                            int64_t min_entities_per_world,
+                            int64_t max_entities_per_world,
+                            int64_t render_width,
+                            int64_t render_height, 
+                            bool debug_compile) {
             new (self) Manager(Manager::Config {
                 .gpuID = (int)gpu_id,
                 .numWorlds = (uint32_t)num_worlds,
+                .minEntitiesPerWorld = (uint32_t)min_entities_per_world,
+                .maxEntitiesPerWorld = (uint32_t)max_entities_per_world,
                 .renderWidth = (uint32_t)render_width,
                 .renderHeight = (uint32_t)render_height,
                 .debugCompile = debug_compile,
             });
-        }, nb::arg("gpu_id"), nb::arg("num_worlds"), nb::arg("render_width"),
-           nb::arg("render_height"), nb::arg("debug_compile") = true)
+        }, nb::arg("gpu_id"),
+           nb::arg("num_worlds"),
+           nb::arg("min_entities_per_world"),
+           nb::arg("max_entities_per_world"),
+           nb::arg("render_width"),
+           nb::arg("render_height"),
+           nb::arg("debug_compile") = true)
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)
         .def("move_action_tensor", &Manager::moveActionTensor)

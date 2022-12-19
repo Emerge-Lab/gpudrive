@@ -11,6 +11,8 @@ public:
     struct Config {
         int gpuID;
         uint32_t numWorlds;
+        uint32_t minEntitiesPerWorld;
+        uint32_t maxEntitiesPerWorld;
         uint32_t renderWidth;
         uint32_t renderHeight;
         bool debugCompile;

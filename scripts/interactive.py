@@ -45,6 +45,8 @@ def get_keyboard_action():
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         gpu_id = 0,
         num_worlds = 1,
+        min_entities_per_world = 50,
+        max_entities_per_world = 50,
         render_width = 1024,
         render_height = 1024
 )

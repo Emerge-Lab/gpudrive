@@ -108,6 +108,8 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         world_inits[i] = WorldInit {
             episode_mgr,
             phys_obj_mgr,
+            cfg.minEntitiesPerWorld,
+            cfg.maxEntitiesPerWorld,
         };
     }
 
