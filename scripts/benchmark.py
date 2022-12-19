@@ -6,14 +6,14 @@ import time
 
 num_worlds = int(sys.argv[1])
 num_steps = int(sys.argv[2])
-objs_per_world = int(sys.argv[3])
+entities_per_world = int(sys.argv[3])
 reset_chance = float(sys.argv[4])
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         gpu_id = 0,
         num_worlds = num_worlds,
-        min_objs_per_world = objs_per_world,
-        max_objs_per_world = objs_per_world,
+        min_entities_per_world = entities_per_world,
+        max_entities_per_world = entities_per_world,
         render_width = 64,
         render_height = 64,
         debug_compile = False,
