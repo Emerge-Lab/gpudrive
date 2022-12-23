@@ -102,6 +102,7 @@ static void resetWorld(Engine &ctx)
     ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 14 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
+    printf("World reset %d\n", total_entities);
     ctx.data().numEntities = total_entities;
 }
 
@@ -175,8 +176,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
 
+    auto recycle_sys = builder.recycleEntitiesNode({sim_done});
+
     (void)phys_cleanup_sys;
     (void)renderer_sys;
+    (void)recycle_sys;
 
     printf("Setup done\n");
 }
