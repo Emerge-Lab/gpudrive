@@ -158,11 +158,11 @@ inline void actionSystem(Engine &, Action &action,
 
 void Sim::setupTasks(TaskGraph::Builder &builder)
 {
-    auto reset_sys =
-        builder.parallelForNode<Engine, resetSystem, WorldReset>({});
+    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
+        resetSystem, WorldReset>>({});
 
-    auto action_sys = builder.parallelForNode<Engine, actionSystem,
-        Action, Position, Rotation>({reset_sys});
+    auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
+        Action, Position, Rotation>>({reset_sys});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
                                                              {action_sys}, 4);
