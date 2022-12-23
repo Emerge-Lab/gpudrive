@@ -176,7 +176,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
 
-    auto recycle_sys = builder.recycleEntitiesNode({sim_done});
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
 
     (void)phys_cleanup_sys;
     (void)renderer_sys;
