@@ -35,40 +35,64 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     DynArray<AABB> aabbs(0);
     DynArray<CollisionPrimitive> prims(0);
 
-    // Sphere: 
-    metadatas.push_back({
-        .invInertiaTensor = { 1.f, 1.f, 1.f },
-    });
+    { // Sphere:
+        metadatas.push_back({
+            .invInertiaTensor = { 1.f, 1.f, 1.f },
+        });
 
-    aabbs.push_back({
-        .pMin = { -1, -1, -1 },
-        .pMax = { 1, 1, 1 },
-    });
+        aabbs.push_back({
+            .pMin = { -1, -1, -1 },
+            .pMax = { 1, 1, 1 },
+        });
 
-    prims.push_back({
-        .type = CollisionPrimitive::Type::Sphere,
-        .sphere = {
-            .radius = 1.f,
-        },
-    });
+        prims.push_back({
+            .type = CollisionPrimitive::Type::Sphere,
+            .sphere = {
+                .radius = 1.f,
+            },
+        });
+    }
 
-    // Plane:
-    metadatas.push_back({
-        .invInertiaTensor = { 1.f, 1.f, 1.f },
-    });
+    { // Plane:
+        metadatas.push_back({
+            .invInertiaTensor = { 1.f, 1.f, 1.f },
+        });
 
-    aabbs.push_back({
-        .pMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX },
-        .pMax = { FLT_MAX, FLT_MAX, FLT_MAX },
-    });
+        aabbs.push_back({
+            .pMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX },
+            .pMax = { FLT_MAX, FLT_MAX, FLT_MAX },
+        });
 
-    prims.push_back({
-        .type = CollisionPrimitive::Type::Plane,
-        .plane = {},
-    });
+        prims.push_back({
+            .type = CollisionPrimitive::Type::Plane,
+            .plane = {},
+        });
+    }
+
+    { // Cube:
+        metadatas.push_back({
+            .invInertiaTensor = { 1.f, 1.f, 1.f },
+        });
+
+        aabbs.push_back({
+            .pMin = { -1, -1, -1 },
+            .pMax = { 1, 1, 1 },
+        });
+
+        geometry::HalfEdgeMesh halfEdgeMesh;
+        halfEdgeMesh.constructCube();
+
+        prims.push_back({
+            .type = CollisionPrimitive::Type::Hull,
+            .hull = {
+                .halfEdgeMesh = halfEdgeMesh
+            },
+        });
+    }
 
     loader.loadObjects(metadatas.data(), aabbs.data(),
                        prims.data(), metadatas.size());
+
 }
 
 Manager::Impl * Manager::Impl::init(const Config &cfg)
