@@ -162,8 +162,22 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
 
+    auto sort_agent_sys = builder.addToGraph<SortArchetypeNode<Agent, WorldID>>({reset_sys});
+    auto post_sort_agent_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_agent_sys});
+
+    auto sort_dyn_sys = builder.addToGraph<SortArchetypeNode<DynamicObject, WorldID>>(
+        {post_sort_agent_reset_tmp});
+    auto post_sort_dyn_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_dyn_sys});
+
+    auto sort_static_sys = builder.addToGraph<SortArchetypeNode<StaticObject, WorldID>>(
+        {post_sort_dyn_reset_tmp});
+    auto post_sort_static_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_static_sys});
+
     auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
-        Action, Position, Rotation>>({reset_sys});
+        Action, Position, Rotation>>({post_sort_static_reset_tmp});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
                                                              {action_sys}, 4);
