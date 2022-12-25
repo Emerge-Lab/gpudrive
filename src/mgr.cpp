@@ -116,6 +116,15 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
     imported_renderer_objs.emplace_back(std::move(*plane_obj));
 
+    auto cube_obj = imp::ImportedObject::importObject(
+        (std::filesystem::path(DATA_DIR) / "cube.obj").c_str());
+
+    if (!cube_obj.has_value()) {
+        FATAL("Failed to load cube");
+    }
+
+    imported_renderer_objs.emplace_back(std::move(*cube_obj));
+
     PhysicsLoader phys_loader(PhysicsLoader::StorageType::CUDA, 10);
     loadPhysicsObjects(phys_loader);
 
