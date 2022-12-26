@@ -60,6 +60,7 @@ print(rgb_observations.shape, rgb_observations.dtype)
 
 while True:
     sim.step()
+    torchvision.utils.save_image((rgb_observations[0].float() / 255).permute(2, 0, 1), sys.argv[1])
 
     action = get_keyboard_action()
     
