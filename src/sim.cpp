@@ -67,13 +67,14 @@ static void resetWorld(Engine &ctx)
         ctx.getUnsafe<Position>(e) = pos;
         ctx.getUnsafe<Rotation>(e) = rot;
         ctx.getUnsafe<Scale>(e) = math::Vector3 {1, 1, 1};
-        ctx.getUnsafe<ObjectID>(e).idx = 0;
+        ctx.getUnsafe<ObjectID>(e).idx = 2;
 
         all_entities[i] = e;
     }
 
     CountT total_entities = num_dyn_entities;
 
+#if 0
     auto makePlane = [&](Vector3 offset, Quat rot) {
         Entity plane = ctx.makeEntityNow<StaticObject>();
         ctx.getUnsafe<Position>(plane) = offset;
@@ -94,6 +95,7 @@ static void resetWorld(Engine &ctx)
     makePlane({20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
     makePlane({0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
     makePlane({0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
+#endif
 
     const math::Quat agent_rot =
         math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
