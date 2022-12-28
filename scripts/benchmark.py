@@ -54,3 +54,5 @@ end = time.time()
 
 duration = end - start
 print(num_worlds * num_steps / duration, duration)
+
+del sim

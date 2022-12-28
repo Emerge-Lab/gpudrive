@@ -71,3 +71,5 @@ while True:
         break
     else:
         actions[0][0] = action
+
+del sim

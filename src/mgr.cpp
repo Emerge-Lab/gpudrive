@@ -31,7 +31,7 @@ struct Manager::Impl {
     static inline Impl * init(const Config &cfg);
 };
 
-struct Manager::CPUImpl {
+struct Manager::CPUImpl : Manager::Impl {
 };
 
 #ifdef MADRONA_CUDA_SUPPORT
@@ -212,14 +212,23 @@ MADRONA_EXPORT Manager::Manager(const Config &cfg)
     : impl_(Impl::init(cfg))
 {}
 
-MADRONA_EXPORT Manager::~Manager() {}
+MADRONA_EXPORT Manager::~Manager() {
+    switch (impl_->cfg.execMode) {
+    case ExecMode::CUDA: {
+        delete static_cast<CUDAImpl *>(impl_);
+    } break;
+    case ExecMode::CPU : {
+        delete static_cast<CPUImpl *>(impl_);
+    } break;
+    }
+}
 
 MADRONA_EXPORT void Manager::step()
 {
     switch (impl_->cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
-        static_cast<CUDAImpl *>(impl_.get())->mwGPU.run();
+        static_cast<CUDAImpl *>(impl_)->mwGPU.run();
 #endif
     } break;
     case ExecMode::CPU: {
@@ -246,7 +255,7 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_.get())->mwGPU.
+        dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             depthObservations();
         gpu_id = impl_->cfg.gpuID;
 #endif
@@ -266,7 +275,7 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_.get())->mwGPU.
+        dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             rgbObservations();
         gpu_id = impl_->cfg.gpuID;
 #endif
@@ -288,7 +297,7 @@ Tensor Manager::exportStateTensor(int64_t slot,
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr =
-            static_cast<CUDAImpl *>(impl_.get())->mwGPU.getExported(slot);
+            static_cast<CUDAImpl *>(impl_)->mwGPU.getExported(slot);
         gpu_id = impl_->cfg.gpuID;
 #endif
     } else {

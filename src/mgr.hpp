@@ -43,7 +43,7 @@ private:
         madrona::py::Tensor::ElementType type,
         madrona::Span<const int64_t> dimensions) const;
 
-    std::unique_ptr<Impl> impl_;
+    Impl *impl_;
 };
 
 }
