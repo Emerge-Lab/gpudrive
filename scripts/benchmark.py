@@ -10,6 +10,7 @@ entities_per_world = int(sys.argv[3])
 reset_chance = float(sys.argv[4])
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
+        exec_mode = gpu_hideseek_python.ExecMode.CUDA,
         gpu_id = 0,
         num_worlds = num_worlds,
         min_entities_per_world = entities_per_world,
