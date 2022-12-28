@@ -2,18 +2,16 @@
 #include <madrona/mw_gpu_entry.hpp>
 
 using namespace madrona;
-using namespace madrona::phys;
 using namespace madrona::math;
 
 namespace GPUHideSeek {
 
-constexpr inline CountT max_instances = 45;
 constexpr inline float deltaT = 1.f / 30.f;
 
 void Sim::registerTypes(ECSRegistry &registry)
 {
     base::registerTypes(registry);
-    RigidBodyPhysicsSystem::registerTypes(registry);
+    phys::RigidBodyPhysicsSystem::registerTypes(registry);
     render::RenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
@@ -21,6 +19,7 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerSingleton<WorldReset>();
 
     registry.registerArchetype<DynamicObject>();
+    registry.registerArchetype<StaticObject>();
     registry.registerArchetype<Agent>();
 
     registry.exportSingleton<WorldReset>(0);
@@ -29,31 +28,33 @@ void Sim::registerTypes(ECSRegistry &registry)
 
 static void resetWorld(Engine &ctx)
 {
-    RigidBodyPhysicsSystem::reset(ctx);
+    phys::RigidBodyPhysicsSystem::reset(ctx);
+
+    Entity *all_entities = ctx.data().allEntities;
+    for (CountT i = 0; i < ctx.data().numEntities; i++) {
+        Entity e = all_entities[i];
+        ctx.destroyEntityNow(e);
+    }
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
         episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
     ctx.data().rng = RNG::make(episode_idx);
 
-    auto reinit_entity = [&](Entity e,
-                             Position pos,
-                             Rotation rot,
-                             Optional<Scale> scale) {
-        ctx.getUnsafe<Position>(e) = pos;
-        ctx.getUnsafe<Rotation>(e) = rot;
+    CountT num_entities_range =
+        ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
 
-        if (scale.has_value()) {
-            ctx.getUnsafe<Scale>(e) = *scale;
-        }
-    };
+    CountT num_dyn_entities =
+        CountT(ctx.data().rng.rand() * num_entities_range) +
+        ctx.data().minEpisodeEntities;
 
     const math::Vector2 bounds { -10.f, 10.f };
     float bounds_diff = bounds.y - bounds.x;
 
-    Entity *dyn_entities = ctx.data().dynObjects;
-    for (CountT i = 0; i < max_instances; i++) {
-        Entity dyn_entity = dyn_entities[i];
+    for (CountT i = 0; i < num_dyn_entities; i++) {
+        Entity e = ctx.makeEntityNow<DynamicObject>();
+        ctx.getUnsafe<phys::broadphase::LeafID>(e) =
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, e);
 
         math::Vector3 pos {
             bounds.x + ctx.data().rng.rand() * bounds_diff,
@@ -63,18 +64,48 @@ static void resetWorld(Engine &ctx)
 
         const auto rot = math::Quat::angleAxis(0, {0, 0, 1});
 
-        reinit_entity(dyn_entity, pos, rot, Scale(math::Vector3 {1, 1, 1}));
+        ctx.getUnsafe<Position>(e) = pos;
+        ctx.getUnsafe<Rotation>(e) = rot;
+        ctx.getUnsafe<Scale>(e) = math::Vector3 {1, 1, 1};
+        ctx.getUnsafe<ObjectID>(e).idx = 2;
 
-        ctx.getUnsafe<ObjectID>(dyn_entity).idx = 0;
+        all_entities[i] = e;
     }
 
-    Entity agent_entity = ctx.data().agent;
+    CountT total_entities = num_dyn_entities;
+
+#if 0
+    auto makePlane = [&](Vector3 offset, Quat rot) {
+        Entity plane = ctx.makeEntityNow<StaticObject>();
+        ctx.getUnsafe<Position>(plane) = offset;
+        ctx.getUnsafe<Rotation>(plane) = rot;
+        ctx.getUnsafe<Scale>(plane) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<ObjectID>(plane) = ObjectID { 1 };
+        ctx.getUnsafe<phys::broadphase::LeafID>(plane) =
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, plane);
+
+        all_entities[total_entities++] = plane;
+
+        return plane;
+    };
+
+    makePlane({0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    makePlane({0, 0, 40}, Quat::angleAxis(math::pi, {1, 0, 0}));
+    makePlane({-20, 0, 0}, Quat::angleAxis(math::pi_d2, {0, 1, 0}));
+    makePlane({20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
+    makePlane({0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
+    makePlane({0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
+#endif
 
     const math::Quat agent_rot =
         math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
 
-    reinit_entity(agent_entity, math::Vector3 { 0, 0, 14 },
-                  agent_rot, Optional<Scale>::none());
+    Entity agent = ctx.data().agent;
+    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 14 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+
+    printf("World reset %d\n", total_entities);
+    ctx.data().numEntities = total_entities;
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
@@ -126,32 +157,46 @@ inline void actionSystem(Engine &, Action &action,
 
     // "Consume" the action
     action.action = 0;
-
-    printf("(%f %f %f) (%f %f %f %f)\n",
-           pos.x, pos.y, pos.z,
-           rot.w, rot.x, rot.y, rot.z);
 }
 
 void Sim::setupTasks(TaskGraph::Builder &builder)
 {
-    auto reset_sys =
-        builder.parallelForNode<Engine, resetSystem, WorldReset>({});
+    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
+        resetSystem, WorldReset>>({});
 
-    auto action_sys = builder.parallelForNode<Engine, actionSystem,
-        Action, Position, Rotation>({reset_sys});
+    auto sort_agent_sys = builder.addToGraph<SortArchetypeNode<Agent, WorldID>>({reset_sys});
+    auto post_sort_agent_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_agent_sys});
 
-    auto phys_sys = RigidBodyPhysicsSystem::setupTasks(builder, {action_sys}, 4);
+    auto sort_dyn_sys = builder.addToGraph<SortArchetypeNode<DynamicObject, WorldID>>(
+        {post_sort_agent_reset_tmp});
+    auto post_sort_dyn_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_dyn_sys});
+
+    auto sort_static_sys = builder.addToGraph<SortArchetypeNode<StaticObject, WorldID>>(
+        {post_sort_dyn_reset_tmp});
+    auto post_sort_static_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_static_sys});
+
+    auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
+        Action, Position, Rotation>>({post_sort_static_reset_tmp});
+
+    auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
+                                                             {action_sys}, 4);
 
     auto sim_done = phys_sys;
 
-    auto phys_cleanup_sys = RigidBodyPhysicsSystem::setupCleanupTasks(builder,
-        {sim_done});
+    auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+        builder, {sim_done});
 
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
 
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
+
     (void)phys_cleanup_sys;
     (void)renderer_sys;
+    (void)recycle_sys;
 
     printf("Setup done\n");
 }
@@ -161,23 +206,23 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    RigidBodyPhysicsSystem::init(ctx, deltaT, 4, max_instances + 1, 100 * 50);
+    CountT max_total_entities = init.maxEntitiesPerWorld + 10;
+
+    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT, 4,
+                                       max_total_entities, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 
-    broadphase::BVH &bp_bvh = ctx.getSingleton<broadphase::BVH>();
-    
+    allEntities =
+        (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));
+
+    numEntities = 0;
+    minEpisodeEntities = init.minEntitiesPerWorld;
+    maxEpisodeEntities = init.maxEntitiesPerWorld;
+
     agent = ctx.makeEntityNow<Agent>();
     ctx.getUnsafe<render::ActiveView>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, math::up * 0.5f);
-
-    dynObjects = (Entity *)rawAlloc(sizeof(Entity) * size_t(max_instances));
-
-    for (CountT i = 0; i < max_instances; i++) {
-        dynObjects[i] = ctx.makeEntityNow<DynamicObject>();
-        ctx.getUnsafe<broadphase::LeafID>(dynObjects[i]) =
-            bp_bvh.reserveLeaf();
-    }
 
     resetWorld(ctx);
     ctx.getSingleton<WorldReset>().resetNow = false;

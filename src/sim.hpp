@@ -35,6 +35,15 @@ struct DynamicObject : public madrona::Archetype<
     madrona::phys::solver::InstanceState
 > {};
 
+struct StaticObject : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID,
+    madrona::phys::CollisionAABB,
+    madrona::phys::broadphase::LeafID
+> {};
+
 struct Action {
     int32_t action;
 };
@@ -58,10 +67,11 @@ struct Sim : public madrona::WorldBase {
     EpisodeManager *episodeMgr;
     RNG rng;
 
+    madrona::Entity *allEntities;
+    madrona::CountT numEntities;
     madrona::Entity agent;
-    madrona::Entity staticEntity;
-    madrona::Entity *dynObjects;
-    madrona::CountT numObjects;
+    madrona::CountT minEpisodeEntities;
+    madrona::CountT maxEpisodeEntities;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {
