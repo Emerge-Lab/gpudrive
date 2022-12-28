@@ -104,7 +104,6 @@ static void resetWorld(Engine &ctx)
     ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 14 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
-    printf("World reset %d\n", total_entities);
     ctx.data().numEntities = total_entities;
 }
 
@@ -117,6 +116,28 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 
     resetWorld(ctx);
 }
+
+#if 0
+inline void sortDebugSystem(Engine &ctx, WorldReset &)
+{
+    if (ctx.worldID().idx != 0) {
+        return;
+    }
+
+    auto state_mgr = mwGPU::getStateManager();
+
+    int32_t num_rows = state_mgr->numArchetypeRows(
+        TypeTracker::typeID<DynamicObject>());
+
+    auto col = (WorldID *)state_mgr->getArchetypeComponent(
+        TypeTracker::typeID<DynamicObject>(),
+        TypeTracker::typeID<WorldID>());
+
+    for (int i = 0; i < num_rows; i++) {
+        printf("%d\n", col[i].idx);
+    }
+}
+#endif
 
 inline void actionSystem(Engine &, Action &action,
                          Position &pos, Rotation &rot)
@@ -178,8 +199,15 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto post_sort_static_reset_tmp =
         builder.addToGraph<ResetTmpAllocNode>({sort_static_sys});
 
+    auto prep_finish = post_sort_static_reset_tmp;
+
+#if 0
+    prep_finish = builder.addToGraph<ParallelForNode<Engine,
+        sortDebugSystem, WorldReset>>({prep_finish});
+#endif
+
     auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
-        Action, Position, Rotation>>({post_sort_static_reset_tmp});
+        Action, Position, Rotation>>({prep_finish});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
                                                              {action_sys}, 4);
