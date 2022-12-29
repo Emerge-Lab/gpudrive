@@ -74,9 +74,9 @@ static void resetWorld(Engine &ctx)
 
     CountT total_entities = num_dyn_entities;
 
-#if 0
+#if 1
     auto makePlane = [&](Vector3 offset, Quat rot) {
-        Entity plane = ctx.makeEntityNow<StaticObject>();
+        Entity plane = ctx.makeEntityNow<DynamicObject>();
         ctx.getUnsafe<Position>(plane) = offset;
         ctx.getUnsafe<Rotation>(plane) = rot;
         ctx.getUnsafe<Scale>(plane) = Vector3 { 1, 1, 1 };
@@ -101,7 +101,7 @@ static void resetWorld(Engine &ctx)
         math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
 
     Entity agent = ctx.data().agent;
-    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 14 };
+    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 35 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
     ctx.data().numEntities = total_entities;
