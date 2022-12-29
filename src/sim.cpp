@@ -68,6 +68,10 @@ static void resetWorld(Engine &ctx)
         ctx.getUnsafe<Rotation>(e) = rot;
         ctx.getUnsafe<Scale>(e) = math::Vector3 {1, 1, 1};
         ctx.getUnsafe<ObjectID>(e).idx = 2;
+        ctx.getUnsafe<Velocity>(e) = {
+            Vector3 { 0, 0, 0 },
+            Vector3 { 0, 0, 0 },
+        };
 
         all_entities[i] = e;
     }
@@ -149,7 +153,7 @@ inline void actionSystem(Engine &, Action &action,
         // Do nothing
     } break;
     case 1: {
-        Vector3 fwd = rot.rotateDir(math::fwd);
+        Vector3 fwd = rot.rotateVec(math::fwd);
         pos += fwd;
     } break;
     case 2: {
@@ -161,15 +165,15 @@ inline void actionSystem(Engine &, Action &action,
         rot = (rot * right_rot).normalize();
     } break;
     case 4: {
-        Vector3 fwd = rot.rotateDir(math::fwd);
+        Vector3 fwd = rot.rotateVec(math::fwd);
         pos -= fwd;
     } break;
     case 5: {
-        Vector3 up = rot.rotateDir(math::up);
+        Vector3 up = rot.rotateVec(math::up);
         pos += up;
     } break;
     case 6: {
-        Vector3 up = rot.rotateDir(math::up);
+        Vector3 up = rot.rotateVec(math::up);
         pos -= up;
     } break;
     default:
