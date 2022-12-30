@@ -78,7 +78,7 @@ static void resetWorld(Engine &ctx)
 
     CountT total_entities = num_dyn_entities;
 
-#if 1
+#if 0
     auto makePlane = [&](Vector3 offset, Quat rot) {
         Entity plane = ctx.makeEntityNow<DynamicObject>();
         ctx.getUnsafe<Position>(plane) = offset;
@@ -87,6 +87,10 @@ static void resetWorld(Engine &ctx)
         ctx.getUnsafe<ObjectID>(plane) = ObjectID { 1 };
         ctx.getUnsafe<phys::broadphase::LeafID>(plane) =
             phys::RigidBodyPhysicsSystem::registerEntity(ctx, plane);
+        ctx.getUnsafe<Velocity>(plane) = {
+            Vector3 { 0, 0, 0 },
+            Vector3 { 0, 0, 0 },
+        };
 
         all_entities[total_entities++] = plane;
 
