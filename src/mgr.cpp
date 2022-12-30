@@ -49,6 +49,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     { // Sphere:
         metadatas.push_back({
             .invInertiaTensor = { 1.f, 1.f, 1.f },
+            .invMass = 1.f,
+            .muS = 0.5f,
+            .muD = 0.3f,
         });
 
         aabbs.push_back({
@@ -66,7 +69,10 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     { // Plane:
         metadatas.push_back({
-            .invInertiaTensor = { 1.f, 1.f, 1.f },
+            .invInertiaTensor = { 0.f, 0.f, 0.f },
+            .invMass = 0.f,
+            .muS = 0.5f,
+            .muD = 0.3f,
         });
 
         aabbs.push_back({
@@ -83,6 +89,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     { // Cube:
         metadatas.push_back({
             .invInertiaTensor = { 1.f, 1.f, 1.f },
+            .invMass = 1.f,
+            .muS = 0.5f,
+            .muD = 0.3f,
         });
 
         aabbs.push_back({
