@@ -26,7 +26,103 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.exportColumn<Agent, Action>(1);
 }
 
-static void resetWorld(Engine &ctx)
+static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
+                            int32_t obj_id)
+{
+    Entity e = ctx.makeEntityNow<DynamicObject>();
+    ctx.getUnsafe<Position>(e) = pos;
+    ctx.getUnsafe<Rotation>(e) = rot;
+    ctx.getUnsafe<Scale>(e) = Vector3 { 1, 1, 1 };
+    ctx.getUnsafe<ObjectID>(e) = ObjectID { obj_id };
+    ctx.getUnsafe<phys::broadphase::LeafID>(e) =
+        phys::RigidBodyPhysicsSystem::registerEntity(ctx, e);
+    ctx.getUnsafe<Velocity>(e) = {
+        Vector3 { 0, 0, 0 },
+        Vector3 { 0, 0, 0 },
+    };
+
+    return e;
+}
+
+static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
+    return makeDynObject(ctx, offset, rot, 1);
+}
+
+static void level1(Engine &ctx)
+{
+    Entity *all_entities = ctx.data().allEntities;
+    CountT num_entities_range =
+        ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
+
+    CountT num_dyn_entities =
+        CountT(ctx.data().rng.rand() * num_entities_range) +
+        ctx.data().minEpisodeEntities;
+
+    const math::Vector2 bounds { -10.f, 10.f };
+    float bounds_diff = bounds.y - bounds.x;
+
+    for (CountT i = 0; i < num_dyn_entities; i++) {
+        math::Vector3 pos {
+            bounds.x + ctx.data().rng.rand() * bounds_diff,
+            bounds.x + ctx.data().rng.rand() * bounds_diff,
+            1.f,
+        };
+
+        const auto rot = math::Quat::angleAxis(0, {0, 0, 1});
+
+        all_entities[i] = makeDynObject(ctx, pos, rot, 2);
+    }
+
+    CountT total_entities = num_dyn_entities;
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 40}, Quat::angleAxis(math::pi, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(math::pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
+
+    const math::Quat agent_rot =
+        math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
+
+    Entity agent = ctx.data().agent;
+    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 35 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+
+    ctx.data().numEntities = total_entities;
+}
+
+static void level2(Engine &ctx)
+{
+    Entity *all_entities = ctx.data().allEntities;
+
+    CountT total_entities = 0;
+
+    Entity test_cube = makeDynObject(ctx, { 0, 0, 5 },
+        (Quat::angleAxis(helpers::toRadians(45), {1, 0, 0}) *
+         Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize(), 2);
+    all_entities[total_entities++] = test_cube;
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+
+    const math::Quat agent_rot =
+        math::Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+
+    Entity agent = ctx.data().agent;
+    ctx.getUnsafe<Position>(agent) = math::Vector3 { -5, -5, 0 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+
+    ctx.data().numEntities = total_entities;
+}
+
+static void resetWorld(Engine &ctx, int32_t level)
 {
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
@@ -41,86 +137,25 @@ static void resetWorld(Engine &ctx)
         episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
     ctx.data().rng = RNG::make(episode_idx);
 
-    CountT num_entities_range =
-        ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
-
-    CountT num_dyn_entities =
-        CountT(ctx.data().rng.rand() * num_entities_range) +
-        ctx.data().minEpisodeEntities;
-
-    const math::Vector2 bounds { -10.f, 10.f };
-    float bounds_diff = bounds.y - bounds.x;
-
-    for (CountT i = 0; i < num_dyn_entities; i++) {
-        Entity e = ctx.makeEntityNow<DynamicObject>();
-        ctx.getUnsafe<phys::broadphase::LeafID>(e) =
-            phys::RigidBodyPhysicsSystem::registerEntity(ctx, e);
-
-        math::Vector3 pos {
-            bounds.x + ctx.data().rng.rand() * bounds_diff,
-            bounds.x + ctx.data().rng.rand() * bounds_diff,
-            1.f,
-        };
-
-        const auto rot = math::Quat::angleAxis(0, {0, 0, 1});
-
-        ctx.getUnsafe<Position>(e) = pos;
-        ctx.getUnsafe<Rotation>(e) = rot;
-        ctx.getUnsafe<Scale>(e) = math::Vector3 {1, 1, 1};
-        ctx.getUnsafe<ObjectID>(e).idx = 2;
-        ctx.getUnsafe<Velocity>(e) = {
-            Vector3 { 0, 0, 0 },
-            Vector3 { 0, 0, 0 },
-        };
-
-        all_entities[i] = e;
+    switch (level) {
+    case 1: {
+        level1(ctx);
+    } break;
+    case 2: {
+        level2(ctx);
+    } break;
     }
-
-    CountT total_entities = num_dyn_entities;
-
-    auto makePlane = [&](Vector3 offset, Quat rot) {
-        Entity plane = ctx.makeEntityNow<DynamicObject>();
-        ctx.getUnsafe<Position>(plane) = offset;
-        ctx.getUnsafe<Rotation>(plane) = rot;
-        ctx.getUnsafe<Scale>(plane) = Vector3 { 1, 1, 1 };
-        ctx.getUnsafe<ObjectID>(plane) = ObjectID { 1 };
-        ctx.getUnsafe<phys::broadphase::LeafID>(plane) =
-            phys::RigidBodyPhysicsSystem::registerEntity(ctx, plane);
-        ctx.getUnsafe<Velocity>(plane) = {
-            Vector3 { 0, 0, 0 },
-            Vector3 { 0, 0, 0 },
-        };
-
-        all_entities[total_entities++] = plane;
-
-        return plane;
-    };
-
-    makePlane({0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
-    makePlane({0, 0, 40}, Quat::angleAxis(math::pi, {1, 0, 0}));
-    makePlane({-20, 0, 0}, Quat::angleAxis(math::pi_d2, {0, 1, 0}));
-    makePlane({20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
-    makePlane({0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
-    makePlane({0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
-
-    const math::Quat agent_rot =
-        math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
-
-    Entity agent = ctx.data().agent;
-    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 35 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
-
-    ctx.data().numEntities = total_entities;
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    if (!reset.resetNow) {
+    int32_t level = reset.resetLevel;
+    if (level == 0) {
         return;
     }
-    reset.resetNow = false;
+    reset.resetLevel = 0;
 
-    resetWorld(ctx);
+    resetWorld(ctx, level);
 }
 
 #if 0
@@ -243,7 +278,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     CountT max_total_entities = init.maxEntitiesPerWorld + 10;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT, 4,
-                                       max_total_entities, 100 * 50);
+        -9.8 * math::up, max_total_entities, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 
@@ -258,8 +293,8 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     ctx.getUnsafe<render::ActiveView>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, math::up * 0.5f);
 
-    resetWorld(ctx);
-    ctx.getSingleton<WorldReset>().resetNow = false;
+    resetWorld(ctx, 1);
+    ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, WorldInit);

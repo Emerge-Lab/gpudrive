@@ -21,7 +21,7 @@ using madrona::phys::Velocity;
 class Engine;
 
 struct WorldReset {
-    int32_t resetNow;
+    int32_t resetLevel;
 };
 
 struct DynamicObject : public madrona::Archetype<
