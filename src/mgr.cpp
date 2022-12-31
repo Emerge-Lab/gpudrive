@@ -4,6 +4,7 @@
 #include <madrona/utils.hpp>
 #include <madrona/importer.hpp>
 #include <madrona/physics_assets.hpp>
+#include <madrona/tracing.hpp>
 
 #include <charconv>
 #include <iostream>
@@ -200,6 +201,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
 Manager::Impl * Manager::Impl::init(const Config &cfg)
 {
+    HostEventLogging(initStart);
     DynArray<imp::ImportedObject> imported_renderer_objs(0);
 
     {
@@ -335,6 +337,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
         mwgpu_exec.loadObjects(renderer_objects);
 
+        HostEventLogging(initEnd);
         return new CUDAImpl {
             { 
                 cfg,
@@ -348,6 +351,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 #endif
     } break;
     case ExecMode::CPU: {
+        HostEventLogging(initEnd);
         return nullptr;
     } break;
     default: __builtin_unreachable();
@@ -367,6 +371,9 @@ MADRONA_EXPORT Manager::~Manager() {
         delete static_cast<CPUImpl *>(impl_);
     } break;
     }
+#ifdef MADRONA_TRACING
+    FinalizeLogging("/tmp/");
+#endif
 }
 
 MADRONA_EXPORT void Manager::step()
