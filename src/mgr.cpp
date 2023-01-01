@@ -88,7 +88,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     { // Cube:
         metadatas.push_back({
-            .invInertiaTensor = { 1.f, 1.f, 1.f },
+            .invInertiaTensor = { 1.5f, 1.5f, 1.5f },
             .invMass = 1.f,
             .muS = 0.5f,
             .muD = 0.3f,

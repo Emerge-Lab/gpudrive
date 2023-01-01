@@ -98,15 +98,13 @@ static void level1(Engine &ctx)
     ctx.data().numEntities = total_entities;
 }
 
-static void level2(Engine &ctx)
+static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 {
     Entity *all_entities = ctx.data().allEntities;
 
     CountT total_entities = 0;
 
-    Entity test_cube = makeDynObject(ctx, { 0, 0, 5 },
-        (Quat::angleAxis(helpers::toRadians(45), {1, 0, 0}) *
-         Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize(), 2);
+    Entity test_cube = makeDynObject(ctx, pos, rot, 2);
     all_entities[total_entities++] = test_cube;
 
     all_entities[total_entities++] =
@@ -120,6 +118,26 @@ static void level2(Engine &ctx)
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
     ctx.data().numEntities = total_entities;
+}
+
+static void level2(Engine &ctx)
+{
+    Quat cube_rotation = (Quat::angleAxis(atanf(1.f/sqrtf(2.f)), {0, 1, 0}) *
+        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize();
+    singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
+}
+
+static void level3(Engine &ctx)
+{
+    singleCubeLevel(ctx, { 0, 0, 5 }, Quat::angleAxis(0, {0, 0, 1}));
+}
+
+static void level4(Engine &ctx)
+{
+    Quat cube_rotation = (
+        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0}) *
+        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize();
+    singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
 }
 
 static void resetWorld(Engine &ctx, int32_t level)
@@ -143,6 +161,12 @@ static void resetWorld(Engine &ctx, int32_t level)
     } break;
     case 2: {
         level2(ctx);
+    } break;
+    case 3: {
+        level3(ctx);
+    } break;
+    case 4: {
+        level4(ctx);
     } break;
     }
 }

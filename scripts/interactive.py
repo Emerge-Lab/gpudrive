@@ -48,6 +48,10 @@ def get_keyboard_action():
             result.reset = 1
         elif key_action == '2':
             result.reset = 2
+        elif key_action == '3':
+            result.reset = 3
+        elif key_action == '4':
+            result.reset = 4
         else:
             continue
 
@@ -57,8 +61,8 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = gpu_hideseek_python.ExecMode.CUDA,
         gpu_id = 0,
         num_worlds = 1,
-        min_entities_per_world = 10,
-        max_entities_per_world = 10,
+        min_entities_per_world = 50,
+        max_entities_per_world = 50,
         render_width = 1024,
         render_height = 1024,
         #debug_compile = False
