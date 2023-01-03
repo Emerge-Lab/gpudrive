@@ -7,6 +7,7 @@ using namespace madrona::math;
 namespace GPUHideSeek {
 
 constexpr inline float deltaT = 1.f / 30.f;
+constexpr inline float numPhysicsSubsteps = 4;
 
 void Sim::registerTypes(ECSRegistry &registry)
 {
@@ -123,7 +124,7 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 static void level2(Engine &ctx)
 {
     Quat cube_rotation = (Quat::angleAxis(atanf(1.f/sqrtf(2.f)), {0, 1, 0}) *
-        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize();
+        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize().normalize();
     singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
 }
 
@@ -135,8 +136,8 @@ static void level3(Engine &ctx)
 static void level4(Engine &ctx)
 {
     Quat cube_rotation = (
-        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0}) *
-        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize();
+        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0}) *
+        Quat::angleAxis(helpers::toRadians(40), {1, 0, 0})).normalize();
     singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
 }
 
@@ -275,7 +276,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
         Action, Position, Rotation>>({prep_finish});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
-                                                             {action_sys}, 4);
+        {action_sys}, numPhysicsSubsteps);
 
     auto sim_done = phys_sys;
 
@@ -301,8 +302,8 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
 {
     CountT max_total_entities = init.maxEntitiesPerWorld + 10;
 
-    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT, 4,
-        -9.8 * math::up, max_total_entities, 100 * 50);
+    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
+         numPhysicsSubsteps, -9.8 * math::up, max_total_entities, 100 * 50);
 
     render::RenderingSystem::init(ctx);
 

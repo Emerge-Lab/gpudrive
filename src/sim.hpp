@@ -33,8 +33,8 @@ struct DynamicObject : public madrona::Archetype<
     madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::SubstepStartState,
-    madrona::phys::solver::SubstepVelocityState
+    madrona::phys::solver::PreSolvePositional,
+    madrona::phys::solver::PreSolveVelocity
 > {};
 
 struct StaticObject : public madrona::Archetype<
