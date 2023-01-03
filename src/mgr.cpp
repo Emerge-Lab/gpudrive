@@ -201,7 +201,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
 Manager::Impl * Manager::Impl::init(const Config &cfg)
 {
-    HostEventLogging(initStart);
+    HostEventLogging(HostEvent::initStart);
     DynArray<imp::ImportedObject> imported_renderer_objs(0);
 
     {
@@ -337,7 +337,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
         mwgpu_exec.loadObjects(renderer_objects);
 
-        HostEventLogging(initEnd);
+        HostEventLogging(HostEvent::initEnd);
         return new CUDAImpl {
             { 
                 cfg,
@@ -351,7 +351,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 #endif
     } break;
     case ExecMode::CPU: {
-        HostEventLogging(initEnd);
+        HostEventLogging(HostEvent::initEnd);
         return nullptr;
     } break;
     default: __builtin_unreachable();
