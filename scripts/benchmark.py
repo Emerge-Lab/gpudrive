@@ -33,6 +33,8 @@ reset_no = torch.zeros_like(resets, dtype=torch.int32)
 reset_yes = torch.ones_like(resets, dtype=torch.int32)
 reset_rand = torch.zeros_like(resets, dtype=torch.float32)
 
+sim.step()
+
 for i in range(num_steps):
     sim.step()
 
