@@ -196,7 +196,6 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     loader.loadObjects(metadatas.data(), aabbs.data(),
                        prims.data(), metadatas.size());
-
 }
 
 Manager::Impl * Manager::Impl::init(const Config &cfg)

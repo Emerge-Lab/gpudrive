@@ -12,6 +12,8 @@
 
 namespace GPUHideSeek {
 
+using madrona::Entity;
+using madrona::CountT;
 using madrona::base::Position;
 using madrona::base::Rotation;
 using madrona::base::Scale;
@@ -64,7 +66,8 @@ struct AgentInterface : public madrona::Archetype<
 struct CameraAgent : public madrona::Archetype<
     Position,
     Rotation,
-    madrona::render::ActiveView
+    madrona::render::ViewSettings,
+    madrona::render::ViewID
 > {};
 
 struct DynAgent : public madrona::Archetype<
@@ -72,13 +75,14 @@ struct DynAgent : public madrona::Archetype<
     Rotation,
     Scale,
     ObjectID,
-    madrona::render::ActiveView,
     Velocity,
     madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity
+    madrona::phys::solver::PreSolveVelocity,
+    madrona::render::ViewSettings,
+    madrona::render::ViewID
 > {};
 
 struct Sim : public madrona::WorldBase {
@@ -91,11 +95,12 @@ struct Sim : public madrona::WorldBase {
     EpisodeManager *episodeMgr;
     RNG rng;
 
-    madrona::Entity *allEntities;
-    madrona::CountT numEntities;
-    madrona::Entity agent;
-    madrona::CountT minEpisodeEntities;
-    madrona::CountT maxEpisodeEntities;
+    Entity *allEntities;
+    CountT numEntities;
+    Entity agents[6];
+    CountT numAgents;
+    CountT minEpisodeEntities;
+    CountT maxEpisodeEntities;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

@@ -55,7 +55,7 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
 template <typename T>
 static Entity makeAgent(Engine &ctx)
 {
-    Entity agent_iface = ctx.data().agent =
+    Entity agent_iface = ctx.data().agents[ctx.data().numAgents++] =
         ctx.makeEntityNow<AgentInterface>();
     Entity agent = ctx.makeEntityNow<T>();
     ctx.getUnsafe<AgentImpl>(agent_iface).implEntity = agent;
@@ -77,6 +77,9 @@ static void level1(Engine &ctx)
     CountT total_num_boxes = CountT(rng.rand() * 6) + 3;
     CountT num_elongated = 
         CountT(ctx.data().rng.rand() * (total_num_boxes  - 3)) + 3;
+
+    CountT num_hiders = CountT(ctx.data().rng.rand() * 2) + 1;
+    CountT num_seekers = CountT(ctx.data().rng.rand() * 2) + 1;
 
     CountT num_cubes = total_num_boxes - num_elongated;
 
@@ -134,24 +137,49 @@ static void level1(Engine &ctx)
     all_entities[num_entities++] =
         makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
-    const Quat agent_rot =
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+    auto makeHider = [&](Vector3 pos, Quat rot) {
+        Entity agent = makeAgent<DynAgent>(ctx);
+        ctx.getUnsafe<Position>(agent) = pos;
+        ctx.getUnsafe<Rotation>(agent) = rot;
+        ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<render::ViewSettings>(agent) =
+            render::RenderingSystem::setupView(ctx, 90.f, Vector3 { 0, 0, 0.8 });
 
-    Entity agent = makeAgent<DynAgent>(ctx);
-    ctx.getUnsafe<Position>(agent) = Vector3 { -15, -15, 1.5 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
-    ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<ObjectID>(agent) = ObjectID { 4 };
+        ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent);
 
-    ctx.getUnsafe<render::ActiveView>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, Vector3 { 0, 0, 0.8 },
-                                           ctx.worldID().idx);
-    ctx.getUnsafe<ObjectID>(agent) = ObjectID { 4 };
-    ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
-        phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent);
-    ctx.getUnsafe<Velocity>(agent) = {
-        Vector3 { 0, 0, 0 },
-        Vector3 { 0, 0, 0 },
+        ctx.getUnsafe<Velocity>(agent) = {
+            Vector3::zero(),
+            Vector3::zero(),
+        };
     };
+
+    makeHider({ -15, -15, 1.5 },
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}));
+
+    for (CountT i = 1; i < num_hiders; i++) {
+        Vector3 pos {
+            bounds.x + rng.rand() * bounds_diff,
+            bounds.x + rng.rand() * bounds_diff,
+            1.5f,
+        };
+
+        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+        makeHider(pos, rot);
+    }
+
+    for (CountT i = 0; i < num_seekers; i++) {
+        Vector3 pos {
+            bounds.x + rng.rand() * bounds_diff,
+            bounds.x + rng.rand() * bounds_diff,
+            1.5f,
+        };
+
+        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+
+        makeHider(pos, rot);
+    }
 
     ctx.data().numEntities = num_entities;
 }
@@ -174,9 +202,8 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
     ctx.data().numEntities = total_entities;
 
     Entity agent = makeAgent<CameraAgent>(ctx);
-    ctx.getUnsafe<render::ActiveView>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f,
-                                           ctx.worldID().idx);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
@@ -245,9 +272,8 @@ static void level5(Engine &ctx)
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
     Entity agent = makeAgent<CameraAgent>(ctx);
-    ctx.getUnsafe<render::ActiveView>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f,
-                                           ctx.worldID().idx);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
@@ -263,12 +289,14 @@ static void resetWorld(Engine &ctx, int32_t level)
         Entity e = all_entities[i];
         ctx.destroyEntityNow(e);
     }
+    ctx.data().numEntities = 0;
 
-    if (ctx.data().agent != Entity::none()) {
+    for (CountT i = 0; i < ctx.data().numAgents; i++) {
         ctx.destroyEntityNow(
-            ctx.getUnsafe<AgentImpl>(ctx.data().agent).implEntity);
-        ctx.destroyEntityNow(ctx.data().agent);
+            ctx.getUnsafe<AgentImpl>(ctx.data().agents[i]).implEntity);
+        ctx.destroyEntityNow(ctx.data().agents[i]);
     }
+    ctx.data().numAgents = 0;
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
@@ -413,7 +441,7 @@ inline void actionSystem(Engine &ctx, Action &action, AgentImpl impl)
 
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
-                               render::ActiveView &)
+                               render::ViewID &)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -471,7 +499,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
         {action_sys}, numPhysicsSubsteps);
 
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, render::ActiveView>>(
+        agentZeroVelSystem, Velocity, render::ViewID>>(
             {phys_sys});
 
     auto sim_done = agent_zero_vel;
@@ -496,7 +524,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
       episodeMgr(init.episodeMgr)
 {
     CountT max_total_entities =
-        std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2)) + 10;
+        std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 10;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities, 100 * 50);
@@ -510,7 +538,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     minEpisodeEntities = init.minEntitiesPerWorld;
     maxEpisodeEntities = init.maxEntitiesPerWorld;
 
-    agent = Entity::none();
+    numAgents = 0;
     resetWorld(ctx, 1);
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
