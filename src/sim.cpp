@@ -16,24 +16,27 @@ void Sim::registerTypes(ECSRegistry &registry)
     render::RenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
+    registry.registerComponent<AgentImpl>();
 
     registry.registerSingleton<WorldReset>();
 
     registry.registerArchetype<DynamicObject>();
     registry.registerArchetype<StaticObject>();
-    registry.registerArchetype<Agent>();
+    registry.registerArchetype<AgentInterface>();
+    registry.registerArchetype<CameraAgent>();
+    registry.registerArchetype<DynAgent>();
 
     registry.exportSingleton<WorldReset>(0);
-    registry.exportColumn<Agent, Action>(1);
+    registry.exportColumn<AgentInterface, Action>(1);
 }
 
 static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
-                            int32_t obj_id)
+                            int32_t obj_id, Vector3 scale = {1, 1, 1})
 {
     Entity e = ctx.makeEntityNow<DynamicObject>();
     ctx.getUnsafe<Position>(e) = pos;
     ctx.getUnsafe<Rotation>(e) = rot;
-    ctx.getUnsafe<Scale>(e) = Vector3 { 1, 1, 1 };
+    ctx.getUnsafe<Scale>(e) = scale;
     ctx.getUnsafe<ObjectID>(e) = ObjectID { obj_id };
     ctx.getUnsafe<phys::broadphase::LeafID>(e) =
         phys::RigidBodyPhysicsSystem::registerEntity(ctx, e);
@@ -49,54 +52,108 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
     return makeDynObject(ctx, offset, rot, 1);
 }
 
+template <typename T>
+static Entity makeAgent(Engine &ctx)
+{
+    Entity agent_iface = ctx.data().agent =
+        ctx.makeEntityNow<AgentInterface>();
+    Entity agent = ctx.makeEntityNow<T>();
+    ctx.getUnsafe<AgentImpl>(agent_iface).implEntity = agent;
+
+    return agent;
+}
+
+// Emergent tool use configuration:
+// 1 - 3 Hiders
+// 1 - 3 Seekers
+// 3 - 9 Movable boxes (at least 3 elongated)
+// 2 movable ramps
+
 static void level1(Engine &ctx)
 {
     Entity *all_entities = ctx.data().allEntities;
-    CountT num_entities_range =
-        ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
+    auto &rng = ctx.data().rng;
 
-    CountT num_dyn_entities =
-        CountT(ctx.data().rng.rand() * num_entities_range) +
-        ctx.data().minEpisodeEntities;
+    CountT total_num_boxes = CountT(rng.rand() * 6) + 3;
+    CountT num_elongated = 
+        CountT(ctx.data().rng.rand() * (total_num_boxes  - 3)) + 3;
 
-    const math::Vector2 bounds { -10.f, 10.f };
+    CountT num_cubes = total_num_boxes - num_elongated;
+
+    const Vector2 bounds { -18.f, 18.f };
     float bounds_diff = bounds.y - bounds.x;
 
-    for (CountT i = 0; i < num_dyn_entities; i++) {
-        math::Vector3 pos {
-            bounds.x + ctx.data().rng.rand() * bounds_diff,
-            bounds.x + ctx.data().rng.rand() * bounds_diff,
-            1.f,
+    CountT num_entities = 0;
+    for (CountT i = 0; i < num_elongated; i++) {
+        Vector3 pos {
+            bounds.x + rng.rand() * bounds_diff,
+            bounds.x + rng.rand() * bounds_diff,
+            1.0f,
         };
 
-        const auto rot = math::Quat::angleAxis(0, {0, 0, 1});
+        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        all_entities[i] = makeDynObject(ctx, pos, rot, 2);
+        all_entities[num_entities++] =
+            makeDynObject(ctx, pos, rot, 6);
     }
 
-    CountT total_entities = num_dyn_entities;
+    for (CountT i = 0; i < num_cubes; i++) {
+        Vector3 pos {
+            bounds.x + rng.rand() * bounds_diff,
+            bounds.x + rng.rand() * bounds_diff,
+            1.0f,
+        };
 
-    all_entities[total_entities++] =
+        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+        all_entities[num_entities++] = makeDynObject(ctx, pos, rot, 2);
+    }
+
+    const CountT num_ramps = 2;
+    for (CountT i = 0; i < num_ramps; i++) {
+        Vector3 pos {
+            bounds.x + rng.rand() * bounds_diff,
+            bounds.x + rng.rand() * bounds_diff,
+            2.f / 3.f,
+        };
+
+        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+
+        all_entities[num_entities++] = makeDynObject(ctx, pos, rot, 5);
+    }
+
+    all_entities[num_entities++] =
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {0, 0, 40}, Quat::angleAxis(math::pi, {1, 0, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(math::pi_d2, {0, 1, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-math::pi_d2, {0, 1, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {0, -20, 0}, Quat::angleAxis(-math::pi_d2, {1, 0, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {0, 20, 0}, Quat::angleAxis(math::pi_d2, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
-    const math::Quat agent_rot =
-        math::Quat::angleAxis(-math::pi_d2, {1, 0, 0});
+    const Quat agent_rot =
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
 
-    Entity agent = ctx.data().agent;
-    ctx.getUnsafe<Position>(agent) = math::Vector3 { 0, 0, 35 };
+    Entity agent = makeAgent<DynAgent>(ctx);
+    ctx.getUnsafe<Position>(agent) = Vector3 { -15, -15, 1.5 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
 
-    ctx.data().numEntities = total_entities;
+    ctx.getUnsafe<render::ActiveView>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, Vector3 { 0, 0, 0.8 },
+                                           ctx.worldID().idx);
+    ctx.getUnsafe<ObjectID>(agent) = ObjectID { 4 };
+    ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
+        phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent);
+    ctx.getUnsafe<Velocity>(agent) = {
+        Vector3 { 0, 0, 0 },
+        Vector3 { 0, 0, 0 },
+    };
+
+    ctx.data().numEntities = num_entities;
 }
 
 static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
@@ -111,14 +168,17 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
     all_entities[total_entities++] =
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
 
-    const math::Quat agent_rot =
-        math::Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
-
-    Entity agent = ctx.data().agent;
-    ctx.getUnsafe<Position>(agent) = math::Vector3 { -5, -5, 0 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    const Quat agent_rot =
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
 
     ctx.data().numEntities = total_entities;
+
+    Entity agent = makeAgent<CameraAgent>(ctx);
+    ctx.getUnsafe<render::ActiveView>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f,
+                                           ctx.worldID().idx);
+    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
 
 static void level2(Engine &ctx)
@@ -141,6 +201,59 @@ static void level4(Engine &ctx)
     singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
 }
 
+static void level5(Engine &ctx)
+{
+    Entity *all_entities = ctx.data().allEntities;
+    CountT num_entities_range =
+        ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
+
+    CountT num_dyn_entities =
+        CountT(ctx.data().rng.rand() * num_entities_range) +
+        ctx.data().minEpisodeEntities;
+
+    const Vector2 bounds { -10.f, 10.f };
+    float bounds_diff = bounds.y - bounds.x;
+
+    for (CountT i = 0; i < num_dyn_entities; i++) {
+        Vector3 pos {
+            bounds.x + ctx.data().rng.rand() * bounds_diff,
+            bounds.x + ctx.data().rng.rand() * bounds_diff,
+            1.f,
+        };
+
+        const auto rot = Quat::angleAxis(0, {0, 0, 1});
+
+        all_entities[i] = makeDynObject(ctx, pos, rot, 2);
+    }
+
+    CountT total_entities = num_dyn_entities;
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 40}, Quat::angleAxis(pi, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, -20, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 20, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
+
+    const Quat agent_rot =
+        Quat::angleAxis(-pi_d2, {1, 0, 0});
+
+    Entity agent = makeAgent<CameraAgent>(ctx);
+    ctx.getUnsafe<render::ActiveView>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f,
+                                           ctx.worldID().idx);
+    ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+
+    ctx.data().numEntities = total_entities;
+}
+
 static void resetWorld(Engine &ctx, int32_t level)
 {
     phys::RigidBodyPhysicsSystem::reset(ctx);
@@ -149,6 +262,12 @@ static void resetWorld(Engine &ctx, int32_t level)
     for (CountT i = 0; i < ctx.data().numEntities; i++) {
         Entity e = all_entities[i];
         ctx.destroyEntityNow(e);
+    }
+
+    if (ctx.data().agent != Entity::none()) {
+        ctx.destroyEntityNow(
+            ctx.getUnsafe<AgentImpl>(ctx.data().agent).implEntity);
+        ctx.destroyEntityNow(ctx.data().agent);
     }
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
@@ -168,6 +287,9 @@ static void resetWorld(Engine &ctx, int32_t level)
     } break;
     case 4: {
         level4(ctx);
+    } break;
+    case 5: {
+        level5(ctx);
     } break;
     }
 }
@@ -192,23 +314,66 @@ inline void sortDebugSystem(Engine &ctx, WorldReset &)
 
     auto state_mgr = mwGPU::getStateManager();
 
-    int32_t num_rows = state_mgr->numArchetypeRows(
-        TypeTracker::typeID<DynamicObject>());
+    {
+        int32_t num_rows = state_mgr->numArchetypeRows(
+            TypeTracker::typeID<AgentInterface>());
+        
+        printf("AgentInterface num rows: %u %d\n",
+               TypeTracker::typeID<AgentInterface>(),
+               num_rows);
 
-    auto col = (WorldID *)state_mgr->getArchetypeComponent(
-        TypeTracker::typeID<DynamicObject>(),
-        TypeTracker::typeID<WorldID>());
+        auto col = (WorldID *)state_mgr->getArchetypeComponent(
+            TypeTracker::typeID<AgentInterface>(),
+            TypeTracker::typeID<WorldID>());
 
-    for (int i = 0; i < num_rows; i++) {
-        printf("%d\n", col[i].idx);
+        for (int i = 0; i < num_rows; i++) {
+            printf("%d\n", col[i].idx);
+        }
+    }
+
+    {
+        int32_t num_rows = state_mgr->numArchetypeRows(
+            TypeTracker::typeID<CameraAgent>());
+        
+        printf("CameraAgent num rows: %u %d\n",
+               TypeTracker::typeID<CameraAgent>(),
+               num_rows);
+
+        auto col = (WorldID *)state_mgr->getArchetypeComponent(
+            TypeTracker::typeID<CameraAgent>(),
+            TypeTracker::typeID<WorldID>());
+
+        for (int i = 0; i < num_rows; i++) {
+            printf("%d\n", col[i].idx);
+        }
+    }
+
+    {
+        int32_t num_rows = state_mgr->numArchetypeRows(
+            TypeTracker::typeID<DynAgent>());
+        
+        printf("DynAgent num rows: %u %d\n",
+               TypeTracker::typeID<DynAgent>(),
+               num_rows);
+
+        auto col = (WorldID *)state_mgr->getArchetypeComponent(
+            TypeTracker::typeID<DynAgent>(),
+            TypeTracker::typeID<WorldID>());
+
+        for (int i = 0; i < num_rows; i++) {
+            printf("%d\n", col[i].idx);
+        }
     }
 }
 #endif
 
-inline void actionSystem(Engine &, Action &action,
-                         Position &pos, Rotation &rot)
+inline void actionSystem(Engine &ctx, Action &action, AgentImpl impl)
 {
     constexpr float turn_angle = helpers::toRadians(10.f);
+
+
+    Position &pos = ctx.getUnsafe<Position>(impl.implEntity);
+    Rotation &rot = ctx.getUnsafe<Rotation>(impl.implEntity);
 
     switch(action.action) {
     case 0: {
@@ -216,19 +381,19 @@ inline void actionSystem(Engine &, Action &action,
     } break;
     case 1: {
         Vector3 fwd = rot.rotateVec(math::fwd);
-        pos += fwd;
+        pos += 0.5f * fwd;
     } break;
     case 2: {
         const Quat left_rot = Quat::angleAxis(turn_angle, math::up);
-        rot = (rot * left_rot).normalize();
+        rot = (left_rot * rot).normalize();
     } break;
     case 3: {
         const Quat right_rot = Quat::angleAxis(-turn_angle, math::up);
-        rot = (rot * right_rot).normalize();
+        rot = (right_rot * rot).normalize();
     } break;
     case 4: {
         Vector3 fwd = rot.rotateVec(math::fwd);
-        pos -= fwd;
+        pos -= 0.5f * fwd;
     } break;
     case 5: {
         Vector3 up = rot.rotateVec(math::up);
@@ -246,22 +411,49 @@ inline void actionSystem(Engine &, Action &action,
     action.action = 0;
 }
 
+inline void agentZeroVelSystem(Engine &,
+                               Velocity &vel,
+                               render::ActiveView &)
+{
+    vel.linear.x = 0;
+    vel.linear.y = 0;
+    vel.linear.z = fminf(vel.linear.z, 0);
+
+    vel.angular = Vector3::zero();
+}
+
 void Sim::setupTasks(TaskGraph::Builder &builder)
 {
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
 
-    auto sort_agent_sys = builder.addToGraph<SortArchetypeNode<Agent, WorldID>>({reset_sys});
-    auto post_sort_agent_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_agent_sys});
+    auto sort_agent_iface_sys =
+        builder.addToGraph<SortArchetypeNode<AgentInterface, WorldID>>(
+            {reset_sys});
+    auto post_sort_agent_iface_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_agent_iface_sys});
 
-    auto sort_dyn_sys = builder.addToGraph<SortArchetypeNode<DynamicObject, WorldID>>(
-        {post_sort_agent_reset_tmp});
+    auto sort_cam_agent_sys =
+        builder.addToGraph<SortArchetypeNode<CameraAgent, WorldID>>(
+            {post_sort_agent_iface_reset_tmp});
+    auto post_sort_cam_agent_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_cam_agent_sys});
+
+    auto sort_dyn_agent_sys =
+        builder.addToGraph<SortArchetypeNode<DynAgent, WorldID>>(
+            {post_sort_cam_agent_reset_tmp});
+    auto post_sort_dyn_agent_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_dyn_agent_sys});
+
+    auto sort_dyn_sys = 
+        builder.addToGraph<SortArchetypeNode<DynamicObject, WorldID>>(
+            {post_sort_dyn_agent_reset_tmp});
     auto post_sort_dyn_reset_tmp =
         builder.addToGraph<ResetTmpAllocNode>({sort_dyn_sys});
 
-    auto sort_static_sys = builder.addToGraph<SortArchetypeNode<StaticObject, WorldID>>(
-        {post_sort_dyn_reset_tmp});
+    auto sort_static_sys =
+        builder.addToGraph<SortArchetypeNode<StaticObject, WorldID>>(
+            {post_sort_dyn_reset_tmp});
     auto post_sort_static_reset_tmp =
         builder.addToGraph<ResetTmpAllocNode>({sort_static_sys});
 
@@ -273,12 +465,16 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 #endif
 
     auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
-        Action, Position, Rotation>>({prep_finish});
+        Action, AgentImpl>>({prep_finish});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
         {action_sys}, numPhysicsSubsteps);
 
-    auto sim_done = phys_sys;
+    auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
+        agentZeroVelSystem, Velocity, render::ActiveView>>(
+            {phys_sys});
+
+    auto sim_done = agent_zero_vel;
 
     auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {sim_done});
@@ -295,12 +491,12 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     printf("Setup done\n");
 }
 
-
 Sim::Sim(Engine &ctx, const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    CountT max_total_entities = init.maxEntitiesPerWorld + 10;
+    CountT max_total_entities =
+        std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2)) + 10;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities, 100 * 50);
@@ -314,10 +510,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     minEpisodeEntities = init.minEntitiesPerWorld;
     maxEpisodeEntities = init.maxEntitiesPerWorld;
 
-    agent = ctx.makeEntityNow<Agent>();
-    ctx.getUnsafe<render::ActiveView>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, math::up * 0.5f);
-
+    agent = Entity::none();
     resetWorld(ctx, 1);
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }

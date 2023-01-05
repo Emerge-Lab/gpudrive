@@ -50,13 +50,35 @@ struct Action {
     int32_t action;
 };
 
+struct AgentImpl {
+    madrona::Entity implEntity;
+};
+
 static_assert(sizeof(Action) == sizeof(int32_t));
 
-struct Agent : public madrona::Archetype<
+struct AgentInterface : public madrona::Archetype<
+    Action,
+    AgentImpl
+> {};
+
+struct CameraAgent : public madrona::Archetype<
     Position,
     Rotation,
+    madrona::render::ActiveView
+> {};
+
+struct DynAgent : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID,
     madrona::render::ActiveView,
-    Action
+    Velocity,
+    madrona::phys::CollisionAABB,
+    madrona::phys::broadphase::LeafID,
+    madrona::phys::solver::SubstepPrevState,
+    madrona::phys::solver::PreSolvePositional,
+    madrona::phys::solver::PreSolveVelocity
 > {};
 
 struct Sim : public madrona::WorldBase {
