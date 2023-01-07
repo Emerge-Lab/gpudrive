@@ -39,7 +39,7 @@ static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
     ctx.getUnsafe<Scale>(e) = scale;
     ctx.getUnsafe<ObjectID>(e) = ObjectID { obj_id };
     ctx.getUnsafe<phys::broadphase::LeafID>(e) =
-        phys::RigidBodyPhysicsSystem::registerEntity(ctx, e);
+        phys::RigidBodyPhysicsSystem::registerEntity(ctx, e, ObjectID {obj_id});
     ctx.getUnsafe<Velocity>(e) = {
         Vector3 { 0, 0, 0 },
         Vector3 { 0, 0, 0 },
@@ -145,9 +145,11 @@ static void level1(Engine &ctx)
         ctx.getUnsafe<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, Vector3 { 0, 0, 0.8 });
 
-        ctx.getUnsafe<ObjectID>(agent) = ObjectID { 4 };
+        ObjectID agent_obj_id = ObjectID { 4 };
+        ctx.getUnsafe<ObjectID>(agent) = agent_obj_id;
         ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
-            phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent);
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
+                                                         agent_obj_id);
 
         ctx.getUnsafe<Velocity>(agent) = {
             Vector3::zero(),

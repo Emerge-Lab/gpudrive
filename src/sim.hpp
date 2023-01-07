@@ -32,7 +32,6 @@ struct DynamicObject : public madrona::Archetype<
     Scale,
     Velocity,
     ObjectID,
-    madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
@@ -44,7 +43,6 @@ struct StaticObject : public madrona::Archetype<
     Rotation,
     Scale,
     ObjectID,
-    madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID
 > {};
 
@@ -76,7 +74,6 @@ struct DynAgent : public madrona::Archetype<
     Scale,
     ObjectID,
     Velocity,
-    madrona::phys::CollisionAABB,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
