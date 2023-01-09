@@ -552,12 +552,24 @@ inline void computeVisibilitySystem(Engine &ctx,
         return;
     }
 
+    Quat agent_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 fwd = agent_rot.rotateVec(math::fwd);
+    const float cos_angle_threshold = cosf(helpers::toRadians(135.f / 2.f));
+
     auto &bvh = ctx.getSingleton<broadphase::BVH>();
 
     auto checkVisibility = [&](Entity other_e, Entity other_sim_e) {
         Vector3 other_pos = ctx.getUnsafe<PositionObservation>(other_e).x;
 
         Vector3 to_other = other_pos - pos.x;
+
+        Vector3 to_other_norm = to_other.normalize();
+
+        float cos_angle = dot(to_other_norm, fwd);
+
+        if (cos_angle < cos_angle_threshold) {
+            return 0.f;
+        }
 
         float hit_t;
         Vector3 hit_normal;
