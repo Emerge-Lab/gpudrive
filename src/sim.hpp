@@ -51,7 +51,11 @@ struct Action {
 };
 
 struct AgentImpl {
-    madrona::Entity implEntity;
+    Entity implEntity;
+};
+
+struct AgentParent {
+    Entity ifaceEntity;
 };
 
 static_assert(sizeof(Action) == sizeof(int32_t));
@@ -68,6 +72,18 @@ struct CameraAgent : public madrona::Archetype<
     madrona::render::ViewID
 > {};
 
+struct TeamReward {
+    float hidersReward;
+};
+
+struct Reward {
+    float reward;
+};
+
+struct AgentType {
+    bool isHider;
+};
+
 struct DynAgent : public madrona::Archetype<
     Position,
     Rotation,
@@ -79,7 +95,10 @@ struct DynAgent : public madrona::Archetype<
     madrona::phys::solver::PreSolvePositional,
     madrona::phys::solver::PreSolveVelocity,
     madrona::render::ViewSettings,
-    madrona::render::ViewID
+    madrona::render::ViewID,
+    Reward,
+    AgentType,
+    AgentParent
 > {};
 
 struct Sim : public madrona::WorldBase {
@@ -94,8 +113,10 @@ struct Sim : public madrona::WorldBase {
 
     Entity *allEntities;
     CountT numEntities;
-    Entity agents[6];
-    CountT numAgents;
+    Entity hiders[3];
+    CountT numHiders;
+    Entity seekers[3];
+    CountT numSeekers;
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
 };

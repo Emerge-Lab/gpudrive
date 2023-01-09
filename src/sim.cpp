@@ -3,6 +3,7 @@
 
 using namespace madrona;
 using namespace madrona::math;
+using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
@@ -17,8 +18,12 @@ void Sim::registerTypes(ECSRegistry &registry)
 
     registry.registerComponent<Action>();
     registry.registerComponent<AgentImpl>();
+    registry.registerComponent<AgentParent>();
+    registry.registerComponent<Reward>();
+    registry.registerComponent<AgentType>();
 
     registry.registerSingleton<WorldReset>();
+    registry.registerSingleton<TeamReward>();
 
     registry.registerArchetype<DynamicObject>();
     registry.registerArchetype<StaticObject>();
@@ -53,12 +58,14 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
 }
 
 template <typename T>
-static Entity makeAgent(Engine &ctx)
+static Entity makeAgent(Engine &ctx, Entity *agent_arr, CountT *num_agents)
 {
-    Entity agent_iface = ctx.data().agents[ctx.data().numAgents++] =
-        ctx.makeEntityNow<AgentInterface>();
+    Entity agent_iface = ctx.makeEntityNow<AgentInterface>();
     Entity agent = ctx.makeEntityNow<T>();
     ctx.getUnsafe<AgentImpl>(agent_iface).implEntity = agent;
+    ctx.getUnsafe<AgentParent>(agent).ifaceEntity = agent_iface;
+
+    agent_arr[(*num_agents)++] = agent;
 
     return agent;
 }
@@ -137,8 +144,9 @@ static void level1(Engine &ctx)
     all_entities[num_entities++] =
         makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
-    auto makeHider = [&](Vector3 pos, Quat rot) {
-        Entity agent = makeAgent<DynAgent>(ctx);
+    auto makeDynAgent = [&](Vector3 pos, Quat rot, Entity *agent_arr,
+                            CountT *agent_count) {
+        Entity agent = makeAgent<DynAgent>(ctx, agent_arr, agent_count);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
@@ -155,6 +163,20 @@ static void level1(Engine &ctx)
             Vector3::zero(),
             Vector3::zero(),
         };
+
+        return agent;
+    };
+
+    auto makeHider = [&](Vector3 pos, Quat rot) {
+        Entity e =
+            makeDynAgent(pos, rot, ctx.data().hiders, &ctx.data().numHiders);
+        ctx.getUnsafe<AgentType>(e).isHider = true;
+    };
+
+    auto makeSeeker = [&](Vector3 pos, Quat rot) {
+        Entity e =
+            makeDynAgent(pos, rot, ctx.data().seekers, &ctx.data().numSeekers);
+        ctx.getUnsafe<AgentType>(e).isHider = false;
     };
 
     makeHider({ -15, -15, 1.5 },
@@ -180,7 +202,7 @@ static void level1(Engine &ctx)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        makeHider(pos, rot);
+        makeSeeker(pos, rot);
     }
 
     ctx.data().numEntities = num_entities;
@@ -203,7 +225,8 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 
     ctx.data().numEntities = total_entities;
 
-    Entity agent = makeAgent<CameraAgent>(ctx);
+    Entity agent = makeAgent<CameraAgent>(ctx, ctx.data().hiders,
+                                          &ctx.data().numHiders);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
@@ -273,7 +296,8 @@ static void level5(Engine &ctx)
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
-    Entity agent = makeAgent<CameraAgent>(ctx);
+    Entity agent = makeAgent<CameraAgent>(ctx, ctx.data().hiders,
+                                          &ctx.data().numHiders);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
@@ -293,12 +317,19 @@ static void resetWorld(Engine &ctx, int32_t level)
     }
     ctx.data().numEntities = 0;
 
-    for (CountT i = 0; i < ctx.data().numAgents; i++) {
+    for (CountT i = 0; i < ctx.data().numHiders; i++) {
         ctx.destroyEntityNow(
-            ctx.getUnsafe<AgentImpl>(ctx.data().agents[i]).implEntity);
-        ctx.destroyEntityNow(ctx.data().agents[i]);
+            ctx.getUnsafe<AgentParent>(ctx.data().hiders[i]).ifaceEntity);
+        ctx.destroyEntityNow(ctx.data().hiders[i]);
     }
-    ctx.data().numAgents = 0;
+    ctx.data().numHiders = 0;
+
+    for (CountT i = 0; i < ctx.data().numSeekers; i++) {
+        ctx.destroyEntityNow(
+            ctx.getUnsafe<AgentParent>(ctx.data().seekers[i]).ifaceEntity);
+        ctx.destroyEntityNow(ctx.data().seekers[i]);
+    }
+    ctx.data().numSeekers = 0;
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
@@ -452,6 +483,60 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
+inline void teamRewardsSystem(Engine &ctx,
+                              TeamReward &team_reward)
+{
+    broadphase::BVH &bvh = ctx.getSingleton<broadphase::BVH>();
+
+    float hidden_reward = 1.f;
+    for (CountT i = 0; i < ctx.data().numHiders; i++) {
+        Entity hider_e = ctx.data().hiders[i];
+        Vector3 hider_pos = ctx.getUnsafe<Position>(hider_e);
+
+        for (CountT j = 0; j < ctx.data().numSeekers; j++) {
+            Entity seeker_e = ctx.data().seekers[j];
+            Vector3 seeker_pos = ctx.getUnsafe<Position>(seeker_e);
+
+            Vector3 to_seeker = seeker_pos - hider_pos;
+
+            float hit_t;
+            Vector3 hit_normal;
+            Entity hit_entity =
+                bvh.traceRay(hider_pos, to_seeker, &hit_t, &hit_normal, 1.f);
+
+            if (hit_entity == seeker_e) {
+                hidden_reward = -1.f;
+                break;
+            }
+        }
+
+        if (hidden_reward == -1.f) {
+            break;
+        }
+    }
+
+    team_reward.hidersReward = hidden_reward;
+}
+
+inline void agentRewardsSystem(Engine &ctx,
+                               const Position &pos,
+                               AgentType agent_type,
+                               Reward &reward)
+{
+    float reward_val = ctx.getSingleton<TeamReward>().hidersReward;
+    if (!agent_type.isHider) {
+        reward_val *= -1.f;
+    }
+
+    if (fabsf(pos.x) >= 18.f || fabsf(pos.y) >= 18.f) {
+        reward_val -= 10.f;
+    }
+
+    reward.reward = reward_val;
+
+    printf("%d %f\n", agent_type.isHider, reward_val);
+}
+
 void Sim::setupTasks(TaskGraph::Builder &builder)
 {
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -514,6 +599,12 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
 
+    auto team_rewards = builder.addToGraph<ParallelForNode<Engine,
+        teamRewardsSystem, TeamReward>>({sim_done});
+
+    auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
+        agentRewardsSystem, Position, AgentType, Reward>>({team_rewards});
+
     (void)phys_cleanup_sys;
     (void)renderer_sys;
     (void)recycle_sys;
@@ -540,7 +631,8 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     minEpisodeEntities = init.minEntitiesPerWorld;
     maxEpisodeEntities = init.maxEntitiesPerWorld;
 
-    numAgents = 0;
+    numHiders = 0;
+    numSeekers = 0;
     resetWorld(ctx, 1);
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
