@@ -20,6 +20,16 @@ using madrona::base::Scale;
 using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 
+namespace consts {
+
+static inline constexpr int32_t maxBoxes = 9;
+static inline constexpr int32_t maxRamps = 2;
+static inline constexpr int32_t maxAgents = 6;
+static inline constexpr int32_t totalObservationsPerAgent = 
+    maxBoxes + maxRamps + maxAgents - 1;
+
+}
+
 class Engine;
 
 struct WorldReset {
@@ -47,7 +57,7 @@ struct SimEntity {
 };
 
 struct TeamReward {
-    float hidersReward;
+    std::atomic<float> hidersReward;
 };
 
 struct Reward {
@@ -70,6 +80,10 @@ struct VelocityObservation {
     madrona::math::Vector3 v;
 };
 
+struct VisibilityMasks {
+    float visible[consts::totalObservationsPerAgent];
+};
+
 static_assert(sizeof(Action) == sizeof(int32_t));
 
 struct AgentInterface : public madrona::Archetype<
@@ -79,7 +93,8 @@ struct AgentInterface : public madrona::Archetype<
     AgentType,
     PositionObservation,
     VelocityObservation,
-    ObservationMask
+    ObservationMask,
+    VisibilityMasks
 > {};
 
 struct CameraAgent : public madrona::Archetype<
@@ -136,13 +151,9 @@ struct Sim : public madrona::WorldBase {
     Entity seekers[3];
     CountT numSeekers;
 
-    static inline constexpr int32_t maxBoxes = 9;
-    static inline constexpr int32_t maxRamps = 2;
-    static inline constexpr int32_t maxAgents = 6;
-
-    Entity boxObservations[maxBoxes];
-    Entity rampObservations[maxRamps];
-    Entity agentObservations[maxAgents];
+    Entity boxObservations[consts::maxBoxes];
+    Entity rampObservations[consts::maxRamps];
+    Entity agentObservations[consts::maxAgents];
     CountT numActiveAgents;
 
     CountT minEpisodeEntities;

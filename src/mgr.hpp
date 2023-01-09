@@ -33,6 +33,7 @@ public:
     MADRONA_IMPORT madrona::py::Tensor moveActionTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rewardTensor() const;
     MADRONA_IMPORT madrona::py::Tensor agentMaskTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor visibilityMasksTensor() const;
     MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
 
