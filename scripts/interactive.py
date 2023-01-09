@@ -71,6 +71,8 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
 )
 
 actions = sim.move_action_tensor().to_torch()
+rewards = sim.reward_tensor().to_torch()
+agent_masks = sim.agent_mask_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
@@ -88,6 +90,8 @@ while True:
         break
 
     resets[0] = action.reset
-    actions[0][0] = action.action
+    actions[0][0][0] = action.action
+
+    print(rewards * agent_masks)
 
 del sim

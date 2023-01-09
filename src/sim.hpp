@@ -38,39 +38,13 @@ struct DynamicObject : public madrona::Archetype<
     madrona::phys::solver::PreSolveVelocity
 > {};
 
-struct StaticObject : public madrona::Archetype<
-    Position,
-    Rotation,
-    Scale,
-    ObjectID,
-    madrona::phys::broadphase::LeafID
-> {};
-
 struct Action {
     int32_t action;
 };
 
-struct AgentImpl {
-    Entity implEntity;
+struct SimEntity {
+    Entity e;
 };
-
-struct AgentParent {
-    Entity ifaceEntity;
-};
-
-static_assert(sizeof(Action) == sizeof(int32_t));
-
-struct AgentInterface : public madrona::Archetype<
-    Action,
-    AgentImpl
-> {};
-
-struct CameraAgent : public madrona::Archetype<
-    Position,
-    Rotation,
-    madrona::render::ViewSettings,
-    madrona::render::ViewID
-> {};
 
 struct TeamReward {
     float hidersReward;
@@ -84,6 +58,37 @@ struct AgentType {
     bool isHider;
 };
 
+struct ObservationMask {
+    float mask;
+};
+
+struct PositionObservation {
+    madrona::math::Vector3 x;
+};
+
+struct VelocityObservation {
+    madrona::math::Vector3 v;
+};
+
+static_assert(sizeof(Action) == sizeof(int32_t));
+
+struct AgentInterface : public madrona::Archetype<
+    SimEntity,
+    Action,
+    Reward,
+    AgentType,
+    PositionObservation,
+    VelocityObservation,
+    ObservationMask
+> {};
+
+struct CameraAgent : public madrona::Archetype<
+    Position,
+    Rotation,
+    madrona::render::ViewSettings,
+    madrona::render::ViewID
+> {};
+
 struct DynAgent : public madrona::Archetype<
     Position,
     Rotation,
@@ -95,13 +100,25 @@ struct DynAgent : public madrona::Archetype<
     madrona::phys::solver::PreSolvePositional,
     madrona::phys::solver::PreSolveVelocity,
     madrona::render::ViewSettings,
-    madrona::render::ViewID,
-    Reward,
-    AgentType,
-    AgentParent
+    madrona::render::ViewID
+> {};
+
+struct BoxObservation : public madrona::Archetype<
+    SimEntity,
+    PositionObservation,
+    VelocityObservation,
+    ObservationMask
+> {};
+
+struct RampObservation : public madrona::Archetype<
+    SimEntity,
+    PositionObservation,
+    VelocityObservation,
+    ObservationMask
 > {};
 
 struct Sim : public madrona::WorldBase {
+
     static void registerTypes(madrona::ECSRegistry &registry);
 
     static void setupTasks(madrona::TaskGraph::Builder &builder);
@@ -111,12 +128,23 @@ struct Sim : public madrona::WorldBase {
     EpisodeManager *episodeMgr;
     RNG rng;
 
-    Entity *allEntities;
-    CountT numEntities;
+    Entity *obstacles;
+    CountT numObstacles;
+
     Entity hiders[3];
     CountT numHiders;
     Entity seekers[3];
     CountT numSeekers;
+
+    static inline constexpr int32_t maxBoxes = 9;
+    static inline constexpr int32_t maxRamps = 2;
+    static inline constexpr int32_t maxAgents = 6;
+
+    Entity boxObservations[maxBoxes];
+    Entity rampObservations[maxRamps];
+    Entity agentObservations[maxAgents];
+    CountT numActiveAgents;
+
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
 };

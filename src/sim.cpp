@@ -17,22 +17,39 @@ void Sim::registerTypes(ECSRegistry &registry)
     render::RenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
-    registry.registerComponent<AgentImpl>();
-    registry.registerComponent<AgentParent>();
     registry.registerComponent<Reward>();
     registry.registerComponent<AgentType>();
+
+    registry.registerComponent<SimEntity>();
+    registry.registerComponent<PositionObservation>();
+    registry.registerComponent<VelocityObservation>();
+    registry.registerComponent<ObservationMask>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<TeamReward>();
 
     registry.registerArchetype<DynamicObject>();
-    registry.registerArchetype<StaticObject>();
     registry.registerArchetype<AgentInterface>();
     registry.registerArchetype<CameraAgent>();
     registry.registerArchetype<DynAgent>();
+    registry.registerArchetype<BoxObservation>();
+    registry.registerArchetype<RampObservation>();
 
     registry.exportSingleton<WorldReset>(0);
     registry.exportColumn<AgentInterface, Action>(1);
+    registry.exportColumn<AgentInterface, Reward>(2);
+    registry.exportColumn<AgentInterface, AgentType>(3);
+    registry.exportColumn<AgentInterface, PositionObservation>(4);
+    registry.exportColumn<AgentInterface, VelocityObservation>(5);
+    registry.exportColumn<AgentInterface, ObservationMask>(6);
+
+    registry.exportColumn<BoxObservation, PositionObservation>(7);
+    registry.exportColumn<BoxObservation, VelocityObservation>(8);
+    registry.exportColumn<BoxObservation, ObservationMask>(9);
+
+    registry.exportColumn<RampObservation, PositionObservation>(10);
+    registry.exportColumn<RampObservation, VelocityObservation>(11);
+    registry.exportColumn<RampObservation, ObservationMask>(12);
 }
 
 static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
@@ -58,14 +75,21 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
 }
 
 template <typename T>
-static Entity makeAgent(Engine &ctx, Entity *agent_arr, CountT *num_agents)
+static Entity makeAgent(Engine &ctx, bool is_hider = true)
 {
-    Entity agent_iface = ctx.makeEntityNow<AgentInterface>();
-    Entity agent = ctx.makeEntityNow<T>();
-    ctx.getUnsafe<AgentImpl>(agent_iface).implEntity = agent;
-    ctx.getUnsafe<AgentParent>(agent).ifaceEntity = agent_iface;
+    Entity agent_iface =
+        ctx.data().agentObservations[ctx.data().numActiveAgents++];
 
-    agent_arr[(*num_agents)++] = agent;
+    Entity agent = ctx.makeEntityNow<T>();
+    ctx.getUnsafe<SimEntity>(agent_iface).e = agent;
+    ctx.getUnsafe<ObservationMask>(agent_iface).mask = 1.f;
+    ctx.getUnsafe<AgentType>(agent_iface).isHider = is_hider;
+
+    if (is_hider) {
+        ctx.data().hiders[ctx.data().numHiders++] = agent;
+    } else {
+        ctx.data().seekers[ctx.data().numSeekers++] = agent;
+    }
 
     return agent;
 }
@@ -78,10 +102,12 @@ static Entity makeAgent(Engine &ctx, Entity *agent_arr, CountT *num_agents)
 
 static void level1(Engine &ctx)
 {
-    Entity *all_entities = ctx.data().allEntities;
+    Entity *all_entities = ctx.data().obstacles;
     auto &rng = ctx.data().rng;
 
     CountT total_num_boxes = CountT(rng.rand() * 6) + 3;
+    assert(total_num_boxes < Sim::maxBoxes);
+
     CountT num_elongated = 
         CountT(ctx.data().rng.rand() * (total_num_boxes  - 3)) + 3;
 
@@ -103,8 +129,12 @@ static void level1(Engine &ctx)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        all_entities[num_entities++] =
+        Entity box = all_entities[num_entities++] =
             makeDynObject(ctx, pos, rot, 6);
+        
+        Entity obs_e = ctx.data().boxObservations[i];
+        ctx.getUnsafe<SimEntity>(obs_e).e = box;
+        ctx.getUnsafe<ObservationMask>(obs_e).mask = 1.f;
     }
 
     for (CountT i = 0; i < num_cubes; i++) {
@@ -115,10 +145,15 @@ static void level1(Engine &ctx)
         };
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-        all_entities[num_entities++] = makeDynObject(ctx, pos, rot, 2);
+        Entity box = all_entities[num_entities++] =
+            makeDynObject(ctx, pos, rot, 2);
+
+        Entity obs_e = ctx.data().boxObservations[num_elongated + i];
+        ctx.getUnsafe<SimEntity>(obs_e).e = box;
+        ctx.getUnsafe<ObservationMask>(obs_e).mask = 1.f;
     }
 
-    const CountT num_ramps = 2;
+    const CountT num_ramps = Sim::maxRamps;
     for (CountT i = 0; i < num_ramps; i++) {
         Vector3 pos {
             bounds.x + rng.rand() * bounds_diff,
@@ -128,7 +163,12 @@ static void level1(Engine &ctx)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        all_entities[num_entities++] = makeDynObject(ctx, pos, rot, 5);
+        Entity ramp = all_entities[num_entities++] =
+            makeDynObject(ctx, pos, rot, 5);
+
+        Entity obs_e = ctx.data().rampObservations[i];
+        ctx.getUnsafe<SimEntity>(obs_e).e = ramp;
+        ctx.getUnsafe<ObservationMask>(obs_e).mask = 1.f;
     }
 
     all_entities[num_entities++] =
@@ -144,9 +184,8 @@ static void level1(Engine &ctx)
     all_entities[num_entities++] =
         makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
-    auto makeDynAgent = [&](Vector3 pos, Quat rot, Entity *agent_arr,
-                            CountT *agent_count) {
-        Entity agent = makeAgent<DynAgent>(ctx, agent_arr, agent_count);
+    auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider) {
+        Entity agent = makeAgent<DynAgent>(ctx, is_hider);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
@@ -167,20 +206,8 @@ static void level1(Engine &ctx)
         return agent;
     };
 
-    auto makeHider = [&](Vector3 pos, Quat rot) {
-        Entity e =
-            makeDynAgent(pos, rot, ctx.data().hiders, &ctx.data().numHiders);
-        ctx.getUnsafe<AgentType>(e).isHider = true;
-    };
-
-    auto makeSeeker = [&](Vector3 pos, Quat rot) {
-        Entity e =
-            makeDynAgent(pos, rot, ctx.data().seekers, &ctx.data().numSeekers);
-        ctx.getUnsafe<AgentType>(e).isHider = false;
-    };
-
-    makeHider({ -15, -15, 1.5 },
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}));
+    makeDynAgent({ -15, -15, 1.5 },
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true);
 
     for (CountT i = 1; i < num_hiders; i++) {
         Vector3 pos {
@@ -190,7 +217,7 @@ static void level1(Engine &ctx)
         };
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-        makeHider(pos, rot);
+        makeDynAgent(pos, rot, true);
     }
 
     for (CountT i = 0; i < num_seekers; i++) {
@@ -202,15 +229,15 @@ static void level1(Engine &ctx)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        makeSeeker(pos, rot);
+        makeDynAgent(pos, rot, false);
     }
 
-    ctx.data().numEntities = num_entities;
+    ctx.data().numObstacles = num_entities;
 }
 
 static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 {
-    Entity *all_entities = ctx.data().allEntities;
+    Entity *all_entities = ctx.data().obstacles;
 
     CountT total_entities = 0;
 
@@ -223,10 +250,9 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
     const Quat agent_rot =
         Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
 
-    ctx.data().numEntities = total_entities;
+    ctx.data().numObstacles = total_entities;
 
-    Entity agent = makeAgent<CameraAgent>(ctx, ctx.data().hiders,
-                                          &ctx.data().numHiders);
+    Entity agent = makeAgent<CameraAgent>(ctx);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
@@ -255,7 +281,7 @@ static void level4(Engine &ctx)
 
 static void level5(Engine &ctx)
 {
-    Entity *all_entities = ctx.data().allEntities;
+    Entity *all_entities = ctx.data().obstacles;
     CountT num_entities_range =
         ctx.data().maxEpisodeEntities - ctx.data().minEpisodeEntities;
 
@@ -296,40 +322,53 @@ static void level5(Engine &ctx)
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
-    Entity agent = makeAgent<CameraAgent>(ctx, ctx.data().hiders,
-                                          &ctx.data().numHiders);
+    Entity agent = makeAgent<CameraAgent>(ctx);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
-    ctx.data().numEntities = total_entities;
+    ctx.data().numObstacles = total_entities;
 }
 
 static void resetWorld(Engine &ctx, int32_t level)
 {
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
-    Entity *all_entities = ctx.data().allEntities;
-    for (CountT i = 0; i < ctx.data().numEntities; i++) {
+    Entity *all_entities = ctx.data().obstacles;
+    for (CountT i = 0; i < ctx.data().numObstacles; i++) {
         Entity e = all_entities[i];
         ctx.destroyEntityNow(e);
     }
-    ctx.data().numEntities = 0;
+    ctx.data().numObstacles = 0;
 
     for (CountT i = 0; i < ctx.data().numHiders; i++) {
-        ctx.destroyEntityNow(
-            ctx.getUnsafe<AgentParent>(ctx.data().hiders[i]).ifaceEntity);
         ctx.destroyEntityNow(ctx.data().hiders[i]);
     }
     ctx.data().numHiders = 0;
 
     for (CountT i = 0; i < ctx.data().numSeekers; i++) {
-        ctx.destroyEntityNow(
-            ctx.getUnsafe<AgentParent>(ctx.data().seekers[i]).ifaceEntity);
         ctx.destroyEntityNow(ctx.data().seekers[i]);
     }
     ctx.data().numSeekers = 0;
+
+    auto clearObservationEntity = [&](Entity e) {
+        ctx.getUnsafe<SimEntity>(e).e = Entity::none();
+        ctx.getUnsafe<ObservationMask>(e).mask = 0.f;
+    };
+
+    for (int32_t i = 0; i < Sim::maxBoxes; i++) {
+        clearObservationEntity(ctx.data().boxObservations[i]);
+    }
+
+    for (int32_t i = 0; i < Sim::maxRamps; i++) {
+        clearObservationEntity(ctx.data().rampObservations[i]);
+    }
+
+    for (int32_t i = 0; i < Sim::maxAgents; i++) {
+        clearObservationEntity(ctx.data().agentObservations[i]);
+    }
+    ctx.data().numActiveAgents = 0;
 
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
@@ -428,13 +467,14 @@ inline void sortDebugSystem(Engine &ctx, WorldReset &)
 }
 #endif
 
-inline void actionSystem(Engine &ctx, Action &action, AgentImpl impl)
+inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e)
 {
+    if (sim_e.e == Entity::none()) return;
+
     constexpr float turn_angle = helpers::toRadians(10.f);
 
-
-    Position &pos = ctx.getUnsafe<Position>(impl.implEntity);
-    Rotation &rot = ctx.getUnsafe<Rotation>(impl.implEntity);
+    Position &pos = ctx.getUnsafe<Position>(sim_e.e);
+    Rotation &rot = ctx.getUnsafe<Rotation>(sim_e.e);
 
     switch(action.action) {
     case 0: {
@@ -483,6 +523,22 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
+inline void collectObservationsSystem(Engine &ctx,
+                                      SimEntity sim_e,
+                                      PositionObservation &pos_obs,
+                                      VelocityObservation &vel_obs)
+{
+    if (sim_e.e == Entity::none()) {
+        return;
+    }
+
+    Vector3 pos = ctx.getUnsafe<Position>(sim_e.e);
+    Vector3 linear_vel = ctx.getUnsafe<Velocity>(sim_e.e).linear;
+
+    pos_obs.x = pos;
+    vel_obs.v = linear_vel;
+}
+
 inline void teamRewardsSystem(Engine &ctx,
                               TeamReward &team_reward)
 {
@@ -519,22 +575,38 @@ inline void teamRewardsSystem(Engine &ctx,
 }
 
 inline void agentRewardsSystem(Engine &ctx,
-                               const Position &pos,
+                               SimEntity sim_e,
+                               const PositionObservation &pos,
                                AgentType agent_type,
                                Reward &reward)
 {
+    if (sim_e.e == Entity::none()) {
+        return;
+    }
+
     float reward_val = ctx.getSingleton<TeamReward>().hidersReward;
     if (!agent_type.isHider) {
         reward_val *= -1.f;
     }
 
-    if (fabsf(pos.x) >= 18.f || fabsf(pos.y) >= 18.f) {
+    if (fabsf(pos.x.x) >= 18.f || fabsf(pos.x.y) >= 18.f) {
         reward_val -= 10.f;
     }
 
     reward.reward = reward_val;
+}
 
-    printf("%d %f\n", agent_type.isHider, reward_val);
+template <typename ArchetypeT>
+TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
+                                   Span<const TaskGraph::NodeID> deps)
+{
+    auto sort_sys =
+        builder.addToGraph<SortArchetypeNode<ArchetypeT, WorldID>>(
+            deps);
+    auto post_sort_reset_tmp =
+        builder.addToGraph<ResetTmpAllocNode>({sort_sys});
+
+    return post_sort_reset_tmp;
 }
 
 void Sim::setupTasks(TaskGraph::Builder &builder)
@@ -542,37 +614,18 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
 
-    auto sort_agent_iface_sys =
-        builder.addToGraph<SortArchetypeNode<AgentInterface, WorldID>>(
-            {reset_sys});
-    auto post_sort_agent_iface_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_agent_iface_sys});
+    // FIXME: these 3 need to be compacted, but sorting is unnecessary
+    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {reset_sys});
+    auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
+    auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
 
-    auto sort_cam_agent_sys =
-        builder.addToGraph<SortArchetypeNode<CameraAgent, WorldID>>(
-            {post_sort_agent_iface_reset_tmp});
-    auto post_sort_cam_agent_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_cam_agent_sys});
+    // FIXME: these 3 really shouldn't need to be sorted. They only need
+    // to be sorted after initialization (purely static afterwards)
+    auto sort_agent_iface = queueSortByWorld<AgentInterface>(builder, {sort_objects});
+    auto sort_box_obs = queueSortByWorld<BoxObservation>(builder, {sort_agent_iface});
+    auto sort_ramp_obs = queueSortByWorld<BoxObservation>(builder, {sort_box_obs});
 
-    auto sort_dyn_agent_sys =
-        builder.addToGraph<SortArchetypeNode<DynAgent, WorldID>>(
-            {post_sort_cam_agent_reset_tmp});
-    auto post_sort_dyn_agent_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_dyn_agent_sys});
-
-    auto sort_dyn_sys = 
-        builder.addToGraph<SortArchetypeNode<DynamicObject, WorldID>>(
-            {post_sort_dyn_agent_reset_tmp});
-    auto post_sort_dyn_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_dyn_sys});
-
-    auto sort_static_sys =
-        builder.addToGraph<SortArchetypeNode<StaticObject, WorldID>>(
-            {post_sort_dyn_reset_tmp});
-    auto post_sort_static_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_static_sys});
-
-    auto prep_finish = post_sort_static_reset_tmp;
+    auto prep_finish = sort_ramp_obs;
 
 #if 0
     prep_finish = builder.addToGraph<ParallelForNode<Engine,
@@ -580,7 +633,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 #endif
 
     auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
-        Action, AgentImpl>>({prep_finish});
+        Action, SimEntity>>({prep_finish});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
         {action_sys}, numPhysicsSubsteps);
@@ -599,15 +652,23 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
 
+    auto collect_observations = builder.addToGraph<ParallelForNode<Engine,
+        collectObservationsSystem,
+            SimEntity,
+            PositionObservation,
+            VelocityObservation>>({sim_done});
+
     auto team_rewards = builder.addToGraph<ParallelForNode<Engine,
-        teamRewardsSystem, TeamReward>>({sim_done});
+        teamRewardsSystem, TeamReward>>({collect_observations});
 
     auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
-        agentRewardsSystem, Position, AgentType, Reward>>({team_rewards});
+        agentRewardsSystem, SimEntity, PositionObservation, AgentType, Reward>>(
+            {team_rewards});
 
     (void)phys_cleanup_sys;
     (void)renderer_sys;
     (void)recycle_sys;
+    (void)agent_rewards;
 
     printf("Setup done\n");
 }
@@ -624,15 +685,28 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
 
     render::RenderingSystem::init(ctx);
 
-    allEntities =
+    obstacles =
         (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));
 
-    numEntities = 0;
+    numObstacles = 0;
     minEpisodeEntities = init.minEntitiesPerWorld;
     maxEpisodeEntities = init.maxEntitiesPerWorld;
 
     numHiders = 0;
     numSeekers = 0;
+
+    for (int32_t i = 0; i < maxBoxes; i++) {
+        boxObservations[i] = ctx.makeEntityNow<BoxObservation>();
+    }
+
+    for (int32_t i = 0; i < maxRamps; i++) {
+        rampObservations[i] = ctx.makeEntityNow<RampObservation>();
+    }
+
+    for (int32_t i = 0; i < maxAgents; i++) {
+        agentObservations[i] = ctx.makeEntityNow<AgentInterface>();
+    }
+
     resetWorld(ctx, 1);
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }

@@ -308,7 +308,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
-            .numExportedBuffers = 2,
+            .numExportedBuffers = 13,
             .gpuID = (uint32_t)cfg.gpuID,
             .renderWidth = cfg.renderWidth,
             .renderHeight = cfg.renderHeight,
@@ -387,7 +387,19 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
 MADRONA_EXPORT Tensor Manager::moveActionTensor() const
 {
     return exportStateTensor(1, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, 1});
+                             {impl_->cfg.numWorlds, Sim::maxAgents, 1});
+}
+
+MADRONA_EXPORT Tensor Manager::rewardTensor() const
+{
+    return exportStateTensor(2, Tensor::ElementType::Float32,
+                             {impl_->cfg.numWorlds, Sim::maxAgents, 1});
+}
+
+MADRONA_EXPORT Tensor Manager::agentMaskTensor() const
+{
+    return exportStateTensor(6, Tensor::ElementType::Float32,
+                             {impl_->cfg.numWorlds, Sim::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::depthTensor() const
