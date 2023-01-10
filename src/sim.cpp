@@ -526,8 +526,8 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
         auto &bvh = ctx.getSingleton<broadphase::BVH>();
         float hit_t;
         Vector3 hit_normal;
-        Entity lock_entity = bvh.traceRay(cur_pos,
-            cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 1.25f);
+        Entity lock_entity = bvh.traceRay(cur_pos - 0.5f * math::up,
+            cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 1.5f);
 
         if (lock_entity != Entity::none()) {
             auto &owner = ctx.getUnsafe<OwnerTeam>(lock_entity);
