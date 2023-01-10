@@ -30,10 +30,16 @@ public:
     MADRONA_IMPORT void step();
 
     MADRONA_IMPORT madrona::py::Tensor resetTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor moveActionTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor actionTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rewardTensor() const;
     MADRONA_IMPORT madrona::py::Tensor agentMaskTensor() const;
     MADRONA_IMPORT madrona::py::Tensor visibilityMasksTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor boxPositionsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor boxVelocitiesTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor rampPositionsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor rampVelocitiesTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor otherAgentPositionsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor otherAgentVelocitiesTensor() const;
     MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
 

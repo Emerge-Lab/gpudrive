@@ -20,7 +20,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         debug_compile = False,
 )
 
-actions = sim.move_action_tensor().to_torch()
+actions = sim.action_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
@@ -43,14 +43,7 @@ for i in range(num_steps):
     reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
     resets.copy_(reset_cond)
 
-    #action = get_keyboard_action()
-    #
-    #if action == -1:
-    #    resets[0] = 1
-    #elif action == -2:
-    #    break
-    #else:
-    #    actions[0][0] = action
+    actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
 
 end = time.time()
 

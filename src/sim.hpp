@@ -49,7 +49,11 @@ struct DynamicObject : public madrona::Archetype<
 > {};
 
 struct Action {
-    int32_t action;
+    int32_t x;
+    int32_t y;
+    int32_t r;
+    int32_t g;
+    int32_t l;
 };
 
 struct SimEntity {
@@ -84,7 +88,7 @@ struct VisibilityMasks {
     float visible[consts::totalObservationsPerAgent];
 };
 
-static_assert(sizeof(Action) == sizeof(int32_t));
+static_assert(sizeof(Action) == 5 * sizeof(int32_t));
 
 struct AgentInterface : public madrona::Archetype<
     SimEntity,

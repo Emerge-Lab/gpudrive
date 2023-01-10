@@ -384,10 +384,10 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
                              {impl_->cfg.numWorlds, 1});
 }
 
-MADRONA_EXPORT Tensor Manager::moveActionTensor() const
+MADRONA_EXPORT Tensor Manager::actionTensor() const
 {
     return exportStateTensor(1, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, consts::maxAgents, 1});
+                             {impl_->cfg.numWorlds, consts::maxAgents, 5});
 }
 
 MADRONA_EXPORT Tensor Manager::rewardTensor() const

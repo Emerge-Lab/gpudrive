@@ -473,45 +473,39 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e)
 {
     if (sim_e.e == Entity::none()) return;
 
-    constexpr float turn_angle = helpers::toRadians(10.f);
+    constexpr CountT discrete_action_buckets = 11;
+    constexpr CountT half_buckets = discrete_action_buckets / 2;
+    constexpr float discrete_action_max = 0.9;
+    constexpr float delta_per_bucket = discrete_action_max / half_buckets;
+
+    float delta_x = delta_per_bucket * action.x;
+    float delta_y = delta_per_bucket * action.y;
+    float turn_angle = delta_per_bucket * action.r;
+
+    Quat delta_rot = Quat::angleAxis(turn_angle, math::up);
 
     Position &pos = ctx.getUnsafe<Position>(sim_e.e);
-    Rotation &rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Rotation &rot_ref = ctx.getUnsafe<Rotation>(sim_e.e);
+    
+    Quat cur_rot = rot_ref;
+    Vector3 pos_delta { delta_x, delta_y, 0.f };
+    pos += cur_rot.rotateVec(pos_delta);
 
-    switch(action.action) {
-    case 0: {
-        // Do nothing
-    } break;
-    case 1: {
-        Vector3 fwd = rot.rotateVec(math::fwd);
-        pos += 0.5f * fwd;
-    } break;
-    case 2: {
-        const Quat left_rot = Quat::angleAxis(turn_angle, math::up);
-        rot = (left_rot * rot).normalize();
-    } break;
-    case 3: {
-        const Quat right_rot = Quat::angleAxis(-turn_angle, math::up);
-        rot = (right_rot * rot).normalize();
-    } break;
-    case 4: {
-        Vector3 fwd = rot.rotateVec(math::fwd);
-        pos -= 0.5f * fwd;
-    } break;
-    case 5: {
-        Vector3 up = rot.rotateVec(math::up);
-        pos += up;
-    } break;
-    case 6: {
-        Vector3 up = rot.rotateVec(math::up);
-        pos -= up;
-    } break;
-    default:
-        break;
+    rot_ref = (delta_rot * cur_rot).normalize();
+
+    if (action.g == 1) {
     }
 
-    // "Consume" the action
-    action.action = 0;
+    if (action.l == 1) {
+    }
+
+    // "Consume" the actions. This isn't strictly necessary but
+    // allows step to be called without every agent having acted
+    action.x = 0;
+    action.y = 0;
+    action.r = 0;
+    action.g = 0;
+    action.l = 0;
 }
 
 inline void agentZeroVelSystem(Engine &,

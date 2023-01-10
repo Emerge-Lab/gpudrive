@@ -19,7 +19,11 @@ def get_single_char():
 
 class Action:
     def __init__(self):
-        self.action = 0
+        self.x = 0
+        self.y = 0
+        self.r = 0
+        self.g = 0
+        self.l = 0
         self.reset = 0
 
 def get_keyboard_action():
@@ -29,21 +33,23 @@ def get_keyboard_action():
         result = Action()
 
         if key_action == 'w':
-            result.action = 1
+            result.y = 3
         elif key_action == 'a':
-            result.action = 2
+            result.x = -3
         elif key_action == 'd':
-            result.action = 3
+            result.x = 3
         elif key_action == 's':
-            result.action = 4
-        elif key_action == 'c':
-            result.action = 5
-        elif key_action == 'z':
-            result.action = 6
+            result.y = -3
         elif key_action == 'q':
-            result.action = -1
-        elif key_action == ' ':
-            result.action = 0
+            result.r = 1
+        elif key_action == 'e':
+            result.r = -1
+        elif key_action == 'g':
+            result.g = 1
+        elif key_action == 'l':
+            result.l = 1
+        elif key_action == 'x':
+            result.reset = -1
         elif key_action == '1':
             result.reset = 1
         elif key_action == '2':
@@ -54,6 +60,8 @@ def get_keyboard_action():
             result.reset = 4
         elif key_action == '5':
             result.reset = 5
+        elif key_action == ' ':
+            pass
         else:
             continue
 
@@ -70,7 +78,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         debug_compile = False,
 )
 
-actions = sim.move_action_tensor().to_torch()
+actions = sim.action_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 agent_valid_masks = sim.agent_mask_tensor().to_torch()
 agent_visibility_masks = sim.visibility_masks_tensor().to_torch()
@@ -90,10 +98,14 @@ while True:
 
     action = get_keyboard_action()
     
-    if action.action < 0:
+    if action.reset < 0:
         break
 
     resets[0] = action.reset
-    actions[0][0][0] = action.action
+    actions[0][0][0] = action.x
+    actions[0][0][1] = action.y
+    actions[0][0][2] = action.r
+    actions[0][0][3] = action.g
+    actions[0][0][4] = action.l
 
 del sim
