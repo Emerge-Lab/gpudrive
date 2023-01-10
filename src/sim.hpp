@@ -19,6 +19,7 @@ using madrona::base::Rotation;
 using madrona::base::Scale;
 using madrona::base::ObjectID;
 using madrona::phys::Velocity;
+using madrona::phys::ResponseType;
 
 namespace consts {
 
@@ -40,12 +41,26 @@ struct WorldDone {
     int32_t done;
 };
 
+enum class OwnerTeam : uint32_t {
+    None,
+    Seeker,
+    Hider,
+    Unownable,
+};
+
+enum class AgentType : uint32_t {
+    Seeker = 0,
+    Hider = 1,
+};
+
 struct DynamicObject : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
     Velocity,
     ObjectID,
+    ResponseType,
+    OwnerTeam,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
@@ -66,10 +81,6 @@ struct SimEntity {
 
 struct Reward {
     float reward;
-};
-
-struct AgentType {
-    bool isHider;
 };
 
 struct ObservationMask {
@@ -112,8 +123,10 @@ struct DynAgent : public madrona::Archetype<
     Position,
     Rotation,
     Scale,
-    ObjectID,
     Velocity,
+    ObjectID,
+    ResponseType,
+    OwnerTeam,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,

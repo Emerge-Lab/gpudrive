@@ -1,5 +1,6 @@
 #include "sim.hpp"
 #include <madrona/mw_gpu_entry.hpp>
+#include <madrona/mw_gpu/host_print.hpp>
 
 using namespace madrona;
 using namespace madrona::math;
@@ -18,6 +19,7 @@ void Sim::registerTypes(ECSRegistry &registry)
 
     registry.registerComponent<Action>();
     registry.registerComponent<Reward>();
+    registry.registerComponent<OwnerTeam>();
     registry.registerComponent<AgentType>();
 
     registry.registerComponent<SimEntity>();
@@ -55,8 +57,13 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.exportColumn<RampObservation, ObservationMask>(14);
 }
 
-static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
-                            int32_t obj_id, Vector3 scale = {1, 1, 1})
+static Entity makeDynObject(Engine &ctx,
+                            Vector3 pos,
+                            Quat rot,
+                            int32_t obj_id,
+                            ResponseType response_type = ResponseType::Dynamic,
+                            OwnerTeam owner_team = OwnerTeam::None,
+                            Vector3 scale = {1, 1, 1})
 {
     Entity e = ctx.makeEntityNow<DynamicObject>();
     ctx.getUnsafe<Position>(e) = pos;
@@ -69,12 +76,15 @@ static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
         Vector3 { 0, 0, 0 },
         Vector3 { 0, 0, 0 },
     };
+    ctx.getUnsafe<ResponseType>(e) = response_type;
+    ctx.getUnsafe<OwnerTeam>(e) = owner_team;
 
     return e;
 }
 
 static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
-    return makeDynObject(ctx, offset, rot, 1);
+    return makeDynObject(ctx, offset, rot, 1, ResponseType::Static,
+                         OwnerTeam::Unownable);
 }
 
 template <typename T>
@@ -86,7 +96,9 @@ static Entity makeAgent(Engine &ctx, bool is_hider = true)
     Entity agent = ctx.makeEntityNow<T>();
     ctx.getUnsafe<SimEntity>(agent_iface).e = agent;
     ctx.getUnsafe<ObservationMask>(agent_iface).mask = 1.f;
-    ctx.getUnsafe<AgentType>(agent_iface).isHider = is_hider;
+
+    ctx.getUnsafe<AgentType>(agent_iface) =
+        is_hider ? AgentType::Hider : AgentType::Seeker;
 
     if (is_hider) {
         ctx.data().hiders[ctx.data().numHiders++] = agent;
@@ -205,6 +217,8 @@ static void level1(Engine &ctx)
             Vector3::zero(),
             Vector3::zero(),
         };
+        ctx.getUnsafe<ResponseType>(agent) = ResponseType::Dynamic;
+        ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
 
         return agent;
     };
@@ -480,7 +494,8 @@ inline void sortDebugSystem(Engine &ctx, WorldReset &)
 }
 #endif
 
-inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e)
+inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
+                         AgentType agent_type)
 {
     if (sim_e.e == Entity::none()) return;
 
@@ -489,25 +504,54 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e)
     constexpr float discrete_action_max = 0.9;
     constexpr float delta_per_bucket = discrete_action_max / half_buckets;
 
+    Position &pos_ref = ctx.getUnsafe<Position>(sim_e.e);
+    Rotation &rot_ref = ctx.getUnsafe<Rotation>(sim_e.e);
+
     float delta_x = delta_per_bucket * action.x;
     float delta_y = delta_per_bucket * action.y;
     float turn_angle = delta_per_bucket * action.r;
 
     Quat delta_rot = Quat::angleAxis(turn_angle, math::up);
 
-    Position &pos = ctx.getUnsafe<Position>(sim_e.e);
-    Rotation &rot_ref = ctx.getUnsafe<Rotation>(sim_e.e);
-    
+    Vector3 cur_pos = pos_ref;
     Quat cur_rot = rot_ref;
-    Vector3 pos_delta { delta_x, delta_y, 0.f };
-    pos += cur_rot.rotateVec(pos_delta);
 
+    Vector3 pos_delta { delta_x, delta_y, 0.f };
+    cur_pos += cur_rot.rotateVec(pos_delta);
+
+    pos_ref = cur_pos;
     rot_ref = (delta_rot * cur_rot).normalize();
 
-    if (action.g == 1) {
+    if (action.l == 1) {
+        auto &bvh = ctx.getSingleton<broadphase::BVH>();
+        float hit_t;
+        Vector3 hit_normal;
+        Entity lock_entity = bvh.traceRay(cur_pos,
+            cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 1.25f);
+
+        if (lock_entity != Entity::none()) {
+            auto &owner = ctx.getUnsafe<OwnerTeam>(lock_entity);
+            auto &response_type = ctx.getUnsafe<ResponseType>(lock_entity);
+
+            if (response_type == ResponseType::Static) {
+                if ((agent_type == AgentType::Seeker &&
+                        owner == OwnerTeam::Seeker) ||
+                        (agent_type == AgentType::Hider &&
+                         owner == OwnerTeam::Hider)) {
+                    response_type = ResponseType::Dynamic;
+                    owner = OwnerTeam::None;
+                }
+            } else {
+                if (owner == OwnerTeam::None) {
+                    response_type = ResponseType::Static;
+                    owner = agent_type == AgentType::Hider ?
+                        OwnerTeam::Hider : OwnerTeam::Seeker;
+                }
+            }
+        }
     }
 
-    if (action.l == 1) {
+    if (action.g == 1) {
     }
 
     // "Consume" the actions. This isn't strictly necessary but
@@ -630,10 +674,9 @@ inline void computeVisibilitySystem(Engine &ctx,
         bool is_visible =
             checkVisibility(other_agent_e, other_agent_sim_e);
 
-        if (!agent_type.isHider && is_visible) {
-            bool other_is_hider =
-                ctx.getUnsafe<AgentType>(other_agent_e).isHider;
-            if (other_is_hider) {
+        if (agent_type == AgentType::Seeker && is_visible) {
+            AgentType other_type = ctx.getUnsafe<AgentType>(other_agent_e);
+            if (other_type == AgentType::Hider) {
                 ctx.data().hiderTeamReward.store(-1.f,
                     std::memory_order_relaxed);
             }
@@ -668,7 +711,7 @@ inline void agentRewardsSystem(Engine &ctx,
 
     float reward_val = ctx.data().hiderTeamReward.load(
         std::memory_order_relaxed);
-    if (!agent_type.isHider) {
+    if (agent_type == AgentType::Seeker) {
         reward_val *= -1.f;
     }
 
@@ -716,7 +759,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 #endif
 
     auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
-        Action, SimEntity>>({prep_finish});
+        Action, SimEntity, AgentType>>({prep_finish});
 
     auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
         {action_sys}, numPhysicsSubsteps);
