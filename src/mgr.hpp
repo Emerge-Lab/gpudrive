@@ -30,6 +30,7 @@ public:
     MADRONA_IMPORT void step();
 
     MADRONA_IMPORT madrona::py::Tensor resetTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor doneTensor() const;
     MADRONA_IMPORT madrona::py::Tensor actionTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rewardTensor() const;
     MADRONA_IMPORT madrona::py::Tensor agentMaskTensor() const;

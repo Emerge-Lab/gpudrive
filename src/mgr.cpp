@@ -308,7 +308,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
-            .numExportedBuffers = 14,
+            .numExportedBuffers = 15,
             .gpuID = (uint32_t)cfg.gpuID,
             .renderWidth = cfg.renderWidth,
             .renderHeight = cfg.renderHeight,
@@ -384,27 +384,33 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
                              {impl_->cfg.numWorlds, 1});
 }
 
-MADRONA_EXPORT Tensor Manager::actionTensor() const
+MADRONA_EXPORT Tensor Manager::doneTensor() const
 {
     return exportStateTensor(1, Tensor::ElementType::Int32,
+                             {impl_->cfg.numWorlds, 1});
+}
+
+MADRONA_EXPORT Tensor Manager::actionTensor() const
+{
+    return exportStateTensor(2, Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds, consts::maxAgents, 5});
 }
 
 MADRONA_EXPORT Tensor Manager::rewardTensor() const
 {
-    return exportStateTensor(2, Tensor::ElementType::Float32,
+    return exportStateTensor(3, Tensor::ElementType::Float32,
                              {impl_->cfg.numWorlds, consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::agentMaskTensor() const
 {
-    return exportStateTensor(6, Tensor::ElementType::Float32,
+    return exportStateTensor(7, Tensor::ElementType::Float32,
                              {impl_->cfg.numWorlds, consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::visibilityMasksTensor() const
 {
-    return exportStateTensor(7, Tensor::ElementType::Float32,
+    return exportStateTensor(8, Tensor::ElementType::Float32,
                              {impl_->cfg.numWorlds, consts::maxAgents,
                               consts::totalObservationsPerAgent});
 }

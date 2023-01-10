@@ -52,6 +52,7 @@ NB_MODULE(gpu_hideseek_python, m) {
            nb::arg("debug_compile") = true)
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)
+        .def("done_tensor", &Manager::doneTensor)
         .def("action_tensor", &Manager::actionTensor)
         .def("agent_mask_tensor", &Manager::agentMaskTensor)
         .def("visibility_masks_tensor", &Manager::visibilityMasksTensor)

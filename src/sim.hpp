@@ -36,6 +36,10 @@ struct WorldReset {
     int32_t resetLevel;
 };
 
+struct WorldDone {
+    int32_t done;
+};
+
 struct DynamicObject : public madrona::Archetype<
     Position, 
     Rotation,
@@ -58,10 +62,6 @@ struct Action {
 
 struct SimEntity {
     Entity e;
-};
-
-struct TeamReward {
-    std::atomic<float> hidersReward;
 };
 
 struct Reward {
@@ -160,8 +160,11 @@ struct Sim : public madrona::WorldBase {
     Entity agentObservations[consts::maxAgents];
     CountT numActiveAgents;
 
+    CountT curEpisodeStep;
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
+
+    std::atomic<float> hiderTeamReward;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

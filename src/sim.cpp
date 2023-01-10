@@ -27,7 +27,7 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerComponent<VisibilityMasks>();
 
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<TeamReward>();
+    registry.registerSingleton<WorldDone>();
 
     registry.registerArchetype<DynamicObject>();
     registry.registerArchetype<AgentInterface>();
@@ -37,21 +37,22 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerArchetype<RampObservation>();
 
     registry.exportSingleton<WorldReset>(0);
-    registry.exportColumn<AgentInterface, Action>(1);
-    registry.exportColumn<AgentInterface, Reward>(2);
-    registry.exportColumn<AgentInterface, AgentType>(3);
-    registry.exportColumn<AgentInterface, PositionObservation>(4);
-    registry.exportColumn<AgentInterface, VelocityObservation>(5);
-    registry.exportColumn<AgentInterface, ObservationMask>(6);
-    registry.exportColumn<AgentInterface, VisibilityMasks>(7);
+    registry.exportSingleton<WorldDone>(1);
+    registry.exportColumn<AgentInterface, Action>(2);
+    registry.exportColumn<AgentInterface, Reward>(3);
+    registry.exportColumn<AgentInterface, AgentType>(4);
+    registry.exportColumn<AgentInterface, PositionObservation>(5);
+    registry.exportColumn<AgentInterface, VelocityObservation>(6);
+    registry.exportColumn<AgentInterface, ObservationMask>(7);
+    registry.exportColumn<AgentInterface, VisibilityMasks>(8);
 
-    registry.exportColumn<BoxObservation, PositionObservation>(8);
-    registry.exportColumn<BoxObservation, VelocityObservation>(9);
-    registry.exportColumn<BoxObservation, ObservationMask>(10);
+    registry.exportColumn<BoxObservation, PositionObservation>(9);
+    registry.exportColumn<BoxObservation, VelocityObservation>(10);
+    registry.exportColumn<BoxObservation, ObservationMask>(11);
 
-    registry.exportColumn<RampObservation, PositionObservation>(11);
-    registry.exportColumn<RampObservation, VelocityObservation>(12);
-    registry.exportColumn<RampObservation, ObservationMask>(13);
+    registry.exportColumn<RampObservation, PositionObservation>(12);
+    registry.exportColumn<RampObservation, VelocityObservation>(13);
+    registry.exportColumn<RampObservation, ObservationMask>(14);
 }
 
 static Entity makeDynObject(Engine &ctx, Vector3 pos, Quat rot,
@@ -335,6 +336,7 @@ static void level5(Engine &ctx)
 
 static void resetWorld(Engine &ctx, int32_t level)
 {
+    ctx.getSingleton<WorldDone>().done = 0;
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
     Entity *all_entities = ctx.data().obstacles;
@@ -377,6 +379,8 @@ static void resetWorld(Engine &ctx, int32_t level)
         episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
     ctx.data().rng = RNG::make(episode_idx);
 
+    ctx.data().curEpisodeStep = 0;
+
     switch (level) {
     case 1: {
         level1(ctx);
@@ -398,6 +402,13 @@ static void resetWorld(Engine &ctx, int32_t level)
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
+    // These don't belong here but this runs once per world every frame, so...
+    ctx.data().hiderTeamReward.store(1.f, std::memory_order_relaxed);
+    CountT step_idx = ++ctx.data().curEpisodeStep;
+    if (step_idx >= 239) {
+        ctx.getSingleton<WorldDone>().done = 1;
+    }
+
     int32_t level = reset.resetLevel;
     if (level == 0) {
         return;
@@ -623,7 +634,7 @@ inline void computeVisibilitySystem(Engine &ctx,
             bool other_is_hider =
                 ctx.getUnsafe<AgentType>(other_agent_e).isHider;
             if (other_is_hider) {
-                ctx.getSingleton<TeamReward>().hidersReward.store(-1.f,
+                ctx.data().hiderTeamReward.store(-1.f,
                     std::memory_order_relaxed);
             }
         }
@@ -640,12 +651,6 @@ inline void computeVisibilitySystem(Engine &ctx,
     }
 }
 
-inline void teamRewardsResetSystem(Engine &ctx,
-                                   TeamReward &team_reward)
-{
-    team_reward.hidersReward = 1.f;
-}
-
 inline void agentRewardsSystem(Engine &ctx,
                                SimEntity sim_e,
                                const PositionObservation &pos,
@@ -656,7 +661,12 @@ inline void agentRewardsSystem(Engine &ctx,
         return;
     }
 
-    float reward_val = ctx.getSingleton<TeamReward>().hidersReward.load(
+    if (ctx.data().curEpisodeStep < 96) {
+        reward.reward = 0.f;
+        return;
+    }
+
+    float reward_val = ctx.data().hiderTeamReward.load(
         std::memory_order_relaxed);
     if (!agent_type.isHider) {
         reward_val *= -1.f;
@@ -731,16 +741,13 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
             PositionObservation,
             VelocityObservation>>({sim_done});
 
-    auto team_rewards_reset = builder.addToGraph<ParallelForNode<Engine,
-        teamRewardsResetSystem, TeamReward>>({collect_observations});
-
     auto compute_visibility = builder.addToGraph<ParallelForNode<Engine,
         computeVisibilitySystem,
             Entity,
             SimEntity,
             AgentType,
             PositionObservation,
-            VisibilityMasks>>({team_rewards_reset});
+            VisibilityMasks>>({collect_observations});
 
     auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
         agentRewardsSystem, SimEntity, PositionObservation, AgentType, Reward>>(
