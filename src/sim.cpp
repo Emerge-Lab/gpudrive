@@ -8,7 +8,7 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
-constexpr inline float deltaT = 1.f / 30.f;
+constexpr inline float deltaT = 0.075;
 constexpr inline float numPhysicsSubsteps = 4;
 
 void Sim::registerTypes(ECSRegistry &registry)
@@ -73,11 +73,13 @@ static Entity makeDynObject(Engine &ctx,
     ctx.getUnsafe<phys::broadphase::LeafID>(e) =
         phys::RigidBodyPhysicsSystem::registerEntity(ctx, e, ObjectID {obj_id});
     ctx.getUnsafe<Velocity>(e) = {
-        Vector3 { 0, 0, 0 },
-        Vector3 { 0, 0, 0 },
+        Vector3::zero(),
+        Vector3::zero(),
     };
     ctx.getUnsafe<ResponseType>(e) = response_type;
     ctx.getUnsafe<OwnerTeam>(e) = owner_team;
+    ctx.getUnsafe<ExternalForce>(e) = Vector3::zero();
+    ctx.getUnsafe<ExternalTorque>(e) = Vector3::zero();
 
     return e;
 }
@@ -219,6 +221,8 @@ static void level1(Engine &ctx)
         };
         ctx.getUnsafe<ResponseType>(agent) = ResponseType::Dynamic;
         ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
+        ctx.getUnsafe<ExternalForce>(agent) = Vector3::zero();
+        ctx.getUnsafe<ExternalTorque>(agent) = Vector3::zero();
 
         return agent;
     };
@@ -501,26 +505,18 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
     constexpr CountT discrete_action_buckets = 11;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_action_max = 0.9;
+    constexpr float discrete_action_max = 0.9 * 10;
     constexpr float delta_per_bucket = discrete_action_max / half_buckets;
 
-    Position &pos_ref = ctx.getUnsafe<Position>(sim_e.e);
-    Rotation &rot_ref = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
+    Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
 
-    float delta_x = delta_per_bucket * action.x;
-    float delta_y = delta_per_bucket * action.y;
-    float turn_angle = delta_per_bucket * action.r;
+    float f_x = delta_per_bucket * action.x;
+    float f_y = delta_per_bucket * action.y;
+    float t_z = delta_per_bucket * action.r;
 
-    Quat delta_rot = Quat::angleAxis(turn_angle, math::up);
-
-    Vector3 cur_pos = pos_ref;
-    Quat cur_rot = rot_ref;
-
-    Vector3 pos_delta { delta_x, delta_y, 0.f };
-    cur_pos += cur_rot.rotateVec(pos_delta);
-
-    pos_ref = cur_pos;
-    rot_ref = (delta_rot * cur_rot).normalize();
+    ctx.getUnsafe<ExternalForce>(sim_e.e) = cur_rot.rotateVec({ f_x, f_y, 0 });
+    ctx.getUnsafe<ExternalTorque>(sim_e.e) = Vector3 { 0, 0, t_z };
 
     if (action.l == 1) {
         auto &bvh = ctx.getSingleton<broadphase::BVH>();

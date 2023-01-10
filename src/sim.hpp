@@ -20,6 +20,8 @@ using madrona::base::Scale;
 using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 using madrona::phys::ResponseType;
+using madrona::phys::ExternalForce;
+using madrona::phys::ExternalTorque;
 
 namespace consts {
 
@@ -60,6 +62,8 @@ struct DynamicObject : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
+    ExternalForce,
+    ExternalTorque,
     OwnerTeam,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
@@ -126,6 +130,8 @@ struct DynAgent : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
+    ExternalForce,
+    ExternalTorque,
     OwnerTeam,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
