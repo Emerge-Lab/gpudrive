@@ -53,6 +53,7 @@ enum class OwnerTeam : uint32_t {
 enum class AgentType : uint32_t {
     Seeker = 0,
     Hider = 1,
+    Camera = 2,
 };
 
 struct DynamicObject : public madrona::Archetype<

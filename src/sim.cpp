@@ -90,7 +90,7 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
 }
 
 template <typename T>
-static Entity makeAgent(Engine &ctx, bool is_hider = true)
+static Entity makeAgent(Engine &ctx, AgentType agent_type)
 {
     Entity agent_iface =
         ctx.data().agentObservations[ctx.data().numActiveAgents++];
@@ -99,13 +99,12 @@ static Entity makeAgent(Engine &ctx, bool is_hider = true)
     ctx.getUnsafe<SimEntity>(agent_iface).e = agent;
     ctx.getUnsafe<ObservationMask>(agent_iface).mask = 1.f;
 
-    ctx.getUnsafe<AgentType>(agent_iface) =
-        is_hider ? AgentType::Hider : AgentType::Seeker;
+    ctx.getUnsafe<AgentType>(agent_iface) = agent_type;
 
-    if (is_hider) {
-        ctx.data().hiders[ctx.data().numHiders++] = agent;
-    } else {
+    if (agent_type == AgentType::Seeker) {
         ctx.data().seekers[ctx.data().numSeekers++] = agent;
+    } else {
+        ctx.data().hiders[ctx.data().numHiders++] = agent;
     }
 
     return agent;
@@ -202,7 +201,7 @@ static void level1(Engine &ctx)
         makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
     auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider) {
-        Entity agent = makeAgent<DynAgent>(ctx, is_hider);
+        Entity agent = makeAgent<DynAgent>(ctx, is_hider ? AgentType::Hider : AgentType::Seeker);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
@@ -273,7 +272,7 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 
     ctx.data().numObstacles = total_entities;
 
-    Entity agent = makeAgent<CameraAgent>(ctx);
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
@@ -343,7 +342,7 @@ static void level5(Engine &ctx)
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
-    Entity agent = makeAgent<CameraAgent>(ctx);
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
@@ -517,6 +516,15 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     float f_y = delta_per_bucket * action.y;
     float t_z = delta_per_bucket * action.r;
 
+    if (agent_type == AgentType::Camera) {
+        ctx.getUnsafe<Position>(sim_e.e) = cur_pos + 10.f * cur_rot.rotateVec({f_x, f_y, 0});
+
+        Quat delta_rot = Quat::angleAxis(t_z * 10.f, math::up);
+        ctx.getUnsafe<Rotation>(sim_e.e) = (delta_rot * cur_rot).normalize();
+
+        return;
+    }
+
     ctx.getUnsafe<ExternalForce>(sim_e.e) = cur_rot.rotateVec({ f_x, f_y, 0 });
     ctx.getUnsafe<ExternalTorque>(sim_e.e) = Vector3 { 0, 0, t_z };
 
@@ -634,7 +642,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       PositionObservation &pos_obs,
                                       VelocityObservation &vel_obs)
 {
-    if (sim_e.e == Entity::none()) {
+    if (sim_e.e == Entity::none() || !ctx.get<Velocity>(sim_e.e).valid()) {
         return;
     }
 
@@ -652,7 +660,7 @@ inline void computeVisibilitySystem(Engine &ctx,
                                     PositionObservation pos,
                                     VisibilityMasks &vis)
 {
-    if (sim_e.e == Entity::none()) {
+    if (sim_e.e == Entity::none() || agent_type == AgentType::Camera) {
         return;
     }
 
