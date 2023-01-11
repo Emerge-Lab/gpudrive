@@ -184,6 +184,9 @@ struct Sim : public madrona::WorldBase {
     CountT maxEpisodeEntities;
 
     std::atomic<float> hiderTeamReward;
+
+    // FIXME remove
+    Entity grabConstraintEntity;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

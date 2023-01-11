@@ -354,6 +354,8 @@ static void level5(Engine &ctx)
 
 static void resetWorld(Engine &ctx, int32_t level)
 {
+    ctx.data().grabConstraintEntity = Entity::none();
+
     ctx.getSingleton<WorldDone>().done = 0;
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
@@ -548,6 +550,63 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     }
 
     if (action.g == 1) {
+        if (ctx.data().grabConstraintEntity != Entity::none()) {
+            ctx.destroyEntityNow(ctx.data().grabConstraintEntity);
+            ctx.data().grabConstraintEntity = Entity::none();
+        } else {
+            auto &bvh = ctx.getSingleton<broadphase::BVH>();
+            float hit_t;
+            Vector3 hit_normal;
+
+            Vector3 ray_o = cur_pos - 0.5f * math::up;
+            Vector3 ray_d = cur_rot.rotateVec(math::fwd);
+
+            Entity grab_entity =
+                bvh.traceRay(ray_o, ray_d, &hit_t, &hit_normal, 1.5f);
+
+            if (grab_entity != Entity::none()) {
+                auto &owner = ctx.getUnsafe<OwnerTeam>(grab_entity);
+                auto &response_type = ctx.getUnsafe<ResponseType>(grab_entity);
+
+                if (owner == OwnerTeam::None &&
+                    response_type == ResponseType::Dynamic) {
+                    ctx.data().grabConstraintEntity =
+                        ctx.makeEntityNow<ConstraintData>();
+
+                    Vector3 other_pos = ctx.getUnsafe<Position>(grab_entity);
+                    Quat other_rot = ctx.getUnsafe<Rotation>(grab_entity);
+
+                    auto &joint_constraint = ctx.getUnsafe<JointConstraint>(
+                        ctx.data().grabConstraintEntity);
+
+                    joint_constraint.e1 = sim_e.e;
+                    joint_constraint.e2 = grab_entity;
+
+                    Vector3 r1 = 0.5f * math::fwd;
+
+                    Vector3 hit_pos = ray_o + ray_d * hit_t;
+                    Vector3 r2 = other_rot.inv().rotateVec(hit_pos - other_pos);
+
+                    joint_constraint.r1 = r1;
+                    joint_constraint.r2 = r2;
+
+                    Vector3 ray_dir_other_local =
+                        other_rot.inv().rotateVec(ray_d);
+
+                    // joint_constraint.axes2 needs to map from
+                    // (0, 0, 1) to ray_dir_other_local
+                    // and (1, 0, 0) to the agent's right vector in the grabbed
+                    // object's local space
+
+                    Vector3 right_vec_other_local = other_rot.inv().rotateVec(
+                        cur_rot.rotateVec(math::right));
+
+                    joint_constraint.axes1 = { 1, 0, 0, 0 };
+                    joint_constraint.axes2; // TODO
+                    joint_constraint.separation = hit_t - 0.5f;
+                }
+            }
+        }
     }
 
     // "Consume" the actions. This isn't strictly necessary but
@@ -808,7 +867,8 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
         std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 10;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
-         numPhysicsSubsteps, -9.8 * math::up, max_total_entities, 100 * 50);
+         numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
+         100 * 50, 10);
 
     render::RenderingSystem::init(ctx);
 
