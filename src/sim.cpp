@@ -200,13 +200,16 @@ static void level1(Engine &ctx)
     all_entities[num_entities++] =
         makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
-    auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider) {
-        Entity agent = makeAgent<DynAgent>(ctx, is_hider ? AgentType::Hider : AgentType::Seeker);
+    auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider,
+                            int32_t view_idx) {
+        Entity agent = makeAgent<DynAgent>(ctx,
+            is_hider ? AgentType::Hider : AgentType::Seeker);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
         ctx.getUnsafe<render::ViewSettings>(agent) =
-            render::RenderingSystem::setupView(ctx, 90.f, Vector3 { 0, 0, 0.8 });
+            render::RenderingSystem::setupView(ctx, 90.f,
+                Vector3 { 0, 0, 0.8 }, { view_idx });
 
         ObjectID agent_obj_id = ObjectID { 4 };
         ctx.getUnsafe<ObjectID>(agent) = agent_obj_id;
@@ -227,7 +230,7 @@ static void level1(Engine &ctx)
     };
 
     makeDynAgent({ -15, -15, 1.5 },
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true);
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true, 0);
 
     for (CountT i = 1; i < num_hiders; i++) {
         Vector3 pos {
@@ -237,7 +240,7 @@ static void level1(Engine &ctx)
         };
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-        makeDynAgent(pos, rot, true);
+        makeDynAgent(pos, rot, true, i);
     }
 
     for (CountT i = 0; i < num_seekers; i++) {
@@ -249,7 +252,7 @@ static void level1(Engine &ctx)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        makeDynAgent(pos, rot, false);
+        makeDynAgent(pos, rot, false, 3 + i);
     }
 
     ctx.data().numObstacles = num_entities;
@@ -274,7 +277,7 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
@@ -344,7 +347,7 @@ static void level5(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f);
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
@@ -633,7 +636,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
-                               render::ViewID &)
+                               render::ViewSettings &)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -833,7 +836,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
         {action_sys}, numPhysicsSubsteps);
 
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, render::ViewID>>(
+        agentZeroVelSystem, Velocity, render::ViewSettings>>(
             {phys_sys});
 
     auto sim_done = agent_zero_vel;

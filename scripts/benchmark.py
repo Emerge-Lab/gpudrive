@@ -15,8 +15,8 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         num_worlds = num_worlds,
         min_entities_per_world = entities_per_world,
         max_entities_per_world = entities_per_world,
-        render_width = 64,
-        render_height = 64,
+        render_width = 30,
+        render_height = 1,
         debug_compile = False,
 )
 

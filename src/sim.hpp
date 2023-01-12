@@ -120,8 +120,7 @@ struct AgentInterface : public madrona::Archetype<
 struct CameraAgent : public madrona::Archetype<
     Position,
     Rotation,
-    madrona::render::ViewSettings,
-    madrona::render::ViewID
+    madrona::render::ViewSettings
 > {};
 
 struct DynAgent : public madrona::Archetype<
@@ -138,8 +137,7 @@ struct DynAgent : public madrona::Archetype<
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
     madrona::phys::solver::PreSolveVelocity,
-    madrona::render::ViewSettings,
-    madrona::render::ViewID
+    madrona::render::ViewSettings
 > {};
 
 struct BoxObservation : public madrona::Archetype<

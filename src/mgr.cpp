@@ -308,8 +308,12 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
+            .maxViewsPerWorld = consts::maxAgents,
             .numExportedBuffers = 15,
             .gpuID = (uint32_t)cfg.gpuID,
+            .cameraMode = cfg.lidarRender ?
+                StateConfig::CameraMode::Lidar :
+                StateConfig::CameraMode::Perspective,
             .renderWidth = cfg.renderWidth,
             .renderHeight = cfg.renderHeight,
         }, {
@@ -431,7 +435,8 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::Float32,
-                     {impl_->cfg.numWorlds, impl_->cfg.renderHeight,
+                     {impl_->cfg.numWorlds, consts::maxAgents,
+                      impl_->cfg.renderHeight,
                       impl_->cfg.renderWidth, 1}, gpu_id);
 }
 
@@ -451,7 +456,8 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::UInt8,
-                  {impl_->cfg.numWorlds, impl_->cfg.renderHeight,
+                  {impl_->cfg.numWorlds, consts::maxAgents,
+                   impl_->cfg.renderHeight,
                    impl_->cfg.renderWidth, 4}, gpu_id);
 }
 

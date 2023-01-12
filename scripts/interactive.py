@@ -75,6 +75,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         max_entities_per_world = 5,
         render_width = 1024,
         render_height = 1024,
+        lidar_render = False,
         debug_compile = False,
 )
 
@@ -91,7 +92,7 @@ print(rgb_observations.shape, rgb_observations.dtype)
 while True:
     print("Stepping")
     sim.step()
-    torchvision.utils.save_image((rgb_observations[0].float() / 255).permute(2, 0, 1), sys.argv[1])
+    torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
 
     print(rewards * agent_valid_masks)
     print(agent_visibility_masks * agent_valid_masks)
