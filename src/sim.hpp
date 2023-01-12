@@ -50,6 +50,10 @@ enum class OwnerTeam : uint32_t {
     Unownable,
 };
 
+struct GrabData {
+    Entity constraintEntity;
+};
+
 enum class AgentType : uint32_t {
     Seeker = 0,
     Hider = 1,
@@ -133,6 +137,7 @@ struct DynAgent : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     OwnerTeam,
+    GrabData,
     madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
@@ -183,9 +188,6 @@ struct Sim : public madrona::WorldBase {
     CountT maxEpisodeEntities;
 
     std::atomic<float> hiderTeamReward;
-
-    // FIXME remove
-    Entity grabConstraintEntity;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

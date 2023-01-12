@@ -21,6 +21,7 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerComponent<Reward>();
     registry.registerComponent<OwnerTeam>();
     registry.registerComponent<AgentType>();
+    registry.registerComponent<GrabData>();
 
     registry.registerComponent<SimEntity>();
     registry.registerComponent<PositionObservation>();
@@ -225,6 +226,7 @@ static void level1(Engine &ctx)
         ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
         ctx.getUnsafe<ExternalForce>(agent) = Vector3::zero();
         ctx.getUnsafe<ExternalTorque>(agent) = Vector3::zero();
+        ctx.getUnsafe<GrabData>(agent).constraintEntity = Entity::none();
 
         return agent;
     };
@@ -356,8 +358,6 @@ static void level5(Engine &ctx)
 
 static void resetWorld(Engine &ctx, int32_t level)
 {
-    ctx.data().grabConstraintEntity = Entity::none();
-
     ctx.getSingleton<WorldDone>().done = 0;
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
@@ -368,13 +368,26 @@ static void resetWorld(Engine &ctx, int32_t level)
     }
     ctx.data().numObstacles = 0;
 
+    auto destroyAgent = [&](Entity e) {
+        auto grab_data = ctx.get<GrabData>(e);
+
+        if (grab_data.valid()) {
+            auto constraint_entity = grab_data.value().constraintEntity;
+            if (constraint_entity != Entity::none()) {
+                ctx.destroyEntityNow(constraint_entity);
+            }
+        }
+
+        ctx.destroyEntityNow(e);
+    };
+
     for (CountT i = 0; i < ctx.data().numHiders; i++) {
-        ctx.destroyEntityNow(ctx.data().hiders[i]);
+        destroyAgent(ctx.data().hiders[i]);
     }
     ctx.data().numHiders = 0;
 
     for (CountT i = 0; i < ctx.data().numSeekers; i++) {
-        ctx.destroyEntityNow(ctx.data().seekers[i]);
+        destroyAgent(ctx.data().seekers[i]);
     }
     ctx.data().numSeekers = 0;
 
@@ -509,7 +522,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
     constexpr CountT discrete_action_buckets = 11;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_action_max = 0.9 * 10;
+    constexpr float discrete_action_max = 0.9 * 250;
     constexpr float delta_per_bucket = discrete_action_max / half_buckets;
 
     Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
@@ -520,9 +533,9 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     float t_z = delta_per_bucket * action.r;
 
     if (agent_type == AgentType::Camera) {
-        ctx.getUnsafe<Position>(sim_e.e) = cur_pos + 10.f * cur_rot.rotateVec({f_x, f_y, 0});
+        ctx.getUnsafe<Position>(sim_e.e) = cur_pos + 0.001f * cur_rot.rotateVec({f_x, f_y, 0});
 
-        Quat delta_rot = Quat::angleAxis(t_z * 10.f, math::up);
+        Quat delta_rot = Quat::angleAxis(t_z * 0.001f, math::up);
         ctx.getUnsafe<Rotation>(sim_e.e) = (delta_rot * cur_rot).normalize();
 
         return;
@@ -561,9 +574,11 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     }
 
     if (action.g == 1) {
-        if (ctx.data().grabConstraintEntity != Entity::none()) {
-            ctx.destroyEntityNow(ctx.data().grabConstraintEntity);
-            ctx.data().grabConstraintEntity = Entity::none();
+        auto &grab_data = ctx.getUnsafe<GrabData>(sim_e.e);
+
+        if (grab_data.constraintEntity != Entity::none()) {
+            ctx.destroyEntityNow(grab_data.constraintEntity);
+            grab_data.constraintEntity = Entity::none();
         } else {
             auto &bvh = ctx.getSingleton<broadphase::BVH>();
             float hit_t;
@@ -581,19 +596,20 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
                 if (owner == OwnerTeam::None &&
                     response_type == ResponseType::Dynamic) {
-                    ctx.data().grabConstraintEntity =
+
+                    grab_data.constraintEntity =
                         ctx.makeEntityNow<ConstraintData>();
 
                     Vector3 other_pos = ctx.getUnsafe<Position>(grab_entity);
                     Quat other_rot = ctx.getUnsafe<Rotation>(grab_entity);
 
                     auto &joint_constraint = ctx.getUnsafe<JointConstraint>(
-                        ctx.data().grabConstraintEntity);
+                        grab_data.constraintEntity);
 
                     joint_constraint.e1 = sim_e.e;
                     joint_constraint.e2 = grab_entity;
 
-                    Vector3 r1 = 0.5f * math::fwd;
+                    Vector3 r1 = 0.25f * math::fwd;
 
                     Vector3 hit_pos = ray_o + ray_d * hit_t;
                     Vector3 r2 = other_rot.inv().rotateVec(hit_pos - other_pos);
@@ -619,7 +635,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                     joint_constraint.axes2 = Quat::fromBasis(
                         right_vec_other_local, up_vec_other_local,
                         ray_dir_other_local);
-                    joint_constraint.separation = hit_t - 0.5f;
+                    joint_constraint.separation = hit_t - 0.25f;
                 }
             }
         }
