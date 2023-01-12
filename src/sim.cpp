@@ -453,7 +453,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         ctx.getSingleton<WorldDone>().done = 1;
     }
 
-    if (step_idx < 96) {
+    if (step_idx <= 96) {
         --ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
     }
 }
@@ -536,7 +536,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
     constexpr CountT discrete_action_buckets = 11;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_action_max = 0.9 * 250;
+    constexpr float discrete_action_max = 0.9 * 125;
     constexpr float delta_per_bucket = discrete_action_max / half_buckets;
 
     Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);

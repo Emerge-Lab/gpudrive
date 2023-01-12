@@ -92,13 +92,12 @@ print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
 print(rgb_observations.shape, rgb_observations.dtype)
 
-print(agent_valid_masks.shape)
 print(agent_visibility_masks.shape)
 print(agent_data.shape)
 
 resets[0][0] = 1
-resets[0][1] = 3
-resets[0][2] = 3
+resets[0][1] = 2
+resets[0][2] = 2
 
 while True:
     print("Stepping")
@@ -106,9 +105,9 @@ while True:
     torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
 
     print(prep_counter)
-    print(rewards * agent_valid_masks)
-    print(agent_visibility_masks * agent_valid_masks.unsqueeze(dim = 3))
-    print(agent_data * agent_valid_masks.unsqueeze(dim = 3).unsqueeze(dim = 4))
+    print(rewards[0][:4] * agent_valid_masks[0][:4])
+    print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 3))
+    print(agent_data[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 3).unsqueeze(dim = 4))
 
     action = get_keyboard_action()
     
