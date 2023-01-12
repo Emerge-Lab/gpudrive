@@ -9,7 +9,7 @@ using namespace madrona::phys;
 namespace GPUHideSeek {
 
 constexpr inline float deltaT = 0.075;
-constexpr inline float numPhysicsSubsteps = 4;
+constexpr inline CountT numPhysicsSubsteps = 4;
 
 void Sim::registerTypes(ECSRegistry &registry)
 {
@@ -609,8 +609,13 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                     Vector3 right_vec_other_local = other_rot.inv().rotateVec(
                         cur_rot.rotateVec(math::right));
 
+                    Vector3 up_vec_other_local =
+                        cross(right_vec_other_local, ray_dir_other_local);
+
                     joint_constraint.axes1 = { 1, 0, 0, 0 };
-                    joint_constraint.axes2; // TODO
+                    joint_constraint.axes2 = Quat::fromBasis(
+                        right_vec_other_local, up_vec_other_local,
+                        ray_dir_other_local);
                     joint_constraint.separation = hit_t - 0.5f;
                 }
             }

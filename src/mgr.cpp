@@ -131,7 +131,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     { // Cylinder:
         metadatas.push_back({
             .invInertiaTensor = { 0.f, 0.f, 10.f }, // FIXME
-            .invMass = 10.f,
+            .invMass = 20.f,
             .muS = 0.5f,
             .muD = 0.5f,
         });
