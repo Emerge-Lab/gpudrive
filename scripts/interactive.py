@@ -106,8 +106,8 @@ while True:
 
     print(prep_counter)
     print(rewards[0][:4] * agent_valid_masks[0][:4])
-    print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 3))
-    print(agent_data[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 3).unsqueeze(dim = 4))
+    print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+    print(agent_data[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2).unsqueeze(dim = 3))
 
     action = get_keyboard_action()
     
