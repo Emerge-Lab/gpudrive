@@ -29,9 +29,13 @@ print(rgb_observations.shape, rgb_observations.dtype)
 
 start = time.time()
 
-reset_no = torch.zeros_like(resets, dtype=torch.int32)
-reset_yes = torch.ones_like(resets, dtype=torch.int32)
-reset_rand = torch.zeros_like(resets, dtype=torch.float32)
+reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32)
+reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32)
+reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32)
+
+resets[:, 0] = 1
+resets[:, 1] = 3
+resets[:, 2] = 3
 
 sim.step()
 
@@ -41,7 +45,7 @@ for i in range(num_steps):
     torch.rand(reset_rand.shape, out=reset_rand)
 
     reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
-    resets.copy_(reset_cond)
+    resets[:, 0].copy_(reset_cond)
 
     actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
 

@@ -33,13 +33,13 @@ def get_keyboard_action():
         result = Action()
 
         if key_action == 'w':
-            result.y = 3
+            result.y = 5
         elif key_action == 'a':
-            result.x = -3
+            result.x = -5
         elif key_action == 'd':
-            result.x = 3
+            result.x = 5
         elif key_action == 's':
-            result.y = -3
+            result.y = -5
         elif key_action == 'q':
             result.r = 1
         elif key_action == 'e':
@@ -82,27 +82,40 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
 actions = sim.action_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 agent_valid_masks = sim.agent_mask_tensor().to_torch()
-agent_visibility_masks = sim.visibility_masks_tensor().to_torch()
+agent_visibility_masks = sim.visible_agents_mask_tensor().to_torch()
+agent_data = sim.agent_data_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
+prep_counter = sim.prep_counter_tensor().to_torch()
+
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
 print(rgb_observations.shape, rgb_observations.dtype)
+
+print(agent_valid_masks.shape)
+print(agent_visibility_masks.shape)
+print(agent_data.shape)
+
+resets[0][0] = 1
+resets[0][1] = 3
+resets[0][2] = 3
 
 while True:
     print("Stepping")
     sim.step()
     torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
 
+    print(prep_counter)
     print(rewards * agent_valid_masks)
-    print(agent_visibility_masks * agent_valid_masks)
+    print(agent_visibility_masks * agent_valid_masks.unsqueeze(dim = 3))
+    print(agent_data * agent_valid_masks.unsqueeze(dim = 3).unsqueeze(dim = 4))
 
     action = get_keyboard_action()
     
     if action.reset < 0:
         break
 
-    resets[0] = action.reset
+    resets[0][0] = action.reset
     actions[0][0][0] = action.x
     actions[0][0][1] = action.y
     actions[0][0][2] = action.r

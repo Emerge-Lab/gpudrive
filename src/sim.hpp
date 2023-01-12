@@ -28,8 +28,6 @@ namespace consts {
 static inline constexpr int32_t maxBoxes = 9;
 static inline constexpr int32_t maxRamps = 2;
 static inline constexpr int32_t maxAgents = 6;
-static inline constexpr int32_t totalObservationsPerAgent = 
-    maxBoxes + maxRamps + maxAgents - 1;
 
 }
 
@@ -37,10 +35,16 @@ class Engine;
 
 struct WorldReset {
     int32_t resetLevel;
+    int32_t numHiders;
+    int32_t numSeekers;
 };
 
 struct WorldDone {
     int32_t done;
+};
+
+struct PrepPhaseCounter {
+    int32_t numPrepStepsLeft;
 };
 
 enum class OwnerTeam : uint32_t {
@@ -92,20 +96,50 @@ struct Reward {
     float reward;
 };
 
-struct ObservationMask {
+struct AgentActiveMask {
     float mask;
 };
 
-struct PositionObservation {
-    madrona::math::Vector3 x;
+struct AgentObservation {
+    madrona::math::Vector2 pos;
+    madrona::math::Vector2 vel;
 };
 
-struct VelocityObservation {
-    madrona::math::Vector3 v;
+struct BoxObservation {
+    madrona::math::Vector2 pos;
+    madrona::math::Vector2 vel;
+    madrona::math::Vector2 boxSize;
+    float boxRotation;
 };
 
-struct VisibilityMasks {
-    float visible[consts::totalObservationsPerAgent];
+struct RampObservation {
+    madrona::math::Vector2 pos;
+    madrona::math::Vector2 vel;
+    float rampRotation;
+};
+
+struct RelativeAgentObservations {
+    AgentObservation obs[consts::maxAgents - 1];
+};
+
+struct RelativeBoxObservations {
+    BoxObservation obs[consts::maxBoxes];
+};
+
+struct RelativeRampObservations {
+    RampObservation obs[consts::maxRamps];
+};
+
+struct AgentVisibilityMasks {
+    float visible[consts::maxAgents - 1];
+};
+
+struct BoxVisibilityMasks {
+    float visible[consts::maxBoxes];
+};
+
+struct RampVisibilityMasks {
+    float visible[consts::maxRamps];
 };
 
 static_assert(sizeof(Action) == 5 * sizeof(int32_t));
@@ -115,10 +149,13 @@ struct AgentInterface : public madrona::Archetype<
     Action,
     Reward,
     AgentType,
-    PositionObservation,
-    VelocityObservation,
-    ObservationMask,
-    VisibilityMasks
+    AgentActiveMask,
+    RelativeAgentObservations,
+    RelativeBoxObservations,
+    RelativeRampObservations,
+    AgentVisibilityMasks,
+    BoxVisibilityMasks,
+    RampVisibilityMasks
 > {};
 
 struct CameraAgent : public madrona::Archetype<
@@ -145,20 +182,6 @@ struct DynAgent : public madrona::Archetype<
     madrona::render::ViewSettings
 > {};
 
-struct BoxObservation : public madrona::Archetype<
-    SimEntity,
-    PositionObservation,
-    VelocityObservation,
-    ObservationMask
-> {};
-
-struct RampObservation : public madrona::Archetype<
-    SimEntity,
-    PositionObservation,
-    VelocityObservation,
-    ObservationMask
-> {};
-
 struct Sim : public madrona::WorldBase {
 
     static void registerTypes(madrona::ECSRegistry &registry);
@@ -178,9 +201,14 @@ struct Sim : public madrona::WorldBase {
     Entity seekers[3];
     CountT numSeekers;
 
-    Entity boxObservations[consts::maxBoxes];
-    Entity rampObservations[consts::maxRamps];
-    Entity agentObservations[consts::maxAgents];
+    Entity boxes[consts::maxBoxes];
+    madrona::math::Vector2 boxSizes[consts::maxBoxes];
+    float boxRotations[consts::maxBoxes];
+    Entity ramps[consts::maxRamps];
+    float rampRotations[consts::maxRamps];
+    Entity agentInterfaces[consts::maxAgents];
+    CountT numActiveBoxes;
+    CountT numActiveRamps;
     CountT numActiveAgents;
 
     CountT curEpisodeStep;
