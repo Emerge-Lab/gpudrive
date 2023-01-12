@@ -77,7 +77,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
         aabbs.push_back({
             .pMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX },
-            .pMax = { FLT_MAX, FLT_MAX, FLT_MAX },
+            .pMax = { FLT_MAX, FLT_MAX, 0 },
         });
 
         prims.push_back({
