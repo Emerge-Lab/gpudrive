@@ -1,6 +1,5 @@
 #include "sim.hpp"
 #include <madrona/mw_gpu_entry.hpp>
-#include <madrona/mw_gpu/host_print.hpp>
 
 using namespace madrona;
 using namespace madrona::math;
@@ -358,7 +357,6 @@ static void level5(Engine &ctx)
 static void level6(Engine &ctx)
 {
     Entity *all_entities = ctx.data().obstacles;
-    auto &rng = ctx.data().rng;
 
     CountT num_entities = 0;
     all_entities[num_entities++] =
@@ -833,8 +831,6 @@ inline void collectObservationsSystem(Engine &ctx,
             ctx.getUnsafe<Position>(other_agent_sim_e);
         Vector3 other_agent_vel =
             ctx.getUnsafe<Velocity>(other_agent_sim_e).linear;
-        Quat other_agent_rot =
-            ctx.getUnsafe<Rotation>(other_agent_sim_e);
 
         Vector3 other_agent_relative_pos =
             agent_rot.inv().rotateVec(other_agent_pos - agent_pos);
@@ -967,6 +963,7 @@ inline void agentRewardsSystem(Engine &ctx,
     reward.reward = reward_val;
 }
 
+#ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
 TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
                                    Span<const TaskGraph::NodeID> deps)
@@ -979,12 +976,14 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 
     return post_sort_reset_tmp;
 }
+#endif
 
 void Sim::setupTasks(TaskGraph::Builder &builder)
 {
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
 
+#ifdef MADRONA_GPU_MODE
     // FIXME: these 3 need to be compacted, but sorting is unnecessary
     auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {reset_sys});
     auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
@@ -994,6 +993,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto sort_agent_iface =
         queueSortByWorld<AgentInterface>(builder, {sort_objects});
     auto prep_finish = sort_agent_iface;
+#else
+    auto prep_finish = reset_sys;
+#endif
 
 #if 0
     prep_finish = builder.addToGraph<ParallelForNode<Engine,
@@ -1018,7 +1020,10 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
 
+#ifdef MADRONA_GPU_MODE
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
+    (void)recycle_sys;
+#endif
 
     auto collect_observations = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
@@ -1050,7 +1055,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
 
     (void)phys_cleanup_sys;
     (void)renderer_sys;
-    (void)recycle_sys;
     (void)collect_observations;
     (void)agent_rewards;
 

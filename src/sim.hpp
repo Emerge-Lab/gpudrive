@@ -183,7 +183,6 @@ struct DynAgent : public madrona::Archetype<
 > {};
 
 struct Sim : public madrona::WorldBase {
-
     static void registerTypes(madrona::ECSRegistry &registry);
 
     static void setupTasks(madrona::TaskGraph::Builder &builder);

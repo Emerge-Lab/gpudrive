@@ -90,6 +90,7 @@ ramp_visibility_masks = sim.visible_ramps_mask_tensor().to_torch()
 agent_data = sim.agent_data_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
 prep_counter = sim.prep_counter_tensor().to_torch()
+dones = sim.done_tensor().to_torch()
 
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
@@ -109,6 +110,7 @@ while True:
     torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
 
     print(prep_counter)
+    print(dones)
     print(rewards[0][:4] * agent_valid_masks[0][:4])
     print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))

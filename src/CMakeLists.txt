@@ -2,11 +2,22 @@ set(SIMULATOR_SRCS
     sim.hpp sim.cpp
 )
 
+add_library(gpu_hideseek_cpu_impl STATIC
+    ${SIMULATOR_SRCS}
+)
+
+target_link_libraries(gpu_hideseek_cpu_impl PRIVATE
+    madrona_common
+    madrona_mw_core
+    madrona_mw_physics
+)
+
 add_library(gpu_hideseek_mgr SHARED
     mgr.hpp mgr.cpp
 )
 
 target_link_libraries(gpu_hideseek_mgr PRIVATE
+    gpu_hideseek_cpu_impl
     madrona_python_utils
     madrona_common
     madrona_importer
