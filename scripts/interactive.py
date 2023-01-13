@@ -60,6 +60,8 @@ def get_keyboard_action():
             result.reset = 4
         elif key_action == '5':
             result.reset = 5
+        elif key_action == '6':
+            result.reset = 6
         elif key_action == ' ':
             pass
         else:
@@ -83,6 +85,8 @@ actions = sim.action_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 agent_valid_masks = sim.agent_mask_tensor().to_torch()
 agent_visibility_masks = sim.visible_agents_mask_tensor().to_torch()
+box_visibility_masks = sim.visible_boxes_mask_tensor().to_torch()
+ramp_visibility_masks = sim.visible_ramps_mask_tensor().to_torch()
 agent_data = sim.agent_data_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
 prep_counter = sim.prep_counter_tensor().to_torch()
@@ -107,7 +111,8 @@ while True:
     print(prep_counter)
     print(rewards[0][:4] * agent_valid_masks[0][:4])
     print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
-    print(agent_data[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2).unsqueeze(dim = 3))
+    print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+    print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 
     action = get_keyboard_action()
     

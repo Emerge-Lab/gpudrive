@@ -233,10 +233,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
         return agent;
     };
 
-    makeDynAgent({ -15, -15, 1.5 },
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true, 0);
-
-    for (CountT i = 1; i < num_hiders; i++) {
+    for (CountT i = 0; i < num_hiders; i++) {
         Vector3 pos {
             bounds.x + rng.rand() * bounds_diff,
             bounds.x + rng.rand() * bounds_diff,
@@ -256,7 +253,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
 
         const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
 
-        makeDynAgent(pos, rot, false, 3 + i);
+        makeDynAgent(pos, rot, false, num_hiders + i);
     }
 
     ctx.data().numObstacles = num_entities;
@@ -358,6 +355,65 @@ static void level5(Engine &ctx)
     ctx.data().numObstacles = total_entities;
 }
 
+static void level6(Engine &ctx)
+{
+    Entity *all_entities = ctx.data().obstacles;
+    auto &rng = ctx.data().rng;
+
+    CountT num_entities = 0;
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
+
+    auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider,
+                            int32_t view_idx) {
+        Entity agent = makeAgent<DynAgent>(ctx,
+            is_hider ? AgentType::Hider : AgentType::Seeker);
+        printf("Made %d\n", agent.id);
+        ctx.getUnsafe<Position>(agent) = pos;
+        ctx.getUnsafe<Rotation>(agent) = rot;
+        ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<render::ViewSettings>(agent) =
+            render::RenderingSystem::setupView(ctx, 90.f,
+                Vector3 { 0, 0, 0.8 }, { view_idx });
+
+        ObjectID agent_obj_id = ObjectID { 4 };
+        ctx.getUnsafe<ObjectID>(agent) = agent_obj_id;
+        ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
+                                                         agent_obj_id);
+
+        ctx.getUnsafe<Velocity>(agent) = {
+            Vector3::zero(),
+            Vector3::zero(),
+        };
+        ctx.getUnsafe<ResponseType>(agent) = ResponseType::Dynamic;
+        ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
+        ctx.getUnsafe<ExternalForce>(agent) = Vector3::zero();
+        ctx.getUnsafe<ExternalTorque>(agent) = Vector3::zero();
+        ctx.getUnsafe<GrabData>(agent).constraintEntity = Entity::none();
+
+        return agent;
+    };
+
+    makeDynAgent({ -15, -15, 1.5 },
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true, 0);
+
+    makeDynAgent({ -15, -10, 1.5 },
+        Quat::angleAxis(helpers::toRadians(45), {0, 0, 1}), false, 1);
+
+    ctx.data().numObstacles = num_entities;
+}
+
 static void resetWorld(Engine &ctx,
                        CountT level,
                        CountT num_hiders,
@@ -429,6 +485,9 @@ static void resetWorld(Engine &ctx,
     } break;
     case 5: {
         level5(ctx);
+    } break;
+    case 6: {
+        level6(ctx);
     } break;
     }
 }
