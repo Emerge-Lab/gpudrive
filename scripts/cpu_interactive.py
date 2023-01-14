@@ -70,7 +70,7 @@ def get_keyboard_action():
         return result
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
-        exec_mode = gpu_hideseek_python.ExecMode.CUDA,
+        exec_mode = gpu_hideseek_python.ExecMode.CPU,
         gpu_id = 0,
         num_worlds = 1,
         min_entities_per_world = 5,

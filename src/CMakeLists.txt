@@ -6,11 +6,13 @@ add_library(gpu_hideseek_cpu_impl STATIC
     ${SIMULATOR_SRCS}
 )
 
-target_link_libraries(gpu_hideseek_cpu_impl PRIVATE
-    madrona_common
-    madrona_mw_core
-    madrona_mw_physics
-    madrona_mw_ecs_render
+target_link_libraries(gpu_hideseek_cpu_impl
+    PUBLIC
+        madrona_mw_core
+    PRIVATE
+        madrona_common
+        madrona_mw_physics
+        madrona_mw_ecs_render
 )
 
 add_library(gpu_hideseek_mgr SHARED
@@ -19,6 +21,7 @@ add_library(gpu_hideseek_mgr SHARED
 
 target_link_libraries(gpu_hideseek_mgr PRIVATE
     gpu_hideseek_cpu_impl
+    madrona_mw_cpu
     madrona_python_utils
     madrona_common
     madrona_importer

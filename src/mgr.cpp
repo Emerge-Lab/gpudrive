@@ -5,7 +5,7 @@
 #include <madrona/importer.hpp>
 #include <madrona/physics_assets.hpp>
 #include <madrona/tracing.hpp>
-#include <madrona/taskgraph.hpp>
+#include <madrona/mw_cpu.hpp>
 
 #include <charconv>
 #include <iostream>
@@ -286,6 +286,14 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         imported_renderer_objs.emplace_back(std::move(*ramp_obj));
     }
 
+    DynArray<imp::SourceObject> renderer_objects(0);
+
+    for (const auto &imported_obj : imported_renderer_objs) {
+        renderer_objects.push_back(imp::SourceObject {
+            imported_obj.meshes,
+        });
+    }
+
     switch (cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -332,14 +340,6 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             CompileConfig::Executor::TaskGraph,
         });
 
-        DynArray<imp::SourceObject> renderer_objects(0);
-
-        for (const auto &imported_obj : imported_renderer_objs) {
-            renderer_objects.push_back(imp::SourceObject {
-                imported_obj.meshes,
-            });
-        }
-
         mwgpu_exec.loadObjects(renderer_objects);
 
         HostEventLogging(HostEvent::initEnd);
@@ -374,20 +374,33 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             };
         }
 
-
-        HostEventLogging(HostEvent::initEnd);
-        return new CPUImpl {
+        auto cpu_impl = new CPUImpl {
             { 
                 cfg,
                 std::move(phys_loader),
                 episode_mgr,
             },
-            CPUImpl::TaskGraphT(
-                {
+            CPUImpl::TaskGraphT {
+                ThreadPoolExecutor::Config {
                     .numWorlds = cfg.numWorlds,
+                    .maxViewsPerWorld = consts::maxAgents,
+                    .maxInstancesPerWorld = 1024,
+                    .renderWidth = cfg.renderWidth,
+                    .renderHeight = cfg.renderHeight,
+                    .maxObjects = 50,
+                    .cameraMode = cfg.lidarRender ?
+                        ThreadPoolExecutor::CameraMode::Lidar :
+                        ThreadPoolExecutor::CameraMode::Perspective,
                 },
-                world_inits.data()),
+                world_inits.data()
+            },
         };
+
+        cpu_impl->cpuExec.loadObjects(renderer_objects);
+
+        HostEventLogging(HostEvent::initEnd);
+
+        return cpu_impl;
     } break;
     default: __builtin_unreachable();
     }
