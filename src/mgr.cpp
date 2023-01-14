@@ -5,6 +5,7 @@
 #include <madrona/importer.hpp>
 #include <madrona/physics_assets.hpp>
 #include <madrona/tracing.hpp>
+#include <madrona/taskgraph.hpp>
 
 #include <charconv>
 #include <iostream>
@@ -33,6 +34,10 @@ struct Manager::Impl {
 };
 
 struct Manager::CPUImpl : Manager::Impl {
+    using TaskGraphT =
+        TaskGraphExecutor<Engine, Sim, WorldInit, render::RendererInit>;
+
+    TaskGraphT cpuExec;
 };
 
 #ifdef MADRONA_CUDA_SUPPORT
@@ -351,8 +356,38 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 #endif
     } break;
     case ExecMode::CPU: {
+        EpisodeManager *episode_mgr = new EpisodeManager {};
+
+        PhysicsLoader phys_loader(PhysicsLoader::StorageType::CPU, 10);
+        loadPhysicsObjects(phys_loader);
+
+        ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
+
+        HeapArray<WorldInit> world_inits(cfg.numWorlds);
+
+        for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
+            world_inits[i] = WorldInit {
+                episode_mgr,
+                phys_obj_mgr,
+                cfg.minEntitiesPerWorld,
+                cfg.maxEntitiesPerWorld,
+            };
+        }
+
+
         HostEventLogging(HostEvent::initEnd);
-        return nullptr;
+        return new CPUImpl {
+            { 
+                cfg,
+                std::move(phys_loader),
+                episode_mgr,
+            },
+            CPUImpl::TaskGraphT(
+                {
+                    .numWorlds = cfg.numWorlds,
+                },
+                world_inits.data()),
+        };
     } break;
     default: __builtin_unreachable();
     }
@@ -385,6 +420,7 @@ MADRONA_EXPORT void Manager::step()
 #endif
     } break;
     case ExecMode::CPU: {
+        static_cast<CPUImpl *>(impl_)->cpuExec.run();
     } break;
     }
 }

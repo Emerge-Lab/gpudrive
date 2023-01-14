@@ -187,7 +187,8 @@ struct Sim : public madrona::WorldBase {
 
     static void setupTasks(madrona::TaskGraph::Builder &builder);
 
-    Sim(Engine &ctx, const WorldInit &init);
+    Sim(Engine &ctx, const WorldInit &init,
+        const madrona::render::RendererInit &renderer_init);
 
     EpisodeManager *episodeMgr;
     RNG rng;

@@ -376,7 +376,6 @@ static void level6(Engine &ctx)
                             int32_t view_idx) {
         Entity agent = makeAgent<DynAgent>(ctx,
             is_hider ? AgentType::Hider : AgentType::Seeker);
-        printf("Made %d\n", agent.id);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
@@ -1061,7 +1060,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     printf("Setup done\n");
 }
 
-Sim::Sim(Engine &ctx, const WorldInit &init)
+Sim::Sim(Engine &ctx,
+         const WorldInit &init,
+         const render::RendererInit &renderer_init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
@@ -1072,7 +1073,7 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
          100 * 50, 10);
 
-    render::RenderingSystem::init(ctx);
+    render::RenderingSystem::init(ctx, renderer_init);
 
     obstacles =
         (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));
@@ -1092,6 +1093,6 @@ Sim::Sim(Engine &ctx, const WorldInit &init)
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
 
-MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, WorldInit);
+MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, WorldInit, render::RendererInit);
 
 }
