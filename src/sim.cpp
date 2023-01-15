@@ -153,28 +153,19 @@ float wallRandom(RNG &rng) {
     return 0.3f + randomFloat(rng) * 0.4f;
 }
 
-struct Room {
-    math::Vector2 low, high;
-};
-
 struct Wall {
     // p1 < p2
     math::Vector2 p1, p2;
-
-    // Indices of two adjacent rooms
-    int rooms[2];
 
     Wall() = default;
 
     // Room 0 is on left,down
     // Room 1 i s on top,right
-    Wall(math::Vector2 p1_in, math::Vector2 p2_in, int room0, int room1) 
-    : p1(p1_in), p2(p2_in), rooms{room0, room1} {
+    Wall(math::Vector2 p1_in, math::Vector2 p2_in) 
+    : p1(p1_in), p2(p2_in) {
         if (p1_in.x > p2_in.x || p1_in.y > p2_in.y) {
             p1 = p2_in, p2 = p1_in;
         }
-
-        // assert(room0 >= -1 && room1 >= -1);
     }
 
     bool isHorizontal() const {
@@ -255,13 +246,11 @@ struct Walls {
     DumbArray<Wall> walls;
     DumbArray<uint8_t> horizontal;
     DumbArray<uint8_t> vertical;
-    DumbArray<Room> rooms;
 
     Walls(Context &ctx, uint32_t maxAddDoors, uint32_t maxConnect) {
         walls.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
         horizontal.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
         vertical.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
-        rooms.alloc(ctx, ((maxAddDoors * 3 + maxConnect * 2) / 3));
     }
 
     int addWall(Wall wall) {
@@ -286,8 +275,6 @@ struct Walls {
         for (int i = 0; i < walls.size(); ++i) {
             walls[i].p1 = doScale(walls[i].p1);
             walls[i].p2 = doScale(walls[i].p2);
-            rooms[i].low = doScale(rooms[i].low);
-            rooms[i].high = doScale(rooms[i].high);
         }
     }
 };
@@ -403,7 +390,7 @@ void addDoor(Walls &walls, Wall &wall, float doorSize, RNG &rng) {
         wall.resort();
 
         // This will have the same walls as the old bigger wall
-        Wall newSplit = Wall({x + doorSize * 0.5f, wall.p1.y}, {oldP2x, wall.p1.y}, wall.rooms[0], wall.rooms[1]);
+        Wall newSplit = Wall({x + doorSize * 0.5f, wall.p1.y}, {oldP2x, wall.p1.y});
         walls.addWall(newSplit);
     }
     else {
@@ -417,7 +404,7 @@ void addDoor(Walls &walls, Wall &wall, float doorSize, RNG &rng) {
         wall.p2.y = y - doorSize*0.5f;
         wall.resort();
 
-        Wall newSplit = Wall({wall.p1.x, y + doorSize * 0.5f}, {wall.p1.x, oldP2y}, wall.rooms[0], wall.rooms[1]);
+        Wall newSplit = Wall({wall.p1.x, y + doorSize * 0.5f}, {wall.p1.x, oldP2y});
         walls.addWall(newSplit);
     }
 }
@@ -466,19 +453,8 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
 
                 // printf("%f - %f - %f\n", low, x, high);
 
-                // This is the room that will be split down the middle
-                int oldRoomIdx = first->rooms[1];
-                Room &oldRoom = walls.rooms[first->rooms[1]];
-                // Save old high value
-                float oldRoomOldHigh = oldRoom.high.x;
-                oldRoom.high.x = x;
-
-                Room newRoom = { {oldRoom.high.x, oldRoom.low.y}, {oldRoomOldHigh, oldRoom.high.y} };
-                int newRoomIdx = walls.rooms.size();
-                walls.rooms.push_back(newRoom);
-
                 // y value in p1&p2 is gonna be the same
-                int newWallIdx = walls.addWall(Wall({x, first->p1.y}, {x, second->p1.y}, oldRoomIdx, newRoomIdx));
+                int newWallIdx = walls.addWall(Wall({x, first->p1.y}, {x, second->p1.y}));
                 first = &walls.walls[(*list)[wallIndirectIdx]];
                 second = &walls.walls[(*list)[otherWallIndirectIdx]];
 
@@ -492,30 +468,13 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
                 second->p2.x = x;
                 second->resort();
 
-                Wall new0 = Wall({x, first->p1.y}, {firstOldP2x, first->p1.y}, first->rooms[0], newRoomIdx);
-                Wall new1 = Wall({x, second->p1.y}, {secondOldP2x, second->p1.y}, newRoomIdx, second->rooms[1]);
+                Wall new0 = Wall({x, first->p1.y}, {firstOldP2x, first->p1.y});
+                Wall new1 = Wall({x, second->p1.y}, {secondOldP2x, second->p1.y});
 
                 walls.addWall(new0);
                 walls.addWall(new1);
 
                 addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
-
-                for (int i = 0; i < walls.vertical.size(); ++i) {
-                    int idx = walls.vertical[i];
-                    if (walls.walls[idx].rooms[0] == oldRoomIdx && idx != newWallIdx) {
-                        walls.walls[idx].rooms[0] = newRoomIdx;
-                    }
-                }
-
-                for (int i = 0; i < walls.horizontal.size(); ++i) {
-                    int idx = walls.horizontal[i];
-                    if (idx != (*list)[wallIndirectIdx] && walls.walls[idx].rooms[1] == oldRoomIdx) {
-                        walls.walls[idx].rooms[1] = newRoomIdx;
-                    }
-                    else if (idx != (*list)[otherWallIndirectIdx] && walls.walls[idx].rooms[0] == oldRoomIdx) {
-                        walls.walls[idx].rooms[0] = newRoomIdx;
-                    }
-                }
             }
             else {
                 // Get range
@@ -529,18 +488,7 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
 
                 // printf("%f - %f - %f\n", low, y, high);
 
-                // This is the room that will be split down the middle
-                int oldRoomIdx = first->rooms[1];
-                Room &oldRoom = walls.rooms[first->rooms[1]];
-                // Save old high value
-                float oldRoomOldHigh = oldRoom.high.y;
-                oldRoom.high.y = y;
-
-                Room newRoom = { {oldRoom.low.x, oldRoom.high.y}, {oldRoom.high.x, oldRoomOldHigh} };
-                int newRoomIdx = walls.rooms.size();
-                walls.rooms.push_back(newRoom);
-
-                int newWallIdx = walls.addWall(Wall({first->p1.x, y}, {second->p1.x, y}, oldRoomIdx, newRoomIdx));
+                int newWallIdx = walls.addWall(Wall({first->p1.x, y}, {second->p1.x, y}));
                 first = &walls.walls[(*list)[wallIndirectIdx]];
                 second = &walls.walls[(*list)[otherWallIndirectIdx]];
 
@@ -553,30 +501,13 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
                 second->p2.y = y;
                 second->resort();
 
-                Wall new0 = Wall({first->p1.x, y}, {first->p1.x, firstOldP2y}, first->rooms[0], newRoomIdx);
-                Wall new1 = Wall({second->p1.x, y}, {second->p1.x, secondOldP2y}, newRoomIdx, second->rooms[1]);
+                Wall new0 = Wall({first->p1.x, y}, {first->p1.x, firstOldP2y});
+                Wall new1 = Wall({second->p1.x, y}, {second->p1.x, secondOldP2y});
 
                 walls.addWall(new0);
                 walls.addWall(new1);
 
                 addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
-
-                for (int i = 0; i < walls.horizontal.size(); ++i) {
-                    int idx = walls.horizontal[i];
-                    if (walls.walls[idx].rooms[0] == oldRoomIdx && idx != newWallIdx) {
-                        walls.walls[idx].rooms[0] = newRoomIdx;
-                    }
-                }
-
-                for (int i = 0; i < walls.vertical.size(); ++i) {
-                    int idx = walls.vertical[i];
-                    if (idx != (*list)[wallIndirectIdx] && walls.walls[idx].rooms[1] == oldRoomIdx) {
-                        walls.walls[idx].rooms[1] = newRoomIdx;
-                    }
-                    else if (idx != (*list)[otherWallIndirectIdx] && walls.walls[idx].rooms[0] == oldRoomIdx) {
-                        walls.walls[idx].rooms[0] = newRoomIdx;
-                    }
-                }
             }
         } break;
 
@@ -603,11 +534,10 @@ Walls makeWalls(Context &ctx, RNG &rng) {
     const uint32_t maxConnect = 6;
 
     Walls walls(ctx, maxAddDoors, maxConnect);
-    walls.rooms.push_back({{0.0f, 0.0f}, {1.0f, 1.0f}});
-    walls.addWall(Wall({0.0f,0.0f}, {1.0f,0.0f}, -1, 0));
-    walls.addWall(Wall({0.0f,0.0f}, {0.0f,1.0f}, -1, 0));
-    walls.addWall(Wall({0.0f,1.0f}, {1.0f,1.0f}, 0, -1));
-    walls.addWall(Wall({1.0f,1.0f}, {1.0f,0.0f}, 0, -1));
+    walls.addWall(Wall({0.0f,0.0f}, {1.0f,0.0f}));
+    walls.addWall(Wall({0.0f,0.0f}, {0.0f,1.0f}));
+    walls.addWall(Wall({0.0f,1.0f}, {1.0f,1.0f}));
+    walls.addWall(Wall({1.0f,1.0f}, {1.0f,0.0f}));
 
     int wallConnectAndAddDoorCount = 1 + rng.u32Rand() % (maxConnect-1);
     int wallAddDoorCount = 4 + rng.u32Rand() % (maxAddDoors - 4);
@@ -721,12 +651,8 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     for (CountT i = 0; i < num_elongated; i++) {
         // Choose a random room and put the entity in a random position in that room
         for(;;) {
-            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
-
-            float bounds_diffx = room->high.x - room->low.x;
-            float bounds_diffy = room->high.y - room->low.y;
-            bounds_diffx = bounds.y - bounds.x;
-            bounds_diffy = bounds.y - bounds.x;
+            float bounds_diffx = bounds.y - bounds.x;
+            float bounds_diffy = bounds.y - bounds.x;
 
             Vector3 pos {
                 bounds.x + rng.rand() * bounds_diffx,
@@ -758,13 +684,8 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     rejections = 0;
     for (CountT i = 0; i < num_cubes; i++) {
         for (;;) {
-            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
-
-            float bounds_diffx = room->high.x - room->low.x;
-            float bounds_diffy = room->high.y - room->low.y;
-
-            bounds_diffx = bounds.y - bounds.x;
-            bounds_diffy = bounds.y - bounds.x;
+            float bounds_diffx = bounds.y - bounds.x;
+            float bounds_diffy = bounds.y - bounds.x;
 
 #if 0
             Vector3 pos {
@@ -809,14 +730,8 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     const CountT num_ramps = consts::maxRamps;
     for (CountT i = 0; i < num_ramps; i++) {
         for (;;) {
-            // Choose a random room and put the entity in a random position in that room
-            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
-
-            float bounds_diffx = room->high.x - room->low.x;
-            float bounds_diffy = room->high.y - room->low.y;
-
-            bounds_diffx = bounds.y - bounds.x;
-            bounds_diffy = bounds.y - bounds.x;
+            float bounds_diffx = bounds.y - bounds.x;
+            float bounds_diffy = bounds.y - bounds.x;
 
 #if 0
             Vector3 pos {
@@ -884,6 +799,15 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
+#if 0
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+    ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+#endif
+
+#if 1
     for (CountT i = 0; i < num_hiders; i++) {
         for (;;) {
             Vector3 pos {
@@ -924,6 +848,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             }
         }
     }
+#endif
 
     all_entities[num_entities++] =
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
