@@ -88,11 +88,13 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
                          OwnerTeam::Unownable);
 }
 
+#if 0
 static Entity makeBorder(Engine &ctx, Vector3 offset, Quat rot) {
     return makeDynObject(ctx, offset, rot, 2, ResponseType::Static,
                          OwnerTeam::Unownable,
                          { 200, 200, 200 });
 }
+#endif
 
 template <typename T>
 static Entity makeAgent(Engine &ctx, AgentType agent_type)
