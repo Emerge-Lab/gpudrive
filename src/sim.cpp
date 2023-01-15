@@ -1664,8 +1664,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     (void)renderer_sys;
     (void)collect_observations;
     (void)agent_rewards;
-
-    printf("Setup done\n");
 }
 
 Sim::Sim(Engine &ctx,

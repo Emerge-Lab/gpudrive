@@ -11,11 +11,11 @@ num_steps = int(sys.argv[2])
 entities_per_world = int(sys.argv[3])
 reset_chance = float(sys.argv[4])
 
-render_width = 30
-render_height = 1
+render_width = 30 
+render_height = 1 
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
-        exec_mode = gpu_hideseek_python.ExecMode.CUDA,
+        exec_mode = gpu_hideseek_python.ExecMode.CPU,
         gpu_id = 0,
         num_worlds = num_worlds,
         min_entities_per_world = entities_per_world,
@@ -25,22 +25,22 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         debug_compile = False,
 )
 
-actions = sim.action_tensor().to_torch()
-resets = sim.reset_tensor().to_torch()
-rgb_observations = sim.rgb_tensor().to_torch()
-print(actions.shape, actions.dtype)
-print(resets.shape, resets.dtype)
-print(rgb_observations.shape, rgb_observations.dtype)
+#actions = sim.action_tensor().to_torch()
+#resets = sim.reset_tensor().to_torch()
+#rgb_observations = sim.rgb_tensor().to_torch()
+#print(actions.shape, actions.dtype)
+#print(resets.shape, resets.dtype)
+#print(rgb_observations.shape, rgb_observations.dtype)
 
 start = time.time()
 
-reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32)
-reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32)
-reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32)
-
-resets[:, 0] = 1
-resets[:, 1] = 3
-resets[:, 2] = 2
+#reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32)
+#reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32)
+#reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32)
+#
+#resets[:, 0] = 1
+#resets[:, 1] = 3
+#resets[:, 2] = 2
 
 def dump_obs(dump_dir, step_idx):
     N = rgb_observations.shape[0]
@@ -57,17 +57,18 @@ def dump_obs(dump_dir, step_idx):
     img = PIL.Image.fromarray(grid)
     img.save(f"{dump_dir}/{step_idx}.png", format="PNG")
 
+print("hi")
 sim.step()
 
 for i in range(num_steps):
     sim.step()
 
-    torch.rand(reset_rand.shape, out=reset_rand)
+    #torch.rand(reset_rand.shape, out=reset_rand)
 
-    reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
-    resets[:, 0].copy_(reset_cond)
+    #reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
+    #resets[:, 0].copy_(reset_cond)
 
-    actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
+    #actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
 
     if len(sys.argv) > 5:
         dump_obs(sys.argv[5], i)

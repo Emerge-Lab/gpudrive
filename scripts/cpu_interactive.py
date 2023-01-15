@@ -5,6 +5,7 @@ import torchvision
 import sys
 import termios
 import tty
+import time
 
 def get_single_char():
     fd = sys.stdin.fileno()
@@ -78,11 +79,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         render_width = 1024,
         render_height = 1024,
         lidar_render = True,
-        debug_compile = False,
 )
-
-for i in range(100):
-    sim.step()
 
 #actions = sim.action_tensor().to_torch()
 #rewards = sim.reward_tensor().to_torch()
@@ -106,10 +103,10 @@ for i in range(100):
 #resets[0][0] = 1
 #resets[0][1] = 2
 #resets[0][2] = 2
-#
-#while True:
-#    print("Stepping")
-#    sim.step()
+
+while True:
+    print("Stepping")
+    sim.step()
 #    torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
 #
 #    print(prep_counter)
@@ -119,10 +116,10 @@ for i in range(100):
 #    print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 #    print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 #
-#    action = get_keyboard_action()
+    action = get_keyboard_action()
 #    
-#    if action.reset < 0:
-#        break
+    if action.reset < 0:
+        break
 #
 #    resets[0][0] = action.reset
 #    actions[0][0][0] = action.x
