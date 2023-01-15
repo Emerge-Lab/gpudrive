@@ -113,7 +113,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Wall:
+    { // Wall: (3)
         metadatas.push_back({
             .invInertiaTensor = { 0.f, 0.f, 0.f },
  .invMass = 0.f,

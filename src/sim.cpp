@@ -109,6 +109,534 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
     return agent;
 }
 
+template <typename T>
+struct DumbArray {
+public:
+    void alloc(Context &ctx, uint32_t maxSize) {
+        mMaxSize = maxSize;
+        // mItems = new T[mMaxSize];
+        // mItems = (T *)TmpAllocator::get(sizeof(T) * mMaxSize);
+        mItems = (T *)ctx.tmpAlloc(sizeof(T) * mMaxSize);
+
+        mCurrentSize = 0;
+    }
+
+    void push_back(T item) {
+        assert(mCurrentSize < mMaxSize);
+        mItems[mCurrentSize++] = item;
+    }
+
+    T &operator[](uint32_t i) {
+        return mItems[i];
+    }
+
+    const T &operator[](uint32_t i) const {
+        return mItems[i];
+    }
+
+    uint32_t size() const {
+        return mCurrentSize;
+    }
+
+private:
+    T *mItems;
+    uint32_t mMaxSize;
+    uint32_t mCurrentSize;
+};
+
+float randomFloat(RNG &rng) {
+    // return (float)rand() / (float)RAND_MAX;
+    return rng.rand();
+}
+
+float wallRandom(RNG &rng) {
+    return 0.3f + randomFloat(rng) * 0.4f;
+}
+
+struct Room {
+    math::Vector2 low, high;
+};
+
+struct Wall {
+    // p1 < p2
+    math::Vector2 p1, p2;
+
+    // Indices of two adjacent rooms
+    int rooms[2];
+
+    Wall() = default;
+
+    // Room 0 is on left,down
+    // Room 1 i s on top,right
+    Wall(math::Vector2 p1_in, math::Vector2 p2_in, int room0, int room1) 
+    : p1(p1_in), p2(p2_in), rooms{room0, room1} {
+        if (p1_in.x > p2_in.x || p1_in.y > p2_in.y) {
+            p1 = p2_in, p2 = p1_in;
+        }
+
+        // assert(room0 >= -1 && room1 >= -1);
+    }
+
+    bool isHorizontal() const {
+        return (fabs(p1.y - p2.y) < 0.000001f);
+    }
+
+    void resort() {
+        math::Vector2 oldP1 = p1;
+        math::Vector2 oldP2 = p2;
+        if (oldP1.x > oldP2.x || oldP1.y > oldP2.y) {
+            p1 = oldP2, p2 = oldP1;
+        }
+    }
+
+    float length() const {
+        if (isHorizontal()) {
+            return p2.x - p1.x;
+        }
+        else {
+            return p2.y - p1.y;
+        }
+    }
+};
+
+enum WallOperation {
+    // Connect two walls with a perpendicular wall
+    WallConnectAndAddDoor,
+    WallAddDoor,
+    WallMaxEnum
+};
+
+struct WallOperationSelection {
+    int selectionSize;
+    WallOperation operations[WallMaxEnum];
+
+    template <typename ...T>
+    WallOperationSelection(int *counts, T ...selections)
+    : operations{selections...}, selectionSize(sizeof...(T)) {
+
+    }
+
+    WallOperationSelection(int *counts) 
+    : selectionSize(WallMaxEnum) {
+        for (int i = 0; i < WallMaxEnum; ++i) {
+            operations[i] = (WallOperation)i;
+        }
+
+        for (int i = 0; i < selectionSize; ++i) {
+            if (counts[operations[i]] == 0) {
+                --selectionSize;
+                operations[i] = operations[selectionSize];
+                --i;
+            }
+        }
+    }
+
+    // How many can we chose left
+    WallOperation select(int *counts, RNG &rng) {
+        int opIdx = rng.u32Rand() % selectionSize;
+        WallOperation op = operations[opIdx];
+
+        int leftCount = counts[op];
+
+        --counts[op];
+        
+        if (counts[op] == 0) {
+            // Yank out this selection
+            --selectionSize;
+            
+            operations[opIdx] = operations[selectionSize];
+        }
+
+        return op;
+    }
+};
+
+struct Walls {
+    DumbArray<Wall> walls;
+    DumbArray<uint8_t> horizontal;
+    DumbArray<uint8_t> vertical;
+    DumbArray<Room> rooms;
+
+    Walls(Context &ctx, uint32_t maxAddDoors, uint32_t maxConnect) {
+        walls.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
+        horizontal.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
+        vertical.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
+        rooms.alloc(ctx, ((maxAddDoors * 3 + maxConnect * 2) / 3));
+    }
+
+    int addWall(Wall wall) {
+        if (wall.isHorizontal()) {
+            // This is a horizontal wall
+            horizontal.push_back((uint8_t)walls.size());
+        }
+        else {
+            vertical.push_back((uint8_t)walls.size());
+        }
+
+        walls.push_back(wall);
+        return walls.size()-1;
+    }
+
+    void scale(Vector2 min, Vector2 max) {
+        // Scale all walls and rooms
+        auto doScale = [&min, &max] (const Vector2 &v) { // v: [0,1]
+            return min + (max-min) * v;
+        };
+
+        for (int i = 0; i < walls.size(); ++i) {
+            walls[i].p1 = doScale(walls[i].p1);
+            walls[i].p2 = doScale(walls[i].p2);
+            rooms[i].low = doScale(rooms[i].low);
+            rooms[i].high = doScale(rooms[i].high);
+        }
+    }
+};
+
+int findAnotherWall(
+    const Walls &walls,
+    const DumbArray<uint8_t> &list, int chosenIndirectIdx,
+    RNG &rng) {
+    const Wall &chosen = walls.walls[list[chosenIndirectIdx]];
+
+    if (chosen.isHorizontal()) {
+        // Search for a wall
+        int startIndirectIdx = chosenIndirectIdx + 1 + rng.u32Rand() % (list.size()-1);
+        for (int i = 0; i < list.size() - 1; ++i) {
+            int currentIndirectIdx = (startIndirectIdx + i) % list.size();
+            if (currentIndirectIdx == chosenIndirectIdx) {
+                currentIndirectIdx = (currentIndirectIdx + 1) % list.size();
+            }
+
+            // Make sure the walls can even be connected in the first place and have enough distance between them
+            const Wall &otherWall = walls.walls[list[currentIndirectIdx]];
+            if (!(chosen.p1.x >= otherWall.p2.x || chosen.p2.x <= otherWall.p1.x) && 
+                chosen.length() >= 0.3f && otherWall.length() >= 0.3f) {
+
+                // Make sure there aren't any walls between these
+                float high = std::min(chosen.p2.x, otherWall.p2.x);
+                float low = std::max(chosen.p1.x, otherWall.p1.x);
+
+                bool works = true;
+                for (int j = 0; j < list.size(); ++j) {
+                    if (j != currentIndirectIdx) {
+                        // Check that this wall isn't in between
+                        float inbetweenLow = std::max(walls.walls[list[j]].p1.x, low - 0.1f);
+                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.x, high + 0.1f);
+                        if (inbetweenLow < inbetweenHigh) {
+                            float y = walls.walls[list[j]].p1.y;
+                            float yMin = std::min(chosen.p1.y, otherWall.p1.y);
+                            float yMax = std::max(chosen.p1.y, otherWall.p1.y);
+                            if (y > yMin && y < yMax) {
+                                works = false;
+                                // printf("Wall in between!\n");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (works) return currentIndirectIdx;
+            }
+        }
+
+        return -1;
+    }
+    else {
+        // Search for a wall
+        int startIndirectIdx = chosenIndirectIdx + 1 + rng.u32Rand() % (list.size()-1);
+        for (int i = 0; i < list.size() - 1; ++i) {
+            int currentIndirectIdx = (startIndirectIdx + i) % list.size();
+            if (currentIndirectIdx == chosenIndirectIdx) {
+                currentIndirectIdx = (currentIndirectIdx + 1) % list.size();
+            }
+
+            // Make sure the walls can even be connected in the first place
+            const Wall &otherWall = walls.walls[list[currentIndirectIdx]];
+            if (!(chosen.p1.y >= otherWall.p2.y || chosen.p2.y <= otherWall.p1.y) &&
+                chosen.length() >= 0.5f && otherWall.length() >= 0.5f) {
+                // Make sure there aren't any walls between these
+                float high = std::min(chosen.p2.y, otherWall.p2.y);
+                float low = std::max(chosen.p1.y, otherWall.p1.y);
+
+                bool works = true;
+                for (int j = 0; j < list.size(); ++j) {
+                    if (j != currentIndirectIdx) {
+                        // Check that this wall isn't in between
+                        float inbetweenLow = std::max(walls.walls[list[j]].p1.y, low - 0.1f);
+                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.y, high + 0.1f);
+                        if (inbetweenLow < inbetweenHigh) {
+                            float x = walls.walls[list[j]].p1.x;
+                            float xMin = std::min(chosen.p1.x, otherWall.p1.x);
+                            float xMax = std::max(chosen.p1.x, otherWall.p1.x);
+                            if (x > xMin && x < xMax) {
+                                works = false;
+                                // printf("Wall in between!\n");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (works) return currentIndirectIdx;
+            }
+        }
+
+        return -1;
+    }
+}
+
+static constexpr float kDoorSize = 0.1f;
+
+// Wall has to at least be length of 3 * kDoorSize
+void addDoor(Walls &walls, Wall &wall, float doorSize, RNG &rng) {
+    // printf("Added door!\n");
+
+    if (wall.isHorizontal()) {
+        float low = wall.p1.x + doorSize;
+        float high = wall.p2.x - doorSize;
+        float rat = 0.3f + randomFloat(rng) * 0.4f;
+        // Position of door
+        float x = low + rat * (high-low);
+
+        float oldP2x = wall.p2.x;
+        wall.p2.x = x - doorSize*0.5f;
+        wall.resort();
+
+        // This will have the same walls as the old bigger wall
+        Wall newSplit = Wall({x + doorSize * 0.5f, wall.p1.y}, {oldP2x, wall.p1.y}, wall.rooms[0], wall.rooms[1]);
+        walls.addWall(newSplit);
+    }
+    else {
+        float low = wall.p1.y + doorSize;
+        float high = wall.p2.y - doorSize;
+        float rat = 0.3f + randomFloat(rng) * 0.4f;
+        // Position of door
+        float y = low + rat * (high-low);
+
+        float oldP2y = wall.p2.y;
+        wall.p2.y = y - doorSize*0.5f;
+        wall.resort();
+
+        Wall newSplit = Wall({wall.p1.x, y + doorSize * 0.5f}, {wall.p1.x, oldP2y}, wall.rooms[0], wall.rooms[1]);
+        walls.addWall(newSplit);
+    }
+}
+
+void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
+    switch (op) {
+        case WallConnectAndAddDoor: {
+            // printf("Connected!\n");
+
+            // First choose a random wall
+            bool isHorizontal = (bool)(rng.u32Rand() % 2);
+            auto *list = [&walls, &isHorizontal] () -> DumbArray<uint8_t> * {
+                return isHorizontal ? &walls.horizontal : &walls.vertical;
+            }();
+
+            // Current wall
+            int wallIndirectIdx = rng.u32Rand() % list->size();
+            int otherWallIndirectIdx;
+
+            int counter = 0;
+            while ((otherWallIndirectIdx = findAnotherWall(walls, *list, wallIndirectIdx, rng)) == -1) {
+                // Find another wall
+                isHorizontal = (bool)(rng.u32Rand() % 2);
+                list = [&walls, &isHorizontal] () -> DumbArray<uint8_t> * {
+                    return isHorizontal ? &walls.horizontal : &walls.vertical;
+                }();
+
+                wallIndirectIdx = rng.u32Rand() % list->size();
+
+                if (counter++ > 4) return;
+            }
+
+            Wall *first = &walls.walls[(*list)[wallIndirectIdx]];
+            Wall *second = &walls.walls[(*list)[otherWallIndirectIdx]];
+
+            if (isHorizontal) {
+                // Get range
+                float high = std::min(first->p2.x, second->p2.x);
+                float low = std::max(first->p1.x, second->p1.x);
+
+                // Make sure that first has a lower y coordinate
+                if (first->p1.y > second->p1.y) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
+
+                float rat = 0.4f + randomFloat(rng) * 0.2f;
+                float x = low + rat * (high-low);
+
+                // printf("%f - %f - %f\n", low, x, high);
+
+                // This is the room that will be split down the middle
+                int oldRoomIdx = first->rooms[1];
+                Room &oldRoom = walls.rooms[first->rooms[1]];
+                // Save old high value
+                float oldRoomOldHigh = oldRoom.high.x;
+                oldRoom.high.x = x;
+
+                Room newRoom = { {oldRoom.high.x, oldRoom.low.y}, {oldRoomOldHigh, oldRoom.high.y} };
+                int newRoomIdx = walls.rooms.size();
+                walls.rooms.push_back(newRoom);
+
+                // y value in p1&p2 is gonna be the same
+                int newWallIdx = walls.addWall(Wall({x, first->p1.y}, {x, second->p1.y}, oldRoomIdx, newRoomIdx));
+                first = &walls.walls[(*list)[wallIndirectIdx]];
+                second = &walls.walls[(*list)[otherWallIndirectIdx]];
+
+                // We have to split the previous walls (adds 2 new walls)
+                float firstOldP2x = first->p2.x;
+                float secondOldP2x = second->p2.x;
+
+                // the original walls have to be split - shorten first and second and add new walls for the other splits
+                first->p2.x = x;
+                first->resort();
+                second->p2.x = x;
+                second->resort();
+
+                Wall new0 = Wall({x, first->p1.y}, {firstOldP2x, first->p1.y}, first->rooms[0], newRoomIdx);
+                Wall new1 = Wall({x, second->p1.y}, {secondOldP2x, second->p1.y}, newRoomIdx, second->rooms[1]);
+
+                walls.addWall(new0);
+                walls.addWall(new1);
+
+                addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
+
+                for (int i = 0; i < walls.vertical.size(); ++i) {
+                    int idx = walls.vertical[i];
+                    if (walls.walls[idx].rooms[0] == oldRoomIdx && idx != newWallIdx) {
+                        walls.walls[idx].rooms[0] = newRoomIdx;
+                    }
+                }
+
+                for (int i = 0; i < walls.horizontal.size(); ++i) {
+                    int idx = walls.horizontal[i];
+                    if (idx != (*list)[wallIndirectIdx] && walls.walls[idx].rooms[1] == oldRoomIdx) {
+                        walls.walls[idx].rooms[1] = newRoomIdx;
+                    }
+                    else if (idx != (*list)[otherWallIndirectIdx] && walls.walls[idx].rooms[0] == oldRoomIdx) {
+                        walls.walls[idx].rooms[0] = newRoomIdx;
+                    }
+                }
+            }
+            else {
+                // Get range
+                float high = std::min(first->p2.y, second->p2.y);
+                float low = std::max(first->p1.y, second->p1.y);
+
+                if (first->p1.x > second->p1.x) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
+
+                float rat = 0.4f + randomFloat(rng) * 0.2f;
+                float y = low + rat * (high-low);
+
+                // printf("%f - %f - %f\n", low, y, high);
+
+                // This is the room that will be split down the middle
+                int oldRoomIdx = first->rooms[1];
+                Room &oldRoom = walls.rooms[first->rooms[1]];
+                // Save old high value
+                float oldRoomOldHigh = oldRoom.high.y;
+                oldRoom.high.y = y;
+
+                Room newRoom = { {oldRoom.low.x, oldRoom.high.y}, {oldRoom.high.x, oldRoomOldHigh} };
+                int newRoomIdx = walls.rooms.size();
+                walls.rooms.push_back(newRoom);
+
+                int newWallIdx = walls.addWall(Wall({first->p1.x, y}, {second->p1.x, y}, oldRoomIdx, newRoomIdx));
+                first = &walls.walls[(*list)[wallIndirectIdx]];
+                second = &walls.walls[(*list)[otherWallIndirectIdx]];
+
+                // We have to split the previous walls (adds 2 new walls)
+                float firstOldP2y = first->p2.y;
+                float secondOldP2y = second->p2.y;
+
+                first->p2.y = y;
+                first->resort();
+                second->p2.y = y;
+                second->resort();
+
+                Wall new0 = Wall({first->p1.x, y}, {first->p1.x, firstOldP2y}, first->rooms[0], newRoomIdx);
+                Wall new1 = Wall({second->p1.x, y}, {second->p1.x, secondOldP2y}, newRoomIdx, second->rooms[1]);
+
+                walls.addWall(new0);
+                walls.addWall(new1);
+
+                addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
+
+                for (int i = 0; i < walls.horizontal.size(); ++i) {
+                    int idx = walls.horizontal[i];
+                    if (walls.walls[idx].rooms[0] == oldRoomIdx && idx != newWallIdx) {
+                        walls.walls[idx].rooms[0] = newRoomIdx;
+                    }
+                }
+
+                for (int i = 0; i < walls.vertical.size(); ++i) {
+                    int idx = walls.vertical[i];
+                    if (idx != (*list)[wallIndirectIdx] && walls.walls[idx].rooms[1] == oldRoomIdx) {
+                        walls.walls[idx].rooms[1] = newRoomIdx;
+                    }
+                    else if (idx != (*list)[otherWallIndirectIdx] && walls.walls[idx].rooms[0] == oldRoomIdx) {
+                        walls.walls[idx].rooms[0] = newRoomIdx;
+                    }
+                }
+            }
+        } break;
+
+        case WallAddDoor: {
+            float doorSize = kDoorSize * 2.0f;
+
+            // Choose a random wall
+            int randomWallIdx = rng.u32Rand() % walls.walls.size();
+            Wall &wall = walls.walls[randomWallIdx];
+            
+            if (wall.length() > 3.0f * doorSize) {
+                addDoor(walls, wall, doorSize, rng);
+            }
+        } break;
+
+        case WallMaxEnum: {
+
+        } break;
+    }
+}
+
+Walls makeWalls(Context &ctx, RNG &rng) {
+    const uint32_t maxAddDoors = 7;
+    const uint32_t maxConnect = 6;
+
+    Walls walls(ctx, maxAddDoors, maxConnect);
+    walls.rooms.push_back({{0.0f, 0.0f}, {1.0f, 1.0f}});
+    walls.addWall(Wall({0.0f,0.0f}, {1.0f,0.0f}, -1, 0));
+    walls.addWall(Wall({0.0f,0.0f}, {0.0f,1.0f}, -1, 0));
+    walls.addWall(Wall({0.0f,1.0f}, {1.0f,1.0f}, 0, -1));
+    walls.addWall(Wall({1.0f,1.0f}, {1.0f,0.0f}, 0, -1));
+
+    int wallConnectAndAddDoorCount = 1 + rng.u32Rand() % (maxConnect-1);
+    int wallAddDoorCount = 4 + rng.u32Rand() % (maxAddDoors - 4);
+
+    int maxCounts[WallMaxEnum] = {};
+    maxCounts[WallConnectAndAddDoor] = wallConnectAndAddDoorCount;
+    maxCounts[WallAddDoor] = wallAddDoorCount;
+
+    auto isFinished = [&maxCounts] () -> bool {
+        bool ret = true;
+        for (int i = 0; i < WallMaxEnum; ++i) {
+            ret &= (maxCounts[i] == 0);
+        }
+        return ret;
+    };
+
+    // First selection
+    WallOperationSelection selector = WallOperationSelection(maxCounts);
+    WallOperation firstOp = selector.select(maxCounts, rng);
+    applyWallOperation(firstOp, walls, rng);
+
+    while (!isFinished()) {
+        WallOperation op = selector.select(maxCounts, rng);
+        applyWallOperation(op, walls, rng);
+    }
+
+    return walls;
+}
+
 // Emergent tool use configuration:
 // 1 - 3 Hiders
 // 1 - 3 Seekers
@@ -120,11 +648,15 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     Entity *all_entities = ctx.data().obstacles;
     auto &rng = ctx.data().rng;
 
+    // Generate the walls
+    Walls walls = makeWalls(ctx, rng);
+    walls.scale({-18, -18}, {18, 18});
+
     CountT total_num_boxes = CountT(rng.rand() * 6) + 3;
     assert(total_num_boxes < consts::maxBoxes);
 
     CountT num_elongated = 
-        CountT(ctx.data().rng.rand() * (total_num_boxes - 3)) + 3;
+    CountT(ctx.data().rng.rand() * (total_num_boxes - 3)) + 3;
 
     CountT num_cubes = total_num_boxes - num_elongated;
 
@@ -133,74 +665,191 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
     const Vector2 bounds { -18.f, 18.f };
     float bounds_diff = bounds.y - bounds.x;
 
+    const ObjectManager &obj_mgr = *ctx.getSingleton<ObjectData>().mgr;
+
     CountT num_entities = 0;
-    for (CountT i = 0; i < num_elongated; i++) {
-        Vector3 pos {
-            bounds.x + rng.rand() * bounds_diff,
-            bounds.x + rng.rand() * bounds_diff,
-            1.0f,
+    // Add walls (3)
+    for (int i = 0; i < walls.walls.size(); ++i) {
+        Wall &wall = walls.walls[i];
+
+        // Wall center
+        Vector3 position = Vector3{
+            0.5f * (wall.p1.x + wall.p2.x),
+            0.5f * (wall.p1.y + wall.p2.y),
+            2.0f / 3.0f
         };
 
-        float box_rotation = rng.rand() * math::pi;
-        const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
+        Vector3 scale;
 
-        ctx.data().boxes[i] = all_entities[num_entities++] =
-                makeDynObject(ctx, pos, rot, 6);
+        if (wall.isHorizontal()) {
+            scale = Vector3{
+                wall.p2.x - position.x, 0.2f, 1.0f
+            };
+        }
+        else {
+            scale = Vector3{
+                0.2f, wall.p2.y - position.y, 1.0f
+            };
+        }
 
-        ctx.data().boxSizes[i] = { 8, 1.5 };
-        ctx.data().boxRotations[i] = box_rotation;
+        all_entities[num_entities++] =
+            makeDynObject(
+                ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
+                ResponseType::Static, OwnerTeam::Unownable, scale);
     }
 
+    auto checkOverlap = [&obj_mgr, &ctx, &all_entities, &num_entities] (const AABB &aabb) {
+        for (int i = 0; i < num_entities; ++i) {
+            ObjectID obj_id = ctx.getUnsafe<ObjectID>(all_entities[i]);
+            AABB other = obj_mgr.aabbs[obj_id.idx];
+
+            Position p = ctx.getUnsafe<Position>(all_entities[i]);
+            Rotation r = ctx.getUnsafe<Rotation>(all_entities[i]);
+            Scale s = ctx.getUnsafe<Scale>(all_entities[i]);
+            other = other.applyTRS(p, r, s);
+
+            if (aabb.overlaps(other)) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    int rejections = 0;
+
+    for (CountT i = 0; i < num_elongated; i++) {
+        // Choose a random room and put the entity in a random position in that room
+        for(;;) {
+            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
+
+            float bounds_diffx = room->high.x - room->low.x;
+            float bounds_diffy = room->high.y - room->low.y;
+            bounds_diffx = bounds.y - bounds.x;
+            bounds_diffy = bounds.y - bounds.x;
+
+            Vector3 pos {
+                bounds.x + rng.rand() * bounds_diffx,
+                bounds.x + rng.rand() * bounds_diffy,
+                1.0f,
+            };
+
+            float box_rotation = rng.rand() * math::pi;
+            const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
+            Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+            AABB aabb = obj_mgr.aabbs[6];
+            aabb = aabb.applyTRS(pos, rot, scale);
+
+            // Check overlap with all other entities
+            if (checkOverlap(aabb)) {
+                ctx.data().boxes[i] = all_entities[num_entities++] =
+                    makeDynObject(ctx, pos, rot, 6);
+
+                ctx.data().boxSizes[i] = { 8, 1.5 };
+                ctx.data().boxRotations[i] = box_rotation;
+                break;
+            }
+
+            rejections++;
+        }
+    }
+
+    rejections = 0;
     for (CountT i = 0; i < num_cubes; i++) {
-        Vector3 pos {
-            bounds.x + rng.rand() * bounds_diff,
-            bounds.x + rng.rand() * bounds_diff,
-            1.0f,
-        };
+        for (;;) {
+            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
 
-        float box_rotation = rng.rand() * math::pi;
-        const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
+            float bounds_diffx = room->high.x - room->low.x;
+            float bounds_diffy = room->high.y - room->low.y;
 
-        CountT box_idx = i + num_elongated;
+            bounds_diffx = bounds.y - bounds.x;
+            bounds_diffy = bounds.y - bounds.x;
 
-        ctx.data().boxes[box_idx] = all_entities[num_entities++] =
-            makeDynObject(ctx, pos, rot, 2);
+#if 0
+            Vector3 pos {
+                room->low.x + rng.rand() * bounds_diffx,
+                room->low.y + rng.rand() * bounds_diffy,
+                1.0f,
+            };
+#endif
 
-        ctx.data().boxSizes[box_idx] = { 2, 2 };
-        ctx.data().boxRotations[box_idx] = box_rotation;
+            Vector3 pos {
+                bounds.x + rng.rand() * bounds_diffx,
+                bounds.x + rng.rand() * bounds_diffy,
+                1.0f,
+            };
+
+            float box_rotation = rng.rand() * math::pi;
+            const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
+            Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+            AABB aabb = obj_mgr.aabbs[2];
+            aabb = aabb.applyTRS(pos, rot, scale);
+
+            if (checkOverlap(aabb)) {
+                CountT box_idx = i + num_elongated;
+
+                ctx.data().boxes[box_idx] = all_entities[num_entities++] =
+                    makeDynObject(ctx, pos, rot, 2);
+
+                ctx.data().boxSizes[box_idx] = { 2, 2 };
+                ctx.data().boxRotations[box_idx] = box_rotation;
+                break;
+            }
+
+            ++rejections;
+        }
     }
 
     ctx.data().numActiveBoxes = total_num_boxes;
 
+    rejections = 0;
+
     const CountT num_ramps = consts::maxRamps;
     for (CountT i = 0; i < num_ramps; i++) {
-        Vector3 pos {
-            bounds.x + rng.rand() * bounds_diff,
-            bounds.x + rng.rand() * bounds_diff,
-            2.f / 3.f,
-        };
+        for (;;) {
+            // Choose a random room and put the entity in a random position in that room
+            Room *room = &walls.rooms[rng.u32Rand() % walls.rooms.size()];
 
-        float ramp_rotation = rng.rand() * math::pi;
-        const auto rot = Quat::angleAxis(ramp_rotation, {0, 0, 1});
+            float bounds_diffx = room->high.x - room->low.x;
+            float bounds_diffy = room->high.y - room->low.y;
 
-        ctx.data().ramps[i] = all_entities[num_entities++] =
-            makeDynObject(ctx, pos, rot, 5);
-        ctx.data().rampRotations[i] = ramp_rotation;
+            bounds_diffx = bounds.y - bounds.x;
+            bounds_diffy = bounds.y - bounds.x;
+
+#if 0
+            Vector3 pos {
+                room->low.x + rng.rand() * bounds_diffx,
+                room->low.y + rng.rand() * bounds_diffy,
+                1.0f,
+            };
+#endif
+
+            Vector3 pos {
+                bounds.x + rng.rand() * bounds_diffx,
+                bounds.x + rng.rand() * bounds_diffy,
+                1.0f,
+            };
+
+            float ramp_rotation = rng.rand() * math::pi;
+            const auto rot = Quat::angleAxis(ramp_rotation, {0, 0, 1});
+            Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+            AABB aabb = obj_mgr.aabbs[5];
+            aabb = aabb.applyTRS(pos, rot, scale);
+
+            if (checkOverlap(aabb)) {
+                ctx.data().ramps[i] = all_entities[num_entities++] =
+                    makeDynObject(ctx, pos, rot, 5);
+                ctx.data().rampRotations[i] = ramp_rotation;
+                break;
+            }
+
+            ++rejections;
+        }
     }
     ctx.data().numActiveRamps = num_ramps;
-
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
     auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider,
                             int32_t view_idx) {
@@ -232,28 +881,62 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
         return agent;
     };
 
-    for (CountT i = 0; i < num_hiders; i++) {
-        Vector3 pos {
-            bounds.x + rng.rand() * bounds_diff,
-            bounds.x + rng.rand() * bounds_diff,
-            1.5f,
-        };
+    const Quat agent_rot =
+        Quat::angleAxis(-pi_d2, {1, 0, 0});
 
-        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-        makeDynAgent(pos, rot, true, i);
+    for (CountT i = 0; i < num_hiders; i++) {
+        for (;;) {
+            Vector3 pos {
+                bounds.x + rng.rand() * bounds_diff,
+                    bounds.x + rng.rand() * bounds_diff,
+                    1.5f,
+            };
+
+            const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+            Vector3 scale = {1.0f, 1.0f, 1.0f};
+
+            AABB aabb = obj_mgr.aabbs[4];
+            aabb = aabb.applyTRS(pos, rot, scale);
+            if (checkOverlap(aabb)) {
+                makeDynAgent(pos, rot, true, i);
+                break;
+            }
+        }
     }
 
     for (CountT i = 0; i < num_seekers; i++) {
-        Vector3 pos {
-            bounds.x + rng.rand() * bounds_diff,
-            bounds.x + rng.rand() * bounds_diff,
-            1.5f,
-        };
+        for (;;) {
+            Vector3 pos {
+                bounds.x + rng.rand() * bounds_diff,
+                    bounds.x + rng.rand() * bounds_diff,
+                    1.5f,
+            };
 
-        const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+            const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
+            Vector3 scale = {1.0f, 1.0f, 1.0f};
 
-        makeDynAgent(pos, rot, false, num_hiders + i);
+            AABB aabb = obj_mgr.aabbs[4];
+            aabb = aabb.applyTRS(pos, rot, scale);
+
+            if (checkOverlap(aabb)) {
+                makeDynAgent(pos, rot, false, num_hiders + i);
+                break;
+            }
+        }
     }
+
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    all_entities[num_entities++] =
+        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
     ctx.data().numObstacles = num_entities;
 }
@@ -982,9 +1665,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
 
+    auto clearTmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+
 #ifdef MADRONA_GPU_MODE
     // FIXME: these 3 need to be compacted, but sorting is unnecessary
-    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {reset_sys});
+    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {clearTmp});
     auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
     auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
 
@@ -993,7 +1678,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder)
         queueSortByWorld<AgentInterface>(builder, {sort_objects});
     auto prep_finish = sort_agent_iface;
 #else
-    auto prep_finish = reset_sys;
+    auto prep_finish = clearTmp;
 #endif
 
 #if 0
@@ -1067,7 +1752,7 @@ Sim::Sim(Engine &ctx,
       episodeMgr(init.episodeMgr)
 {
     CountT max_total_entities =
-        std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 10;
+        std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 100;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
