@@ -112,7 +112,7 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
 template <typename T>
 struct DumbArray {
 public:
-    void alloc(Context &ctx, uint32_t maxSize) {
+    void alloc(Context &ctx, CountT maxSize) {
         mMaxSize = maxSize;
         // mItems = new T[mMaxSize];
         // mItems = (T *)TmpAllocator::get(sizeof(T) * mMaxSize);
@@ -126,22 +126,22 @@ public:
         mItems[mCurrentSize++] = item;
     }
 
-    T &operator[](uint32_t i) {
+    T &operator[](CountT i) {
         return mItems[i];
     }
 
-    const T &operator[](uint32_t i) const {
+    const T &operator[](CountT i) const {
         return mItems[i];
     }
 
-    uint32_t size() const {
+    CountT size() const {
         return mCurrentSize;
     }
 
 private:
     T *mItems;
-    uint32_t mMaxSize;
-    uint32_t mCurrentSize;
+    CountT mMaxSize;
+    CountT mCurrentSize;
 };
 
 float randomFloat(RNG &rng) {
@@ -202,10 +202,10 @@ struct WallOperationSelection {
     WallOperation operations[WallMaxEnum];
 
     template <typename ...T>
-    WallOperationSelection(int *counts, T ...selections)
-    : operations{selections...}, selectionSize(sizeof...(T)) {
-
-    }
+    WallOperationSelection(int *, T ...selections)
+        : selectionSize(sizeof...(T)),
+          operations{selections...}
+    {}
 
     WallOperationSelection(int *counts) 
     : selectionSize(WallMaxEnum) {
@@ -226,8 +226,6 @@ struct WallOperationSelection {
     WallOperation select(int *counts, RNG &rng) {
         int opIdx = rng.u32Rand() % selectionSize;
         WallOperation op = operations[opIdx];
-
-        int leftCount = counts[op];
 
         --counts[op];
         
@@ -606,7 +604,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
         Vector3 position = Vector3{
             0.5f * (wall.p1.x + wall.p2.x),
             0.5f * (wall.p1.y + wall.p2.y),
-            2.0f / 3.0f
+            0.f,
         };
 
         Vector3 scale;
@@ -796,10 +794,10 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
         return agent;
     };
 
+#if 0
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
 
-#if 0
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
         render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
