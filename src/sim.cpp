@@ -88,6 +88,12 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
                          OwnerTeam::Unownable);
 }
 
+static Entity makeBorder(Engine &ctx, Vector3 offset, Quat rot) {
+    return makeDynObject(ctx, offset, rot, 2, ResponseType::Static,
+                         OwnerTeam::Unownable,
+                         { 200, 200, 200 });
+}
+
 template <typename T>
 static Entity makeAgent(Engine &ctx, AgentType agent_type)
 {
@@ -846,6 +852,21 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             }
         }
     }
+#endif
+
+#if 0
+    all_entities[num_entities++] =
+        makeBorder(ctx, {0, 0, -200}, Quat {1, 0, 0, 0});
+    all_entities[num_entities++] =
+        makeBorder(ctx, {0, 0, 100 + 200}, Quat {1, 0, 0, 0});
+    all_entities[num_entities++] =
+        makeBorder(ctx, {-100 - 200, 0, 0}, Quat {1, 0, 0, 0});
+    all_entities[num_entities++] =
+        makeBorder(ctx, {100 + 200, 0, 0}, Quat {1, 0, 0, 0});
+    all_entities[num_entities++] =
+        makeBorder(ctx, {0, -100 - 200, 0}, Quat {1, 0, 0, 0});
+    all_entities[num_entities++] =
+        makeBorder(ctx, {0, 100 + 200, 0}, Quat {1, 0, 0, 0});
 #endif
 
     all_entities[num_entities++] =
