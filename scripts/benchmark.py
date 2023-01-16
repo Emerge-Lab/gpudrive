@@ -32,8 +32,6 @@ print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
 print(rgb_observations.shape, rgb_observations.dtype)
 
-start = time.time()
-
 reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32)
 reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32)
 reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32)
@@ -57,7 +55,14 @@ def dump_obs(dump_dir, step_idx):
     img = PIL.Image.fromarray(grid)
     img.save(f"{dump_dir}/{step_idx}.png", format="PNG")
 
-sim.step()
+move_action_slice = actions[..., 0:2]
+
+for i in range(5):
+    sim.step()
+
+resets[:, 0] = 1
+
+start = time.time()
 
 for i in range(num_steps):
     sim.step()
@@ -67,7 +72,9 @@ for i in range(num_steps):
     reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
     resets[:, 0].copy_(reset_cond)
 
-    actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
+    torch.randint(-5, 5, move_action_slice.shape,
+                  out=move_action_slice,
+                  dtype=torch.int32, device=torch.device('cuda'))
 
     if len(sys.argv) > 5:
         dump_obs(sys.argv[5], i)

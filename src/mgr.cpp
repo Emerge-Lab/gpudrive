@@ -388,9 +388,11 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                     .renderWidth = cfg.renderWidth,
                     .renderHeight = cfg.renderHeight,
                     .maxObjects = 50,
+                    .numExportedBuffers = 15,
                     .cameraMode = cfg.lidarRender ?
                         ThreadPoolExecutor::CameraMode::Lidar :
                         ThreadPoolExecutor::CameraMode::Perspective,
+                    .renderGPUID = cfg.gpuID,
                 },
                 world_inits.data()
             },
@@ -550,16 +552,16 @@ MADRONA_EXPORT madrona::py::Tensor Manager::visibleRampsMaskTensor() const
 MADRONA_EXPORT Tensor Manager::depthTensor() const
 {
     void *dev_ptr = nullptr;
-    Optional<int> gpu_id = Optional<int>::none();
+    Optional<int> gpu_id = impl_->cfg.gpuID;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             depthObservations();
-        gpu_id = impl_->cfg.gpuID;
 #endif
     } else {
-        dev_ptr = nullptr;
+        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
+            depthObservations();
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::Float32,
@@ -571,16 +573,16 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
 MADRONA_EXPORT Tensor Manager::rgbTensor() const
 {
     void *dev_ptr = nullptr;
-    Optional<int> gpu_id = Optional<int>::none();
+    Optional<int> gpu_id = impl_->cfg.gpuID;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             rgbObservations();
-        gpu_id = impl_->cfg.gpuID;
 #endif
     } else {
-        dev_ptr = nullptr;
+        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
+            rgbObservations();
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::UInt8,
@@ -602,8 +604,7 @@ Tensor Manager::exportStateTensor(int64_t slot,
         gpu_id = impl_->cfg.gpuID;
 #endif
     } else {
-        (void)slot;
-        dev_ptr = nullptr;
+        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.getExported(slot);
     }
 
     return Tensor(dev_ptr, type, dimensions, gpu_id);

@@ -69,8 +69,18 @@ def get_keyboard_action():
 
         return result
 
+exec_mode_str = sys.argv[1]
+
+if exec_mode_str == "CUDA":
+    exec_mode = gpu_hideseek_python.ExecMode.CUDA
+elif exec_mode_str == "CPU":
+    exec_mode = gpu_hideseek_python.ExecMode.CPU
+else:
+    print("interactive.py (CUDA | CPU) [out.png]")
+    sys.exit(1)
+
 sim = gpu_hideseek_python.HideAndSeekSimulator(
-        exec_mode = gpu_hideseek_python.ExecMode.CUDA,
+        exec_mode = exec_mode,
         gpu_id = 0,
         num_worlds = 1,
         min_entities_per_world = 5,
@@ -107,7 +117,9 @@ resets[0][2] = 2
 while True:
     print("Stepping")
     sim.step()
-    torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[1])
+
+    if len(sys.argv) > 2:
+        torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
 
     print(prep_counter)
     print(dones)

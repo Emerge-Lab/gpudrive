@@ -11,8 +11,8 @@ num_steps = int(sys.argv[2])
 entities_per_world = int(sys.argv[3])
 reset_chance = float(sys.argv[4])
 
-render_width = 30 
-render_height = 1 
+render_width = 64
+render_height = 64
 
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = gpu_hideseek_python.ExecMode.CPU,
@@ -25,24 +25,9 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         debug_compile = False,
 )
 
-#actions = sim.action_tensor().to_torch()
-#resets = sim.reset_tensor().to_torch()
-#rgb_observations = sim.rgb_tensor().to_torch()
-#print(actions.shape, actions.dtype)
-#print(resets.shape, resets.dtype)
-#print(rgb_observations.shape, rgb_observations.dtype)
+rgb_observations = sim.rgb_tensor().to_torch()
 
-start = time.time()
-
-#reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32)
-#reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32)
-#reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32)
-#
-#resets[:, 0] = 1
-#resets[:, 1] = 3
-#resets[:, 2] = 2
-
-def dump_obs(dump_dir, step_idx):
+def dump_rgb(dump_dir, step_idx):
     N = rgb_observations.shape[0]
     A = rgb_observations.shape[1]
 
@@ -57,21 +42,73 @@ def dump_obs(dump_dir, step_idx):
     img = PIL.Image.fromarray(grid)
     img.save(f"{dump_dir}/{step_idx}.png", format="PNG")
 
-print("hi")
-sim.step()
+
+actions = sim.action_tensor().to_torch()
+actions_gpu = torch.zeros_like(actions, device=torch.device('cuda'))
+
+observations_cpu = [
+        sim.done_tensor().to_torch(),
+        sim.prep_counter_tensor().to_torch(),
+        sim.reward_tensor().to_torch(),
+        sim.agent_mask_tensor().to_torch(),
+        sim.visible_agents_mask_tensor().to_torch(),
+        sim.visible_boxes_mask_tensor().to_torch(),
+        sim.visible_ramps_mask_tensor().to_torch(),
+        sim.agent_data_tensor().to_torch(),
+        sim.box_data_tensor().to_torch(),
+        sim.ramp_data_tensor().to_torch(),
+    ]
+
+observations_gpu = [
+        torch.zeros_like(obs, device=torch.device('cuda')) for obs in observations_cpu
+    ]
+
+resets = sim.reset_tensor().to_torch()
+print(actions.shape, actions.dtype)
+print(resets.shape, resets.dtype)
+print(rgb_observations.shape, rgb_observations.dtype)
+
+reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32,
+                            device=torch.device('cuda'))
+reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32,
+                            device=torch.device('cuda'))
+reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32,
+                              device=torch.device('cuda'))
+
+resets[:, 0] = 1
+resets[:, 1] = 3
+resets[:, 2] = 2
+
+move_action_slice_gpu = actions_gpu[..., 0:2]
+move_action_slice = actions[..., 0:2]
+
+for i in range(5):
+    sim.step()
+
+resets[:, 0] = 1
+
+start = time.time()
 
 for i in range(num_steps):
     sim.step()
 
-    #torch.rand(reset_rand.shape, out=reset_rand)
+    for obs_cpu, obs_gpu in zip(observations_cpu, observations_gpu):
+        obs_gpu.copy_(obs_cpu)
 
-    #reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
-    #resets[:, 0].copy_(reset_cond)
+    torch.rand(reset_rand.shape, out=reset_rand)
 
-    #actions[..., 0:2] = torch.randint_like(actions[..., 0:2], -5, 5)
+    reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
+    resets[:, 0].copy_(reset_cond)
+
+    torch.randint(-5, 5, move_action_slice.shape,
+                  out=move_action_slice_gpu,
+                  dtype=torch.int32, device=torch.device('cuda'))
+    move_action_slice.copy_(move_action_slice_gpu)
+
+    torch.cuda.synchronize()
 
     if len(sys.argv) > 5:
-        dump_obs(sys.argv[5], i)
+        dump_rgb(sys.argv[5], i)
 
 end = time.time()
 

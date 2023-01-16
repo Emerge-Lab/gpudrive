@@ -37,7 +37,7 @@ void Sim::registerTypes(ECSRegistry &registry)
     registry.registerSingleton<PrepPhaseCounter>();
 
     registry.registerArchetype<DynamicObject>();
-    registry.registerArchetype<AgentInterface>();
+    registry.registerFixedSizeArchetype<AgentInterface>(consts::maxAgents);
     registry.registerArchetype<CameraAgent>();
     registry.registerArchetype<DynAgent>();
 
