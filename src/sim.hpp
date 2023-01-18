@@ -182,10 +182,15 @@ struct DynAgent : public madrona::Archetype<
     madrona::render::ViewSettings
 > {};
 
-struct Sim : public madrona::WorldBase {
-    static void registerTypes(madrona::ECSRegistry &registry);
+struct Config {
+};
 
-    static void setupTasks(madrona::TaskGraph::Builder &builder);
+struct Sim : public madrona::WorldBase {
+    static void registerTypes(madrona::ECSRegistry &registry,
+                              const Config &cfg);
+
+    static void setupTasks(madrona::TaskGraph::Builder &builder,
+                           const Config &cfg);
 
     Sim(Engine &ctx, const WorldInit &init,
         const madrona::render::RendererInit &renderer_init);

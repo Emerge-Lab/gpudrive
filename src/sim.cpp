@@ -10,7 +10,7 @@ namespace GPUHideSeek {
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
 
-void Sim::registerTypes(ECSRegistry &registry)
+void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
     base::registerTypes(registry);
     phys::RigidBodyPhysicsSystem::registerTypes(registry);
@@ -62,7 +62,7 @@ static Entity makeDynObject(Engine &ctx,
                             int32_t obj_id,
                             ResponseType response_type = ResponseType::Dynamic,
                             OwnerTeam owner_team = OwnerTeam::None,
-                            Vector3 scale = {1, 1, 1})
+                            Diag3x3 scale = {1, 1, 1})
 {
     Entity e = ctx.makeEntityNow<DynamicObject>();
     ctx.getUnsafe<Position>(e) = pos;
@@ -615,15 +615,15 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             0.f,
         };
 
-        Vector3 scale;
+        Diag3x3 scale;
 
         if (wall.isHorizontal()) {
-            scale = Vector3{
+            scale = {
                 wall.p2.x - position.x, 0.2f, 1.0f
             };
         }
         else {
-            scale = Vector3{
+            scale = {
                 0.2f, wall.p2.y - position.y, 1.0f
             };
         }
@@ -642,7 +642,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             Position p = ctx.getUnsafe<Position>(all_entities[i]);
             Rotation r = ctx.getUnsafe<Rotation>(all_entities[i]);
             Scale s = ctx.getUnsafe<Scale>(all_entities[i]);
-            other = other.applyTRS(p, r, s);
+            other = other.applyTRS(p, r, Diag3x3(s));
 
             if (aabb.overlaps(other)) {
                 return false;
@@ -668,7 +668,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
 
             float box_rotation = rng.rand() * math::pi;
             const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
-            Vector3 scale = {1.0f, 1.0f, 1.0f};
+            Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
             AABB aabb = obj_mgr.aabbs[6];
             aabb = aabb.applyTRS(pos, rot, scale);
@@ -709,7 +709,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
 
             float box_rotation = rng.rand() * math::pi;
             const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
-            Vector3 scale = {1.0f, 1.0f, 1.0f};
+            Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
             AABB aabb = obj_mgr.aabbs[2];
             aabb = aabb.applyTRS(pos, rot, scale);
@@ -755,7 +755,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
 
             float ramp_rotation = rng.rand() * math::pi;
             const auto rot = Quat::angleAxis(ramp_rotation, {0, 0, 1});
-            Vector3 scale = {1.0f, 1.0f, 1.0f};
+            Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
             AABB aabb = obj_mgr.aabbs[5];
             aabb = aabb.applyTRS(pos, rot, scale);
@@ -778,7 +778,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             is_hider ? AgentType::Hider : AgentType::Seeker);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
-        ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         ctx.getUnsafe<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f,
                 Vector3 { 0, 0, 0.8 }, { view_idx });
@@ -823,7 +823,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             };
 
             const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-            Vector3 scale = {1.0f, 1.0f, 1.0f};
+            Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
             AABB aabb = obj_mgr.aabbs[4];
             aabb = aabb.applyTRS(pos, rot, scale);
@@ -843,7 +843,7 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
             };
 
             const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
-            Vector3 scale = {1.0f, 1.0f, 1.0f};
+            Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
             AABB aabb = obj_mgr.aabbs[4];
             aabb = aabb.applyTRS(pos, rot, scale);
@@ -925,10 +925,44 @@ static void level3(Engine &ctx)
 
 static void level4(Engine &ctx)
 {
-    Quat cube_rotation = (
+    Vector3 pos { 0, 0, 5 };
+
+    Quat rot = (
+        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize();
+#if 0
         Quat::angleAxis(helpers::toRadians(45), {0, 1, 0}) *
         Quat::angleAxis(helpers::toRadians(40), {1, 0, 0})).normalize();
-    singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
+#endif
+
+    Entity *all_entities = ctx.data().obstacles;
+
+    CountT total_entities = 0;
+
+    //Entity test_cube = makeDynObject(ctx, pos, rot, 2);
+    //all_entities[total_entities++] = test_cube;
+
+    all_entities[total_entities++] =
+        makeDynObject(ctx, pos + Vector3 {0, 0, 5}, rot, 6,
+                      ResponseType::Dynamic, OwnerTeam::None,
+                      {1, 1, 1});
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+
+    const Quat agent_rot =
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+
+    ctx.data().numObstacles = total_entities;
+
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+    ctx.getUnsafe<Position>(agent) = Vector3 { -7.5, -7.5, 0.5 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
 
 static void level5(Engine &ctx)
@@ -962,14 +996,14 @@ static void level5(Engine &ctx)
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
     all_entities[total_entities++] =
         makePlane(ctx, {0, 0, 40}, Quat::angleAxis(pi, {1, 0, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {0, -20, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
-    all_entities[total_entities++] =
-        makePlane(ctx, {0, 20, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {0, -20, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    //all_entities[total_entities++] =
+    //    makePlane(ctx, {0, 20, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
     const Quat agent_rot =
         Quat::angleAxis(-pi_d2, {1, 0, 0});
@@ -1007,7 +1041,7 @@ static void level6(Engine &ctx)
             is_hider ? AgentType::Hider : AgentType::Seeker);
         ctx.getUnsafe<Position>(agent) = pos;
         ctx.getUnsafe<Rotation>(agent) = rot;
-        ctx.getUnsafe<Scale>(agent) = Vector3 { 1, 1, 1 };
+        ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         ctx.getUnsafe<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f,
                 Vector3 { 0, 0, 0.8 }, { view_idx });
@@ -1038,6 +1072,90 @@ static void level6(Engine &ctx)
         Quat::angleAxis(helpers::toRadians(45), {0, 0, 1}), false, 1);
 
     ctx.data().numObstacles = num_entities;
+}
+
+static void level7(Engine &ctx)
+{
+    Vector3 pos { 0, 0, 5 };
+
+    Quat rot = (
+        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0}) *
+        Quat::angleAxis(helpers::toRadians(40), {1, 0, 0})).normalize();
+
+    Entity *all_entities = ctx.data().obstacles;
+
+    CountT total_entities = 0;
+
+    all_entities[total_entities++] =  makeDynObject(ctx, pos, rot, 2);
+
+    all_entities[total_entities++] =
+        makeDynObject(ctx, pos + Vector3 {0, 0, 5}, rot, 2,
+                      ResponseType::Dynamic, OwnerTeam::None,
+                      {1, 1, 1});
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+
+    const Quat agent_rot =
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+
+    ctx.data().numObstacles = total_entities;
+
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+}
+
+static void level8(Engine &ctx)
+{
+    Entity *all_entities = ctx.data().obstacles;
+
+    CountT total_entities = 0;
+
+    Vector3 ramp_pos { 0, 0, 10 };
+
+    Quat ramp_rot = (
+        Quat::angleAxis(helpers::toRadians(25), {0, 1, 0}) *
+        Quat::angleAxis(helpers::toRadians(90), {0, 0, 1}) *
+        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize();
+
+    Entity ramp_dyn = all_entities[total_entities++] =
+        makeDynObject(ctx, ramp_pos, ramp_rot, 5);
+
+    ctx.getUnsafe<Velocity>(ramp_dyn).linear = {0, 0, -30};
+
+    all_entities[total_entities++] =
+        makeDynObject(ctx,
+                      {0, 0, 1.5},
+                      (Quat::angleAxis(helpers::toRadians(-90), {1, 0, 0 }) *
+                          Quat::angleAxis(pi, {0, 1, 0 })).normalize(),
+                      5,
+                      ResponseType::Static, OwnerTeam::None,
+                      {1, 1, 1});
+
+    all_entities[total_entities++] =
+        makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {-20, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    all_entities[total_entities++] =
+        makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+
+    const Quat agent_rot =
+        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+
+    ctx.data().numObstacles = total_entities;
+
+    Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
+    ctx.getUnsafe<render::ViewSettings>(agent) =
+        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
+    ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
 
 static void resetWorld(Engine &ctx,
@@ -1114,6 +1232,12 @@ static void resetWorld(Engine &ctx,
     } break;
     case 6: {
         level6(ctx);
+    } break;
+    case 7: {
+        level7(ctx);
+    } break;
+    case 8: {
+        level8(ctx);
     } break;
     }
 }
@@ -1606,7 +1730,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-void Sim::setupTasks(TaskGraph::Builder &builder)
+void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
 {
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});

@@ -62,6 +62,10 @@ def get_keyboard_action():
             result.reset = 5
         elif key_action == '6':
             result.reset = 6
+        elif key_action == '7':
+            result.reset = 7
+        elif key_action == '8':
+            result.reset = 8
         elif key_action == ' ':
             pass
         else:
@@ -83,8 +87,8 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = exec_mode,
         gpu_id = 0,
         num_worlds = 1,
-        min_entities_per_world = 5,
-        max_entities_per_world = 5,
+        min_entities_per_world = 100,
+        max_entities_per_world = 100,
         render_width = 1024,
         render_height = 1024,
         lidar_render = True,
@@ -121,12 +125,12 @@ while True:
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
 
-    print(prep_counter)
-    print(dones)
-    print(rewards[0][:4] * agent_valid_masks[0][:4])
-    print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
-    print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
-    print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+    #print(prep_counter)
+    #print(dones)
+    #print(rewards[0][:4] * agent_valid_masks[0][:4])
+    #print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+    #print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+    #print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 
     action = get_keyboard_action()
     

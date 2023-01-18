@@ -35,7 +35,8 @@ struct Manager::Impl {
 
 struct Manager::CPUImpl : Manager::Impl {
     using TaskGraphT =
-        TaskGraphExecutor<Engine, Sim, WorldInit, render::RendererInit>;
+        TaskGraphExecutor<Engine, Sim, GPUHideSeek::Config,
+                          WorldInit, render::RendererInit>;
 
     TaskGraphT cpuExec;
 };
@@ -52,7 +53,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     DynArray<AABB> aabbs(0);
     DynArray<CollisionPrimitive> prims(0);
 
-    { // Sphere:
+    { // Sphere: (0)
         metadatas.push_back({
             .invInertiaTensor = { 2.5f, 2.5f, 2.5f },
             .invMass = 1.f,
@@ -73,7 +74,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Plane:
+    { // Plane: (1)
         metadatas.push_back({
             .invInertiaTensor = { 0.f, 0.f, 0.f },
             .invMass = 0.f,
@@ -92,7 +93,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Cube:
+    { // Cube: (2)
         metadatas.push_back({
             .invInertiaTensor = { 1.5f, 1.5f, 1.5f },
             .invMass = 1.f,
@@ -134,7 +135,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Cylinder:
+    { // Cylinder: (4)
         metadatas.push_back({
             .invInertiaTensor = { 0.f, 0.f, 1.f }, // FIXME
             .invMass = 1.f,
@@ -156,9 +157,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Ramp
+    { // Ramp (5)
         metadatas.push_back({
-            .invInertiaTensor = { 1.f, 1.f, 1.f }, // FIXME
+            .invInertiaTensor = { 1.5f, 1.5f, 1.5f }, // FIXME
             .invMass = 1.f,
             .muS = 0.5f,
             .muD = 0.5f,
@@ -178,9 +179,17 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    { // Elongated box
+    { // Elongated box (6)
+        float width = 8;
+        float height = 2;
+        float depth = 1.5;
+
         metadatas.push_back({
-            .invInertiaTensor = { 1.f, 1.f, 1.f }, // FIXME
+            .invInertiaTensor = 12.f / Vector3 {
+                height * height + depth * depth,
+                height * height  + width * width,
+                width * width + depth * depth,
+            },
             .invMass = 1.f,
             .muS = 0.5f,
             .muD = 0.5f,
@@ -294,6 +303,8 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         });
     }
 
+    GPUHideSeek::Config app_cfg {};
+
     switch (cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -320,6 +331,8 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         MWCudaExecutor mwgpu_exec({
             .worldInitPtr = world_inits.data(),
             .numWorldInitBytes = sizeof(WorldInit),
+            .userConfigPtr = &app_cfg,
+            .numUserConfigBytes = sizeof(GPUHideSeek::Config),
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
@@ -394,6 +407,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                         ThreadPoolExecutor::CameraMode::Perspective,
                     .renderGPUID = cfg.gpuID,
                 },
+                app_cfg,
                 world_inits.data()
             },
         };
