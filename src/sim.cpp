@@ -1024,16 +1024,11 @@ static void level6(Engine &ctx)
     CountT num_entities = 0;
     all_entities[num_entities++] =
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
+
     all_entities[num_entities++] =
-        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
+        makeDynObject(
+            ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}), 3,
+            ResponseType::Static, OwnerTeam::Unownable, {10.f, 0.2f, 1.f} );
 
     auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider,
                             int32_t view_idx) {
