@@ -1846,6 +1846,7 @@ Sim::Sim(Engine &ctx,
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
 
-MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, WorldInit, render::RendererInit);
+MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit,
+                          render::RendererInit);
 
 }
