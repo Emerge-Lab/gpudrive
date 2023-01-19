@@ -43,6 +43,7 @@ public:
     MADRONA_IMPORT madrona::py::Tensor visibleAgentsMaskTensor() const;
     MADRONA_IMPORT madrona::py::Tensor visibleBoxesMaskTensor() const;
     MADRONA_IMPORT madrona::py::Tensor visibleRampsMaskTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor globalPositionsTensor() const;
     MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
 

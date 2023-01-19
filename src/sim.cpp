@@ -35,6 +35,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<WorldDone>();
     registry.registerSingleton<PrepPhaseCounter>();
+    registry.registerSingleton<GlobalDebugPositions>();
 
     registry.registerArchetype<DynamicObject>();
     registry.registerFixedSizeArchetype<AgentInterface>(consts::maxAgents);
@@ -54,6 +55,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<AgentInterface, AgentVisibilityMasks>(10);
     registry.exportColumn<AgentInterface, BoxVisibilityMasks>(11);
     registry.exportColumn<AgentInterface, RampVisibilityMasks>(12);
+    registry.exportSingleton<GlobalDebugPositions>(13);
 }
 
 static Entity makeDynObject(Engine &ctx,
@@ -1710,6 +1712,55 @@ inline void agentRewardsSystem(Engine &ctx,
     reward.reward = reward_val;
 }
 
+
+inline void globalPositionsDebugSystem(Engine &ctx,
+                                       GlobalDebugPositions &global_positions)
+{
+    auto getXY = [](Vector3 v) {
+        return Vector2 {
+            v.x,
+            v.y,
+        };
+    };
+
+    for (CountT i = 0; i < consts::maxBoxes; i++) {
+        if (i >= ctx.data().numActiveBoxes) {
+            global_positions.boxPositions[i] = Vector2 {0, 0};
+            continue;
+        }
+
+        global_positions.boxPositions[i] =
+            getXY(ctx.getUnsafe<Position>(ctx.data().boxes[i]));
+    }
+
+    for (CountT i = 0; i < consts::maxRamps; i++) {
+        if (i >= ctx.data().numActiveRamps) {
+            global_positions.rampPositions[i] = Vector2 {0, 0};
+            continue;
+        }
+
+        global_positions.rampPositions[i] =
+            getXY(ctx.getUnsafe<Position>(ctx.data().ramps[i]));
+    }
+
+    {
+        CountT out_offset = 0;
+        for (CountT i = 0; i < ctx.data().numHiders; i++) {
+            global_positions.agentPositions[out_offset++] = 
+                getXY(ctx.getUnsafe<Position>(ctx.data().hiders[i]));
+        }
+
+        for (CountT i = 0; i < ctx.data().numSeekers; i++) {
+            global_positions.agentPositions[out_offset++] = 
+                getXY(ctx.getUnsafe<Position>(ctx.data().seekers[i]));
+        }
+
+        for (; out_offset < consts::maxAgents; out_offset++) {
+            global_positions.agentPositions[out_offset++] = Vector2 {0, 0};
+        }
+    }
+}
+
 #ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
 TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
@@ -1802,10 +1853,16 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
             Reward
         >>({compute_visibility});
 
+    auto global_positions_debug = builder.addToGraph<ParallelForNode<Engine,
+        globalPositionsDebugSystem,
+            GlobalDebugPositions
+        >>({sim_done});
+
     (void)phys_cleanup_sys;
     (void)renderer_sys;
     (void)collect_observations;
     (void)agent_rewards;
+    (void)global_positions_debug;
 }
 
 Sim::Sim(Engine &ctx,

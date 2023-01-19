@@ -105,6 +105,7 @@ agent_data = sim.agent_data_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
 prep_counter = sim.prep_counter_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
+global_pos = sim.global_positions_tensor().to_torch()
 
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
@@ -131,6 +132,8 @@ while True:
     #print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
+
+    print(global_pos)
 
     action = get_keyboard_action()
     

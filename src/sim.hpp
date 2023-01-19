@@ -100,6 +100,12 @@ struct AgentActiveMask {
     float mask;
 };
 
+struct GlobalDebugPositions {
+    madrona::math::Vector2 boxPositions[consts::maxBoxes];
+    madrona::math::Vector2 rampPositions[consts::maxRamps];
+    madrona::math::Vector2 agentPositions[consts::maxAgents];
+};
+
 struct AgentObservation {
     madrona::math::Vector2 pos;
     madrona::math::Vector2 vel;

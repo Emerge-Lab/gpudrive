@@ -337,7 +337,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
             .maxViewsPerWorld = consts::maxAgents,
-            .numExportedBuffers = 15,
+            .numExportedBuffers = 16,
             .gpuID = (uint32_t)cfg.gpuID,
             .cameraMode = cfg.lidarRender ?
                 StateConfig::CameraMode::Lidar :
@@ -401,7 +401,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                     .renderWidth = cfg.renderWidth,
                     .renderHeight = cfg.renderHeight,
                     .maxObjects = 50,
-                    .numExportedBuffers = 15,
+                    .numExportedBuffers = 16,
                     .cameraMode = cfg.lidarRender ?
                         ThreadPoolExecutor::CameraMode::Lidar :
                         ThreadPoolExecutor::CameraMode::Perspective,
@@ -560,6 +560,17 @@ MADRONA_EXPORT madrona::py::Tensor Manager::visibleRampsMaskTensor() const
                                  consts::maxAgents,
                                  consts::maxRamps,
                                  1,
+                             });
+}
+
+MADRONA_IMPORT madrona::py::Tensor Manager::globalPositionsTensor() const
+{
+    return exportStateTensor(13, Tensor::ElementType::Float32,
+                             {
+                                 impl_->cfg.numWorlds,
+                                 consts::maxBoxes + consts::maxRamps +
+                                     consts::maxAgents,
+                                 2,
                              });
 }
 

@@ -67,6 +67,7 @@ NB_MODULE(gpu_hideseek_python, m) {
         .def("visible_agents_mask_tensor", &Manager::visibleAgentsMaskTensor)
         .def("visible_boxes_mask_tensor", &Manager::visibleBoxesMaskTensor)
         .def("visible_ramps_mask_tensor", &Manager::visibleRampsMaskTensor)
+        .def("global_positions_tensor", &Manager::globalPositionsTensor)
         .def("depth_tensor", &Manager::depthTensor)
         .def("rgb_tensor", &Manager::rgbTensor)
     ;
