@@ -1779,10 +1779,62 @@ inline void agentRewardsSystem(Engine &ctx,
     reward.reward = reward_val;
 }
 
+#ifdef MADRONA_GPU_MODE
+//#define COUNT_GPU_CLOCKS
+#endif
+
+#ifdef COUNT_GPU_CLOCKS
+extern "C" {
+extern std::atomic_uint64_t narrowphaseAllClocks;
+extern std::atomic_uint64_t narrowphaseFetchWorldClocks;
+extern std::atomic_uint64_t narrowphaseSetupClocks;
+extern std::atomic_uint64_t narrowphasePrepClocks;
+extern std::atomic_uint64_t narrowphaseSwitchClocks;
+extern std::atomic_uint64_t narrowphaseSATFaceClocks;
+extern std::atomic_uint64_t narrowphaseSATEdgeClocks;
+extern std::atomic_uint64_t narrowphaseSATPlaneClocks;
+extern std::atomic_uint64_t narrowphaseSATContactClocks;
+extern std::atomic_uint64_t narrowphaseSATPlaneContactClocks;
+extern std::atomic_uint64_t narrowphaseSaveContactsClocks;
+extern std::atomic_uint64_t narrowphaseTxfmHullCtrs;
+}
+#endif
 
 inline void globalPositionsDebugSystem(Engine &ctx,
                                        GlobalDebugPositions &global_positions)
 {
+#ifdef COUNT_GPU_CLOCKS 
+    if (threadIdx.x == 0 && ctx.worldID().idx == 0) {
+        printf("[%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu]\n",
+                narrowphaseAllClocks.load(std::memory_order_relaxed),
+                narrowphaseFetchWorldClocks.load(std::memory_order_relaxed),
+                narrowphaseSetupClocks.load(std::memory_order_relaxed),
+                narrowphasePrepClocks.load(std::memory_order_relaxed),
+                narrowphaseSwitchClocks.load(std::memory_order_relaxed),
+                narrowphaseSATFaceClocks.load(std::memory_order_relaxed),
+                narrowphaseSATEdgeClocks.load(std::memory_order_relaxed),
+                narrowphaseSATPlaneClocks.load(std::memory_order_relaxed),
+                narrowphaseSATContactClocks.load(std::memory_order_relaxed),
+                narrowphaseSATPlaneContactClocks.load(std::memory_order_relaxed),
+                narrowphaseSaveContactsClocks.load(std::memory_order_relaxed),
+                narrowphaseTxfmHullCtrs.load(std::memory_order_relaxed)
+               );
+
+        narrowphaseAllClocks.store(0, std::memory_order_relaxed);
+        narrowphaseFetchWorldClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSetupClocks.store(0, std::memory_order_relaxed),
+        narrowphasePrepClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSwitchClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSATFaceClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSATEdgeClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSATPlaneClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSATContactClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSATPlaneContactClocks.store(0, std::memory_order_relaxed);
+        narrowphaseSaveContactsClocks.store(0, std::memory_order_relaxed);
+        narrowphaseTxfmHullCtrs.store(0, std::memory_order_relaxed);
+    }
+#endif
+
     auto getXY = [](Vector3 v) {
         return Vector2 {
             v.x,

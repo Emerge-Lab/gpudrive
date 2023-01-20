@@ -141,9 +141,9 @@ while True:
         break
 
     resets[0][0] = action.reset
-    actions[0][0][0] = action.x
-    actions[0][0][1] = action.y
-    actions[0][0][2] = action.r
+    actions[0][0][0] = action.x - 5
+    actions[0][0][1] = action.y - 5 
+    actions[0][0][2] = action.r - 5
     actions[0][0][3] = action.g
     actions[0][0][4] = action.l
 
