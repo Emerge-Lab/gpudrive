@@ -1631,6 +1631,72 @@ inline void computeVisibilitySystem(Engine &ctx,
         return hit_entity == other_e ? 1.f : 0.f;
     };
 
+#ifdef MADRONA_GPU_MODE
+    constexpr int32_t num_total_vis =
+        consts::maxBoxes + consts::maxRamps + consts::maxAgents;
+    const int32_t lane_id = threadIdx.x % 32;
+    for (int32_t global_offset = 0; global_offset < num_total_vis;
+         global_offset += 32) {
+        int32_t cur_idx = global_offset + lane_id;
+
+        Entity check_e = Entity::none();
+        float *vis_out = nullptr;
+
+        bool checking_agent = cur_idx < consts::maxAgents;
+        uint32_t agent_mask = __ballot_sync(mwGPU::allActive, checking_agent);
+        bool seeker_checking_hider = false;
+        if (checking_agent) {
+            bool valid_check = true;
+            if (cur_idx < ctx.data().numActiveAgents) {
+                Entity other_agent_e = ctx.data().agentInterfaces[cur_idx];
+                valid_check = other_agent_e != agent_e;
+
+                if (valid_check) {
+                    check_e = ctx.getUnsafe<SimEntity>(other_agent_e).e;
+                    seeker_checking_hider = 
+                        agent_type == AgentType::Seeker &&
+                        ctx.getUnsafe<AgentType>(other_agent_e) ==
+                            AgentType::Hider;
+                }
+            }
+
+            uint32_t valid_mask = __ballot_sync(agent_mask, valid_check);
+            valid_mask <<= (32 - lane_id);
+            uint32_t num_lower_valid = __popc(valid_mask);
+
+            if (valid_check) {
+                vis_out = &agent_vis.visible[num_lower_valid];
+            }
+        } else if (int32_t box_idx = cur_idx - consts::maxAgents;
+                   box_idx < consts::maxBoxes) {
+            if (cur_idx < ctx.data().numActiveBoxes) {
+                check_e = ctx.data().boxes[cur_idx];
+            }
+            vis_out = &box_vis.visible[cur_idx];
+        } else if (int32_t ramp_idx =
+                       cur_idx - consts::maxAgents - consts::maxBoxes;
+                   ramp_idx < consts::maxRamps) {
+            if (ramp_idx < ctx.data().numActiveRamps) {
+                check_e = ctx.data().ramps[ramp_idx];
+            }
+            vis_out = &ramp_vis.visible[ramp_idx];
+        } 
+
+        if (check_e == Entity::none()) {
+           if (vis_out != nullptr) {
+               *vis_out = 0.f;
+           }
+        } else {
+            bool is_visible = checkVisibility(check_e);
+            *vis_out = is_visible ? 1.f : 0.f;
+
+            if (seeker_checking_hider && is_visible) {
+                ctx.data().hiderTeamReward.store(-1.f,
+                    std::memory_order_relaxed);
+            }
+        }
+    }
+#else
     CountT num_boxes = ctx.data().numActiveBoxes;
     for (CountT box_idx = 0; box_idx < consts::maxBoxes; box_idx++) {
         if (box_idx < num_boxes) {
@@ -1678,6 +1744,7 @@ inline void computeVisibilitySystem(Engine &ctx,
 
         agent_vis.visible[num_other_agents++] = is_visible;
     }
+#endif
 }
 
 inline void agentRewardsSystem(Engine &ctx,
@@ -1836,8 +1903,13 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
         >>({sim_done});
 
 
+#ifdef MADRONA_GPU_MODE
+    auto compute_visibility = builder.addToGraph<CustomParallelForNode<Engine,
+        computeVisibilitySystem, 32, 1,
+#else
     auto compute_visibility = builder.addToGraph<ParallelForNode<Engine,
         computeVisibilitySystem,
+#endif
             Entity,
             SimEntity,
             AgentType,
