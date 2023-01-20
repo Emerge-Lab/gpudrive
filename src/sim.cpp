@@ -1426,8 +1426,8 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                     auto &joint_constraint = ctx.getUnsafe<JointConstraint>(
                         grab_data.constraintEntity);
 
-                    joint_constraint.e1 = sim_e.e;
-                    joint_constraint.e2 = grab_entity;
+                    joint_constraint.e1 = ctx.getLoc(sim_e.e);
+                    joint_constraint.e2 = ctx.getLoc(grab_entity);
 
                     Vector3 r1 = 0.25f * math::fwd;
 
