@@ -71,13 +71,13 @@ struct DynamicObject : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
-    ExternalForce,
-    ExternalTorque,
-    OwnerTeam,
-    madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity
+    madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
+    ExternalTorque,
+    madrona::phys::broadphase::LeafID,
+    OwnerTeam
 > {};
 
 struct Action {
@@ -171,20 +171,20 @@ struct CameraAgent : public madrona::Archetype<
 > {};
 
 struct DynAgent : public madrona::Archetype<
-    Position,
+    Position, 
     Rotation,
     Scale,
     Velocity,
     ObjectID,
     ResponseType,
-    ExternalForce,
-    ExternalTorque,
-    OwnerTeam,
-    GrabData,
-    madrona::phys::broadphase::LeafID,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
     madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
+    ExternalTorque,
+    madrona::phys::broadphase::LeafID,
+    OwnerTeam,
+    GrabData,
     madrona::render::ViewSettings
 > {};
 

@@ -486,7 +486,7 @@ MADRONA_EXPORT Tensor Manager::rewardTensor() const
 
 MADRONA_EXPORT Tensor Manager::agentTypeTensor() const
 {
-    return exportStateTensor(5, Tensor::ElementType::Float32,
+    return exportStateTensor(5, Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds, consts::maxAgents, 1});
 }
 
