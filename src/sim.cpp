@@ -875,16 +875,16 @@ static void level1(Engine &ctx, CountT num_hiders, CountT num_seekers)
 
     all_entities[num_entities++] =
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
-    all_entities[num_entities++] =
-        makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
+    //all_entities[num_entities++] =
+    //    makePlane(ctx, {0, 0, 100}, Quat::angleAxis(pi, {1, 0, 0}));
+    //all_entities[num_entities++] =
+    //    makePlane(ctx, {-100, 0, 0}, Quat::angleAxis(pi_d2, {0, 1, 0}));
+    //all_entities[num_entities++] =
+    //    makePlane(ctx, {100, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
+    //all_entities[num_entities++] =
+    //    makePlane(ctx, {0, -100, 0}, Quat::angleAxis(-pi_d2, {1, 0, 0}));
+    //all_entities[num_entities++] =
+    //    makePlane(ctx, {0, 100, 0}, Quat::angleAxis(pi_d2, {1, 0, 0}));
 
     ctx.data().numObstacles = num_entities;
 }
@@ -2000,7 +2000,7 @@ Sim::Sim(Engine &ctx,
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
-         100 * 50, 10);
+         50 * 20, 10);
 
     render::RenderingSystem::init(ctx, renderer_init);
 
