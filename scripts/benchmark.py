@@ -66,7 +66,7 @@ start = time.time()
 
 for i in range(num_steps):
     if i % 240 == 0:
-        resets[: 0] = 1
+        resets[:, 0] = 1
 
     sim.step()
 
