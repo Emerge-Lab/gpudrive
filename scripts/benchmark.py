@@ -60,17 +60,20 @@ move_action_slice = actions[..., 0:2]
 for i in range(5):
     sim.step()
 
-resets[:, 0] = 1
+#resets[:, 0] = 1
 
 start = time.time()
 
 for i in range(num_steps):
+    if i % 240 == 0:
+        resets[: 0] = 1
+
     sim.step()
 
-    torch.rand(reset_rand.shape, out=reset_rand)
+    #torch.rand(reset_rand.shape, out=reset_rand)
 
-    reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
-    resets[:, 0].copy_(reset_cond)
+    #reset_cond = torch.where(reset_rand < reset_chance, reset_yes, reset_no)
+    #resets[:, 0].copy_(reset_cond)
 
     torch.randint(-5, 5, move_action_slice.shape,
                   out=move_action_slice,
