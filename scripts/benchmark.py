@@ -8,7 +8,7 @@ import PIL.Image
 torch.manual_seed(0)
 import random
 random.seed(0)
-￼
+
 num_worlds = int(sys.argv[1])
 num_steps = int(sys.argv[2])
 entities_per_world = int(sys.argv[3])
@@ -59,7 +59,7 @@ def dump_obs(dump_dir, step_idx):
     img.save(f"{dump_dir}/{step_idx}.png", format="PNG")
 
 move_action_slice = actions[..., 0:2]
-move_action_slice.copy_(torch.zeros_like(move_action_slice)
+move_action_slice.copy_(torch.zeros_like(move_action_slice))
 
 for i in range(5):
     sim.step()
