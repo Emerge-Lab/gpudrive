@@ -5,7 +5,10 @@ import sys
 import time
 import PIL
 import PIL.Image
-
+torch.manual_seed(0)
+import random
+random.seed(0)
+￼
 num_worlds = int(sys.argv[1])
 num_steps = int(sys.argv[2])
 entities_per_world = int(sys.argv[3])
