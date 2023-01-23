@@ -118,6 +118,7 @@ print(agent_data.shape)
 resets[0][0] = 1
 resets[0][1] = 2
 resets[0][2] = 2
+actions[:, :, :] = 0
 
 while True:
     print("Stepping")

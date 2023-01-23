@@ -81,6 +81,7 @@ resets[:, 2] = 2
 
 move_action_slice_gpu = actions_gpu[..., 0:2]
 move_action_slice = actions[..., 0:2]
+move_action_slice.copy_(torch.zeros_like(move_action_slice))
 
 for i in range(5):
     sim.step()
