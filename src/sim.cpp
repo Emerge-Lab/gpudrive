@@ -2066,7 +2066,9 @@ Sim::Sim(Engine &ctx,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
          50 * 20, 10);
 
+#if 0
     render::RenderingSystem::init(ctx, renderer_init);
+#endif
 
     obstacles =
         (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));

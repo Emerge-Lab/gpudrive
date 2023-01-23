@@ -339,9 +339,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .maxViewsPerWorld = consts::maxAgents,
             .numExportedBuffers = 16,
             .gpuID = (uint32_t)cfg.gpuID,
-            .cameraMode = cfg.lidarRender ?
-                StateConfig::CameraMode::Lidar :
-                StateConfig::CameraMode::Perspective,
+            .cameraMode = StateConfig::CameraMode::None,
             .renderWidth = cfg.renderWidth,
             .renderHeight = cfg.renderHeight,
         }, {
@@ -353,7 +351,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             CompileConfig::Executor::TaskGraph,
         });
 
-        mwgpu_exec.loadObjects(renderer_objects);
+        //mwgpu_exec.loadObjects(renderer_objects);
 
         HostEventLogging(HostEvent::initEnd);
         return new CUDAImpl {
@@ -402,9 +400,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                     .renderHeight = cfg.renderHeight,
                     .maxObjects = 50,
                     .numExportedBuffers = 16,
-                    .cameraMode = cfg.lidarRender ?
-                        ThreadPoolExecutor::CameraMode::Lidar :
-                        ThreadPoolExecutor::CameraMode::Perspective,
+                    .cameraMode = ThreadPoolExecutor::CameraMode::None,
                     .renderGPUID = cfg.gpuID,
                 },
                 app_cfg,
@@ -412,7 +408,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             },
         };
 
-        cpu_impl->cpuExec.loadObjects(renderer_objects);
+        //cpu_impl->cpuExec.loadObjects(renderer_objects);
 
         HostEventLogging(HostEvent::initEnd);
 

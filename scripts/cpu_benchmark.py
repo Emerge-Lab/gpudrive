@@ -28,7 +28,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         debug_compile = False,
 )
 
-rgb_observations = sim.rgb_tensor().to_torch()
+#rgb_observations = sim.rgb_tensor().to_torch()
 
 def dump_rgb(dump_dir, step_idx):
     N = rgb_observations.shape[0]
@@ -69,7 +69,7 @@ observations_gpu = [
 resets = sim.reset_tensor().to_torch()
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
-print(rgb_observations.shape, rgb_observations.dtype)
+#print(rgb_observations.shape, rgb_observations.dtype)
 
 reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32,
                             device=torch.device('cuda'))
