@@ -31,6 +31,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<AgentVisibilityMasks>();
     registry.registerComponent<BoxVisibilityMasks>();
     registry.registerComponent<RampVisibilityMasks>();
+    registry.registerComponent<Lidar>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<WorldDone>();
@@ -55,6 +56,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<AgentInterface, AgentVisibilityMasks>(10);
     registry.exportColumn<AgentInterface, BoxVisibilityMasks>(11);
     registry.exportColumn<AgentInterface, RampVisibilityMasks>(12);
+    registry.exportColumn<AgentInterface, Lidar>(14);
     registry.exportSingleton<GlobalDebugPositions>(13);
 }
 
@@ -1747,6 +1749,54 @@ inline void computeVisibilitySystem(Engine &ctx,
 #endif
 }
 
+inline void lidarSystem(Engine &ctx,
+                        SimEntity sim_e,
+                        Lidar &lidar)
+{
+    if (sim_e.e == Entity::none()) {
+        return;
+    }
+
+    Vector3 pos = ctx.getUnsafe<Position>(sim_e.e);
+    Quat rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    auto &bvh = ctx.getSingleton<broadphase::BVH>();
+
+    Vector3 fwd = rot.rotateVec(math::fwd);
+    Vector3 right = rot.rotateVec(math::right);
+
+    auto traceRay = [&](int32_t idx) {
+        float theta = 2.f * math::pi * (float(idx) / float(30));
+        float x = cosf(theta);
+        float y = sinf(theta);
+
+        Vector3 ray_dir = (x * right + y * fwd).normalize();
+
+        float hit_t;
+        Vector3 hit_normal;
+        Entity hit_entity =
+            bvh.traceRay(pos , ray_dir, &hit_t, &hit_normal, 200.f);
+
+        if (hit_entity == Entity::none()) {
+            lidar.depth[idx] = 0.f;
+        } else {
+            lidar.depth[idx] = hit_t;
+        }
+    };
+
+
+#ifdef MADRONA_GPU_MODE
+    int32_t idx = threadIdx.x % 32;
+
+    if (idx < 30) {
+        traceRay(idx);
+    }
+#else
+    for (int32_t i = 0; i < 30; i++) {
+        traceRay(i);
+    }
+#endif
+}
+
 inline void agentRewardsSystem(Engine &ctx,
                                SimEntity sim_e,
                                AgentType agent_type,
@@ -1936,8 +1986,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
     auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {sim_done});
 
+#if 0
     auto renderer_sys = render::RenderingSystem::setupTasks(builder,
         {sim_done});
+    //(void)renderer_sys;
+#endif
 
 #ifdef MADRONA_GPU_MODE
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
@@ -1970,6 +2023,17 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
             RampVisibilityMasks
         >>({sim_done});
 
+#ifdef MADRONA_GPU_MODE
+    auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
+        lidarSystem, 32, 1,
+#else
+    auto lidar = builder.addToGraph<ParallelForNode<Engine,
+        lidarSystem,
+#endif
+            SimEntity,
+            Lidar
+        >>({sim_done});
+
     auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
         agentRewardsSystem,
             SimEntity,
@@ -1982,8 +2046,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
             GlobalDebugPositions
         >>({sim_done});
 
+    (void)lidar;
     (void)phys_cleanup_sys;
-    (void)renderer_sys;
     (void)collect_observations;
     (void)agent_rewards;
     (void)global_positions_debug;

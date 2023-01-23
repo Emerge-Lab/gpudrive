@@ -148,6 +148,10 @@ struct RampVisibilityMasks {
     float visible[consts::maxRamps];
 };
 
+struct Lidar {
+    float depth[30];
+};
+
 static_assert(sizeof(Action) == 5 * sizeof(int32_t));
 
 struct AgentInterface : public madrona::Archetype<
@@ -161,7 +165,8 @@ struct AgentInterface : public madrona::Archetype<
     RelativeRampObservations,
     AgentVisibilityMasks,
     BoxVisibilityMasks,
-    RampVisibilityMasks
+    RampVisibilityMasks,
+    Lidar
 > {};
 
 struct CameraAgent : public madrona::Archetype<

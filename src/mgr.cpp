@@ -616,6 +616,17 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
                    impl_->cfg.renderWidth, 4}, gpu_id);
 }
 
+
+MADRONA_EXPORT madrona::py::Tensor Manager::lidarTensor() const
+{
+    return exportStateTensor(14, Tensor::ElementType::Float32,
+                             {
+                                 impl_->cfg.numWorlds,
+                                 consts::maxAgents,
+                                 30,
+                             });
+}
+
 Tensor Manager::exportStateTensor(int64_t slot,
                                   Tensor::ElementType type,
                                   Span<const int64_t> dimensions) const

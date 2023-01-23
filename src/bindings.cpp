@@ -70,6 +70,7 @@ NB_MODULE(gpu_hideseek_python, m) {
         .def("global_positions_tensor", &Manager::globalPositionsTensor)
         .def("depth_tensor", &Manager::depthTensor)
         .def("rgb_tensor", &Manager::rgbTensor)
+        .def("lidar_tensor", &Manager::lidarTensor)
     ;
 }
 

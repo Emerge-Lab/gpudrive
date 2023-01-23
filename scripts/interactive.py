@@ -86,13 +86,13 @@ else:
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = exec_mode,
         gpu_id = 0,
-        num_worlds = 1,
+        num_worlds = 16,
         min_entities_per_world = 100,
         max_entities_per_world = 100,
         render_width = 1024,
         render_height = 1024,
-        lidar_render = True,
-        debug_compile = False,
+        lidar_render = False,
+        debug_compile = True,
 )
 
 actions = sim.action_tensor().to_torch()
@@ -106,6 +106,7 @@ resets = sim.reset_tensor().to_torch()
 prep_counter = sim.prep_counter_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 global_pos = sim.global_positions_tensor().to_torch()
+lidar = sim.lidar_tensor().to_torch()
 
 rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
@@ -134,7 +135,8 @@ while True:
     #print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 
-    print(global_pos)
+    #print(global_pos)
+    print(lidar[0][0])
 
     action = get_keyboard_action()
     
