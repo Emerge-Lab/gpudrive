@@ -31,7 +31,7 @@ NB_MODULE(gpu_hideseek_python, m) {
                             int64_t max_entities_per_world,
                             int64_t render_width,
                             int64_t render_height, 
-                            bool lidar_render,
+                            bool enable_render,
                             bool debug_compile) {
             new (self) Manager(Manager::Config {
                 .execMode = exec_mode,
@@ -41,7 +41,7 @@ NB_MODULE(gpu_hideseek_python, m) {
                 .maxEntitiesPerWorld = (uint32_t)max_entities_per_world,
                 .renderWidth = (uint32_t)render_width,
                 .renderHeight = (uint32_t)render_height,
-                .lidarRender = lidar_render,
+                .enableRender = enable_render,
                 .debugCompile = debug_compile,
             });
         }, nb::arg("exec_mode"),
@@ -51,8 +51,8 @@ NB_MODULE(gpu_hideseek_python, m) {
            nb::arg("max_entities_per_world"),
            nb::arg("render_width"),
            nb::arg("render_height"),
-           nb::arg("lidar_render") = true,
-           nb::arg("debug_compile") = true)
+           nb::arg("enable_render") = false,
+           nb::arg("debug_compile") = false)
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)
         .def("done_tensor", &Manager::doneTensor)

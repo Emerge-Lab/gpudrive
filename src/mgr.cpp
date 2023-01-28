@@ -35,8 +35,7 @@ struct Manager::Impl {
 
 struct Manager::CPUImpl : Manager::Impl {
     using TaskGraphT =
-        TaskGraphExecutor<Engine, Sim, GPUHideSeek::Config,
-                          WorldInit, render::RendererInit>;
+        TaskGraphExecutor<Engine, Sim, GPUHideSeek::Config, WorldInit>;
 
     TaskGraphT cpuExec;
 };
@@ -117,7 +116,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     { // Wall: (3)
         metadatas.push_back({
             .invInertiaTensor = { 0.f, 0.f, 0.f },
- .invMass = 0.f,
+            .invMass = 0.f,
             .muS = 0.5f,
             .muD = 0.5f,
         });
@@ -303,7 +302,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         });
     }
 
-    GPUHideSeek::Config app_cfg {};
+    GPUHideSeek::Config app_cfg {
+        cfg.enableRender,
+    };
 
     switch (cfg.execMode) {
     case ExecMode::CUDA: {
@@ -339,7 +340,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .maxViewsPerWorld = consts::maxAgents,
             .numExportedBuffers = 16,
             .gpuID = (uint32_t)cfg.gpuID,
-            .cameraMode = StateConfig::CameraMode::None,
+            .cameraMode = cfg.enableRender ? 
+                render::CameraMode::Perspective :
+                render::CameraMode::None,
             .renderWidth = cfg.renderWidth,
             .renderHeight = cfg.renderHeight,
         }, {
@@ -351,7 +354,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             CompileConfig::Executor::TaskGraph,
         });
 
-        //mwgpu_exec.loadObjects(renderer_objects);
+        if (cfg.enableRender) {
+            mwgpu_exec.loadObjects(renderer_objects);
+        }
 
         HostEventLogging(HostEvent::initEnd);
         return new CUDAImpl {
@@ -400,7 +405,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                     .renderHeight = cfg.renderHeight,
                     .maxObjects = 50,
                     .numExportedBuffers = 16,
-                    .cameraMode = ThreadPoolExecutor::CameraMode::None,
+                    .cameraMode = cfg.enableRender ?
+                        render::CameraMode::Perspective :
+                        render::CameraMode::None,
                     .renderGPUID = cfg.gpuID,
                 },
                 app_cfg,
@@ -408,7 +415,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             },
         };
 
-        //cpu_impl->cpuExec.loadObjects(renderer_objects);
+        if (cfg.enableRender) {
+            cpu_impl->cpuExec.loadObjects(renderer_objects);
+        }
 
         HostEventLogging(HostEvent::initEnd);
 

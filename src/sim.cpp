@@ -1945,7 +1945,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
+void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 {
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({});
@@ -1986,11 +1986,10 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
     auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {sim_done});
 
-#if 0
-    auto renderer_sys = render::RenderingSystem::setupTasks(builder,
-        {sim_done});
-    //(void)renderer_sys;
-#endif
+    if (cfg.enableRender) {
+        render::RenderingSystem::setupTasks(builder,
+            {sim_done});
+    }
 
 #ifdef MADRONA_GPU_MODE
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
@@ -2054,8 +2053,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &)
 }
 
 Sim::Sim(Engine &ctx,
-         const WorldInit &init,
-         const render::RendererInit &renderer_init)
+         const Config &,
+         const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
@@ -2066,9 +2065,6 @@ Sim::Sim(Engine &ctx,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
          50 * 20, 10);
 
-#if 0
-    render::RenderingSystem::init(ctx, renderer_init);
-#endif
 
     obstacles =
         (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));
@@ -2088,7 +2084,6 @@ Sim::Sim(Engine &ctx,
     ctx.getSingleton<WorldReset>().resetLevel = 0;
 }
 
-MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit,
-                          render::RendererInit);
+MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);
 
 }

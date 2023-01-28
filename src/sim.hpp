@@ -5,7 +5,7 @@
 #include <madrona/custom_context.hpp>
 #include <madrona/components.hpp>
 #include <madrona/physics.hpp>
-#include <madrona/render.hpp>
+#include <madrona/mw_render.hpp>
 
 #include "init.hpp"
 #include "rng.hpp"
@@ -194,6 +194,7 @@ struct DynAgent : public madrona::Archetype<
 > {};
 
 struct Config {
+    bool enableRender;
 };
 
 struct Sim : public madrona::WorldBase {
@@ -203,8 +204,9 @@ struct Sim : public madrona::WorldBase {
     static void setupTasks(madrona::TaskGraph::Builder &builder,
                            const Config &cfg);
 
-    Sim(Engine &ctx, const WorldInit &init,
-        const madrona::render::RendererInit &renderer_init);
+    Sim(Engine &ctx,
+        const Config &cfg,
+        const WorldInit &init);
 
     EpisodeManager *episodeMgr;
     RNG rng;

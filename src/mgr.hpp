@@ -21,7 +21,7 @@ public:
         uint32_t maxEntitiesPerWorld;
         uint32_t renderWidth;
         uint32_t renderHeight;
-        bool lidarRender;
+        bool enableRender;
         bool debugCompile;
     };
 

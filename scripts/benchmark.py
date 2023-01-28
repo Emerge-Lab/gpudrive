@@ -25,7 +25,6 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         max_entities_per_world = entities_per_world,
         render_width = render_width,
         render_height = render_height,
-        debug_compile = False,
 )
 
 actions = sim.action_tensor().to_torch()
