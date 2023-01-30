@@ -434,7 +434,9 @@ MADRONA_EXPORT Manager::Manager(const Config &cfg)
 MADRONA_EXPORT Manager::~Manager() {
     switch (impl_->cfg.execMode) {
     case ExecMode::CUDA: {
+#ifdef MADRONA_CUDA_SUPPORT
         delete static_cast<CUDAImpl *>(impl_);
+#endif
     } break;
     case ExecMode::CPU : {
         delete static_cast<CPUImpl *>(impl_);

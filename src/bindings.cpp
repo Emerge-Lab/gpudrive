@@ -17,6 +17,8 @@ namespace nb = nanobind;
 namespace GPUHideSeek {
 
 NB_MODULE(gpu_hideseek_python, m) {
+    nb::module_::import_("madrona_python");
+
     nb::enum_<Manager::ExecMode>(m, "ExecMode")
         .value("CPU", Manager::ExecMode::CPU)
         .value("CUDA", Manager::ExecMode::CUDA)

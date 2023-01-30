@@ -1,4 +1,3 @@
-import madrona_python
 import gpu_hideseek_python
 import torch
 import sys
@@ -17,9 +16,11 @@ reset_chance = float(sys.argv[4])
 render_width = 64
 render_height = 64
 
+gpu_id = 0
+
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = gpu_hideseek_python.ExecMode.CPU,
-        gpu_id = 0,
+        gpu_id = gpu_id,
         num_worlds = num_worlds,
         min_entities_per_world = entities_per_world,
         max_entities_per_world = entities_per_world,
@@ -47,7 +48,17 @@ def dump_rgb(dump_dir, step_idx):
 
 
 actions = sim.action_tensor().to_torch()
-actions_gpu = torch.zeros_like(actions, device=torch.device('cuda'))
+
+if torch.cuda.is_available():
+    is_cuda = True
+    gpu_dev = torch.device(f'cuda:{gpu_id}')
+elif torch.backends.mps.is_available():
+    is_cuda = False
+    gpu_dev = torch.device('mps')
+else:
+    print("No supported GPU backend", file=sys.stderr)
+
+actions_gpu = torch.zeros_like(actions, device=gpu_dev)
 
 observations_cpu = [
         sim.done_tensor().to_torch(),
@@ -63,7 +74,7 @@ observations_cpu = [
     ]
 
 observations_gpu = [
-        torch.zeros_like(obs, device=torch.device('cuda')) for obs in observations_cpu
+        torch.zeros_like(obs, device=gpu_dev) for obs in observations_cpu
     ]
 
 resets = sim.reset_tensor().to_torch()
@@ -72,11 +83,11 @@ print(resets.shape, resets.dtype)
 #print(rgb_observations.shape, rgb_observations.dtype)
 
 reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32,
-                            device=torch.device('cuda'))
+                            device=gpu_dev)
 reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32,
-                            device=torch.device('cuda'))
+                            device=gpu_dev)
 reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32,
-                              device=torch.device('cuda'))
+                              device=gpu_dev)
 
 resets[:, 0] = 1
 resets[:, 1] = 3
@@ -108,10 +119,11 @@ for i in range(num_steps):
 
     torch.randint(-5, 5, move_action_slice.shape,
                   out=move_action_slice_gpu,
-                  dtype=torch.int32, device=torch.device('cuda'))
+                  dtype=torch.int32, device=gpu_dev)
     move_action_slice.copy_(move_action_slice_gpu)
 
-    torch.cuda.synchronize()
+    if is_cuda:
+        torch.cuda.synchronize()
 
     if len(sys.argv) > 5:
         dump_rgb(sys.argv[5], i)

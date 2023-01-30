@@ -43,9 +43,7 @@ if (TARGET madrona_mw_gpu)
         gpu_hideseek_gpu_srcs
         madrona_mw_gpu
     )
-else ()
 endif ()
-
 
 target_compile_definitions(gpu_hideseek_mgr PRIVATE
     -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
@@ -56,6 +54,5 @@ madrona_python_module(gpu_hideseek_python
 )
 
 target_link_libraries(gpu_hideseek_python PRIVATE
-    madrona_hdrs
     gpu_hideseek_mgr
 )
