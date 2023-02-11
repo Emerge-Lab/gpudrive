@@ -1,5 +1,8 @@
 set(SIMULATOR_SRCS
     sim.hpp sim.cpp
+    init.hpp rng.hpp
+    geo_gen.hpp geo_gen.inl geo_gen.cpp
+    level_gen.hpp level_gen.cpp
 )
 
 add_library(gpu_hideseek_cpu_impl STATIC
