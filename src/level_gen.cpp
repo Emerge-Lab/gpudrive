@@ -204,7 +204,7 @@ static void generateTrainingEnvironment(Engine &ctx,
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         ctx.getUnsafe<render::ViewSettings>(agent) =
-            render::RenderingSystem::setupView(ctx, 90.f,
+            render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
                 Vector3 { 0, 0, 0.8 }, { view_idx });
 
         ObjectID agent_obj_id = ObjectID { 4 };
@@ -327,7 +327,8 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+        render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
+                                           up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
@@ -381,7 +382,8 @@ static void level4(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+        render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
+                                           up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { -7.5, -7.5, 0.5 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
@@ -431,7 +433,8 @@ static void level5(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+        render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
+                                           up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 
@@ -459,7 +462,7 @@ static void level6(Engine &ctx)
         ctx.getUnsafe<Rotation>(agent) = rot;
         ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         ctx.getUnsafe<render::ViewSettings>(agent) =
-            render::RenderingSystem::setupView(ctx, 90.f,
+            render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
                 Vector3 { 0, 0, 0.8 }, { view_idx });
 
         ObjectID agent_obj_id = ObjectID { 4 };
@@ -523,7 +526,8 @@ static void level7(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+        render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
+                                           up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }
@@ -569,7 +573,8 @@ static void level8(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     ctx.getUnsafe<render::ViewSettings>(agent) =
-        render::RenderingSystem::setupView(ctx, 90.f, up * 0.5f, { 0 });
+        render::RenderingSystem::setupView(ctx, 90.f, 1.f, 0.001f,
+                                           up * 0.5f, { 0 });
     ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
     ctx.getUnsafe<Rotation>(agent) = agent_rot;
 }

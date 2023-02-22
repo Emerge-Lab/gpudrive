@@ -108,10 +108,10 @@ dones = sim.done_tensor().to_torch()
 global_pos = sim.global_positions_tensor().to_torch()
 lidar = sim.lidar_tensor().to_torch()
 
-rgb_observations = sim.rgb_tensor().to_torch()
+#rgb_observations = sim.rgb_tensor().to_torch()
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
-print(rgb_observations.shape, rgb_observations.dtype)
+#print(rgb_observations.shape, rgb_observations.dtype)
 
 print(agent_visibility_masks.shape)
 print(agent_data.shape)
@@ -139,6 +139,7 @@ while True:
     print(lidar[0][0])
 
     action = get_keyboard_action()
+    #action = Action()
     
     if action.reset < 0:
         break

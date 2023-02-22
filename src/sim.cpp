@@ -69,6 +69,7 @@ static inline void resetEnvironment(Engine &ctx)
     ctx.getSingleton<WorldDone>().done = 0;
     ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft = 96;
 
+    render::RenderingSystem::reset(ctx);
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
     Entity *all_entities = ctx.data().obstacles;
