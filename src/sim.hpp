@@ -233,7 +233,7 @@ struct Sim : public madrona::WorldBase {
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
 
-    std::atomic<float> hiderTeamReward;
+    madrona::AtomicFloat hiderTeamReward {0};
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

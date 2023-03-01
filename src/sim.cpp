@@ -128,7 +128,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     // These don't belong here but this runs once per world every frame, so...
-    ctx.data().hiderTeamReward.store(1.f, std::memory_order_relaxed);
+    ctx.data().hiderTeamReward.store_relaxed(1.f);
     CountT step_idx = ++ctx.data().curEpisodeStep;
     if (step_idx >= 239) {
         ctx.getSingleton<WorldDone>().done = 1;
@@ -566,8 +566,7 @@ inline void computeVisibilitySystem(Engine &ctx,
             *vis_out = is_visible ? 1.f : 0.f;
 
             if (seeker_checking_hider && is_visible) {
-                ctx.data().hiderTeamReward.store(-1.f,
-                    std::memory_order_relaxed);
+                ctx.data().hiderTeamReward.store_relaxed(-1.f);
             }
         }
     }
@@ -612,8 +611,7 @@ inline void computeVisibilitySystem(Engine &ctx,
         if (agent_type == AgentType::Seeker && is_visible) {
             AgentType other_type = ctx.getUnsafe<AgentType>(other_agent_e);
             if (other_type == AgentType::Hider) {
-                ctx.data().hiderTeamReward.store(-1.f,
-                    std::memory_order_relaxed);
+                ctx.data().hiderTeamReward.store_relaxed(-1.f);
             }
         }
 
@@ -687,8 +685,7 @@ inline void agentRewardsSystem(Engine &ctx,
         return;
     }
 
-    float reward_val = ctx.data().hiderTeamReward.load(
-        std::memory_order_relaxed);
+    float reward_val = ctx.data().hiderTeamReward.load_relaxed();
     if (agent_type == AgentType::Seeker) {
         reward_val *= -1.f;
     }

@@ -372,7 +372,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 #endif
     } break;
     case ExecMode::CPU: {
-        EpisodeManager *episode_mgr = new EpisodeManager {};
+        EpisodeManager *episode_mgr = new EpisodeManager { 0 };
 
         PhysicsLoader phys_loader(PhysicsLoader::StorageType::CPU, 10);
         loadPhysicsObjects(phys_loader);

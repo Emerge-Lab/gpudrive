@@ -298,7 +298,7 @@ void generateEnvironment(Engine &ctx,
 {
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     uint32_t episode_idx =
-        episode_mgr.curEpisode.fetch_add(1, std::memory_order_relaxed);
+        episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
     ctx.data().rng = RNG::make(episode_idx);
 
     if (level_id == 1) {

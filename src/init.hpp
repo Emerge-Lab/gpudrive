@@ -5,7 +5,7 @@
 namespace GPUHideSeek {
 
 struct EpisodeManager {
-    std::atomic_uint32_t curEpisode;
+    madrona::AtomicU32 curEpisode;
 };
 
 struct WorldInit {
