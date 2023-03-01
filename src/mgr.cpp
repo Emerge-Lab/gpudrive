@@ -584,12 +584,13 @@ MADRONA_IMPORT madrona::py::Tensor Manager::globalPositionsTensor() const
 MADRONA_EXPORT Tensor Manager::depthTensor() const
 {
     void *dev_ptr = nullptr;
-    Optional<int> gpu_id = impl_->cfg.gpuID;
+    Optional<int> gpu_id = Optional<int>::none();
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             depthObservations();
+        gpu_id = impl_->cfg.gpuID;
 #endif
     } else {
         dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
@@ -605,12 +606,13 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
 MADRONA_EXPORT Tensor Manager::rgbTensor() const
 {
     void *dev_ptr = nullptr;
-    Optional<int> gpu_id = impl_->cfg.gpuID;
+    Optional<int> gpu_id = Optional<int>::none();
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
             rgbObservations();
+        gpu_id = impl_->cfg.gpuID;
 #endif
     } else {
         dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.

@@ -89,7 +89,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         num_worlds = 16,
         min_entities_per_world = 100,
         max_entities_per_world = 100,
-        render_width = 1024,
+        render_width = 1536,
         render_height = 1024,
         enable_render = True,
         debug_compile = False,
@@ -108,10 +108,11 @@ dones = sim.done_tensor().to_torch()
 global_pos = sim.global_positions_tensor().to_torch()
 lidar = sim.lidar_tensor().to_torch()
 
-#rgb_observations = sim.rgb_tensor().to_torch()
+if len(sys.argv) > 2:
+    rgb_observations = sim.rgb_tensor().to_torch()
+
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
-#print(rgb_observations.shape, rgb_observations.dtype)
 
 print(agent_visibility_masks.shape)
 print(agent_data.shape)
