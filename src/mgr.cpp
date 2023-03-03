@@ -595,6 +595,10 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
     } else {
         dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
             depthObservations();
+
+#ifdef MADRONA_LINUX
+        gpu_id = impl_->cfg.gpuID;
+#endif
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::Float32,
@@ -617,6 +621,10 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
     } else {
         dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
             rgbObservations();
+
+#ifdef MADRONA_LINUX
+        gpu_id = impl_->cfg.gpuID;
+#endif
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::UInt8,
