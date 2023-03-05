@@ -233,6 +233,8 @@ struct Sim : public madrona::WorldBase {
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
 
+    bool enableRender;
+
     madrona::AtomicFloat hiderTeamReward {0};
 };
 

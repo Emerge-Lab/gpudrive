@@ -27,6 +27,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         render_width = render_width,
         render_height = render_height,
         debug_compile = False,
+        enable_render = False
 )
 
 #rgb_observations = sim.rgb_tensor().to_torch()

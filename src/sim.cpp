@@ -69,7 +69,10 @@ static inline void resetEnvironment(Engine &ctx)
     ctx.getSingleton<WorldDone>().done = 0;
     ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft = 96;
 
-    render::RenderingSystem::reset(ctx);
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::reset(ctx);
+    }
+
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
     Entity *all_entities = ctx.data().obstacles;
@@ -870,7 +873,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 }
 
 Sim::Sim(Engine &ctx,
-         const Config &,
+         const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
@@ -897,9 +900,12 @@ Sim::Sim(Engine &ctx,
         agentInterfaces[i] = ctx.makeEntityNow<AgentInterface>();
     }
 
+    enableRender = cfg.enableRender;
+
     resetEnvironment(ctx);
     generateEnvironment(ctx, 1, 3, 3);
     ctx.getSingleton<WorldReset>().resetLevel = 0;
+
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);
