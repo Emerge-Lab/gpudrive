@@ -204,8 +204,8 @@ inline void sortDebugSystem(Engine &ctx, WorldReset &)
 }
 #endif
 
-inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
-                         AgentType agent_type)
+inline void movementSystem(Engine &ctx, Action &action, SimEntity sim_e,
+                                 AgentType agent_type)
 {
     if (sim_e.e == Entity::none()) return;
 
@@ -241,8 +241,27 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
     ctx.getUnsafe<ExternalForce>(sim_e.e) = cur_rot.rotateVec({ f_x, f_y, 0 });
     ctx.getUnsafe<ExternalTorque>(sim_e.e) = Vector3 { 0, 0, t_z };
+}
+
+inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
+                         AgentType agent_type)
+{
+    if (sim_e.e == Entity::none()) return;
+    if (agent_type == AgentType::Camera) return;
+
+    if (agent_type == AgentType::Seeker) {
+        int32_t num_prep_left =
+            ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
+
+        if (num_prep_left > 0) {
+            return;
+        }
+    }
 
     if (action.l == 1) {
+        Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
+        Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+
         auto &bvh = ctx.getSingleton<broadphase::BVH>();
         float hit_t;
         Vector3 hit_normal;
@@ -272,6 +291,9 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     }
 
     if (action.g == 1) {
+        Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
+        Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+
         auto &grab_data = ctx.getUnsafe<GrabData>(sim_e.e);
 
         if (grab_data.constraintEntity != Entity::none()) {
@@ -791,15 +813,21 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         sortDebugSystem, WorldReset>>({prep_finish});
 #endif
 
-    auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
+    auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
         Action, SimEntity, AgentType>>({prep_finish});
 
-    auto phys_sys = phys::RigidBodyPhysicsSystem::setupTasks(builder,
+    auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        {move_sys});
+
+    auto action_sys = builder.addToGraph<ParallelForNode<Engine, actionSystem,
+        Action, SimEntity, AgentType>>({broadphase_setup_sys});
+
+    auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
         {action_sys}, numPhysicsSubsteps);
 
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
         agentZeroVelSystem, Velocity, render::ViewSettings>>(
-            {phys_sys});
+            {substep_sys});
 
     auto sim_done = agent_zero_vel;
 
