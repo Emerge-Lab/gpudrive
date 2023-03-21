@@ -86,7 +86,7 @@ else:
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = exec_mode,
         gpu_id = 0,
-        num_worlds = 16,
+        num_worlds = 1,
         min_entities_per_world = 100,
         max_entities_per_world = 100,
         render_width = 1536,

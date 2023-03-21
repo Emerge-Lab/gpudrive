@@ -13,8 +13,8 @@ num_steps = int(sys.argv[2])
 entities_per_world = int(sys.argv[3])
 reset_chance = float(sys.argv[4])
 
-render_width = 64
-render_height = 64
+render_width = 1536
+render_height = 1024
 
 gpu_id = 0
 
@@ -27,10 +27,10 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         render_width = render_width,
         render_height = render_height,
         debug_compile = False,
-        enable_render = False
+        enable_render = True 
 )
 
-#rgb_observations = sim.rgb_tensor().to_torch()
+rgb_observations = sim.rgb_tensor().to_torch()
 
 def dump_rgb(dump_dir, step_idx):
     N = rgb_observations.shape[0]
@@ -43,6 +43,7 @@ def dump_rgb(dump_dir, step_idx):
 
     grid = grid.reshape(N * A // num_wide * render_height, num_wide * render_width, 4)
     grid = grid.type(torch.uint8).cpu().numpy()
+    print(grid.shape)
 
     img = PIL.Image.fromarray(grid)
     img.save(f"{dump_dir}/{step_idx}.png", format="PNG")
@@ -88,7 +89,7 @@ else:
 resets = sim.reset_tensor().to_torch()
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
-#print(rgb_observations.shape, rgb_observations.dtype)
+print(rgb_observations.shape, rgb_observations.dtype)
 
 reset_no = torch.zeros_like(resets[:, 0], dtype=torch.int32,
                             device=dev)
@@ -97,7 +98,7 @@ reset_yes = torch.ones_like(resets[:, 0], dtype=torch.int32,
 reset_rand = torch.zeros_like(resets[:, 0], dtype=torch.float32,
                               device=dev)
 
-resets[:, 0] = 1
+resets[:, 0] = 3
 resets[:, 1] = 3
 resets[:, 2] = 2
 
@@ -114,7 +115,7 @@ start = time.time()
 
 for i in range(num_steps):
     if i % 240 == 0:
-        resets[:, 0] = 1
+        resets[:, 0] = 3
 
     sim.step()
 

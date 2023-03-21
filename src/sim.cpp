@@ -266,7 +266,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
         float hit_t;
         Vector3 hit_normal;
         Entity lock_entity = bvh.traceRay(cur_pos - 0.5f * math::up,
-            cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 1.5f);
+            cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 2.5f);
 
         if (lock_entity != Entity::none()) {
             auto &owner = ctx.getUnsafe<OwnerTeam>(lock_entity);
@@ -308,7 +308,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
             Vector3 ray_d = cur_rot.rotateVec(math::fwd);
 
             Entity grab_entity =
-                bvh.traceRay(ray_o, ray_d, &hit_t, &hit_normal, 1.5f);
+                bvh.traceRay(ray_o, ray_d, &hit_t, &hit_normal, 2.5f);
 
             if (grab_entity != Entity::none()) {
                 auto &owner = ctx.getUnsafe<OwnerTeam>(grab_entity);
