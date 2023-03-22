@@ -467,7 +467,7 @@ static void level6(Engine &ctx)
     all_entities[num_entities++] =
         makeDynObject(
             ctx, {0, -5, 1}, Quat::angleAxis(0, {1, 0, 0}), 2,
-            ResponseType::Static, OwnerTeam::Unownable, {1.f, 1.f, 1.f} );
+            ResponseType::Dynamic, OwnerTeam::None, {1.f, 1.f, 1.f} );
 
     auto makeDynAgent = [&](Vector3 pos, Quat rot, bool is_hider,
                             int32_t view_idx) {

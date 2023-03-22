@@ -329,33 +329,26 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                     joint_constraint.e1 = ctx.getLoc(sim_e.e);
                     joint_constraint.e2 = ctx.getLoc(grab_entity);
 
-                    Vector3 r1 = 0.25f * math::fwd;
+                    Vector3 r1 = 1.25f * math::fwd - 0.5f * math::up;
 
                     Vector3 hit_pos = ray_o + ray_d * hit_t;
-                    Vector3 r2 = other_rot.inv().rotateVec(hit_pos - other_pos);
+                    Vector3 r2 =
+                        other_rot.inv().rotateVec(hit_pos - other_pos);
 
                     joint_constraint.r1 = r1;
                     joint_constraint.r2 = r2;
 
-                    Vector3 ray_dir_other_local =
-                        other_rot.inv().rotateVec(ray_d);
-
                     // joint_constraint.axes2 needs to map from
-                    // (0, 0, 1) to ray_dir_other_local
-                    // and (1, 0, 0) to the agent's right vector in the grabbed
-                    // object's local space
-
-                    Vector3 right_vec_other_local = other_rot.inv().rotateVec(
-                        cur_rot.rotateVec(math::right));
-
-                    Vector3 up_vec_other_local =
-                        cross(right_vec_other_local, ray_dir_other_local);
+                    // math::fwd to -ray_dir_other_local in the grabbed
+                    // object's local space. Same for teh right vector
+                    // Leverage the fact that the joint is always along the forward
+                    // direction in sim_e's local space
+                    Quat axes2 = (other_rot.inv() * cur_rot *
+                        Quat::angleAxis(math::pi, math::up)).normalize();
 
                     joint_constraint.axes1 = { 1, 0, 0, 0 };
-                    joint_constraint.axes2 = Quat::fromBasis(
-                        right_vec_other_local, up_vec_other_local,
-                        ray_dir_other_local);
-                    joint_constraint.separation = hit_t - 0.25f;
+                    joint_constraint.axes2 = axes2;
+                    joint_constraint.separation = hit_t - 1.25f;
                 }
             }
         }
