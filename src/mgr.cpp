@@ -183,12 +183,14 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         float height = 2;
         float depth = 1.5;
 
+        Vector3 inv_inertia = 12.f / Vector3 {
+            height * height + depth * depth,
+            height * height  + width * width,
+            width * width + depth * depth,
+        };
+
         metadatas.push_back({
-            .invInertiaTensor = 12.f / Vector3 {
-                height * height + depth * depth,
-                height * height  + width * width,
-                width * width + depth * depth,
-            },
+            .invInertiaTensor = inv_inertia,
             .invMass = 1.f,
             .muS = 0.5f,
             .muD = 0.5f,
