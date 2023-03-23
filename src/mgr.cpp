@@ -463,6 +463,7 @@ MADRONA_EXPORT void Manager::step()
     }
 }
 
+
 MADRONA_EXPORT Tensor Manager::resetTensor() const
 {
     return exportStateTensor(0, Tensor::ElementType::Int32,
@@ -484,25 +485,25 @@ MADRONA_EXPORT madrona::py::Tensor Manager::prepCounterTensor() const
 MADRONA_EXPORT Tensor Manager::actionTensor() const
 {
     return exportStateTensor(3, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, consts::maxAgents, 5});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 5});
 }
 
 MADRONA_EXPORT Tensor Manager::rewardTensor() const
 {
     return exportStateTensor(4, Tensor::ElementType::Float32,
-                             {impl_->cfg.numWorlds, consts::maxAgents, 1});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::agentTypeTensor() const
 {
     return exportStateTensor(5, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, consts::maxAgents, 1});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::agentMaskTensor() const
 {
     return exportStateTensor(6, Tensor::ElementType::Float32,
-                             {impl_->cfg.numWorlds, consts::maxAgents, 1});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 
 
@@ -510,8 +511,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::agentDataTensor() const
 {
     return exportStateTensor(7, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxAgents - 1,
                                  4,
                              });
@@ -521,8 +521,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::boxDataTensor() const
 {
     return exportStateTensor(8, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxBoxes,
                                  7,
                              });
@@ -532,8 +531,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::rampDataTensor() const
 {
     return exportStateTensor(9, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxRamps,
                                  5,
                              });
@@ -543,8 +541,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::visibleAgentsMaskTensor() const
 {
     return exportStateTensor(10, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxAgents - 1,
                                  1,
                              });
@@ -554,8 +551,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::visibleBoxesMaskTensor() const
 {
     return exportStateTensor(11, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxBoxes,
                                  1,
                              });
@@ -565,8 +561,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::visibleRampsMaskTensor() const
 {
     return exportStateTensor(12, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  consts::maxRamps,
                                  1,
                              });
@@ -604,7 +599,7 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::Float32,
-                     {impl_->cfg.numWorlds, consts::maxAgents,
+                     {impl_->cfg.numWorlds * consts::maxAgents,
                       impl_->cfg.renderHeight,
                       impl_->cfg.renderWidth, 1}, gpu_id);
 }
@@ -630,7 +625,7 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
     }
 
     return Tensor(dev_ptr, Tensor::ElementType::UInt8,
-                  {impl_->cfg.numWorlds, consts::maxAgents,
+                  {impl_->cfg.numWorlds * consts::maxAgents,
                    impl_->cfg.renderHeight,
                    impl_->cfg.renderWidth, 4}, gpu_id);
 }
@@ -640,8 +635,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::lidarTensor() const
 {
     return exportStateTensor(14, Tensor::ElementType::Float32,
                              {
-                                 impl_->cfg.numWorlds,
-                                 consts::maxAgents,
+                                 impl_->cfg.numWorlds * consts::maxAgents,
                                  30,
                              });
 }

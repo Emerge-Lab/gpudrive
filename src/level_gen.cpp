@@ -11,7 +11,8 @@ template <typename T>
 static Entity makeAgent(Engine &ctx, AgentType agent_type)
 {
     Entity agent_iface =
-        ctx.data().agentInterfaces[ctx.data().numActiveAgents++];
+        ctx.data().agentInterfaces[ctx.data().numActiveAgents++] =
+            ctx.makeEntityNow<AgentInterface>();
 
     Entity agent = ctx.makeEntityNow<T>();
     ctx.getUnsafe<SimEntity>(agent_iface).e = agent;

@@ -41,7 +41,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerSingleton<GlobalDebugPositions>();
 
     registry.registerArchetype<DynamicObject>();
-    registry.registerFixedSizeArchetype<AgentInterface>(consts::maxAgents);
+    registry.registerArchetype<AgentInterface>();
     registry.registerArchetype<CameraAgent>();
     registry.registerArchetype<DynAgent>();
 
@@ -107,10 +107,8 @@ static inline void resetEnvironment(Engine &ctx)
     }
     ctx.data().numSeekers = 0;
 
-    for (int32_t i = 0; i < consts::maxAgents; i++) {
-        Entity e = ctx.data().agentInterfaces[i];
-        ctx.getUnsafe<SimEntity>(e).e = Entity::none();
-        ctx.getUnsafe<AgentActiveMask>(e).mask = 0.f;
+    for (int32_t i = 0; i < ctx.data().numActiveAgents; i++) {
+        ctx.destroyEntityNow(ctx.data().agentInterfaces[i]);
     }
     ctx.data().numActiveAgents = 0;
 }
@@ -916,10 +914,8 @@ Sim::Sim(Engine &ctx,
 
     numHiders = 0;
     numSeekers = 0;
+    numActiveAgents = 0;
 
-    for (int32_t i = 0; i < consts::maxAgents; i++) {
-        agentInterfaces[i] = ctx.makeEntityNow<AgentInterface>();
-    }
 
     enableRender = cfg.enableRender;
 
