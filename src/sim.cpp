@@ -18,6 +18,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     phys::RigidBodyPhysicsSystem::registerTypes(registry);
     render::RenderingSystem::registerTypes(registry);
 
+    registry.registerComponent<AgentDone>();
+    registry.registerComponent<AgentPrepCounter>();
     registry.registerComponent<Action>();
     registry.registerComponent<Reward>();
     registry.registerComponent<OwnerTeam>();
@@ -35,9 +37,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<RampVisibilityMasks>();
     registry.registerComponent<Lidar>();
 
+
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<WorldDone>();
-    registry.registerSingleton<PrepPhaseCounter>();
     registry.registerSingleton<GlobalDebugPositions>();
 
     registry.registerArchetype<DynamicObject>();
@@ -46,8 +47,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerArchetype<DynAgent>();
 
     registry.exportSingleton<WorldReset>(0);
-    registry.exportSingleton<WorldDone>(1);
-    registry.exportSingleton<PrepPhaseCounter>(2);
+    registry.exportColumn<AgentInterface, AgentDone>(1);
+    registry.exportColumn<AgentInterface, AgentPrepCounter>(2);
     registry.exportColumn<AgentInterface, Action>(3);
     registry.exportColumn<AgentInterface, Reward>(4);
     registry.exportColumn<AgentInterface, AgentType>(5);
@@ -65,9 +66,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 static inline void resetEnvironment(Engine &ctx)
 {
     ctx.data().curEpisodeStep = 0;
-
-    ctx.getSingleton<WorldDone>().done = 0;
-    ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft = 96;
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::reset(ctx);
@@ -130,14 +128,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 
     // These don't belong here but this runs once per world every frame, so...
     ctx.data().hiderTeamReward.store_relaxed(1.f);
-    CountT step_idx = ++ctx.data().curEpisodeStep;
-    if (step_idx >= 239) {
-        ctx.getSingleton<WorldDone>().done = 1;
-    }
-
-    if (step_idx <= 96) {
-        --ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
-    }
+    ctx.data().curEpisodeStep += 1;
 }
 
 #if 0
@@ -207,13 +198,8 @@ inline void movementSystem(Engine &ctx, Action &action, SimEntity sim_e,
 {
     if (sim_e.e == Entity::none()) return;
 
-    if (agent_type == AgentType::Seeker) {
-        int32_t num_prep_left =
-            ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
-
-        if (num_prep_left > 0) {
-            return;
-        }
+    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep <= 96) {
+        return;
     }
 
     constexpr CountT discrete_action_buckets = 11;
@@ -247,13 +233,8 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     if (sim_e.e == Entity::none()) return;
     if (agent_type == AgentType::Camera) return;
 
-    if (agent_type == AgentType::Seeker) {
-        int32_t num_prep_left =
-            ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
-
-        if (num_prep_left > 0) {
-            return;
-        }
+    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep <= 96) {
+        return;
     }
 
     if (action.l == 1) {
@@ -687,18 +668,22 @@ inline void lidarSystem(Engine &ctx,
 inline void agentRewardsSystem(Engine &ctx,
                                SimEntity sim_e,
                                AgentType agent_type,
-                               Reward &reward)
+                               Reward &reward,
+                               AgentDone &done,
+                               AgentPrepCounter &prep_counter)
 {
     if (sim_e.e == Entity::none()) {
         return;
     }
 
-    int32_t num_prep_left =
-        ctx.getSingleton<PrepPhaseCounter>().numPrepStepsLeft;
-
-    if (num_prep_left > 0) {
+    CountT cur_step = ctx.data().curEpisodeStep;
+    if (cur_step <= 96) {
         reward.reward = 0.f;
+        prep_counter.numPrepStepsLeft = 96 - cur_step;
+
         return;
+    } else if (cur_step >= 240) {
+        done.isDone = 1;
     }
 
     float reward_val = ctx.data().hiderTeamReward.load_relaxed();
@@ -876,7 +861,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         agentRewardsSystem,
             SimEntity,
             AgentType,
-            Reward
+            Reward,
+            AgentDone,
+            AgentPrepCounter
         >>({compute_visibility});
 
     auto global_positions_debug = builder.addToGraph<ParallelForNode<Engine,
@@ -915,7 +902,6 @@ Sim::Sim(Engine &ctx,
     numHiders = 0;
     numSeekers = 0;
     numActiveAgents = 0;
-
 
     enableRender = cfg.enableRender;
 

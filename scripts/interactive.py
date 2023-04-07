@@ -129,8 +129,9 @@ while True:
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
 
-    #print(prep_counter)
-    #print(dones)
+    print(prep_counter)
+    print(dones)
+    print(rewards)
     #print(rewards[0][:4] * agent_valid_masks[0][:4])
     #print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))

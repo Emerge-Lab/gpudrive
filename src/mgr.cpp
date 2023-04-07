@@ -473,13 +473,13 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
 MADRONA_EXPORT Tensor Manager::doneTensor() const
 {
     return exportStateTensor(1, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, 1});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT madrona::py::Tensor Manager::prepCounterTensor() const
 {
     return exportStateTensor(2, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, 1});
+                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 
 MADRONA_EXPORT Tensor Manager::actionTensor() const
