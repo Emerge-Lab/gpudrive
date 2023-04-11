@@ -86,7 +86,7 @@ else:
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = exec_mode,
         gpu_id = 0,
-        num_worlds = 1,
+        num_worlds = 16,
         min_entities_per_world = 100,
         max_entities_per_world = 100,
         render_width = 1536,
@@ -117,10 +117,10 @@ print(resets.shape, resets.dtype)
 print(agent_visibility_masks.shape)
 print(agent_data.shape)
 
-resets[0][0] = 1
-resets[0][1] = 2
-resets[0][2] = 2
-actions[:, :] = 0
+resets[..., 0] = 1
+resets[..., 1] = 2
+resets[..., 2] = 2
+actions[...] = 0
 
 while True:
     print("Stepping")
@@ -129,16 +129,14 @@ while True:
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
 
-    print(prep_counter)
-    print(dones)
-    print(rewards)
+    print(rewards[0:16 * 4])
     #print(rewards[0][:4] * agent_valid_masks[0][:4])
     #print(agent_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(box_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
     #print(ramp_visibility_masks[0][:4] * agent_valid_masks[0][:4].unsqueeze(dim = 2))
 
     #print(global_pos)
-    print(lidar[0][0])
+    #print(lidar[0][0])
 
     action = get_keyboard_action()
     #action = Action()
@@ -146,7 +144,7 @@ while True:
     if action.reset < 0:
         break
 
-    resets[0][0] = action.reset
+    resets[..., 0] = action.reset
     actions[0][0] = action.x
     actions[0][1] = action.y
     actions[0][2] = action.r

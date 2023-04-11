@@ -775,8 +775,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {clearTmp});
     auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
     auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
-
-    // FIXME: These don't need to be sorted after initialization (purely static)
     auto sort_agent_iface =
         queueSortByWorld<AgentInterface>(builder, {sort_objects});
     auto prep_finish = sort_agent_iface;
