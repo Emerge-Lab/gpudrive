@@ -296,17 +296,12 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                 if (owner == OwnerTeam::None &&
                     response_type == ResponseType::Dynamic) {
 
-                    grab_data.constraintEntity =
+                    Entity constraint_entity =
                         ctx.makeEntityNow<ConstraintData>();
+                    grab_data.constraintEntity = constraint_entity;
 
                     Vector3 other_pos = ctx.getUnsafe<Position>(grab_entity);
                     Quat other_rot = ctx.getUnsafe<Rotation>(grab_entity);
-
-                    auto &joint_constraint = ctx.getUnsafe<JointConstraint>(
-                        grab_data.constraintEntity);
-
-                    joint_constraint.e1 = ctx.getLoc(sim_e.e);
-                    joint_constraint.e2 = ctx.getLoc(grab_entity);
 
                     Vector3 r1 = 1.25f * math::fwd - 0.5f * math::up;
 
@@ -314,20 +309,16 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                     Vector3 r2 =
                         other_rot.inv().rotateVec(hit_pos - other_pos);
 
-                    joint_constraint.r1 = r1;
-                    joint_constraint.r2 = r2;
+                    Quat attach1 = { 1, 0, 0, 0 };
+                    Quat attach2 = (other_rot.inv() * cur_rot).normalize();
 
-                    // joint_constraint.axes2 needs to map from
-                    // math::fwd to -ray_dir_other_local in the grabbed
-                    // object's local space. Same for teh right vector
-                    // Leverage the fact that the joint is always along the forward
-                    // direction in sim_e's local space
-                    Quat axes2 = (other_rot.inv() * cur_rot *
-                        Quat::angleAxis(math::pi, math::up)).normalize();
+                    float separation = hit_t - 1.25f;
 
-                    joint_constraint.axes1 = { 1, 0, 0, 0 };
-                    joint_constraint.axes2 = axes2;
-                    joint_constraint.separation = hit_t - 1.25f;
+                    ctx.getUnsafe<JointConstraint>(constraint_entity) =
+                        JointConstraint::setupFixed(sim_e.e, grab_entity,
+                                                    attach1, attach2,
+                                                    r1, r2, separation);
+
                 }
             }
         }
