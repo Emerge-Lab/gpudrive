@@ -28,6 +28,7 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
 
     ctx.getUnsafe<AgentDone>(agent_iface) = { 0 };
     ctx.getUnsafe<AgentPrepCounter>(agent_iface) = { 96 };
+    ctx.getUnsafe<Seed>(agent_iface).seed = ctx.data().curEpisodeSeed;
 
     return agent;
 }
@@ -306,6 +307,8 @@ void generateEnvironment(Engine &ctx,
     uint32_t episode_idx =
         episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
     ctx.data().rng = RNG::make(episode_idx);
+
+    ctx.data().curEpisodeSeed = episode_idx;
 
     if (level_id == 1) {
         generateTrainingEnvironment(ctx, num_hiders, num_seekers);

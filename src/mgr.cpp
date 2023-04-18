@@ -640,6 +640,15 @@ MADRONA_EXPORT madrona::py::Tensor Manager::lidarTensor() const
                              });
 }
 
+MADRONA_EXPORT madrona::py::Tensor Manager::seedTensor() const
+{
+    return exportStateTensor(15, Tensor::ElementType::Int32,
+                             {
+                                 impl_->cfg.numWorlds * consts::maxAgents,
+                                 1,
+                             });
+}
+
 Tensor Manager::exportStateTensor(int64_t slot,
                                   Tensor::ElementType type,
                                   Span<const int64_t> dimensions) const

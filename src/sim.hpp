@@ -152,6 +152,10 @@ struct Lidar {
     float depth[30];
 };
 
+struct Seed {
+    int32_t seed;
+};
+
 static_assert(sizeof(Action) == 5 * sizeof(int32_t));
 
 struct AgentInterface : public madrona::Archetype<
@@ -168,7 +172,8 @@ struct AgentInterface : public madrona::Archetype<
     AgentVisibilityMasks,
     BoxVisibilityMasks,
     RampVisibilityMasks,
-    Lidar
+    Lidar,
+    Seed
 > {};
 
 struct CameraAgent : public madrona::Archetype<
@@ -235,6 +240,7 @@ struct Sim : public madrona::WorldBase {
     CountT minEpisodeEntities;
     CountT maxEpisodeEntities;
 
+    uint32_t curEpisodeSeed;
     bool enableRender;
 
     madrona::AtomicFloat hiderTeamReward {0};

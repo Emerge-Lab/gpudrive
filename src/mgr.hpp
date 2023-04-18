@@ -47,6 +47,7 @@ public:
     MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
     MADRONA_IMPORT madrona::py::Tensor lidarTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor seedTensor() const;
 
 private:
     struct Impl;

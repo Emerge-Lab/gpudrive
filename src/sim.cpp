@@ -36,6 +36,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<BoxVisibilityMasks>();
     registry.registerComponent<RampVisibilityMasks>();
     registry.registerComponent<Lidar>();
+    registry.registerComponent<Seed>();
 
 
     registry.registerSingleton<WorldReset>();
@@ -60,6 +61,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<AgentInterface, BoxVisibilityMasks>(11);
     registry.exportColumn<AgentInterface, RampVisibilityMasks>(12);
     registry.exportColumn<AgentInterface, Lidar>(14);
+    registry.exportColumn<AgentInterface, Seed>(15);
     registry.exportSingleton<GlobalDebugPositions>(13);
 }
 
