@@ -472,7 +472,7 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
 
 MADRONA_EXPORT Tensor Manager::doneTensor() const
 {
-    return exportStateTensor(1, Tensor::ElementType::Int32,
+    return exportStateTensor(1, Tensor::ElementType::UInt8,
                              {impl_->cfg.numWorlds * consts::maxAgents, 1});
 }
 

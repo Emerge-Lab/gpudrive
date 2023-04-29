@@ -39,9 +39,11 @@ struct WorldReset {
     int32_t numSeekers;
 };
 
-struct AgentDone {
-    int32_t isDone;
+struct __attribute__((packed)) AgentDone {
+    uint8_t isDone;
 };
+
+static_assert(sizeof(AgentDone) == 1);
 
 struct AgentPrepCounter {
     int32_t numPrepStepsLeft;
