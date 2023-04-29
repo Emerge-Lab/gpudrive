@@ -68,6 +68,13 @@ def setup_obs():
 
     return obs_tensors, process_obs, num_obs_features
 
+if torch.cuda.is_available():
+    dev = torch.device(f'cuda:{args.gpu_id}')
+elif torch.backends.mps.is_available():
+    dev = torch.device('mps')
+else:
+    dev = torch.device('cpu')
+
 obs_tensors, process_obs_cb, num_obs_features = setup_obs()
 
 policy = madrona_learn.model.ActorCritic()
@@ -84,7 +91,6 @@ madrona_learn.train(madrona_learn.SimConfig(
                         gamma = args.gamma,
                         lr = args.lr,
                         steps_per_update = args.steps_per_update),
-                    dev = torch.device(f'cuda:{args.gpu_id}'))
-
+                    dev = dev)
 
 del sim
