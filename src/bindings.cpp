@@ -33,6 +33,7 @@ NB_MODULE(gpu_hideseek_python, m) {
                             int64_t max_entities_per_world,
                             int64_t render_width,
                             int64_t render_height, 
+                            bool auto_reset,
                             bool enable_render,
                             bool debug_compile) {
             new (self) Manager(Manager::Config {
@@ -43,6 +44,7 @@ NB_MODULE(gpu_hideseek_python, m) {
                 .maxEntitiesPerWorld = (uint32_t)max_entities_per_world,
                 .renderWidth = (uint32_t)render_width,
                 .renderHeight = (uint32_t)render_height,
+                .autoReset = auto_reset,
                 .enableRender = enable_render,
                 .debugCompile = debug_compile,
             });
@@ -53,6 +55,7 @@ NB_MODULE(gpu_hideseek_python, m) {
            nb::arg("max_entities_per_world"),
            nb::arg("render_width"),
            nb::arg("render_height"),
+           nb::arg("auto_reset") = false,
            nb::arg("enable_render") = false,
            nb::arg("debug_compile") = false)
         .def("step", &Manager::step)

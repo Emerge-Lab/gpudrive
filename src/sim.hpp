@@ -204,6 +204,7 @@ struct DynAgent : public madrona::Archetype<
 
 struct Config {
     bool enableRender;
+    bool autoReset;
 };
 
 struct Sim : public madrona::WorldBase {
@@ -244,6 +245,7 @@ struct Sim : public madrona::WorldBase {
 
     uint32_t curEpisodeSeed;
     bool enableRender;
+    bool autoReset;
 
     madrona::AtomicFloat hiderTeamReward {0};
 };

@@ -306,6 +306,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
     GPUHideSeek::Config app_cfg {
         cfg.enableRender,
+        cfg.autoReset,
     };
 
     switch (cfg.execMode) {

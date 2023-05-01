@@ -117,6 +117,10 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t level = reset.resetLevel;
 
+    if (ctx.data().autoReset && ctx.data().curEpisodeStep == 240) {
+        level = 1;
+    }
+
     if (level != 0) {
         resetEnvironment(ctx);
 
@@ -126,11 +130,12 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         int32_t num_seekers = reset.numSeekers;
 
         generateEnvironment(ctx, level, num_hiders, num_seekers);
+    } else {
+        ctx.data().curEpisodeStep += 1;
     }
 
     // These don't belong here but this runs once per world every frame, so...
     ctx.data().hiderTeamReward.store_relaxed(1.f);
-    ctx.data().curEpisodeStep += 1;
 }
 
 #if 0
@@ -200,7 +205,7 @@ inline void movementSystem(Engine &ctx, Action &action, SimEntity sim_e,
 {
     if (sim_e.e == Entity::none()) return;
 
-    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep <= 96) {
+    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep < 96) {
         return;
     }
 
@@ -235,7 +240,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     if (sim_e.e == Entity::none()) return;
     if (agent_type == AgentType::Camera) return;
 
-    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep <= 96) {
+    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep < 96) {
         return;
     }
 
@@ -670,12 +675,12 @@ inline void agentRewardsSystem(Engine &ctx,
     }
 
     CountT cur_step = ctx.data().curEpisodeStep;
-    if (cur_step <= 96) {
+    if (cur_step < 96) {
         reward.reward = 0.f;
         prep_counter.numPrepStepsLeft = 96 - cur_step;
 
         return;
-    } else if (cur_step >= 240) {
+    } else if (cur_step == 239) {
         done.isDone = 1;
     }
 
@@ -895,6 +900,7 @@ Sim::Sim(Engine &ctx,
     numActiveAgents = 0;
 
     enableRender = cfg.enableRender;
+    autoReset = cfg.autoReset;
 
     resetEnvironment(ctx);
     generateEnvironment(ctx, 1, 3, 3);

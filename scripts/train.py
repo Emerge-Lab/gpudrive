@@ -24,6 +24,7 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
         num_worlds = args.num_worlds,
         min_entities_per_world = 0,
         max_entities_per_world = 0,
+        auto_reset = True,
         render_width = 0,
         render_height = 0,
 )
@@ -96,12 +97,22 @@ policy = SharedActorCritic(
         [5, 5, 5, 2, 2]),
     critic = SharedActorCritic.DefaultCritic(512))
 
-madrona_learn.train(madrona_learn.SimConfig(
+# Hack to fill out observations: Reset envs and take step to populate envs
+# FIXME: just make it possible to populate observations after init
+# (IE run subset of task graph after init)
+resets = sim.reset_tensor().to_torch()
+actions = sim.action_tensor().to_torch()
+actions.zero_()
+
+resets[:, 0] = 1
+sim.step()
+
+madrona_learn.train(madrona_learn.SimData(
                         step = lambda: sim.step(),
                         obs = obs_tensors,
-                        actions = sim.action_tensor().to_torch(),
-                        rewards = sim.reward_tensor().to_torch(),
-                        dones = sim.done_tensor().to_torch()),
+                        actions = actions,
+                        dones = sim.done_tensor().to_torch(),
+                        rewards = sim.reward_tensor().to_torch()),
                     madrona_learn.TrainConfig(
                         num_updates = args.num_updates,
                         gamma = args.gamma,

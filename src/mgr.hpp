@@ -21,6 +21,7 @@ public:
         uint32_t maxEntitiesPerWorld;
         uint32_t renderWidth;
         uint32_t renderHeight;
+        bool autoReset;
         bool enableRender;
         bool debugCompile;
     };
