@@ -30,6 +30,15 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
     ctx.getUnsafe<AgentPrepCounter>(agent_iface) = { 96 };
     ctx.getUnsafe<Seed>(agent_iface).seed = ctx.data().curEpisodeSeed;
 
+    // Zero out actions
+    ctx.getUnsafe<Action>(agent_iface) = {
+        .x = 0,
+        .y = 0,
+        .r = 0,
+        .g = 0,
+        .l = 0,
+    };
+
     return agent;
 }
 

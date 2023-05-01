@@ -92,7 +92,8 @@ obs_tensors, process_obs_cb, num_obs_features = setup_obs()
 policy = SharedActorCritic(
     process_obs_fn = process_obs_cb,
     core = SmallMLP(num_obs_features, 512),
-    actor = SharedActorCritic.DefaultDiscreteActor(512, 3),
+    actor = SharedActorCritic.DefaultDiscreteActor(512,
+        [5, 5, 5, 2, 2]),
     critic = SharedActorCritic.DefaultCritic(512))
 
 madrona_learn.train(madrona_learn.SimConfig(

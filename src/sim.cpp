@@ -898,8 +898,11 @@ Sim::Sim(Engine &ctx,
 
     resetEnvironment(ctx);
     generateEnvironment(ctx, 1, 3, 3);
-    ctx.getSingleton<WorldReset>().resetLevel = 0;
-
+    ctx.getSingleton<WorldReset>() = {
+        .resetLevel = 0,
+        .numHiders = 3,
+        .numSeekers = 3,
+    };
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);
