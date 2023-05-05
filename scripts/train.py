@@ -1,6 +1,7 @@
 import gpu_hideseek_python
 import madrona_learn
-from madrona_learn.model import SharedActorCritic, SmallMLP
+from madrona_learn.model import (ActorCritic, RecurrentActorCritic,
+                                 SmallMLPBackbone, LSTMRecurrentPolicy)
 import torch
 import argparse
 import math
@@ -90,12 +91,14 @@ def setup_obs():
 
 obs_tensors, process_obs_cb, num_obs_features = setup_obs()
 
-policy = SharedActorCritic(
-    process_obs_fn = process_obs_cb,
-    core = SmallMLP(num_obs_features, 512),
-    actor = SharedActorCritic.DefaultDiscreteActor(512,
-        [5, 5, 5, 2, 2]),
-    critic = SharedActorCritic.DefaultCritic(512))
+policy = RecurrentActorCritic(
+    backbone = SmallMLPBackbone(
+        process_obs_cb,
+        num_obs_features, 512),
+    rnn = LSTMRecurrentPolicy(512, 512, 1),
+    actor = ActorCritic.DefaultDiscreteActor(512,
+        [10, 10, 10, 2, 2]),
+    critic = ActorCritic.DefaultCritic(512))
 
 # Hack to fill out observations: Reset envs and take step to populate envs
 # FIXME: just make it possible to populate observations after init
