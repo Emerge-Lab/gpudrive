@@ -100,15 +100,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
             .muD = 0.5f,
         });
 
-        PhysicsLoader::LoadedHull cube_hull = loader.loadHullFromDisk(
-            (std::filesystem::path(DATA_DIR) / "cube_collision.obj").c_str());
+        auto cube_path =
+            std::filesystem::path(DATA_DIR) / "cube_collision.obj";
 
-        aabbs.push_back(cube_hull.aabb);
+        HeapArray<PhysicsLoader::LoadedHull> cube_hulls =
+            loader.importConvexDecompFromDisk(cube_path.c_str());
+
+        aabbs.push_back(cube_hulls[0].aabb);
 
         prims.push_back({
             .type = CollisionPrimitive::Type::Hull,
             .hull = {
-                .halfEdgeMesh = cube_hull.collisionMesh,
+                .halfEdgeMesh = cube_hulls[0].collisionMesh,
             },
         });
     }
@@ -121,15 +124,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
             .muD = 0.5f,
         });
 
-        PhysicsLoader::LoadedHull wall_hull = loader.loadHullFromDisk(
-            (std::filesystem::path(DATA_DIR) / "wall_collision.obj").c_str());
+        auto wall_path =
+            std::filesystem::path(DATA_DIR) / "wall_collision.obj";
 
-        aabbs.push_back(wall_hull.aabb);
+        HeapArray<PhysicsLoader::LoadedHull> wall_hulls =
+            loader.importConvexDecompFromDisk(wall_path.c_str());
+
+        aabbs.push_back(wall_hulls[0].aabb);
 
         prims.push_back({
             .type = CollisionPrimitive::Type::Hull,
             .hull = {
-                .halfEdgeMesh = wall_hull.collisionMesh,
+                .halfEdgeMesh = wall_hulls[0].collisionMesh,
             },
         });
     }
@@ -142,16 +148,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
             .muD = 0.5f,
         });
 
-        PhysicsLoader::LoadedHull cylinder_hull = loader.loadHullFromDisk(
-            (std::filesystem::path(DATA_DIR) /
-             "cylinder_collision.obj").c_str());
+        auto cylinder_path =
+            std::filesystem::path(DATA_DIR) / "cylinder_collision.obj";
 
-        aabbs.push_back(cylinder_hull.aabb);
+        HeapArray<PhysicsLoader::LoadedHull> cylinder_hulls =
+            loader.importConvexDecompFromDisk(cylinder_path.c_str());
+
+        aabbs.push_back(cylinder_hulls[0].aabb);
 
         prims.push_back({
             .type = CollisionPrimitive::Type::Hull,
             .hull = {
-                .halfEdgeMesh = cylinder_hull.collisionMesh,
+                .halfEdgeMesh = cylinder_hulls[0].collisionMesh,
             },
         });
     }
@@ -164,16 +172,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
             .muD = 0.5f,
         });
 
-        PhysicsLoader::LoadedHull ramp_hull = loader.loadHullFromDisk(
-            (std::filesystem::path(DATA_DIR) /
-             "ramp_collision.obj").c_str());
+        auto ramp_path =
+            std::filesystem::path(DATA_DIR) / "ramp_collision.obj";
 
-        aabbs.push_back(ramp_hull.aabb);
+        HeapArray<PhysicsLoader::LoadedHull> ramp_hulls =
+            loader.importConvexDecompFromDisk(ramp_path.c_str());
+
+        aabbs.push_back(ramp_hulls[0].aabb);
 
         prims.push_back({
             .type = CollisionPrimitive::Type::Hull,
             .hull = {
-                .halfEdgeMesh = ramp_hull.collisionMesh,
+                .halfEdgeMesh = ramp_hulls[0].collisionMesh,
             },
         });
     }
@@ -196,16 +206,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
             .muD = 0.5f,
         });
 
-        PhysicsLoader::LoadedHull elongated_box_hull = loader.loadHullFromDisk(
-            (std::filesystem::path(DATA_DIR) /
-             "elongated_collision.obj").c_str());
+        auto elongated_path =
+            std::filesystem::path(DATA_DIR) / "elongated_collision.obj";
 
-        aabbs.push_back(elongated_box_hull.aabb);
+        HeapArray<PhysicsLoader::LoadedHull> elongated_box_hulls =
+            loader.importConvexDecompFromDisk(elongated_path.c_str());
+
+        aabbs.push_back(elongated_box_hulls[0].aabb);
 
         prims.push_back({
             .type = CollisionPrimitive::Type::Hull,
             .hull = {
-                .halfEdgeMesh = elongated_box_hull.collisionMesh,
+                .halfEdgeMesh = elongated_box_hulls[0].collisionMesh,
             },
         });
     }
@@ -217,91 +229,20 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 Manager::Impl * Manager::Impl::init(const Config &cfg)
 {
     HostEventLogging(HostEvent::initStart);
-    DynArray<imp::ImportedObject> imported_renderer_objs(0);
 
-    {
-        auto sphere_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "sphere.obj").c_str());
+    std::array<char, 1024> import_err;
+    auto render_assets = imp::ImportedAssets::importFromDisk({
+        (std::filesystem::path(DATA_DIR) / "sphere.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "plane.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "wall_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str(),
+    }, Span<char>(import_err.data(), import_err.size()));
 
-        if (!sphere_obj.has_value()) {
-            FATAL("Failed to load sphere");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*sphere_obj));
-    }
-
-    {
-        auto plane_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "plane.obj").c_str());
-
-        if (!plane_obj.has_value()) {
-            FATAL("Failed to load plane");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*plane_obj));
-    }
-
-    {
-        auto cube_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "cube_render.obj").c_str());
-
-        if (!cube_obj.has_value()) {
-            FATAL("Failed to load cube");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*cube_obj));
-    }
-
-    {
-        auto wall_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "wall_render.obj").c_str());
-
-        if (!wall_obj.has_value()) {
-            FATAL("Failed to load wall");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*wall_obj));
-    }
-
-    {
-        auto cylinder_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").c_str());
-
-        if (!cylinder_obj.has_value()) {
-            FATAL("Failed to load cylinder");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*cylinder_obj));
-    }
-
-    {
-        auto ramp_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "ramp_render.obj").c_str());
-
-        if (!ramp_obj.has_value()) {
-            FATAL("Failed to load ramp");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*ramp_obj));
-    }
-
-    {
-        auto ramp_obj = imp::ImportedObject::importObject(
-            (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str());
-
-        if (!ramp_obj.has_value()) {
-            FATAL("Failed to load elongated");
-        }
-
-        imported_renderer_objs.emplace_back(std::move(*ramp_obj));
-    }
-
-    DynArray<imp::SourceObject> renderer_objects(0);
-
-    for (const auto &imported_obj : imported_renderer_objs) {
-        renderer_objects.push_back(imp::SourceObject {
-            imported_obj.meshes,
-        });
+    if (!render_assets.has_value()) {
+        FATAL("Failed to load render assets: %s", import_err);
     }
 
     GPUHideSeek::Config app_cfg {
@@ -358,7 +299,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         });
 
         if (cfg.enableRender) {
-            mwgpu_exec.loadObjects(renderer_objects);
+            mwgpu_exec.loadObjects(render_assets->objects);
         }
 
         HostEventLogging(HostEvent::initEnd);
@@ -419,7 +360,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         };
 
         if (cfg.enableRender) {
-            cpu_impl->cpuExec.loadObjects(renderer_objects);
+            cpu_impl->cpuExec.loadObjects(render_assets->objects);
         }
 
         HostEventLogging(HostEvent::initEnd);

@@ -339,7 +339,7 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
         makePlane(ctx, {0, 0, 0}, Quat::angleAxis(0, {1, 0, 0}));
 
     const Quat agent_rot =
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+        Quat::angleAxis(toRadians(-45), {0, 0, 1});
 
     ctx.data().numObstacles = total_entities;
 
@@ -356,7 +356,7 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 static void level2(Engine &ctx)
 {
     Quat cube_rotation = (Quat::angleAxis(atanf(1.f/sqrtf(2.f)), {0, 1, 0}) *
-        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize().normalize();
+        Quat::angleAxis(toRadians(45), {1, 0, 0})).normalize().normalize();
     singleCubeLevel(ctx, { 0, 0, 5 }, cube_rotation);
 }
 
@@ -370,10 +370,10 @@ static void level4(Engine &ctx)
     Vector3 pos { 0, 0, 5 };
 
     Quat rot = (
-        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0})).normalize();
+        Quat::angleAxis(toRadians(45), {0, 1, 0})).normalize();
 #if 0
-        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0}) *
-        Quat::angleAxis(helpers::toRadians(40), {1, 0, 0})).normalize();
+        Quat::angleAxis(toRadians(45), {0, 1, 0}) *
+        Quat::angleAxis(toRadians(40), {1, 0, 0})).normalize();
 #endif
 
     Entity *all_entities = ctx.data().obstacles;
@@ -396,7 +396,7 @@ static void level4(Engine &ctx)
     //    makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
 
     const Quat agent_rot =
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+        Quat::angleAxis(toRadians(-45), {0, 0, 1});
 
     ctx.data().numObstacles = total_entities;
 
@@ -518,10 +518,10 @@ static void level6(Engine &ctx)
     };
 
     makeDynAgent({ -15, -15, 1.5 },
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1}), true, 0);
+        Quat::angleAxis(toRadians(-45), {0, 0, 1}), true, 0);
 
     makeDynAgent({ -15, -10, 1.5 },
-        Quat::angleAxis(helpers::toRadians(45), {0, 0, 1}), false, 1);
+        Quat::angleAxis(toRadians(45), {0, 0, 1}), false, 1);
 
     ctx.data().numObstacles = num_entities;
 }
@@ -531,8 +531,8 @@ static void level7(Engine &ctx)
     Vector3 pos { 0, 0, 5 };
 
     Quat rot = (
-        Quat::angleAxis(helpers::toRadians(45), {0, 1, 0}) *
-        Quat::angleAxis(helpers::toRadians(40), {1, 0, 0})).normalize();
+        Quat::angleAxis(toRadians(45), {0, 1, 0}) *
+        Quat::angleAxis(toRadians(40), {1, 0, 0})).normalize();
 
     Entity *all_entities = ctx.data().obstacles;
 
@@ -553,7 +553,7 @@ static void level7(Engine &ctx)
         makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
 
     const Quat agent_rot =
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+        Quat::angleAxis(toRadians(-45), {0, 0, 1});
 
     ctx.data().numObstacles = total_entities;
 
@@ -576,9 +576,9 @@ static void level8(Engine &ctx)
     Vector3 ramp_pos { 0, 0, 10 };
 
     Quat ramp_rot = (
-        Quat::angleAxis(helpers::toRadians(25), {0, 1, 0}) *
-        Quat::angleAxis(helpers::toRadians(90), {0, 0, 1}) *
-        Quat::angleAxis(helpers::toRadians(45), {1, 0, 0})).normalize();
+        Quat::angleAxis(toRadians(25), {0, 1, 0}) *
+        Quat::angleAxis(toRadians(90), {0, 0, 1}) *
+        Quat::angleAxis(toRadians(45), {1, 0, 0})).normalize();
 
     Entity ramp_dyn = all_entities[total_entities++] =
         makeDynObject(ctx, ramp_pos, ramp_rot, 5);
@@ -588,7 +588,7 @@ static void level8(Engine &ctx)
     all_entities[total_entities++] =
         makeDynObject(ctx,
                       {0, 0, 1.5},
-                      (Quat::angleAxis(helpers::toRadians(-90), {1, 0, 0 }) *
+                      (Quat::angleAxis(toRadians(-90), {1, 0, 0 }) *
                           Quat::angleAxis(pi, {0, 1, 0 })).normalize(),
                       5,
                       ResponseType::Static, OwnerTeam::None,
@@ -602,7 +602,7 @@ static void level8(Engine &ctx)
         makePlane(ctx, {20, 0, 0}, Quat::angleAxis(-pi_d2, {0, 1, 0}));
 
     const Quat agent_rot =
-        Quat::angleAxis(helpers::toRadians(-45), {0, 0, 1});
+        Quat::angleAxis(toRadians(-45), {0, 0, 1});
 
     ctx.data().numObstacles = total_entities;
 

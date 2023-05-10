@@ -162,7 +162,8 @@ struct Walls {
     inline void scale(Vector2 min, Vector2 max) {
         // Scale all walls and rooms
         auto doScale = [&min, &max] (const Vector2 &v) { // v: [0,1]
-            return min + (max-min) * v;
+            Vector2 range = max - min;
+            return min + Vector2 { range.x * v.x, range.y * v.y };
         };
 
         for (int i = 0; i < walls.size(); ++i) {
