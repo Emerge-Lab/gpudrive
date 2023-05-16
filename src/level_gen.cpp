@@ -83,7 +83,7 @@ static void generateTrainingEnvironment(Engine &ctx,
                          &all_entities, &num_entities](const AABB &aabb) {
         for (int i = 0; i < num_entities; ++i) {
             ObjectID obj_id = ctx.getUnsafe<ObjectID>(all_entities[i]);
-            AABB other = obj_mgr.aabbs[obj_id.idx];
+            AABB other = obj_mgr.rigidBodyAABBs[obj_id.idx];
 
             Position p = ctx.getUnsafe<Position>(all_entities[i]);
             Rotation r = ctx.getUnsafe<Rotation>(all_entities[i]);
@@ -117,7 +117,7 @@ static void generateTrainingEnvironment(Engine &ctx,
             const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
             Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
-            AABB aabb = obj_mgr.aabbs[6];
+            AABB aabb = obj_mgr.rigidBodyAABBs[6];
             aabb = aabb.applyTRS(pos, rot, scale);
 
             // Check overlap with all other entities
@@ -158,7 +158,7 @@ static void generateTrainingEnvironment(Engine &ctx,
             const auto rot = Quat::angleAxis(box_rotation, {0, 0, 1});
             Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
-            AABB aabb = obj_mgr.aabbs[2];
+            AABB aabb = obj_mgr.rigidBodyAABBs[2];
             aabb = aabb.applyTRS(pos, rot, scale);
 
             if (checkOverlap(aabb) || rejections == max_rejections) {
@@ -195,7 +195,7 @@ static void generateTrainingEnvironment(Engine &ctx,
             const auto rot = Quat::angleAxis(ramp_rotation, {0, 0, 1});
             Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
-            AABB aabb = obj_mgr.aabbs[5];
+            AABB aabb = obj_mgr.rigidBodyAABBs[5];
             aabb = aabb.applyTRS(pos, rot, scale);
 
             if (checkOverlap(aabb) || rejections == max_rejections) {
@@ -254,7 +254,7 @@ static void generateTrainingEnvironment(Engine &ctx,
             const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
             Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
-            AABB aabb = obj_mgr.aabbs[4];
+            AABB aabb = obj_mgr.rigidBodyAABBs[4];
             aabb = aabb.applyTRS(pos, rot, scale);
             if (checkOverlap(aabb) || rejections == max_rejections) {
                 makeDynAgent(pos, rot, true, i);
@@ -277,7 +277,7 @@ static void generateTrainingEnvironment(Engine &ctx,
             const auto rot = Quat::angleAxis(rng.rand() * math::pi, {0, 0, 1});
             Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
-            AABB aabb = obj_mgr.aabbs[4];
+            AABB aabb = obj_mgr.rigidBodyAABBs[4];
             aabb = aabb.applyTRS(pos, rot, scale);
 
             if (checkOverlap(aabb) || rejections == max_rejections) {

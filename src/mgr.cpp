@@ -7,6 +7,7 @@
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
 
+#include <array>
 #include <charconv>
 #include <iostream>
 #include <filesystem>
@@ -48,182 +49,137 @@ struct Manager::CUDAImpl : Manager::Impl {
 
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
-    DynArray<RigidBodyMetadata> metadatas(0);
-    DynArray<AABB> aabbs(0);
-    DynArray<CollisionPrimitive> prims(0);
+    using SourceCollisionObject = PhysicsLoader::SourceCollisionObject;
+    using SourceCollisionPrimitive = PhysicsLoader::SourceCollisionPrimitive;
 
-    { // Sphere: (0)
-        metadatas.push_back({
-            .invInertiaTensor = { 2.5f, 2.5f, 2.5f },
-            .invMass = 1.f,
+    SourceCollisionPrimitive sphere_prim {
+        .type = CollisionPrimitive::Type::Sphere,
+        .sphere = CollisionPrimitive::Sphere {
+            .radius = 1.f,
+        },
+    };
+
+    SourceCollisionPrimitive plane_prim {
+        .type = CollisionPrimitive::Type::Plane,
+    };
+
+    char import_err_buffer[4096];
+    auto imported_hulls = imp::ImportedAssets::importFromDisk({
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "ramp_collision.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "elongated_collision.obj").c_str(),
+    }, import_err_buffer, true);
+
+    if (!imported_hulls.has_value()) {
+        FATAL("%s", import_err_buffer);
+    }
+
+    DynArray<DynArray<SourceCollisionPrimitive>> prim_arrays(0);
+    HeapArray<SourceCollisionObject> src_objs(imported_hulls->objects.size() + 2);
+
+    // Sphere (0)
+    src_objs[0] = {
+        .prims = Span<const SourceCollisionPrimitive>(&sphere_prim, 1),
+        .invMass = 1.f,
+        .friction = {
             .muS = 0.5f,
             .muD = 0.5f,
-        });
+        },
+    };
 
-        aabbs.push_back({
-            .pMin = { -1, -1, -1 },
-            .pMax = { 1, 1, 1 },
-        });
+    // Plane (1)
+    src_objs[1] = {
+        .prims = Span<const SourceCollisionPrimitive>(&plane_prim, 1),
+        .invMass = 0.f,
+        .friction = {
+            .muS = 0.5f,
+            .muD = 0.5f,
+        },
+    };
 
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Sphere,
-            .sphere = {
-                .radius = 1.f,
-            },
+    auto setupHull = [&](CountT obj_idx, float inv_mass,
+                         RigidBodyFrictionData friction) {
+        auto meshes = imported_hulls->objects[obj_idx].meshes;
+        DynArray<SourceCollisionPrimitive> prims(meshes.size());
+
+        for (const imp::SourceMesh &mesh : meshes) {
+            prims.push_back({
+                .type = CollisionPrimitive::Type::Hull,
+                .hull = {
+                    .mesh = &mesh,
+                },
+            });
+        }
+
+        prim_arrays.emplace_back(std::move(prims));
+
+        return SourceCollisionObject {
+            .prims = Span<const SourceCollisionPrimitive>(prim_arrays.back()),
+            .invMass = inv_mass,
+            .friction = friction,
+        };
+    };
+
+    { // Cube (2)
+        src_objs[2] = setupHull(0, 1.f, {
+            .muS = 0.5f,
+            .muD = 0.5f,
         });
     }
 
-    { // Plane: (1)
-        metadatas.push_back({
-            .invInertiaTensor = { 0.f, 0.f, 0.f },
-            .invMass = 0.f,
+    { // Wall (3)
+        src_objs[3] = setupHull(1, 0.f, {
             .muS = 0.5f,
             .muD = 0.5f,
-        });
-
-        aabbs.push_back({
-            .pMin = { -FLT_MAX, -FLT_MAX, -FLT_MAX },
-            .pMax = { FLT_MAX, FLT_MAX, 0 },
-        });
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Plane,
-            .plane = {},
         });
     }
 
-    { // Cube: (2)
-        metadatas.push_back({
-            .invInertiaTensor = { 1.5f, 1.5f, 1.5f },
-            .invMass = 1.f,
+    { // Cylinder (4)
+        src_objs[4] = setupHull(2, 1.f, {
             .muS = 0.5f,
             .muD = 0.5f,
-        });
-
-        auto cube_path =
-            std::filesystem::path(DATA_DIR) / "cube_collision.obj";
-
-        HeapArray<PhysicsLoader::LoadedHull> cube_hulls =
-            loader.importConvexDecompFromDisk(cube_path.c_str());
-
-        aabbs.push_back(cube_hulls[0].aabb);
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Hull,
-            .hull = {
-                .halfEdgeMesh = cube_hulls[0].collisionMesh,
-            },
-        });
-    }
-
-    { // Wall: (3)
-        metadatas.push_back({
-            .invInertiaTensor = { 0.f, 0.f, 0.f },
-            .invMass = 0.f,
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-
-        auto wall_path =
-            std::filesystem::path(DATA_DIR) / "wall_collision.obj";
-
-        HeapArray<PhysicsLoader::LoadedHull> wall_hulls =
-            loader.importConvexDecompFromDisk(wall_path.c_str());
-
-        aabbs.push_back(wall_hulls[0].aabb);
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Hull,
-            .hull = {
-                .halfEdgeMesh = wall_hulls[0].collisionMesh,
-            },
-        });
-    }
-
-    { // Cylinder: (4)
-        metadatas.push_back({
-            .invInertiaTensor = { 0.f, 0.f, 1.f }, // FIXME
-            .invMass = 1.f,
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-
-        auto cylinder_path =
-            std::filesystem::path(DATA_DIR) / "cylinder_collision.obj";
-
-        HeapArray<PhysicsLoader::LoadedHull> cylinder_hulls =
-            loader.importConvexDecompFromDisk(cylinder_path.c_str());
-
-        aabbs.push_back(cylinder_hulls[0].aabb);
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Hull,
-            .hull = {
-                .halfEdgeMesh = cylinder_hulls[0].collisionMesh,
-            },
         });
     }
 
     { // Ramp (5)
-        metadatas.push_back({
-            .invInertiaTensor = { 1.5f, 1.5f, 1.5f }, // FIXME
-            .invMass = 1.f,
+        src_objs[5] = setupHull(3, 1.f, {
             .muS = 0.5f,
             .muD = 0.5f,
         });
-
-        auto ramp_path =
-            std::filesystem::path(DATA_DIR) / "ramp_collision.obj";
-
-        HeapArray<PhysicsLoader::LoadedHull> ramp_hulls =
-            loader.importConvexDecompFromDisk(ramp_path.c_str());
-
-        aabbs.push_back(ramp_hulls[0].aabb);
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Hull,
-            .hull = {
-                .halfEdgeMesh = ramp_hulls[0].collisionMesh,
-            },
-        });
     }
 
-    { // Elongated box (6)
-        float width = 8;
-        float height = 2;
-        float depth = 1.5;
-
-        Vector3 inv_inertia = 12.f / Vector3 {
-            height * height + depth * depth,
-            height * height  + width * width,
-            width * width + depth * depth,
-        };
-
-        metadatas.push_back({
-            .invInertiaTensor = inv_inertia,
-            .invMass = 1.f,
+    { // Elongated Box (6)
+        src_objs[6] = setupHull(4, 1.f, {
             .muS = 0.5f,
             .muD = 0.5f,
         });
-
-        auto elongated_path =
-            std::filesystem::path(DATA_DIR) / "elongated_collision.obj";
-
-        HeapArray<PhysicsLoader::LoadedHull> elongated_box_hulls =
-            loader.importConvexDecompFromDisk(elongated_path.c_str());
-
-        aabbs.push_back(elongated_box_hulls[0].aabb);
-
-        prims.push_back({
-            .type = CollisionPrimitive::Type::Hull,
-            .hull = {
-                .halfEdgeMesh = elongated_box_hulls[0].collisionMesh,
-            },
-        });
     }
 
-    loader.loadObjects(metadatas.data(), aabbs.data(),
-                       prims.data(), metadatas.size());
+    auto phys_objs = loader.importRigidBodyData(
+        src_objs.data(), src_objs.size(), true);
+
+    // HACK:
+    phys_objs.metadatas[4].mass.invInertiaTensor.x = 0.f,
+    phys_objs.metadatas[4].mass.invInertiaTensor.y = 0.f,
+
+    loader.loadObjects(
+        phys_objs.metadatas.data(),
+        phys_objs.objectAABBs.data(),
+        phys_objs.primOffsets.data(),
+        phys_objs.primCounts.data(),
+        phys_objs.metadatas.size(),
+        phys_objs.collisionPrimitives.data(),
+        phys_objs.primitiveAABBs.data(),
+        phys_objs.collisionPrimitives.size(),
+        phys_objs.hullData.halfEdges.data(),
+        phys_objs.hullData.halfEdges.size(),
+        phys_objs.hullData.faceBaseHEs.data(),
+        phys_objs.hullData.facePlanes.data(),
+        phys_objs.hullData.facePlanes.size(),
+        phys_objs.hullData.positions.data(),
+        phys_objs.hullData.positions.size());
 }
 
 Manager::Impl * Manager::Impl::init(const Config &cfg)
