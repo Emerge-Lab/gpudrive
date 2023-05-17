@@ -158,7 +158,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     }
 
     auto phys_objs = loader.importRigidBodyData(
-        src_objs.data(), src_objs.size(), true);
+        src_objs.data(), src_objs.size(), false);
 
     // HACK:
     phys_objs.metadatas[4].mass.invInertiaTensor.x = 0.f,
