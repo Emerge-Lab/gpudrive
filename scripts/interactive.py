@@ -121,10 +121,10 @@ resets[..., 0] = 1
 resets[..., 1] = 2
 resets[..., 2] = 2
 actions[...] = 0
+sim.step()
 
 while True:
     print("Stepping")
-    sim.step()
 
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
@@ -150,5 +150,7 @@ while True:
     actions[0][2] = action.r
     actions[0][3] = action.g
     actions[0][4] = action.l
+
+    sim.step()
 
 del sim

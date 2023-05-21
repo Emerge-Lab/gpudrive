@@ -122,6 +122,8 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     if (level != 0) {
+        printf("Reset Triggered\n");
+
         resetEnvironment(ctx);
 
         reset.resetLevel = 0;
@@ -763,30 +765,8 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 
 void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 {
-    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem, WorldReset>>({});
-
-    auto clearTmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
-
-#ifdef MADRONA_GPU_MODE
-    // FIXME: these 3 need to be compacted, but sorting is unnecessary
-    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {clearTmp});
-    auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
-    auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
-    auto sort_agent_iface =
-        queueSortByWorld<AgentInterface>(builder, {sort_objects});
-    auto prep_finish = sort_agent_iface;
-#else
-    auto prep_finish = clearTmp;
-#endif
-
-#if 0
-    prep_finish = builder.addToGraph<ParallelForNode<Engine,
-        sortDebugSystem, WorldReset>>({prep_finish});
-#endif
-
     auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
-        Action, SimEntity, AgentType>>({prep_finish});
+        Action, SimEntity, AgentType>>({});
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {move_sys});
@@ -803,16 +783,38 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     auto sim_done = agent_zero_vel;
 
-    auto phys_cleanup_sys = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+    sim_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {sim_done});
+
+    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
+        resetSystem, WorldReset>>({sim_done});
+
+    auto clearTmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+
+#ifdef MADRONA_GPU_MODE
+    // FIXME: these 3 need to be compacted, but sorting is unnecessary
+    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {clearTmp});
+    auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
+    auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
+    auto sort_agent_iface =
+        queueSortByWorld<AgentInterface>(builder, {sort_objects});
+    auto reset_finish = sort_agent_iface;
+#else
+    auto reset_finish = clearTmp;
+#endif
 
     if (cfg.enableRender) {
         render::RenderingSystem::setupTasks(builder,
-            {sim_done});
+            {reset_finish});
     }
 
+#if 0
+    prep_finish = builder.addToGraph<ParallelForNode<Engine,
+        sortDebugSystem, WorldReset>>({prep_finish});
+#endif
+
 #ifdef MADRONA_GPU_MODE
-    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({sim_done});
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_finish});
     (void)recycle_sys;
 #endif
 
@@ -824,7 +826,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             RelativeAgentObservations,
             RelativeBoxObservations,
             RelativeRampObservations
-        >>({sim_done});
+        >>({reset_finish});
 
 
 #ifdef MADRONA_GPU_MODE
@@ -840,7 +842,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             AgentVisibilityMasks,
             BoxVisibilityMasks,
             RampVisibilityMasks
-        >>({sim_done});
+        >>({reset_finish});
 
 #ifdef MADRONA_GPU_MODE
     auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
@@ -851,7 +853,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 #endif
             SimEntity,
             Lidar
-        >>({sim_done});
+        >>({reset_finish});
 
     auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
         agentRewardsSystem,
@@ -865,10 +867,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto global_positions_debug = builder.addToGraph<ParallelForNode<Engine,
         globalPositionsDebugSystem,
             GlobalDebugPositions
-        >>({sim_done});
+        >>({reset_finish});
 
     (void)lidar;
-    (void)phys_cleanup_sys;
     (void)collect_observations;
     (void)agent_rewards;
     (void)global_positions_debug;
