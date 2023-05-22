@@ -293,7 +293,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
-                reward_buffer,
+                reward_buffer + i * consts::maxAgents,
                 phys_obj_mgr,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
@@ -305,6 +305,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                 cfg,
                 std::move(phys_loader),
                 episode_mgr,
+                reward_buffer,
             },
             CPUImpl::TaskGraphT {
                 ThreadPoolExecutor::Config {
@@ -366,7 +367,23 @@ MADRONA_EXPORT void Manager::step()
 #endif
     } break;
     case ExecMode::CPU: {
-        static_cast<CPUImpl *>(impl_)->cpuExec.run();
+        auto cpu_impl = static_cast<CPUImpl *>(impl_);
+        cpu_impl->cpuExec.run();
+
+        // FIXME: provide some way to do this more cleanly in madrona
+        CountT cur_reward_offset = 0;
+        float *base_rewards = cpu_impl->rewardsBuffer;
+        for (CountT i = 0; i < (CountT)impl_->cfg.numWorlds; i++) {
+            const Sim &sim_data = cpu_impl->cpuExec.getWorldData(i);
+            CountT num_agents = sim_data.numActiveAgents;
+            float *world_rewards = sim_data.rewardBuffer;
+
+            memcpy(&base_rewards[cur_reward_offset],
+                   world_rewards,
+                   sizeof(float) * num_agents);
+
+            cur_reward_offset += num_agents;
+        }
     } break;
     }
 }

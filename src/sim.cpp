@@ -474,7 +474,7 @@ inline void computeVisibilitySystem(Engine &ctx,
 
     Vector3 agent_pos = ctx.getUnsafe<Position>(sim_e.e);
     Quat agent_rot = ctx.getUnsafe<Rotation>(sim_e.e);
-    Vector3 fwd = agent_rot.rotateVec(math::fwd);
+    Vector3 agent_fwd = agent_rot.rotateVec(math::fwd);
     const float cos_angle_threshold = cosf(toRadians(135.f / 2.f));
 
     auto &bvh = ctx.getSingleton<broadphase::BVH>();
@@ -486,7 +486,7 @@ inline void computeVisibilitySystem(Engine &ctx,
 
         Vector3 to_other_norm = to_other.normalize();
 
-        float cos_angle = dot(to_other_norm, fwd);
+        float cos_angle = dot(to_other_norm, agent_fwd);
 
         if (cos_angle < cos_angle_threshold) {
             return 0.f;
@@ -622,7 +622,7 @@ inline void lidarSystem(Engine &ctx,
     Quat rot = ctx.getUnsafe<Rotation>(sim_e.e);
     auto &bvh = ctx.getSingleton<broadphase::BVH>();
 
-    Vector3 fwd = rot.rotateVec(math::fwd);
+    Vector3 agent_fwd = rot.rotateVec(math::fwd);
     Vector3 right = rot.rotateVec(math::right);
 
     auto traceRay = [&](int32_t idx) {
@@ -630,7 +630,7 @@ inline void lidarSystem(Engine &ctx,
         float x = cosf(theta);
         float y = sinf(theta);
 
-        Vector3 ray_dir = (x * right + y * fwd).normalize();
+        Vector3 ray_dir = (x * right + y * agent_fwd).normalize();
 
         float hit_t;
         Vector3 hit_normal;
@@ -658,15 +658,50 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
+// FIXME: refactor this so the observation systems can reuse these raycasts
+// (unless a reset has occurred)
 inline void rewardsVisSystem(Engine &ctx,
                              SimEntity sim_e,
                              AgentType agent_type)
 {
+    const float cos_angle_threshold = cosf(toRadians(135.f / 2.f));
+
     if (sim_e.e == Entity::none() || agent_type != AgentType::Hider) {
         return;
     }
 
+    auto &bvh = ctx.getSingleton<broadphase::BVH>();
 
+    Vector3 hider_pos = ctx.getUnsafe<Position>(sim_e.e);
+    Quat hider_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 agent_fwd = hider_rot.rotateVec(math::fwd);
+
+    for (CountT i = 0; i < ctx.data().numSeekers; i++) {
+        Entity iface_e = ctx.data().seekers[i];
+        Entity seeker_sim_e = ctx.getUnsafe<SimEntity>(iface_e).e;
+
+        Vector3 seeker_pos = ctx.getUnsafe<Position>(seeker_sim_e);
+
+        Vector3 to_seeker = seeker_pos - hider_pos;
+
+        Vector3 to_seeker_norm = to_seeker.normalize();
+
+        float cos_angle = dot(to_seeker_norm, agent_fwd);
+
+        if (cos_angle < cos_angle_threshold) {
+            continue;
+        }
+
+        float hit_t;
+        Vector3 hit_normal;
+        Entity hit_entity =
+            bvh.traceRay(hider_pos, to_seeker, &hit_t, &hit_normal, 1.f);
+
+        if (hit_entity == seeker_sim_e) {
+            ctx.data().hiderTeamReward.store_relaxed(-1);
+            break;
+        }
+    }
 }
 
 inline void outputRewardsSystem(Engine &ctx,
@@ -679,15 +714,21 @@ inline void outputRewardsSystem(Engine &ctx,
         return;
     }
 
+    // FIXME: allow loc to be passed in
+    Loc l = ctx.getLoc(sim_e.e);
+    float *reward_out = &ctx.data().rewardBuffer[l.row];
+
     CountT cur_step = ctx.data().curEpisodeStep;
     if (cur_step < 96) {
-        reward.reward = 0.f;
+        *reward_out = 0.f;
         prep_counter.numPrepStepsLeft = 96 - cur_step;
 
         return;
     } else if (cur_step == 239) {
         done.isDone = 1;
     }
+
+    prep_counter.numPrepStepsLeft = 0;
 
     float reward_val = ctx.data().hiderTeamReward.load_relaxed();
     if (agent_type == AgentType::Seeker) {
@@ -700,9 +741,7 @@ inline void outputRewardsSystem(Engine &ctx,
         reward_val -= 10.f;
     }
 
-    // FIXME: allow loc to be passed in
-    Loc l = ctx.getLoc(sim_e);
-    ctx.data().rewardBuffer[l.row] = reward_val;
+    *reward_out = reward_val;
 }
 
 inline void globalPositionsDebugSystem(Engine &ctx,
@@ -793,6 +832,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     auto rewards_vis = builder.addToGraph<ParallelForNode<Engine,
         rewardsVisSystem,
+            SimEntity,
+            AgentType
         >>({sim_done});
 
     auto output_rewards = builder.addToGraph<ParallelForNode<Engine,
@@ -878,8 +919,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         >>({reset_finish});
 
     (void)lidar;
+    (void)compute_visibility;
     (void)collect_observations;
-    (void)agent_rewards;
     (void)global_positions_debug;
 }
 
@@ -887,7 +928,7 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr)
+      episodeMgr(init.episodeMgr),
       rewardBuffer(init.rewardBuffer)
 {
     CountT max_total_entities =
