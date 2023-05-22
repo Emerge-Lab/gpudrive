@@ -10,6 +10,8 @@ torch.manual_seed(0)
 
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('--num-worlds', type=int, required=True)
+arg_parser.add_argument('--num-hiders', type=int, default=2)
+arg_parser.add_argument('--num-seekers', type=int, default=1)
 arg_parser.add_argument('--num-updates', type=int, required=True)
 arg_parser.add_argument('--lr', type=float, default=1e-3)
 arg_parser.add_argument('--gamma', type=float, default=0.99)
@@ -37,12 +39,12 @@ elif torch.backends.mps.is_available() and False:
 else:
     dev = torch.device('cpu')
 
-def setup_obs():
-    prep_counter_tensor = sim.prep_counter_tensor().to_torch()
-    agent_type_tensor = sim.agent_type_tensor().to_torch()
-    agent_data_tensor = sim.agent_data_tensor().to_torch()
-    box_data_tensor = sim.box_data_tensor().to_torch()
-    ramp_data_tensor = sim.ramp_data_tensor().to_torch()
+def setup_obs(total_agents):
+    prep_counter_tensor = sim.prep_counter_tensor().to_torch()[0:total_agents]
+    agent_type_tensor = sim.agent_type_tensor().to_torch()[0:total_agents]
+    agent_data_tensor = sim.agent_data_tensor().to_torch()[0:total_agents]
+    box_data_tensor = sim.box_data_tensor().to_torch()[0:total_agents]
+    ramp_data_tensor = sim.ramp_data_tensor().to_torch()[0:total_agents]
     
     obs_tensors = [
         prep_counter_tensor,
@@ -50,9 +52,9 @@ def setup_obs():
         agent_data_tensor,
         box_data_tensor,
         ramp_data_tensor,
-        sim.visible_agents_mask_tensor().to_torch(),
-        sim.visible_boxes_mask_tensor().to_torch(),
-        sim.visible_ramps_mask_tensor().to_torch(),
+        sim.visible_agents_mask_tensor().to_torch()[0:total_agents],
+        sim.visible_boxes_mask_tensor().to_torch()[0:total_agents],
+        sim.visible_ramps_mask_tensor().to_torch()[0:total_agents],
     ]
     
     num_agent_data_features = math.prod(agent_data_tensor.shape[1:])
@@ -89,7 +91,9 @@ def setup_obs():
 
     return obs_tensors, process_obs, num_obs_features
 
-obs_tensors, process_obs_cb, num_obs_features = setup_obs()
+total_agents = args.num_worlds * (args.num_hiders + args.num_seekers)
+
+obs_tensors, process_obs_cb, num_obs_features = setup_obs(total_agents)
 
 policy = RecurrentActorCritic(
     backbone = SmallMLPBackbone(
@@ -100,22 +104,27 @@ policy = RecurrentActorCritic(
         [10, 10, 10, 2, 2]),
     critic = ActorCritic.DefaultCritic(512))
 
+
 # Hack to fill out observations: Reset envs and take step to populate envs
 # FIXME: just make it possible to populate observations after init
 # (IE run subset of task graph after init)
 resets = sim.reset_tensor().to_torch()
-actions = sim.action_tensor().to_torch()
-actions.zero_()
+actions = sim.action_tensor().to_torch()[0:total_agents]
+dones = sim.done_tensor().to_torch()[0:total_agents]
+rewards = sim.reward_tensor().to_torch()[0:total_agents]
 
+actions.zero_()
 resets[:, 0] = 1
+resets[:, 1] = args.num_hiders
+resets[:, 2] = args.num_seekers
 sim.step()
 
 madrona_learn.train(madrona_learn.SimData(
                         step = lambda: sim.step(),
                         obs = obs_tensors,
                         actions = actions,
-                        dones = sim.done_tensor().to_torch(),
-                        rewards = sim.reward_tensor().to_torch()),
+                        dones = dones,
+                        rewards = rewards),
                     madrona_learn.TrainConfig(
                         num_updates = args.num_updates,
                         gamma = args.gamma,
