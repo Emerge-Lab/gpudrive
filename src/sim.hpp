@@ -94,10 +94,6 @@ struct SimEntity {
     Entity e;
 };
 
-struct Reward {
-    float reward;
-};
-
 struct AgentActiveMask {
     float mask;
 };
@@ -165,7 +161,6 @@ struct AgentInterface : public madrona::Archetype<
     AgentDone,
     AgentPrepCounter,
     Action,
-    Reward,
     AgentType,
     AgentActiveMask,
     RelativeAgentObservations,
@@ -219,6 +214,7 @@ struct Sim : public madrona::WorldBase {
         const WorldInit &init);
 
     EpisodeManager *episodeMgr;
+    float *rewardBuffer;
     RNG rng;
 
     Entity *obstacles;

@@ -21,7 +21,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<AgentDone>();
     registry.registerComponent<AgentPrepCounter>();
     registry.registerComponent<Action>();
-    registry.registerComponent<Reward>();
     registry.registerComponent<OwnerTeam>();
     registry.registerComponent<AgentType>();
     registry.registerComponent<GrabData>();
@@ -51,7 +50,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<AgentInterface, AgentDone>(1);
     registry.exportColumn<AgentInterface, AgentPrepCounter>(2);
     registry.exportColumn<AgentInterface, Action>(3);
-    registry.exportColumn<AgentInterface, Reward>(4);
     registry.exportColumn<AgentInterface, AgentType>(5);
     registry.exportColumn<AgentInterface, AgentActiveMask>(6);
     registry.exportColumn<AgentInterface, RelativeAgentObservations>(7);
@@ -117,7 +115,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t level = reset.resetLevel;
 
-    if (ctx.data().autoReset && ctx.data().curEpisodeStep == 240) {
+    if (ctx.data().autoReset && ctx.data().curEpisodeStep == 239) {
         level = 1;
     }
 
@@ -136,7 +134,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         ctx.data().curEpisodeStep += 1;
     }
 
-    // These don't belong here but this runs once per world every frame, so...
     ctx.data().hiderTeamReward.store_relaxed(1.f);
 }
 
@@ -561,10 +558,6 @@ inline void computeVisibilitySystem(Engine &ctx,
         } else {
             bool is_visible = checkVisibility(check_e);
             *vis_out = is_visible ? 1.f : 0.f;
-
-            if (seeker_checking_hider && is_visible) {
-                ctx.data().hiderTeamReward.store_relaxed(-1.f);
-            }
         }
     }
 #else
@@ -665,10 +658,20 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
-inline void agentRewardsSystem(Engine &ctx,
+inline void rewardsVisSystem(Engine &ctx,
+                             SimEntity sim_e,
+                             AgentType agent_type)
+{
+    if (sim_e.e == Entity::none() || agent_type != AgentType::Hider) {
+        return;
+    }
+
+
+}
+
+inline void outputRewardsSystem(Engine &ctx,
                                SimEntity sim_e,
                                AgentType agent_type,
-                               Reward &reward,
                                AgentDone &done,
                                AgentPrepCounter &prep_counter)
 {
@@ -697,7 +700,9 @@ inline void agentRewardsSystem(Engine &ctx,
         reward_val -= 10.f;
     }
 
-    reward.reward = reward_val;
+    // FIXME: allow loc to be passed in
+    Loc l = ctx.getLoc(sim_e);
+    ctx.data().rewardBuffer[l.row] = reward_val;
 }
 
 inline void globalPositionsDebugSystem(Engine &ctx,
@@ -786,8 +791,20 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     sim_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {sim_done});
 
+    auto rewards_vis = builder.addToGraph<ParallelForNode<Engine,
+        rewardsVisSystem,
+        >>({sim_done});
+
+    auto output_rewards = builder.addToGraph<ParallelForNode<Engine,
+        outputRewardsSystem,
+            SimEntity,
+            AgentType,
+            AgentDone,
+            AgentPrepCounter
+        >>({rewards_vis});
+
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem, WorldReset>>({sim_done});
+        resetSystem, WorldReset>>({output_rewards});
 
     auto clearTmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
 
@@ -855,15 +872,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             Lidar
         >>({reset_finish});
 
-    auto agent_rewards = builder.addToGraph<ParallelForNode<Engine,
-        agentRewardsSystem,
-            SimEntity,
-            AgentType,
-            Reward,
-            AgentDone,
-            AgentPrepCounter
-        >>({compute_visibility});
-
     auto global_positions_debug = builder.addToGraph<ParallelForNode<Engine,
         globalPositionsDebugSystem,
             GlobalDebugPositions
@@ -880,6 +888,7 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
+      rewardBuffer(init.rewardBuffer)
 {
     CountT max_total_entities =
         std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 100;
@@ -900,6 +909,8 @@ Sim::Sim(Engine &ctx,
     numSeekers = 0;
     numActiveAgents = 0;
 
+    curEpisodeStep = 0;
+
     enableRender = cfg.enableRender;
     autoReset = cfg.autoReset;
 
@@ -910,6 +921,8 @@ Sim::Sim(Engine &ctx,
         .numHiders = 3,
         .numSeekers = 3,
     };
+
+    ctx.data().hiderTeamReward.store_relaxed(1.f);
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);

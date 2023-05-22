@@ -30,6 +30,7 @@ struct Manager::Impl {
     Config cfg;
     PhysicsLoader physicsLoader;
     EpisodeManager *episodeMgr;
+    float *rewardsBuffer;
 
     static inline Impl * init(const Config &cfg);
 };
@@ -218,11 +219,15 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
+        auto reward_buffer = (float *)cu::allocGPU(sizeof(float) *
+            consts::maxAgents * cfg.numWorlds);
+
         HeapArray<WorldInit> world_inits(cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
+                reward_buffer,
                 phys_obj_mgr,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
@@ -264,6 +269,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                 cfg,
                 std::move(phys_loader),
                 episode_mgr,
+                reward_buffer,
             },
             std::move(mwgpu_exec),
         };
@@ -279,11 +285,15 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
+        auto reward_buffer = (float *)malloc(
+            sizeof(float) * consts::maxAgents * cfg.numWorlds);
+
         HeapArray<WorldInit> world_inits(cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
+                reward_buffer,
                 phys_obj_mgr,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
@@ -388,8 +398,13 @@ MADRONA_EXPORT Tensor Manager::actionTensor() const
 
 MADRONA_EXPORT Tensor Manager::rewardTensor() const
 {
-    return exportStateTensor(4, Tensor::ElementType::Float32,
-                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
+    Optional<int> gpu_id = Optional<int>::none();
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+        gpu_id = impl_->cfg.gpuID;
+    }
+
+    return Tensor(impl_->rewardsBuffer, Tensor::ElementType::Float32,
+                 {impl_->cfg.numWorlds * consts::maxAgents, 1}, gpu_id);
 }
 
 MADRONA_EXPORT Tensor Manager::agentTypeTensor() const

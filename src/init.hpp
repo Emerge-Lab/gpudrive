@@ -10,6 +10,7 @@ struct EpisodeManager {
 
 struct WorldInit {
     EpisodeManager *episodeMgr;
+    float *rewardBuffer;
     madrona::phys::ObjectManager *rigidBodyObjMgr;
     uint32_t minEntitiesPerWorld;
     uint32_t maxEntitiesPerWorld;
