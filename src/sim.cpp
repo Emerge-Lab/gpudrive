@@ -527,10 +527,6 @@ inline void computeVisibilitySystem(Engine &ctx,
 
                 if (valid_check) {
                     check_e = ctx.getUnsafe<SimEntity>(other_agent_e).e;
-                    seeker_checking_hider = 
-                        agent_type == AgentType::Seeker &&
-                        ctx.getUnsafe<AgentType>(other_agent_e) ==
-                            AgentType::Hider;
                 }
             }
 
@@ -682,8 +678,7 @@ inline void rewardsVisSystem(Engine &ctx,
     Vector3 seeker_fwd = seeker_rot.rotateVec(math::fwd);
 
     for (CountT i = 0; i < ctx.data().numHiders; i++) {
-        Entity hider_iface = ctx.data().hiders[i];
-        Entity hider_sim_e = ctx.getUnsafe<SimEntity>(hider_iface).e;
+        Entity hider_sim_e = ctx.data().hiders[i];
 
         Vector3 hider_pos = ctx.getUnsafe<Position>(hider_sim_e);
 
