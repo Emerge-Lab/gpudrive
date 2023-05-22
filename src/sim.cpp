@@ -519,7 +519,6 @@ inline void computeVisibilitySystem(Engine &ctx,
 
         bool checking_agent = cur_idx < consts::maxAgents;
         uint32_t agent_mask = __ballot_sync(mwGPU::allActive, checking_agent);
-        bool seeker_checking_hider = false;
         if (checking_agent) {
             bool valid_check = true;
             if (cur_idx < ctx.data().numActiveAgents) {
