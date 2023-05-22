@@ -120,8 +120,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     if (level != 0) {
-        printf("Reset Triggered\n");
-
         resetEnvironment(ctx);
 
         reset.resetLevel = 0;
