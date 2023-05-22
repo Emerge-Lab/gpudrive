@@ -31,6 +31,7 @@ struct Manager::Impl {
     PhysicsLoader physicsLoader;
     EpisodeManager *episodeMgr;
     float *rewardsBuffer;
+    uint8_t *donesBuffer;
 
     static inline Impl * init(const Config &cfg);
 };
@@ -219,6 +220,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
+        auto done_buffer = (uint8_t *)cu::allocGPU(sizeof(uint8_t) *
+            consts::maxAgents * cfg.numWorlds);
+
         auto reward_buffer = (float *)cu::allocGPU(sizeof(float) *
             consts::maxAgents * cfg.numWorlds);
 
@@ -228,6 +232,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             world_inits[i] = WorldInit {
                 episode_mgr,
                 reward_buffer,
+                done_buffer,
                 phys_obj_mgr,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
@@ -270,6 +275,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                 std::move(phys_loader),
                 episode_mgr,
                 reward_buffer,
+                done_buffer,
             },
             std::move(mwgpu_exec),
         };
@@ -288,12 +294,16 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         auto reward_buffer = (float *)malloc(
             sizeof(float) * consts::maxAgents * cfg.numWorlds);
 
+        auto done_buffer = (uint8_t *)malloc(
+            sizeof(uint8_t) * consts::maxAgents * cfg.numWorlds);
+
         HeapArray<WorldInit> world_inits(cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
                 reward_buffer + i * consts::maxAgents,
+                done_buffer + i * consts::maxAgents,
                 phys_obj_mgr,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
@@ -306,6 +316,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
                 std::move(phys_loader),
                 episode_mgr,
                 reward_buffer,
+                done_buffer,
             },
             CPUImpl::TaskGraphT {
                 ThreadPoolExecutor::Config {
@@ -371,18 +382,25 @@ MADRONA_EXPORT void Manager::step()
         cpu_impl->cpuExec.run();
 
         // FIXME: provide some way to do this more cleanly in madrona
-        CountT cur_reward_offset = 0;
+        CountT cur_agent_offset = 0;
         float *base_rewards = cpu_impl->rewardsBuffer;
+        uint8_t *base_dones = cpu_impl->donesBuffer;
+
         for (CountT i = 0; i < (CountT)impl_->cfg.numWorlds; i++) {
             const Sim &sim_data = cpu_impl->cpuExec.getWorldData(i);
             CountT num_agents = sim_data.numActiveAgents;
             float *world_rewards = sim_data.rewardBuffer;
+            uint8_t *world_dones = sim_data.doneBuffer;
 
-            memcpy(&base_rewards[cur_reward_offset],
-                   world_rewards,
-                   sizeof(float) * num_agents);
+            memmove(&base_rewards[cur_agent_offset],
+                    world_rewards,
+                    sizeof(float) * num_agents);
 
-            cur_reward_offset += num_agents;
+            memmove(&base_dones[cur_agent_offset],
+                    world_dones,
+                    sizeof(uint8_t) * num_agents);
+
+            cur_agent_offset += num_agents;
         }
     } break;
     }
@@ -397,8 +415,13 @@ MADRONA_EXPORT Tensor Manager::resetTensor() const
 
 MADRONA_EXPORT Tensor Manager::doneTensor() const
 {
-    return exportStateTensor(1, Tensor::ElementType::UInt8,
-                             {impl_->cfg.numWorlds * consts::maxAgents, 1});
+    Optional<int> gpu_id = Optional<int>::none();
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+        gpu_id = impl_->cfg.gpuID;
+    }
+
+    return Tensor(impl_->donesBuffer, Tensor::ElementType::UInt8,
+                 {impl_->cfg.numWorlds * consts::maxAgents, 1}, gpu_id);
 }
 
 MADRONA_EXPORT madrona::py::Tensor Manager::prepCounterTensor() const

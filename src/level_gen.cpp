@@ -26,8 +26,6 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
         ctx.data().hiders[ctx.data().numHiders++] = agent;
     }
 
-    ctx.getUnsafe<AgentDone>(agent_iface) = { 0 };
-    ctx.getUnsafe<AgentPrepCounter>(agent_iface) = { 96 };
     ctx.getUnsafe<Seed>(agent_iface).seed = ctx.data().curEpisodeSeed;
 
     // Zero out actions

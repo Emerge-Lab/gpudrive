@@ -39,12 +39,6 @@ struct WorldReset {
     int32_t numSeekers;
 };
 
-struct __attribute__((packed)) AgentDone {
-    uint8_t isDone;
-};
-
-static_assert(sizeof(AgentDone) == 1);
-
 struct AgentPrepCounter {
     int32_t numPrepStepsLeft;
 };
@@ -158,7 +152,6 @@ static_assert(sizeof(Action) == 5 * sizeof(int32_t));
 
 struct AgentInterface : public madrona::Archetype<
     SimEntity,
-    AgentDone,
     AgentPrepCounter,
     Action,
     AgentType,
@@ -215,6 +208,7 @@ struct Sim : public madrona::WorldBase {
 
     EpisodeManager *episodeMgr;
     float *rewardBuffer;
+    uint8_t *doneBuffer;
     RNG rng;
 
     Entity *obstacles;

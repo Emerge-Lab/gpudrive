@@ -11,6 +11,8 @@ namespace GPUHideSeek {
 
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
+constexpr inline CountT numPrepSteps = 96;
+constexpr inline CountT episodeLen = 240;
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
@@ -18,7 +20,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     phys::RigidBodyPhysicsSystem::registerTypes(registry);
     render::RenderingSystem::registerTypes(registry);
 
-    registry.registerComponent<AgentDone>();
     registry.registerComponent<AgentPrepCounter>();
     registry.registerComponent<Action>();
     registry.registerComponent<OwnerTeam>();
@@ -47,7 +48,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerArchetype<DynAgent>();
 
     registry.exportSingleton<WorldReset>(0);
-    registry.exportColumn<AgentInterface, AgentDone>(1);
     registry.exportColumn<AgentInterface, AgentPrepCounter>(2);
     registry.exportColumn<AgentInterface, Action>(3);
     registry.exportColumn<AgentInterface, AgentType>(5);
@@ -115,7 +115,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t level = reset.resetLevel;
 
-    if (ctx.data().autoReset && ctx.data().curEpisodeStep == 239) {
+    if (ctx.data().autoReset && ctx.data().curEpisodeStep == episodeLen - 1) {
         level = 1;
     }
 
@@ -204,7 +204,8 @@ inline void movementSystem(Engine &ctx, Action &action, SimEntity sim_e,
 {
     if (sim_e.e == Entity::none()) return;
 
-    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep < 96) {
+    if (agent_type == AgentType::Seeker &&
+            ctx.data().curEpisodeStep < numPrepSteps - 1) {
         return;
     }
 
@@ -239,7 +240,8 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     if (sim_e.e == Entity::none()) return;
     if (agent_type == AgentType::Camera) return;
 
-    if (agent_type == AgentType::Seeker && ctx.data().curEpisodeStep < 96) {
+    if (agent_type == AgentType::Seeker &&
+            ctx.data().curEpisodeStep < numPrepSteps - 1) {
         return;
     }
 
@@ -356,11 +358,17 @@ inline void collectObservationsSystem(Engine &ctx,
                                       AgentType agent_type,
                                       RelativeAgentObservations &agent_obs,
                                       RelativeBoxObservations &box_obs,
-                                      RelativeRampObservations &ramp_obs)
+                                      RelativeRampObservations &ramp_obs,
+                                      AgentPrepCounter &prep_counter)
 {
     if (sim_e.e == Entity::none() || agent_type == AgentType::Camera) {
         return;
     }
+
+    CountT cur_step = ctx.data().curEpisodeStep;
+    if (cur_step <= numPrepSteps) {
+        prep_counter.numPrepStepsLeft = numPrepSteps - cur_step;
+    } 
 
     Vector3 agent_pos = ctx.getUnsafe<Position>(sim_e.e);
     Quat agent_rot = ctx.getUnsafe<Rotation>(sim_e.e);
@@ -666,27 +674,27 @@ inline void rewardsVisSystem(Engine &ctx,
 {
     const float cos_angle_threshold = cosf(toRadians(135.f / 2.f));
 
-    if (sim_e.e == Entity::none() || agent_type != AgentType::Hider) {
+    if (sim_e.e == Entity::none() || agent_type != AgentType::Seeker) {
         return;
     }
 
     auto &bvh = ctx.getSingleton<broadphase::BVH>();
 
-    Vector3 hider_pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat hider_rot = ctx.getUnsafe<Rotation>(sim_e.e);
-    Vector3 agent_fwd = hider_rot.rotateVec(math::fwd);
+    Vector3 seeker_pos = ctx.getUnsafe<Position>(sim_e.e);
+    Quat seeker_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 seeker_fwd = seeker_rot.rotateVec(math::fwd);
 
-    for (CountT i = 0; i < ctx.data().numSeekers; i++) {
-        Entity iface_e = ctx.data().seekers[i];
-        Entity seeker_sim_e = ctx.getUnsafe<SimEntity>(iface_e).e;
+    for (CountT i = 0; i < ctx.data().numHiders; i++) {
+        Entity hider_iface = ctx.data().hiders[i];
+        Entity hider_sim_e = ctx.getUnsafe<SimEntity>(hider_iface).e;
 
-        Vector3 seeker_pos = ctx.getUnsafe<Position>(seeker_sim_e);
+        Vector3 hider_pos = ctx.getUnsafe<Position>(hider_sim_e);
 
-        Vector3 to_seeker = seeker_pos - hider_pos;
+        Vector3 to_hider = hider_pos - seeker_pos;
 
-        Vector3 to_seeker_norm = to_seeker.normalize();
+        Vector3 to_hider_norm = to_hider.normalize();
 
-        float cos_angle = dot(to_seeker_norm, agent_fwd);
+        float cos_angle = dot(to_hider_norm, seeker_fwd);
 
         if (cos_angle < cos_angle_threshold) {
             continue;
@@ -695,20 +703,18 @@ inline void rewardsVisSystem(Engine &ctx,
         float hit_t;
         Vector3 hit_normal;
         Entity hit_entity =
-            bvh.traceRay(hider_pos, to_seeker, &hit_t, &hit_normal, 1.f);
+            bvh.traceRay(seeker_pos, to_hider, &hit_t, &hit_normal, 1.f);
 
-        if (hit_entity == seeker_sim_e) {
+        if (hit_entity == hider_sim_e) {
             ctx.data().hiderTeamReward.store_relaxed(-1);
             break;
         }
     }
 }
 
-inline void outputRewardsSystem(Engine &ctx,
-                               SimEntity sim_e,
-                               AgentType agent_type,
-                               AgentDone &done,
-                               AgentPrepCounter &prep_counter)
+inline void outputRewardsDonesSystem(Engine &ctx,
+                                    SimEntity sim_e,
+                                    AgentType agent_type)
 {
     if (sim_e.e == Entity::none()) {
         return;
@@ -717,18 +723,20 @@ inline void outputRewardsSystem(Engine &ctx,
     // FIXME: allow loc to be passed in
     Loc l = ctx.getLoc(sim_e.e);
     float *reward_out = &ctx.data().rewardBuffer[l.row];
+    uint8_t * const done_out = &ctx.data().doneBuffer[l.row];
 
     CountT cur_step = ctx.data().curEpisodeStep;
-    if (cur_step < 96) {
-        *reward_out = 0.f;
-        prep_counter.numPrepStepsLeft = 96 - cur_step;
 
-        return;
-    } else if (cur_step == 239) {
-        done.isDone = 1;
+    if (cur_step == 0) {
+        *done_out = 0;
     }
 
-    prep_counter.numPrepStepsLeft = 0;
+    if (cur_step < numPrepSteps - 1) {
+        *reward_out = 0.f;
+        return;
+    } else if (cur_step == episodeLen - 1) {
+        *done_out = 1;
+    }
 
     float reward_val = ctx.data().hiderTeamReward.load_relaxed();
     if (agent_type == AgentType::Seeker) {
@@ -837,11 +845,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         >>({sim_done});
 
     auto output_rewards = builder.addToGraph<ParallelForNode<Engine,
-        outputRewardsSystem,
+        outputRewardsDonesSystem,
             SimEntity,
-            AgentType,
-            AgentDone,
-            AgentPrepCounter
+            AgentType
         >>({rewards_vis});
 
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -883,7 +889,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             AgentType,
             RelativeAgentObservations,
             RelativeBoxObservations,
-            RelativeRampObservations
+            RelativeRampObservations,
+            AgentPrepCounter
         >>({reset_finish});
 
 
@@ -929,7 +936,8 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr),
-      rewardBuffer(init.rewardBuffer)
+      rewardBuffer(init.rewardBuffer),
+      doneBuffer(init.doneBuffer)
 {
     CountT max_total_entities =
         std::max(init.maxEntitiesPerWorld, uint32_t(3 + 3 + 9 + 2 + 6)) + 100;
@@ -937,7 +945,6 @@ Sim::Sim(Engine &ctx,
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
          50 * 20, 10);
-
 
     obstacles =
         (Entity *)rawAlloc(sizeof(Entity) * size_t(max_total_entities));
