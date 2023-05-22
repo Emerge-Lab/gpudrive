@@ -124,7 +124,8 @@ actions[...] = 0
 sim.step()
 
 while True:
-    print("Stepping")
+    print("\nObs:")
+    print(prep_counter[0])
 
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])
@@ -152,5 +153,9 @@ while True:
     actions[0][4] = action.l
 
     sim.step()
+    print("Stepping:")
+
+    print(dones[0])
+    print(rewards[0])
 
 del sim
