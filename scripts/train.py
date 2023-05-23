@@ -124,12 +124,23 @@ madrona_learn.train(madrona_learn.SimData(
                         obs = obs_tensors,
                         actions = actions,
                         dones = dones,
-                        rewards = rewards),
+                        rewards = rewards,
+                    ),
                     madrona_learn.TrainConfig(
                         num_updates = args.num_updates,
                         gamma = args.gamma,
                         lr = args.lr,
-                        steps_per_update = args.steps_per_update),
+                        steps_per_update = args.steps_per_update,
+                        ppo = madrona_learn.PPOConfig(
+                            num_mini_batches=1,
+                            clip_coef=0.1,
+                            value_loss_coef=1.0,
+                            entropy_coef=1.0,
+                            max_grad_norm=1,
+                            num_epochs=1,
+                            clip_value_loss=True,
+                        ),
+                    ),
                     policy,
                     dev = dev)
 
