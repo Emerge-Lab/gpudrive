@@ -7,7 +7,7 @@
 #pragma GCC diagnostic ignored "-Weverything"
 #endif
 #include <nanobind/nanobind.h>
-#include <nanobind/tensor.h>
+#include <nanobind/ndarray.h>
 #if defined(MADRONA_CLANG) || defined(MADRONA_GCC)
 #pragma GCC diagnostic pop
 #endif
