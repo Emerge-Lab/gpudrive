@@ -109,7 +109,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         for (const imp::SourceMesh &mesh : meshes) {
             prims.push_back({
                 .type = CollisionPrimitive::Type::Hull,
-                .hull = {
+                .hullInput = {
                     .mesh = &mesh,
                 },
             });
@@ -159,8 +159,14 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
     }
 
-    auto phys_objs = loader.importRigidBodyData(
-        src_objs.data(), src_objs.size(), true);
+    auto phys_objs_res = loader.importRigidBodyData(
+        src_objs.data(), src_objs.size(), false);
+
+    if (!phys_objs_res.has_value()) {
+        FATAL("Invalid collision hull input");
+    }
+
+    auto &phys_objs = *phys_objs_res;
 
     // HACK:
     phys_objs.metadatas[4].mass.invInertiaTensor.x = 0.f,
