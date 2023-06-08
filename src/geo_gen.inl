@@ -13,21 +13,21 @@ madrona::Entity makeDynObject(Engine &ctx,
     using namespace madrona;
     using namespace madrona::math;
 
-    Entity e = ctx.makeEntityNow<DynamicObject>();
-    ctx.getUnsafe<Position>(e) = pos;
-    ctx.getUnsafe<Rotation>(e) = rot;
-    ctx.getUnsafe<Scale>(e) = scale;
-    ctx.getUnsafe<ObjectID>(e) = ObjectID { obj_id };
-    ctx.getUnsafe<phys::broadphase::LeafID>(e) =
+    Entity e = ctx.makeEntity<DynamicObject>();
+    ctx.get<Position>(e) = pos;
+    ctx.get<Rotation>(e) = rot;
+    ctx.get<Scale>(e) = scale;
+    ctx.get<ObjectID>(e) = ObjectID { obj_id };
+    ctx.get<phys::broadphase::LeafID>(e) =
         phys::RigidBodyPhysicsSystem::registerEntity(ctx, e, ObjectID {obj_id});
-    ctx.getUnsafe<Velocity>(e) = {
+    ctx.get<Velocity>(e) = {
         Vector3::zero(),
         Vector3::zero(),
     };
-    ctx.getUnsafe<ResponseType>(e) = response_type;
-    ctx.getUnsafe<OwnerTeam>(e) = owner_team;
-    ctx.getUnsafe<ExternalForce>(e) = Vector3::zero();
-    ctx.getUnsafe<ExternalTorque>(e) = Vector3::zero();
+    ctx.get<ResponseType>(e) = response_type;
+    ctx.get<OwnerTeam>(e) = owner_team;
+    ctx.get<ExternalForce>(e) = Vector3::zero();
+    ctx.get<ExternalTorque>(e) = Vector3::zero();
 
     return e;
 }

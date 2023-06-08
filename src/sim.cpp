@@ -76,23 +76,23 @@ static inline void resetEnvironment(Engine &ctx)
     Entity *all_entities = ctx.data().obstacles;
     for (CountT i = 0; i < ctx.data().numObstacles; i++) {
         Entity e = all_entities[i];
-        ctx.destroyEntityNow(e);
+        ctx.destroyEntity(e);
     }
     ctx.data().numObstacles = 0;
     ctx.data().numActiveBoxes = 0;
     ctx.data().numActiveRamps = 0;
 
     auto destroyAgent = [&](Entity e) {
-        auto grab_data = ctx.get<GrabData>(e);
+        auto grab_data = ctx.getSafe<GrabData>(e);
 
         if (grab_data.valid()) {
             auto constraint_entity = grab_data.value().constraintEntity;
             if (constraint_entity != Entity::none()) {
-                ctx.destroyEntityNow(constraint_entity);
+                ctx.destroyEntity(constraint_entity);
             }
         }
 
-        ctx.destroyEntityNow(e);
+        ctx.destroyEntity(e);
     };
 
     for (CountT i = 0; i < ctx.data().numHiders; i++) {
@@ -106,7 +106,7 @@ static inline void resetEnvironment(Engine &ctx)
     ctx.data().numSeekers = 0;
 
     for (int32_t i = 0; i < ctx.data().numActiveAgents; i++) {
-        ctx.destroyEntityNow(ctx.data().agentInterfaces[i]);
+        ctx.destroyEntity(ctx.data().agentInterfaces[i]);
     }
     ctx.data().numActiveAgents = 0;
 }
@@ -212,24 +212,24 @@ inline void movementSystem(Engine &ctx, Action &action, SimEntity sim_e,
     constexpr float discrete_action_max = 0.9 * 125;
     constexpr float delta_per_bucket = discrete_action_max / half_buckets;
 
-    Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 cur_pos = ctx.get<Position>(sim_e.e);
+    Quat cur_rot = ctx.get<Rotation>(sim_e.e);
 
     float f_x = delta_per_bucket * action.x;
     float f_y = delta_per_bucket * action.y;
     float t_z = delta_per_bucket * action.r;
 
     if (agent_type == AgentType::Camera) {
-        ctx.getUnsafe<Position>(sim_e.e) = cur_pos + 0.001f * cur_rot.rotateVec({f_x, f_y, 0});
+        ctx.get<Position>(sim_e.e) = cur_pos + 0.001f * cur_rot.rotateVec({f_x, f_y, 0});
 
         Quat delta_rot = Quat::angleAxis(t_z * 0.001f, math::up);
-        ctx.getUnsafe<Rotation>(sim_e.e) = (delta_rot * cur_rot).normalize();
+        ctx.get<Rotation>(sim_e.e) = (delta_rot * cur_rot).normalize();
 
         return;
     }
 
-    ctx.getUnsafe<ExternalForce>(sim_e.e) = cur_rot.rotateVec({ f_x, f_y, 0 });
-    ctx.getUnsafe<ExternalTorque>(sim_e.e) = Vector3 { 0, 0, t_z };
+    ctx.get<ExternalForce>(sim_e.e) = cur_rot.rotateVec({ f_x, f_y, 0 });
+    ctx.get<ExternalTorque>(sim_e.e) = Vector3 { 0, 0, t_z };
 }
 
 inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
@@ -244,18 +244,18 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     }
 
     if (action.l == 1) {
-        Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
-        Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+        Vector3 cur_pos = ctx.get<Position>(sim_e.e);
+        Quat cur_rot = ctx.get<Rotation>(sim_e.e);
 
-        auto &bvh = ctx.getSingleton<broadphase::BVH>();
+        auto &bvh = ctx.singleton<broadphase::BVH>();
         float hit_t;
         Vector3 hit_normal;
         Entity lock_entity = bvh.traceRay(cur_pos - 0.5f * math::up,
             cur_rot.rotateVec(math::fwd), &hit_t, &hit_normal, 2.5f);
 
         if (lock_entity != Entity::none()) {
-            auto &owner = ctx.getUnsafe<OwnerTeam>(lock_entity);
-            auto &response_type = ctx.getUnsafe<ResponseType>(lock_entity);
+            auto &owner = ctx.get<OwnerTeam>(lock_entity);
+            auto &response_type = ctx.get<ResponseType>(lock_entity);
 
             if (response_type == ResponseType::Static) {
                 if ((agent_type == AgentType::Seeker &&
@@ -276,16 +276,16 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
     }
 
     if (action.g == 1) {
-        Vector3 cur_pos = ctx.getUnsafe<Position>(sim_e.e);
-        Quat cur_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+        Vector3 cur_pos = ctx.get<Position>(sim_e.e);
+        Quat cur_rot = ctx.get<Rotation>(sim_e.e);
 
-        auto &grab_data = ctx.getUnsafe<GrabData>(sim_e.e);
+        auto &grab_data = ctx.get<GrabData>(sim_e.e);
 
         if (grab_data.constraintEntity != Entity::none()) {
-            ctx.destroyEntityNow(grab_data.constraintEntity);
+            ctx.destroyEntity(grab_data.constraintEntity);
             grab_data.constraintEntity = Entity::none();
         } else {
-            auto &bvh = ctx.getSingleton<broadphase::BVH>();
+            auto &bvh = ctx.singleton<broadphase::BVH>();
             float hit_t;
             Vector3 hit_normal;
 
@@ -296,18 +296,18 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
                 bvh.traceRay(ray_o, ray_d, &hit_t, &hit_normal, 2.5f);
 
             if (grab_entity != Entity::none()) {
-                auto &owner = ctx.getUnsafe<OwnerTeam>(grab_entity);
-                auto &response_type = ctx.getUnsafe<ResponseType>(grab_entity);
+                auto &owner = ctx.get<OwnerTeam>(grab_entity);
+                auto &response_type = ctx.get<ResponseType>(grab_entity);
 
                 if (owner == OwnerTeam::None &&
                     response_type == ResponseType::Dynamic) {
 
                     Entity constraint_entity =
-                        ctx.makeEntityNow<ConstraintData>();
+                        ctx.makeEntity<ConstraintData>();
                     grab_data.constraintEntity = constraint_entity;
 
-                    Vector3 other_pos = ctx.getUnsafe<Position>(grab_entity);
-                    Quat other_rot = ctx.getUnsafe<Rotation>(grab_entity);
+                    Vector3 other_pos = ctx.get<Position>(grab_entity);
+                    Quat other_rot = ctx.get<Rotation>(grab_entity);
 
                     Vector3 r1 = 1.25f * math::fwd - 0.5f * math::up;
 
@@ -320,7 +320,7 @@ inline void actionSystem(Engine &ctx, Action &action, SimEntity sim_e,
 
                     float separation = hit_t - 1.25f;
 
-                    ctx.getUnsafe<JointConstraint>(constraint_entity) =
+                    ctx.get<JointConstraint>(constraint_entity) =
                         JointConstraint::setupFixed(sim_e.e, grab_entity,
                                                     attach1, attach2,
                                                     r1, r2, separation);
@@ -368,8 +368,8 @@ inline void collectObservationsSystem(Engine &ctx,
         prep_counter.numPrepStepsLeft = numPrepSteps - cur_step;
     } 
 
-    Vector3 agent_pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat agent_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 agent_pos = ctx.get<Position>(sim_e.e);
+    Quat agent_rot = ctx.get<Rotation>(sim_e.e);
 
     CountT num_boxes = ctx.data().numActiveBoxes;
     for (CountT box_idx = 0; box_idx < consts::maxBoxes; box_idx++) {
@@ -382,9 +382,9 @@ inline void collectObservationsSystem(Engine &ctx,
 
         Entity box_e = ctx.data().boxes[box_idx];
 
-        Vector3 box_pos = ctx.getUnsafe<Position>(box_e);
-        Vector3 box_vel = ctx.getUnsafe<Velocity>(box_e).linear;
-        Quat box_rot = ctx.getUnsafe<Rotation>(box_e);
+        Vector3 box_pos = ctx.get<Position>(box_e);
+        Vector3 box_vel = ctx.get<Velocity>(box_e).linear;
+        Quat box_rot = ctx.get<Rotation>(box_e);
 
         Vector3 box_relative_pos =
             agent_rot.inv().rotateVec(box_pos - agent_pos);
@@ -414,9 +414,9 @@ inline void collectObservationsSystem(Engine &ctx,
 
         Entity ramp_e = ctx.data().ramps[ramp_idx];
 
-        Vector3 ramp_pos = ctx.getUnsafe<Position>(ramp_e);
-        Vector3 ramp_vel = ctx.getUnsafe<Velocity>(ramp_e).linear;
-        Quat ramp_rot = ctx.getUnsafe<Rotation>(ramp_e);
+        Vector3 ramp_pos = ctx.get<Position>(ramp_e);
+        Vector3 ramp_vel = ctx.get<Velocity>(ramp_e).linear;
+        Quat ramp_rot = ctx.get<Rotation>(ramp_e);
 
         Vector3 ramp_relative_pos =
             agent_rot.inv().rotateVec(ramp_pos - agent_pos);
@@ -447,14 +447,14 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
 
-        Entity other_agent_sim_e = ctx.getUnsafe<SimEntity>(other_agent_e).e;
+        Entity other_agent_sim_e = ctx.get<SimEntity>(other_agent_e).e;
 
         auto &obs = agent_obs.obs[num_other_agents++];
 
         Vector3 other_agent_pos =
-            ctx.getUnsafe<Position>(other_agent_sim_e);
+            ctx.get<Position>(other_agent_sim_e);
         Vector3 other_agent_vel =
-            ctx.getUnsafe<Velocity>(other_agent_sim_e).linear;
+            ctx.get<Velocity>(other_agent_sim_e).linear;
 
         Vector3 other_agent_relative_pos =
             agent_rot.inv().rotateVec(other_agent_pos - agent_pos);
@@ -478,15 +478,15 @@ inline void computeVisibilitySystem(Engine &ctx,
         return;
     }
 
-    Vector3 agent_pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat agent_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 agent_pos = ctx.get<Position>(sim_e.e);
+    Quat agent_rot = ctx.get<Rotation>(sim_e.e);
     Vector3 agent_fwd = agent_rot.rotateVec(math::fwd);
     const float cos_angle_threshold = cosf(toRadians(135.f / 2.f));
 
-    auto &bvh = ctx.getSingleton<broadphase::BVH>();
+    auto &bvh = ctx.singleton<broadphase::BVH>();
 
     auto checkVisibility = [&](Entity other_e) {
-        Vector3 other_pos = ctx.getUnsafe<Position>(other_e);
+        Vector3 other_pos = ctx.get<Position>(other_e);
 
         Vector3 to_other = other_pos - agent_pos;
 
@@ -526,7 +526,7 @@ inline void computeVisibilitySystem(Engine &ctx,
                 valid_check = other_agent_e != agent_e;
 
                 if (valid_check) {
-                    check_e = ctx.getUnsafe<SimEntity>(other_agent_e).e;
+                    check_e = ctx.get<SimEntity>(other_agent_e).e;
                 }
             }
 
@@ -595,12 +595,12 @@ inline void computeVisibilitySystem(Engine &ctx,
             continue;
         }
 
-        Entity other_agent_sim_e = ctx.getUnsafe<SimEntity>(other_agent_e).e;
+        Entity other_agent_sim_e = ctx.get<SimEntity>(other_agent_e).e;
 
         bool is_visible = checkVisibility(other_agent_sim_e);
 
         if (agent_type == AgentType::Seeker && is_visible) {
-            AgentType other_type = ctx.getUnsafe<AgentType>(other_agent_e);
+            AgentType other_type = ctx.get<AgentType>(other_agent_e);
             if (other_type == AgentType::Hider) {
                 ctx.data().hiderTeamReward.store_relaxed(-1.f);
             }
@@ -619,9 +619,9 @@ inline void lidarSystem(Engine &ctx,
         return;
     }
 
-    Vector3 pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat rot = ctx.getUnsafe<Rotation>(sim_e.e);
-    auto &bvh = ctx.getSingleton<broadphase::BVH>();
+    Vector3 pos = ctx.get<Position>(sim_e.e);
+    Quat rot = ctx.get<Rotation>(sim_e.e);
+    auto &bvh = ctx.singleton<broadphase::BVH>();
 
     Vector3 agent_fwd = rot.rotateVec(math::fwd);
     Vector3 right = rot.rotateVec(math::right);
@@ -671,16 +671,16 @@ inline void rewardsVisSystem(Engine &ctx,
         return;
     }
 
-    auto &bvh = ctx.getSingleton<broadphase::BVH>();
+    auto &bvh = ctx.singleton<broadphase::BVH>();
 
-    Vector3 seeker_pos = ctx.getUnsafe<Position>(sim_e.e);
-    Quat seeker_rot = ctx.getUnsafe<Rotation>(sim_e.e);
+    Vector3 seeker_pos = ctx.get<Position>(sim_e.e);
+    Quat seeker_rot = ctx.get<Rotation>(sim_e.e);
     Vector3 seeker_fwd = seeker_rot.rotateVec(math::fwd);
 
     for (CountT i = 0; i < ctx.data().numHiders; i++) {
         Entity hider_sim_e = ctx.data().hiders[i];
 
-        Vector3 hider_pos = ctx.getUnsafe<Position>(hider_sim_e);
+        Vector3 hider_pos = ctx.get<Position>(hider_sim_e);
 
         Vector3 to_hider = hider_pos - seeker_pos;
 
@@ -713,7 +713,7 @@ inline void outputRewardsDonesSystem(Engine &ctx,
     }
 
     // FIXME: allow loc to be passed in
-    Loc l = ctx.getLoc(sim_e.e);
+    Loc l = ctx.loc(sim_e.e);
     float *reward_out = &ctx.data().rewardBuffer[l.row];
     uint8_t * const done_out = &ctx.data().doneBuffer[l.row];
 
@@ -735,7 +735,7 @@ inline void outputRewardsDonesSystem(Engine &ctx,
         reward_val *= -1.f;
     }
 
-    Vector3 pos = ctx.getUnsafe<Position>(sim_e.e);
+    Vector3 pos = ctx.get<Position>(sim_e.e);
 
     if (fabsf(pos.x) >= 18.f || fabsf(pos.y) >= 18.f) {
         reward_val -= 10.f;
@@ -761,7 +761,7 @@ inline void globalPositionsDebugSystem(Engine &ctx,
         }
 
         global_positions.boxPositions[i] =
-            getXY(ctx.getUnsafe<Position>(ctx.data().boxes[i]));
+            getXY(ctx.get<Position>(ctx.data().boxes[i]));
     }
 
     for (CountT i = 0; i < consts::maxRamps; i++) {
@@ -771,19 +771,19 @@ inline void globalPositionsDebugSystem(Engine &ctx,
         }
 
         global_positions.rampPositions[i] =
-            getXY(ctx.getUnsafe<Position>(ctx.data().ramps[i]));
+            getXY(ctx.get<Position>(ctx.data().ramps[i]));
     }
 
     {
         CountT out_offset = 0;
         for (CountT i = 0; i < ctx.data().numHiders; i++) {
             global_positions.agentPositions[out_offset++] = 
-                getXY(ctx.getUnsafe<Position>(ctx.data().hiders[i]));
+                getXY(ctx.get<Position>(ctx.data().hiders[i]));
         }
 
         for (CountT i = 0; i < ctx.data().numSeekers; i++) {
             global_positions.agentPositions[out_offset++] = 
-                getXY(ctx.getUnsafe<Position>(ctx.data().seekers[i]));
+                getXY(ctx.get<Position>(ctx.data().seekers[i]));
         }
 
         for (; out_offset < consts::maxAgents; out_offset++) {
@@ -956,7 +956,7 @@ Sim::Sim(Engine &ctx,
 
     resetEnvironment(ctx);
     generateEnvironment(ctx, 1, 3, 3);
-    ctx.getSingleton<WorldReset>() = {
+    ctx.singleton<WorldReset>() = {
         .resetLevel = 0,
         .numHiders = 3,
         .numSeekers = 3,

@@ -12,13 +12,13 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
 {
     Entity agent_iface =
         ctx.data().agentInterfaces[ctx.data().numActiveAgents++] =
-            ctx.makeEntityNow<AgentInterface>();
+            ctx.makeEntity<AgentInterface>();
 
-    Entity agent = ctx.makeEntityNow<T>();
-    ctx.getUnsafe<SimEntity>(agent_iface).e = agent;
-    ctx.getUnsafe<AgentActiveMask>(agent_iface).mask = 1.f;
+    Entity agent = ctx.makeEntity<T>();
+    ctx.get<SimEntity>(agent_iface).e = agent;
+    ctx.get<AgentActiveMask>(agent_iface).mask = 1.f;
 
-    ctx.getUnsafe<AgentType>(agent_iface) = agent_type;
+    ctx.get<AgentType>(agent_iface) = agent_type;
 
     if (agent_type == AgentType::Seeker) {
         ctx.data().seekers[ctx.data().numSeekers++] = agent;
@@ -26,10 +26,10 @@ static Entity makeAgent(Engine &ctx, AgentType agent_type)
         ctx.data().hiders[ctx.data().numHiders++] = agent;
     }
 
-    ctx.getUnsafe<Seed>(agent_iface).seed = ctx.data().curEpisodeSeed;
+    ctx.get<Seed>(agent_iface).seed = ctx.data().curEpisodeSeed;
 
     // Zero out actions
-    ctx.getUnsafe<Action>(agent_iface) = {
+    ctx.get<Action>(agent_iface) = {
         .x = 0,
         .y = 0,
         .r = 0,
@@ -70,7 +70,7 @@ static void generateTrainingEnvironment(Engine &ctx,
     const Vector2 bounds { -18.f, 18.f };
     float bounds_diff = bounds.y - bounds.x;
 
-    const ObjectManager &obj_mgr = *ctx.getSingleton<ObjectData>().mgr;
+    const ObjectManager &obj_mgr = *ctx.singleton<ObjectData>().mgr;
 
     CountT num_entities =
         populateStaticGeometry(ctx, rng, {bounds.y, bounds.y});
@@ -80,12 +80,12 @@ static void generateTrainingEnvironment(Engine &ctx,
     auto checkOverlap = [&obj_mgr, &ctx,
                          &all_entities, &num_entities](const AABB &aabb) {
         for (int i = 0; i < num_entities; ++i) {
-            ObjectID obj_id = ctx.getUnsafe<ObjectID>(all_entities[i]);
+            ObjectID obj_id = ctx.get<ObjectID>(all_entities[i]);
             AABB other = obj_mgr.rigidBodyAABBs[obj_id.idx];
 
-            Position p = ctx.getUnsafe<Position>(all_entities[i]);
-            Rotation r = ctx.getUnsafe<Rotation>(all_entities[i]);
-            Scale s = ctx.getUnsafe<Scale>(all_entities[i]);
+            Position p = ctx.get<Position>(all_entities[i]);
+            Rotation r = ctx.get<Rotation>(all_entities[i]);
+            Scale s = ctx.get<Scale>(all_entities[i]);
             other = other.applyTRS(p, r, Diag3x3(s));
 
             if (aabb.overlaps(other)) {
@@ -212,30 +212,30 @@ static void generateTrainingEnvironment(Engine &ctx,
                             int32_t view_idx) {
         Entity agent = makeAgent<DynAgent>(ctx,
             is_hider ? AgentType::Hider : AgentType::Seeker);
-        ctx.getUnsafe<Position>(agent) = pos;
-        ctx.getUnsafe<Rotation>(agent) = rot;
-        ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
+        ctx.get<Position>(agent) = pos;
+        ctx.get<Rotation>(agent) = rot;
+        ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         if (ctx.data().enableRender) {
-            ctx.getUnsafe<render::ViewSettings>(agent) =
+            ctx.get<render::ViewSettings>(agent) =
                 render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                     Vector3 { 0, 0, 0.8 }, { view_idx });
         }
 
         ObjectID agent_obj_id = ObjectID { 4 };
-        ctx.getUnsafe<ObjectID>(agent) = agent_obj_id;
-        ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
+        ctx.get<ObjectID>(agent) = agent_obj_id;
+        ctx.get<phys::broadphase::LeafID>(agent) =
             phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
                                                          agent_obj_id);
 
-        ctx.getUnsafe<Velocity>(agent) = {
+        ctx.get<Velocity>(agent) = {
             Vector3::zero(),
             Vector3::zero(),
         };
-        ctx.getUnsafe<ResponseType>(agent) = ResponseType::Dynamic;
-        ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
-        ctx.getUnsafe<ExternalForce>(agent) = Vector3::zero();
-        ctx.getUnsafe<ExternalTorque>(agent) = Vector3::zero();
-        ctx.getUnsafe<GrabData>(agent).constraintEntity = Entity::none();
+        ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
+        ctx.get<OwnerTeam>(agent) = OwnerTeam::Unownable;
+        ctx.get<ExternalForce>(agent) = Vector3::zero();
+        ctx.get<ExternalTorque>(agent) = Vector3::zero();
+        ctx.get<GrabData>(agent).constraintEntity = Entity::none();
 
         return agent;
     };
@@ -343,12 +343,12 @@ static void singleCubeLevel(Engine &ctx, Vector3 pos, Quat rot)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     if (ctx.data().enableRender) {
-        ctx.getUnsafe<render::ViewSettings>(agent) =
+        ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                                                up * 0.5f, { 0 });
     }
-    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.get<Position>(agent) = Vector3 { -5, -5, 0 };
+    ctx.get<Rotation>(agent) = agent_rot;
 }
 
 static void level2(Engine &ctx)
@@ -400,13 +400,13 @@ static void level4(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     if (ctx.data().enableRender) {
-        ctx.getUnsafe<render::ViewSettings>(agent) =
+        ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                                                up * 0.5f, { 0 });
     }
 
-    ctx.getUnsafe<Position>(agent) = Vector3 { -7.5, -7.5, 0.5 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.get<Position>(agent) = Vector3 { -7.5, -7.5, 0.5 };
+    ctx.get<Rotation>(agent) = agent_rot;
 }
 
 static void level5(Engine &ctx)
@@ -454,13 +454,13 @@ static void level5(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     if (ctx.data().enableRender) {
-        ctx.getUnsafe<render::ViewSettings>(agent) =
+        ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                                                up * 0.5f, { 0 });
     }
 
-    ctx.getUnsafe<Position>(agent) = Vector3 { 0, 0, 35 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.get<Position>(agent) = Vector3 { 0, 0, 35 };
+    ctx.get<Rotation>(agent) = agent_rot;
 
     ctx.data().numObstacles = total_entities;
 }
@@ -487,30 +487,30 @@ static void level6(Engine &ctx)
                             int32_t view_idx) {
         Entity agent = makeAgent<DynAgent>(ctx,
             is_hider ? AgentType::Hider : AgentType::Seeker);
-        ctx.getUnsafe<Position>(agent) = pos;
-        ctx.getUnsafe<Rotation>(agent) = rot;
-        ctx.getUnsafe<Scale>(agent) = Diag3x3 { 1, 1, 1 };
+        ctx.get<Position>(agent) = pos;
+        ctx.get<Rotation>(agent) = rot;
+        ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
         if (ctx.data().enableRender) {
-            ctx.getUnsafe<render::ViewSettings>(agent) =
+            ctx.get<render::ViewSettings>(agent) =
                 render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                     Vector3 { 0, 0, 0.8 }, { view_idx });
         }
 
         ObjectID agent_obj_id = ObjectID { 4 };
-        ctx.getUnsafe<ObjectID>(agent) = agent_obj_id;
-        ctx.getUnsafe<phys::broadphase::LeafID>(agent) =
+        ctx.get<ObjectID>(agent) = agent_obj_id;
+        ctx.get<phys::broadphase::LeafID>(agent) =
             phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
                                                          agent_obj_id);
 
-        ctx.getUnsafe<Velocity>(agent) = {
+        ctx.get<Velocity>(agent) = {
             Vector3::zero(),
             Vector3::zero(),
         };
-        ctx.getUnsafe<ResponseType>(agent) = ResponseType::Dynamic;
-        ctx.getUnsafe<OwnerTeam>(agent) = OwnerTeam::Unownable;
-        ctx.getUnsafe<ExternalForce>(agent) = Vector3::zero();
-        ctx.getUnsafe<ExternalTorque>(agent) = Vector3::zero();
-        ctx.getUnsafe<GrabData>(agent).constraintEntity = Entity::none();
+        ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
+        ctx.get<OwnerTeam>(agent) = OwnerTeam::Unownable;
+        ctx.get<ExternalForce>(agent) = Vector3::zero();
+        ctx.get<ExternalTorque>(agent) = Vector3::zero();
+        ctx.get<GrabData>(agent).constraintEntity = Entity::none();
 
         return agent;
     };
@@ -557,12 +557,12 @@ static void level7(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     if (ctx.data().enableRender) {
-        ctx.getUnsafe<render::ViewSettings>(agent) =
+        ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                                                up * 0.5f, { 0 });
     }
-    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.get<Position>(agent) = Vector3 { -5, -5, 0.5 };
+    ctx.get<Rotation>(agent) = agent_rot;
 }
 
 static void level8(Engine &ctx)
@@ -581,7 +581,7 @@ static void level8(Engine &ctx)
     Entity ramp_dyn = all_entities[total_entities++] =
         makeDynObject(ctx, ramp_pos, ramp_rot, 5);
 
-    ctx.getUnsafe<Velocity>(ramp_dyn).linear = {0, 0, -30};
+    ctx.get<Velocity>(ramp_dyn).linear = {0, 0, -30};
 
     all_entities[total_entities++] =
         makeDynObject(ctx,
@@ -606,14 +606,13 @@ static void level8(Engine &ctx)
 
     Entity agent = makeAgent<CameraAgent>(ctx, AgentType::Camera);
     if (ctx.data().enableRender) {
-        ctx.getUnsafe<render::ViewSettings>(agent) =
+        ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
                                                up * 0.5f, { 0 });
     }
-    ctx.getUnsafe<Position>(agent) = Vector3 { -5, -5, 0.5 };
-    ctx.getUnsafe<Rotation>(agent) = agent_rot;
+    ctx.get<Position>(agent) = Vector3 { -5, -5, 0.5 };
+    ctx.get<Rotation>(agent) = agent_rot;
 }
-
 
 static void generateDebugEnvironment(Engine &ctx, CountT level_id)
 {
