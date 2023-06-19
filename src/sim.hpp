@@ -138,17 +138,17 @@ struct Agent : public madrona::Archetype<
     Scale,
     Velocity,
     ObjectID,
-    Action,
-    AgentType,
-
-    // Physics
     ResponseType,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
-    ExternalForce,
     madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
+
+    // Inputs
+    Action,
+    AgentType,
 
     // Observations
     RelativeAgentObservations,
@@ -177,12 +177,12 @@ struct Button : public madrona::Archetype<
 > {};
 
 struct Door : public madrona::Archetype<
+    // General Rigid Body Components
     Position,
-    Scale,
     Rotation,
+    Scale,
+    Velocity,
     ObjectID,
-
-    // Physics
     ResponseType,
     madrona::phys::solver::SubstepPrevState,
     madrona::phys::solver::PreSolvePositional,
