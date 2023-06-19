@@ -410,6 +410,10 @@ Sim::Sim(Engine &ctx,
     walls = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
     doors = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
 
+    ctx.data().numDoors = 0;
+    ctx.data().numWalls = 0;
+    ctx.data().roomCount = 0;
+
     createAgents(ctx);
     createFloor(ctx);
 
