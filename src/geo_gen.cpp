@@ -609,15 +609,17 @@ void populateStaticGeometry(Engine &ctx,
         Diag3x3 scale;
         scale = { end.x - position.x, 0.2f, 1.0f };
 
+        CountT wall_idx = wallCount++;
+
+        ctx.data().walls[wall_idx] = makeDynObject(
+            ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
+            ResponseType::Static, scale);
+
         // This wall is a door
         if (wall.doorIdx != -1) {
             // Preserve the order of the doors in the array of doors in SIM struct
-            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wallCount++];
+            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wall_idx];
         }
-
-        ctx.data().walls[wallCount++] = makeDynObject(
-            ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
-            ResponseType::Static, scale);
     }
 
     // Vertical walls
@@ -638,14 +640,16 @@ void populateStaticGeometry(Engine &ctx,
         Diag3x3 scale;
         scale = { end.x - position.x, 0.2f, 1.0f };
 
-        if (wall.doorIdx != -1) {
-            // Preserve the order of the doors in the array of doors in SIM struct
-            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wallCount];
-        }
+        CountT wall_idx = wallCount++;
 
-        ctx.data().walls[wallCount++] = makeDynObject(
+        ctx.data().walls[wall_idx] = makeDynObject(
             ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
             ResponseType::Static, scale);
+
+        if (wall.doorIdx != -1) {
+            // Preserve the order of the doors in the array of doors in SIM struct
+            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wall_idx];
+        }
     }
 }
 
