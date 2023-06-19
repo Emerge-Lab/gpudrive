@@ -27,6 +27,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<RelativeAgentObservations>();
     registry.registerComponent<RelativeButtonObservations>();
     registry.registerComponent<RelativeDestinationObservations>();
+    registry.registerComponent<OpenState>();
 
     registry.registerComponent<Lidar>();
     registry.registerComponent<Seed>();
@@ -304,10 +305,10 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         Action, Position, Rotation, ExternalForce, ExternalTorque, AgentType>>({});
 
     auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
-        OpenState>>({});
+        OpenState>>({move_sys});
 
     auto door_control_sys = builder.addToGraph<ParallelForNode<Engine, doorControlSystem,
-        Position, AgentType>>({move_sys, reset_door_sys});
+        Position, AgentType>>({reset_door_sys});
 
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
         Position, OpenState>>({door_control_sys});
@@ -408,6 +409,8 @@ Sim::Sim(Engine &ctx,
     leafs = (uint32_t *)rawAlloc(sizeof(uint32_t) * consts::maxRooms);
     walls = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
     doors = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
+
+    createAgents(ctx);
     createFloor(ctx);
 
     // Creates the wall entities and placess the agents into the source room

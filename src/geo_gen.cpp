@@ -1,3 +1,4 @@
+#include "level_gen.hpp"
 #include "geo_gen.hpp"
 
 using namespace madrona;
@@ -84,11 +85,12 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
     EnvironmentRooms data;
 
     data.rooms.alloc(ctx, consts::maxRooms);
+    data.leafs.alloc(ctx, consts::maxRooms);
 
     data.rooms.push_back(root);
     data.leafs.push_back(0);
 
-    while (data.rooms.size() < consts::maxRooms) {
+    while (data.rooms.size() < consts::maxRooms-1) {
         // Select a random room to split
         int8_t parentLeafIdx = data.leafs[rng.u32Rand() % data.leafs.size()];
         Room &parent = data.rooms[parentLeafIdx];
@@ -162,7 +164,10 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
     // Find destination room
     Room *room = &data.rooms[0];
     int8_t roomIdx = 0;
-    for (; room->splitNeg != -1; room = &data.rooms[room->splitNeg], roomIdx = room->splitNeg);
+    while (room->splitPlus != -1) {
+        roomIdx = room->splitPlus;
+        room = &data.rooms[roomIdx];
+    }
 
     assert(roomIdx != -1);
     data.dstRoom = (uint32_t)roomIdx;
@@ -378,6 +383,8 @@ bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls)
                 wall.end.y = other.end.y;
         }
     }
+
+    return true;
 }
 
 bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls)
@@ -461,8 +468,6 @@ void addOtherRoomsWalls(EnvironmentRooms &rooms, TmpArray<WallData> &verticalWal
         }
     }
 }
-
-static constexpr float BUTTON_WIDTH = 1.0f/36.0f;
 
 void placeButtons(Engine &ctx, RNG &rng, EnvironmentRooms &rooms)
 {

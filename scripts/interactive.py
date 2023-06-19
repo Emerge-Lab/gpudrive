@@ -86,7 +86,7 @@ else:
 sim = gpu_hideseek_python.HideAndSeekSimulator(
         exec_mode = exec_mode,
         gpu_id = 0,
-        num_worlds = 16,
+        num_worlds = 1,
         min_entities_per_world = 100,
         max_entities_per_world = 100,
         render_width = 1536,
@@ -97,15 +97,8 @@ sim = gpu_hideseek_python.HideAndSeekSimulator(
 
 actions = sim.action_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
-agent_valid_masks = sim.agent_mask_tensor().to_torch()
-agent_visibility_masks = sim.visible_agents_mask_tensor().to_torch()
-box_visibility_masks = sim.visible_boxes_mask_tensor().to_torch()
-ramp_visibility_masks = sim.visible_ramps_mask_tensor().to_torch()
-agent_data = sim.agent_data_tensor().to_torch()
 resets = sim.reset_tensor().to_torch()
-prep_counter = sim.prep_counter_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
-global_pos = sim.global_positions_tensor().to_torch()
 lidar = sim.lidar_tensor().to_torch()
 
 if len(sys.argv) > 2:
@@ -113,9 +106,6 @@ if len(sys.argv) > 2:
 
 print(actions.shape, actions.dtype)
 print(resets.shape, resets.dtype)
-
-print(agent_visibility_masks.shape)
-print(agent_data.shape)
 
 resets[..., 0] = 1
 resets[..., 1] = 2

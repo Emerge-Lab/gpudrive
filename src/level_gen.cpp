@@ -131,7 +131,7 @@ void createAgents(Engine &ctx)
         AABB aabb = obj_mgr.rigidBodyAABBs[4];
         aabb = aabb.applyTRS(pos, rot, scale);
 
-        makeAgent(ctx, i, 0, pos, rot);
+        ctx.data().agents[i] = makeAgent(ctx, i, 0, pos, rot);
     }
 }
 
