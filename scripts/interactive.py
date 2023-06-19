@@ -115,7 +115,6 @@ sim.step()
 
 while True:
     print("\nObs:")
-    print(prep_counter[0])
 
     if len(sys.argv) > 2:
         torchvision.utils.save_image((rgb_observations[0][0].float() / 255).permute(2, 0, 1), sys.argv[2])

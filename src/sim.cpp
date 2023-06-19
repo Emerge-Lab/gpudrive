@@ -414,6 +414,7 @@ Sim::Sim(Engine &ctx,
     createFloor(ctx);
 
     // Creates the wall entities and placess the agents into the source room
+    resetEnvironment(ctx);
     generateEnvironment(ctx);
 }
 
