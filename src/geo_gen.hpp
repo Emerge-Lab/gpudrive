@@ -5,18 +5,24 @@
 
 namespace GPUHideSeek {
 
-inline Entity makeDynObject(
+#include "geo_gen.hpp"
+inline madrona::Entity makeDynObject(
     Engine &ctx,
     madrona::math::Vector3 pos,
     madrona::math::Quat rot,
     int32_t obj_id,
     madrona::phys::ResponseType response_type = ResponseType::Dynamic,
-    OwnerTeam owner_team = OwnerTeam::None,
     madrona::math::Diag3x3 scale = {1, 1, 1});
 
-CountT populateStaticGeometry(Engine &ctx,
-                              RNG &rng,
-                              madrona::math::Vector2 level_scale);
+void populateStaticGeometry(Engine &ctx,
+                            RNG &rng,
+                            madrona::math::Vector2 level_scale,
+                            uint32_t &srcRoom, uint32_t &dstRoom);
+
+// Finds which room an entity is in
+Room *containedRoom(madrona::math::Vector2 pos, Room *rooms);
+// Finds whether an entity is pressing a button or not
+bool isPressingButton(madrona::math::Vector2 pos, Room *room);
 
 }
 

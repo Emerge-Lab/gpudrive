@@ -1,13 +1,12 @@
 #pragma once
 
-namespace GPUHideSeek {
 
+namespace GPUHideSeek {
 madrona::Entity makeDynObject(Engine &ctx,
                      madrona::math::Vector3 pos,
                      madrona::math::Quat rot,
                      int32_t obj_id,
                      madrona::phys::ResponseType response_type,
-                     OwnerTeam owner_team,
                      madrona::math::Diag3x3 scale)
 {
     using namespace madrona;
@@ -25,7 +24,6 @@ madrona::Entity makeDynObject(Engine &ctx,
         Vector3::zero(),
     };
     ctx.get<ResponseType>(e) = response_type;
-    ctx.get<OwnerTeam>(e) = owner_team;
     ctx.get<ExternalForce>(e) = Vector3::zero();
     ctx.get<ExternalTorque>(e) = Vector3::zero();
 

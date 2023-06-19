@@ -33,18 +33,12 @@ public:
 
     MADRONA_IMPORT madrona::py::Tensor resetTensor() const;
     MADRONA_IMPORT madrona::py::Tensor doneTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor prepCounterTensor() const;
     MADRONA_IMPORT madrona::py::Tensor actionTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rewardTensor() const;
     MADRONA_IMPORT madrona::py::Tensor agentTypeTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor agentMaskTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor agentDataTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor boxDataTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor rampDataTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor visibleAgentsMaskTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor visibleBoxesMaskTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor visibleRampsMaskTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor globalPositionsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor relativeAgentObservationsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor relativeButtonObservationsTensor() const;
+    MADRONA_IMPORT madrona::py::Tensor relativeDestinationObservationsTensor() const;
     MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
     MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
     MADRONA_IMPORT madrona::py::Tensor lidarTensor() const;

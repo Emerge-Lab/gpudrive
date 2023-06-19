@@ -6,6 +6,8 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
+static constexpr float EPS = 0.000001f;
+
 template <typename T>
 struct TmpArray {
 public:
@@ -41,464 +43,639 @@ private:
     CountT mCurrentSize;
 };
 
+enum class Orientation { VERTICAL, HORIZONTAL };
 
-static inline float randomFloat(RNG &rng)
+struct ConnectingDoor {
+    // 0 -> vertical, 1 -> horizontal
+    Orientation orientation;
+
+    Vector2 start;
+    Vector2 end;
+};
+
+struct EnvironmentRooms {
+    TmpArray<int8_t> leafs;
+    TmpArray<Room> rooms;
+
+    uint32_t srcRoom;
+    uint32_t dstRoom;
+};
+
+// This will generate all the rooms
+EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
 {
-    // return (float)rand() / (float)RAND_MAX;
-    return rng.rand();
-}
-
-struct Wall {
-    // p1 < p2
-    math::Vector2 p1, p2;
-
-    Wall() = default;
-
-    // Room 0 is on left,down
-    // Room 1 i s on top,right
-    Wall(math::Vector2 p1_in, math::Vector2 p2_in) 
-    : p1(p1_in), p2(p2_in) {
-        if (p1_in.x > p2_in.x || p1_in.y > p2_in.y) {
-            p1 = p2_in, p2 = p1_in;
-        }
-    }
-
-    bool isHorizontal() const {
-        return (fabs(p1.y - p2.y) < 0.000001f);
-    }
-
-    void resort() {
-        math::Vector2 oldP1 = p1;
-        math::Vector2 oldP2 = p2;
-        if (oldP1.x > oldP2.x || oldP1.y > oldP2.y) {
-            p1 = oldP2, p2 = oldP1;
-        }
-    }
-
-    float length() const {
-        if (isHorizontal()) {
-            return p2.x - p1.x;
-        }
-        else {
-            return p2.y - p1.y;
-        }
-    }
-};
-
-enum WallOperation {
-    // Connect two walls with a perpendicular wall
-    WallConnectAndAddDoor,
-    WallAddDoor,
-    WallMaxEnum
-};
-
-struct WallOperationSelection {
-    int selectionSize;
-    WallOperation operations[WallMaxEnum];
-
-    template <typename ...T>
-    WallOperationSelection(int *, T ...selections)
-        : selectionSize(sizeof...(T)),
-          operations{selections...}
-    {}
-
-    WallOperationSelection(int *counts) 
-    : selectionSize(WallMaxEnum) {
-        for (int i = 0; i < WallMaxEnum; ++i) {
-            operations[i] = (WallOperation)i;
-        }
-
-        for (int i = 0; i < selectionSize; ++i) {
-            if (counts[operations[i]] == 0) {
-                --selectionSize;
-                operations[i] = operations[selectionSize];
-                --i;
-            }
-        }
-    }
-
-    // How many can we chose left
-    WallOperation select(int *counts, RNG &rng) {
-        int opIdx = rng.u32Rand() % selectionSize;
-        WallOperation op = operations[opIdx];
-
-        --counts[op];
-        
-        if (counts[op] == 0) {
-            // Yank out this selection
-            --selectionSize;
-            
-            operations[opIdx] = operations[selectionSize];
-        }
-
-        return op;
-    }
-};
-
-struct Walls {
-    TmpArray<Wall> walls;
-    TmpArray<uint8_t> horizontal;
-    TmpArray<uint8_t> vertical;
-
-    inline Walls(Context &ctx, uint32_t maxAddDoors, uint32_t maxConnect) {
-        walls.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
-        horizontal.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
-        vertical.alloc(ctx, maxAddDoors * 3 + maxConnect * 2);
-    }
-
-    inline int addWall(Wall wall) {
-        if (wall.isHorizontal()) {
-            // This is a horizontal wall
-            horizontal.push_back((uint8_t)walls.size());
-        }
-        else {
-            vertical.push_back((uint8_t)walls.size());
-        }
-
-        walls.push_back(wall);
-        return walls.size()-1;
-    }
-
-    inline void scale(Vector2 min, Vector2 max) {
-        // Scale all walls and rooms
-        auto doScale = [&min, &max] (const Vector2 &v) { // v: [0,1]
-            Vector2 range = max - min;
-            return min + Vector2 { range.x * v.x, range.y * v.y };
-        };
-
-        for (int i = 0; i < walls.size(); ++i) {
-            walls[i].p1 = doScale(walls[i].p1);
-            walls[i].p2 = doScale(walls[i].p2);
-        }
-    }
-};
-
-int findAnotherWall(
-    const Walls &walls,
-    const TmpArray<uint8_t> &list, int chosenIndirectIdx,
-    RNG &rng) {
-    const Wall &chosen = walls.walls[list[chosenIndirectIdx]];
-
-    if (chosen.isHorizontal()) {
-        // Search for a wall
-        int startIndirectIdx = chosenIndirectIdx + 1 + rng.u32Rand() % (list.size()-1);
-        for (int i = 0; i < list.size() - 1; ++i) {
-            int currentIndirectIdx = (startIndirectIdx + i) % list.size();
-            if (currentIndirectIdx == chosenIndirectIdx) {
-                currentIndirectIdx = (currentIndirectIdx + 1) % list.size();
-            }
-
-            // Make sure the walls can even be connected in the first place and have enough distance between them
-            const Wall &otherWall = walls.walls[list[currentIndirectIdx]];
-            if (!(chosen.p1.x >= otherWall.p2.x || chosen.p2.x <= otherWall.p1.x) && 
-                chosen.length() >= 0.3f && otherWall.length() >= 0.3f) {
-
-                // Make sure there aren't any walls between these
-                float high = std::min(chosen.p2.x, otherWall.p2.x);
-                float low = std::max(chosen.p1.x, otherWall.p1.x);
-
-                bool works = true;
-                for (int j = 0; j < list.size(); ++j) {
-                    if (j != currentIndirectIdx) {
-                        // Check that this wall isn't in between
-                        float inbetweenLow = std::max(walls.walls[list[j]].p1.x, low - 0.1f);
-                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.x, high + 0.1f);
-                        if (inbetweenLow < inbetweenHigh) {
-                            float y = walls.walls[list[j]].p1.y;
-                            float yMin = std::min(chosen.p1.y, otherWall.p1.y);
-                            float yMax = std::max(chosen.p1.y, otherWall.p1.y);
-                            if (y > yMin && y < yMax) {
-                                works = false;
-                                // printf("Wall in between!\n");
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (works) return currentIndirectIdx;
-            }
-        }
-
-        return -1;
-    }
-    else {
-        // Search for a wall
-        int startIndirectIdx = chosenIndirectIdx + 1 + rng.u32Rand() % (list.size()-1);
-        for (int i = 0; i < list.size() - 1; ++i) {
-            int currentIndirectIdx = (startIndirectIdx + i) % list.size();
-            if (currentIndirectIdx == chosenIndirectIdx) {
-                currentIndirectIdx = (currentIndirectIdx + 1) % list.size();
-            }
-
-            // Make sure the walls can even be connected in the first place
-            const Wall &otherWall = walls.walls[list[currentIndirectIdx]];
-            if (!(chosen.p1.y >= otherWall.p2.y || chosen.p2.y <= otherWall.p1.y) &&
-                chosen.length() >= 0.5f && otherWall.length() >= 0.5f) {
-                // Make sure there aren't any walls between these
-                float high = std::min(chosen.p2.y, otherWall.p2.y);
-                float low = std::max(chosen.p1.y, otherWall.p1.y);
-
-                bool works = true;
-                for (int j = 0; j < list.size(); ++j) {
-                    if (j != currentIndirectIdx) {
-                        // Check that this wall isn't in between
-                        float inbetweenLow = std::max(walls.walls[list[j]].p1.y, low - 0.1f);
-                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.y, high + 0.1f);
-                        if (inbetweenLow < inbetweenHigh) {
-                            float x = walls.walls[list[j]].p1.x;
-                            float xMin = std::min(chosen.p1.x, otherWall.p1.x);
-                            float xMax = std::max(chosen.p1.x, otherWall.p1.x);
-                            if (x > xMin && x < xMax) {
-                                works = false;
-                                // printf("Wall in between!\n");
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (works) return currentIndirectIdx;
-            }
-        }
-
-        return -1;
-    }
-}
-
-static constexpr float kDoorSize = 0.1f;
-
-// Wall has to at least be length of 3 * kDoorSize
-void addDoor(Walls &walls, Wall &wall, float doorSize, RNG &rng) {
-    // printf("Added door!\n");
-
-    if (wall.isHorizontal()) {
-        float low = wall.p1.x + doorSize;
-        float high = wall.p2.x - doorSize;
-        float rat = 0.3f + randomFloat(rng) * 0.4f;
-        // Position of door
-        float x = low + rat * (high-low);
-
-        float oldP2x = wall.p2.x;
-        wall.p2.x = x - doorSize*0.5f;
-        wall.resort();
-
-        // This will have the same walls as the old bigger wall
-        Wall newSplit = Wall({x + doorSize * 0.5f, wall.p1.y}, {oldP2x, wall.p1.y});
-        walls.addWall(newSplit);
-    }
-    else {
-        float low = wall.p1.y + doorSize;
-        float high = wall.p2.y - doorSize;
-        float rat = 0.3f + randomFloat(rng) * 0.4f;
-        // Position of door
-        float y = low + rat * (high-low);
-
-        float oldP2y = wall.p2.y;
-        wall.p2.y = y - doorSize*0.5f;
-        wall.resort();
-
-        Wall newSplit = Wall({wall.p1.x, y + doorSize * 0.5f}, {wall.p1.x, oldP2y});
-        walls.addWall(newSplit);
-    }
-}
-
-void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
-    switch (op) {
-        case WallConnectAndAddDoor: {
-            // printf("Connected!\n");
-
-            // First choose a random wall
-            bool isHorizontal = (bool)(rng.u32Rand() % 2);
-            auto *list = [&walls, &isHorizontal] () -> TmpArray<uint8_t> * {
-                return isHorizontal ? &walls.horizontal : &walls.vertical;
-            }();
-
-            // Current wall
-            int wallIndirectIdx = rng.u32Rand() % list->size();
-            int otherWallIndirectIdx;
-
-            int counter = 0;
-            while ((otherWallIndirectIdx = findAnotherWall(walls, *list, wallIndirectIdx, rng)) == -1) {
-                // Find another wall
-                isHorizontal = (bool)(rng.u32Rand() % 2);
-                list = [&walls, &isHorizontal] () -> TmpArray<uint8_t> * {
-                    return isHorizontal ? &walls.horizontal : &walls.vertical;
-                }();
-
-                wallIndirectIdx = rng.u32Rand() % list->size();
-
-                if (counter++ > 4) return;
-            }
-
-            Wall *first = &walls.walls[(*list)[wallIndirectIdx]];
-            Wall *second = &walls.walls[(*list)[otherWallIndirectIdx]];
-
-            if (isHorizontal) {
-                // Get range
-                float high = std::min(first->p2.x, second->p2.x);
-                float low = std::max(first->p1.x, second->p1.x);
-
-                // Make sure that first has a lower y coordinate
-                if (first->p1.y > second->p1.y) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
-
-                float rat = 0.4f + randomFloat(rng) * 0.2f;
-                float x = low + rat * (high-low);
-
-                // printf("%f - %f - %f\n", low, x, high);
-
-                // y value in p1&p2 is gonna be the same
-                int newWallIdx = walls.addWall(Wall({x, first->p1.y}, {x, second->p1.y}));
-                first = &walls.walls[(*list)[wallIndirectIdx]];
-                second = &walls.walls[(*list)[otherWallIndirectIdx]];
-
-                // We have to split the previous walls (adds 2 new walls)
-                float firstOldP2x = first->p2.x;
-                float secondOldP2x = second->p2.x;
-
-                // the original walls have to be split - shorten first and second and add new walls for the other splits
-                first->p2.x = x;
-                first->resort();
-                second->p2.x = x;
-                second->resort();
-
-                Wall new0 = Wall({x, first->p1.y}, {firstOldP2x, first->p1.y});
-                Wall new1 = Wall({x, second->p1.y}, {secondOldP2x, second->p1.y});
-
-                walls.addWall(new0);
-                walls.addWall(new1);
-
-                addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
-            }
-            else {
-                // Get range
-                float high = std::min(first->p2.y, second->p2.y);
-                float low = std::max(first->p1.y, second->p1.y);
-
-                if (first->p1.x > second->p1.x) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
-
-                float rat = 0.4f + randomFloat(rng) * 0.2f;
-                float y = low + rat * (high-low);
-
-                // printf("%f - %f - %f\n", low, y, high);
-
-                int newWallIdx = walls.addWall(Wall({first->p1.x, y}, {second->p1.x, y}));
-                first = &walls.walls[(*list)[wallIndirectIdx]];
-                second = &walls.walls[(*list)[otherWallIndirectIdx]];
-
-                // We have to split the previous walls (adds 2 new walls)
-                float firstOldP2y = first->p2.y;
-                float secondOldP2y = second->p2.y;
-
-                first->p2.y = y;
-                first->resort();
-                second->p2.y = y;
-                second->resort();
-
-                Wall new0 = Wall({first->p1.x, y}, {first->p1.x, firstOldP2y});
-                Wall new1 = Wall({second->p1.x, y}, {second->p1.x, secondOldP2y});
-
-                walls.addWall(new0);
-                walls.addWall(new1);
-
-                addDoor(walls, walls.walls[newWallIdx], kDoorSize, rng);
-            }
-        } break;
-
-        case WallAddDoor: {
-            float doorSize = kDoorSize * 2.0f;
-
-            // Choose a random wall
-            int randomWallIdx = rng.u32Rand() % walls.walls.size();
-            Wall &wall = walls.walls[randomWallIdx];
-            
-            if (wall.length() > 3.0f * doorSize) {
-                addDoor(walls, wall, doorSize, rng);
-            }
-        } break;
-
-        case WallMaxEnum: {
-
-        } break;
-    }
-}
-
-Walls makeWalls(Context &ctx, RNG &rng) {
-    const uint32_t maxAddDoors = 7;
-    const uint32_t maxConnect = 6;
-
-    Walls walls(ctx, maxAddDoors, maxConnect);
-    walls.addWall(Wall({0.0f,0.0f}, {1.0f,0.0f}));
-    walls.addWall(Wall({0.0f,0.0f}, {0.0f,1.0f}));
-    walls.addWall(Wall({0.0f,1.0f}, {1.0f,1.0f}));
-    walls.addWall(Wall({1.0f,1.0f}, {1.0f,0.0f}));
-
-    int wallConnectAndAddDoorCount = 1 + rng.u32Rand() % (maxConnect-1);
-    int wallAddDoorCount = 4 + rng.u32Rand() % (maxAddDoors - 4);
-
-    int maxCounts[WallMaxEnum] = {};
-    maxCounts[WallConnectAndAddDoor] = wallConnectAndAddDoorCount;
-    maxCounts[WallAddDoor] = wallAddDoorCount;
-
-    auto isFinished = [&maxCounts] () -> bool {
-        bool ret = true;
-        for (int i = 0; i < WallMaxEnum; ++i) {
-            ret &= (maxCounts[i] == 0);
-        }
-        return ret;
+    Room root = {
+        { 0.0f, 0.0f },
+        { 1.0f, 1.0f },
+
+        // Leaf right now with no parent
+        -1, -1, -1,
+        0,
+
+        0,
+        { -1, -1, -1, -1 },
+        false,
+
+        false,
+        0.0f,
+        {}
     };
 
-    // First selection
-    WallOperationSelection selector = WallOperationSelection(maxCounts);
-    WallOperation firstOp = selector.select(maxCounts, rng);
-    applyWallOperation(firstOp, walls, rng);
+    EnvironmentRooms data;
 
-    while (!isFinished()) {
-        WallOperation op = selector.select(maxCounts, rng);
-        applyWallOperation(op, walls, rng);
+    data.rooms.alloc(ctx, consts::maxRooms);
+
+    data.rooms.push_back(root);
+    data.leafs.push_back(0);
+
+    while (data.rooms.size() < consts::maxRooms) {
+        // Select a random room to split
+        int8_t parentLeafIdx = data.leafs[rng.u32Rand() % data.leafs.size()];
+        Room &parent = data.rooms[parentLeafIdx];
+
+        // Get a split factor which determines how deep the split is (0.4-0.6)
+        float splitFactor = rng.rand() * 0.2 + 0.4;
+
+        // Select horizontal or vertical split
+        bool isHorizontal = rng.u32Rand() % 2;
+
+        parent.splitHorizontal = isHorizontal;
+        parent.splitFactor = splitFactor;
+
+        if (isHorizontal) {
+            Room r0 = parent;
+            Room r1 = parent;
+            r0.parent = parentLeafIdx;
+            r1.parent = parentLeafIdx;
+
+            r0.offset = parent.offset;
+            r0.extent = {parent.extent.x * splitFactor, parent.extent.y};
+            // Replace parent's leaf index with r0
+            r0.leafIdx = parent.leafIdx;
+            parent.leafIdx = -1;
+
+            // Make sure the leaf idx now points to the new room
+            data.leafs[r0.leafIdx] = data.rooms.size();
+            parent.splitNeg = data.rooms.size();
+            data.rooms.push_back(r0);
+
+
+            // For r1, we need to push a new leaf idx
+            r1.offset = { r0.offset.x + r0.extent.x, r0.offset.y };
+            r1.extent = { parent.extent.x - r0.extent.x, r0.extent.y };
+            r1.leafIdx = data.leafs.size();
+            data.leafs.push_back(data.rooms.size());
+            parent.splitPlus = data.rooms.size();
+            data.rooms.push_back(r1);
+        }
+        else {
+            Room r0 = parent;
+            Room r1 = parent;
+            r0.parent = parentLeafIdx;
+            r1.parent = parentLeafIdx;
+
+            r0.offset = parent.offset;
+            r0.extent = {parent.extent.x, parent.extent.y * splitFactor};
+            // Replace parent's leaf index with r0
+            r0.leafIdx = parent.leafIdx;
+            parent.leafIdx = -1;
+
+            // Make sure the leaf idx now points to the new room
+            data.leafs[r0.leafIdx] = data.rooms.size();
+            parent.splitNeg = data.rooms.size();
+            data.rooms.push_back(r0);
+
+
+            // For r1, we need to push a new leaf idx
+            r1.offset = { r0.offset.x, r0.offset.y + r0.extent.y };
+            r1.extent = { r0.extent.x, parent.extent.y - r0.extent.y };
+            r1.leafIdx = data.leafs.size();
+            data.leafs.push_back(data.rooms.size());
+            parent.splitPlus = data.rooms.size();
+            data.rooms.push_back(r1);
+        }
     }
 
-    return walls;
+    // Source room is just the first one in the list
+    data.srcRoom = 0;
+
+    // Find destination room
+    Room *room = &data.rooms[0];
+    int8_t roomIdx = 0;
+    for (; room->splitNeg != -1; room = &data.rooms[room->splitNeg], roomIdx = room->splitNeg);
+
+    assert(roomIdx != -1);
+    data.dstRoom = (uint32_t)roomIdx;
+
+    return data;
 }
 
-CountT populateStaticGeometry(Engine &ctx,
-                              RNG &rng,
-                              Vector2 level_scale)
+TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
 {
-    Entity *obstacles = ctx.data().obstacles;
+    TmpArray<uint32_t> eligibleRooms;
+    eligibleRooms.alloc(ctx, consts::maxRooms);
 
-    Walls walls = makeWalls(ctx, rng);
-    walls.scale(-level_scale, level_scale);
+    for (int i = 0; i < rooms.leafs.size(); ++i) {
+        int8_t roomIdx = rooms.leafs[i];
+        assert(roomIdx != -1);
+        Room &room = rooms.rooms[(uint32_t)roomIdx];
+        bool isEligible = true;
 
-    // Add walls
-    for (int i = 0; i < walls.walls.size(); ++i) {
-        Wall &wall = walls.walls[i];
+        // Check that this room is eligible - this means checking that the walls are
+        // not interrupted by breaks (they are contiguous).
+        for (int j = 0; j < rooms.leafs.size(); ++j) {
+            int8_t otherRoomIdx = rooms.leafs[j];
+            assert(otherRoomIdx != -1);
+            Room &other = rooms.rooms[(uint32_t)otherRoomIdx];
+
+            // Perform comparison
+            if ((other.offset.y > room.offset.y && other.offset.y < room.offset.y+room.extent.y) ||
+                (other.offset.y+other.extent.y > room.offset.y && other.offset.y+other.extent.y < room.offset.y+room.extent.y)) {
+                // Check if this room is to the right or left of this one
+                if (fabs(other.offset.x - (room.offset.x + room.extent.x)) < EPS || 
+                    fabs((other.offset.x + other.extent.x) - room.offset.x) < EPS) {
+                    // The room is not eligible!
+                    isEligible = false;
+                    break;
+                }
+            }
+            else if ((other.offset.x > room.offset.x && other.offset.x < room.offset.y+room.extent.x) ||
+                    (other.offset.x+other.extent.x > room.offset.x && other.offset.x+other.extent.x < room.offset.x+room.extent.x)) {
+                // Check if this room is on top or on the bottom of this one
+                if (fabs(other.offset.y - (room.offset.y + room.extent.y)) < EPS || 
+                    fabs((other.offset.y + other.extent.y) - room.offset.y) < EPS) {
+                    // The room is not eligible!
+                    isEligible = false;
+                    break;
+                }
+            }
+        }
+
+        if (isEligible) {
+            rooms.rooms[roomIdx].isEligible = true;
+            eligibleRooms.push_back((uint32_t)roomIdx);
+        }
+    }
+    
+    return eligibleRooms;
+}
+
+void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, Room &room, ConnectingDoor &door, uint32_t doorIdx) {
+    for (int i = 0; i < rooms.rooms.size(); ++i) {
+        Room &other = rooms.rooms[i];
+
+        // Perform comparison
+        if (std::min(room.offset.y+room.extent.y, other.offset.y+other.extent.y) <= room.offset.y+room.extent.y &&
+            std::max(room.offset.y, other.offset.y) >= room.offset.y) {
+            // Check if this room is to the right or left of this one
+            if (fabs(other.offset.x - (room.offset.x + room.extent.x)) < EPS || 
+                    fabs((other.offset.x + other.extent.x) - room.offset.x) < EPS) {
+                // This room is adjacent and should be aware of this door
+                other.doors[other.doorCount++] = doorIdx;
+            }
+        }
+        else if (std::min(room.offset.x+room.extent.x, other.offset.x+other.extent.x) <= room.offset.x+room.extent.x &&
+                 std::max(room.offset.x, other.offset.x) >= room.offset.x) {
+            // Check if this room is on top or on the bottom of this one
+            if (fabs(other.offset.y - (room.offset.y + room.extent.y)) < EPS || 
+                    fabs((other.offset.y + other.extent.y) - room.offset.y) < EPS) {
+                other.doors[other.doorCount++] = doorIdx;
+            }
+        }
+    }
+}
+
+void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
+{
+    // Place the doors in the rooms that are eligible for doors
+    // also make adjacent rooms aware of these doors.
+    for (int i = 0; i < eligibleRooms.size(); ++i) {
+        Room &room = rooms.rooms[eligibleRooms[i]];
+        ConnectingDoor newDoors[4] = {
+            // Left
+            { Orientation::VERTICAL, room.offset, room.offset + Vector2{ 0.0f, room.extent.y } },
+            // Right
+            { Orientation::VERTICAL, room.offset + Vector2{room.extent.x, 0}, room.offset + room.extent },
+            // Bottom
+            { Orientation::HORIZONTAL, room.offset, room.offset + Vector2{ room.extent.x, 0.0f } },
+            // Top
+            { Orientation::HORIZONTAL, room.offset + Vector2{0, room.extent.y}, room.offset + room.extent }
+        };
+
+        // Only add these doors if they are not at the boundaries of the world
+        for (int j = 0; j < 4; ++j) {
+            if (newDoors[j].orientation == Orientation::VERTICAL) {
+                if (!(fabs(newDoors[j].start.x - 0.0f) < EPS || fabs(newDoors[j].start.x - 1.0f) < EPS)) {
+                    // Now, let's make the relevant rooms aware of this new door
+                    room.doors[j] = doors.size()-1;
+                    // Make adjacent rooms aware of this door
+                    makeRoomsAwareOfDoor(rooms, room, newDoors[j], doors.size());
+
+                    doors.push_back(newDoors[j]);
+                }
+            }
+            else {
+                if (!(fabs(newDoors[j].start.y - 0.0f) < EPS || fabs(newDoors[j].start.y - 1.0f) < EPS)) {
+                    // Now, let's make the relevant rooms aware of this new door
+                    room.doors[j] = doors.size()-1;
+                    // Make adjacent rooms aware of this door
+                    makeRoomsAwareOfDoor(rooms, room, newDoors[j], doors.size());
+
+                    doors.push_back(newDoors[j]);
+                }
+            }
+        }
+    }
+}
+
+struct WallData {
+    Vector2 start;
+    Vector2 end;
+
+    // -1 if there is no door on this wall
+    int32_t doorIdx;
+};
+
+void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpArray<WallData> &verticalWalls, TmpArray<WallData> &horizontalWalls)
+{
+    // First, add the walls from eligible rooms (for doors)
+    for (int i = 0; i < eligibleRooms.size(); ++i) {
+        Room &room = rooms.rooms[eligibleRooms[i]];
+
+        // Add left wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset },
+                { room.offset + Vector2{0.0f, room.extent.y} },
+                room.doors[0] // May be -1 or an actual door index
+            };
+
+            verticalWalls.push_back(newWall);
+        }
+
+        // Add right wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset + Vector2{ room.extent.x, 0.0f } },
+                { room.offset + room.extent },
+                room.doors[1]
+            };
+
+            verticalWalls.push_back(newWall);
+        }
+
+        // Add bottom wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset },
+                { room.offset + Vector2{room.extent.x, 0.0f} },
+                room.doors[2]
+            };
+
+            horizontalWalls.push_back(newWall);
+        }
+
+        // Add top wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset + Vector2{0.0f, room.extent.y} },
+                { room.offset + Vector2{room.extent.x, room.extent.y} },
+                room.doors[3]
+            };
+
+            horizontalWalls.push_back(newWall);
+        }
+
+        // Now order the doors in the room's door array properly
+        room.doorCount = 0;
+        for (int d = 0; d < consts::maxDoorsPerRoom; ++d) {
+            if (room.doors[d] != -1)
+                room.doors[room.doorCount++] = room.doors[d];
+        }
+    }
+}
+
+// If the wall shouldn't exist (duplicate), returns false, otherwise true
+bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls)
+{
+    for (int i = 0; i < verticalWalls.size(); ++i) {
+        WallData &other = verticalWalls[i];
+
+        if (fabs(other.start.x - wall.start.x) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.y >= other.start.y && wall.end.y <= other.end.y)
+                return false;
+
+            // Crop from bottom
+            if (other.start.y >= wall.start.y && other.start.y <= wall.end.y)
+                wall.start.y = other.start.y;
+
+            if (other.end.y <= wall.end.y && other.end.y >= wall.start.y)
+                wall.end.y = other.end.y;
+        }
+    }
+}
+
+bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls)
+{
+    for (int i = 0; i < horizontalWalls.size(); ++i) {
+        WallData &other = horizontalWalls[i];
+
+        if (fabs(other.start.y - wall.start.y) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.x >= other.start.x && wall.end.x <= other.end.x)
+                return false;
+
+            // Crop from bottom
+            if (other.start.x >= wall.start.x && other.start.x <= wall.end.x)
+                wall.start.x = other.start.x;
+
+            if (other.end.x <= wall.end.x && other.end.x >= wall.start.x)
+                wall.end.x = other.end.x;
+        }
+    }
+
+    return true;
+}
+
+void addOtherRoomsWalls(EnvironmentRooms &rooms, TmpArray<WallData> &verticalWalls, TmpArray<WallData> &horizontalWalls)
+{
+    for (int i = 0; i < rooms.leafs.size(); ++i) {
+        // Add walls but make sure not to duplicate
+        Room &room = rooms.rooms[rooms.leafs[i]];
+
+        // Add left wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset },
+                { room.offset + Vector2{0.0f, room.extent.y} },
+                -1,
+            };
+
+            if (cropVerticalWall(newWall, verticalWalls))
+                verticalWalls.push_back(newWall);
+        }
+
+        // Add right wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset + Vector2{ room.extent.x, 0.0f } },
+                { room.offset + room.extent },
+                -1,
+            };
+
+            if (cropVerticalWall(newWall, verticalWalls))
+                verticalWalls.push_back(newWall);
+        }
+
+        // Add bottom wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset },
+                { room.offset + Vector2{room.extent.x, 0.0f} },
+                -1,
+            };
+
+            if (cropHorizontalWall(newWall, horizontalWalls))
+                horizontalWalls.push_back(newWall);
+        }
+
+        // Add top wall
+        {
+            // Make sure that this wall isn't contained in any other
+            WallData newWall = {
+                { room.offset + Vector2{0.0f, room.extent.y} },
+                { room.offset + Vector2{room.extent.x, room.extent.y} },
+                -1,
+            };
+
+            if (cropHorizontalWall(newWall, horizontalWalls))
+                horizontalWalls.push_back(newWall);
+        }
+    }
+}
+
+static constexpr float BUTTON_WIDTH = 1.0f/36.0f;
+
+void placeButtons(Engine &ctx, RNG &rng, EnvironmentRooms &rooms)
+{
+    for (int i = 0; i < rooms.leafs.size(); ++i) {
+        Room &room = rooms.rooms[rooms.leafs[i]];
+        
+        // Find the range of where the button center could be
+        float xStart = room.offset.x + BUTTON_WIDTH/2.0f;
+        float yStart = room.offset.y + BUTTON_WIDTH/2.0f;
+
+        float xEnd = room.offset.x+room.extent.x - BUTTON_WIDTH/2.0f;
+        float yEnd = room.offset.y+room.extent.y - BUTTON_WIDTH/2.0f;
+
+        float x = xStart + rng.rand() * (xEnd - xStart);
+        float y = yStart + rng.rand() * (yEnd - yStart);
+
+        room.button.start = { x - BUTTON_WIDTH/2.0f, y - BUTTON_WIDTH/2.0f };
+        room.button.end = room.button.start + Vector2{BUTTON_WIDTH, BUTTON_WIDTH};
+    }
+}
+
+madrona::Entity makeWallObject(Engine &ctx,
+                     madrona::math::Vector3 pos,
+                     madrona::math::Quat rot,
+                     int32_t obj_id,
+                     madrona::phys::ResponseType response_type,
+                     madrona::math::Diag3x3 scale)
+{
+    using namespace madrona;
+    using namespace madrona::math;
+
+    Entity e = ctx.makeEntity<WallObject>();
+    ctx.get<Position>(e) = pos;
+    ctx.get<Rotation>(e) = rot;
+    ctx.get<Scale>(e) = scale;
+    ctx.get<ObjectID>(e) = ObjectID { obj_id };
+    ctx.get<phys::broadphase::LeafID>(e) =
+        phys::RigidBodyPhysicsSystem::registerEntity(ctx, e, ObjectID {obj_id});
+    ctx.get<Velocity>(e) = {
+        Vector3::zero(),
+        Vector3::zero(),
+    };
+    ctx.get<ResponseType>(e) = response_type;
+    ctx.get<ExternalForce>(e) = Vector3::zero();
+    ctx.get<ExternalTorque>(e) = Vector3::zero();
+    ctx.get<OpenState>(e) = {false};
+
+    return e;
+}
+
+void populateStaticGeometry(Engine &ctx,
+        RNG &rng,
+        Vector2 level_scale,
+        uint32_t &srcRoom,
+        uint32_t &dstRoom)
+{
+    (void)level_scale;
+    // This generated the rooms data structure as well as determine what the
+    // source room and destination room is
+    EnvironmentRooms rooms = makeRooms(ctx, rng);
+    srcRoom = rooms.srcRoom;
+    dstRoom = rooms.dstRoom;
+
+    placeButtons(ctx, rng, rooms);
+
+    // Get the rooms that are eligible for doors
+    TmpArray<uint32_t> eligibleRooms = findEligibleRoomsForDoors(ctx, rooms);
+
+    // Allocate doors
+    TmpArray<ConnectingDoor> doors;
+    doors.alloc(ctx, eligibleRooms.size() * consts::maxDoorsPerRoom);
+
+    placeDoors(eligibleRooms, rooms, doors);
+
+    // For now, let's split the walls into horizontal and vertical walls
+    TmpArray<WallData> horizontalWalls;
+    horizontalWalls.alloc(ctx, consts::maxRooms * 2);
+
+    TmpArray<WallData> verticalWalls;
+    verticalWalls.alloc(ctx, consts::maxRooms * 2);
+
+    // The eligible rooms' walls have been added
+    addEligibleRoomWalls(eligibleRooms, rooms, verticalWalls, horizontalWalls);
+    // Other rooms' walls have been added
+    addOtherRoomsWalls(rooms, verticalWalls, horizontalWalls);
+
+    auto doScale = [] (const Vector2 &v, const Vector2 &min, const Vector2 &max) { // v: [0,1]
+        Vector2 range = max - min;
+        return min + Vector2 { range.x * v.x, range.y * v.y };
+    };
+
+    auto doDirScale = [] (const Vector2 &v, const Vector2 &min, const Vector2 &max) { // v: [0,1]
+        Vector2 range = max - min;
+        return Vector2 { range.x * v.x, range.y * v.y };
+    };
+
+    // Allocate rooms
+    ctx.data().roomCount = rooms.rooms.size();
+
+    // Copy the rooms from the temporary allocator into the environment context
+    for (int i = 0; i < rooms.rooms.size(); ++i) {
+        ctx.data().rooms[i] = rooms.rooms[i];
+
+        // Apply scale
+        ctx.data().rooms[i].offset = doScale(ctx.data().rooms[i].offset, -level_scale, level_scale);
+        ctx.data().rooms[i].extent = doDirScale(ctx.data().rooms[i].extent, -level_scale, level_scale);
+
+        ctx.data().rooms[i].button.start = doScale(ctx.data().rooms[i].button.start, -level_scale, level_scale);
+        ctx.data().rooms[i].button.end = doScale(ctx.data().rooms[i].button.end, -level_scale, level_scale);
+    }
+
+    ctx.data().leafCount = rooms.leafs.size();
+    for (int i = 0; i < rooms.leafs.size(); ++i) {
+        ctx.data().leafs[i] = rooms.leafs[i];
+    }
+
+    // Allocate walls
+    ctx.data().numWalls = horizontalWalls.size() + verticalWalls.size();
+
+    // Allocate doors
+    ctx.data().numDoors = doors.size();
+
+    uint32_t wallCount = 0;
+    // Now, we can add the walls' geometry to the scene
+    for (int i = 0; i < horizontalWalls.size(); ++i) {
+        WallData &wall = horizontalWalls[i];
+
+        // Perform scale for the wall
+        Vector2 start = doScale(wall.start, -level_scale, level_scale);
+        Vector2 end = doScale(wall.start, -level_scale, level_scale);
 
         // Wall center
         Vector3 position {
-            0.5f * (wall.p1.x + wall.p2.x),
-            0.5f * (wall.p1.y + wall.p2.y),
+            0.5f * (start.x + start.x),
+            0.5f * (end.y + end.y),
             0.f,
         };
 
         Diag3x3 scale;
+        scale = { end.x - position.x, 0.2f, 1.0f };
 
-        if (wall.isHorizontal()) {
-            scale = {
-                wall.p2.x - position.x, 0.2f, 1.0f
-            };
-        } else {
-            scale = {
-                0.2f, wall.p2.y - position.y, 1.0f
-            };
+        // This wall is a door
+        if (wall.doorIdx != -1) {
+            // Preserve the order of the doors in the array of doors in SIM struct
+            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wallCount++];
         }
 
-        obstacles[i] = makeDynObject(
+        ctx.data().walls[wallCount++] = makeDynObject(
             ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
-            ResponseType::Static, OwnerTeam::Unownable, scale);
+            ResponseType::Static, scale);
     }
 
-    return walls.walls.size();
+    // Vertical walls
+    for (int i = 0; i < verticalWalls.size(); ++i) {
+        WallData &wall = verticalWalls[i];
+
+        // Perform scale for the wall
+        Vector2 start = doScale(wall.start, -level_scale, level_scale);
+        Vector2 end = doScale(wall.start, -level_scale, level_scale);
+
+        // Wall center
+        Vector3 position {
+            0.5f * (start.x + start.x),
+            0.5f * (end.y + end.y),
+            0.f,
+        };
+
+        Diag3x3 scale;
+        scale = { end.x - position.x, 0.2f, 1.0f };
+
+        if (wall.doorIdx != -1) {
+            // Preserve the order of the doors in the array of doors in SIM struct
+            ctx.data().doors[wall.doorIdx] = ctx.data().walls[wallCount];
+        }
+
+        ctx.data().walls[wallCount++] = makeDynObject(
+            ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
+            ResponseType::Static, scale);
+    }
+}
+
+Room *containedRoom(madrona::math::Vector2 pos, Room *rooms)
+{
+    Room *parent = rooms;
+
+    while (parent->splitNeg != -1) {
+        if (parent->splitHorizontal) {
+            if (pos.x < rooms[parent->splitPlus].offset.x) {
+                // The position is contained in the left node
+                parent = &rooms[parent->splitNeg];
+            }
+            else {
+                parent = &rooms[parent->splitPlus];
+            }
+        }
+        else {
+            if (pos.y < rooms[parent->splitPlus].offset.y) {
+                // The position is contained in the left node
+                parent = &rooms[parent->splitNeg];
+            }
+            else {
+                parent = &rooms[parent->splitPlus];
+            }
+        }
+    }
+
+    return parent;
+}
+
+bool isPressingButton(madrona::math::Vector2 pos, Room *room)
+{
+    return (room->button.start.x <= pos.x && pos.x <= room->button.end.x &&
+        room->button.start.y <= pos.y && pos.y <= room->button.end.y);
 }
 
 }
