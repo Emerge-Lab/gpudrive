@@ -227,10 +227,10 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
         auto done_buffer = (uint8_t *)cu::allocGPU(sizeof(uint8_t) *
-            consts::maxAgents * cfg.numWorlds);
+            consts::numAgents * cfg.numWorlds);
 
         auto reward_buffer = (float *)cu::allocGPU(sizeof(float) *
-            consts::maxAgents * cfg.numWorlds);
+            consts::numAgents * cfg.numWorlds);
 
         HeapArray<WorldInit> world_inits(cfg.numWorlds);
 
@@ -253,7 +253,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
-            .maxViewsPerWorld = consts::maxAgents,
+            .maxViewsPerWorld = consts::numAgents,
             .numExportedBuffers = 16,
             .gpuID = (uint32_t)cfg.gpuID,
             .cameraMode = cfg.enableRender ? 
