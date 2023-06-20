@@ -120,8 +120,6 @@ inline void movementSystem(Engine &ctx, Action &action,
 
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
-
-    printf("Entity at : %f %f %f\n", position.x, position.y, position.z);
 }
 
 // Resets doors to closed temporarily
@@ -144,7 +142,7 @@ inline void doorControlSystem(Engine &ctx, Position &pos, AgentType &agent_type)
     }
 }
 
-inline void setDoorPositionSystem(Engine &ctx, Position &pos, OpenState &open_state)
+inline void setDoorPositionSystem(Engine &ctx, Entity e, Position &pos, OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
@@ -341,7 +339,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         Position, AgentType>>({reset_door_sys});
 
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
-        Position, OpenState>>({door_control_sys});
+        Entity, Position, OpenState>>({door_control_sys});
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {set_door_pos_sys});

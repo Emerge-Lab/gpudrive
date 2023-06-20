@@ -35,7 +35,7 @@ namespace consts {
 static constexpr uint32_t numAgents = 2;
 
 // NOTE: There will be as many buttons as there are rooms.
-static constexpr uint32_t maxRooms = 10;
+static constexpr uint32_t maxRooms = 3;
 
 static constexpr uint32_t maxDoorsPerRoom = 6;
 
