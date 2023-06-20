@@ -71,7 +71,7 @@ struct DynamicObject : public madrona::Archetype<
 > {};
 
 struct OpenState {
-    bool isOpen;
+    CountT isOpen;
 };
 
 struct WallObject : public madrona::Archetype<
@@ -170,29 +170,6 @@ struct Button : public madrona::Archetype<
     Scale,
     ObjectID,
     ButtonState
-> {};
-
-struct Door : public madrona::Archetype<
-    // General Rigid Body Components
-    Position,
-    Rotation,
-    Scale,
-    Velocity,
-    ObjectID,
-    ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
-    madrona::phys::broadphase::LeafID
-> {};
-
-// Camera
-struct CameraAgent : public madrona::Archetype<
-    Position,
-    Rotation,
-    madrona::render::ViewSettings
 > {};
 
 struct Config {

@@ -50,7 +50,7 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
     return makeDynObject(ctx, offset, rot, 1, ResponseType::Static);
 }
 
-#if 0
+#if 1
 static void generateTrainingEnvironment(Engine &ctx)
 {
     const Vector2 bounds { -18.f, 18.f };
@@ -95,6 +95,12 @@ static void generateTrainingEnvironment(Engine &ctx)
         ctx.get<Velocity>(agent) = { Vector3::zero(), Vector3::zero() };
         ctx.get<ExternalForce>(agent) = Vector3::zero();
         ctx.get<ExternalTorque>(agent) = Vector3::zero();
+
+        if (ctx.data().enableRender) {
+            ctx.get<render::ViewSettings>(agent) =
+                render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
+                        Vector3 { 0, 0, 0.8 }, { (int32_t)i });
+        }
     }
 
     // Register the plane object again to the physics system
@@ -102,8 +108,7 @@ static void generateTrainingEnvironment(Engine &ctx)
         phys::RigidBodyPhysicsSystem::registerEntity(ctx, ctx.data().floorPlane, 
             ctx.get<ObjectID>(ctx.data().floorPlane));
 }
-#endif
-
+#else
 static void generateTrainingEnvironment(Engine &ctx)
 {
     const Vector2 bounds { -18.f, 18.f };
@@ -145,6 +150,7 @@ static void generateTrainingEnvironment(Engine &ctx)
         phys::RigidBodyPhysicsSystem::registerEntity(ctx, ctx.data().floorPlane, 
             ctx.get<ObjectID>(ctx.data().floorPlane));
 }
+#endif
 
 void generateEnvironment(Engine &ctx)
 {

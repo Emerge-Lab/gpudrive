@@ -36,7 +36,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<DynamicObject>();
-    registry.registerArchetype<CameraAgent>();
     registry.registerArchetype<WallObject>();
 
     registry.exportSingleton<WorldReset>(0);
@@ -126,7 +125,7 @@ inline void movementSystem(Engine &ctx, Action &action,
 }
 
 // Resets doors to closed temporarily
-inline void resetDoorStateSystem(Engine &ctx, OpenState &open_state)
+inline void resetDoorStateSystem(Engine &ctx, Entity e, OpenState &open_state)
 {
     open_state.isOpen = false;
 }
@@ -168,7 +167,7 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
-#if 0
+#if 1
 inline void collectObservationsSystem(Engine &ctx,
                                       Entity agent_e,
                                       AgentType agent_type,
@@ -206,7 +205,7 @@ inline void collectObservationsSystem(Engine &ctx,
         des_obs.obs = { diff.length(), atan(diff.y / diff.x) };
     }
 }
-#endif
+#else
 inline void collectObservationsSystem(Engine &ctx,
                                       Entity agent_e,
                                       AgentType agent_type,
@@ -223,6 +222,7 @@ inline void collectObservationsSystem(Engine &ctx,
         agent_obs.obs[0] = { relAgentObs.length(), atan(relAgentObs.y / relAgentObs.x) };
     }
 }
+#endif
 
 inline void lidarSystem(Engine &ctx,
                         Entity e,
@@ -269,7 +269,7 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
-#if 0
+#if 1
 inline void rewardSystem(Engine &ctx,
                          Entity e,
                          AgentType agent_type)
@@ -304,12 +304,13 @@ inline void rewardSystem(Engine &ctx,
         ctx.data().doneBuffer[l.row] = 1;
     }
 }
-#endif
+#else
 inline void rewardSystem(Engine &ctx,
                          Entity e,
                          AgentType agent_type)
 {
 }
+#endif
 
 #ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
@@ -332,9 +333,9 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
         Action, Position, Rotation, ExternalForce, ExternalTorque, AgentType>>({});
 
-#if 0
+#if 1
     auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
-        OpenState>>({move_sys});
+        Entity, OpenState>>({move_sys});
 
     auto door_control_sys = builder.addToGraph<ParallelForNode<Engine, doorControlSystem,
         Position, AgentType>>({reset_door_sys});

@@ -618,12 +618,12 @@ void populateStaticGeometry(Engine &ctx,
 
         // Perform scale for the wall
         Vector2 start = doScale(wall.start, -level_scale, level_scale);
-        Vector2 end = doScale(wall.start, -level_scale, level_scale);
+        Vector2 end = doScale(wall.end, -level_scale, level_scale);
 
         // Wall center
         Vector3 position {
-            0.5f * (start.x + start.x),
-            0.5f * (end.y + end.y),
+            0.5f * (start.x + end.x),
+            0.5f * (start.y + end.y),
             0.f,
         };
 
@@ -632,7 +632,7 @@ void populateStaticGeometry(Engine &ctx,
 
         CountT wall_idx = wallCount++;
 
-        ctx.data().walls[wall_idx] = makeDynObject(
+        ctx.data().walls[wall_idx] = makeWallObject(
             ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
             ResponseType::Static, scale);
 
@@ -649,12 +649,12 @@ void populateStaticGeometry(Engine &ctx,
 
         // Perform scale for the wall
         Vector2 start = doScale(wall.start, -level_scale, level_scale);
-        Vector2 end = doScale(wall.start, -level_scale, level_scale);
+        Vector2 end = doScale(wall.end, -level_scale, level_scale);
 
         // Wall center
         Vector3 position {
-            0.5f * (start.x + start.x),
-            0.5f * (end.y + end.y),
+            0.5f * (start.x + end.x),
+            0.5f * (start.y + end.y),
             0.f,
         };
 
@@ -663,7 +663,7 @@ void populateStaticGeometry(Engine &ctx,
 
         CountT wall_idx = wallCount++;
 
-        ctx.data().walls[wall_idx] = makeDynObject(
+        ctx.data().walls[wall_idx] = makeWallObject(
             ctx, position, Quat::angleAxis(0, {1, 0, 0}), 3, 
             ResponseType::Static, scale);
 
