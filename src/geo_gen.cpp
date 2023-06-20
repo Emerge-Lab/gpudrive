@@ -76,6 +76,7 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
         0,
 
         0,
+        0,
         { },
         false,
 
@@ -84,7 +85,7 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
         {}
     };
 
-    for (uint32_t i = 0; i < consts::maxDoorsPerRoom; ++i)
+    for (uint32_t i = 0; i < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++i)
         root.doors[i] = -1;
 
     EnvironmentRooms data;
@@ -190,6 +191,37 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
     return data;
 }
 
+void makeDoors(Engine &ctx, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
+{
+    for (int leafIdx = 0; leafIdx < rooms.leafs.size(); ++leafIdx) {
+        Room &room = rooms.rooms[rooms.leafs[leafIdx]];
+
+        ConnectingDoor newDoors[4] = {
+            // Left
+            { Orientation::VERTICAL, room.offset, room.offset + Vector2{ 0.0f, room.extent.y }, 1 },
+            // Right
+            { Orientation::VERTICAL, room.offset + Vector2{room.extent.x, 0}, room.offset + room.extent, 0 },
+            // Bottom
+            { Orientation::HORIZONTAL, room.offset, room.offset + Vector2{ room.extent.x, 0.0f }, 3 },
+            // Top
+            { Orientation::HORIZONTAL, room.offset + Vector2{0, room.extent.y}, room.offset + room.extent, 2 }
+        };
+
+        for (int localDoorIdx = 0; localDoorIdx < 4; ++localDoorIdx) {
+            ConnectingDoor &newDoor = newDoors[localDoorIdx];
+
+            
+            for (int otherLeafIdx = 0; otherLeafIdx < rooms.leafs.size(); ++otherLeafIdx) {
+                if (otherLeafIdx == leafIdx) continue;
+
+                Room &otherRoom = rooms.rooms[rooms.leafs[otherLeafIdx]];
+
+            }
+        }
+    }
+}
+
+#if 0
 TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
 {
     TmpArray<uint32_t> eligibleRooms;
@@ -239,6 +271,18 @@ TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &room
     
     return eligibleRooms;
 }
+#else
+TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
+{
+    TmpArray<uint32_t> eligibleRooms;
+    eligibleRooms.alloc(ctx, consts::maxRooms);
+
+    for (int i = 0; i < rooms.leafs.size(); ++i)
+        eligibleRooms.push_back(rooms.leafs[i]);
+
+    return eligibleRooms;
+}
+#endif
 
 void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, uint32_t roomIdx, Room &room, ConnectingDoor &door, uint32_t doorIdx) {
     for (uint32_t i = 0; i < rooms.leafs.size(); ++i) {
@@ -249,41 +293,37 @@ void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, uint32_t roomIdx, Room &room,
 
         if (door.orientation == Orientation::HORIZONTAL) {
             // Check if the top or bottom of the room touch the door
-            Vector2 bottomStart = room.offset;
-            Vector2 bottomEnd = room.offset + Vector2{ room.extent.x, 0.0f };
-            Vector2 topStart = room.offset + Vector2{ 0.0f, room.extent.y };
-            Vector2 topEnd = room.offset + room.extent;
+            Vector2 bottomStart = other.offset;
+            Vector2 bottomEnd = other.offset + Vector2{ other.extent.x, 0.0f };
+            Vector2 topStart = other.offset + Vector2{ 0.0f, other.extent.y };
+            Vector2 topEnd = other.offset + other.extent;
 
             if (fabs(bottomStart.y - door.start.y) < EPS) {
-                if (bottomEnd.x >= door.start.x && door.end.x >= bottomStart.x) {
-                    other.doorCount++;
-                    other.doors[door.complement] = doorIdx;
+                if (bottomEnd.x > door.start.x && door.end.x > bottomStart.x) {
+                    other.addDoor(door.complement, doorIdx);
                 }
             }
             else if (fabs(topStart.y - door.start.y) < EPS) {
-                if (topEnd.x >= door.start.x && door.end.x >= topStart.x) {
-                    other.doorCount++;
-                    other.doors[door.complement] = doorIdx;
+                if (topEnd.x > door.start.x && door.end.x > topStart.x) {
+                    other.addDoor(door.complement, doorIdx);
                 }
             }
         }
         else if (door.orientation == Orientation::VERTICAL) {
             // Check if the top or bottom of the room touch the door
-            Vector2 leftStart = room.offset;
-            Vector2 leftEnd = room.offset + Vector2{ 0.0f, room.extent.y };
-            Vector2 rightStart = room.offset + Vector2{ room.extent.x, 0.0f };
-            Vector2 rightEnd = room.offset + room.extent;
+            Vector2 leftStart = other.offset;
+            Vector2 leftEnd = other.offset + Vector2{ 0.0f, other.extent.y };
+            Vector2 rightStart = other.offset + Vector2{ other.extent.x, 0.0f };
+            Vector2 rightEnd = other.offset + other.extent;
 
             if (fabs(leftStart.x - door.start.x) < EPS) {
-                if (leftEnd.y >= door.start.y && door.end.y >= leftStart.y) {
-                    other.doorCount++;
-                    other.doors[door.complement] = doorIdx;
+                if (leftEnd.y > door.start.y && door.end.y > leftStart.y) {
+                    other.addDoor(door.complement, doorIdx);
                 }
             }
             else if (fabs(rightStart.x - door.start.x) < EPS) {
-                if (rightEnd.y >= door.start.y && door.end.y >= rightStart.y) {
-                    other.doorCount++;
-                    other.doors[door.complement] = doorIdx;
+                if (rightEnd.y > door.start.y && door.end.y > rightStart.y) {
+                    other.addDoor(door.complement, doorIdx);
                 }
             }
         }
@@ -291,6 +331,42 @@ void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, uint32_t roomIdx, Room &room,
             assert(false);
         }
     }
+}
+
+uint32_t numRoomsSharingBoundary(EnvironmentRooms &rooms, Vector2 start, Vector2 end, Orientation orientation)
+{
+    uint32_t sharedCount = 0;
+    for (int i = 0; i < rooms.leafs.size(); ++i) {
+        Room &room = rooms.rooms[rooms.leafs[i]];
+
+        ConnectingDoor newDoors[4] = {
+            // Left
+            { Orientation::VERTICAL, room.offset, room.offset + Vector2{ 0.0f, room.extent.y }, 1 },
+            // Right
+            { Orientation::VERTICAL, room.offset + Vector2{room.extent.x, 0}, room.offset + room.extent, 0 },
+            // Bottom
+            { Orientation::HORIZONTAL, room.offset, room.offset + Vector2{ room.extent.x, 0.0f }, 3 },
+            // Top
+            { Orientation::HORIZONTAL, room.offset + Vector2{0, room.extent.y}, room.offset + room.extent, 2 }
+        };
+
+        for (int j = 0; j < 4; ++j) {
+            if (orientation == Orientation::HORIZONTAL) {
+                if (fabs(start.y - newDoors[j].start.y) < EPS && end.x > newDoors[j].start.x && newDoors[j].end.x > start.x) {
+                    sharedCount++;
+                    break;
+                }
+            }
+            else {
+                if (fabs(start.x - newDoors[j].start.x) < EPS && end.y > newDoors[j].start.y && newDoors[j].end.y > start.y) {
+                    sharedCount++;
+                    break;
+                }
+            }
+        }
+    }
+
+    return sharedCount;
 }
 
 void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
@@ -321,8 +397,7 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
                 ConnectingDoor &newDoor = newDoors[j];
 
                 if ((existing.start - newDoor.start).length2() < EPS && (existing.end - newDoor.end).length2() < EPS) {
-                    room.doors[j] = d;
-                    room.doorCount++;
+                    room.addDoor(j, d);
                     alreadyExists = true;
                 }
             }
@@ -330,11 +405,13 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
             if (alreadyExists) 
                 continue;
 
+            if (numRoomsSharingBoundary(rooms, newDoors[j].start, newDoors[j].end, newDoors[j].orientation) > 2)
+                continue;
+
             if (newDoors[j].orientation == Orientation::VERTICAL) {
                 if (!(fabs(newDoors[j].start.x - 0.0f) < EPS || fabs(newDoors[j].start.x - 1.0f) < EPS)) {
                     // Now, letos make the relevant rooms aware of this new door
-                    room.doors[j] = doors.size();
-                    room.doorCount++;
+                    room.addDoor(j, doors.size());
                     // Make adjacent rooms aware of this door
                     makeRoomsAwareOfDoor(rooms, eligibleRooms[i], room, newDoors[j], doors.size());
 
@@ -344,8 +421,7 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
             else {
                 if (!(fabs(newDoors[j].start.y - 0.0f) < EPS || fabs(newDoors[j].start.y - 1.0f) < EPS)) {
                     // Now, let's make the relevant rooms aware of this new door
-                    room.doors[j] = doors.size();
-                    room.doorCount++;
+                    room.addDoor(j, doors.size());
                     // Make adjacent rooms aware of this door
                     makeRoomsAwareOfDoor(rooms, eligibleRooms[i], room, newDoors[j], doors.size());
 
@@ -364,30 +440,87 @@ struct WallData {
     int32_t doorIdx;
 };
 
-bool wallExists(const WallData &newWall, TmpArray<WallData> &walls) 
+// If the wall shouldn't exist (duplicate), returns false, otherwise true
+bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls, TmpArray<ConnectingDoor> &doors)
 {
-    for (int i = 0; i < walls.size(); ++i) {
-        WallData &existing = walls[i];
+    for (int i = 0; i < verticalWalls.size(); ++i) {
+        WallData &other = verticalWalls[i];
 
-        if ((existing.start - newWall.start).length2() < EPS && (existing.end - newWall.end).length2() < EPS) {
-            return true;
+        if (fabs(other.start.x - wall.start.x) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.y >= other.start.y && wall.end.y <= other.end.y)
+                return false;
+
+            // Crop from bottom
+            if (other.start.y > wall.start.y && other.start.y < wall.end.y)
+                wall.end.y = other.start.y;
+
+            if (other.end.y < wall.end.y && other.end.y > wall.start.y)
+                wall.start.y = other.end.y;
         }
     }
 
-    return false;
+    for (int i = 0; i < doors.size(); ++i) {
+        ConnectingDoor &other = doors[i];
+        if (other.orientation == Orientation::HORIZONTAL)
+            continue;
+
+        if (fabs(other.start.x - wall.start.x) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.y >= other.start.y && wall.end.y <= other.end.y)
+                return false;
+
+            // Crop from bottom
+            if (other.start.y > wall.start.y && other.start.y < wall.end.y)
+                wall.end.y = other.start.y;
+
+            if (other.end.y < wall.end.y && other.end.y > wall.start.y)
+                wall.start.y = other.end.y;
+        }
+    }
+
+    return true;
 }
 
-bool doorExists(const WallData &newWall, TmpArray<ConnectingDoor> &walls) 
+bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls, TmpArray<ConnectingDoor> &doors)
 {
-    for (int i = 0; i < walls.size(); ++i) {
-        ConnectingDoor &existing = walls[i];
+    for (int i = 0; i < horizontalWalls.size(); ++i) {
+        WallData &other = horizontalWalls[i];
 
-        if ((existing.start - newWall.start).length2() < EPS && (existing.end - newWall.end).length2() < EPS) {
-            return true;
+        if (fabs(other.start.y - wall.start.y) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.x >= other.start.x && wall.end.x <= other.end.x)
+                return false;
+
+            // Crop from bottom
+            if (other.start.x > wall.start.x && other.start.x < wall.end.x)
+                wall.end.x = other.start.x;
+
+            if (other.end.x < wall.end.x && other.end.x > wall.start.x)
+                wall.start.x = other.end.x;
         }
     }
 
-    return false;
+    for (int i = 0; i < doors.size(); ++i) {
+        ConnectingDoor &other = doors[i];
+        if (other.orientation == Orientation::VERTICAL)
+            continue;
+
+        if (fabs(other.start.x - wall.start.x) < EPS) {
+            // These are duplicates/this wall is contained in another one's
+            if (wall.start.y >= other.start.y && wall.end.y <= other.end.y)
+                return false;
+
+            // Crop from bottom
+            if (other.start.y > wall.start.y && other.start.y < wall.end.y)
+                wall.end.y = other.start.y;
+
+            if (other.end.y < wall.end.y && other.end.y > wall.start.y)
+                wall.start.y = other.end.y;
+        }
+    }
+
+    return true;
 }
 
 void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, 
@@ -407,7 +540,7 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
                 room.doors[0] // May be -1 or an actual door index
             };
 
-            if (newWall.doorIdx == -1 && !wallExists(newWall, verticalWalls) && !doorExists(newWall, doors))
+            if (cropVerticalWall(newWall, verticalWalls, doors))
                 verticalWalls.push_back(newWall);
         }
 
@@ -420,7 +553,7 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
                 room.doors[1]
             };
 
-            if (newWall.doorIdx == -1 && !wallExists(newWall, verticalWalls) && !doorExists(newWall, doors))
+            if (cropVerticalWall(newWall, verticalWalls, doors))
                 verticalWalls.push_back(newWall);
         }
 
@@ -433,7 +566,7 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
                 room.doors[2]
             };
 
-            if (newWall.doorIdx == -1 && !wallExists(newWall, horizontalWalls) && !doorExists(newWall, doors))
+            if (cropHorizontalWall(newWall, horizontalWalls, doors))
                 horizontalWalls.push_back(newWall);
         }
 
@@ -446,125 +579,15 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
                 room.doors[3]
             };
 
-            if (newWall.doorIdx == -1 && !wallExists(newWall, horizontalWalls) && !doorExists(newWall, doors))
+            if (cropHorizontalWall(newWall, horizontalWalls, doors))
                 horizontalWalls.push_back(newWall);
         }
 
         // Now order the doors in the room's door array properly
         room.doorCount = 0;
-        for (int d = 0; d < consts::maxDoorsPerRoom; ++d) {
+        for (int d = 0; d < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++d) {
             if (room.doors[d] != -1)
                 room.doors[room.doorCount++] = room.doors[d];
-        }
-    }
-}
-
-// If the wall shouldn't exist (duplicate), returns false, otherwise true
-bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls)
-{
-    for (int i = 0; i < verticalWalls.size(); ++i) {
-        WallData &other = verticalWalls[i];
-
-        if (fabs(other.start.x - wall.start.x) < EPS) {
-            // These are duplicates/this wall is contained in another one's
-            if (wall.start.y >= other.start.y && wall.end.y <= other.end.y)
-                return false;
-
-            // Crop from bottom
-            if (other.start.y >= wall.start.y && other.start.y <= wall.end.y)
-                wall.start.y = other.start.y;
-
-            if (other.end.y <= wall.end.y && other.end.y >= wall.start.y)
-                wall.end.y = other.end.y;
-        }
-    }
-
-    return true;
-}
-
-bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls)
-{
-    for (int i = 0; i < horizontalWalls.size(); ++i) {
-        WallData &other = horizontalWalls[i];
-
-        if (fabs(other.start.y - wall.start.y) < EPS) {
-            // These are duplicates/this wall is contained in another one's
-            if (wall.start.x >= other.start.x && wall.end.x <= other.end.x)
-                return false;
-
-            // Crop from bottom
-            if (other.start.x >= wall.start.x && other.start.x <= wall.end.x)
-                wall.start.x = other.start.x;
-
-            if (other.end.x <= wall.end.x && other.end.x >= wall.start.x)
-                wall.end.x = other.end.x;
-        }
-    }
-
-    return true;
-}
-
-void addOtherRoomsWalls(EnvironmentRooms &rooms, 
-                        TmpArray<WallData> &verticalWalls, TmpArray<WallData> &horizontalWalls,
-                        TmpArray<ConnectingDoor> &doors)
-{
-    for (int i = 0; i < rooms.leafs.size(); ++i) {
-        // Add walls but make sure not to duplicate
-        Room &room = rooms.rooms[rooms.leafs[i]];
-
-        if (room.isEligible)
-            continue;
-
-        // Add left wall
-        {
-            // Make sure that this wall isn't contained in any other
-            WallData newWall = {
-                { room.offset },
-                { room.offset + Vector2{0.0f, room.extent.y} },
-                -1,
-            };
-
-            if (cropVerticalWall(newWall, verticalWalls))
-                verticalWalls.push_back(newWall);
-        }
-
-        // Add right wall
-        {
-            // Make sure that this wall isn't contained in any other
-            WallData newWall = {
-                { room.offset + Vector2{ room.extent.x, 0.0f } },
-                { room.offset + room.extent },
-                -1,
-            };
-
-            if (cropVerticalWall(newWall, verticalWalls))
-                verticalWalls.push_back(newWall);
-        }
-
-        // Add bottom wall
-        {
-            // Make sure that this wall isn't contained in any other
-            WallData newWall = {
-                { room.offset },
-                { room.offset + Vector2{room.extent.x, 0.0f} },
-                -1,
-            };
-
-            if (cropHorizontalWall(newWall, horizontalWalls))
-                horizontalWalls.push_back(newWall);
-        }
-
-        // Add top wall
-        {
-            // Make sure that this wall isn't contained in any other
-            WallData newWall = {
-                { room.offset + Vector2{0.0f, room.extent.y} },
-                { room.offset + Vector2{room.extent.x, room.extent.y} },
-                -1,
-            };
-
-            if (cropHorizontalWall(newWall, horizontalWalls))
-                horizontalWalls.push_back(newWall);
         }
     }
 }
@@ -651,8 +674,6 @@ void populateStaticGeometry(Engine &ctx,
 
     // The eligible rooms' walls have been added
     addEligibleRoomWalls(eligibleRooms, rooms, verticalWalls, horizontalWalls, doors);
-    // Other rooms' walls have been added
-    addOtherRoomsWalls(rooms, verticalWalls, horizontalWalls, doors);
 
     auto doScale = [] (const Vector2 &v, const Vector2 &min, const Vector2 &max) { // v: [0,1]
         Vector2 range = max - min;

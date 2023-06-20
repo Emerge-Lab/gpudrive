@@ -35,7 +35,7 @@ namespace consts {
 static constexpr uint32_t numAgents = 2;
 
 // NOTE: There will be as many buttons as there are rooms.
-static constexpr uint32_t maxRooms = 3;
+static constexpr uint32_t maxRooms = 7;
 
 static constexpr uint32_t maxDoorsPerRoom = 6;
 
@@ -188,6 +188,8 @@ struct ButtonInfo {
 };
 
 struct Room {
+    static constexpr CountT kTmpPadSpace = 4;
+
     madrona::math::Vector2 offset;
     madrona::math::Vector2 extent;
 
@@ -199,7 +201,8 @@ struct Room {
     int8_t leafIdx;
 
     uint32_t doorCount;
-    int8_t doors[consts::maxDoorsPerRoom];
+    uint32_t tmpOffset;
+    int8_t doors[consts::maxDoorsPerRoom+kTmpPadSpace];
 
     // Eligible for door
     bool isEligible;
@@ -208,6 +211,16 @@ struct Room {
     float splitFactor;
 
     ButtonInfo button;
+
+    void addDoor(CountT at, CountT doorIdx)
+    {
+        if (doors[at] == -1)
+            doors[at] = (int8_t)doorIdx;
+        else
+            doors[consts::maxDoorsPerRoom + (tmpOffset++)] = (int8_t)doorIdx;
+
+        doorCount++;
+    }
 };
 
 struct Sim : public madrona::WorldBase {

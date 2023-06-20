@@ -75,6 +75,13 @@ static void generateTrainingEnvironment(Engine &ctx)
             x, y, 1.5f,
         };
 
+#if 1
+        if (i == 0) {
+            pos.x = 0.5f*(room.button.start.x + room.button.end.x);
+            pos.y = 0.5f*(room.button.start.y + room.button.end.y);
+        }
+#endif
+
         const auto rot = Quat::angleAxis(ctx.data().rng.rand() * math::pi, {0, 0, 1});
         Diag3x3 scale = {1.0f, 1.0f, 1.0f};
 
