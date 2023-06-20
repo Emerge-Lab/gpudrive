@@ -60,4 +60,12 @@ target_link_libraries(gpu_hideseek_python PRIVATE
     gpu_hideseek_mgr
 )
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+if (TARGET madrona_viewer)
+    add_executable(viewer viewer.cpp)
+    target_link_libraries(viewer madrona_viewer
+        madrona_mw_core gpu_hideseek_mgr)
+
+    target_compile_definitions(viewer PRIVATE
+        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
+    )
+endif()

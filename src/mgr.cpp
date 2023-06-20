@@ -33,7 +33,8 @@ struct Manager::Impl {
     float *rewardsBuffer;
     uint8_t *donesBuffer;
 
-    static inline Impl * init(const Config &cfg);
+    static inline Impl * init(const Config &cfg,
+                              const render::RendererBridge *viewer_bridge);
 };
 
 struct Manager::CPUImpl : Manager::Impl {
@@ -190,7 +191,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         phys_objs.hullData.positions.size());
 }
 
-Manager::Impl * Manager::Impl::init(const Config &cfg)
+Manager::Impl * Manager::Impl::init(
+    const Config &cfg,
+    const render::RendererBridge *viewer_bridge)
 {
     HostEventLogging(HostEvent::initStart);
 
@@ -210,7 +213,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
     }
 
     GPUHideSeek::Config app_cfg {
-        cfg.enableRender,
+        cfg.enableBatchRender,
         cfg.autoReset,
     };
 
@@ -221,7 +224,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
 
-        PhysicsLoader phys_loader(PhysicsLoader::StorageType::CUDA, 10);
+        PhysicsLoader phys_loader(PhysicsLoader::ExecMode::CUDA, 10);
         loadPhysicsObjects(phys_loader);
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
@@ -292,7 +295,7 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
     case ExecMode::CPU: {
         EpisodeManager *episode_mgr = new EpisodeManager { 0 };
 
-        PhysicsLoader phys_loader(PhysicsLoader::StorageType::CPU, 10);
+        PhysicsLoader phys_loader(ExecMode::CPU, 10);
         loadPhysicsObjects(phys_loader);
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
@@ -327,25 +330,13 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
             CPUImpl::TaskGraphT {
                 ThreadPoolExecutor::Config {
                     .numWorlds = cfg.numWorlds,
-                    .maxViewsPerWorld = consts::numAgents,
-                    .maxInstancesPerWorld = 1024,
-                    .renderWidth = cfg.renderWidth,
-                    .renderHeight = cfg.renderHeight,
-                    .maxObjects = 50,
                     .numExportedBuffers = 16,
-                    .cameraMode = cfg.enableRender ?
-                        render::CameraMode::Perspective :
-                        render::CameraMode::None,
-                    .renderGPUID = cfg.gpuID,
                 },
                 app_cfg,
-                world_inits.data()
+                world_inits.data(),
+                viewer_bridge,
             },
         };
-
-        if (cfg.enableRender) {
-            cpu_impl->cpuExec.loadObjects(render_assets->objects);
-        }
 
         HostEventLogging(HostEvent::initEnd);
 
@@ -355,8 +346,9 @@ Manager::Impl * Manager::Impl::init(const Config &cfg)
     }
 }
 
-MADRONA_EXPORT Manager::Manager(const Config &cfg)
-    : impl_(Impl::init(cfg))
+MADRONA_EXPORT Manager::Manager(const Config &cfg,
+                                const render::RendererBridge *viewer_bridge)
+    : impl_(Impl::init(cfg, viewer_bridge))
 {}
 
 MADRONA_EXPORT Manager::~Manager() {
@@ -488,6 +480,7 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
     void *dev_ptr = nullptr;
     Optional<int> gpu_id = Optional<int>::none();
 
+#if 0
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
@@ -502,6 +495,7 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
         gpu_id = impl_->cfg.gpuID;
 #endif
     }
+#endif
 
     return Tensor(dev_ptr, Tensor::ElementType::Float32,
                      {impl_->cfg.numWorlds * consts::numAgents,
@@ -514,6 +508,7 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
     void *dev_ptr = nullptr;
     Optional<int> gpu_id = Optional<int>::none();
 
+#if 0
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
         dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
@@ -528,6 +523,7 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
         gpu_id = impl_->cfg.gpuID;
 #endif
     }
+#endif
 
     return Tensor(dev_ptr, Tensor::ElementType::UInt8,
                   {impl_->cfg.numWorlds * consts::numAgents,
