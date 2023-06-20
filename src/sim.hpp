@@ -196,7 +196,8 @@ struct CameraAgent : public madrona::Archetype<
 > {};
 
 struct Config {
-    bool enableRender;
+    bool enableBatchRender;
+    bool enableViewer;
     bool autoReset;
 };
 

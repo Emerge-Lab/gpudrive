@@ -214,6 +214,7 @@ Manager::Impl * Manager::Impl::init(
 
     GPUHideSeek::Config app_cfg {
         cfg.enableBatchRender,
+        viewer_bridge != nullptr,
         cfg.autoReset,
     };
 
@@ -224,7 +225,7 @@ Manager::Impl * Manager::Impl::init(
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
 
-        PhysicsLoader phys_loader(PhysicsLoader::ExecMode::CUDA, 10);
+        PhysicsLoader phys_loader(ExecMode::CUDA, 10);
         loadPhysicsObjects(phys_loader);
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
@@ -256,14 +257,8 @@ Manager::Impl * Manager::Impl::init(
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = cfg.numWorlds,
-            .maxViewsPerWorld = consts::numAgents,
             .numExportedBuffers = 16,
             .gpuID = (uint32_t)cfg.gpuID,
-            .cameraMode = cfg.enableRender ? 
-                render::CameraMode::Perspective :
-                render::CameraMode::None,
-            .renderWidth = cfg.renderWidth,
-            .renderHeight = cfg.renderHeight,
         }, {
             "",
             { GPU_HIDESEEK_SRC_LIST },
@@ -272,10 +267,6 @@ Manager::Impl * Manager::Impl::init(
                 CompileConfig::OptMode::LTO,
             CompileConfig::Executor::TaskGraph,
         });
-
-        if (cfg.enableRender) {
-            mwgpu_exec.loadObjects(render_assets->objects);
-        }
 
         HostEventLogging(HostEvent::initEnd);
         return new CUDAImpl {

@@ -382,7 +382,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto reset_finish = clearTmp;
 #endif
 
-    if (cfg.enableRender) {
+    if (cfg.enableBatchRender || cfg.enableViewer) {
         render::RenderingSystem::setupTasks(builder,
             {reset_finish});
     }
@@ -436,7 +436,7 @@ Sim::Sim(Engine &ctx,
 
     curEpisodeStep = 0;
 
-    enableRender = cfg.enableRender;
+    enableRender = cfg.enableBatchRender || cfg.enableViewer;
     autoReset = cfg.autoReset;
 
     rooms = (Room *)rawAlloc(sizeof(Room) * consts::maxRooms);
