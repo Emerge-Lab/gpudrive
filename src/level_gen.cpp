@@ -51,6 +51,7 @@ static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
     return makeDynObject(ctx, offset, rot, 1, ResponseType::Static);
 }
 
+#if 0
 static void generateTrainingEnvironment(Engine &ctx)
 {
     const Vector2 bounds { -18.f, 18.f };
@@ -71,6 +72,49 @@ static void generateTrainingEnvironment(Engine &ctx)
 
         float x = xStart + ctx.data().rng.rand() * (xEnd - xStart);
         float y = yStart + ctx.data().rng.rand() * (yEnd - yStart);
+
+        Vector3 pos {
+            x, y, 1.5f,
+        };
+
+        const auto rot = Quat::angleAxis(ctx.data().rng.rand() * math::pi, {0, 0, 1});
+        Diag3x3 scale = {1.0f, 1.0f, 1.0f};
+
+        AABB aabb = obj_mgr.rigidBodyAABBs[4];
+        aabb = aabb.applyTRS(pos, rot, scale);
+
+        Entity agent = ctx.data().agents[i];
+
+        // Reset state for the agent
+        ctx.get<phys::broadphase::LeafID>(agent) =
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
+                    ctx.get<ObjectID>(agent));
+        ctx.get<Action>(agent) = { .x = 0, .y = 0, .r = 0, };
+        ctx.get<Position>(agent) = pos;
+        ctx.get<Rotation>(agent) = rot;
+        ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
+        ctx.get<Velocity>(agent) = { Vector3::zero(), Vector3::zero() };
+        ctx.get<ExternalForce>(agent) = Vector3::zero();
+        ctx.get<ExternalTorque>(agent) = Vector3::zero();
+    }
+
+    // Register the plane object again to the physics system
+    ctx.get<phys::broadphase::LeafID>(ctx.data().floorPlane) =
+        phys::RigidBodyPhysicsSystem::registerEntity(ctx, ctx.data().floorPlane, 
+            ctx.get<ObjectID>(ctx.data().floorPlane));
+}
+#endif
+
+static void generateTrainingEnvironment(Engine &ctx)
+{
+    const Vector2 bounds { -18.f, 18.f };
+
+    const ObjectManager &obj_mgr = *ctx.singleton<ObjectData>().mgr;
+
+    // Need to create the entities themselves
+    for (CountT i = 0; i < consts::numAgents; ++i) {
+        float x = (float)i*3.0f;
+        float y = (float)i*3.0f;
 
         Vector3 pos {
             x, y, 1.5f,

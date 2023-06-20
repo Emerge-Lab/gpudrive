@@ -81,11 +81,13 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     if (level != 0) {
-        resetEnvironment(ctx);
-
         reset.resetLevel = 0;
 
+#if 1
+        resetEnvironment(ctx);
+
         generateEnvironment(ctx);
+#endif
     } else {
         ctx.data().curEpisodeStep += 1;
     }
@@ -120,6 +122,9 @@ inline void movementSystem(Engine &ctx, Action &action,
 
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
+
+
+    printf("Entity at : %f %f %f\n", position.x, position.y, position.z);
 }
 
 // Resets doors to closed temporarily
@@ -165,6 +170,7 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
+#if 0
 inline void collectObservationsSystem(Engine &ctx,
                                       Entity agent_e,
                                       AgentType agent_type,
@@ -200,6 +206,23 @@ inline void collectObservationsSystem(Engine &ctx,
         Vector2 dstButtonPos = (dst.button.start + dst.button.end) * 0.5f;
         Vector2 diff = dstButtonPos - agentPosV2;
         des_obs.obs = { diff.length(), atan(diff.y / diff.x) };
+    }
+}
+#endif
+inline void collectObservationsSystem(Engine &ctx,
+                                      Entity agent_e,
+                                      AgentType agent_type,
+                                      RelativeAgentObservations &agent_obs,
+                                      RelativeButtonObservations &button_obs,
+                                      RelativeDestinationObservations &des_obs)
+{
+    Vector2 agentPosV2 = { ctx.get<Position>(agent_e).x, ctx.get<Position>(agent_e).y };
+
+    // Get relative agent observations
+    if (agent_e == ctx.data().agents[0]) {
+        Vector3 relAgentObsV3 = ctx.get<Position>(ctx.data().agents[1]) - ctx.get<Position>(agent_e);
+        Vector2 relAgentObs = { relAgentObsV3.x, relAgentObsV3.y };
+        agent_obs.obs[0] = { relAgentObs.length(), atan(relAgentObs.y / relAgentObs.x) };
     }
 }
 
@@ -304,6 +327,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
         Action, Position, Rotation, ExternalForce, ExternalTorque, AgentType>>({});
 
+#if 0
     auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
         OpenState>>({move_sys});
 
@@ -315,6 +339,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {set_door_pos_sys});
+
+#else
+    auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        {move_sys});
+#endif
 
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
         {broadphase_setup_sys}, numPhysicsSubsteps);

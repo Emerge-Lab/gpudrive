@@ -229,23 +229,44 @@ void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, Room &room, ConnectingDoor &d
     for (int i = 0; i < rooms.rooms.size(); ++i) {
         Room &other = rooms.rooms[i];
 
-        // Perform comparison
-        if (std::min(room.offset.y+room.extent.y, other.offset.y+other.extent.y) <= room.offset.y+room.extent.y &&
-            std::max(room.offset.y, other.offset.y) >= room.offset.y) {
-            // Check if this room is to the right or left of this one
-            if (fabs(other.offset.x - (room.offset.x + room.extent.x)) < EPS || 
-                    fabs((other.offset.x + other.extent.x) - room.offset.x) < EPS) {
-                // This room is adjacent and should be aware of this door
-                other.doors[other.doorCount++] = doorIdx;
+        if (door.orientation == Orientation::HORIZONTAL) {
+            // Check if the top or bottom of the room touch the door
+            Vector2 bottomStart = room.offset;
+            Vector2 bottomEnd = room.offset + Vector2{ room.extent.x, 0.0f };
+            Vector2 topStart = room.offset + Vector2{ 0.0f, room.extent.y };
+            Vector2 topEnd = room.offset + room.extent;
+
+            if (fabs(bottomStart.y - door.start.y) < EPS) {
+                if (bottomEnd.x >= door.start.x && door.end.x >= bottomStart.x) {
+                    other.doors[other.doorCount++] = doorIdx;
+                }
+            }
+            else if (fabs(topStart.y - door.start.y) < EPS) {
+                if (topEnd.x >= door.start.x && door.end.x >= topStart.x) {
+                    other.doors[other.doorCount++] = doorIdx;
+                }
             }
         }
-        else if (std::min(room.offset.x+room.extent.x, other.offset.x+other.extent.x) <= room.offset.x+room.extent.x &&
-                 std::max(room.offset.x, other.offset.x) >= room.offset.x) {
-            // Check if this room is on top or on the bottom of this one
-            if (fabs(other.offset.y - (room.offset.y + room.extent.y)) < EPS || 
-                    fabs((other.offset.y + other.extent.y) - room.offset.y) < EPS) {
-                other.doors[other.doorCount++] = doorIdx;
+        else if (door.orientation == Orientation::VERTICAL) {
+            // Check if the top or bottom of the room touch the door
+            Vector2 leftStart = room.offset;
+            Vector2 leftEnd = room.offset + Vector2{ 0.0f, room.extent.y };
+            Vector2 rightStart = room.offset + Vector2{ room.extent.x, 0.0f };
+            Vector2 rightEnd = room.offset + room.extent;
+
+            if (fabs(leftStart.x - door.start.x) < EPS) {
+                if (leftEnd.y >= door.start.y && door.end.y >= leftStart.y) {
+                    other.doors[other.doorCount++] = doorIdx;
+                }
             }
+            else if (fabs(rightStart.x - door.start.x) < EPS) {
+                if (rightEnd.y >= door.start.y && door.end.y >= rightStart.y) {
+                    other.doors[other.doorCount++] = doorIdx;
+                }
+            }
+        }
+        else {
+            assert(false);
         }
     }
 }
@@ -272,7 +293,7 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
             if (newDoors[j].orientation == Orientation::VERTICAL) {
                 if (!(fabs(newDoors[j].start.x - 0.0f) < EPS || fabs(newDoors[j].start.x - 1.0f) < EPS)) {
                     // Now, let's make the relevant rooms aware of this new door
-                    room.doors[j] = doors.size()-1;
+                    room.doors[j] = doors.size();
                     // Make adjacent rooms aware of this door
                     makeRoomsAwareOfDoor(rooms, room, newDoors[j], doors.size());
 
@@ -282,7 +303,7 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
             else {
                 if (!(fabs(newDoors[j].start.y - 0.0f) < EPS || fabs(newDoors[j].start.y - 1.0f) < EPS)) {
                     // Now, let's make the relevant rooms aware of this new door
-                    room.doors[j] = doors.size()-1;
+                    room.doors[j] = doors.size();
                     // Make adjacent rooms aware of this door
                     makeRoomsAwareOfDoor(rooms, room, newDoors[j], doors.size());
 
