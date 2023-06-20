@@ -172,8 +172,7 @@ struct Button : public madrona::Archetype<
     Position,
     Scale,
     ObjectID,
-    ButtonState,
-    madrona::render::ViewSettings
+    ButtonState
 > {};
 
 struct Door : public madrona::Archetype<
@@ -189,10 +188,7 @@ struct Door : public madrona::Archetype<
     madrona::phys::solver::PreSolveVelocity,
     ExternalForce,
     ExternalTorque,
-    madrona::phys::broadphase::LeafID,
-
-    // Render
-    madrona::render::ViewSettings
+    madrona::phys::broadphase::LeafID
 > {};
 
 // Camera

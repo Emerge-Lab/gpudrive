@@ -8,7 +8,7 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
-static Entity makeAgent(Engine &ctx, uint32_t agentIdx, int32_t viewIdx, Vector3 pos, Quat rot)
+static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
 {
     Entity agent = ctx.data().agents[agentIdx] = ctx.makeEntity<Agent>();
 
@@ -24,7 +24,7 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, int32_t viewIdx, Vector3
     if (ctx.data().enableRender) {
         ctx.get<render::ViewSettings>(agent) =
             render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
-                    Vector3 { 0, 0, 0.8 }, { viewIdx });
+                    Vector3 { 0, 0, 0.8 }, { (int32_t)agentIdx });
     }
 
     ObjectID agent_obj_id = ObjectID { 4 };
@@ -131,7 +131,7 @@ void createAgents(Engine &ctx)
         AABB aabb = obj_mgr.rigidBodyAABBs[4];
         aabb = aabb.applyTRS(pos, rot, scale);
 
-        ctx.data().agents[i] = makeAgent(ctx, i, 0, pos, rot);
+        ctx.data().agents[i] = makeAgent(ctx, i, pos, rot);
     }
 }
 
