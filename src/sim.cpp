@@ -123,7 +123,6 @@ inline void movementSystem(Engine &ctx, Action &action,
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
 
-
     printf("Entity at : %f %f %f\n", position.x, position.y, position.z);
 }
 
@@ -271,6 +270,7 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
+#if 0
 inline void rewardSystem(Engine &ctx,
                          Entity e,
                          AgentType agent_type)
@@ -304,6 +304,12 @@ inline void rewardSystem(Engine &ctx,
     if (cur_step == episodeLen - 1) {
         ctx.data().doneBuffer[l.row] = 1;
     }
+}
+#endif
+inline void rewardSystem(Engine &ctx,
+                         Entity e,
+                         AgentType agent_type)
+{
 }
 
 #ifdef MADRONA_GPU_MODE

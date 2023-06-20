@@ -59,3 +59,5 @@ madrona_python_module(gpu_hideseek_python
 target_link_libraries(gpu_hideseek_python PRIVATE
     gpu_hideseek_mgr
 )
+
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
