@@ -49,9 +49,6 @@ struct WorldReset {
     int32_t numSeekers;
 };
 
-struct GrabData {
-    Entity constraintEntity;
-};
 enum class AgentType : uint32_t {
 
     Agent = 0,

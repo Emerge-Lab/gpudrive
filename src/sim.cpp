@@ -23,7 +23,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerComponent<Action>();
     registry.registerComponent<AgentType>();
-    registry.registerComponent<GrabData>();
     registry.registerComponent<RelativeAgentObservations>();
     registry.registerComponent<RelativeButtonObservations>();
     registry.registerComponent<RelativeDestinationObservations>();

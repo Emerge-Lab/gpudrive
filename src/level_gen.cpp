@@ -42,7 +42,6 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
-    ctx.get<GrabData>(agent).constraintEntity = Entity::none();
 
     return agent;
 }
