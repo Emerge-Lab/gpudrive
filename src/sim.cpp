@@ -106,7 +106,7 @@ inline void movementSystem(Engine &ctx, Action &action,
     constexpr CountT half_buckets = discrete_action_buckets / 2;
     constexpr float discrete_move_max =  110;
     constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 0.9 * 30;
+    constexpr float discrete_turn_max = 30;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
     Vector3 cur_pos = position;
