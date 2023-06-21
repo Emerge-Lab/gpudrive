@@ -243,7 +243,8 @@ inline void lidarSystem(Engine &ctx,
 }
 
 inline void rewardSystem(Engine &ctx,
-                         Entity e)
+                         Entity e,
+                         Action &)
 {
     Loc l = ctx.loc(e);
 
@@ -328,7 +329,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         builder, {sim_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Entity>>({sim_done});
+         rewardSystem, Entity, Action>>({sim_done});
 
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({reward_sys});

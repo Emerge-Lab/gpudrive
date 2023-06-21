@@ -25,11 +25,11 @@ int main(int argc, char *argv[])
         (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str(),
     }, Span<char>(import_err.data(), import_err.size()));
 
-    Span<const imp::SourceMaterial> materials = {
+    std::array<imp::SourceMaterial, 3> materials = {{
         { math::Vector4{1.0f, 1.0f, 1.0f, 1.0f} },
         { math::Vector4{1.0f, 0.0f, 0.0f, 1.0f} },
         { math::Vector4{0.0f, 0.0f, 1.0f, 1.0f} }
-    };
+    }};
 
     if (!render_assets.has_value()) {
         FATAL("Failed to load render assets: %s", import_err);
