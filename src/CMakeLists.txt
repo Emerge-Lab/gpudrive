@@ -5,6 +5,8 @@ set(SIMULATOR_SRCS
     level_gen.hpp level_gen.cpp
 )
 
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+
 add_library(gpu_hideseek_cpu_impl STATIC
     ${SIMULATOR_SRCS}
 )

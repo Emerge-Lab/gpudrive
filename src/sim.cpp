@@ -65,6 +65,11 @@ static inline void resetEnvironment(Engine &ctx)
         ctx.destroyEntity(e);
     }
 
+    for (CountT i = 0; i < ctx.data().numDoors; ++i) {
+        Entity e = ctx.data().doors[i];
+        ctx.destroyEntity(e);
+    }
+
     ctx.data().numDoors = 0;
     ctx.data().roomCount = 0;
 }
