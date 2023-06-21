@@ -29,13 +29,16 @@ int main(int argc, char *argv[])
         FATAL("Failed to load render assets: %s", import_err);
     }
 
+    uint32_t num_worlds = 2;
+
     Viewer viewer({
         .gpuID = 0,
         .renderWidth = 2730,
         .renderHeight = 1536,
-        .numWorlds = 1,
-        .maxViewsPerWorld = 6,
+        .numWorlds = num_worlds,
+        .maxViewsPerWorld = 2,
         .maxInstancesPerWorld = 1000,
+        .defaultSimTickRate = 10,
         .execMode = ExecMode::CPU,
     });
 
@@ -44,7 +47,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
-        .numWorlds = 1,
+        .numWorlds = num_worlds,
         .renderWidth = 0,
         .renderHeight = 0,
         .autoReset = false,
@@ -52,7 +55,47 @@ int main(int argc, char *argv[])
         .debugCompile = false,
     }, viewer.rendererBridge());
 
-    viewer.loop([&mgr]() {
+    for (CountT i = 0; i < (CountT)num_worlds; i++) {
+        mgr.triggerReset(i);
+    }
+
+    mgr.step();
+
+    viewer.loop([&mgr](CountT world_idx, CountT agent_idx,
+                       const Viewer::UserInput &input) {
+        using Key = Viewer::KeyboardKey;
+
+        int32_t x = 0;
+        int32_t y = 0;
+        int32_t r = 0;
+
+        if (input.keyPressed(Key::R)) {
+            mgr.triggerReset(world_idx);
+        }
+
+        if (input.keyPressed(Key::W)) {
+            y += 5;
+        }
+        if (input.keyPressed(Key::S)) {
+            y -= 5;
+        }
+
+        if (input.keyPressed(Key::D)) {
+            x += 5;
+        }
+        if (input.keyPressed(Key::A)) {
+            x -= 5;
+        }
+
+        if (input.keyPressed(Key::Q)) {
+            r += 5;
+        }
+        if (input.keyPressed(Key::E)) {
+            r -= 5;
+        }
+
+        mgr.setAction(world_idx, agent_idx, x, y, r);
+    }, [&mgr]() {
         mgr.step();
     });
 }
