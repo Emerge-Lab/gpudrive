@@ -118,6 +118,7 @@ static void generateTrainingEnvironment(Engine &ctx)
 void generateEnvironment(Engine &ctx)
 {
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
+    episode_mgr.curEpisode.fetch_add<sync::relaxed>(150);
     uint32_t episode_idx =
         episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
     ctx.data().rng = RNG::make(episode_idx);
