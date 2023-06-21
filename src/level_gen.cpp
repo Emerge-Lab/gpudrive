@@ -75,7 +75,7 @@ static void generateTrainingEnvironment(Engine &ctx)
             x, y, 1.5f,
         };
 
-#if 1
+#if 0
         if (i == 0) {
             pos.x = 0.5f*(room.button.start.x + room.button.end.x);
             pos.y = 0.5f*(room.button.start.y + room.button.end.y);
