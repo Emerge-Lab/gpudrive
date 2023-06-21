@@ -161,8 +161,8 @@ struct Agent : public madrona::Archetype<
 > {};
 
 struct ButtonState {
-    bool isPressed;
-    int boundDoor;
+    CountT isPressed;
+    CountT boundDoor;
 };
 
 struct Button : public madrona::Archetype<
@@ -194,15 +194,15 @@ struct Room {
     madrona::math::Vector2 extent;
 
     // If this is negative, we are at the leaf
-    int8_t splitPlus;
-    int8_t splitNeg;
-    int8_t parent;
+    CountT splitPlus;
+    CountT splitNeg;
+    CountT parent;
 
-    int8_t leafIdx;
+    CountT leafIdx;
 
-    uint32_t doorCount;
-    uint32_t tmpOffset;
-    int8_t doors[consts::maxDoorsPerRoom+kTmpPadSpace];
+    CountT doorCount;
+    CountT tmpOffset;
+    CountT doors[consts::maxDoorsPerRoom+kTmpPadSpace];
 
     // Eligible for door
     bool isEligible;
@@ -215,9 +215,9 @@ struct Room {
     void addDoor(CountT at, CountT doorIdx)
     {
         if (doors[at] == -1)
-            doors[at] = (int8_t)doorIdx;
+            doors[at] = doorIdx;
         else
-            doors[consts::maxDoorsPerRoom + (tmpOffset++)] = (int8_t)doorIdx;
+            doors[consts::maxDoorsPerRoom + (tmpOffset++)] = doorIdx;
 
         doorCount++;
     }
@@ -240,23 +240,23 @@ struct Sim : public madrona::WorldBase {
     RNG rng;
 
     // Rooms
-    uint32_t roomCount;
+    CountT roomCount;
     Room *rooms;
-    uint32_t srcRoom;
-    uint32_t dstRoom;
+    CountT srcRoom;
+    CountT dstRoom;
 
-    uint32_t leafCount;
-    uint32_t *leafs;
+    CountT leafCount;
+    CountT *leafs;
 
     // Walls (which can retract into the ground)
-    uint32_t numWalls;
+    CountT numWalls;
     Entity *walls;
 
     Entity floorPlane;
 
     // Points into the wall entity array
     Entity *doors;
-    uint32_t numDoors;
+    CountT numDoors;
 
     // Agents which will try to get to the destination
     Entity agents[consts::numAgents];

@@ -17,7 +17,7 @@ inline madrona::Entity makeDynObject(
 void populateStaticGeometry(Engine &ctx,
                             RNG &rng,
                             madrona::math::Vector2 level_scale,
-                            uint32_t &srcRoom, uint32_t &dstRoom);
+                            CountT &srcRoom, CountT &dstRoom);
 
 // Finds which room an entity is in
 Room *containedRoom(madrona::math::Vector2 pos, Room *rooms);

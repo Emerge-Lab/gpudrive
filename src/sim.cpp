@@ -136,7 +136,7 @@ inline void doorControlSystem(Engine &ctx, Position &pos, AgentType &agent_type)
     // If the button is pressed, set the doors of this room to be open
     if (isPressingButton({ pos.x, pos.y }, room)) {
         for (CountT i = 0; i < room->doorCount; ++i) {
-            uint32_t doorIdx = room->doors[i];
+            CountT doorIdx = room->doors[i];
             ctx.get<OpenState>(ctx.data().doors[doorIdx]).isOpen = true;
         }
     }
@@ -183,7 +183,7 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     // Get relative button observations
-    uint32_t buttonCount = 0;
+    CountT buttonCount = 0;
     for (; buttonCount < ctx.data().leafCount; ++buttonCount) {
         Room &room = ctx.data().rooms[ctx.data().leafs[buttonCount]];
 
@@ -439,7 +439,7 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     rooms = (Room *)rawAlloc(sizeof(Room) * consts::maxRooms);
-    leafs = (uint32_t *)rawAlloc(sizeof(uint32_t) * consts::maxRooms);
+    leafs = (CountT *)rawAlloc(sizeof(CountT) * consts::maxRooms);
     walls = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
     doors = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
 

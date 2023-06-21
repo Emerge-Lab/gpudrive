@@ -53,15 +53,15 @@ struct ConnectingDoor {
     Vector2 start;
     Vector2 end;
 
-    uint32_t complement;
+    CountT complement;
 };
 
 struct EnvironmentRooms {
-    TmpArray<int8_t> leafs;
+    TmpArray<CountT> leafs;
     TmpArray<Room> rooms;
 
-    uint32_t srcRoom;
-    uint32_t dstRoom;
+    CountT srcRoom;
+    CountT dstRoom;
 };
 
 // This will generate all the rooms
@@ -85,7 +85,7 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
         {}
     };
 
-    for (uint32_t i = 0; i < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++i)
+    for (CountT i = 0; i < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++i)
         root.doors[i] = -1;
 
     EnvironmentRooms data;
@@ -98,7 +98,7 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
 
     while (data.rooms.size() < consts::maxRooms-1) {
         // Select a random room to split
-        int8_t parentLeafIdx = data.leafs[rng.u32Rand() % data.leafs.size()];
+        CountT parentLeafIdx = data.leafs[rng.u32Rand() % data.leafs.size()];
         Room &parent = data.rooms[parentLeafIdx];
 
         // Get a split factor which determines how deep the split is (0.4-0.6)
@@ -166,26 +166,26 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
 
     { // Find destination room
         Room *room = &data.rooms[0];
-        int8_t roomIdx = 0;
+        CountT roomIdx = 0;
         while (room->splitNeg != -1) {
             roomIdx = room->splitNeg;
             room = &data.rooms[roomIdx];
         }
 
         assert(roomIdx != -1);
-        data.srcRoom = (uint32_t)roomIdx;
+        data.srcRoom = roomIdx;
     }
 
     { // Find destination room
         Room *room = &data.rooms[0];
-        int8_t roomIdx = 0;
+        CountT roomIdx = 0;
         while (room->splitPlus != -1) {
             roomIdx = room->splitPlus;
             room = &data.rooms[roomIdx];
         }
 
         assert(roomIdx != -1);
-        data.dstRoom = (uint32_t)roomIdx;
+        data.dstRoom = roomIdx;
     }
 
     return data;
@@ -193,7 +193,7 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
 
 void makeDoors(Engine &ctx, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
 {
-    for (int leafIdx = 0; leafIdx < rooms.leafs.size(); ++leafIdx) {
+    for (CountT leafIdx = 0; leafIdx < rooms.leafs.size(); ++leafIdx) {
         Room &room = rooms.rooms[rooms.leafs[leafIdx]];
 
         ConnectingDoor newDoors[4] = {
@@ -207,11 +207,11 @@ void makeDoors(Engine &ctx, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &d
             { Orientation::HORIZONTAL, room.offset + Vector2{0, room.extent.y}, room.offset + room.extent, 2 }
         };
 
-        for (int localDoorIdx = 0; localDoorIdx < 4; ++localDoorIdx) {
+        for (CountT localDoorIdx = 0; localDoorIdx < 4; ++localDoorIdx) {
             ConnectingDoor &newDoor = newDoors[localDoorIdx];
 
             
-            for (int otherLeafIdx = 0; otherLeafIdx < rooms.leafs.size(); ++otherLeafIdx) {
+            for (CountT otherLeafIdx = 0; otherLeafIdx < rooms.leafs.size(); ++otherLeafIdx) {
                 if (otherLeafIdx == leafIdx) continue;
 
                 Room &otherRoom = rooms.rooms[rooms.leafs[otherLeafIdx]];
@@ -221,60 +221,9 @@ void makeDoors(Engine &ctx, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &d
     }
 }
 
-#if 0
-TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
+TmpArray<CountT> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
 {
-    TmpArray<uint32_t> eligibleRooms;
-    eligibleRooms.alloc(ctx, consts::maxRooms);
-
-    for (int i = 0; i < rooms.leafs.size(); ++i) {
-        int8_t roomIdx = rooms.leafs[i];
-        assert(roomIdx != -1);
-        Room &room = rooms.rooms[(uint32_t)roomIdx];
-        bool isEligible = true;
-
-        // Check that this room is eligible - this means checking that the walls are
-        // not interrupted by breaks (they are contiguous).
-        for (int j = 0; j < rooms.leafs.size(); ++j) {
-            int8_t otherRoomIdx = rooms.leafs[j];
-            assert(otherRoomIdx != -1);
-            Room &other = rooms.rooms[(uint32_t)otherRoomIdx];
-
-            // Perform comparison
-            if ((other.offset.y > room.offset.y && other.offset.y < room.offset.y+room.extent.y) ||
-                (other.offset.y+other.extent.y > room.offset.y && other.offset.y+other.extent.y < room.offset.y+room.extent.y)) {
-                // Check if this room is to the right or left of this one
-                if (fabs(other.offset.x - (room.offset.x + room.extent.x)) < EPS || 
-                    fabs((other.offset.x + other.extent.x) - room.offset.x) < EPS) {
-                    // The room is not eligible!
-                    isEligible = false;
-                    break;
-                }
-            }
-            else if ((other.offset.x > room.offset.x && other.offset.x < room.offset.y+room.extent.x) ||
-                    (other.offset.x+other.extent.x > room.offset.x && other.offset.x+other.extent.x < room.offset.x+room.extent.x)) {
-                // Check if this room is on top or on the bottom of this one
-                if (fabs(other.offset.y - (room.offset.y + room.extent.y)) < EPS || 
-                    fabs((other.offset.y + other.extent.y) - room.offset.y) < EPS) {
-                    // The room is not eligible!
-                    isEligible = false;
-                    break;
-                }
-            }
-        }
-
-        if (isEligible) {
-            rooms.rooms[roomIdx].isEligible = true;
-            eligibleRooms.push_back((uint32_t)roomIdx);
-        }
-    }
-    
-    return eligibleRooms;
-}
-#else
-TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &rooms)
-{
-    TmpArray<uint32_t> eligibleRooms;
+    TmpArray<CountT> eligibleRooms;
     eligibleRooms.alloc(ctx, consts::maxRooms);
 
     for (int i = 0; i < rooms.leafs.size(); ++i)
@@ -282,11 +231,10 @@ TmpArray<uint32_t> findEligibleRoomsForDoors(Engine &ctx, EnvironmentRooms &room
 
     return eligibleRooms;
 }
-#endif
 
-void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, uint32_t roomIdx, Room &room, ConnectingDoor &door, uint32_t doorIdx) {
-    for (uint32_t i = 0; i < rooms.leafs.size(); ++i) {
-        if ((uint32_t)rooms.leafs[i] == roomIdx)
+void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, CountT roomIdx, Room &room, ConnectingDoor &door, CountT doorIdx) {
+    for (CountT i = 0; i < rooms.leafs.size(); ++i) {
+        if (rooms.leafs[i] == roomIdx)
             continue;
 
         Room &other = rooms.rooms[rooms.leafs[i]];
@@ -333,10 +281,10 @@ void makeRoomsAwareOfDoor(EnvironmentRooms &rooms, uint32_t roomIdx, Room &room,
     }
 }
 
-uint32_t numRoomsSharingBoundary(EnvironmentRooms &rooms, Vector2 start, Vector2 end, Orientation orientation)
+CountT numRoomsSharingBoundary(EnvironmentRooms &rooms, Vector2 start, Vector2 end, Orientation orientation)
 {
-    uint32_t sharedCount = 0;
-    for (int i = 0; i < rooms.leafs.size(); ++i) {
+    CountT sharedCount = 0;
+    for (CountT i = 0; i < rooms.leafs.size(); ++i) {
         Room &room = rooms.rooms[rooms.leafs[i]];
 
         ConnectingDoor newDoors[4] = {
@@ -350,7 +298,7 @@ uint32_t numRoomsSharingBoundary(EnvironmentRooms &rooms, Vector2 start, Vector2
             { Orientation::HORIZONTAL, room.offset + Vector2{0, room.extent.y}, room.offset + room.extent, 2 }
         };
 
-        for (int j = 0; j < 4; ++j) {
+        for (CountT j = 0; j < 4; ++j) {
             if (orientation == Orientation::HORIZONTAL) {
                 if (fabs(start.y - newDoors[j].start.y) < EPS && end.x > newDoors[j].start.x && newDoors[j].end.x > start.x) {
                     sharedCount++;
@@ -369,11 +317,11 @@ uint32_t numRoomsSharingBoundary(EnvironmentRooms &rooms, Vector2 start, Vector2
     return sharedCount;
 }
 
-void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
+void placeDoors(TmpArray<CountT> &eligibleRooms, EnvironmentRooms &rooms, TmpArray<ConnectingDoor> &doors)
 {
     // Place the doors in the rooms that are eligible for doors
     // also make adjacent rooms aware of these doors.
-    for (int i = 0; i < eligibleRooms.size(); ++i) {
+    for (CountT i = 0; i < eligibleRooms.size(); ++i) {
         Room &room = rooms.rooms[eligibleRooms[i]];
         ConnectingDoor newDoors[4] = {
             // Left
@@ -387,12 +335,12 @@ void placeDoors(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, TmpA
         };
 
         // Only add these doors if they are not at the boundaries of the world and if they don't already exist
-        for (int j = 0; j < 4; ++j) {
+        for (CountT j = 0; j < 4; ++j) {
             if (room.doors[j] != -1)
                 continue;
 
             bool alreadyExists = false;
-            for (int d = 0; d < doors.size(); ++d) {
+            for (CountT d = 0; d < doors.size(); ++d) {
                 ConnectingDoor &existing = doors[d];
                 ConnectingDoor &newDoor = newDoors[j];
 
@@ -437,13 +385,13 @@ struct WallData {
     Vector2 end;
 
     // -1 if there is no door on this wall
-    int32_t doorIdx;
+    CountT doorIdx;
 };
 
 // If the wall shouldn't exist (duplicate), returns false, otherwise true
 bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls, TmpArray<ConnectingDoor> &doors)
 {
-    for (int i = 0; i < verticalWalls.size(); ++i) {
+    for (CountT i = 0; i < verticalWalls.size(); ++i) {
         WallData &other = verticalWalls[i];
 
         if (fabs(other.start.x - wall.start.x) < EPS) {
@@ -460,7 +408,7 @@ bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls, TmpArra
         }
     }
 
-    for (int i = 0; i < doors.size(); ++i) {
+    for (CountT i = 0; i < doors.size(); ++i) {
         ConnectingDoor &other = doors[i];
         if (other.orientation == Orientation::HORIZONTAL)
             continue;
@@ -484,7 +432,7 @@ bool cropVerticalWall(WallData &wall, TmpArray<WallData> &verticalWalls, TmpArra
 
 bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls, TmpArray<ConnectingDoor> &doors)
 {
-    for (int i = 0; i < horizontalWalls.size(); ++i) {
+    for (CountT i = 0; i < horizontalWalls.size(); ++i) {
         WallData &other = horizontalWalls[i];
 
         if (fabs(other.start.y - wall.start.y) < EPS) {
@@ -501,7 +449,7 @@ bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls, Tmp
         }
     }
 
-    for (int i = 0; i < doors.size(); ++i) {
+    for (CountT i = 0; i < doors.size(); ++i) {
         ConnectingDoor &other = doors[i];
         if (other.orientation == Orientation::VERTICAL)
             continue;
@@ -523,12 +471,12 @@ bool cropHorizontalWall(WallData &wall, TmpArray<WallData> &horizontalWalls, Tmp
     return true;
 }
 
-void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &rooms, 
+void addEligibleRoomWalls(TmpArray<CountT> &eligibleRooms, EnvironmentRooms &rooms, 
                           TmpArray<WallData> &verticalWalls, TmpArray<WallData> &horizontalWalls,
                           TmpArray<ConnectingDoor> &doors)
 {
     // First, add the walls from eligible rooms (for doors)
-    for (int i = 0; i < eligibleRooms.size(); ++i) {
+    for (CountT i = 0; i < eligibleRooms.size(); ++i) {
         Room &room = rooms.rooms[eligibleRooms[i]];
 
         // Add left wall
@@ -585,7 +533,7 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
 
         // Now order the doors in the room's door array properly
         room.doorCount = 0;
-        for (int d = 0; d < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++d) {
+        for (CountT d = 0; d < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++d) {
             if (room.doors[d] != -1)
                 room.doors[room.doorCount++] = room.doors[d];
         }
@@ -594,7 +542,7 @@ void addEligibleRoomWalls(TmpArray<uint32_t> &eligibleRooms, EnvironmentRooms &r
 
 void placeButtons(Engine &ctx, RNG &rng, EnvironmentRooms &rooms)
 {
-    for (int i = 0; i < rooms.leafs.size(); ++i) {
+    for (CountT i = 0; i < rooms.leafs.size(); ++i) {
         Room &room = rooms.rooms[rooms.leafs[i]];
         
         // Find the range of where the button center could be
@@ -644,8 +592,8 @@ madrona::Entity makeWallObject(Engine &ctx,
 void populateStaticGeometry(Engine &ctx,
         RNG &rng,
         Vector2 level_scale,
-        uint32_t &srcRoom,
-        uint32_t &dstRoom)
+        CountT &srcRoom,
+        CountT &dstRoom)
 {
     (void)level_scale;
     // This generated the rooms data structure as well as determine what the
@@ -657,7 +605,7 @@ void populateStaticGeometry(Engine &ctx,
     placeButtons(ctx, rng, rooms);
 
     // Get the rooms that are eligible for doors
-    TmpArray<uint32_t> eligibleRooms = findEligibleRoomsForDoors(ctx, rooms);
+    TmpArray<CountT> eligibleRooms = findEligibleRoomsForDoors(ctx, rooms);
 
     // Allocate doors
     TmpArray<ConnectingDoor> doors;
@@ -689,7 +637,7 @@ void populateStaticGeometry(Engine &ctx,
     ctx.data().roomCount = rooms.rooms.size();
 
     // Copy the rooms from the temporary allocator into the environment context
-    for (int i = 0; i < rooms.rooms.size(); ++i) {
+    for (CountT i = 0; i < rooms.rooms.size(); ++i) {
         ctx.data().rooms[i] = rooms.rooms[i];
 
         // Apply scale
@@ -701,7 +649,7 @@ void populateStaticGeometry(Engine &ctx,
     }
 
     ctx.data().leafCount = rooms.leafs.size();
-    for (int i = 0; i < rooms.leafs.size(); ++i) {
+    for (CountT i = 0; i < rooms.leafs.size(); ++i) {
         ctx.data().leafs[i] = rooms.leafs[i];
     }
 
@@ -711,10 +659,10 @@ void populateStaticGeometry(Engine &ctx,
     // Allocate doors
     ctx.data().numDoors = doors.size();
 
-    uint32_t wallCount = 0;
+    CountT wallCount = 0;
     
     // Now, we can add the walls' geometry to the scene
-    for (int i = 0; i < horizontalWalls.size(); ++i) {
+    for (CountT i = 0; i < horizontalWalls.size(); ++i) {
         WallData &wall = horizontalWalls[i];
 
         // Perform scale for the wall
@@ -739,7 +687,7 @@ void populateStaticGeometry(Engine &ctx,
     }
 
     // Vertical walls
-    for (int i = 0; i < verticalWalls.size(); ++i) {
+    for (CountT i = 0; i < verticalWalls.size(); ++i) {
         WallData &wall = verticalWalls[i];
 
         // Perform scale for the wall
@@ -764,7 +712,7 @@ void populateStaticGeometry(Engine &ctx,
     }
 
     // Doors
-    for (int i = 0; i < doors.size(); ++i) {
+    for (CountT i = 0; i < doors.size(); ++i) {
         ConnectingDoor &door = doors[i];
 
         // Perform scale for the wall
