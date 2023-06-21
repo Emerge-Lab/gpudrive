@@ -54,45 +54,9 @@ struct WorldReset {
     int32_t numSeekers;
 };
 
-enum class AgentType : uint32_t {
-    Agent = 0,
-    Camera = 1,
-};
-
-struct DynamicObject : public madrona::Archetype<
-    Position, 
-    Rotation,
-    Scale,
-    Velocity,
-    ObjectID,
-    ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
-    madrona::phys::broadphase::LeafID
-> {};
-
 struct OpenState {
     CountT isOpen;
 };
-
-struct WallObject : public madrona::Archetype<
-    Position, 
-    Rotation,
-    Scale,
-    Velocity,
-    ObjectID,
-    ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
-    madrona::phys::broadphase::LeafID,
-    OpenState
-> {};
 
 struct Action {
     int32_t x;
@@ -131,6 +95,37 @@ struct Seed {
 
 static_assert(sizeof(Action) == 3 * sizeof(int32_t));
 
+struct WallObject : public madrona::Archetype<
+    Position, 
+    Rotation,
+    Scale,
+    Velocity,
+    ObjectID,
+    ResponseType,
+    madrona::phys::solver::SubstepPrevState,
+    madrona::phys::solver::PreSolvePositional,
+    madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
+    ExternalTorque,
+    madrona::phys::broadphase::LeafID,
+    OpenState
+> {};
+
+struct DynamicObject : public madrona::Archetype<
+    Position, 
+    Rotation,
+    Scale,
+    Velocity,
+    ObjectID,
+    ResponseType,
+    madrona::phys::solver::SubstepPrevState,
+    madrona::phys::solver::PreSolvePositional,
+    madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
+    ExternalTorque,
+    madrona::phys::broadphase::LeafID
+> {};
+
 // There are 2 Agents in the environment trying to get to the destination
 struct Agent : public madrona::Archetype<
     // Basic things
@@ -149,7 +144,6 @@ struct Agent : public madrona::Archetype<
 
     // Inputs
     Action,
-    AgentType,
 
     // Observations
     RelativeAgentObservations,

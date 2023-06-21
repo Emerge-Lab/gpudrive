@@ -22,7 +22,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     render::RenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
-    registry.registerComponent<AgentType>();
     registry.registerComponent<RelativeAgentObservations>();
     registry.registerComponent<RelativeButtonObservations>();
     registry.registerComponent<RelativeDestinationObservations>();
@@ -41,7 +40,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportSingleton<WorldReset>((uint32_t)ExportIDs::Reset);
 
     registry.exportColumn<Agent, Action>((uint32_t)ExportIDs::Action);
-    registry.exportColumn<Agent, AgentType>(4);
     registry.exportColumn<Agent, RelativeAgentObservations>(5);
     registry.exportColumn<Agent, RelativeButtonObservations>(6);
     registry.exportColumn<Agent, RelativeDestinationObservations>(7);
@@ -97,10 +95,11 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 }
 
 // Provide forces for entities which are controlled by actions (the two agents in this case).
-inline void movementSystem(Engine &ctx, Action &action, 
-                           Position &position, Rotation &rot, 
-                           ExternalForce &external_force, ExternalTorque &external_torque,
-                           AgentType agent_type)
+inline void movementSystem(Engine &,
+                           Action &action, 
+                           Rotation &rot, 
+                           ExternalForce &external_force,
+                           ExternalTorque &external_torque)
 {
     constexpr CountT discrete_action_buckets = 11;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
@@ -109,34 +108,24 @@ inline void movementSystem(Engine &ctx, Action &action,
     constexpr float discrete_turn_max = 30;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
-    Vector3 cur_pos = position;
     Quat cur_rot = rot;
 
     float f_x = move_delta_per_bucket * action.x;
     float f_y = move_delta_per_bucket * action.y;
     float t_z = turn_delta_per_bucket * action.r;
 
-    if (agent_type == AgentType::Camera) {
-        position = cur_pos + 0.001f * cur_rot.rotateVec({f_x, f_y, 0});
-
-        Quat delta_rot = Quat::angleAxis(t_z * 0.001f, math::up);
-        rot = (delta_rot * cur_rot).normalize();
-
-        return;
-    }
-
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
 }
 
 // Resets doors to closed temporarily
-inline void resetDoorStateSystem(Engine &ctx, Entity e, OpenState &open_state)
+inline void resetDoorStateSystem(Engine &, OpenState &open_state)
 {
     open_state.isOpen = false;
 }
 
 // Sets door open state given where entities are (loops through entities).
-inline void doorControlSystem(Engine &ctx, Position &pos, AgentType &agent_type)
+inline void doorControlSystem(Engine &ctx, Position &pos)
 {
     Room *room = containedRoom({ pos.x, pos.y }, ctx.data().rooms);
 
@@ -149,7 +138,7 @@ inline void doorControlSystem(Engine &ctx, Position &pos, AgentType &agent_type)
     }
 }
 
-inline void setDoorPositionSystem(Engine &ctx, Entity e, Position &pos, OpenState &open_state)
+inline void setDoorPositionSystem(Engine &, Position &pos, OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
@@ -172,10 +161,8 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
-#if 1
 inline void collectObservationsSystem(Engine &ctx,
                                       Entity agent_e,
-                                      AgentType agent_type,
                                       RelativeAgentObservations &agent_obs,
                                       RelativeButtonObservations &button_obs,
                                       RelativeDestinationObservations &des_obs)
@@ -210,28 +197,9 @@ inline void collectObservationsSystem(Engine &ctx,
         des_obs.obs = { diff.length(), atan(diff.y / diff.x) };
     }
 }
-#else
-inline void collectObservationsSystem(Engine &ctx,
-                                      Entity agent_e,
-                                      AgentType agent_type,
-                                      RelativeAgentObservations &agent_obs,
-                                      RelativeButtonObservations &button_obs,
-                                      RelativeDestinationObservations &des_obs)
-{
-    Vector2 agentPosV2 = { ctx.get<Position>(agent_e).x, ctx.get<Position>(agent_e).y };
-
-    // Get relative agent observations
-    if (agent_e == ctx.data().agents[0]) {
-        Vector3 relAgentObsV3 = ctx.get<Position>(ctx.data().agents[1]) - ctx.get<Position>(agent_e);
-        Vector2 relAgentObs = { relAgentObsV3.x, relAgentObsV3.y };
-        agent_obs.obs[0] = { relAgentObs.length(), atan(relAgentObs.y / relAgentObs.x) };
-    }
-}
-#endif
 
 inline void lidarSystem(Engine &ctx,
                         Entity e,
-                        AgentType agent_type,
                         Lidar &lidar)
 {
     Vector3 pos = ctx.get<Position>(e);
@@ -274,10 +242,8 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
-#if 1
 inline void rewardSystem(Engine &ctx,
-                         Entity e,
-                         AgentType agent_type)
+                         Entity e)
 {
     Loc l = ctx.loc(e);
 
@@ -309,13 +275,6 @@ inline void rewardSystem(Engine &ctx,
         ctx.data().doneBuffer[l.row] = 1;
     }
 }
-#else
-inline void rewardSystem(Engine &ctx,
-                         Entity e,
-                         AgentType agent_type)
-{
-}
-#endif
 
 #ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
@@ -336,17 +295,17 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 {
     auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
-        Action, Position, Rotation, ExternalForce, ExternalTorque, AgentType>>({});
+        Action, Rotation, ExternalForce, ExternalTorque>>({});
 
 #if 1
     auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
-        Entity, OpenState>>({move_sys});
+        OpenState>>({move_sys});
 
     auto door_control_sys = builder.addToGraph<ParallelForNode<Engine, doorControlSystem,
-        Position, AgentType>>({reset_door_sys});
+        Position>>({reset_door_sys});
 
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
-        Entity, Position, OpenState>>({door_control_sys});
+        Position, OpenState>>({door_control_sys});
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {set_door_pos_sys});
@@ -369,7 +328,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         builder, {sim_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Entity, AgentType>>({sim_done});
+         rewardSystem, Entity>>({sim_done});
 
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({reward_sys});
@@ -378,7 +337,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
 #ifdef MADRONA_GPU_MODE
     // FIXME: these 3 need to be compacted, but sorting is unnecessary
-    auto sort_cam_agent = queueSortByWorld<CameraAgent>(builder, {clearTmp});
     auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
     auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
     auto sort_agent_iface =
@@ -401,7 +359,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto collect_observations = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
             Entity,
-            AgentType,
             RelativeAgentObservations,
             RelativeButtonObservations,
             RelativeDestinationObservations
@@ -415,7 +372,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         lidarSystem,
 #endif
             Entity,
-            AgentType,
             Lidar
         >>({reset_finish});
 
