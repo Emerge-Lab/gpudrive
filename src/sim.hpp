@@ -32,14 +32,19 @@ using madrona::phys::ExternalTorque;
 
 namespace consts {
 
-static constexpr uint32_t numAgents = 2;
+inline constexpr uint32_t numAgents = 2;
 
 // NOTE: There will be as many buttons as there are rooms.
-static constexpr uint32_t maxRooms = 7;
+inline constexpr uint32_t maxRooms = 7;
 
-static constexpr uint32_t maxDoorsPerRoom = 6;
+inline constexpr uint32_t maxDoorsPerRoom = 6;
 
 }
+
+enum class ExportIDs : uint32_t {
+    Reset = 0,
+    Action = 2,
+};
 
 class Engine;
 
@@ -50,7 +55,6 @@ struct WorldReset {
 };
 
 enum class AgentType : uint32_t {
-
     Agent = 0,
     Camera = 1,
 };

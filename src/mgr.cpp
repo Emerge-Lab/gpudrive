@@ -30,6 +30,8 @@ struct Manager::Impl {
     Config cfg;
     PhysicsLoader physicsLoader;
     EpisodeManager *episodeMgr;
+    WorldReset *worldResetBuffer;
+    Action *agentActionsBuffer;
     float *rewardsBuffer;
     uint8_t *donesBuffer;
 
@@ -268,12 +270,20 @@ Manager::Impl * Manager::Impl::init(
             CompileConfig::Executor::TaskGraph,
         });
 
+        WorldReset *world_reset_buffer = 
+            (WorldReset *)mwgpu_exec.getExported((uint32_t)ExportIDs::Reset);
+
+        Action *agent_actions_buffer = 
+            (Action *)mwgpu_exec.getExported((uint32_t)ExportIDs::Action);
+
         HostEventLogging(HostEvent::initEnd);
         return new CUDAImpl {
             { 
                 cfg,
                 std::move(phys_loader),
                 episode_mgr,
+                world_reset_buffer,
+                agent_actions_buffer,
                 reward_buffer,
                 done_buffer,
             },
@@ -310,23 +320,33 @@ Manager::Impl * Manager::Impl::init(
             };
         }
 
+        CPUImpl::TaskGraphT cpu_exec {
+            ThreadPoolExecutor::Config {
+                .numWorlds = cfg.numWorlds,
+                .numExportedBuffers = 16,
+            },
+            app_cfg,
+            world_inits.data(),
+            viewer_bridge,
+        };
+
+        WorldReset *world_reset_buffer = 
+            (WorldReset *)cpu_exec.getExported((uint32_t)ExportIDs::Reset);
+
+        Action *agent_actions_buffer = 
+            (Action *)cpu_exec.getExported((uint32_t)ExportIDs::Action);
+
         auto cpu_impl = new CPUImpl {
             { 
                 cfg,
                 std::move(phys_loader),
                 episode_mgr,
+                world_reset_buffer,
+                agent_actions_buffer,
                 reward_buffer,
                 done_buffer,
             },
-            CPUImpl::TaskGraphT {
-                ThreadPoolExecutor::Config {
-                    .numWorlds = cfg.numWorlds,
-                    .numExportedBuffers = 16,
-                },
-                app_cfg,
-                world_inits.data(),
-                viewer_bridge,
-            },
+            std::move(cpu_exec),
         };
 
         HostEventLogging(HostEvent::initEnd);
@@ -398,7 +418,8 @@ MADRONA_EXPORT void Manager::step()
 
 MADRONA_EXPORT Tensor Manager::resetTensor() const
 {
-    return exportStateTensor(0, Tensor::ElementType::Int32,
+    return exportStateTensor((uint32_t)ExportIDs::Reset,
+                             Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds, 3});
 }
 
@@ -415,7 +436,7 @@ MADRONA_EXPORT Tensor Manager::doneTensor() const
 
 MADRONA_EXPORT Tensor Manager::actionTensor() const
 {
-    return exportStateTensor(2, Tensor::ElementType::Int32,
+    return exportStateTensor((uint32_t)ExportIDs::Action, Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds * consts::numAgents, 5});
 }
 
@@ -560,5 +581,44 @@ Tensor Manager::exportStateTensor(int64_t slot,
     return Tensor(dev_ptr, type, dimensions, gpu_id);
 }
 
+MADRONA_EXPORT void Manager::triggerReset(int32_t world_idx)
+{
+    WorldReset reset {
+        1, 0, 0, // FIXME
+    };
+
+    auto *reset_ptr = impl_->worldResetBuffer + world_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(reset_ptr, &reset, sizeof(WorldReset),
+                   cudaMemcpyHostToDevice);
+#endif
+    }  else {
+        *reset_ptr = reset;
+    }
+}
+
+MADRONA_EXPORT void Manager::setAction(int32_t world_idx, int32_t agent_idx,
+                                       int32_t x, int32_t y, int32_t r)
+{
+    Action action { 
+        .x = x,
+        .y = y,
+        .r = r,
+    };
+
+    auto *action_ptr = impl_->agentActionsBuffer +
+        world_idx * consts::numAgents + agent_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(action_ptr, &action, sizeof(Action),
+                   cudaMemcpyHostToDevice);
+#endif
+    } else {
+        *action_ptr = action;
+    }
+}
 
 }

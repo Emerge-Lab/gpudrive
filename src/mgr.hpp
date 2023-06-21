@@ -42,6 +42,10 @@ public:
     MADRONA_IMPORT madrona::py::Tensor lidarTensor() const;
     MADRONA_IMPORT madrona::py::Tensor seedTensor() const;
 
+    MADRONA_IMPORT void triggerReset(int32_t world_idx);
+    MADRONA_IMPORT void setAction(int32_t world_idx, int32_t agent_idx,
+                                  int32_t x, int32_t y, int32_t r);
+
 private:
     struct Impl;
     struct CPUImpl;
