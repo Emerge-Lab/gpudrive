@@ -25,6 +25,12 @@ int main(int argc, char *argv[])
         (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str(),
     }, Span<char>(import_err.data(), import_err.size()));
 
+    Span<const imp::SourceMaterial> materials = {
+        { math::Vector4{1.0f, 1.0f, 1.0f, 1.0f} },
+        { math::Vector4{1.0f, 0.0f, 0.0f, 1.0f} },
+        { math::Vector4{0.0f, 0.0f, 1.0f, 1.0f} }
+    };
+
     if (!render_assets.has_value()) {
         FATAL("Failed to load render assets: %s", import_err);
     }
@@ -42,7 +48,15 @@ int main(int argc, char *argv[])
         .execMode = ExecMode::CPU,
     });
 
-    viewer.loadObjects(render_assets->objects);
+    const_cast<uint32_t&>(render_assets->objects[0].meshes[0].materialIDX) = 0;
+    const_cast<uint32_t&>(render_assets->objects[1].meshes[0].materialIDX) = 0;
+    const_cast<uint32_t&>(render_assets->objects[2].meshes[0].materialIDX) = 0;
+    const_cast<uint32_t&>(render_assets->objects[3].meshes[0].materialIDX) = 0;
+    const_cast<uint32_t&>(render_assets->objects[4].meshes[0].materialIDX) = 2;
+    const_cast<uint32_t&>(render_assets->objects[5].meshes[0].materialIDX) = 0;
+    const_cast<uint32_t&>(render_assets->objects[6].meshes[0].materialIDX) = 0;
+
+    viewer.loadObjects(render_assets->objects, materials);
 
     Manager mgr({
         .execMode = ExecMode::CPU,
