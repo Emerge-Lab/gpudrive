@@ -75,8 +75,6 @@ static inline void resetEnvironment(Engine &ctx)
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t level = reset.resetLevel;
-    ctx.data().curEpisodeStep = 0;
-
     if (ctx.data().autoReset && ctx.data().curEpisodeStep == episodeLen - 1) {
         level = 1;
     }
@@ -84,11 +82,12 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     if (level != 0) {
         reset.resetLevel = 0;
 
-#if 1
         resetEnvironment(ctx);
-
         generateEnvironment(ctx);
-#endif
+
+        if (ctx.data().enableVizRender) {
+            viz::VizRenderingSystem::markEpisode(ctx);
+        }
     } else {
         ctx.data().curEpisodeStep += 1;
     }
