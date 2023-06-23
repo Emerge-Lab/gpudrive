@@ -5,7 +5,7 @@
 #include <madrona/custom_context.hpp>
 #include <madrona/components.hpp>
 #include <madrona/physics.hpp>
-#include <madrona/render/mw.hpp>
+#include <madrona/viz/system.hpp>
 
 #include "init.hpp"
 #include "rng.hpp"
@@ -155,7 +155,7 @@ struct Agent : public madrona::Archetype<
     Seed,
 
     // Render
-    madrona::render::ViewSettings
+    madrona::viz::VizCamera
 > {};
 
 struct ButtonState {
@@ -264,7 +264,8 @@ struct Sim : public madrona::WorldBase {
     CountT maxEpisodeEntities;
 
     uint32_t curEpisodeSeed;
-    bool enableRender;
+    bool enableBatchRender;
+    bool enableVizRender;
     bool autoReset;
 };
 

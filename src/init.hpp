@@ -13,6 +13,7 @@ struct WorldInit {
     float *rewardBuffer;
     uint8_t *doneBuffer;
     madrona::phys::ObjectManager *rigidBodyObjMgr;
+    const madrona::viz::VizECSBridge *vizBridge;
     uint32_t minEntitiesPerWorld;
     uint32_t maxEntitiesPerWorld;
 };

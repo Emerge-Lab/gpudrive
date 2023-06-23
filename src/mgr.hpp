@@ -4,7 +4,9 @@
 
 #include <madrona/python.hpp>
 #include <madrona/exec_mode.hpp>
+
 #include <madrona/render/mw.hpp>
+#include <madrona/viz/system.hpp>
 
 namespace GPUHideSeek {
 
@@ -23,8 +25,9 @@ public:
         bool debugCompile;
     };
 
-    MADRONA_IMPORT Manager(const Config &cfg,
-                           const madrona::render::RendererBridge *viewer_bridge = nullptr);
+    MADRONA_IMPORT Manager(
+        const Config &cfg,
+        const madrona::viz::VizECSBridge *viz_bridge = nullptr);
     MADRONA_IMPORT ~Manager();
 
     MADRONA_IMPORT void step();
