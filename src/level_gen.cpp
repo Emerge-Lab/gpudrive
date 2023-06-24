@@ -21,10 +21,10 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
     ctx.get<Rotation>(agent) = rot;
     ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
 
-    if (ctx.data().enableRender) {
-        ctx.get<render::ViewSettings>(agent) =
-            render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
-                    Vector3 { 0, 0, 0.8 }, { (int32_t)agentIdx });
+    if (ctx.data().enableVizRender) {
+        ctx.get<viz::VizCamera>(agent) =
+            viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
+                    Vector3 { 0, 0, 0.8 }, (int32_t)agentIdx);
     }
 
     ObjectID agent_obj_id = ObjectID { 4 };
@@ -102,10 +102,10 @@ static void generateTrainingEnvironment(Engine &ctx)
         ctx.get<ExternalForce>(agent) = Vector3::zero();
         ctx.get<ExternalTorque>(agent) = Vector3::zero();
 
-        if (ctx.data().enableRender) {
-            ctx.get<render::ViewSettings>(agent) =
-                render::RenderingSystem::setupView(ctx, 90.f, 0.001f,
-                        Vector3 { 0, 0, 0.8 }, { (int32_t)i });
+        if (ctx.data().enableVizRender) {
+            ctx.get<viz::VizCamera>(agent) =
+                viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
+                    Vector3 { 0, 0, 0.8 }, { (int32_t)i });
         }
     }
 

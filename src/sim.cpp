@@ -19,7 +19,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
     base::registerTypes(registry);
     phys::RigidBodyPhysicsSystem::registerTypes(registry);
-    render::RenderingSystem::registerTypes(registry);
+    viz::VizRenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
     registry.registerComponent<RelativeAgentObservations>();
@@ -51,8 +51,8 @@ static inline void resetEnvironment(Engine &ctx)
 {
     ctx.data().curEpisodeStep = 0;
 
-    if (ctx.data().enableRender) {
-        render::RenderingSystem::reset(ctx);
+    if (ctx.data().enableVizRender) {
+        viz::VizRenderingSystem::reset(ctx);
     }
 
     phys::RigidBodyPhysicsSystem::reset(ctx);
@@ -75,8 +75,6 @@ static inline void resetEnvironment(Engine &ctx)
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t level = reset.resetLevel;
-    ctx.data().curEpisodeStep = 0;
-
     if (ctx.data().autoReset && ctx.data().curEpisodeStep == episodeLen - 1) {
         level = 1;
     }
@@ -84,11 +82,12 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     if (level != 0) {
         reset.resetLevel = 0;
 
-#if 1
         resetEnvironment(ctx);
-
         generateEnvironment(ctx);
-#endif
+
+        if (ctx.data().enableVizRender) {
+            viz::VizRenderingSystem::markEpisode(ctx);
+        }
     } else {
         ctx.data().curEpisodeStep += 1;
     }
@@ -152,7 +151,7 @@ inline void setDoorPositionSystem(Engine &, Position &pos, OpenState &open_state
 
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
-                               render::ViewSettings &)
+                               viz::VizCamera &)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -320,7 +319,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         {broadphase_setup_sys}, numPhysicsSubsteps);
 
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, render::ViewSettings>>(
+        agentZeroVelSystem, Velocity, viz::VizCamera>>(
             {substep_sys});
 
     auto sim_done = agent_zero_vel;
@@ -347,9 +346,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto reset_finish = clearTmp;
 #endif
 
-    if (cfg.enableBatchRender || cfg.enableViewer) {
-        render::RenderingSystem::setupTasks(builder,
-            {reset_finish});
+    if (cfg.enableViewer) {
+        viz::VizRenderingSystem::setupTasks(builder, {reset_finish});
     }
 
 #ifdef MADRONA_GPU_MODE
@@ -399,7 +397,13 @@ Sim::Sim(Engine &ctx,
 
     curEpisodeStep = 0;
 
-    enableRender = cfg.enableBatchRender || cfg.enableViewer;
+    enableBatchRender = cfg.enableBatchRender;
+    enableVizRender = cfg.enableViewer;
+
+    if (enableVizRender) {
+        viz::VizRenderingSystem::init(ctx, init.vizBridge);
+    }
+
     autoReset = cfg.autoReset;
 
     rooms = (Room *)rawAlloc(sizeof(Room) * consts::maxRooms);

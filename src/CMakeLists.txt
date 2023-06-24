@@ -15,6 +15,7 @@ target_link_libraries(gpu_hideseek_cpu_impl
     PRIVATE
         madrona_common
         madrona_mw_physics
+        madrona_viz_system
 )
 
 add_library(gpu_hideseek_mgr SHARED

@@ -36,7 +36,7 @@ struct Manager::Impl {
     uint8_t *donesBuffer;
 
     static inline Impl * init(const Config &cfg,
-                              const render::RendererBridge *viewer_bridge);
+                              const viz::VizECSBridge *viz_bridge);
 };
 
 struct Manager::CPUImpl : Manager::Impl {
@@ -195,7 +195,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
 Manager::Impl * Manager::Impl::init(
     const Config &cfg,
-    const render::RendererBridge *viewer_bridge)
+    const viz::VizECSBridge *viz_bridge)
 {
     HostEventLogging(HostEvent::initStart);
 
@@ -216,7 +216,7 @@ Manager::Impl * Manager::Impl::init(
 
     GPUHideSeek::Config app_cfg {
         cfg.enableBatchRender,
-        viewer_bridge != nullptr,
+        viz_bridge != nullptr,
         cfg.autoReset,
     };
 
@@ -246,6 +246,7 @@ Manager::Impl * Manager::Impl::init(
                 reward_buffer,
                 done_buffer,
                 phys_obj_mgr,
+                viz_bridge,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
             };
@@ -315,6 +316,7 @@ Manager::Impl * Manager::Impl::init(
                 reward_buffer + i * consts::numAgents,
                 done_buffer + i * consts::numAgents,
                 phys_obj_mgr,
+                viz_bridge,
                 cfg.minEntitiesPerWorld,
                 cfg.maxEntitiesPerWorld,
             };
@@ -327,7 +329,6 @@ Manager::Impl * Manager::Impl::init(
             },
             app_cfg,
             world_inits.data(),
-            viewer_bridge,
         };
 
         WorldReset *world_reset_buffer = 
@@ -358,8 +359,8 @@ Manager::Impl * Manager::Impl::init(
 }
 
 MADRONA_EXPORT Manager::Manager(const Config &cfg,
-                                const render::RendererBridge *viewer_bridge)
-    : impl_(Impl::init(cfg, viewer_bridge))
+                                const viz::VizECSBridge *viz_bridge)
+    : impl_(Impl::init(cfg, viz_bridge))
 {}
 
 MADRONA_EXPORT Manager::~Manager() {
