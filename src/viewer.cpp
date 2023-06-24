@@ -26,9 +26,9 @@ int main(int argc, char *argv[])
     }, Span<char>(import_err.data(), import_err.size()));
 
     std::array<imp::SourceMaterial, 3> materials = {{
-        { math::Vector4{1.0f, 1.0f, 1.0f, 1.0f} },
-        { math::Vector4{1.0f, 0.0f, 0.0f, 1.0f} },
-        { math::Vector4{0.0f, 0.0f, 1.0f, 1.0f} }
+        { math::Vector4{0.2f, 0.2f, 0.2f, 0.0f} },
+        { math::Vector4{1.0f, 0.0f, 0.0f, 0.0f} },
+        { math::Vector4{0.0f, 0.0f, 1.0f, 0.0f} }
     }};
 
     if (!render_assets.has_value()) {
