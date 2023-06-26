@@ -26,9 +26,9 @@ int main(int argc, char *argv[])
     }, Span<char>(import_err.data(), import_err.size()));
 
     std::array<imp::SourceMaterial, 3> materials = {{
-        { math::Vector4{0.2f, 0.2f, 0.2f, 0.0f} },
-        { math::Vector4{1.0f, 0.0f, 0.0f, 0.0f} },
-        { math::Vector4{0.0f, 0.0f, 1.0f, 0.0f} }
+        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f} },
+        { math::Vector4{1.0f, 0.1f, 0.1f, 0.0f} },
+        { math::Vector4{0.1f, 0.1f, 1.0f, 0.0f} }
     }};
 
     if (!render_assets.has_value()) {
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     viewer.loadObjects(render_assets->objects, materials);
 
     viewer.configureLighting({
-        { true, math::Vector3{-1.0f, -1.0f, -1.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
+        { true, math::Vector3{1.0f, 1.0f, -0.1f}, math::Vector3{1.0f, 1.0f, 1.0f} }
     });
 
     Manager mgr({
