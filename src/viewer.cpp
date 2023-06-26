@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     viewer.loadObjects(render_assets->objects, materials);
 
     viewer.configureLighting({
-        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
+        { true, math::Vector3{1.0f, 1.0f, -1.5f}, math::Vector3{1.0f, 1.0f, 1.0f} }
     });
 
     Manager mgr({
