@@ -16,13 +16,13 @@ int main(int argc, char *argv[])
 
     std::array<char, 1024> import_err;
     auto render_assets = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "sphere.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "plane.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "sphere.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "plane.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").string().c_str(),
     }, Span<char>(import_err.data(), import_err.size()));
 
     std::array<imp::SourceMaterial, 3> materials = {{
