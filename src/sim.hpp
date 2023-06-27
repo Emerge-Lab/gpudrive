@@ -95,6 +95,13 @@ struct Seed {
 
 static_assert(sizeof(Action) == 3 * sizeof(int32_t));
 
+struct ButtonObject : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID
+> {};
+
 struct WallObject : public madrona::Archetype<
     Position, 
     Rotation,
@@ -209,6 +216,7 @@ struct Room {
     float splitFactor;
 
     ButtonInfo button;
+    Entity buttonEntity;
 
     void addDoor(CountT at, CountT doorIdx)
     {

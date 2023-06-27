@@ -15,6 +15,6 @@ void createAgents(Engine &ctx);
 // Creates the floor
 void createFloor(Engine &ctx);
 
-static constexpr float BUTTON_WIDTH = 1.0f/36.0f;
+static constexpr float BUTTON_WIDTH = 1.0f/22.0f;
 
 }

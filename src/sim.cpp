@@ -36,6 +36,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerArchetype<Agent>();
     registry.registerArchetype<DynamicObject>();
     registry.registerArchetype<WallObject>();
+    registry.registerArchetype<ButtonObject>();
 
     registry.exportSingleton<WorldReset>((uint32_t)ExportIDs::Reset);
 
@@ -56,6 +57,12 @@ static inline void resetEnvironment(Engine &ctx)
     }
 
     phys::RigidBodyPhysicsSystem::reset(ctx);
+
+#if 1
+    for (CountT i = 0; i < ctx.data().leafCount; ++i) {
+        ctx.destroyEntity(ctx.data().rooms[ctx.data().leafs[i]].buttonEntity);
+    }
+#endif
 
     // Destroy the wall entities (door entities count as walls)
     for (CountT i = 0; i < ctx.data().numWalls; ++i) {
@@ -124,8 +131,10 @@ inline void resetDoorStateSystem(Engine &, OpenState &open_state)
 }
 
 // Sets door open state given where entities are (loops through entities).
-inline void doorControlSystem(Engine &ctx, Position &pos)
+inline void doorControlSystem(Engine &ctx, Position &pos, Action &action)
 {
+    (void)action;
+
     Room *room = containedRoom({ pos.x, pos.y }, ctx.data().rooms);
 
     // If the button is pressed, set the doors of this room to be open
@@ -302,7 +311,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         OpenState>>({move_sys});
 
     auto door_control_sys = builder.addToGraph<ParallelForNode<Engine, doorControlSystem,
-        Position>>({reset_door_sys});
+        Position, Action>>({reset_door_sys});
 
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
         Position, OpenState>>({door_control_sys});

@@ -560,6 +560,20 @@ void placeButtons(Engine &ctx, RNG &rng, EnvironmentRooms &rooms)
     }
 }
 
+static madrona::Entity makeButtonEntity(Engine &ctx, Vector2 start, Vector2 end)
+{
+    Vector3 pos = { 0.5f*(start.x + end.x), 0.5f*(start.y + end.y), 0.0f };
+    Diag3x3 scale = { end.x - pos.x, end.y - pos.y, 0.2f };
+
+    Entity e = ctx.makeEntity<ButtonObject>();
+    ctx.get<Position>(e) = pos;
+    ctx.get<Rotation>(e) = Quat::angleAxis(0, {1, 0, 0});
+    ctx.get<Scale>(e) = scale;
+    ctx.get<ObjectID>(e) = ObjectID { 2 };
+
+    return e;
+}
+
 madrona::Entity makeWallObject(Engine &ctx,
                      madrona::math::Vector3 pos,
                      madrona::math::Quat rot,
@@ -651,6 +665,11 @@ void populateStaticGeometry(Engine &ctx,
     ctx.data().leafCount = rooms.leafs.size();
     for (CountT i = 0; i < rooms.leafs.size(); ++i) {
         ctx.data().leafs[i] = rooms.leafs[i];
+
+        uint32_t roomIdx = rooms.leafs[i];
+
+        ctx.data().rooms[roomIdx].buttonEntity = makeButtonEntity(
+            ctx, ctx.data().rooms[roomIdx].button.start, ctx.data().rooms[roomIdx].button.end);
     }
 
     // Allocate walls

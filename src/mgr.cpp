@@ -70,11 +70,11 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     char import_err_buffer[4096];
     auto imported_hulls = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_collision.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_collision.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "ramp_collision.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "elongated_collision.obj").string().c_str(),
     }, import_err_buffer, true);
 
     if (!imported_hulls.has_value()) {
@@ -201,13 +201,13 @@ Manager::Impl * Manager::Impl::init(
 
     std::array<char, 1024> import_err;
     auto render_assets = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "sphere.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "plane.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").c_str(),
+        (std::filesystem::path(DATA_DIR) / "sphere.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "plane.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").string().c_str(),
     }, Span<char>(import_err.data(), import_err.size()));
 
     if (!render_assets.has_value()) {
@@ -354,7 +354,7 @@ Manager::Impl * Manager::Impl::init(
 
         return cpu_impl;
     } break;
-    default: __builtin_unreachable();
+    default: MADRONA_UNREACHABLE();
     }
 }
 
