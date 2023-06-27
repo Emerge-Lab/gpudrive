@@ -10,6 +10,7 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
+constexpr inline float wallSpeed = 4.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
 constexpr inline CountT numPrepSteps = 96;
@@ -146,14 +147,20 @@ inline void doorControlSystem(Engine &ctx, Position &pos, Action &action)
     }
 }
 
-inline void setDoorPositionSystem(Engine &, Position &pos, OpenState &open_state)
+inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &vel, OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
-        pos.z = -10.0f;
+
+        if (pos.z > -3.0f)
+            pos.z += -wallSpeed * deltaT;
     }
-    else {
+    else if (pos.z < 0.0f) {
         // Put back on surface
+        pos.z += wallSpeed * deltaT;
+    }
+    
+    if (pos.z >= 0.0f) {
         pos.z = 0.0f;
     }
 }
@@ -314,7 +321,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         Position, Action>>({reset_door_sys});
 
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
-        Position, OpenState>>({door_control_sys});
+        Position, Velocity, OpenState>>({door_control_sys});
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {set_door_pos_sys});
