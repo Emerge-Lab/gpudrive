@@ -430,6 +430,7 @@ Sim::Sim(Engine &ctx,
     ctx.data().numDoors = 0;
     ctx.data().numWalls = 0;
     ctx.data().roomCount = 0;
+    ctx.data().leafCount = 0;
 
     createAgents(ctx);
     createFloor(ctx);
