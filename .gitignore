@@ -1,4 +1,5 @@
 /build
+/out
 /build-debug
 /.vs
 /CMakeSettings.json
