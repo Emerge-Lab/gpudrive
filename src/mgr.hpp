@@ -1,4 +1,9 @@
 #pragma once
+#ifdef madrona_3d_example_mgr_EXPORTS
+#define MGR_EXPORT MADRONA_EXPORT
+#else
+#define MGR_EXPORT MADRONA_IMPORT
+#endif
 
 #include <memory>
 
@@ -25,29 +30,29 @@ public:
         bool debugCompile;
     };
 
-    MADRONA_IMPORT Manager(
+    MGR_EXPORT Manager(
         const Config &cfg,
         const madrona::viz::VizECSBridge *viz_bridge = nullptr);
-    MADRONA_IMPORT ~Manager();
+    MGR_EXPORT ~Manager();
 
-    MADRONA_IMPORT void step();
+    MGR_EXPORT void step();
 
-    MADRONA_IMPORT madrona::py::Tensor resetTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor doneTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor actionTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor rewardTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor agentTypeTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor relativeAgentObservationsTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor relativeButtonObservationsTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor relativeDestinationObservationsTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor depthTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor rgbTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor lidarTensor() const;
-    MADRONA_IMPORT madrona::py::Tensor seedTensor() const;
+    MGR_EXPORT madrona::py::Tensor resetTensor() const;
+    MGR_EXPORT madrona::py::Tensor doneTensor() const;
+    MGR_EXPORT madrona::py::Tensor actionTensor() const;
+    MGR_EXPORT madrona::py::Tensor rewardTensor() const;
+    MGR_EXPORT madrona::py::Tensor agentTypeTensor() const;
+    MGR_EXPORT madrona::py::Tensor relativeAgentObservationsTensor() const;
+    MGR_EXPORT madrona::py::Tensor relativeButtonObservationsTensor() const;
+    MGR_EXPORT madrona::py::Tensor relativeDestinationObservationsTensor() const;
+    MGR_EXPORT madrona::py::Tensor depthTensor() const;
+    MGR_EXPORT madrona::py::Tensor rgbTensor() const;
+    MGR_EXPORT madrona::py::Tensor lidarTensor() const;
+    MGR_EXPORT madrona::py::Tensor seedTensor() const;
 
-    MADRONA_IMPORT void triggerReset(int32_t world_idx);
-    MADRONA_IMPORT void setAction(int32_t world_idx, int32_t agent_idx,
-                                  int32_t x, int32_t y, int32_t r);
+    MGR_EXPORT void triggerReset(int32_t world_idx);
+    MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
+                              int32_t x, int32_t y, int32_t r);
 
 private:
     struct Impl;

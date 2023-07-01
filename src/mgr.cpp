@@ -358,12 +358,12 @@ Manager::Impl * Manager::Impl::init(
     }
 }
 
-MADRONA_EXPORT Manager::Manager(const Config &cfg,
+Manager::Manager(const Config &cfg,
                                 const viz::VizECSBridge *viz_bridge)
     : impl_(Impl::init(cfg, viz_bridge))
 {}
 
-MADRONA_EXPORT Manager::~Manager() {
+Manager::~Manager() {
     switch (impl_->cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -379,7 +379,7 @@ MADRONA_EXPORT Manager::~Manager() {
 #endif
 }
 
-MADRONA_EXPORT void Manager::step()
+void Manager::step()
 {
     switch (impl_->cfg.execMode) {
     case ExecMode::CUDA: {
@@ -417,14 +417,14 @@ MADRONA_EXPORT void Manager::step()
 }
 
 
-MADRONA_EXPORT Tensor Manager::resetTensor() const
+Tensor Manager::resetTensor() const
 {
     return exportStateTensor((uint32_t)ExportIDs::Reset,
                              Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds, 3});
 }
 
-MADRONA_EXPORT Tensor Manager::doneTensor() const
+Tensor Manager::doneTensor() const
 {
     Optional<int> gpu_id = Optional<int>::none();
     if (impl_->cfg.execMode == ExecMode::CUDA) {
@@ -435,13 +435,13 @@ MADRONA_EXPORT Tensor Manager::doneTensor() const
                  {impl_->cfg.numWorlds * consts::numAgents, 1}, gpu_id);
 }
 
-MADRONA_EXPORT Tensor Manager::actionTensor() const
+Tensor Manager::actionTensor() const
 {
     return exportStateTensor((uint32_t)ExportIDs::Action, Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds * consts::numAgents, 5});
 }
 
-MADRONA_EXPORT Tensor Manager::rewardTensor() const
+Tensor Manager::rewardTensor() const
 {
     Optional<int> gpu_id = Optional<int>::none();
     if (impl_->cfg.execMode == ExecMode::CUDA) {
@@ -452,13 +452,13 @@ MADRONA_EXPORT Tensor Manager::rewardTensor() const
                  {impl_->cfg.numWorlds * consts::numAgents, 1}, gpu_id);
 }
 
-MADRONA_EXPORT Tensor Manager::agentTypeTensor() const
+Tensor Manager::agentTypeTensor() const
 {
     return exportStateTensor(4, Tensor::ElementType::Int32,
                              {impl_->cfg.numWorlds * consts::numAgents, 1});
 }
 
-MADRONA_EXPORT madrona::py::Tensor Manager::relativeAgentObservationsTensor() const
+madrona::py::Tensor Manager::relativeAgentObservationsTensor() const
 {
     return exportStateTensor(5, Tensor::ElementType::Float32,
                              {
@@ -468,7 +468,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::relativeAgentObservationsTensor() co
                              });
 }
 
-MADRONA_EXPORT madrona::py::Tensor Manager::relativeButtonObservationsTensor() const
+madrona::py::Tensor Manager::relativeButtonObservationsTensor() const
 {
     return exportStateTensor(6, Tensor::ElementType::Float32,
                              {
@@ -478,7 +478,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::relativeButtonObservationsTensor() c
                              });
 }
 
-MADRONA_EXPORT madrona::py::Tensor Manager::relativeDestinationObservationsTensor() const
+madrona::py::Tensor Manager::relativeDestinationObservationsTensor() const
 {
     return exportStateTensor(7, Tensor::ElementType::Float32,
                              {
@@ -488,7 +488,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::relativeDestinationObservationsTenso
                              });
 }
 
-MADRONA_EXPORT Tensor Manager::depthTensor() const
+Tensor Manager::depthTensor() const
 {
     void *dev_ptr = nullptr;
     Optional<int> gpu_id = Optional<int>::none();
@@ -516,7 +516,7 @@ MADRONA_EXPORT Tensor Manager::depthTensor() const
                       impl_->cfg.renderWidth, 1}, gpu_id);
 }
 
-MADRONA_EXPORT Tensor Manager::rgbTensor() const
+Tensor Manager::rgbTensor() const
 {
     void *dev_ptr = nullptr;
     Optional<int> gpu_id = Optional<int>::none();
@@ -545,7 +545,7 @@ MADRONA_EXPORT Tensor Manager::rgbTensor() const
 }
 
 
-MADRONA_EXPORT madrona::py::Tensor Manager::lidarTensor() const
+madrona::py::Tensor Manager::lidarTensor() const
 {
     return exportStateTensor(10, Tensor::ElementType::Float32,
                              {
@@ -554,7 +554,7 @@ MADRONA_EXPORT madrona::py::Tensor Manager::lidarTensor() const
                              });
 }
 
-MADRONA_EXPORT madrona::py::Tensor Manager::seedTensor() const
+madrona::py::Tensor Manager::seedTensor() const
 {
     return exportStateTensor(11, Tensor::ElementType::Int32,
                              {
@@ -582,7 +582,7 @@ Tensor Manager::exportStateTensor(int64_t slot,
     return Tensor(dev_ptr, type, dimensions, gpu_id);
 }
 
-MADRONA_EXPORT void Manager::triggerReset(int32_t world_idx)
+void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
         1, 0, 0, // FIXME
@@ -600,7 +600,7 @@ MADRONA_EXPORT void Manager::triggerReset(int32_t world_idx)
     }
 }
 
-MADRONA_EXPORT void Manager::setAction(int32_t world_idx, int32_t agent_idx,
+void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                                        int32_t x, int32_t y, int32_t r)
 {
     Action action { 
