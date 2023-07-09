@@ -601,7 +601,7 @@ void Manager::triggerReset(int32_t world_idx)
 }
 
 void Manager::setAction(int32_t world_idx, int32_t agent_idx,
-                                       int32_t x, int32_t y, int32_t r)
+                        int32_t x, int32_t y, int32_t r)
 {
     Action action { 
         .x = x,
