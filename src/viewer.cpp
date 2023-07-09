@@ -26,9 +26,9 @@ int main(int argc, char *argv[])
     }, Span<char>(import_err.data(), import_err.size()));
 
     std::array<imp::SourceMaterial, 3> materials = {{
-        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f} },
-        { math::Vector4{1.0f, 0.1f, 0.1f, 0.0f} },
-        { math::Vector4{0.1f, 0.1f, 1.0f, 0.0f} }
+        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 1.f, 0.f },
+        { math::Vector4{1.0f, 0.1f, 0.1f, 0.0f}, -1, 1.f, 0.f },
+        { math::Vector4{0.1f, 0.1f, 1.0f, 0.0f}, -1, 1.f, 0.f }
     }};
 
     if (!render_assets.has_value()) {
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     const_cast<uint32_t&>(render_assets->objects[5].meshes[0].materialIDX) = 0;
     const_cast<uint32_t&>(render_assets->objects[6].meshes[0].materialIDX) = 0;
 
-    viewer.loadObjects(render_assets->objects, materials);
+    viewer.loadObjects(render_assets->objects, materials, {});
 
     viewer.configureLighting({
         { true, math::Vector3{1.0f, 1.0f, -1.5f}, math::Vector3{1.0f, 1.0f, 1.0f} }
