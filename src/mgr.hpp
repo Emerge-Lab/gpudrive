@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include <madrona/python.hpp>
+#include <madrona/py/utils.hpp>
 #include <madrona/exec_mode.hpp>
 
 #include <madrona/render/mw.hpp>

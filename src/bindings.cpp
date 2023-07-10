@@ -1,16 +1,7 @@
 #include "mgr.hpp"
 
 #include <madrona/macros.hpp>
-
-#if defined(MADRONA_CLANG) || defined(MADRONA_GCC)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weverything"
-#endif
-#include <nanobind/nanobind.h>
-#include <nanobind/ndarray.h>
-#if defined(MADRONA_CLANG) || defined(MADRONA_GCC)
-#pragma GCC diagnostic pop
-#endif
+#include <madrona/py/bindings.hpp>
 
 namespace nb = nanobind;
 
