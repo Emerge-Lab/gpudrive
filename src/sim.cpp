@@ -94,12 +94,18 @@ static inline void resetEnvironment(Engine &ctx)
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    int32_t level = reset.reset;
-    if (ctx.data().autoReset && ctx.data().curEpisodeStep == episodeLen - 1) {
-        level = 1;
+    int32_t should_reset = reset.reset;
+    if (ctx.data().autoReset) {
+        for (CountT i = 0; i < consts::numAgents; i++) {
+            Entity agent = ctx.data().agents[i];
+            Done done = ctx.get<Done>(agent);
+            if (done.v) {
+                should_reset = 1;
+            }
+        }
     }
 
-    if (level != 0) {
+    if (should_reset != 0) {
         reset.reset = 0;
 
         resetEnvironment(ctx);
@@ -129,9 +135,9 @@ inline void movementSystem(Engine &,
 
     Quat cur_rot = rot;
 
-    float f_x = move_delta_per_bucket * action.x;
-    float f_y = move_delta_per_bucket * action.y;
-    float t_z = turn_delta_per_bucket * action.r;
+    float f_x = move_delta_per_bucket * (action.x - (int32_t)half_buckets);
+    float f_y = move_delta_per_bucket * (action.y - (int32_t)half_buckets);
+    float t_z = turn_delta_per_bucket * (action.r - (int32_t)half_buckets);
 
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
@@ -297,16 +303,19 @@ inline void rewardSystem(Engine &ctx,
     }
 
     float reward = 0.0f;
+    bool at_goal;
     if (diff.length2() < BUTTON_WIDTH*BUTTON_WIDTH) {
         reward = 100.0f;
+        at_goal = true;
     }
     else {
         reward = -0.05f;
+        at_goal = false;
     }
 
     out_reward.v = reward;
 
-    if (cur_step == episodeLen - 1) {
+    if (cur_step == episodeLen - 1 || at_goal) {
         done.v = 1;
     }
 }

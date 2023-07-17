@@ -146,6 +146,21 @@ void createAgents(Engine &ctx)
 
         ctx.data().agents[i] = makeAgent(ctx, i, pos, rot);
     }
+
+    for (CountT i = 0; i < consts::numAgents; i++) {
+        Entity cur_agent = ctx.data().agents[i];
+        OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
+
+        CountT out_idx = 0;
+        for (CountT j = 0; j < consts::numAgents; j++) {
+            if (i == j) {
+                continue;
+            }
+
+            Entity other_agent = ctx.data().agents[j];
+            other_agents.e[out_idx++] = other_agent;
+        }
+    }
 }
 
 void createFloor(Engine &ctx)

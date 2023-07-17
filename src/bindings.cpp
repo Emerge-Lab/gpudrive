@@ -10,14 +10,14 @@ namespace GPUHideSeek {
 NB_MODULE(madrona_3d_example, m) {
     madrona::py::setupMadronaSubmodule(m);
 
-    nb::class_<Manager> (m, "3DExampleSimulator")
+    nb::class_<Manager> (m, "SimManager")
         .def("__init__", [](Manager *self,
-                            madrona::ExecMode exec_mode,
+                            madrona::py::PyExecMode exec_mode,
                             int64_t gpu_id,
                             int64_t num_worlds,
+                            bool auto_reset,
                             int64_t render_width,
                             int64_t render_height, 
-                            bool auto_reset,
                             bool enable_batch_render) {
             new (self) Manager(Manager::Config {
                 .execMode = exec_mode,
@@ -31,9 +31,9 @@ NB_MODULE(madrona_3d_example, m) {
         }, nb::arg("exec_mode"),
            nb::arg("gpu_id"),
            nb::arg("num_worlds"),
-           nb::arg("render_width"),
-           nb::arg("render_height"),
            nb::arg("auto_reset"),
+           nb::arg("render_width") = 0,
+           nb::arg("render_height") = 0,
            nb::arg("enable_batch_render") = false)
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)

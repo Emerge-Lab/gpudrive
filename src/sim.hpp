@@ -168,6 +168,7 @@ struct Agent : public madrona::Archetype<
     Action,
 
     // Observations
+    OtherAgents,
     ToOtherAgents,
     ToButtons,
     ToGoal,
