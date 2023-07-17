@@ -1,29 +1,52 @@
 import madrona_3d_example
 
 from madrona_learn import (
-        train, profile, TrainConfig, PPOConfig, SimInterface,
-        ActorCritic, DiscreteActor, Critic, 
-        BackboneShared, BackboneSeparate,
-        BackboneEncoder, RecurrentBackboneEncoder,
-    )
-from madrona_learn.models import (
-        MLP, LinearLayerDiscreteActor, LinearLayerCritic,
-    )
+    train, profile, TrainConfig, PPOConfig, SimInterface,
+)
 
-from madrona_learn.rnn import LSTM, FastLSTM
+from policy import make_policy, setup_obs
 
 import torch
 import argparse
 import math
+from pathlib import Path
 import warnings
 warnings.filterwarnings("error")
 
 torch.manual_seed(0)
 
+class LearningCallback:
+    def __init__(self, ckpt_dir, profile_report):
+        self.mean_fps = 0
+        self.ckpt_dir = ckpt_dir
+        self.profile_report = profile_report
+
+    def __call__(self, update_idx, update_time, update_results, learning_state):
+        update_id = update_idx + 1
+
+        fps = args.num_worlds * args.steps_per_update / update_time
+        self.mean_fps += (fps - self.mean_fps) / update_id
+
+        if update_id != 1 and  update_id % 10 != 0:
+            return
+
+        ppo = update_results.ppo_stats
+
+        print(f"\nUpdate: {update_id}")
+        print(f"    Loss: {ppo.loss: .3e}, A: {ppo.action_loss: .3e}, V: {ppo.value_loss: .3e}, E: {ppo.entropy_loss: .3e}")
+        print(f"    FPS: {fps:.0f}, Update Time: {update_time:.2f}, Avg FPS: {self.mean_fps:.0f}")
+        if self.profile_report:
+            profile.report()
+
+        if update_id % 100 == 0:
+            learning_state.save(update_id, self.ckpt_dir / f"{update_id}.pth")
+
+
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-updates', type=int, required=True)
 arg_parser.add_argument('--ckpt-dir', type=str, required=True)
+arg_parser.add_argument('--restore', type=int)
 arg_parser.add_argument('--lr', type=float, default=0.01)
 arg_parser.add_argument('--gamma', type=float, default=0.998)
 arg_parser.add_argument('--steps-per-update', type=int, default=50)
@@ -49,87 +72,19 @@ sim = madrona_3d_example.SimManager(
     auto_reset = True,
 )
 
+ckpt_dir = Path(args.ckpt_dir)
+
+learning_cb = LearningCallback(ckpt_dir, args.profile_report)
+
 if torch.cuda.is_available():
     dev = torch.device(f'cuda:{args.gpu_id}')
 else:
     dev = torch.device('cpu')
 
-def setup_obs():
-    to_others_tensor = sim.to_other_agents_tensor().to_torch()
-    to_buttons_tensor = sim.to_buttons_tensor().to_torch()
-    to_goal_tensor = sim.to_goal_tensor().to_torch()
-    lidar_tensor = sim.lidar_tensor().to_torch()
-    
-    obs_tensors = [
-        to_others_tensor,
-        to_buttons_tensor,
-        to_goal_tensor,
-        lidar_tensor,
-    ]
-    
-    num_obs_features = (
-        math.prod(to_others_tensor.shape[1:]) +
-        math.prod(to_buttons_tensor.shape[1:]) +
-        math.prod(to_goal_tensor.shape[1:]) +
-        math.prod(lidar_tensor.shape[1:])
-    )
+ckpt_dir.mkdir(exist_ok=True, parents=True)
 
-    def process_obs(to_others, to_buttons, to_goal, lidar):
-        assert(not torch.isnan(to_others).any())
-        assert(not torch.isnan(to_buttons).any())
-        assert(not torch.isnan(to_goal).any())
-        assert(not torch.isnan(lidar).any())
-        assert(not torch.isinf(to_others).any())
-        assert(not torch.isinf(to_buttons).any())
-        assert(not torch.isinf(to_goal).any())
-        assert(not torch.isinf(lidar).any())
-
-        return torch.cat([
-            to_others.view(to_others.shape[0], -1), 
-            to_buttons.view(to_buttons.shape[0], -1), 
-            to_goal, 
-            lidar,
-        ], dim=1)
-
-    return obs_tensors, process_obs, num_obs_features
-
-def update_cb(update_idx, update_time, update_results):
-    update_id = update_idx + 1
-    if update_id % 10 != 0:
-        return
-
-    ppo = update_results.ppo_stats
-
-    print(f"\nUpdate: {update_id}")
-    print(f"    Loss: {ppo.loss: .3e}, A: {ppo.action_loss: .3e}, V: {ppo.value_loss: .3e}, E: {ppo.entropy_loss: .3e}")
-    if args.profile_report:
-        profile.report()
-
-
-move_action_dim = 11
-num_channels = args.num_channels
-obs, process_obs_cb, num_obs_features = setup_obs()
-
-policy = ActorCritic(
-    backbone = BackboneShared(
-        process_obs = process_obs_cb,
-        encoder = RecurrentBackboneEncoder(
-            net = MLP(
-                input_dim = num_obs_features,
-                num_channels = num_channels,
-                num_layers = 2,
-            ),
-            rnn = FastLSTM(
-                in_channels = num_channels,
-                hidden_channels = num_channels,
-                num_layers = 1,
-            ),
-        ),
-    ),
-    actor = LinearLayerDiscreteActor(
-        [move_action_dim, move_action_dim, move_action_dim], num_channels),
-    critic = LinearLayerCritic(num_channels),
-)
+obs, process_obs_cb, num_obs_features = setup_obs(sim)
+policy = make_policy(process_obs_cb, num_obs_features, args.num_channels)
 
 # Hack to fill out observations: Reset envs and take step to populate envs
 # FIXME: just make it possible to populate observations after init
@@ -139,9 +94,14 @@ dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 
 resets = sim.reset_tensor().to_torch()
-actions.fill_(move_action_dim // 2)
+actions.fill_(5)
 resets[:, 0] = 1
 sim.step()
+
+if args.restore:
+    restore_ckpt = ckpt_dir / f"{args.restore}.pth"
+else:
+    restore_ckpt = None
 
 train(
     dev,
@@ -156,7 +116,6 @@ train(
         num_updates = args.num_updates,
         steps_per_update = args.steps_per_update,
         num_bptt_chunks = args.num_bptt_chunks,
-        ckpt_dir = args.ckpt_dir,
         lr = args.lr,
         gamma = args.gamma,
         gae_lambda = 0.95,
@@ -172,5 +131,6 @@ train(
         mixed_precision = args.fp16,
     ),
     policy,
-    update_cb,
+    learning_cb,
+    restore_ckpt
 )
