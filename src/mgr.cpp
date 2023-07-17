@@ -32,23 +32,101 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
-    float *rewardsBuffer;
-    uint8_t *donesBuffer;
+
+    inline Impl(const Manager::Config &mgr_cfg,
+                PhysicsLoader &&phys_loader,
+                EpisodeManager *ep_mgr,
+                WorldReset *reset_buffer,
+                Action *action_buffer)
+        : cfg(mgr_cfg),
+          physicsLoader(std::move(phys_loader)),
+          episodeMgr(ep_mgr),
+          worldResetBuffer(reset_buffer),
+          agentActionsBuffer(action_buffer)
+    {}
+
+    inline virtual ~Impl() {}
+
+    virtual void run() = 0;
+
+    virtual Tensor exportTensor(ExportID slot,
+        Tensor::ElementType type,
+        madrona::Span<const int64_t> dimensions) const = 0;
 
     static inline Impl * init(const Config &cfg,
                               const viz::VizECSBridge *viz_bridge);
 };
 
-struct Manager::CPUImpl : Manager::Impl {
+struct Manager::CPUImpl final : Manager::Impl {
     using TaskGraphT =
-        TaskGraphExecutor<Engine, Sim, GPUHideSeek::Config, WorldInit>;
+        TaskGraphExecutor<Engine, Sim, Sim::Config, WorldInit>;
 
     TaskGraphT cpuExec;
+
+    inline CPUImpl(const Manager::Config &mgr_cfg,
+                   const Sim::Config &sim_cfg,
+                   PhysicsLoader &&phys_loader,
+                   EpisodeManager *ep_mgr,
+                   WorldReset *reset_buffer,
+                   Action *action_buffer,
+                   TaskGraphT &&cpu_exec)
+        : Impl(mgr_cfg, std::move(phys_loader),
+               ep_mgr, reset_buffer, action_buffer),
+          cpuExec(std::move(cpu_exec))
+    {}
+
+    inline virtual ~CPUImpl() final
+    {
+        delete episodeMgr;
+    }
+
+    inline virtual void run()
+    {
+        cpuExec.run();
+    }
+
+    virtual inline Tensor exportTensor(ExportID slot,
+        Tensor::ElementType type,
+        madrona::Span<const int64_t> dims) const final
+    {
+        void *dev_ptr = cpuExec.getExported((uint32_t)slot);
+        return Tensor(dev_ptr, type, dims, Optional<int>::none());
+    }
 };
 
 #ifdef MADRONA_CUDA_SUPPORT
 struct Manager::CUDAImpl : Manager::Impl {
-    MWCudaExecutor mwGPU;
+    MWCudaExecutor gpuExec;
+
+    inline GPUImpl(const Manager::Config &mgr_cfg,
+                   const Sim::Config &sim_cfg,
+                   PhysicsLoader &&phys_loader,
+                   EpisodeManager *ep_mgr,
+                   WorldReset *reset_buffer,
+                   Action *action_buffer,
+                   MWCudaExecutor &&gpu_exec)
+        : Impl(mgr_cfg, std::move(phys_loader),
+               ep_mgr, reset_buffer, action_buffer),
+          gpuExec(std::move(gpu_exec))
+    {}
+
+    inline virtual ~GPUImpl() final
+    {
+        REQ_CUDA(cudaFree(episodeMgr));
+    }
+
+    inline virtual void run()
+    {
+        gpuExec.run();
+    }
+
+    virtual inline Tensor exportTensor(ExportID slot,
+        Tensor::ElementType type,
+        madrona::Span<const int64_t> dims) const final
+    {
+        void *dev_ptr = gpu_exec.getExported((uint32_t)slot);
+        return Tensor(dev_ptr, type, dims, cfg.gpuID);
+    }
 };
 #endif
 
@@ -194,7 +272,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 }
 
 Manager::Impl * Manager::Impl::init(
-    const Config &cfg,
+    const Manager::Config &mgr_cfg,
     const viz::VizECSBridge *viz_bridge)
 {
     HostEventLogging(HostEvent::initStart);
@@ -214,13 +292,13 @@ Manager::Impl * Manager::Impl::init(
         FATAL("Failed to load render assets: %s", import_err);
     }
 
-    GPUHideSeek::Config app_cfg {
-        cfg.enableBatchRender,
+    Sim::Config sim_cfg {
+        mgr_cfg.enableBatchRender,
         viz_bridge != nullptr,
-        cfg.autoReset,
+        mgr_cfg.autoReset,
     };
 
-    switch (cfg.execMode) {
+    switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
         EpisodeManager *episode_mgr = 
@@ -232,63 +310,49 @@ Manager::Impl * Manager::Impl::init(
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
-        auto done_buffer = (uint8_t *)cu::allocGPU(sizeof(uint8_t) *
-            consts::numAgents * cfg.numWorlds);
+        HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        auto reward_buffer = (float *)cu::allocGPU(sizeof(float) *
-            consts::numAgents * cfg.numWorlds);
-
-        HeapArray<WorldInit> world_inits(cfg.numWorlds);
-
-        for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
+        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
-                reward_buffer,
-                done_buffer,
                 phys_obj_mgr,
                 viz_bridge,
-                cfg.minEntitiesPerWorld,
-                cfg.maxEntitiesPerWorld,
             };
         }
 
-        MWCudaExecutor mwgpu_exec({
+        MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
             .numWorldInitBytes = sizeof(WorldInit),
-            .userConfigPtr = &app_cfg,
-            .numUserConfigBytes = sizeof(GPUHideSeek::Config),
+            .userConfigPtr = (void *)&sim_cfg,
+            .numUserConfigBytes = sizeof(Sim::Config),
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
-            .numWorlds = cfg.numWorlds,
-            .numExportedBuffers = 16,
-            .gpuID = (uint32_t)cfg.gpuID,
+            .numWorlds = mgr_cfg.numWorlds,
+            .numExportedBuffers = (uint32_t)ExportID::NumExports, 
+            .gpuID = (uint32_t)mgr_cfg.gpuID,
         }, {
             "",
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
-            cfg.debugCompile ? CompileConfig::OptMode::Debug :
-                CompileConfig::OptMode::LTO,
+            CompileConfig::OptMode::LTO,
             CompileConfig::Executor::TaskGraph,
         });
 
         WorldReset *world_reset_buffer = 
-            (WorldReset *)mwgpu_exec.getExported((uint32_t)ExportIDs::Reset);
+            (WorldReset *)gpu_exec.getExported((uint32_t)ExportID::Reset);
 
         Action *agent_actions_buffer = 
-            (Action *)mwgpu_exec.getExported((uint32_t)ExportIDs::Action);
+            (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
-        HostEventLogging(HostEvent::initEnd);
-        return new CUDAImpl {
-            { 
-                cfg,
-                std::move(phys_loader),
-                episode_mgr,
-                world_reset_buffer,
-                agent_actions_buffer,
-                reward_buffer,
-                done_buffer,
-            },
-            std::move(mwgpu_exec),
+
+        return new GPUImpl {
+            mgr_cfg,
+            sim_cfg,
+            std::move(phys_loader),
+            episode_mgr,
+            world_reset_buffer,
+            agent_actions_buffer,
+            std::move(gpu_exec),
         };
 #else
         FATAL("Madrona was not compiled with CUDA support");
@@ -302,55 +366,40 @@ Manager::Impl * Manager::Impl::init(
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
-        auto reward_buffer = (float *)malloc(
-            sizeof(float) * consts::numAgents * cfg.numWorlds);
+        HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        auto done_buffer = (uint8_t *)malloc(
-            sizeof(uint8_t) * consts::numAgents * cfg.numWorlds);
-
-        HeapArray<WorldInit> world_inits(cfg.numWorlds);
-
-        for (int64_t i = 0; i < (int64_t)cfg.numWorlds; i++) {
+        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
             world_inits[i] = WorldInit {
                 episode_mgr,
-                reward_buffer + i * consts::numAgents,
-                done_buffer + i * consts::numAgents,
                 phys_obj_mgr,
                 viz_bridge,
-                cfg.minEntitiesPerWorld,
-                cfg.maxEntitiesPerWorld,
             };
         }
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
-                .numWorlds = cfg.numWorlds,
-                .numExportedBuffers = 16,
+                .numWorlds = mgr_cfg.numWorlds,
+                .numExportedBuffers = (uint32_t)ExportID::NumExports,
             },
-            app_cfg,
+            sim_cfg,
             world_inits.data(),
         };
 
         WorldReset *world_reset_buffer = 
-            (WorldReset *)cpu_exec.getExported((uint32_t)ExportIDs::Reset);
+            (WorldReset *)cpu_exec.getExported((uint32_t)ExportID::Reset);
 
         Action *agent_actions_buffer = 
-            (Action *)cpu_exec.getExported((uint32_t)ExportIDs::Action);
+            (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
 
         auto cpu_impl = new CPUImpl {
-            { 
-                cfg,
-                std::move(phys_loader),
-                episode_mgr,
-                world_reset_buffer,
-                agent_actions_buffer,
-                reward_buffer,
-                done_buffer,
-            },
+            mgr_cfg,
+            sim_cfg,
+            std::move(phys_loader),
+            episode_mgr,
+            world_reset_buffer,
+            agent_actions_buffer,
             std::move(cpu_exec),
         };
-
-        HostEventLogging(HostEvent::initEnd);
 
         return cpu_impl;
     } break;
@@ -363,129 +412,87 @@ Manager::Manager(const Config &cfg,
     : impl_(Impl::init(cfg, viz_bridge))
 {}
 
-Manager::~Manager() {
-    switch (impl_->cfg.execMode) {
-    case ExecMode::CUDA: {
-#ifdef MADRONA_CUDA_SUPPORT
-        delete static_cast<CUDAImpl *>(impl_);
-#endif
-    } break;
-    case ExecMode::CPU : {
-        delete static_cast<CPUImpl *>(impl_);
-    } break;
-    }
-#ifdef MADRONA_TRACING
-    FinalizeLogging("/tmp/");
-#endif
-}
+Manager::~Manager() {}
 
 void Manager::step()
 {
-    switch (impl_->cfg.execMode) {
-    case ExecMode::CUDA: {
-#ifdef MADRONA_CUDA_SUPPORT
-        static_cast<CUDAImpl *>(impl_)->mwGPU.run();
-#endif
-    } break;
-    case ExecMode::CPU: {
-        auto cpu_impl = static_cast<CPUImpl *>(impl_);
-        cpu_impl->cpuExec.run();
-
-        // FIXME: provide some way to do this more cleanly in madrona
-        CountT cur_agent_offset = 0;
-        float *base_rewards = cpu_impl->rewardsBuffer;
-        uint8_t *base_dones = cpu_impl->donesBuffer;
-
-        for (CountT i = 0; i < (CountT)impl_->cfg.numWorlds; i++) {
-            const Sim &sim_data = cpu_impl->cpuExec.getWorldData(i);
-            CountT num_agents = consts::numAgents;
-            float *world_rewards = sim_data.rewardBuffer;
-            uint8_t *world_dones = sim_data.doneBuffer;
-
-            memmove(&base_rewards[cur_agent_offset],
-                    world_rewards,
-                    sizeof(float) * num_agents);
-
-            memmove(&base_dones[cur_agent_offset],
-                    world_dones,
-                    sizeof(uint8_t) * num_agents);
-
-            cur_agent_offset += num_agents;
-        }
-    } break;
-    }
+    impl_->run();
 }
-
 
 Tensor Manager::resetTensor() const
 {
-    return exportStateTensor((uint32_t)ExportIDs::Reset,
-                             Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds, 3});
-}
-
-Tensor Manager::doneTensor() const
-{
-    Optional<int> gpu_id = Optional<int>::none();
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-        gpu_id = impl_->cfg.gpuID;
-    }
-
-    return Tensor(impl_->donesBuffer, Tensor::ElementType::UInt8,
-                 {impl_->cfg.numWorlds * consts::numAgents, 1}, gpu_id);
+    return impl_->exportTensor(ExportID::Reset,
+                               Tensor::ElementType::Int32,
+                               {impl_->cfg.numWorlds, 1});
 }
 
 Tensor Manager::actionTensor() const
 {
-    return exportStateTensor((uint32_t)ExportIDs::Action, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds * consts::numAgents, 5});
+    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Int32,
+        {impl_->cfg.numWorlds * consts::numAgents, 3});
 }
 
 Tensor Manager::rewardTensor() const
 {
-    Optional<int> gpu_id = Optional<int>::none();
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-        gpu_id = impl_->cfg.gpuID;
-    }
-
-    return Tensor(impl_->rewardsBuffer, Tensor::ElementType::Float32,
-                 {impl_->cfg.numWorlds * consts::numAgents, 1}, gpu_id);
+    return impl_->exportTensor(ExportID::Reward, Tensor::ElementType::Float32,
+                               {impl_->cfg.numWorlds * consts::numAgents, 1});
 }
 
-Tensor Manager::agentTypeTensor() const
+Tensor Manager::doneTensor() const
 {
-    return exportStateTensor(4, Tensor::ElementType::Int32,
-                             {impl_->cfg.numWorlds * consts::numAgents, 1});
+    return impl_->exportTensor(ExportID::Done, Tensor::ElementType::Int32,
+                               {impl_->cfg.numWorlds * consts::numAgents, 1});
 }
 
-madrona::py::Tensor Manager::relativeAgentObservationsTensor() const
+
+Tensor Manager::toOtherAgentsTensor() const
 {
-    return exportStateTensor(5, Tensor::ElementType::Float32,
-                             {
-                                 impl_->cfg.numWorlds * consts::numAgents,
-                                 consts::numAgents - 1,
-                                 2, // Polar coordinates
-                             });
+    return impl_->exportTensor(ExportID::ToOtherAgents,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   consts::numAgents - 1,
+                                   2, // Polar coordinates
+                               });
 }
 
-madrona::py::Tensor Manager::relativeButtonObservationsTensor() const
+Tensor Manager::toButtonsTensor() const
 {
-    return exportStateTensor(6, Tensor::ElementType::Float32,
-                             {
-                                 impl_->cfg.numWorlds * consts::numAgents,
-                                 consts::maxRooms,
-                                 2, // Polar coordinates
-                             });
+    return impl_->exportTensor(ExportID::ToButtons,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   consts::maxRooms,
+                                   2, // Polar coordinates
+                               });
 }
 
-madrona::py::Tensor Manager::relativeDestinationObservationsTensor() const
+Tensor Manager::toGoalTensor() const
 {
-    return exportStateTensor(7, Tensor::ElementType::Float32,
-                             {
-                                 impl_->cfg.numWorlds * consts::numAgents,
-                                 1,
-                                 2, // Polar coordinates
-                             });
+    return impl_->exportTensor(ExportID::ToGoal,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   2, // Polar coordinates
+                               });
+}
+
+Tensor Manager::lidarTensor() const
+{
+    return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   consts::numLidarSamples,
+                               });
+}
+
+Tensor Manager::seedTensor() const
+{
+    return impl_->exportTensor(ExportID::Seed, Tensor::ElementType::Int32,
+                               {
+                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   1,
+                               });
 }
 
 Tensor Manager::depthTensor() const
@@ -496,7 +503,7 @@ Tensor Manager::depthTensor() const
 #if 0
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
+        dev_ptr = static_cast<CUDAImpl *>(impl_)->gpuExec.
             depthObservations();
         gpu_id = impl_->cfg.gpuID;
 #endif
@@ -524,7 +531,7 @@ Tensor Manager::rgbTensor() const
 #if 0
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_)->mwGPU.
+        dev_ptr = static_cast<CUDAImpl *>(impl_)->gpuExec.
             rgbObservations();
         gpu_id = impl_->cfg.gpuID;
 #endif
@@ -544,48 +551,10 @@ Tensor Manager::rgbTensor() const
                    impl_->cfg.renderWidth, 4}, gpu_id);
 }
 
-
-madrona::py::Tensor Manager::lidarTensor() const
-{
-    return exportStateTensor(10, Tensor::ElementType::Float32,
-                             {
-                                 impl_->cfg.numWorlds * consts::numAgents,
-                                 30,
-                             });
-}
-
-madrona::py::Tensor Manager::seedTensor() const
-{
-    return exportStateTensor(11, Tensor::ElementType::Int32,
-                             {
-                                 impl_->cfg.numWorlds * consts::numAgents,
-                                 1,
-                             });
-}
-
-Tensor Manager::exportStateTensor(int64_t slot,
-                                  Tensor::ElementType type,
-                                  Span<const int64_t> dimensions) const
-{
-    void *dev_ptr = nullptr;
-    Optional<int> gpu_id = Optional<int>::none();
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr =
-            static_cast<CUDAImpl *>(impl_)->mwGPU.getExported(slot);
-        gpu_id = impl_->cfg.gpuID;
-#endif
-    } else {
-        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.getExported(slot);
-    }
-
-    return Tensor(dev_ptr, type, dimensions, gpu_id);
-}
-
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
-        1, 0, 0, // FIXME
+        1,
     };
 
     auto *reset_ptr = impl_->worldResetBuffer + world_idx;

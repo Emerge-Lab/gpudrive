@@ -10,13 +10,6 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace madrona::math {
-
-// x maps to r; y maps to theta
-using PolarVector2 = Vector2;
-    
-}
-
 namespace GPUHideSeek {
 
 using madrona::Entity;
@@ -32,26 +25,34 @@ using madrona::phys::ExternalTorque;
 
 namespace consts {
 
-inline constexpr uint32_t numAgents = 2;
+inline constexpr CountT numAgents = 2;
 
 // NOTE: There will be as many buttons as there are rooms.
-inline constexpr uint32_t maxRooms = 7;
+inline constexpr CountT maxRooms = 7;
 
-inline constexpr uint32_t maxDoorsPerRoom = 6;
+inline constexpr CountT maxDoorsPerRoom = 6;
+
+inline constexpr CountT numLidarSamples = 30;
 
 }
 
-enum class ExportIDs : uint32_t {
-    Reset = 0,
-    Action = 2,
+enum class ExportID : uint32_t {
+    Reset,
+    Action,
+    Reward,
+    Done,
+    ToOtherAgents,
+    ToButtons,
+    ToGoal,
+    Lidar,
+    Seed,
+    NumExports,
 };
 
 class Engine;
 
 struct WorldReset {
-    int32_t resetLevel;
-    int32_t numHiders;
-    int32_t numSeekers;
+    int32_t reset;
 };
 
 struct OpenState {
@@ -64,25 +65,39 @@ struct Action {
     int32_t r;
 };
 
-struct AgentActiveMask {
-    float mask;
+struct Reward {
+    float v;
+};
+
+struct Done {
+    int32_t v;
 };
 
 struct GlobalDebugPositions {
     madrona::math::Vector2 agentPositions[consts::numAgents];
 };
 
-// Relative position of the other agent.
-struct RelativeAgentObservations {
-    madrona::math::PolarVector2 obs[consts::numAgents - 1];
+// Entity ID of the other agents
+struct OtherAgents {
+    madrona::Entity e[consts::numAgents - 1];
 };
 
-struct RelativeButtonObservations {
-    madrona::math::PolarVector2 obs[consts::maxRooms];
+struct PolarCoord {
+    float r;
+    float theta;
 };
 
-struct RelativeDestinationObservations {
-    madrona::math::PolarVector2 obs;
+// Relative position of the other agents.
+struct ToOtherAgents {
+    PolarCoord obs[consts::numAgents - 1];
+};
+
+struct ToButtons {
+    PolarCoord obs[consts::maxRooms];
+};
+
+struct ToGoal {
+    PolarCoord obs;
 };
 
 struct Lidar {
@@ -153,10 +168,12 @@ struct Agent : public madrona::Archetype<
     Action,
 
     // Observations
-    RelativeAgentObservations,
-    RelativeButtonObservations,
-    RelativeDestinationObservations,
+    ToOtherAgents,
+    ToButtons,
+    ToGoal,
     Lidar,
+    Reward,
+    Done,
 
     // RNG
     Seed,
@@ -176,12 +193,6 @@ struct Button : public madrona::Archetype<
     ObjectID,
     ButtonState
 > {};
-
-struct Config {
-    bool enableBatchRender;
-    bool enableViewer;
-    bool autoReset;
-};
 
 struct EnvRoom {
     Entity doors[consts::maxDoorsPerRoom];
@@ -218,7 +229,7 @@ struct Room {
     ButtonInfo button;
     Entity buttonEntity;
 
-    void addDoor(CountT at, CountT doorIdx)
+    inline void addDoor(CountT at, CountT doorIdx)
     {
         if (doors[at] == -1)
             doors[at] = doorIdx;
@@ -230,6 +241,12 @@ struct Room {
 };
 
 struct Sim : public madrona::WorldBase {
+    struct Config {
+        bool enableBatchRender;
+        bool enableViewer;
+        bool autoReset;
+    };
+
     static void registerTypes(madrona::ECSRegistry &registry,
                               const Config &cfg);
 
@@ -241,8 +258,6 @@ struct Sim : public madrona::WorldBase {
         const WorldInit &init);
 
     EpisodeManager *episodeMgr;
-    float *rewardBuffer;
-    uint8_t *doneBuffer;
     RNG rng;
 
     // Rooms
@@ -268,8 +283,6 @@ struct Sim : public madrona::WorldBase {
     Entity agents[consts::numAgents];
 
     CountT curEpisodeStep;
-    CountT minEpisodeEntities;
-    CountT maxEpisodeEntities;
 
     uint32_t curEpisodeSeed;
     bool enableBatchRender;
@@ -280,6 +293,5 @@ struct Sim : public madrona::WorldBase {
 class Engine : public ::madrona::CustomContext<Engine, Sim> {
     using CustomContext::CustomContext;
 };
-
 
 }

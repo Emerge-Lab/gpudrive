@@ -70,7 +70,6 @@ int main(int argc, char *argv[])
         .renderHeight = 0,
         .autoReset = false,
         .enableBatchRender = false,
-        .debugCompile = false,
     }, viewer.rendererBridge());
 
     for (CountT i = 0; i < (CountT)num_worlds; i++) {

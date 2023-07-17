@@ -21,13 +21,10 @@ public:
         madrona::ExecMode execMode;
         int gpuID;
         uint32_t numWorlds;
-        uint32_t minEntitiesPerWorld;
-        uint32_t maxEntitiesPerWorld;
         uint32_t renderWidth;
         uint32_t renderHeight;
         bool autoReset;
         bool enableBatchRender;
-        bool debugCompile;
     };
 
     MGR_EXPORT Manager(
@@ -38,17 +35,16 @@ public:
     MGR_EXPORT void step();
 
     MGR_EXPORT madrona::py::Tensor resetTensor() const;
-    MGR_EXPORT madrona::py::Tensor doneTensor() const;
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
-    MGR_EXPORT madrona::py::Tensor agentTypeTensor() const;
-    MGR_EXPORT madrona::py::Tensor relativeAgentObservationsTensor() const;
-    MGR_EXPORT madrona::py::Tensor relativeButtonObservationsTensor() const;
-    MGR_EXPORT madrona::py::Tensor relativeDestinationObservationsTensor() const;
-    MGR_EXPORT madrona::py::Tensor depthTensor() const;
-    MGR_EXPORT madrona::py::Tensor rgbTensor() const;
+    MGR_EXPORT madrona::py::Tensor doneTensor() const;
+    MGR_EXPORT madrona::py::Tensor toOtherAgentsTensor() const;
+    MGR_EXPORT madrona::py::Tensor toButtonsTensor() const;
+    MGR_EXPORT madrona::py::Tensor toGoalTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
     MGR_EXPORT madrona::py::Tensor seedTensor() const;
+    MGR_EXPORT madrona::py::Tensor depthTensor() const;
+    MGR_EXPORT madrona::py::Tensor rgbTensor() const;
 
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
@@ -59,11 +55,7 @@ private:
     struct CPUImpl;
     struct CUDAImpl;
 
-    inline madrona::py::Tensor exportStateTensor(int64_t slot,
-        madrona::py::Tensor::ElementType type,
-        madrona::Span<const int64_t> dimensions) const;
-
-    Impl *impl_;
+    std::unique_ptr<Impl> impl_;
 };
 
 }

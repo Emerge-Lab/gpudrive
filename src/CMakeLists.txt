@@ -53,11 +53,11 @@ target_compile_definitions(madrona_3d_example_mgr PRIVATE
     -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
 )
 
-madrona_python_module(madrona_3d_example_python
+madrona_python_module(madrona_3d_example
     bindings.cpp
 )
 
-target_link_libraries(madrona_3d_example_python PRIVATE
+target_link_libraries(madrona_3d_example PRIVATE
     madrona_3d_example_mgr
 )
 

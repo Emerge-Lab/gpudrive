@@ -13,7 +13,6 @@ namespace GPUHideSeek {
 constexpr inline float wallSpeed = 4.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
-constexpr inline CountT numPrepSteps = 96;
 constexpr inline CountT episodeLen = 240;
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
@@ -23,9 +22,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     viz::VizRenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
-    registry.registerComponent<RelativeAgentObservations>();
-    registry.registerComponent<RelativeButtonObservations>();
-    registry.registerComponent<RelativeDestinationObservations>();
+    registry.registerComponent<Reward>();
+    registry.registerComponent<Done>();
+    registry.registerComponent<OtherAgents>();
+    registry.registerComponent<ToOtherAgents>();
+    registry.registerComponent<ToButtons>();
+    registry.registerComponent<ToGoal>();
     registry.registerComponent<OpenState>();
 
     registry.registerComponent<Lidar>();
@@ -39,14 +41,24 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerArchetype<WallObject>();
     registry.registerArchetype<ButtonObject>();
 
-    registry.exportSingleton<WorldReset>((uint32_t)ExportIDs::Reset);
-
-    registry.exportColumn<Agent, Action>((uint32_t)ExportIDs::Action);
-    registry.exportColumn<Agent, RelativeAgentObservations>(5);
-    registry.exportColumn<Agent, RelativeButtonObservations>(6);
-    registry.exportColumn<Agent, RelativeDestinationObservations>(7);
-    registry.exportColumn<Agent, Lidar>(10);
-    registry.exportColumn<Agent, Seed>(11);
+    registry.exportSingleton<WorldReset>(
+        (uint32_t)ExportID::Reset);
+    registry.exportColumn<Agent, Action>(
+        (uint32_t)ExportID::Action);
+    registry.exportColumn<Agent, ToOtherAgents>(
+        (uint32_t)ExportID::ToOtherAgents);
+    registry.exportColumn<Agent, ToButtons>(
+        (uint32_t)ExportID::ToButtons);
+    registry.exportColumn<Agent, ToGoal>(
+        (uint32_t)ExportID::ToGoal);
+    registry.exportColumn<Agent, Lidar>(
+        (uint32_t)ExportID::Lidar);
+    registry.exportColumn<Agent, Reward>(
+        (uint32_t)ExportID::Reward);
+    registry.exportColumn<Agent, Done>(
+        (uint32_t)ExportID::Done);
+    registry.exportColumn<Agent, Seed>(
+        (uint32_t)ExportID::Seed);
 }
 
 static inline void resetEnvironment(Engine &ctx)
@@ -82,13 +94,13 @@ static inline void resetEnvironment(Engine &ctx)
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    int32_t level = reset.resetLevel;
+    int32_t level = reset.reset;
     if (ctx.data().autoReset && ctx.data().curEpisodeStep == episodeLen - 1) {
         level = 1;
     }
 
     if (level != 0) {
-        reset.resetLevel = 0;
+        reset.reset = 0;
 
         resetEnvironment(ctx);
         generateEnvironment(ctx);
@@ -176,40 +188,50 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
-inline void collectObservationsSystem(Engine &ctx,
-                                      Entity agent_e,
-                                      RelativeAgentObservations &agent_obs,
-                                      RelativeButtonObservations &button_obs,
-                                      RelativeDestinationObservations &des_obs)
+static inline PolarCoord xyToPolar(Vector3 v)
 {
-    Vector2 agentPosV2 = { ctx.get<Position>(agent_e).x, ctx.get<Position>(agent_e).y };
+    Vector2 xy { v.x, v.y };
+    return PolarCoord {
+        .r = xy.length(),
+        .theta = atan2f(xy.y, xy.x),
+    };
+}
 
-    // Get relative agent observations
-    if (agent_e == ctx.data().agents[0]) {
-        Vector3 relAgentObsV3 = ctx.get<Position>(ctx.data().agents[1]) - ctx.get<Position>(agent_e);
-        Vector2 relAgentObs = { relAgentObsV3.x, relAgentObsV3.y };
-        agent_obs.obs[0] = { relAgentObs.length(), atan(relAgentObs.y / relAgentObs.x) };
+inline void collectObservationsSystem(Engine &ctx,
+                                      Position pos,
+                                      const OtherAgents &other_agents,
+                                      ToOtherAgents &to_other_agents,
+                                      ToButtons &to_buttons,
+                                      ToGoal &to_goal)
+{
+#pragma unroll
+    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+        Entity other = other_agents.e[i];
+
+        Vector3 other_pos = ctx.get<Position>(other);
+        to_other_agents.obs[i] = xyToPolar(other_pos - pos);
     }
 
-    // Get relative button observations
-    CountT buttonCount = 0;
-    for (; buttonCount < ctx.data().leafCount; ++buttonCount) {
-        Room &room = ctx.data().rooms[ctx.data().leafs[buttonCount]];
+    // Compute polar coords to buttons
+    CountT button_idx = 0;
+    for (; button_idx < ctx.data().leafCount; button_idx++) {
+        Room &room = ctx.data().rooms[ctx.data().leafs[button_idx]];
 
-        Vector2 buttonPos = (room.button.start + room.button.end) * 0.5f;
-        Vector2 diff = buttonPos - agentPosV2;
-        button_obs.obs[buttonCount] = { diff.length(), atan(diff.y / diff.x) };
+        Vector2 button_pos = (room.button.start + room.button.end) * 0.5f;
+        to_buttons.obs[button_idx] = xyToPolar(
+            Vector3 { button_pos.x, button_pos.y, 0 } - pos);
     }
 
-    for (; buttonCount < consts::maxRooms; ++buttonCount) {
-        button_obs.obs[buttonCount] = { FLT_MAX, 0.0f };
+    for (; button_idx < consts::maxRooms; button_idx++) {
+        // FIXME: is this a good invalid output?
+        to_buttons.obs[button_idx] = { 0.f, 2.f * math::pi };
     }
 
-    { // Get relative to destination observation
+    { // Compute polar coords to goal
         Room &dst = ctx.data().rooms[ctx.data().dstRoom];
-        Vector2 dstButtonPos = (dst.button.start + dst.button.end) * 0.5f;
-        Vector2 diff = dstButtonPos - agentPosV2;
-        des_obs.obs = { diff.length(), atan(diff.y / diff.x) };
+        Vector2 dst_button_pos = (dst.button.start + dst.button.end) * 0.5f;
+        to_goal.obs = xyToPolar(
+            Vector3 { dst_button_pos.x, dst_button_pos.y, 0 }  - pos);
     }
 }
 
@@ -225,7 +247,8 @@ inline void lidarSystem(Engine &ctx,
     Vector3 right = rot.rotateVec(math::right);
 
     auto traceRay = [&](int32_t idx) {
-        float theta = 2.f * math::pi * (float(idx) / float(30));
+        float theta = 2.f * math::pi * (
+            float(idx) / float(consts::numLidarSamples));
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -247,34 +270,30 @@ inline void lidarSystem(Engine &ctx,
 #ifdef MADRONA_GPU_MODE
     int32_t idx = threadIdx.x % 32;
 
-    if (idx < 30) {
+    if (idx < consts::numLidarSamples) {
         traceRay(idx);
     }
 #else
-    for (int32_t i = 0; i < 30; i++) {
+    for (CountT i = 0; i < consts::numLidarSamples; i++) {
         traceRay(i);
     }
 #endif
 }
 
 inline void rewardSystem(Engine &ctx,
-                         Entity e,
-                         Action &)
+                         Position pos,
+                         Reward &out_reward,
+                         Done &done)
 {
-    Loc l = ctx.loc(e);
-
-    Vector2 agentPosV2 = { ctx.get<Position>(e).x, ctx.get<Position>(e).y };
-
     Room &dst = ctx.data().rooms[ctx.data().dstRoom];
     Vector2 dstButtonPos = (dst.button.start + dst.button.end) * 0.5f;
-    Vector2 diff = dstButtonPos - agentPosV2;
-
+    Vector2 diff = dstButtonPos - Vector2 {pos .x, pos.y };
 
     CountT cur_step = ctx.data().curEpisodeStep;
 
     if (cur_step == 0) {
-        ctx.data().doneBuffer[l.row] = 0;
-        ctx.data().rewardBuffer[l.row] = 0.f;
+        out_reward.v = 0.f;
+        done.v = 0.f;
     }
 
     float reward = 0.0f;
@@ -285,10 +304,10 @@ inline void rewardSystem(Engine &ctx,
         reward = -0.05f;
     }
 
-    ctx.data().rewardBuffer[l.row] += reward;
+    out_reward.v = reward;
 
     if (cur_step == episodeLen - 1) {
-        ctx.data().doneBuffer[l.row] = 1;
+        done.v = 1;
     }
 }
 
@@ -313,7 +332,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
         Action, Rotation, ExternalForce, ExternalTorque>>({});
 
-#if 1
     auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
         OpenState>>({move_sys});
 
@@ -325,11 +343,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
         {set_door_pos_sys});
-
-#else
-    auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
-        {move_sys});
-#endif
 
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
         {broadphase_setup_sys}, numPhysicsSubsteps);
@@ -344,7 +357,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         builder, {sim_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Entity, Action>>({sim_done});
+         rewardSystem, Position, Reward, Done>>({sim_done});
 
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({reward_sys});
@@ -373,10 +386,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     auto collect_observations = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
-            Entity,
-            RelativeAgentObservations,
-            RelativeButtonObservations,
-            RelativeDestinationObservations
+            Position,
+            OtherAgents,
+            ToOtherAgents,
+            ToButtons,
+            ToGoal
         >>({reset_finish});
 
 #ifdef MADRONA_GPU_MODE
@@ -398,18 +412,13 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr),
-      rewardBuffer(init.rewardBuffer),
-      doneBuffer(init.doneBuffer)
+      episodeMgr(init.episodeMgr)
 {
-    CountT max_total_entities = init.maxEntitiesPerWorld + 100;
+    CountT max_total_entities = 100;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
          50 * 20, 10);
-
-    minEpisodeEntities = init.minEntitiesPerWorld;
-    maxEpisodeEntities = init.maxEntitiesPerWorld;
 
     curEpisodeStep = 0;
 
