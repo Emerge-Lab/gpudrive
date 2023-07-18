@@ -567,6 +567,6 @@ Sim::Sim(Engine &ctx,
     reward_tracker.numNewButtonsVisited = 0;
 }
 
-MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);
+MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);
 
 }

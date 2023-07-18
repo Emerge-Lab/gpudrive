@@ -11,7 +11,6 @@ using namespace madrona::phys;
 static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
 {
     Entity agent = ctx.data().agents[agentIdx] = ctx.makeEntity<Agent>();
-
     ctx.get<Seed>(agent).seed = ctx.data().curEpisodeIdx;
 
     // Zero out actions
