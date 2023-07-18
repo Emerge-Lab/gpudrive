@@ -58,6 +58,7 @@ for shape in policy.recurrent_cfg.shapes:
 for i in range(args.num_steps):
     with torch.no_grad():
         policy.fwd_actor(actions, cur_rnn_states, cur_rnn_states, *obs)
+    print(obs[0])
     print(actions)
     sim.step()
     print(rewards)

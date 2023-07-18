@@ -15,7 +15,7 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
     ctx.get<Seed>(agent).seed = ctx.data().curEpisodeIdx;
 
     // Zero out actions
-    ctx.get<Action>(agent) = { .x = 0, .y = 0, .r = 0, };
+    ctx.get<Action>(agent) = { .x = 5, .y = 5, .r = 5, };
 
     ctx.get<Position>(agent) = pos;
     ctx.get<Rotation>(agent) = rot;

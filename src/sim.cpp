@@ -175,7 +175,7 @@ inline void doorControlSystem(Engine &ctx, Position &pos, Action &action)
     }
 }
 
-inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &vel, OpenState &open_state)
+inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &, OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
@@ -301,7 +301,8 @@ inline void lidarSystem(Engine &ctx,
 }
 
 inline void updateVisitedSystem(Engine &ctx,
-                                const Position &pos)
+                                const Position &pos,
+                                const Reward &)
 {
     RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
 
@@ -319,9 +320,9 @@ inline void updateVisitedSystem(Engine &ctx,
         return;
     }
 
-    AtomicU32Ref cell(reward_tracker.visited[y][x]);
+    AtomicU32Ref cell(reward_tracker.visited[cell_y][cell_x]);
 
-    uint32_t cur_episode_idx = ctx.data().curEpisodeIdx;
+    uint32_t cur_episode_idx = (uint32_t)ctx.data().curEpisodeIdx;
     uint32_t old = cell.exchange<sync::relaxed>(cur_episode_idx);
     if (old != cur_episode_idx) {
         AtomicU32Ref(reward_tracker.numNewCellsVisited).fetch_add<sync::relaxed>(1);
@@ -329,12 +330,13 @@ inline void updateVisitedSystem(Engine &ctx,
 }
 
 inline void rewardSystem(Engine &ctx,
-                         Position pos,
                          Reward &out_reward,
                          Done &done)
 {
     int32_t cur_step = ctx.data().curEpisodeStep;
-    if (cur_step == episodeLen -1) {
+    if (cur_step == 0) {
+        done.v = 0;
+    } else if (cur_step == episodeLen -1) {
         done.v = 1;
     }
 
@@ -449,10 +451,10 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     // Now that physics is done we're going to compute the rewards
     // resulting from these actions
     auto update_visited = builder.addToGraph<ParallelForNode<Engine,
-        updateVisitedSystem, Position>>({phys_done});
+        updateVisitedSystem, Position, Reward>>({phys_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Position, Reward, Done>>({update_visited});
+         rewardSystem, Reward, Done>>({update_visited});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,

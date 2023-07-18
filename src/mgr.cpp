@@ -64,7 +64,6 @@ struct Manager::CPUImpl final : Manager::Impl {
     TaskGraphT cpuExec;
 
     inline CPUImpl(const Manager::Config &mgr_cfg,
-                   const Sim::Config &sim_cfg,
                    PhysicsLoader &&phys_loader,
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
@@ -95,11 +94,10 @@ struct Manager::CPUImpl final : Manager::Impl {
 };
 
 #ifdef MADRONA_CUDA_SUPPORT
-struct Manager::CUDAImpl : Manager::Impl {
+struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
 
-    inline GPUImpl(const Manager::Config &mgr_cfg,
-                   const Sim::Config &sim_cfg,
+    inline CUDAImpl(const Manager::Config &mgr_cfg,
                    PhysicsLoader &&phys_loader,
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
@@ -110,7 +108,7 @@ struct Manager::CUDAImpl : Manager::Impl {
           gpuExec(std::move(gpu_exec))
     {}
 
-    inline virtual ~GPUImpl() final
+    inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
     }
@@ -124,7 +122,7 @@ struct Manager::CUDAImpl : Manager::Impl {
         Tensor::ElementType type,
         madrona::Span<const int64_t> dims) const final
     {
-        void *dev_ptr = gpu_exec.getExported((uint32_t)slot);
+        void *dev_ptr = gpuExec.getExported((uint32_t)slot);
         return Tensor(dev_ptr, type, dims, cfg.gpuID);
     }
 };
@@ -345,9 +343,8 @@ Manager::Impl * Manager::Impl::init(
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
 
-        return new GPUImpl {
+        return new CUDAImpl {
             mgr_cfg,
-            sim_cfg,
             std::move(phys_loader),
             episode_mgr,
             world_reset_buffer,
@@ -393,7 +390,6 @@ Manager::Impl * Manager::Impl::init(
 
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
-            sim_cfg,
             std::move(phys_loader),
             episode_mgr,
             world_reset_buffer,
@@ -447,7 +443,7 @@ Tensor Manager::doneTensor() const
 Tensor Manager::positionObservationTensor() const
 {
     return impl_->exportTensor(ExportID::PositionObservation,
-                               Tensor::ElementType::Int32,
+                               Tensor::ElementType::Float32,
                                {impl_->cfg.numWorlds * consts::numAgents, 2});
 }
 

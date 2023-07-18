@@ -22,13 +22,15 @@ add_library(madrona_3d_example_mgr SHARED
     mgr.hpp mgr.cpp
 )
 
-target_link_libraries(madrona_3d_example_mgr PRIVATE
-    madrona_3d_example_cpu_impl
-    madrona_mw_cpu
-    madrona_python_utils
-    madrona_common
-    madrona_importer
-    madrona_physics_assets
+target_link_libraries(madrona_3d_example_mgr 
+    PUBLIC
+        madrona_python_utils
+    PRIVATE
+        madrona_3d_example_cpu_impl
+        madrona_mw_cpu
+        madrona_common
+        madrona_importer
+        madrona_physics_assets
 )
 
 if (TARGET madrona_mw_gpu)
@@ -70,3 +72,6 @@ if (TARGET madrona_viewer)
         -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
     )
 endif()
+
+add_executable(headless headless.cpp)
+target_link_libraries(headless madrona_3d_example_mgr)

@@ -82,9 +82,9 @@ int main(int argc, char *argv[])
                        const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
 
-        int32_t x = 0;
-        int32_t y = 0;
-        int32_t r = 0;
+        int32_t x = 5;
+        int32_t y = 5;
+        int32_t r = 5;
 
         if (input.keyPressed(Key::R)) {
             mgr.triggerReset(world_idx);
