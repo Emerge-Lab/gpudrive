@@ -34,6 +34,8 @@ inline constexpr CountT maxDoorsPerRoom = 6;
 
 inline constexpr CountT numLidarSamples = 30;
 
+inline constexpr float worldBounds = 18.f;
+
 }
 
 enum class ExportID : uint32_t {
@@ -41,6 +43,7 @@ enum class ExportID : uint32_t {
     Action,
     Reward,
     Done,
+    PositionObservation,
     ToOtherAgents,
     ToButtons,
     ToGoal,
@@ -75,6 +78,11 @@ struct Done {
 
 struct GlobalDebugPositions {
     madrona::math::Vector2 agentPositions[consts::numAgents];
+};
+
+struct PositionObservation {
+    float x;
+    float y;
 };
 
 // Entity ID of the other agents
@@ -133,7 +141,7 @@ struct WallObject : public madrona::Archetype<
     OpenState
 > {};
 
-struct DynamicObject : public madrona::Archetype<
+struct PhysicsObject : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
@@ -168,6 +176,7 @@ struct Agent : public madrona::Archetype<
     Action,
 
     // Observations
+    PositionObservation,
     OtherAgents,
     ToOtherAgents,
     ToButtons,
@@ -183,17 +192,17 @@ struct Agent : public madrona::Archetype<
     madrona::viz::VizCamera
 > {};
 
-struct ButtonState {
-    CountT isPressed;
-    CountT boundDoor;
-};
+struct RewardTracker {
+    static inline constexpr int32_t gridWidth = 41;
+    static inline constexpr int32_t gridMaxX = gridWidth / 2;
+    static inline constexpr int32_t gridHeight = 41;
+    static inline constexpr int32_t gridMaxY = gridHeight / 2;
 
-struct Button : public madrona::Archetype<
-    Position,
-    Scale,
-    ObjectID,
-    ButtonState
-> {};
+    uint32_t visited[gridHeight][gridWidth];
+    uint32_t numNewCellsVisited;
+    uint32_t numNewButtonsVisited;
+    uint32_t outOfBounds;
+};
 
 struct EnvRoom {
     Entity doors[consts::maxDoorsPerRoom];
@@ -283,9 +292,8 @@ struct Sim : public madrona::WorldBase {
     // Agents which will try to get to the destination
     Entity agents[consts::numAgents];
 
-    CountT curEpisodeStep;
-
-    uint32_t curEpisodeSeed;
+    int32_t curEpisodeStep;
+    int32_t curEpisodeIdx;
     bool enableBatchRender;
     bool enableVizRender;
     bool autoReset;

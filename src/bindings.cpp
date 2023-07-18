@@ -40,6 +40,7 @@ NB_MODULE(madrona_3d_example, m) {
         .def("action_tensor", &Manager::actionTensor)
         .def("reward_tensor", &Manager::rewardTensor)
         .def("done_tensor", &Manager::doneTensor)
+        .def("position_observation_tensor", &Manager::positionObservationTensor)
         .def("to_other_agents_tensor", &Manager::toOtherAgentsTensor)
         .def("to_buttons_tensor", &Manager::toButtonsTensor)
         .def("to_goal_tensor", &Manager::toGoalTensor)

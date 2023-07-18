@@ -12,7 +12,7 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
 {
     Entity agent = ctx.data().agents[agentIdx] = ctx.makeEntity<Agent>();
 
-    ctx.get<Seed>(agent).seed = ctx.data().curEpisodeSeed;
+    ctx.get<Seed>(agent).seed = ctx.data().curEpisodeIdx;
 
     // Zero out actions
     ctx.get<Action>(agent) = { .x = 0, .y = 0, .r = 0, };
@@ -47,12 +47,12 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
 }
 
 static Entity makePlane(Engine &ctx, Vector3 offset, Quat rot) {
-    return makeDynObject(ctx, offset, rot, 1, ResponseType::Static);
+    return makePhysicsObject(ctx, offset, rot, 1, ResponseType::Static);
 }
 
 static void generateTrainingEnvironment(Engine &ctx)
 {
-    const Vector2 bounds { -18.f, 18.f };
+    const Vector2 bounds { -consts::worldBounds, consts::worldBounds };
 
     // After this function, all the entities for the walls have been created
     populateStaticGeometry(ctx, ctx.data().rng, {bounds.y, bounds.y}, ctx.data().srcRoom, ctx.data().dstRoom);
@@ -118,12 +118,10 @@ static void generateTrainingEnvironment(Engine &ctx)
 void generateEnvironment(Engine &ctx)
 {
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
-    episode_mgr.curEpisode.fetch_add<sync::relaxed>(150);
-    uint32_t episode_idx =
-        episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
-    ctx.data().rng = RNG::make(episode_idx);
+    int32_t episode_idx = episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
+    ctx.data().rng = RNG::make(0/*episode_idx*/);
 
-    ctx.data().curEpisodeSeed = episode_idx;
+    ctx.data().curEpisodeIdx = episode_idx;
 
     generateTrainingEnvironment(ctx);
 }

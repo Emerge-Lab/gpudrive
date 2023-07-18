@@ -38,6 +38,7 @@ public:
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
+    MGR_EXPORT madrona::py::Tensor positionObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor toOtherAgentsTensor() const;
     MGR_EXPORT madrona::py::Tensor toButtonsTensor() const;
     MGR_EXPORT madrona::py::Tensor toGoalTensor() const;

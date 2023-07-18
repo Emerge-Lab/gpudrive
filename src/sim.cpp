@@ -13,7 +13,7 @@ namespace GPUHideSeek {
 constexpr inline float wallSpeed = 4.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
-constexpr inline CountT episodeLen = 240;
+constexpr inline int32_t episodeLen = 240;
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
@@ -22,6 +22,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     viz::VizRenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
+    registry.registerComponent<PositionObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
     registry.registerComponent<OtherAgents>();
@@ -35,9 +36,10 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<GlobalDebugPositions>();
+    registry.registerSingleton<RewardTracker>();
 
     registry.registerArchetype<Agent>();
-    registry.registerArchetype<DynamicObject>();
+    registry.registerArchetype<PhysicsObject>();
     registry.registerArchetype<WallObject>();
     registry.registerArchetype<ButtonObject>();
 
@@ -45,6 +47,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Reset);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
+    registry.exportColumn<Agent, PositionObservation>(
+        (uint32_t)ExportID::PositionObservation);
     registry.exportColumn<Agent, ToOtherAgents>(
         (uint32_t)ExportID::ToOtherAgents);
     registry.exportColumn<Agent, ToButtons>(
@@ -94,6 +98,12 @@ static inline void resetEnvironment(Engine &ctx)
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
+    // Reset the reward tracker for the next step
+    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
+    reward_tracker.numNewCellsVisited = 0;
+    reward_tracker.numNewButtonsVisited = 0;
+    reward_tracker.outOfBounds = 0;
+
     int32_t should_reset = reset.reset;
     if (ctx.data().autoReset) {
         for (CountT i = 0; i < consts::numAgents; i++) {
@@ -185,7 +195,7 @@ inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &vel, OpenSt
 
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
-                               viz::VizCamera &)
+                               Action &)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -205,11 +215,15 @@ static inline PolarCoord xyToPolar(Vector3 v)
 
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
+                                      PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
                                       ToButtons &to_buttons,
                                       ToGoal &to_goal)
 {
+    pos_obs.x = pos.x;
+    pos_obs.y = pos.y;
+
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = other_agents.e[i];
@@ -286,11 +300,62 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
+inline void updateVisitedSystem(Engine &ctx,
+                                const Position &pos)
+{
+    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
+
+    // Discretize position
+    int32_t x = int32_t(pos.x + 0.5f);
+    int32_t y = int32_t(pos.y + 0.5f);
+
+    int32_t cell_x = x + RewardTracker::gridMaxX;
+    int32_t cell_y = y + RewardTracker::gridMaxY;
+
+    if (cell_x < 0 || cell_x >= RewardTracker::gridWidth ||
+        cell_y < 0 || cell_y >= RewardTracker::gridHeight) {
+        AtomicU32Ref(reward_tracker.outOfBounds).store<sync::relaxed>(1);
+
+        return;
+    }
+
+    AtomicU32Ref cell(reward_tracker.visited[y][x]);
+
+    uint32_t cur_episode_idx = ctx.data().curEpisodeIdx;
+    uint32_t old = cell.exchange<sync::relaxed>(cur_episode_idx);
+    if (old != cur_episode_idx) {
+        AtomicU32Ref(reward_tracker.numNewCellsVisited).fetch_add<sync::relaxed>(1);
+    }
+}
+
 inline void rewardSystem(Engine &ctx,
                          Position pos,
                          Reward &out_reward,
                          Done &done)
 {
+    int32_t cur_step = ctx.data().curEpisodeStep;
+    if (cur_step == episodeLen -1) {
+        done.v = 1;
+    }
+
+    const RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
+    if (reward_tracker.numNewCellsVisited == 0 &&
+            reward_tracker.numNewButtonsVisited == 0 &&
+            reward_tracker.outOfBounds == 0) {
+        out_reward.v = -0.05f;
+        return;
+    }
+
+    float reward = reward_tracker.numNewCellsVisited * 1.f;
+    reward += reward_tracker.numNewButtonsVisited * 10.f;
+
+    if (reward_tracker.outOfBounds) {
+        reward += 1000.f;
+    }
+
+    out_reward.v = reward;
+
+#if 0
     Room &dst = ctx.data().rooms[ctx.data().dstRoom];
     Vector2 dstButtonPos = (dst.button.start + dst.button.end) * 0.5f;
     Vector2 diff = dstButtonPos - Vector2 {pos .x, pos.y };
@@ -318,6 +383,7 @@ inline void rewardSystem(Engine &ctx,
     if (cur_step == episodeLen - 1 || at_goal) {
         done.v = 1;
     }
+#endif
 }
 
 #ifdef MADRONA_GPU_MODE
@@ -338,69 +404,83 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 
 void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 {
-    auto move_sys = builder.addToGraph<ParallelForNode<Engine, movementSystem,
-        Action, Rotation, ExternalForce, ExternalTorque>>({});
+    // Turn policy actions into movement
+    auto move_sys = builder.addToGraph<ParallelForNode<Engine,
+        movementSystem,
+            Action,
+            Rotation,
+            ExternalForce,
+            ExternalTorque
+        >>({});
 
-    auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine, resetDoorStateSystem,
-        OpenState>>({move_sys});
+    // Scripted door behaviors
+    auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine,
+        resetDoorStateSystem,
+            OpenState
+        >>({move_sys});
 
-    auto door_control_sys = builder.addToGraph<ParallelForNode<Engine, doorControlSystem,
-        Position, Action>>({reset_door_sys});
+    auto door_control_sys = builder.addToGraph<ParallelForNode<Engine,
+        doorControlSystem,
+            Position,
+            Action
+        >>({reset_door_sys});
 
-    auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine, setDoorPositionSystem,
-        Position, Velocity, OpenState>>({door_control_sys});
+    auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine,
+        setDoorPositionSystem,
+            Position,
+            Velocity,
+            OpenState
+        >>({door_control_sys});
 
-    auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
-        {set_door_pos_sys});
+    // Physics systems
+    auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
+        builder, {set_door_pos_sys});
 
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
         {broadphase_setup_sys}, numPhysicsSubsteps);
 
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, viz::VizCamera>>(
+        agentZeroVelSystem, Velocity, Action>>(
             {substep_sys});
 
-    auto sim_done = agent_zero_vel;
+    auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+        builder, {agent_zero_vel});
 
-    sim_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
-        builder, {sim_done});
+    // Now that physics is done we're going to compute the rewards
+    // resulting from these actions
+    auto update_visited = builder.addToGraph<ParallelForNode<Engine,
+        updateVisitedSystem, Position>>({phys_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Position, Reward, Done>>({sim_done});
+         rewardSystem, Position, Reward, Done>>({update_visited});
 
+    // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
         resetSystem, WorldReset>>({reward_sys});
 
-    auto clearTmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+
+    // This second BVH build is a limitation of the current taskgraph API.
+    // It's only necessary if the world was reset, but we don't have a way
+    // to conditionally queue taskgraph nodes yet.
+    auto post_reset_broadphase = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
+        builder, {clear_tmp});
 
 #ifdef MADRONA_GPU_MODE
-    // FIXME: these 3 need to be compacted, but sorting is unnecessary
-    auto sort_dyn_agent = queueSortByWorld<DynAgent>(builder, {sort_cam_agent});
-    auto sort_objects = queueSortByWorld<DynamicObject>(builder, {sort_dyn_agent});
-    auto sort_agent_iface =
-        queueSortByWorld<AgentInterface>(builder, {sort_objects});
-    auto reset_finish = sort_agent_iface;
-#else
-    auto reset_finish = clearTmp;
-#endif
-
-    if (cfg.enableViewer) {
-        viz::VizRenderingSystem::setupTasks(builder, {reset_finish});
-    }
-
-#ifdef MADRONA_GPU_MODE
-    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_finish});
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_sys});
     (void)recycle_sys;
 #endif
 
-    auto collect_observations = builder.addToGraph<ParallelForNode<Engine,
+    // Finally, collect observations for the next step.
+    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
             Position,
+            PositionObservation,
             OtherAgents,
             ToOtherAgents,
             ToButtons,
             ToGoal
-        >>({reset_finish});
+        >>({post_reset_broadphase});
 
 #ifdef MADRONA_GPU_MODE
     auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
@@ -411,10 +491,27 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 #endif
             Entity,
             Lidar
-        >>({reset_finish});
+        >>({post_reset_broadphase});
 
+    if (cfg.enableViewer) {
+        viz::VizRenderingSystem::setupTasks(builder, {reset_sys});
+    }
+
+#ifdef MADRONA_GPU_MODE
+    // Sort entities, again, this could be conditional on reset.
+    auto sort_agents = queueSortByWorld<Agent>(
+        builder, {lidar, collect_obs});
+    auto sort_phys_objects = queueSortByWorld<PhysicsObject>(
+        builder, {sort_agents});
+    auto sort_buttons = queueSortByWorld<ButtonObject>(
+        builder, {sort_phys_objects});
+    auto sort_walls = queueSortByWorld<WallObject>(
+        builder, {sort_buttons});
+    (void)sort_walls;
+#else
     (void)lidar;
-    (void)collect_observations;
+    (void)collect_obs;
+#endif
 }
 
 Sim::Sim(Engine &ctx,
@@ -456,6 +553,16 @@ Sim::Sim(Engine &ctx,
     // Creates the wall entities and placess the agents into the source room
     resetEnvironment(ctx);
     generateEnvironment(ctx);
+
+    // Clear reward tracker:
+    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
+    for (CountT y = 0; y < RewardTracker::gridHeight; y++) {
+        for (CountT x = 0; x < RewardTracker::gridWidth; x++) {
+            reward_tracker.visited[y][x] = 0xFFFF'FFFF;
+        }
+    }
+    reward_tracker.numNewCellsVisited = 0;
+    reward_tracker.numNewButtonsVisited = 0;
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Config, WorldInit);

@@ -6,7 +6,7 @@
 namespace GPUHideSeek {
 
 #include "geo_gen.hpp"
-inline madrona::Entity makeDynObject(
+inline madrona::Entity makePhysicsObject(
     Engine &ctx,
     madrona::math::Vector3 pos,
     madrona::math::Quat rot,

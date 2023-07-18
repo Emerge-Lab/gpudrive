@@ -574,12 +574,13 @@ static madrona::Entity makeButtonEntity(Engine &ctx, Vector2 start, Vector2 end)
     return e;
 }
 
-madrona::Entity makeWallObject(Engine &ctx,
-                     madrona::math::Vector3 pos,
-                     madrona::math::Quat rot,
-                     int32_t obj_id,
-                     madrona::phys::ResponseType response_type,
-                     madrona::math::Diag3x3 scale)
+madrona::Entity makeWallObject(
+    Engine &ctx,
+    madrona::math::Vector3 pos,
+    madrona::math::Quat rot,
+    int32_t obj_id,
+    madrona::phys::ResponseType response_type,
+    madrona::math::Diag3x3 scale)
 {
     using namespace madrona;
     using namespace madrona::math;

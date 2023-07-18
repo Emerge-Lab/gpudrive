@@ -444,6 +444,12 @@ Tensor Manager::doneTensor() const
                                {impl_->cfg.numWorlds * consts::numAgents, 1});
 }
 
+Tensor Manager::positionObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::PositionObservation,
+                               Tensor::ElementType::Int32,
+                               {impl_->cfg.numWorlds * consts::numAgents, 2});
+}
 
 Tensor Manager::toOtherAgentsTensor() const
 {
