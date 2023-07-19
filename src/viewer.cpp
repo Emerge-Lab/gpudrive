@@ -18,7 +18,6 @@ int main(int argc, char *argv[])
 
     ExecMode exec_mode = ExecMode::CPU;
     if (argc >= 3) {
-        printf("%s\n", argv[2]);
         if (!strcmp("--cpu", argv[2])) {
             exec_mode = ExecMode::CPU;
         } else if (!strcmp("--cuda", argv[2])) {
