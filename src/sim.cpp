@@ -13,7 +13,7 @@ namespace GPUHideSeek {
 constexpr inline float wallSpeed = 4.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
-constexpr inline int32_t episodeLen = 240;
+constexpr inline int32_t episodeLen = 480;
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
