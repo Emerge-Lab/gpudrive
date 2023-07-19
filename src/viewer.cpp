@@ -11,8 +11,20 @@ int main(int argc, char *argv[])
 {
     using namespace GPUHideSeek;
 
-    (void)argc;
-    (void)argv;
+    uint32_t num_worlds = 1;
+    if (argc >= 2) {
+        num_worlds = (uint32_t)atoi(argv[1]);
+    }
+
+    ExecMode exec_mode = ExecMode::CPU;
+    if (argc >= 3) {
+        printf("%s\n", argv[2]);
+        if (!strcmp("--cpu", argv[2])) {
+            exec_mode = ExecMode::CPU;
+        } else if (!strcmp("--cuda", argv[2])) {
+            exec_mode = ExecMode::CUDA;
+        }
+    }
 
     std::array<char, 1024> import_err;
     auto render_assets = imp::ImportedAssets::importFromDisk({
@@ -35,8 +47,6 @@ int main(int argc, char *argv[])
         FATAL("Failed to load render assets: %s", import_err);
     }
 
-    uint32_t num_worlds = 2;
-
     Viewer viewer({
         .gpuID = 0,
         .renderWidth = 2730,
@@ -45,7 +55,7 @@ int main(int argc, char *argv[])
         .maxViewsPerWorld = 2,
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 10,
-        .execMode = ExecMode::CPU,
+        .execMode = exec_mode,
     });
 
     const_cast<uint32_t&>(render_assets->objects[0].meshes[0].materialIDX) = 0;
@@ -63,7 +73,7 @@ int main(int argc, char *argv[])
     });
 
     Manager mgr({
-        .execMode = ExecMode::CPU,
+        .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
         .renderWidth = 0,

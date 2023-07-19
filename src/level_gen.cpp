@@ -15,7 +15,6 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
 
     // Zero out actions
     ctx.get<Action>(agent) = { .x = 5, .y = 5, .r = 5, };
-
     ctx.get<Position>(agent) = pos;
     ctx.get<Rotation>(agent) = rot;
     ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
@@ -93,7 +92,7 @@ static void generateTrainingEnvironment(Engine &ctx)
         ctx.get<phys::broadphase::LeafID>(agent) =
             phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
                     ctx.get<ObjectID>(agent));
-        ctx.get<Action>(agent) = { .x = 0, .y = 0, .r = 0, };
+        ctx.get<Action>(agent) = { .x = 5, .y = 5, .r = 5, };
         ctx.get<Position>(agent) = pos;
         ctx.get<Rotation>(agent) = rot;
         ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
