@@ -82,7 +82,8 @@ EnvironmentRooms makeRooms(Engine &ctx, RNG &rng)
 
         false,
         0.0f,
-        {}
+        {},
+        Entity::none(),
     };
 
     for (CountT i = 0; i < consts::maxDoorsPerRoom + Room::kTmpPadSpace; ++i)
@@ -555,20 +556,22 @@ void placeButtons(Engine &ctx, RNG &rng, EnvironmentRooms &rooms)
         float x = xStart + rng.rand() * (xEnd - xStart);
         float y = yStart + rng.rand() * (yEnd - yStart);
 
-        room.button.start = { x - BUTTON_WIDTH/2.0f, y - BUTTON_WIDTH/2.0f };
-        room.button.end = room.button.start + Vector2{BUTTON_WIDTH, BUTTON_WIDTH};
+        room.button.pos.x = x;
+        room.button.pos.y = y;
+        room.button.visited = 0;
     }
 }
 
-static madrona::Entity makeButtonEntity(Engine &ctx, Vector2 start, Vector2 end)
+static madrona::Entity makeButtonEntity(Engine &ctx, Vector2 pos, Vector2 scale)
 {
-    Vector3 pos = { 0.5f*(start.x + end.x), 0.5f*(start.y + end.y), 0.0f };
-    Diag3x3 scale = { end.x - pos.x, end.y - pos.y, 0.2f };
-
     Entity e = ctx.makeEntity<ButtonObject>();
-    ctx.get<Position>(e) = pos;
+    ctx.get<Position>(e) = Vector3 { pos.x, pos.y, 0.f };
     ctx.get<Rotation>(e) = Quat::angleAxis(0, {1, 0, 0});
-    ctx.get<Scale>(e) = scale;
+    ctx.get<Scale>(e) = Diag3x3 {
+        scale.x * BUTTON_WIDTH,
+        scale.y * BUTTON_WIDTH,
+        0.2f,
+    };
     ctx.get<ObjectID>(e) = ObjectID { 2 };
 
     return e;
@@ -659,8 +662,7 @@ void populateStaticGeometry(Engine &ctx,
         ctx.data().rooms[i].offset = doScale(ctx.data().rooms[i].offset, -level_scale, level_scale);
         ctx.data().rooms[i].extent = doDirScale(ctx.data().rooms[i].extent, -level_scale, level_scale);
 
-        ctx.data().rooms[i].button.start = doScale(ctx.data().rooms[i].button.start, -level_scale, level_scale);
-        ctx.data().rooms[i].button.end = doScale(ctx.data().rooms[i].button.end, -level_scale, level_scale);
+        ctx.data().rooms[i].button.pos = doScale(ctx.data().rooms[i].button.pos, -level_scale, level_scale);
     }
 
     ctx.data().leafCount = rooms.leafs.size();
@@ -670,7 +672,7 @@ void populateStaticGeometry(Engine &ctx,
         uint32_t roomIdx = rooms.leafs[i];
 
         ctx.data().rooms[roomIdx].buttonEntity = makeButtonEntity(
-            ctx, ctx.data().rooms[roomIdx].button.start, ctx.data().rooms[roomIdx].button.end);
+            ctx, ctx.data().rooms[roomIdx].button.pos, level_scale);
     }
 
     // Allocate walls
@@ -784,12 +786,6 @@ Room *containedRoom(madrona::math::Vector2 pos, Room *rooms)
     }
 
     return parent;
-}
-
-bool isPressingButton(madrona::math::Vector2 pos, Room *room)
-{
-    return (room->button.start.x <= pos.x && pos.x <= room->button.end.x &&
-        room->button.start.y <= pos.y && pos.y <= room->button.end.y);
 }
 
 }

@@ -36,6 +36,8 @@ inline constexpr CountT numLidarSamples = 30;
 
 inline constexpr float worldBounds = 18.f;
 
+inline constexpr CountT numMoveBuckets = 5;
+
 }
 
 enum class ExportID : uint32_t {
@@ -193,9 +195,9 @@ struct Agent : public madrona::Archetype<
 > {};
 
 struct RewardTracker {
-    static inline constexpr int32_t gridWidth = 41;
+    static inline constexpr int32_t gridWidth = 11;
     static inline constexpr int32_t gridMaxX = gridWidth / 2;
-    static inline constexpr int32_t gridHeight = 41;
+    static inline constexpr int32_t gridHeight = 11;
     static inline constexpr int32_t gridMaxY = gridHeight / 2;
 
     uint32_t visited[gridHeight][gridWidth];
@@ -209,8 +211,8 @@ struct EnvRoom {
 };
 
 struct ButtonInfo {
-    madrona::math::Vector2 start;
-    madrona::math::Vector2 end;
+    madrona::math::Vector2 pos;
+    uint32_t visited;
 };
 
 struct Room {

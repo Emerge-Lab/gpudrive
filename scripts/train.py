@@ -23,7 +23,6 @@ class LearningCallback:
 
     def __call__(self, update_idx, update_time, update_results, learning_state):
         update_id = update_idx + 1
-
         fps = args.num_worlds * args.steps_per_update / update_time
         self.mean_fps += (fps - self.mean_fps) / update_id
 
@@ -32,35 +31,61 @@ class LearningCallback:
 
         ppo = update_results.ppo_stats
 
+        with torch.no_grad():
+            reward_mean = update_results.rewards.mean().cpu().item()
+            reward_min = update_results.rewards.min().cpu().item()
+            reward_max = update_results.rewards.max().cpu().item()
+
+            value_mean = update_results.values.mean().cpu().item()
+            value_min = update_results.values.min().cpu().item()
+            value_max = update_results.values.max().cpu().item()
+
+            advantage_mean = update_results.advantages.mean().cpu().item()
+            advantage_min = update_results.advantages.min().cpu().item()
+            advantage_max = update_results.advantages.max().cpu().item()
+
+            bootstrap_value_mean = update_results.bootstrap_values.mean().cpu().item()
+            bootstrap_value_min = update_results.bootstrap_values.min().cpu().item()
+            bootstrap_value_max = update_results.bootstrap_values.max().cpu().item()
+
         print(f"\nUpdate: {update_id}")
         print(f"    Loss: {ppo.loss: .3e}, A: {ppo.action_loss: .3e}, V: {ppo.value_loss: .3e}, E: {ppo.entropy_loss: .3e}")
-        print(f"    FPS: {fps:.0f}, Update Time: {update_time:.2f}, Avg FPS: {self.mean_fps:.0f}")
+        print()
+        print(f"    Rewards          => Avg: {reward_mean: .3e}, Min: {reward_min: .3e}, Max: {reward_max: .3e}")
+        print(f"    Values           => Avg: {value_mean: .3e}, Min: {value_min: .3e}, Max: {value_max: .3e}")
+        print(f"    Advantages       => Avg: {advantage_mean: .3e}, Min: {advantage_min: .3e}, Max: {advantage_max: .3e}")
+        print(f"    Bootstrap Values => Avg: {bootstrap_value_mean: .3e}, Min: {bootstrap_value_min: .3e}, Max: {bootstrap_value_max: .3e}")
+
         if self.profile_report:
+            print()
+            print(f"    FPS: {fps:.0f}, Update Time: {update_time:.2f}, Avg FPS: {self.mean_fps:.0f}")
             profile.report()
 
         if update_id % 100 == 0:
-            learning_state.save(update_id, self.ckpt_dir / f"{update_id}.pth")
+            learning_state.save(update_idx, self.ckpt_dir / f"{update_id}.pth")
 
 
 arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument('--num-worlds', type=int, required=True)
-arg_parser.add_argument('--num-updates', type=int, required=True)
+arg_parser.add_argument('--gpu-id', type=int, default=0)
 arg_parser.add_argument('--ckpt-dir', type=str, required=True)
 arg_parser.add_argument('--restore', type=int)
+
+arg_parser.add_argument('--num-worlds', type=int, required=True)
+arg_parser.add_argument('--num-updates', type=int, required=True)
+arg_parser.add_argument('--steps-per-update', type=int, default=50)
+arg_parser.add_argument('--num-bptt-chunks', type=int, default=1)
+
 arg_parser.add_argument('--lr', type=float, default=0.01)
 arg_parser.add_argument('--gamma', type=float, default=0.998)
-arg_parser.add_argument('--steps-per-update', type=int, default=50)
-arg_parser.add_argument('--gpu-id', type=int, default=0)
 arg_parser.add_argument('--entropy-loss-coef', type=float, default=0.3)
 arg_parser.add_argument('--value-loss-coef', type=float, default=0.5)
-arg_parser.add_argument('--gpu-sim', action='store_true')
-arg_parser.add_argument('--fp16', action='store_true')
-arg_parser.add_argument('--dnn', action='store_true')
+arg_parser.add_argument('--clip-value-loss', action='store_true')
+
 arg_parser.add_argument('--num-channels', type=int, default=1024)
 arg_parser.add_argument('--separate-value', action='store_true')
-arg_parser.add_argument('--actor-rnn', action='store_true')
-arg_parser.add_argument('--critic-rnn', action='store_true')
-arg_parser.add_argument('--num-bptt-chunks', type=int, default=1)
+arg_parser.add_argument('--fp16', action='store_true')
+
+arg_parser.add_argument('--gpu-sim', action='store_true')
 arg_parser.add_argument('--profile-report', action='store_true')
 
 args = arg_parser.parse_args()
@@ -84,7 +109,8 @@ else:
 ckpt_dir.mkdir(exist_ok=True, parents=True)
 
 obs, process_obs_cb, num_obs_features = setup_obs(sim)
-policy = make_policy(process_obs_cb, num_obs_features, args.num_channels)
+policy = make_policy(process_obs_cb, num_obs_features,
+                     args.num_channels, args.separate_value)
 
 # Hack to fill out observations: Reset envs and take step to populate envs
 # FIXME: just make it possible to populate observations after init
@@ -126,7 +152,7 @@ train(
             entropy_coef=args.entropy_loss_coef,
             max_grad_norm=0.5,
             num_epochs=1,
-            clip_value_loss=True,
+            clip_value_loss=args.clip_value_loss,
         ),
         mixed_precision = args.fp16,
     ),

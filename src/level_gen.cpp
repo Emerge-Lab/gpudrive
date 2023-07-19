@@ -14,7 +14,11 @@ static Entity makeAgent(Engine &ctx, uint32_t agentIdx, Vector3 pos, Quat rot)
     ctx.get<Seed>(agent).seed = ctx.data().curEpisodeIdx;
 
     // Zero out actions
-    ctx.get<Action>(agent) = { .x = 5, .y = 5, .r = 5, };
+    ctx.get<Action>(agent) = {
+        .x = consts::numMoveBuckets / 2,
+        .y = consts::numMoveBuckets / 2,
+        .r = consts::numMoveBuckets / 2,
+    };
     ctx.get<Position>(agent) = pos;
     ctx.get<Rotation>(agent) = rot;
     ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
@@ -73,18 +77,7 @@ static void generateTrainingEnvironment(Engine &ctx)
             x, y, 1.5f,
         };
 
-#if 0
-        if (i == 0) {
-            pos.x = 0.5f*(room.button.start.x + room.button.end.x);
-            pos.y = 0.5f*(room.button.start.y + room.button.end.y);
-        }
-#endif
-
         const auto rot = Quat::angleAxis(ctx.data().rng.rand() * math::pi, {0, 0, 1});
-        Diag3x3 scale = {1.0f, 1.0f, 1.0f};
-
-        AABB aabb = obj_mgr.rigidBodyAABBs[4];
-        aabb = aabb.applyTRS(pos, rot, scale);
 
         Entity agent = ctx.data().agents[i];
 
@@ -92,7 +85,11 @@ static void generateTrainingEnvironment(Engine &ctx)
         ctx.get<phys::broadphase::LeafID>(agent) =
             phys::RigidBodyPhysicsSystem::registerEntity(ctx, agent,
                     ctx.get<ObjectID>(agent));
-        ctx.get<Action>(agent) = { .x = 5, .y = 5, .r = 5, };
+        ctx.get<Action>(agent) = {
+            .x = consts::numMoveBuckets / 2,
+            .y = consts::numMoveBuckets / 2,
+            .r = consts::numMoveBuckets / 2,
+        };
         ctx.get<Position>(agent) = pos;
         ctx.get<Rotation>(agent) = rot;
         ctx.get<Scale>(agent) = Diag3x3 { 1, 1, 1 };
@@ -103,7 +100,7 @@ static void generateTrainingEnvironment(Engine &ctx)
         if (ctx.data().enableVizRender) {
             ctx.get<viz::VizCamera>(agent) =
                 viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
-                    Vector3 { 0, 0, 0.8 }, { (int32_t)i });
+                    Vector3 { 0, 0, 0.8 }, (int32_t)i);
         }
     }
 
@@ -135,11 +132,6 @@ void createAgents(Engine &ctx)
         };
 
         const auto rot = Quat::angleAxis(ctx.data().rng.rand() * math::pi, {0, 0, 1});
-        Diag3x3 scale = {1.0f, 1.0f, 1.0f};
-
-        AABB aabb = obj_mgr.rigidBodyAABBs[4];
-        aabb = aabb.applyTRS(pos, rot, scale);
-
         ctx.data().agents[i] = makeAgent(ctx, i, pos, rot);
     }
 

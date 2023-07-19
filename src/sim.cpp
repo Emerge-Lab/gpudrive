@@ -136,11 +136,11 @@ inline void movementSystem(Engine &,
                            ExternalForce &external_force,
                            ExternalTorque &external_torque)
 {
-    constexpr CountT discrete_action_buckets = 11;
+    constexpr CountT discrete_action_buckets = consts::numMoveBuckets;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_move_max =  110;
+    constexpr float discrete_move_max = 300;
     constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 30;
+    constexpr float discrete_turn_max = 90;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
     Quat cur_rot = rot;
@@ -159,18 +159,54 @@ inline void resetDoorStateSystem(Engine &, OpenState &open_state)
     open_state.isOpen = false;
 }
 
-// Sets door open state given where entities are (loops through entities).
-inline void doorControlSystem(Engine &ctx, Position &pos, Action &action)
+static bool isPressingButton(madrona::math::Vector2 pos, const ButtonInfo &button)
 {
-    (void)action;
+    constexpr float press_radius = 1.5f;
+    constexpr float button_dim = consts::worldBounds * BUTTON_WIDTH + 0.1f;
 
+    float circle_dist_x = fabsf(pos.x - button.pos.x);
+    float circle_dist_y = fabsf(pos.y - button.pos.y);
+
+    if (circle_dist_x > (button_dim / 2 + press_radius) ||
+            circle_dist_y > (button_dim / 2 + press_radius)) {
+        return false;
+    }
+    
+
+    if (circle_dist_x <= (button_dim / 2) ||
+            circle_dist_y <= (button_dim / 2)) {
+        return true;
+    }
+
+    float corner_dist_x = circle_dist_x - button_dim;
+    float corner_dist_y = circle_dist_y - button_dim;
+
+    float corner_dist2 = corner_dist_x * corner_dist_x +
+        corner_dist_y * corner_dist_y;
+
+    return corner_dist2 <= press_radius * press_radius;
+}
+
+// Sets door open state given where entities are (loops through entities).
+inline void buttonSystem(Engine &ctx, Position &pos, Action &)
+{
     Room *room = containedRoom({ pos.x, pos.y }, ctx.data().rooms);
+    ButtonInfo button = room->button;
 
     // If the button is pressed, set the doors of this room to be open
-    if (isPressingButton({ pos.x, pos.y }, room)) {
+    if (isPressingButton({ pos.x, pos.y }, button)) {
         for (CountT i = 0; i < room->doorCount; ++i) {
             CountT doorIdx = room->doors[i];
             ctx.get<OpenState>(ctx.data().doors[doorIdx]).isOpen = true;
+        }
+
+        uint32_t prev_visited =
+            AtomicU32Ref(room->button.visited).exchange<sync::relaxed>(1);
+
+        if (!prev_visited) {
+            auto &reward_tracker = ctx.singleton<RewardTracker>();
+            AtomicU32Ref(
+                reward_tracker.numNewButtonsVisited).fetch_add<sync::relaxed>(1);
         }
     }
 }
@@ -237,7 +273,7 @@ inline void collectObservationsSystem(Engine &ctx,
     for (; button_idx < ctx.data().leafCount; button_idx++) {
         Room &room = ctx.data().rooms[ctx.data().leafs[button_idx]];
 
-        Vector2 button_pos = (room.button.start + room.button.end) * 0.5f;
+        Vector2 button_pos = room.button.pos;
         to_buttons.obs[button_idx] = xyToPolar(
             Vector3 { button_pos.x, button_pos.y, 0 } - pos);
     }
@@ -249,7 +285,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     { // Compute polar coords to goal
         Room &dst = ctx.data().rooms[ctx.data().dstRoom];
-        Vector2 dst_button_pos = (dst.button.start + dst.button.end) * 0.5f;
+        Vector2 dst_button_pos = dst.button.pos;
         to_goal.obs = xyToPolar(
             Vector3 { dst_button_pos.x, dst_button_pos.y, 0 }  - pos);
     }
@@ -307,8 +343,8 @@ inline void updateVisitedSystem(Engine &ctx,
     RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
 
     // Discretize position
-    int32_t x = int32_t(pos.x + 0.5f);
-    int32_t y = int32_t(pos.y + 0.5f);
+    int32_t x = int32_t((pos.x + 0.5f) / 4);
+    int32_t y = int32_t((pos.y + 0.5f) / 4);
 
     int32_t cell_x = x + RewardTracker::gridMaxX;
     int32_t cell_y = y + RewardTracker::gridMaxY;
@@ -421,8 +457,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             OpenState
         >>({move_sys});
 
-    auto door_control_sys = builder.addToGraph<ParallelForNode<Engine,
-        doorControlSystem,
+    auto button_sys = builder.addToGraph<ParallelForNode<Engine,
+        buttonSystem,
             Position,
             Action
         >>({reset_door_sys});
@@ -432,7 +468,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             Position,
             Velocity,
             OpenState
-        >>({door_control_sys});
+        >>({button_sys});
 
     // Physics systems
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
@@ -565,6 +601,7 @@ Sim::Sim(Engine &ctx,
     }
     reward_tracker.numNewCellsVisited = 0;
     reward_tracker.numNewButtonsVisited = 0;
+    reward_tracker.outOfBounds = 0;
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);

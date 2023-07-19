@@ -58,13 +58,27 @@ def setup_obs(sim):
 
     return obs_tensors, process_obs, num_obs_features
 
-def make_policy(process_obs_cb, num_obs_features, num_channels):
-    move_action_dim = 11
+def make_policy(process_obs_cb, num_obs_features, num_channels, separate_value):
+    move_action_dim = 5
+    
+    encoder = RecurrentBackboneEncoder(
+        net = MLP(
+            input_dim = num_obs_features,
+            num_channels = num_channels,
+            num_layers = 2,
+        ),
+        rnn = LSTM(
+            in_channels = num_channels,
+            hidden_channels = num_channels,
+            num_layers = 1,
+        ),
+    )
 
-    return ActorCritic(
-        backbone = BackboneShared(
+    if separate_value:
+        backbone = BackboneSeparate(
             process_obs = process_obs_cb,
-            encoder = RecurrentBackboneEncoder(
+            actor_encoder = encoder,
+            critic_encoder = RecurrentBackboneEncoder(
                 net = MLP(
                     input_dim = num_obs_features,
                     num_channels = num_channels,
@@ -75,8 +89,16 @@ def make_policy(process_obs_cb, num_obs_features, num_channels):
                     hidden_channels = num_channels,
                     num_layers = 1,
                 ),
-            ),
-        ),
+            )
+        )
+    else:
+        backbone = BackboneShared(
+            process_obs = process_obs_cb,
+            encoder = encoder,
+        )
+
+    return ActorCritic(
+        backbone = backbone,
         actor = LinearLayerDiscreteActor(
             [move_action_dim, move_action_dim, move_action_dim], num_channels),
         critic = LinearLayerCritic(num_channels),

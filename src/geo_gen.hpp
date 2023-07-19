@@ -21,8 +21,6 @@ void populateStaticGeometry(Engine &ctx,
 
 // Finds which room an entity is in
 Room *containedRoom(madrona::math::Vector2 pos, Room *rooms);
-// Finds whether an entity is pressing a button or not
-bool isPressingButton(madrona::math::Vector2 pos, Room *room);
 
 }
 

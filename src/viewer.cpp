@@ -3,13 +3,30 @@
 #include "mgr.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 using namespace madrona;
 using namespace madrona::viz;
 
+HeapArray<int32_t> readReplayLog(const char *path)
+{
+    std::ifstream replay_log(path, std::ios::binary);
+    replay_log.seekg(0, std::ios::end);
+    int64_t size = replay_log.tellg();
+    replay_log.seekg(0, std::ios::beg);
+
+    HeapArray<int32_t> log(size / sizeof(int32_t));
+
+    replay_log.read((char *)log.data(), (size / sizeof(int32_t)) * sizeof(int32_t));
+
+    return log;
+}
+
 int main(int argc, char *argv[])
 {
     using namespace GPUHideSeek;
+
+    constexpr int64_t num_views = 2;
 
     uint32_t num_worlds = 1;
     if (argc >= 2) {
@@ -23,6 +40,19 @@ int main(int argc, char *argv[])
         } else if (!strcmp("--cuda", argv[2])) {
             exec_mode = ExecMode::CUDA;
         }
+    }
+
+    const char *replay_log_path = nullptr;
+    if (argc >= 4) {
+        replay_log_path = argv[3];
+    }
+
+    auto replay_log = Optional<HeapArray<int32_t>>::none();
+    uint32_t cur_replay_step = 0;
+    uint32_t num_replay_steps = 0;
+    if (replay_log_path != nullptr) {
+        replay_log = readReplayLog(replay_log_path);
+        num_replay_steps = replay_log->size() / (num_worlds * num_views * 3);
     }
 
     std::array<char, 1024> import_err;
@@ -51,7 +81,7 @@ int main(int argc, char *argv[])
         .renderWidth = 2730,
         .renderHeight = 1536,
         .numWorlds = num_worlds,
-        .maxViewsPerWorld = 2,
+        .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 10,
         .execMode = exec_mode,
@@ -87,41 +117,73 @@ int main(int argc, char *argv[])
 
     mgr.step();
 
+    auto replayStep = [&]() {
+        if (cur_replay_step == num_replay_steps) {
+            cur_replay_step = 0;
+            for (uint32_t i = 0; i < num_worlds; i++) {
+                mgr.triggerReset(i);
+                mgr.step();
+            }
+        }
+
+        printf("Step: %u\n", cur_replay_step);
+
+        for (uint32_t i = 0; i < num_worlds; i++) {
+            for (uint32_t j = 0; j < num_views; j++) {
+                uint32_t base_idx = 0;
+                base_idx = 3 * (cur_replay_step * num_views * num_worlds +
+                    i * num_views + j);
+
+                int32_t x = (*replay_log)[base_idx];
+                int32_t y = (*replay_log)[base_idx + 1];
+                int32_t r = (*replay_log)[base_idx + 2];
+
+                mgr.setAction(i, j, x, y, r);
+            }
+        }
+
+        cur_replay_step++;
+    };
+
     viewer.loop([&mgr](CountT world_idx, CountT agent_idx,
                        const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
 
-        int32_t x = 5;
-        int32_t y = 5;
-        int32_t r = 5;
+        int32_t x = 2;
+        int32_t y = 2;
+        int32_t r = 2;
 
         if (input.keyPressed(Key::R)) {
             mgr.triggerReset(world_idx);
         }
 
         if (input.keyPressed(Key::W)) {
-            y += 5;
+            y += 2;
         }
         if (input.keyPressed(Key::S)) {
-            y -= 5;
+            y -= 2;
         }
 
         if (input.keyPressed(Key::D)) {
-            x += 5;
+            x += 2;
         }
         if (input.keyPressed(Key::A)) {
-            x -= 5;
+            x -= 2;
         }
 
         if (input.keyPressed(Key::Q)) {
-            r += 5;
+            r += 2;
         }
         if (input.keyPressed(Key::E)) {
-            r -= 5;
+            r -= 2;
         }
 
         mgr.setAction(world_idx, agent_idx, x, y, r);
-    }, [&mgr]() {
+    }, [&mgr, &replay_log, &replayStep]() {
+        if (replay_log.has_value()) {
+            replayStep();
+        }
+
         mgr.step();
     });
 }
