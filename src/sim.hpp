@@ -92,22 +92,22 @@ struct OtherAgents {
     madrona::Entity e[consts::numAgents - 1];
 };
 
-struct PolarCoord {
+struct PolarObservation {
     float r;
     float theta;
 };
 
 // Relative position of the other agents.
 struct ToOtherAgents {
-    PolarCoord obs[consts::numAgents - 1];
+    PolarObservation obs[consts::numAgents - 1];
 };
 
 struct ToButtons {
-    PolarCoord obs[consts::maxRooms];
+    PolarObservation obs[consts::maxRooms];
 };
 
 struct ToGoal {
-    PolarCoord obs;
+    PolarObservation obs;
 };
 
 struct Lidar {
@@ -195,9 +195,9 @@ struct Agent : public madrona::Archetype<
 > {};
 
 struct RewardTracker {
-    static inline constexpr int32_t gridWidth = 11;
+    static inline constexpr int32_t gridWidth = 15;
     static inline constexpr int32_t gridMaxX = gridWidth / 2;
-    static inline constexpr int32_t gridHeight = 11;
+    static inline constexpr int32_t gridHeight = 15;
     static inline constexpr int32_t gridMaxY = gridHeight / 2;
 
     uint32_t visited[gridHeight][gridWidth];

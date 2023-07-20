@@ -145,6 +145,31 @@ int main(int argc, char *argv[])
         cur_replay_step++;
     };
 
+    auto pos_printer = mgr.positionObservationTensor().makePrinter();
+    auto to_other_printer = mgr.toOtherAgentsTensor().makePrinter();
+    auto to_button_printer = mgr.toButtonsTensor().makePrinter();
+    auto to_goal_printer = mgr.toGoalTensor().makePrinter();
+    auto lidar_printer = mgr.lidarTensor().makePrinter();
+
+    auto printObs = [&]() {
+        printf("Pos\n");
+        pos_printer.print();
+
+        printf("To Other\n");
+        to_other_printer.print();
+
+        printf("To Button\n");
+        to_button_printer.print();
+
+        printf("To Goal\n");
+        to_goal_printer.print();
+
+        printf("Lidar\n");
+        lidar_printer.print();
+
+        printf("\n");
+    };
+
     viewer.loop([&mgr](CountT world_idx, CountT agent_idx,
                        const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
@@ -179,11 +204,13 @@ int main(int argc, char *argv[])
         }
 
         mgr.setAction(world_idx, agent_idx, x, y, r);
-    }, [&mgr, &replay_log, &replayStep]() {
+    }, [&mgr, &replay_log, &replayStep, &printObs]() {
         if (replay_log.has_value()) {
             replayStep();
         }
 
         mgr.step();
+        
+        printObs();
     });
 }

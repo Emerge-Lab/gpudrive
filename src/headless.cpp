@@ -4,10 +4,23 @@
 #include <chrono>
 #include <string>
 #include <filesystem>
+#include <fstream>
 #include <random>
 
 using namespace madrona;
 using namespace madrona::viz;
+
+[[maybe_unused]] static void saveWorldActions(
+    const HeapArray<int32_t> &action_store,
+    int32_t total_num_steps,
+    int32_t world_idx)
+{
+    const int32_t *world_base = action_store.data() + world_idx * total_num_steps * 2 * 3;
+
+    std::ofstream f("/tmp/actions", std::ios::binary);
+    f.write((char *)world_base,
+            sizeof(uint32_t) * total_num_steps * 2 * 3);
+}
 
 int main(int argc, char *argv[])
 {
@@ -32,6 +45,9 @@ int main(int argc, char *argv[])
     uint64_t num_worlds = std::stoul(argv[2]);
     uint64_t num_steps = std::stoul(argv[3]);
 
+    HeapArray<int32_t> action_store(
+        num_worlds * 2 * num_steps * 3);
+
     bool rand_actions = false;
     if (argc >= 5) {
         if (std::string(argv[4]) == "--rand-actions") {
@@ -51,7 +67,7 @@ int main(int argc, char *argv[])
 
     std::random_device rd;
     std::mt19937 rand_gen(rd());
-    std::uniform_int_distribution<int32_t> act_rand(-5, 5);
+    std::uniform_int_distribution<int32_t> act_rand(0, 4);
 
     for (CountT i = 0; i < (CountT)num_worlds; i++) {
         mgr.triggerReset(i);
@@ -68,6 +84,11 @@ int main(int argc, char *argv[])
                     int32_t r = act_rand(rand_gen);
 
                     mgr.setAction(j, k, x, y, r);
+                    
+                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
+                    action_store[base_idx] = x;
+                    action_store[base_idx + 1] = y;
+                    action_store[base_idx + 2] = r;
                 }
             }
         }

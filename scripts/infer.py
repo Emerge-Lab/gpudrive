@@ -33,7 +33,7 @@ sim = madrona_3d_example.SimManager(
     exec_mode = madrona_3d_example.madrona.ExecMode.CUDA if args.gpu_sim else madrona_3d_example.madrona.ExecMode.CPU,
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
-    auto_reset = False,
+    auto_reset = True,
 )
 
 obs, process_obs_cb, num_obs_features = setup_obs(sim)
@@ -51,7 +51,7 @@ dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 
 resets = sim.reset_tensor().to_torch()
-actions.fill_(5)
+actions.fill_(2)
 resets[:, 0] = 1
 sim.step()
 
@@ -75,6 +75,10 @@ for i in range(args.num_steps):
 
     print()
     print("Pos:", obs[0])
+    print("Others:", obs[1])
+    print("Buttons:", obs[2])
+    print("Goal:", obs[3])
+    print("Lidar:", obs[4])
 
     print("X Probs")
     print(" ", np.array_str(probs[0][0].cpu().numpy(), precision=2, suppress_small=True))

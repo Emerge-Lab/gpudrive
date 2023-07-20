@@ -61,8 +61,6 @@ static void generateTrainingEnvironment(Engine &ctx)
 
     Room &room = ctx.data().rooms[ctx.data().srcRoom];
 
-    const ObjectManager &obj_mgr = *ctx.singleton<ObjectData>().mgr;
-
     // Need to create the entities themselves
     for (CountT i = 0; i < consts::numAgents; ++i) {
         float xStart = room.offset.x + 1.0f;
@@ -114,7 +112,7 @@ void generateEnvironment(Engine &ctx)
 {
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     int32_t episode_idx = episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
-    ctx.data().rng = RNG::make(0/*episode_idx*/);
+    ctx.data().rng = RNG::make(episode_idx);
 
     ctx.data().curEpisodeIdx = episode_idx;
 
@@ -123,8 +121,6 @@ void generateEnvironment(Engine &ctx)
 
 void createAgents(Engine &ctx)
 {
-    const ObjectManager &obj_mgr = *ctx.singleton<ObjectData>().mgr;
-
     // Need to create the entities themselves
     for (CountT i = 0; i < consts::numAgents; ++i) {
         Vector3 pos {

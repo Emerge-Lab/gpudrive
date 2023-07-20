@@ -10,10 +10,10 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
-constexpr inline float wallSpeed = 4.0f;
+constexpr inline float wallSpeed = 12.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
-constexpr inline int32_t episodeLen = 480;
+constexpr inline int32_t episodeLen = 240;
 
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
@@ -240,32 +240,58 @@ inline void agentZeroVelSystem(Engine &,
     vel.angular = Vector3::zero();
 }
 
-static inline PolarCoord xyToPolar(Vector3 v)
+static inline float distObs(float v)
+{
+    return v / consts::worldBounds;
+}
+
+static inline float posObs(float v)
+{
+    return v / consts::worldBounds;
+}
+
+static inline float angleObs(float v)
+{
+    return v / math::pi;
+}
+
+static inline PolarObservation xyToPolar(Vector3 v)
 {
     Vector2 xy { v.x, v.y };
-    return PolarCoord {
-        .r = xy.length(),
-        .theta = atan2f(xy.y, xy.x),
+
+    float r = xy.length();
+
+    // Note that this is angle off y-forward
+    float theta = atan2f(xy.x, xy.y);
+
+    return PolarObservation {
+        .r = distObs(r),
+        .theta = angleObs(theta),
     };
 }
 
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
+                                      Rotation rot,
                                       PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
                                       ToButtons &to_buttons,
                                       ToGoal &to_goal)
 {
-    pos_obs.x = pos.x;
-    pos_obs.y = pos.y;
+    Quat to_view = rot.inv();
+
+    pos_obs.x = posObs(pos.x);
+    pos_obs.y = posObs(pos.y);
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
         Vector3 other_pos = ctx.get<Position>(other);
-        to_other_agents.obs[i] = xyToPolar(other_pos - pos);
+        Vector3 to_other = other_pos - pos;
+
+        to_other_agents.obs[i] = xyToPolar(to_view.rotateVec(to_other));
     }
 
     // Compute polar coords to buttons
@@ -274,8 +300,9 @@ inline void collectObservationsSystem(Engine &ctx,
         Room &room = ctx.data().rooms[ctx.data().leafs[button_idx]];
 
         Vector2 button_pos = room.button.pos;
-        to_buttons.obs[button_idx] = xyToPolar(
-            Vector3 { button_pos.x, button_pos.y, 0 } - pos);
+        Vector3 to_button = Vector3 { button_pos.x, button_pos.y, 0 } - pos;
+
+        to_buttons.obs[button_idx] = xyToPolar(to_view.rotateVec(to_button));
     }
 
     for (; button_idx < consts::maxRooms; button_idx++) {
@@ -285,9 +312,9 @@ inline void collectObservationsSystem(Engine &ctx,
 
     { // Compute polar coords to goal
         Room &dst = ctx.data().rooms[ctx.data().dstRoom];
-        Vector2 dst_button_pos = dst.button.pos;
-        to_goal.obs = xyToPolar(
-            Vector3 { dst_button_pos.x, dst_button_pos.y, 0 }  - pos);
+        Vector2 dst_pos { dst.button.pos.x, dst.button.pos.y };
+        Vector3 to_dst = Vector3 { dst_pos.x, dst_pos.y, 0 } - pos;
+        to_goal.obs = xyToPolar(to_view.rotateVec(to_dst));
     }
 }
 
@@ -304,7 +331,7 @@ inline void lidarSystem(Engine &ctx,
 
     auto traceRay = [&](int32_t idx) {
         float theta = 2.f * math::pi * (
-            float(idx) / float(consts::numLidarSamples));
+            float(idx) / float(consts::numLidarSamples)) + math::pi / 2.f;
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -318,7 +345,7 @@ inline void lidarSystem(Engine &ctx,
         if (hit_entity == Entity::none()) {
             lidar.depth[idx] = 0.f;
         } else {
-            lidar.depth[idx] = hit_t;
+            lidar.depth[idx] = distObs(hit_t);
         }
     };
 
@@ -352,7 +379,6 @@ inline void updateVisitedSystem(Engine &ctx,
     if (cell_x < 0 || cell_x >= RewardTracker::gridWidth ||
         cell_y < 0 || cell_y >= RewardTracker::gridHeight) {
         AtomicU32Ref(reward_tracker.outOfBounds).store<sync::relaxed>(1);
-
         return;
     }
 
@@ -380,16 +406,18 @@ inline void rewardSystem(Engine &ctx,
     if (reward_tracker.numNewCellsVisited == 0 &&
             reward_tracker.numNewButtonsVisited == 0 &&
             reward_tracker.outOfBounds == 0) {
-        out_reward.v = -0.05f;
+        out_reward.v = -0.01f;
         return;
     }
 
-    float reward = reward_tracker.numNewCellsVisited * 1.f;
-    reward += reward_tracker.numNewButtonsVisited * 10.f;
+    float reward = reward_tracker.numNewCellsVisited * 0.1f;
+    reward += reward_tracker.numNewButtonsVisited * 0.5f;
 
+#if 0
     if (reward_tracker.outOfBounds) {
-        reward += 1000.f;
+        reward += 0.1f;
     }
+#endif
 
     out_reward.v = reward;
 
@@ -513,6 +541,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
             Position,
+            Rotation,
             PositionObservation,
             OtherAgents,
             ToOtherAgents,
