@@ -30,17 +30,19 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<ToOtherAgents>();
     registry.registerComponent<ToDynamicEntities>();
-    registry.registerComponent<ButtonState>();
+    registry.registerComponent<ButtonProperties>();
     registry.registerComponent<OpenState>();
+    registry.registerComponent<LinkedDoor>();
 
     registry.registerComponent<Lidar>();
 
     registry.registerSingleton<WorldReset>();
+    registry.registerSingleton<LevelState>();
 
     registry.registerArchetype<Agent>();
-    registry.registerArchetype<PhysicsObject>();
-    registry.registerArchetype<WallObject>();
-    registry.registerArchetype<ButtonObject>();
+    registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<DoorEntity>();
+    registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -60,17 +62,27 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Done);
 }
 
-static inline void resetWorld(Engine &ctx)
+static inline void cleanupWorld(Engine &ctx)
+{
+    // Destroy current level entities
+    LevelState &level = ctx.singleton<LevelState>();
+    for (CountT i = 0; i < consts::numChallenges; i++) {
+        ChallengeState &challenge = level.challenges[i];
+        for (CountT j = 0; j < consts::maxEntitiesPerChallenge; j++) {
+            if (challenge.entities[j].type != DynEntityType::None) {
+                ctx.destroyEntity(challenge.entities[j].e);
+            }
+        }
+
+        ctx.destroyEntity(challenge.separators[0]);
+        ctx.destroyEntity(challenge.separators[1]);
+        ctx.destroyEntity(challenge.door);
+    }
+}
+
+static inline void initWorld(Engine &ctx)
 {
     ctx.data().curEpisodeStep = 0;
-
-    // Destroy old entities
-    Entity *dyn_entities = ctx.data().dynamicEntities;
-    int32_t num_old_entities = ctx.data().numDynamicEntities;
-    for (int32_t i = 0; i < num_old_entities; i++) {
-        ctx.destroyEntity(dyn_entities[i]);
-    }
-    ctx.data().numDynamicEntities = 0;
 
     if (ctx.data().enableVizRender) {
         viz::VizRenderingSystem::reset(ctx);
@@ -103,7 +115,8 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     if (should_reset != 0) {
         reset.reset = 0;
 
-        resetWorld(ctx);
+        cleanupWorld(ctx);
+        initWorld(ctx);
 
         if (ctx.data().enableVizRender) {
             viz::VizRenderingSystem::markEpisode(ctx);
@@ -137,12 +150,6 @@ inline void movementSystem(Engine &,
     external_torque = Vector3 { 0, 0, t_z };
 }
 
-// Resets doors to closed temporarily
-inline void resetDoorStateSystem(Engine &, OpenState &open_state)
-{
-    open_state.isOpen = false;
-}
-
 static bool isPressingButton(madrona::math::Vector3 agent_pos,
                              madrona::math::Vector3 button_pos)
 {
@@ -172,38 +179,39 @@ static bool isPressingButton(madrona::math::Vector3 agent_pos,
     return corner_dist2 <= press_radius * press_radius;
 }
 
-// Sets door open state given where entities are (loops through entities).
-inline void buttonSystem(Engine &ctx, Position &pos, Action &)
+// Checks if button is pressed and opens door if so
+inline void buttonSystem(Engine &ctx,
+                         Position pos,
+                         const ButtonProperties &props,
+                         const LinkedDoor &door)
 {
-#if 0
-    Room *room = containedRoom({ pos.x, pos.y }, ctx.data().rooms);
-    ButtonInfo button = room->button;
+    bool button_pressed = false;
+#pragma unroll
+    for (CountT i = 0; i < consts::numAgents; i++) {
+        Entity agent = ctx.data().agents[i];
+        Vector3 agent_pos = ctx.get<Position>(agent);
 
-    // If the button is pressed, set the doors of this room to be open
-    if (isPressingButton({ pos.x, pos.y }, button)) {
-        for (CountT i = 0; i < room->doorCount; ++i) {
-            CountT doorIdx = room->doors[i];
-            ctx.get<OpenState>(ctx.data().doors[doorIdx]).isOpen = true;
-        }
-
-        uint32_t prev_visited =
-            AtomicU32Ref(room->button.visited).exchange<sync::relaxed>(1);
-
-        if (!prev_visited) {
-            auto &reward_tracker = ctx.singleton<RewardTracker>();
-            AtomicU32Ref(
-                reward_tracker.numNewButtonsVisited).fetch_add<sync::relaxed>(1);
+        if (isPressingButton(agent_pos, pos)) {
+            button_pressed = true;
         }
     }
-#endif
+
+    if (button_pressed) {
+        ctx.get<OpenState>(door.e).isOpen = true;
+    } else if (!props.isPersistent) {
+        ctx.get<OpenState>(door.e).isOpen = false;
+    }
 }
 
-inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &, OpenState &open_state)
+inline void setDoorPositionSystem(Engine &,
+                                  Position &pos,
+                                  Velocity &,
+                                  OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
 
-        if (pos.z > -3.0f)
+        if (pos.z > -4.5f)
             pos.z += -wallSpeed * deltaT;
     }
     else if (pos.z < 0.0f) {
@@ -257,10 +265,9 @@ static inline PolarObservation xyToPolar(Vector3 v)
     };
 }
 
-static inline float convertDynamicEntityType(
-    DynamicEntityType type)
+static inline float encodeDynType(DynEntityType type)
 {
-    return (float)type / (float)DynamicEntityType::NumTypes;
+    return (float)type / (float)DynEntityType::NumTypes;
 }
 
 static inline float computeZAngle(Quat q)
@@ -276,7 +283,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
-                                      ToDynamicEntities &to_buttons)
+                                      ToDynamicEntities &to_dyn)
 {
     Quat to_view = rot.inv();
 
@@ -293,6 +300,31 @@ inline void collectObservationsSystem(Engine &ctx,
         Vector3 to_other = other_pos - pos;
 
         to_other_agents.obs[i] = xyToPolar(to_view.rotateVec(to_other));
+    }
+
+    const LevelState &level = ctx.singleton<LevelState>();
+
+#pragma unroll
+    for (CountT challenge_idx = 0; challenge_idx < consts::numChallenges;
+         challenge_idx++) {
+        const ChallengeState &challenge = level.challenges[challenge_idx];
+
+#pragma unroll
+        for (CountT i = 0; i < consts::maxEntitiesPerChallenge; i++) {
+            DynEntityState entity_info = challenge.entities[i];
+            EntityObservation ob;
+            ob.encodedType = encodeDynType(entity_info.type);
+
+            if (entity_info.type == DynEntityType::None) {
+                ob.polar = { 0.f, 1.f };
+            } else {
+                Vector3 entity_pos = ctx.get<Position>(entity_info.e);
+                Vector3 to_entity = entity_pos - pos;
+                ob.polar = xyToPolar(to_view.rotateVec(to_entity));
+            }
+
+            to_dyn.obs[challenge_idx][i] = ob;
+        }
     }
 
 #if 0
@@ -395,7 +427,7 @@ inline void gatherPartnerRewardSystem(Engine &ctx,
     }
 }
 
-inline void assignPartnerRewardSystem(Engine &ctx,
+inline void assignPartnerRewardSystem(Engine &,
                                       OtherAgents &others,
                                       Reward &reward)
 {
@@ -448,24 +480,13 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             ExternalTorque
         >>({});
 
-    // Scripted door behaviors
-    auto reset_door_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetDoorStateSystem,
-            OpenState
-        >>({move_sys});
-
-    auto button_sys = builder.addToGraph<ParallelForNode<Engine,
-        buttonSystem,
-            Position,
-            Action
-        >>({reset_door_sys});
-
+    // Scripted door behavior
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine,
         setDoorPositionSystem,
             Position,
             Velocity,
             OpenState
-        >>({button_sys});
+        >>({move_sys});
 
     // Physics systems
     auto broadphase_setup_sys = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
@@ -482,13 +503,21 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
+    // Check buttons
+    auto button_sys = builder.addToGraph<ParallelForNode<Engine,
+        buttonSystem,
+            Position,
+            ButtonProperties,
+            LinkedDoor
+        >>({phys_done});
+
     // Compute initial reward now that physics has updated the world state
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
             Position,
             Progress,
             Reward
-        >>({phys_done});
+        >>({button_sys});
 
     // Read partner's reward
     auto gather_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -558,11 +587,11 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     // Sort entities, again, this could be conditional on reset.
     auto sort_agents = queueSortByWorld<Agent>(
         builder, {lidar, collect_obs});
-    auto sort_phys_objects = queueSortByWorld<PhysicsObject>(
+    auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
-    auto sort_buttons = queueSortByWorld<ButtonObject>(
+    auto sort_buttons = queueSortByWorld<ButtonEntity>(
         builder, {sort_phys_objects});
-    auto sort_walls = queueSortByWorld<WallObject>(
+    auto sort_walls = queueSortByWorld<DoorEntity>(
         builder, {sort_buttons});
     (void)sort_walls;
 #else
@@ -601,10 +630,9 @@ Sim::Sim(Engine &ctx,
 
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
-    numDynamicEntities = 0;
 
     // Generate initial world state
-    resetWorld(ctx);
+    initWorld(ctx);
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);

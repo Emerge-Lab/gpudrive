@@ -68,16 +68,11 @@ enum class ExportID : uint32_t {
 enum class SimObject : uint32_t {
     Cube,
     Wall,
+    Door,
     Agent,
+    Button,
     Plane,
     NumObjects,
-};
-
-enum class DynamicEntityType : uint32_t {
-    None,
-    Button,
-    Block,
-    NumTypes,
 };
 
 class Engine;
@@ -87,11 +82,15 @@ struct WorldReset {
 };
 
 struct OpenState {
-    int32_t isOpen;
+    bool isOpen;
 };
 
-struct ButtonState {
-    bool isPressed;
+struct LinkedDoor {
+    Entity e;
+};
+
+struct ButtonProperties {
+    bool isPersistent;
 };
 
 struct Progress {
@@ -161,6 +160,33 @@ struct Lidar {
     float depth[30];
 };
 
+enum class DynEntityType : uint32_t {
+    None,
+    Button,
+    Block,
+    NumTypes,
+};
+
+struct DynEntityState {
+    Entity e;
+    DynEntityType type;
+};
+
+struct ChallengeState {
+    // These are entities the agent will interact with
+    DynEntityState entities[consts::maxEntitiesPerChallenge];
+
+    // The walls that separate this challenge from the next
+    Entity separators[2];
+
+    // The door the agents need to figure out how to lower
+    Entity door;
+};
+
+struct LevelState {
+    ChallengeState challenges[consts::numChallenges];
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -200,7 +226,7 @@ struct Agent : public madrona::Archetype<
     madrona::viz::VizCamera
 > {};
 
-struct WallObject : public madrona::Archetype<
+struct DoorEntity : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
@@ -216,7 +242,7 @@ struct WallObject : public madrona::Archetype<
     OpenState
 > {};
 
-struct PhysicsObject : public madrona::Archetype<
+struct PhysicsEntity : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
@@ -232,12 +258,13 @@ struct PhysicsObject : public madrona::Archetype<
 > {};
 
 // Button objects don't have collision
-struct ButtonObject : public madrona::Archetype<
+struct ButtonEntity : public madrona::Archetype<
     Position,
     Rotation,
     Scale,
     ObjectID,
-    ButtonState
+    ButtonProperties,
+    LinkedDoor
 > {};
 
 // The Sim class encapsulates the per-world state of the simulation.
@@ -288,12 +315,6 @@ struct Sim : public madrona::WorldBase {
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     Entity agents[consts::numAgents];
-
-    // Dynamic entities that need to be cleaned up when generating a new
-    // environment.
-    Entity dynamicEntities[
-        consts::maxEntitiesPerChallenge * consts::numChallenges];
-    int32_t numDynamicEntities;
 
     // Current step within this episode
     int32_t curEpisodeStep;

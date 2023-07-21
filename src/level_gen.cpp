@@ -10,15 +10,7 @@ namespace consts {
 inline constexpr float doorWidth = consts::worldWidth / 3.f;
 }
 
-template <typename ArchetypeT>
-static Entity makeDynEntity(Engine &ctx)
-{
-    Entity e = ctx.makeEntity<ArchetypeT>();
-    ctx.data().dynamicEntities[ctx.data().numDynamicEntities++] = e;
-    return e;
-}
-
-static inline void setupPhysicsEntity(
+static inline void setupRigidBodyEntity(
     Engine &ctx,
     Entity e,
     Vector3 pos,
@@ -42,7 +34,7 @@ static inline void setupPhysicsEntity(
     ctx.get<ExternalTorque>(e) = Vector3::zero();
 }
 
-static void registerPhysicsEntity(
+static void registerRigidBodyEntity(
     Engine &ctx,
     Entity e,
     SimObject sim_obj)
@@ -55,7 +47,7 @@ static void registerPhysicsEntity(
 #if 0
 static Entity makeButtonEntity(Engine &ctx, Vector2 pos, Vector2 scale)
 {
-    Entity e = ctx.makeEntity<ButtonObject>();
+    Entity e = ctx.makeEntity<ButtonEntity>();
     ctx.get<Position>(e) = Vector3 { pos.x, pos.y, 0.f };
     ctx.get<Rotation>(e) = Quat::angleAxis(0, {1, 0, 0});
     ctx.get<Scale>(e) = Diag3x3 {
@@ -74,8 +66,8 @@ static Entity makeButtonEntity(Engine &ctx, Vector2 pos, Vector2 scale)
 void createPersistentEntities(Engine &ctx)
 {
     // Create the floor entity, just a simple static plane.
-    ctx.data().floorPlane = ctx.makeEntity<PhysicsObject>();
-    setupPhysicsEntity(
+    ctx.data().floorPlane = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         ctx.data().floorPlane,
         Vector3 { 0, 0, 0 },
@@ -86,8 +78,8 @@ void createPersistentEntities(Engine &ctx)
     // Create the outer wall entities
     // Left
 
-    ctx.data().borders[0] = ctx.makeEntity<PhysicsObject>();
-    setupPhysicsEntity(
+    ctx.data().borders[0] = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         ctx.data().borders[0],
         Vector3 {
@@ -105,8 +97,8 @@ void createPersistentEntities(Engine &ctx)
         });
 
     // Top
-    ctx.data().borders[1] = ctx.makeEntity<PhysicsObject>();
-    setupPhysicsEntity(
+    ctx.data().borders[1] = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         ctx.data().borders[1],
         Vector3 {
@@ -124,8 +116,8 @@ void createPersistentEntities(Engine &ctx)
         });
 
     // Bottom
-    ctx.data().borders[2] = ctx.makeEntity<PhysicsObject>();
-    setupPhysicsEntity(
+    ctx.data().borders[2] = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         ctx.data().borders[2],
         Vector3 {
@@ -183,16 +175,16 @@ static inline float randBetween(Engine &ctx, float min, float max)
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    registerPhysicsEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
+    registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 
      for (CountT i = 0; i < 3; i++) {
          Entity wall_entity = ctx.data().borders[i];
-         registerPhysicsEntity(ctx, wall_entity, SimObject::Wall);
+         registerRigidBodyEntity(ctx, wall_entity, SimObject::Wall);
      }
 
      for (CountT i = 0; i < consts::numAgents; i++) {
          Entity agent_entity = ctx.data().agents[i];
-         registerPhysicsEntity(ctx, agent_entity, SimObject::Agent);
+         registerRigidBodyEntity(ctx, agent_entity, SimObject::Agent);
 
          ctx.get<viz::VizCamera>(agent_entity) =
              viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
@@ -236,8 +228,10 @@ static void resetPersistentEntities(Engine &ctx)
      }
 }
 
-// Builds the two walls 
-static Vector2 makeChallengeSeparator(Engine &ctx, int32_t challenge_idx)
+// Builds the two walls & door
+static Entity makeChallengeWall(Engine &ctx,
+                                ChallengeState &challenge,
+                                CountT challenge_idx)
 {
     float y_pos = consts::challengeLength * (challenge_idx + 1) -
         consts::wallWidth / 2.f;
@@ -247,8 +241,8 @@ static Vector2 makeChallengeSeparator(Engine &ctx, int32_t challenge_idx)
     float door_center = randBetween(ctx, 0.75f * consts::doorWidth, 
         consts::worldWidth - 0.75f * consts::doorWidth);
     float left_len = door_center - 0.5f * consts::doorWidth;
-    Entity left_wall = makeDynEntity<PhysicsObject>(ctx);
-    setupPhysicsEntity(
+    Entity left_wall = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         left_wall,
         Vector3 {
@@ -264,12 +258,12 @@ static Vector2 makeChallengeSeparator(Engine &ctx, int32_t challenge_idx)
             consts::wallWidth,
             1.75f,
         });
-    registerPhysicsEntity(ctx, left_wall, SimObject::Wall);
+    registerRigidBodyEntity(ctx, left_wall, SimObject::Wall);
 
     float right_len =
         consts::worldWidth - door_center - 0.5f * consts::doorWidth;
-    Entity right_wall = makeDynEntity<PhysicsObject>(ctx);
-    setupPhysicsEntity(
+    Entity right_wall = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
         ctx,
         right_wall,
         Vector3 {
@@ -285,18 +279,95 @@ static Vector2 makeChallengeSeparator(Engine &ctx, int32_t challenge_idx)
             consts::wallWidth,
             1.75f,
         });
-    registerPhysicsEntity(ctx, right_wall, SimObject::Wall);
+    registerRigidBodyEntity(ctx, right_wall, SimObject::Wall);
 
-    return { 0, 0 };
+    Entity door = ctx.makeEntity<DoorEntity>();
+    setupRigidBodyEntity(
+        ctx,
+        door,
+        Vector3 {
+            door_center - consts::worldWidth / 2.f,
+            y_pos,
+            0,
+        },
+        Quat { 1, 0, 0, 0 },
+        SimObject::Door,
+        ResponseType::Static,
+        Diag3x3 {
+            consts::doorWidth * 0.8f,
+            consts::wallWidth,
+            1.75f,
+        });
+    registerRigidBodyEntity(ctx, door, SimObject::Door);
+    ctx.get<OpenState>(door).isOpen = false;
+
+    challenge.separators[0] = left_wall;
+    challenge.separators[1] = right_wall;
+    challenge.door = door;
+
+    return Entity::none();
 }
 
-static void generateChallenges(Engine &ctx)
+static void makeSingleButtonChallenge(Engine &ctx,
+                                      ChallengeState &challenge,
+                                      float y_min,
+                                      float y_max)
 {
-    Vector2 door1_pos = makeChallengeSeparator(ctx, 0);
+    float button_x = randInRangeCentered(ctx,
+        consts::worldWidth / 2.f - consts::buttonWidth);
+    float button_y = randBetween(ctx, y_min + consts::challengeLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
 
+    Entity button = ctx.makeEntity<ButtonEntity>();
+    ctx.get<Position>(button) = Vector3 {
+        button_x,
+        button_y,
+        0.f,
+    };
+    ctx.get<Rotation>(button) = Quat { 1, 0, 0, 0 };
+    ctx.get<Scale>(button) = Diag3x3 {
+        consts::buttonWidth,
+        consts::buttonWidth,
+        0.2f,
+    };
+    ctx.get<ObjectID>(button) = ObjectID { (int32_t)SimObject::Button };
+    ctx.get<ButtonProperties>(button).isPersistent = true;
+
+    challenge.entities[0].type = DynEntityType::Button;
+    challenge.entities[0].e = button;
+    for (CountT i = 1; i < consts::maxEntitiesPerChallenge; i++) {
+        challenge.entities[i].type = DynEntityType::None;
+    }
+
+    ctx.get<LinkedDoor>(button).e =
+        challenge.door;
+}
+
+static void makeRandomChallenge(Engine &ctx,
+                                ChallengeState &challenge,
+                                CountT challenge_idx)
+{
+    float challenge_y_min = challenge_idx * consts::challengeLength;
+    float challenge_y_max = (challenge_idx + 1) * consts::challengeLength;
+
+    makeSingleButtonChallenge(
+        ctx, challenge, challenge_y_min, challenge_y_max);
+}
+
+static void generateLevel(Engine &ctx)
+{
+    LevelState &level = ctx.singleton<LevelState>();
+
+    {
+        ChallengeState &challenge = level.challenges[0];
+        makeChallengeWall(ctx, challenge, 0);
+        makeSingleButtonChallenge(ctx, challenge, 0, consts::challengeLength);
+    }
     
     for (CountT i = 1; i < consts::numChallenges; i++) {
-        Vector2 door_pos = makeChallengeSeparator(ctx, i);
+        ChallengeState &challenge = level.challenges[i];
+        makeChallengeWall(ctx, challenge, i);
+        makeRandomChallenge(ctx, challenge, i);
     }
 }
 
@@ -304,7 +375,7 @@ static void generateChallenges(Engine &ctx)
 void generateWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
-    generateChallenges(ctx);
+    generateLevel(ctx);
 }
 
 }

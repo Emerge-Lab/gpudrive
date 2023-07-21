@@ -80,8 +80,12 @@ int main(int argc, char *argv[])
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::Wall] =
         (std::filesystem::path(DATA_DIR) / "wall_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Door] =
+        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string();
     render_asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Button] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::Plane] =
         (std::filesystem::path(DATA_DIR) / "plane.obj").string();
 
@@ -104,6 +108,8 @@ int main(int argc, char *argv[])
         { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
         { rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
         { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
+        { rgb8ToFloat(230, 20, 20),   -1, 0.8f, 1.0f },
+        { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
     });
 
     Viewer viewer({
@@ -120,9 +126,11 @@ int main(int argc, char *argv[])
     // Override materials
     render_assets->objects[(CountT)SimObject::Cube].meshes[0].materialIDX = 0;
     render_assets->objects[(CountT)SimObject::Wall].meshes[0].materialIDX = 1;
+    render_assets->objects[(CountT)SimObject::Door].meshes[0].materialIDX = 5;
     render_assets->objects[(CountT)SimObject::Agent].meshes[0].materialIDX = 2;
     render_assets->objects[(CountT)SimObject::Agent].meshes[1].materialIDX = 3;
     render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::Button].meshes[0].materialIDX = 6;
     render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
 
     viewer.loadObjects(render_assets->objects, materials, {

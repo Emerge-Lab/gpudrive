@@ -138,8 +138,12 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::Wall] =
         (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
+    asset_paths[(size_t)SimObject::Door] =
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
     asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_collision.obj").string();
+    asset_paths[(size_t)SimObject::Button] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
@@ -192,7 +196,17 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.5f,
     });
 
+    setupHull(SimObject::Door, 0.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
+
     setupHull(SimObject::Agent, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
+
+    setupHull(SimObject::Button, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
@@ -368,8 +382,9 @@ Manager::Manager(const Config &cfg,
     // Currently, there is no way to populate the initial set of observations
     // without stepping the simulations in order to execute the taskgraph.
     // Therefore, after setup, we step all the simulations with a forced reset
-    // that ensures the first real step will have valid observations in order
-    // to act on.
+    // that ensures the first real step will have valid observations at the
+    // start of a fresh episode in order to compute actions.
+    //
     // This will be improved in the future with support for multiple task
     // graphs, allowing a small task graph to be executed after initialization.
     
