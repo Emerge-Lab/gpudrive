@@ -25,7 +25,7 @@ NB_MODULE(madrona_3d_example, m) {
         }, nb::arg("exec_mode"),
            nb::arg("gpu_id"),
            nb::arg("num_worlds"),
-           nb::arg("auto_reset")
+           nb::arg("auto_reset"))
         .def("step", &Manager::step)
         .def("reset_tensor", &Manager::resetTensor)
         .def("action_tensor", &Manager::actionTensor)
@@ -33,7 +33,7 @@ NB_MODULE(madrona_3d_example, m) {
         .def("done_tensor", &Manager::doneTensor)
         .def("position_observation_tensor", &Manager::positionObservationTensor)
         .def("to_other_agents_tensor", &Manager::toOtherAgentsTensor)
-        .def("to_buttons_tensor", &Manager::toButtonsTensor)
+        .def("to_dyn_entities_tensor", &Manager::toDynEntitiesTensor)
         .def("lidar_tensor", &Manager::lidarTensor)
     ;
 }

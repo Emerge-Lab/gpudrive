@@ -2,7 +2,6 @@
 
 #include "sim.hpp"
 #include "level_gen.hpp"
-#include "geo_gen.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -27,15 +26,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<PositionObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
+    registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<ToOtherAgents>();
-    registry.registerComponent<ToButtons>();
+    registry.registerComponent<ToDynamicEntities>();
+    registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
 
     registry.registerComponent<Lidar>();
 
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<RewardTracker>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsObject>();
@@ -50,8 +50,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::PositionObservation);
     registry.exportColumn<Agent, ToOtherAgents>(
         (uint32_t)ExportID::ToOtherAgents);
-    registry.exportColumn<Agent, ToButtons>(
-        (uint32_t)ExportID::ToButtons);
+    registry.exportColumn<Agent, ToDynamicEntities>(
+        (uint32_t)ExportID::ToDynamicEntities);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, Reward>(
@@ -60,9 +60,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Done);
 }
 
-static inline void resetEnvironment(Engine &ctx)
+static inline void resetWorld(Engine &ctx)
 {
     ctx.data().curEpisodeStep = 0;
+
+    // Destroy old entities
+    Entity *dyn_entities = ctx.data().dynamicEntities;
+    int32_t num_old_entities= ctx.data().numDynamicEntities;
+    for (int32_t i = 0; i < num_old_entities; i++) {
+        ctx.destroyEntity(dyn_entities[i]);
+    }
 
     if (ctx.data().enableVizRender) {
         viz::VizRenderingSystem::reset(ctx);
@@ -70,17 +77,17 @@ static inline void resetEnvironment(Engine &ctx)
 
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
+    // Assign a new episode ID
+    EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
+    int32_t episode_idx = episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
+    ctx.data().rng = RNG::make(0 /*episode_idx*/);
+    ctx.data().curEpisodeIdx = episode_idx;
+
     generateWorld(ctx);
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    // Reset the reward tracker for the next step
-    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
-    reward_tracker.numNewCellsVisited = 0;
-    reward_tracker.numNewButtonsVisited = 0;
-    reward_tracker.outOfBounds = 0;
-
     int32_t should_reset = reset.reset;
     if (ctx.data().autoReset) {
         for (CountT i = 0; i < consts::numAgents; i++) {
@@ -95,8 +102,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     if (should_reset != 0) {
         reset.reset = 0;
 
-        resetEnvironment(ctx);
-        generateEnvironment(ctx);
+        resetWorld(ctx);
 
         if (ctx.data().enableVizRender) {
             viz::VizRenderingSystem::markEpisode(ctx);
@@ -136,13 +142,14 @@ inline void resetDoorStateSystem(Engine &, OpenState &open_state)
     open_state.isOpen = false;
 }
 
-static bool isPressingButton(madrona::math::Vector2 pos, const ButtonInfo &button)
+static bool isPressingButton(madrona::math::Vector3 agent_pos,
+                             madrona::math::Vector3 button_pos)
 {
     constexpr float press_radius = 1.5f;
-    constexpr float button_dim = consts::worldBounds * BUTTON_WIDTH + 0.1f;
+    constexpr float button_dim = consts::buttonWidth + 0.05f;
 
-    float circle_dist_x = fabsf(pos.x - button.pos.x);
-    float circle_dist_y = fabsf(pos.y - button.pos.y);
+    float circle_dist_x = fabsf(agent_pos.x - button_pos.x);
+    float circle_dist_y = fabsf(agent_pos.y - button_pos.y);
 
     if (circle_dist_x > (button_dim / 2 + press_radius) ||
             circle_dist_y > (button_dim / 2 + press_radius)) {
@@ -167,6 +174,7 @@ static bool isPressingButton(madrona::math::Vector2 pos, const ButtonInfo &butto
 // Sets door open state given where entities are (loops through entities).
 inline void buttonSystem(Engine &ctx, Position &pos, Action &)
 {
+#if 0
     Room *room = containedRoom({ pos.x, pos.y }, ctx.data().rooms);
     ButtonInfo button = room->button;
 
@@ -186,6 +194,7 @@ inline void buttonSystem(Engine &ctx, Position &pos, Action &)
                 reward_tracker.numNewButtonsVisited).fetch_add<sync::relaxed>(1);
         }
     }
+#endif
 }
 
 inline void setDoorPositionSystem(Engine &, Position &pos, Velocity &, OpenState &open_state)
@@ -219,12 +228,12 @@ inline void agentZeroVelSystem(Engine &,
 
 static inline float distObs(float v)
 {
-    return v / consts::worldBounds;
+    return v / consts::worldLength;
 }
 
 static inline float posObs(float v)
 {
-    return v / consts::worldBounds;
+    return v / consts::worldLength;
 }
 
 static inline float angleObs(float v)
@@ -247,19 +256,33 @@ static inline PolarObservation xyToPolar(Vector3 v)
     };
 }
 
+static inline float convertDynamicEntityType(
+    DynamicEntityType type)
+{
+    return (float)type / (float)DynamicEntityType::NumTypes;
+}
+
+static inline float computeZAngle(Quat q)
+{
+    float siny_cosp = 2.f * (q.w * q.z + q.x * q.y);
+    float cosy_cosp = 1.f - 2.f * (q.y * q.y + q.z * q.z);
+    return atan2f(siny_cosp, cosy_cosp);
+}
+
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
                                       Rotation rot,
                                       PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
-                                      ToButtons &to_buttons)
+                                      ToDynamicEntities &to_buttons)
 {
     Quat to_view = rot.inv();
 
     pos_obs.x = posObs(pos.x);
     pos_obs.y = posObs(pos.y);
-    pos_obs.z = pos.z;
+    pos_obs.z = posObs(pos.z);
+    pos_obs.theta = angleObs(computeZAngle(rot));
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
@@ -271,6 +294,7 @@ inline void collectObservationsSystem(Engine &ctx,
         to_other_agents.obs[i] = xyToPolar(to_view.rotateVec(to_other));
     }
 
+#if 0
     // Compute polar coords to buttons
     CountT button_idx = 0;
     for (; button_idx < ctx.data().leafCount; button_idx++) {
@@ -286,6 +310,7 @@ inline void collectObservationsSystem(Engine &ctx,
         // FIXME: is this a good invalid output?
         to_buttons.obs[button_idx] = { 0.f, 1.f };
     }
+#endif
 }
 
 inline void lidarSystem(Engine &ctx,
@@ -333,75 +358,39 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
-inline void updateVisitedSystem(Engine &ctx,
-                                const Position &pos,
-                                const Reward &)
-{
-    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
-
-    // Discretize position
-    int32_t x = int32_t((pos.x + 0.5f) / 4);
-    int32_t y = int32_t((pos.y + 0.5f) / 4);
-
-    int32_t cell_x = x + RewardTracker::gridMaxX;
-    int32_t cell_y = y + RewardTracker::gridMaxY;
-
-    if (cell_x < 0 || cell_x >= RewardTracker::gridWidth ||
-        cell_y < 0 || cell_y >= RewardTracker::gridHeight) {
-        AtomicU32Ref(reward_tracker.outOfBounds).store<sync::relaxed>(1);
-        return;
-    }
-
-    AtomicU32Ref cell(reward_tracker.visited[cell_y][cell_x]);
-
-    uint32_t cur_episode_idx = (uint32_t)ctx.data().curEpisodeIdx;
-    uint32_t old = cell.exchange<sync::relaxed>(cur_episode_idx);
-    if (old != cur_episode_idx) {
-        AtomicU32Ref(reward_tracker.numNewCellsVisited).fetch_add<sync::relaxed>(1);
-    }
-}
-
 inline void rewardSystem(Engine &ctx,
-                         Reward &out_reward,
-                         Done &done)
+                         Position pos,
+                         Progress &progress,
+                         Reward &out_reward)
 {
-    const RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
-    if (reward_tracker.numNewCellsVisited == 0 &&
-            reward_tracker.numNewButtonsVisited == 0 &&
-            reward_tracker.outOfBounds == 0) {
-        out_reward.v = -0.01f;
-        return;
-    }
+    constexpr float dist_per_progress = 2.f;
+    constexpr float progress_reward = 0.2f;
+    constexpr float slack_reward = -0.01f;
 
-    float reward = reward_tracker.numNewCellsVisited * 0.1f;
-    reward += reward_tracker.numNewButtonsVisited * 0.5f;
+    int32_t new_progress = int32_t(pos.x / dist_per_progress);
+
+    float reward;
+    if (new_progress > progress.numProgressIncrements) {
+        reward = progress_reward *
+            (new_progress - progress.numProgressIncrements);
+        progress.numProgressIncrements = new_progress;
+    } else {
+        reward = slack_reward;
+    }
 
     out_reward.v = reward;
 }
 
+// Each agent gets half the reward of the other agent in
+// order to encourage them to cooperate.
 inline void partnerRewardSystem(Engine &ctx,
-                                Reward &out_reward,
-                                Done &done)
+                                const OtherAgents &others,
+                                Reward &out_reward)
 {
-    int32_t cur_step = ctx.data().curEpisodeStep;
-    if (cur_step == 0) {
-        done.v = 0;
-    } else if (cur_step == episodeLen -1) {
-        done.v = 1;
+    for (CountT i = 0; i < consts::numAgents; i++) {
+        Entity other = others.e[i];
+        out_reward.v += ctx.get<Reward>(other).v / 2.f;
     }
-
-    const RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
-    if (reward_tracker.numNewCellsVisited == 0 &&
-            reward_tracker.numNewButtonsVisited == 0 &&
-            reward_tracker.outOfBounds == 0) {
-        out_reward.v = -0.01f;
-        return;
-    }
-
-    float reward = reward_tracker.numNewCellsVisited * 0.1f;
-    reward += reward_tracker.numNewButtonsVisited * 0.5f;
-
-    out_reward.v = reward;
 }
 
 // Notify training that an episode has completed by
@@ -475,26 +464,36 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         agentZeroVelSystem, Velocity, Action>>(
             {substep_sys});
 
+    // Finalize physics subsystem work
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
-    // Now that physics is done we're going to compute the rewards
-    // resulting from these actions
-    auto update_visited = builder.addToGraph<ParallelForNode<Engine,
-        updateVisitedSystem, Position, Reward>>({phys_done});
-
+    // Compute initial reward now that physics has updated the world state
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Reward>>({update_visited});
+         rewardSystem,
+            Position,
+            Progress,
+            Reward
+        >>({phys_done});
 
+    // Read partner's reward and apply
     auto partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         partnerRewardSystem, Reward>>({reward_sys});
+         partnerRewardSystem,
+            OtherAgents,
+            Reward
+        >>({reward_sys});
 
+    // Check if the episode is over
     auto done_sys = builder.addToGraph<ParallelForNode<Engine,
-        doneSystem, Done>>({done_sys});
+        doneSystem,
+            Done
+        >>({partner_reward_sys});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem, WorldReset>>({done_sys});
+        resetSystem,
+            WorldReset
+        >>({done_sys});
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
 
@@ -517,8 +516,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             PositionObservation,
             OtherAgents,
             ToOtherAgents,
-            ToButtons,
-            ToGoal
+            ToDynamicEntities
         >>({post_reset_broadphase});
 
 #ifdef MADRONA_GPU_MODE
@@ -585,7 +583,7 @@ Sim::Sim(Engine &ctx,
     createPersistentEntities(ctx);
 
     // Generate initial world state
-    resetEnvironment(ctx);
+    resetWorld(ctx);
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);

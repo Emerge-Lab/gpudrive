@@ -1,6 +1,7 @@
 #include <madrona/viz/viewer.hpp>
 
 #include "mgr.hpp"
+#include "sim.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -8,7 +9,26 @@
 using namespace madrona;
 using namespace madrona::viz;
 
-HeapArray<int32_t> readReplayLog(const char *path)
+static inline float srgbToLinear(float srgb)
+{
+    if (srgb <= 0.04045f) {
+        return srgb / 12.92f;
+    }
+
+    return powf((srgb + 0.055f) / 1.055f, 2.4f);
+}
+
+static inline math::Vector4 rgb8ToFloat(uint8_t r, uint8_t g, uint8_t b)
+{
+    return {
+        srgbToLinear((float)r / 255.f),
+        srgbToLinear((float)g / 255.f),
+        srgbToLinear((float)b / 255.f),
+        1.f,
+    };
+}
+
+static HeapArray<int32_t> readReplayLog(const char *path)
 {
     std::ifstream replay_log(path, std::ios::binary);
     replay_log.seekg(0, std::ios::end);
@@ -55,26 +75,36 @@ int main(int argc, char *argv[])
         num_replay_steps = replay_log->size() / (num_worlds * num_views * 3);
     }
 
-    std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "sphere.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "plane.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").string().c_str(),
-    }, Span<char>(import_err.data(), import_err.size()));
+    std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
+    render_asset_paths[(size_t)SimObject::Cube] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Wall] =
+        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Agent] =
+        (std::filesystem::path(DATA_DIR) / "agent_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Plane] =
+        (std::filesystem::path(DATA_DIR) / "plane.obj").string();
 
-    std::array<imp::SourceMaterial, 3> materials = {{
-        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 1.f, 0.f },
-        { math::Vector4{1.0f, 0.1f, 0.1f, 0.0f}, -1, 1.f, 0.f },
-        { math::Vector4{0.1f, 0.1f, 1.0f, 0.0f}, -1, 1.f, 0.f }
-    }};
+    std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
+    for (size_t i = 0; i < render_asset_paths.size(); i++) {
+        render_asset_cstrs[i] = render_asset_paths[i].c_str();
+    }
+
+    std::array<char, 1024> import_err;
+    auto render_assets = imp::ImportedAssets::importFromDisk(
+        render_asset_cstrs, Span<char>(import_err.data(), import_err.size()));
 
     if (!render_assets.has_value()) {
         FATAL("Failed to load render assets: %s", import_err);
     }
+
+    auto materials = std::to_array<imp::SourceMaterial>({
+        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 0.2f },
+        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
+        { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
+        { rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
+        { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
+    });
 
     Viewer viewer({
         .gpuID = 0,
@@ -87,28 +117,30 @@ int main(int argc, char *argv[])
         .execMode = exec_mode,
     });
 
-    const_cast<uint32_t&>(render_assets->objects[0].meshes[0].materialIDX) = 0;
-    const_cast<uint32_t&>(render_assets->objects[1].meshes[0].materialIDX) = 0;
-    const_cast<uint32_t&>(render_assets->objects[2].meshes[0].materialIDX) = 1;
-    const_cast<uint32_t&>(render_assets->objects[3].meshes[0].materialIDX) = 0;
-    const_cast<uint32_t&>(render_assets->objects[4].meshes[0].materialIDX) = 2;
-    const_cast<uint32_t&>(render_assets->objects[5].meshes[0].materialIDX) = 0;
-    const_cast<uint32_t&>(render_assets->objects[6].meshes[0].materialIDX) = 0;
+    // Override materials
+    render_assets->objects[(CountT)SimObject::Cube].meshes[0].materialIDX = 0;
+    render_assets->objects[(CountT)SimObject::Wall].meshes[0].materialIDX = 1;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[0].materialIDX = 2;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[1].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
 
-    viewer.loadObjects(render_assets->objects, materials, {});
+    viewer.loadObjects(render_assets->objects, materials, {
+        { (std::filesystem::path(DATA_DIR) /
+           "green_grid.png").string().c_str() },
+        { (std::filesystem::path(DATA_DIR) /
+           "smile.png").string().c_str() },
+    });
 
     viewer.configureLighting({
-        { true, math::Vector3{1.0f, 1.0f, -1.5f}, math::Vector3{1.0f, 1.0f, 1.0f} }
+        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
     });
 
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .renderWidth = 0,
-        .renderHeight = 0,
         .autoReset = false,
-        .enableBatchRender = false,
     }, viewer.rendererBridge());
 
     for (CountT i = 0; i < (CountT)num_worlds; i++) {
@@ -147,8 +179,7 @@ int main(int argc, char *argv[])
 
     auto pos_printer = mgr.positionObservationTensor().makePrinter();
     auto to_other_printer = mgr.toOtherAgentsTensor().makePrinter();
-    auto to_button_printer = mgr.toButtonsTensor().makePrinter();
-    auto to_goal_printer = mgr.toGoalTensor().makePrinter();
+    auto to_dyn_printer = mgr.toDynEntitiesTensor().makePrinter();
     auto lidar_printer = mgr.lidarTensor().makePrinter();
 
     auto printObs = [&]() {
@@ -158,11 +189,8 @@ int main(int argc, char *argv[])
         printf("To Other\n");
         to_other_printer.print();
 
-        printf("To Button\n");
-        to_button_printer.print();
-
-        printf("To Goal\n");
-        to_goal_printer.print();
+        printf("To Dyn Entities\n");
+        to_dyn_printer.print();
 
         printf("Lidar\n");
         lidar_printer.print();

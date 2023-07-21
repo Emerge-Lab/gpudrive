@@ -59,10 +59,7 @@ int main(int argc, char *argv[])
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
-        .renderWidth = 0,
-        .renderHeight = 0,
         .autoReset = false,
-        .enableBatchRender = false,
     });
 
     std::random_device rd;

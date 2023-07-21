@@ -33,6 +33,11 @@ inline constexpr CountT numAgents = 2;
 
 inline constexpr float worldLength = 30.f;
 inline constexpr float worldWidth = 15.f;
+inline constexpr float wallWidth = 0.3f;
+inline constexpr float buttonWidth = 0.8f;
+inline constexpr float agentRadius = 1.f;
+inline constexpr float challengeLength =
+    worldLength / numChallenges - wallWidth;
 
 // How many discrete options for each movement action
 inline constexpr CountT numMoveBuckets = 5;
@@ -50,7 +55,7 @@ enum class ExportID : uint32_t {
     Done,
     PositionObservation,
     ToOtherAgents,
-    ToButtons,
+    ToDynamicEntities,
     Lidar,
     NumExports,
 };
@@ -63,6 +68,13 @@ enum class SimObject : uint32_t {
     Agent,
     Plane,
     NumObjects,
+};
+
+enum class DynamicEntityType : uint32_t {
+    None,
+    Button,
+    Block,
+    NumTypes,
 };
 
 class Engine;
@@ -80,7 +92,7 @@ struct ButtonState {
 };
 
 struct Progress {
-    float maxDistance;
+    int32_t numProgressIncrements;
 };
 
 struct Action {
@@ -88,8 +100,6 @@ struct Action {
     int32_t y;
     int32_t r;
 };
-// Action is exported as an N, 3 tensor to pytorch
-static_assert(sizeof(Action) == 3 * sizeof(int32_t));
 
 struct Reward {
     float v;
@@ -108,6 +118,7 @@ struct PositionObservation {
     float x;
     float y;
     float z;
+    float theta;
 };
 
 // Entity ID of the other agents
@@ -126,9 +137,20 @@ struct ToOtherAgents {
     PolarObservation obs[consts::numAgents - 1];
 };
 
-struct ToButtons {
-    PolarObservation obs[consts::maxRooms];
+struct EntityObservation {
+    float encodedType;
+    PolarObservation polar;
 };
+
+struct ToDynamicEntities {
+    EntityObservation obs[consts::numChallenges][
+        consts::maxEntitiesPerChallenge];
+};
+
+// ToDynamicEntities is exported as a
+// N, numChallenges, maxEntitiesPerChallenge, 3 tensor to pytorch
+static_assert(sizeof(ToDynamicEntities) == 3 * sizeof(float) *
+              consts::numChallenges * consts::maxEntitiesPerChallenge);
 
 struct Lidar {
     float depth[30];
@@ -161,8 +183,7 @@ struct Agent : public madrona::Archetype<
     PositionObservation,
     OtherAgents,
     ToOtherAgents,
-    ToButtons,
-    ToGoal,
+    ToDynamicEntities,
     Lidar,
 
     // Data for training code
@@ -210,7 +231,7 @@ struct ButtonObject : public madrona::Archetype<
     Rotation,
     Scale,
     ObjectID,
-    ButtonState 
+    ButtonState
 > {};
 
 // The Sim class encapsulates the per-world state of the simulation.

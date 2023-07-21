@@ -133,7 +133,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     using SourceCollisionObject = PhysicsLoader::SourceCollisionObject;
     using SourceCollisionPrimitive = PhysicsLoader::SourceCollisionPrimitive;
 
-    std::array<std::string, (size_t)SimObject::NumObjects> asset_paths;
+    std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::Wall] =
@@ -141,14 +141,14 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_collision.obj").string();
 
-    std::array<const char *, (size_t)SimObject::NumObjects> asset_cstrs;
+    std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
         asset_cstrs[i] = asset_paths[i].c_str();
     }
 
     char import_err_buffer[4096];
     auto imported_hulls = imp::ImportedAssets::importFromDisk(
-        asset_cstr, import_err_buffer, true);
+        asset_cstrs, import_err_buffer, true);
 
     if (!imported_hulls.has_value()) {
         FATAL("%s", import_err_buffer);
@@ -156,7 +156,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     DynArray<DynArray<SourceCollisionPrimitive>> prim_arrays(0);
     HeapArray<SourceCollisionObject> src_objs(
-        (CountT)SimObjects::NumObjects);
+        (CountT)SimObject::NumObjects);
 
     auto setupHull = [&](SimObject obj_id,
                          float inv_mass,
@@ -175,7 +175,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
         prim_arrays.emplace_back(std::move(prims));
 
-        src_obs[(CountT)obj_id] = SourceCollisionObject {
+        src_objs[(CountT)obj_id] = SourceCollisionObject {
             .prims = Span<const SourceCollisionPrimitive>(prim_arrays.back()),
             .invMass = inv_mass,
             .friction = friction,
@@ -249,25 +249,7 @@ Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg,
     const viz::VizECSBridge *viz_bridge)
 {
-    HostEventLogging(HostEvent::initStart);
-
-    std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "sphere.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "plane.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").string().c_str(),
-    }, Span<char>(import_err.data(), import_err.size()));
-
-    if (!render_assets.has_value()) {
-        FATAL("Failed to load render assets: %s", import_err);
-    }
-
     Sim::Config sim_cfg {
-        mgr_cfg.enableBatchRender,
         viz_bridge != nullptr,
         mgr_cfg.autoReset,
     };
@@ -420,7 +402,7 @@ Tensor Manager::positionObservationTensor() const
 {
     return impl_->exportTensor(ExportID::PositionObservation,
                                Tensor::ElementType::Float32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 3});
+                               {impl_->cfg.numWorlds * consts::numAgents, 4});
 }
 
 Tensor Manager::toOtherAgentsTensor() const
@@ -434,24 +416,15 @@ Tensor Manager::toOtherAgentsTensor() const
                                });
 }
 
-Tensor Manager::toButtonsTensor() const
+Tensor Manager::toDynEntitiesTensor() const
 {
-    return impl_->exportTensor(ExportID::ToButtons,
+    return impl_->exportTensor(ExportID::ToDynamicEntities,
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds * consts::numAgents,
-                                   consts::maxRooms,
-                                   2, // Polar coordinates
-                               });
-}
-
-Tensor Manager::toGoalTensor() const
-{
-    return impl_->exportTensor(ExportID::ToGoal,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds * consts::numAgents,
-                                   2, // Polar coordinates
+                                   consts::numChallenges,
+                                   consts::maxEntitiesPerChallenge,
+                                   3, // Polar coordinates
                                });
 }
 
