@@ -31,13 +31,13 @@ inline constexpr CountT numChallenges = 4;
 
 inline constexpr CountT numAgents = 2;
 
-inline constexpr float worldLength = 30.f;
-inline constexpr float worldWidth = 15.f;
-inline constexpr float wallWidth = 0.3f;
+inline constexpr float worldLength = 60.f;
+inline constexpr float worldWidth = 20.f;
+inline constexpr float wallWidth = 1.f;
 inline constexpr float buttonWidth = 0.8f;
 inline constexpr float agentRadius = 1.f;
 inline constexpr float challengeLength =
-    worldLength / numChallenges - wallWidth;
+    worldLength / numChallenges;
 
 // Units of distance along the environment needed for further reward
 constexpr float distancePerProgress = 4.f;

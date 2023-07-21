@@ -6,8 +6,21 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
-static inline Entity makePhysicsObject(
+namespace consts {
+inline constexpr float doorWidth = consts::worldWidth / 3.f;
+}
+
+template <typename ArchetypeT>
+static Entity makeDynEntity(Engine &ctx)
+{
+    Entity e = ctx.makeEntity<ArchetypeT>();
+    ctx.data().dynamicEntities[ctx.data().numDynamicEntities++] = e;
+    return e;
+}
+
+static inline void setupPhysicsEntity(
     Engine &ctx,
+    Entity e,
     Vector3 pos,
     Quat rot,
     SimObject sim_obj,
@@ -16,7 +29,6 @@ static inline Entity makePhysicsObject(
 {
     ObjectID obj_id { (int32_t)sim_obj };
 
-    Entity e = ctx.makeEntity<PhysicsObject>();
     ctx.get<Position>(e) = pos;
     ctx.get<Rotation>(e) = rot;
     ctx.get<Scale>(e) = scale;
@@ -28,8 +40,16 @@ static inline Entity makePhysicsObject(
     ctx.get<ResponseType>(e) = response_type;
     ctx.get<ExternalForce>(e) = Vector3::zero();
     ctx.get<ExternalTorque>(e) = Vector3::zero();
+}
 
-    return e;
+static void registerPhysicsEntity(
+    Engine &ctx,
+    Entity e,
+    SimObject sim_obj)
+{
+    ObjectID obj_id { (int32_t)sim_obj };
+    ctx.get<broadphase::LeafID>(e) =
+        RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
 #if 0
@@ -54,8 +74,10 @@ static Entity makeButtonEntity(Engine &ctx, Vector2 pos, Vector2 scale)
 void createPersistentEntities(Engine &ctx)
 {
     // Create the floor entity, just a simple static plane.
-    ctx.data().floorPlane = makePhysicsObject(
+    ctx.data().floorPlane = ctx.makeEntity<PhysicsObject>();
+    setupPhysicsEntity(
         ctx,
+        ctx.data().floorPlane,
         Vector3 { 0, 0, 0 },
         Quat { 1, 0, 0, 0 },
         SimObject::Plane,
@@ -63,49 +85,60 @@ void createPersistentEntities(Engine &ctx)
 
     // Create the outer wall entities
     // Left
-    ctx.data().borders[0] = makePhysicsObject(
+
+    ctx.data().borders[0] = ctx.makeEntity<PhysicsObject>();
+    setupPhysicsEntity(
         ctx,
-        Vector3 { -consts::wallWidth / 2.f, 0, 0 },
-        Quat::angleAxis(math::pi / 2.f, math::up),
+        ctx.data().borders[0],
+        Vector3 {
+            0,
+            -consts::wallWidth / 2.f,
+            0,
+        },
+        Quat { 1, 0, 0, 0 },
         SimObject::Wall,
         ResponseType::Static,
         Diag3x3 {
-            consts::worldWidth,
+            consts::worldWidth + consts::wallWidth * 2,
             consts::wallWidth,
             2.f,
         });
 
     // Top
-    ctx.data().borders[1] = makePhysicsObject(
+    ctx.data().borders[1] = ctx.makeEntity<PhysicsObject>();
+    setupPhysicsEntity(
         ctx,
+        ctx.data().borders[1],
         Vector3 {
-            consts::worldLength / 2.f,
             consts::worldWidth / 2.f + consts::wallWidth / 2.f,
+            consts::worldLength / 2.f,
             0,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
         ResponseType::Static,
         Diag3x3 {
-            consts::worldLength,
             consts::wallWidth,
+            consts::worldLength,
             2.f,
         });
 
     // Bottom
-    ctx.data().borders[2] = makePhysicsObject(
+    ctx.data().borders[2] = ctx.makeEntity<PhysicsObject>();
+    setupPhysicsEntity(
         ctx,
+        ctx.data().borders[2],
         Vector3 {
-            consts::worldLength / 2.f,
             -consts::worldWidth / 2.f - consts::wallWidth / 2.f,
+            consts::worldLength / 2.f,
             0,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
         ResponseType::Static,
         Diag3x3 {
-            consts::worldLength,
             consts::wallWidth,
+            consts::worldLength,
             2.f,
         });
 
@@ -143,54 +176,46 @@ static inline float randInRangeCentered(Engine &ctx, float range)
     return ctx.data().rng.rand() * range - range / 2.f;
 }
 
-static inline float randInRange(Engine &ctx, float range)
+static inline float randBetween(Engine &ctx, float min, float max)
 {
-    return ctx.data().rng.rand() * range;
+    return ctx.data().rng.rand() * (max - min) + min;
 }
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    {
-        Entity floor_entity = ctx.data().floorPlane;
-        ctx.get<broadphase::LeafID>(floor_entity) = 
-            phys::RigidBodyPhysicsSystem::registerEntity(ctx, floor_entity,
-                ctx.get<ObjectID>(floor_entity));
-    }
+    registerPhysicsEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 
      for (CountT i = 0; i < 3; i++) {
          Entity wall_entity = ctx.data().borders[i];
-         ctx.get<broadphase::LeafID>(wall_entity) =
-             phys::RigidBodyPhysicsSystem::registerEntity(
-                ctx, wall_entity, ctx.get<ObjectID>(wall_entity));
+         registerPhysicsEntity(ctx, wall_entity, SimObject::Wall);
      }
 
      for (CountT i = 0; i < consts::numAgents; i++) {
          Entity agent_entity = ctx.data().agents[i];
-         ctx.get<broadphase::LeafID>(agent_entity) =
-             phys::RigidBodyPhysicsSystem::registerEntity(
-                ctx, agent_entity, ctx.get<ObjectID>(agent_entity));
+         registerPhysicsEntity(ctx, agent_entity, SimObject::Agent);
+
          ctx.get<viz::VizCamera>(agent_entity) =
              viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
                  1.5f * math::up, (int32_t)i);
 
          // Place the agents near the starting wall
          Vector3 pos {
-             randInRange(ctx, consts::distancePerProgress / 2.f) +
-                 1.1f * consts::agentRadius,
              randInRangeCentered(ctx, 
-                 consts::worldWidth / 2.f - 2.f * consts::agentRadius),
+                 consts::worldWidth / 2.f - 2.5f * consts::agentRadius),
+             randBetween(ctx, 0.f, consts::distancePerProgress / 2.f) +
+                 1.1f * consts::agentRadius,
              0.f,
          };
 
          if (i % 2 == 0) {
-             pos.y += consts::worldWidth / 4.f;
+             pos.x += consts::worldWidth / 4.f;
          } else {
-             pos.y -= consts::worldWidth / 4.f;
+             pos.x -= consts::worldWidth / 4.f;
          }
 
          ctx.get<Position>(agent_entity) = pos;
          ctx.get<Rotation>(agent_entity) = Quat::angleAxis(
-             -math::pi / 2.f - randInRangeCentered(ctx, math::pi / 2.f),
+             randInRangeCentered(ctx, math::pi / 4.f),
              math::up);
 
          ctx.get<Progress>(agent_entity).numProgressIncrements = 0;
@@ -211,10 +236,75 @@ static void resetPersistentEntities(Engine &ctx)
      }
 }
 
+// Builds the two walls 
+static Vector2 makeChallengeSeparator(Engine &ctx, int32_t challenge_idx)
+{
+    float y_pos = consts::challengeLength * (challenge_idx + 1) -
+        consts::wallWidth / 2.f;
+
+    // Quarter door of buffer on both sides, place door and then build walls
+    // up to the door gap on both sides
+    float door_center = randBetween(ctx, 0.75f * consts::doorWidth, 
+        consts::worldWidth - 0.75f * consts::doorWidth);
+    float left_len = door_center - 0.5f * consts::doorWidth;
+    Entity left_wall = makeDynEntity<PhysicsObject>(ctx);
+    setupPhysicsEntity(
+        ctx,
+        left_wall,
+        Vector3 {
+            (-consts::worldWidth + left_len) / 2.f,
+            y_pos,
+            0,
+        },
+        Quat { 1, 0, 0, 0 },
+        SimObject::Wall,
+        ResponseType::Static,
+        Diag3x3 {
+            left_len,
+            consts::wallWidth,
+            1.75f,
+        });
+    registerPhysicsEntity(ctx, left_wall, SimObject::Wall);
+
+    float right_len =
+        consts::worldWidth - door_center - 0.5f * consts::doorWidth;
+    Entity right_wall = makeDynEntity<PhysicsObject>(ctx);
+    setupPhysicsEntity(
+        ctx,
+        right_wall,
+        Vector3 {
+            (consts::worldWidth - right_len) / 2.f,
+            y_pos,
+            0,
+        },
+        Quat { 1, 0, 0, 0 },
+        SimObject::Wall,
+        ResponseType::Static,
+        Diag3x3 {
+            right_len,
+            consts::wallWidth,
+            1.75f,
+        });
+    registerPhysicsEntity(ctx, right_wall, SimObject::Wall);
+
+    return { 0, 0 };
+}
+
+static void generateChallenges(Engine &ctx)
+{
+    Vector2 door1_pos = makeChallengeSeparator(ctx, 0);
+
+    
+    for (CountT i = 1; i < consts::numChallenges; i++) {
+        Vector2 door_pos = makeChallengeSeparator(ctx, i);
+    }
+}
+
 // Randomly generate a new world for a training episode
 void generateWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
+    generateChallenges(ctx);
 }
 
 }

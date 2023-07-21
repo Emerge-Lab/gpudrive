@@ -336,7 +336,8 @@ inline void lidarSystem(Engine &ctx,
         float hit_t;
         Vector3 hit_normal;
         Entity hit_entity =
-            bvh.traceRay(pos , ray_dir, &hit_t, &hit_normal, 200.f);
+            bvh.traceRay(pos + 0.5f * math::up, ray_dir, &hit_t,
+                         &hit_normal, 200.f);
 
         if (hit_entity == Entity::none()) {
             lidar.depth[idx] = 0.f;
@@ -367,7 +368,7 @@ inline void rewardSystem(Engine &ctx,
     constexpr float progress_reward = 0.2f;
     constexpr float slack_reward = -0.01f;
 
-    int32_t new_progress = int32_t(pos.x / consts::distancePerProgress);
+    int32_t new_progress = int32_t(pos.y / consts::distancePerProgress);
 
     float reward;
     if (new_progress > progress.numProgressIncrements) {
