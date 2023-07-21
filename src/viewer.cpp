@@ -181,6 +181,7 @@ int main(int argc, char *argv[])
     auto to_other_printer = mgr.toOtherAgentsTensor().makePrinter();
     auto to_dyn_printer = mgr.toDynEntitiesTensor().makePrinter();
     auto lidar_printer = mgr.lidarTensor().makePrinter();
+    auto reward_printer = mgr.rewardTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Pos\n");
@@ -194,6 +195,9 @@ int main(int argc, char *argv[])
 
         printf("Lidar\n");
         lidar_printer.print();
+
+        printf("Reward\n");
+        reward_printer.print();
 
         printf("\n");
     };

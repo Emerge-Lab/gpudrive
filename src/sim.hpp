@@ -45,7 +45,7 @@ constexpr float distancePerProgress = 4.f;
 // How many discrete options for each movement action
 inline constexpr CountT numMoveBuckets = 5;
 inline constexpr CountT numLidarSamples = 30;
-inline constexpr CountT maxEntitiesPerChallenge = 5;
+inline constexpr CountT maxEntitiesPerChallenge = 3;
 
 }
 
@@ -124,9 +124,11 @@ struct PositionObservation {
     float theta;
 };
 
-// Entity ID of the other agents
+// Entity ID of the other agents as well as a place to cache their rewards
+// so each agent can get half of their partner's reward as well
 struct OtherAgents {
     madrona::Entity e[consts::numAgents - 1];
+    float rewards[consts::numAgents - 1];
 };
 
 // The state of the world is passed to each agent in terms of egocentric

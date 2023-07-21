@@ -124,7 +124,7 @@ inline void movementSystem(Engine &,
     constexpr CountT half_buckets = discrete_action_buckets / 2;
     constexpr float discrete_move_max = 300;
     constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 20;
+    constexpr float discrete_turn_max = 40;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
     Quat cur_rot = rot;
@@ -360,12 +360,12 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
-inline void rewardSystem(Engine &ctx,
+inline void rewardSystem(Engine &,
                          Position pos,
                          Progress &progress,
                          Reward &out_reward)
 {
-    constexpr float progress_reward = 0.2f;
+    constexpr float progress_reward = 0.1f;
     constexpr float slack_reward = -0.01f;
 
     int32_t new_progress = int32_t(pos.y / consts::distancePerProgress);
@@ -383,15 +383,28 @@ inline void rewardSystem(Engine &ctx,
 }
 
 // Each agent gets half the reward of the other agent in
-// order to encourage them to cooperate.
-inline void partnerRewardSystem(Engine &ctx,
-                                const OtherAgents &others,
-                                Reward &out_reward)
+// order to encourage them to cooperate. Need to cache
+// the rewards in this system to avoid a race condition
+// when reading the rewards in the next system
+inline void gatherPartnerRewardSystem(Engine &ctx,
+                                      OtherAgents &others)
 {
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = others.e[i];
-        out_reward.v += ctx.get<Reward>(other).v / 2.f;
+        others.rewards[i] = ctx.get<Reward>(other).v / 2.f;
     }
+}
+
+inline void assignPartnerRewardSystem(Engine &ctx,
+                                      OtherAgents &others,
+                                      Reward &reward)
+{
+    float other_rewards = 0.f;
+    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+        other_rewards += others.rewards[i];
+    }
+
+    reward.v += other_rewards / float(consts::numAgents - 1);
 }
 
 // Notify training that an episode has completed by
@@ -477,18 +490,24 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             Reward
         >>({phys_done});
 
-    // Read partner's reward and apply
-    auto partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         partnerRewardSystem,
+    // Read partner's reward
+    auto gather_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
+         gatherPartnerRewardSystem,
+            OtherAgents
+        >>({reward_sys});
+
+    // Assign partner's reward
+    auto assign_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
+         assignPartnerRewardSystem,
             OtherAgents,
             Reward
-        >>({reward_sys});
+        >>({gather_partner_reward_sys});
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<ParallelForNode<Engine,
         doneSystem,
             Done
-        >>({partner_reward_sys});
+        >>({assign_partner_reward_sys});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
