@@ -39,6 +39,9 @@ inline constexpr float agentRadius = 1.f;
 inline constexpr float challengeLength =
     worldLength / numChallenges - wallWidth;
 
+// Units of distance along the environment needed for further reward
+constexpr float distancePerProgress = 4.f;
+
 // How many discrete options for each movement action
 inline constexpr CountT numMoveBuckets = 5;
 inline constexpr CountT numLidarSamples = 30;
@@ -175,6 +178,7 @@ struct Agent : public madrona::Archetype<
     madrona::phys::broadphase::LeafID,
 
     // Internal state
+    Progress,
 
     // Input
     Action,

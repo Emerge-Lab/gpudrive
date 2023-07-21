@@ -66,10 +66,11 @@ static inline void resetWorld(Engine &ctx)
 
     // Destroy old entities
     Entity *dyn_entities = ctx.data().dynamicEntities;
-    int32_t num_old_entities= ctx.data().numDynamicEntities;
+    int32_t num_old_entities = ctx.data().numDynamicEntities;
     for (int32_t i = 0; i < num_old_entities; i++) {
         ctx.destroyEntity(dyn_entities[i]);
     }
+    ctx.data().numDynamicEntities = 0;
 
     if (ctx.data().enableVizRender) {
         viz::VizRenderingSystem::reset(ctx);
@@ -80,7 +81,7 @@ static inline void resetWorld(Engine &ctx)
     // Assign a new episode ID
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
     int32_t episode_idx = episode_mgr.curEpisode.fetch_add<sync::relaxed>(1);
-    ctx.data().rng = RNG::make(0 /*episode_idx*/);
+    ctx.data().rng = RNG::make(episode_idx);
     ctx.data().curEpisodeIdx = episode_idx;
 
     generateWorld(ctx);
@@ -123,7 +124,7 @@ inline void movementSystem(Engine &,
     constexpr CountT half_buckets = discrete_action_buckets / 2;
     constexpr float discrete_move_max = 300;
     constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 90;
+    constexpr float discrete_turn_max = 20;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
     Quat cur_rot = rot;
@@ -363,11 +364,10 @@ inline void rewardSystem(Engine &ctx,
                          Progress &progress,
                          Reward &out_reward)
 {
-    constexpr float dist_per_progress = 2.f;
     constexpr float progress_reward = 0.2f;
     constexpr float slack_reward = -0.01f;
 
-    int32_t new_progress = int32_t(pos.x / dist_per_progress);
+    int32_t new_progress = int32_t(pos.x / consts::distancePerProgress);
 
     float reward;
     if (new_progress > progress.numProgressIncrements) {
@@ -387,7 +387,7 @@ inline void partnerRewardSystem(Engine &ctx,
                                 const OtherAgents &others,
                                 Reward &out_reward)
 {
-    for (CountT i = 0; i < consts::numAgents; i++) {
+    for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = others.e[i];
         out_reward.v += ctx.get<Reward>(other).v / 2.f;
     }
@@ -581,6 +581,7 @@ Sim::Sim(Engine &ctx,
 
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
+    numDynamicEntities = 0;
 
     // Generate initial world state
     resetWorld(ctx);

@@ -79,7 +79,7 @@ void createPersistentEntities(Engine &ctx)
     ctx.data().borders[1] = makePhysicsObject(
         ctx,
         Vector3 {
-            -consts::worldLength / 2.f,
+            consts::worldLength / 2.f,
             consts::worldWidth / 2.f + consts::wallWidth / 2.f,
             0,
         },
@@ -96,7 +96,7 @@ void createPersistentEntities(Engine &ctx)
     ctx.data().borders[2] = makePhysicsObject(
         ctx,
         Vector3 {
-            -consts::worldLength / 2.f,
+            consts::worldLength / 2.f,
             -consts::worldWidth / 2.f - consts::wallWidth / 2.f,
             0,
         },
@@ -152,34 +152,45 @@ static void resetPersistentEntities(Engine &ctx)
 {
     {
         Entity floor_entity = ctx.data().floorPlane;
-        phys::RigidBodyPhysicsSystem::registerEntity(ctx, floor_entity,
-            ctx.get<ObjectID>(floor_entity));
+        ctx.get<broadphase::LeafID>(floor_entity) = 
+            phys::RigidBodyPhysicsSystem::registerEntity(ctx, floor_entity,
+                ctx.get<ObjectID>(floor_entity));
     }
 
      for (CountT i = 0; i < 3; i++) {
          Entity wall_entity = ctx.data().borders[i];
-         phys::RigidBodyPhysicsSystem::registerEntity(
-            ctx, wall_entity, ctx.get<ObjectID>(wall_entity));
+         ctx.get<broadphase::LeafID>(wall_entity) =
+             phys::RigidBodyPhysicsSystem::registerEntity(
+                ctx, wall_entity, ctx.get<ObjectID>(wall_entity));
      }
 
      for (CountT i = 0; i < consts::numAgents; i++) {
-         Entity agent_entity = ctx.data().borders[i];
-         phys::RigidBodyPhysicsSystem::registerEntity(
-            ctx, agent_entity, ctx.get<ObjectID>(agent_entity));
+         Entity agent_entity = ctx.data().agents[i];
+         ctx.get<broadphase::LeafID>(agent_entity) =
+             phys::RigidBodyPhysicsSystem::registerEntity(
+                ctx, agent_entity, ctx.get<ObjectID>(agent_entity));
          ctx.get<viz::VizCamera>(agent_entity) =
              viz::VizRenderingSystem::setupView(ctx, 90.f, 0.001f,
-                 Vector3 { 0, 0, 0.8 }, (int32_t)i);
+                 1.5f * math::up, (int32_t)i);
 
+         // Place the agents near the starting wall
          Vector3 pos {
-             randInRange(ctx, 0.5f + consts::agentRadius),
+             randInRange(ctx, consts::distancePerProgress / 2.f) +
+                 1.1f * consts::agentRadius,
              randInRangeCentered(ctx, 
-                 consts::worldWidth - 2.f * consts::agentRadius),
-             1.5f,
+                 consts::worldWidth / 2.f - 2.f * consts::agentRadius),
+             0.f,
          };
+
+         if (i % 2 == 0) {
+             pos.y += consts::worldWidth / 4.f;
+         } else {
+             pos.y -= consts::worldWidth / 4.f;
+         }
 
          ctx.get<Position>(agent_entity) = pos;
          ctx.get<Rotation>(agent_entity) = Quat::angleAxis(
-             math::pi / 2.f + randInRangeCentered(ctx, math::pi / 2.f),
+             -math::pi / 2.f - randInRangeCentered(ctx, math::pi / 2.f),
              math::up);
 
          ctx.get<Progress>(agent_entity).numProgressIncrements = 0;
