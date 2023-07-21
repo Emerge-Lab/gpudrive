@@ -17,42 +17,33 @@ def setup_obs(sim):
     pos_obs_tensor = sim.position_observation_tensor().to_torch()
     to_others_tensor = sim.to_other_agents_tensor().to_torch()
     to_buttons_tensor = sim.to_buttons_tensor().to_torch()
-    to_goal_tensor = sim.to_goal_tensor().to_torch()
     lidar_tensor = sim.lidar_tensor().to_torch()
     
     obs_tensors = [
         pos_obs_tensor,
         to_others_tensor,
         to_buttons_tensor,
-        to_goal_tensor,
         lidar_tensor,
     ]
-    
-    num_obs_features = (
-        math.prod(pos_obs_tensor.shape[1:]) +
-        math.prod(to_others_tensor.shape[1:]) +
-        math.prod(to_buttons_tensor.shape[1:]) +
-        math.prod(to_goal_tensor.shape[1:]) +
-        math.prod(lidar_tensor.shape[1:])
-    )
 
-    def process_obs(pos_obs, to_others, to_buttons, to_goal, lidar):
+    num_obs_features = 0
+    for tensor in obs_tensors:
+        num_obs_features += math.prod(tensor.shape[1:])
+
+    def process_obs(pos_obs, to_others, to_buttons, lidar):
         assert(not torch.isnan(pos_obs).any())
         assert(not torch.isnan(to_others).any())
         assert(not torch.isnan(to_buttons).any())
-        assert(not torch.isnan(to_goal).any())
         assert(not torch.isnan(lidar).any())
         assert(not torch.isinf(pos_obs).any())
         assert(not torch.isinf(to_others).any())
         assert(not torch.isinf(to_buttons).any())
-        assert(not torch.isinf(to_goal).any())
         assert(not torch.isinf(lidar).any())
 
         return torch.cat([
             pos_obs.view(pos_obs.shape[0], -1),
             to_others.view(to_others.shape[0], -1),
             to_buttons.view(to_buttons.shape[0], -1),
-            to_goal,
             lidar
         ], dim=1)
 

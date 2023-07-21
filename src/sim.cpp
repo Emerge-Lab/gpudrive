@@ -13,8 +13,10 @@ namespace GPUHideSeek {
 constexpr inline float wallSpeed = 12.0f;
 constexpr inline float deltaT = 0.075;
 constexpr inline CountT numPhysicsSubsteps = 4;
-constexpr inline int32_t episodeLen = 240;
+constexpr inline int32_t episodeLen = 100;
 
+// Register all the ECS components and archetypes that will be
+// use in the simulation
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
     base::registerTypes(registry);
@@ -28,14 +30,11 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<ToOtherAgents>();
     registry.registerComponent<ToButtons>();
-    registry.registerComponent<ToGoal>();
     registry.registerComponent<OpenState>();
 
     registry.registerComponent<Lidar>();
-    registry.registerComponent<Seed>();
 
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<GlobalDebugPositions>();
     registry.registerSingleton<RewardTracker>();
 
     registry.registerArchetype<Agent>();
@@ -53,16 +52,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::ToOtherAgents);
     registry.exportColumn<Agent, ToButtons>(
         (uint32_t)ExportID::ToButtons);
-    registry.exportColumn<Agent, ToGoal>(
-        (uint32_t)ExportID::ToGoal);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, Reward>(
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
         (uint32_t)ExportID::Done);
-    registry.exportColumn<Agent, Seed>(
-        (uint32_t)ExportID::Seed);
 }
 
 static inline void resetEnvironment(Engine &ctx)
@@ -75,25 +70,7 @@ static inline void resetEnvironment(Engine &ctx)
 
     phys::RigidBodyPhysicsSystem::reset(ctx);
 
-#if 1
-    for (CountT i = 0; i < ctx.data().leafCount; ++i) {
-        ctx.destroyEntity(ctx.data().rooms[ctx.data().leafs[i]].buttonEntity);
-    }
-#endif
-
-    // Destroy the wall entities (door entities count as walls)
-    for (CountT i = 0; i < ctx.data().numWalls; ++i) {
-        Entity e = ctx.data().walls[i];
-        ctx.destroyEntity(e);
-    }
-
-    for (CountT i = 0; i < ctx.data().numDoors; ++i) {
-        Entity e = ctx.data().doors[i];
-        ctx.destroyEntity(e);
-    }
-
-    ctx.data().numDoors = 0;
-    ctx.data().roomCount = 0;
+    generateWorld(ctx);
 }
 
 inline void resetSystem(Engine &ctx, WorldReset &reset)
@@ -276,13 +253,13 @@ inline void collectObservationsSystem(Engine &ctx,
                                       PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
-                                      ToButtons &to_buttons,
-                                      ToGoal &to_goal)
+                                      ToButtons &to_buttons)
 {
     Quat to_view = rot.inv();
 
     pos_obs.x = posObs(pos.x);
     pos_obs.y = posObs(pos.y);
+    pos_obs.z = pos.z;
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
@@ -307,14 +284,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     for (; button_idx < consts::maxRooms; button_idx++) {
         // FIXME: is this a good invalid output?
-        to_buttons.obs[button_idx] = { 0.f, 2.f * math::pi };
-    }
-
-    { // Compute polar coords to goal
-        Room &dst = ctx.data().rooms[ctx.data().dstRoom];
-        Vector2 dst_pos { dst.button.pos.x, dst.button.pos.y };
-        Vector3 to_dst = Vector3 { dst_pos.x, dst_pos.y, 0 } - pos;
-        to_goal.obs = xyToPolar(to_view.rotateVec(to_dst));
+        to_buttons.obs[button_idx] = { 0.f, 1.f };
     }
 }
 
@@ -395,6 +365,24 @@ inline void rewardSystem(Engine &ctx,
                          Reward &out_reward,
                          Done &done)
 {
+    const RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
+    if (reward_tracker.numNewCellsVisited == 0 &&
+            reward_tracker.numNewButtonsVisited == 0 &&
+            reward_tracker.outOfBounds == 0) {
+        out_reward.v = -0.01f;
+        return;
+    }
+
+    float reward = reward_tracker.numNewCellsVisited * 0.1f;
+    reward += reward_tracker.numNewButtonsVisited * 0.5f;
+
+    out_reward.v = reward;
+}
+
+inline void partnerRewardSystem(Engine &ctx,
+                                Reward &out_reward,
+                                Done &done)
+{
     int32_t cur_step = ctx.data().curEpisodeStep;
     if (cur_step == 0) {
         done.v = 0;
@@ -413,43 +401,21 @@ inline void rewardSystem(Engine &ctx,
     float reward = reward_tracker.numNewCellsVisited * 0.1f;
     reward += reward_tracker.numNewButtonsVisited * 0.5f;
 
-#if 0
-    if (reward_tracker.outOfBounds) {
-        reward += 0.1f;
-    }
-#endif
-
     out_reward.v = reward;
+}
 
-#if 0
-    Room &dst = ctx.data().rooms[ctx.data().dstRoom];
-    Vector2 dstButtonPos = (dst.button.start + dst.button.end) * 0.5f;
-    Vector2 diff = dstButtonPos - Vector2 {pos .x, pos.y };
-
-    CountT cur_step = ctx.data().curEpisodeStep;
-
+// Notify training that an episode has completed by
+// setting done = 1 on the final step of the episode
+inline void doneSystem(Engine &ctx,
+                       Done &done)
+{
+    int32_t cur_step = ctx.data().curEpisodeStep;
     if (cur_step == 0) {
-        out_reward.v = 0.f;
-        done.v = 0.f;
-    }
-
-    float reward = 0.0f;
-    bool at_goal;
-    if (diff.length2() < BUTTON_WIDTH*BUTTON_WIDTH) {
-        reward = 100.0f;
-        at_goal = true;
-    }
-    else {
-        reward = -0.05f;
-        at_goal = false;
-    }
-
-    out_reward.v = reward;
-
-    if (cur_step == episodeLen - 1 || at_goal) {
+        done.v = 0;
+    } else if (cur_step == episodeLen -1) {
         done.v = 1;
     }
-#endif
+
 }
 
 #ifdef MADRONA_GPU_MODE
@@ -518,11 +484,17 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         updateVisitedSystem, Position, Reward>>({phys_done});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem, Reward, Done>>({update_visited});
+         rewardSystem, Reward>>({update_visited});
+
+    auto partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
+         partnerRewardSystem, Reward>>({reward_sys});
+
+    auto done_sys = builder.addToGraph<ParallelForNode<Engine,
+        doneSystem, Done>>({done_sys});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem, WorldReset>>({reward_sys});
+        resetSystem, WorldReset>>({done_sys});
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
 
@@ -587,15 +559,20 @@ Sim::Sim(Engine &ctx,
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    CountT max_total_entities = 100;
+    // Currently the physics system needs an upper bound on the number of
+    // entities that will be stored in the BVH. We plan to fix this in
+    // a future release.
+    constexpr CountT max_total_entities =
+        consts::numAgents +
+        consts::numChallenges * consts::maxEntitiesPerChallenge +
+        4; // border walls + floor
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
-         50 * 20, 10);
+         max_total_entities * max_total_entities / 2, consts::numAgents);
 
     curEpisodeStep = 0;
 
-    enableBatchRender = cfg.enableBatchRender;
     enableVizRender = cfg.enableViewer;
 
     if (enableVizRender) {
@@ -604,33 +581,11 @@ Sim::Sim(Engine &ctx,
 
     autoReset = cfg.autoReset;
 
-    rooms = (Room *)rawAlloc(sizeof(Room) * consts::maxRooms);
-    leafs = (CountT *)rawAlloc(sizeof(CountT) * consts::maxRooms);
-    walls = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
-    doors = (Entity *)rawAlloc(sizeof(Entity) * consts::maxRooms * consts::maxDoorsPerRoom);
+    // Creates agents, walls, etc.
+    createPersistentEntities(ctx);
 
-    ctx.data().numDoors = 0;
-    ctx.data().numWalls = 0;
-    ctx.data().roomCount = 0;
-    ctx.data().leafCount = 0;
-
-    createAgents(ctx);
-    createFloor(ctx);
-
-    // Creates the wall entities and placess the agents into the source room
+    // Generate initial world state
     resetEnvironment(ctx);
-    generateEnvironment(ctx);
-
-    // Clear reward tracker:
-    RewardTracker &reward_tracker = ctx.singleton<RewardTracker>();
-    for (CountT y = 0; y < RewardTracker::gridHeight; y++) {
-        for (CountT x = 0; x < RewardTracker::gridWidth; x++) {
-            reward_tracker.visited[y][x] = 0xFFFF'FFFF;
-        }
-    }
-    reward_tracker.numNewCellsVisited = 0;
-    reward_tracker.numNewButtonsVisited = 0;
-    reward_tracker.outOfBounds = 0;
 }
 
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);

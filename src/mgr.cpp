@@ -133,56 +133,35 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     using SourceCollisionObject = PhysicsLoader::SourceCollisionObject;
     using SourceCollisionPrimitive = PhysicsLoader::SourceCollisionPrimitive;
 
-    SourceCollisionPrimitive sphere_prim {
-        .type = CollisionPrimitive::Type::Sphere,
-        .sphere = CollisionPrimitive::Sphere {
-            .radius = 1.f,
-        },
-    };
+    std::array<std::string, (size_t)SimObject::NumObjects> asset_paths;
+    asset_paths[(size_t)SimObject::Cube] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::Wall] =
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
+    asset_paths[(size_t)SimObject::Agent] =
+        (std::filesystem::path(DATA_DIR) / "agent_collision.obj").string();
 
-    SourceCollisionPrimitive plane_prim {
-        .type = CollisionPrimitive::Type::Plane,
-    };
+    std::array<const char *, (size_t)SimObject::NumObjects> asset_cstrs;
+    for (size_t i = 0; i < asset_paths.size(); i++) {
+        asset_cstrs[i] = asset_paths[i].c_str();
+    }
 
     char import_err_buffer[4096];
-    auto imported_hulls = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_collision.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_collision.obj").string().c_str(),
-    }, import_err_buffer, true);
+    auto imported_hulls = imp::ImportedAssets::importFromDisk(
+        asset_cstr, import_err_buffer, true);
 
     if (!imported_hulls.has_value()) {
         FATAL("%s", import_err_buffer);
     }
 
     DynArray<DynArray<SourceCollisionPrimitive>> prim_arrays(0);
-    HeapArray<SourceCollisionObject> src_objs(imported_hulls->objects.size() + 2);
+    HeapArray<SourceCollisionObject> src_objs(
+        (CountT)SimObjects::NumObjects);
 
-    // Sphere (0)
-    src_objs[0] = {
-        .prims = Span<const SourceCollisionPrimitive>(&sphere_prim, 1),
-        .invMass = 1.f,
-        .friction = {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        },
-    };
-
-    // Plane (1)
-    src_objs[1] = {
-        .prims = Span<const SourceCollisionPrimitive>(&plane_prim, 1),
-        .invMass = 0.f,
-        .friction = {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        },
-    };
-
-    auto setupHull = [&](CountT obj_idx, float inv_mass,
+    auto setupHull = [&](SimObject obj_id,
+                         float inv_mass,
                          RigidBodyFrictionData friction) {
-        auto meshes = imported_hulls->objects[obj_idx].meshes;
+        auto meshes = imported_hulls->objects[(CountT)obj_id].meshes;
         DynArray<SourceCollisionPrimitive> prims(meshes.size());
 
         for (const imp::SourceMesh &mesh : meshes) {
@@ -196,47 +175,40 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
         prim_arrays.emplace_back(std::move(prims));
 
-        return SourceCollisionObject {
+        src_obs[(CountT)obj_id] = SourceCollisionObject {
             .prims = Span<const SourceCollisionPrimitive>(prim_arrays.back()),
             .invMass = inv_mass,
             .friction = friction,
         };
     };
 
-    { // Cube (2)
-        src_objs[2] = setupHull(0, 1.f, {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-    }
+    setupHull(SimObject::Cube, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
 
-    { // Wall (3)
-        src_objs[3] = setupHull(1, 0.f, {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-    }
+    setupHull(SimObject::Wall, 0.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
 
-    { // Cylinder (4)
-        src_objs[4] = setupHull(2, 1.f, {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-    }
+    setupHull(SimObject::Agent, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
 
-    { // Ramp (5)
-        src_objs[5] = setupHull(3, 1.f, {
-            .muS = 0.5f,
-            .muD = 0.5f,
-        });
-    }
+    SourceCollisionPrimitive plane_prim {
+        .type = CollisionPrimitive::Type::Plane,
+    };
 
-    { // Elongated Box (6)
-        src_objs[6] = setupHull(4, 1.f, {
+    src_objs[(CountT)SimObject::Plane] = {
+        .prims = Span<const SourceCollisionPrimitive>(&plane_prim, 1),
+        .invMass = 0.f,
+        .friction = {
             .muS = 0.5f,
             .muD = 0.5f,
-        });
-    }
+        },
+    };
 
     auto phys_objs_res = loader.importRigidBodyData(
         src_objs.data(), src_objs.size(), false);
@@ -247,9 +219,13 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     auto &phys_objs = *phys_objs_res;
 
-    // HACK:
-    phys_objs.metadatas[4].mass.invInertiaTensor.x = 0.f,
-    phys_objs.metadatas[4].mass.invInertiaTensor.y = 0.f,
+    // This is a bit hacky, but in order to make sure the agents
+    // remain controllable by the policy, they are only allowed to
+    // rotate around the Z axis (infinite inertia in x & y axes)
+    phys_objs.metadatas[
+        (CountT)SimObject::Agent].mass.invInertiaTensor.x = 0.f;
+    phys_objs.metadatas[
+        (CountT)SimObject::Agent].mass.invInertiaTensor.y = 0.f;
 
     loader.loadObjects(
         phys_objs.metadatas.data(),
@@ -444,7 +420,7 @@ Tensor Manager::positionObservationTensor() const
 {
     return impl_->exportTensor(ExportID::PositionObservation,
                                Tensor::ElementType::Float32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 2});
+                               {impl_->cfg.numWorlds * consts::numAgents, 3});
 }
 
 Tensor Manager::toOtherAgentsTensor() const
@@ -486,71 +462,6 @@ Tensor Manager::lidarTensor() const
                                    impl_->cfg.numWorlds * consts::numAgents,
                                    consts::numLidarSamples,
                                });
-}
-
-Tensor Manager::seedTensor() const
-{
-    return impl_->exportTensor(ExportID::Seed, Tensor::ElementType::Int32,
-                               {
-                                   impl_->cfg.numWorlds * consts::numAgents,
-                                   1,
-                               });
-}
-
-Tensor Manager::depthTensor() const
-{
-    void *dev_ptr = nullptr;
-    Optional<int> gpu_id = Optional<int>::none();
-
-#if 0
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_)->gpuExec.
-            depthObservations();
-        gpu_id = impl_->cfg.gpuID;
-#endif
-    } else {
-        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
-            depthObservations();
-
-#ifdef MADRONA_LINUX
-        gpu_id = impl_->cfg.gpuID;
-#endif
-    }
-#endif
-
-    return Tensor(dev_ptr, Tensor::ElementType::Float32,
-                     {impl_->cfg.numWorlds * consts::numAgents,
-                      impl_->cfg.renderHeight,
-                      impl_->cfg.renderWidth, 1}, gpu_id);
-}
-
-Tensor Manager::rgbTensor() const
-{
-    void *dev_ptr = nullptr;
-    Optional<int> gpu_id = Optional<int>::none();
-
-#if 0
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        dev_ptr = static_cast<CUDAImpl *>(impl_)->gpuExec.
-            rgbObservations();
-        gpu_id = impl_->cfg.gpuID;
-#endif
-    } else {
-        dev_ptr = static_cast<CPUImpl *>(impl_)->cpuExec.
-            rgbObservations();
-
-#ifdef MADRONA_LINUX
-        gpu_id = impl_->cfg.gpuID;
-#endif
-    }
-#endif
-
-    return Tensor(dev_ptr, Tensor::ElementType::UInt8,
-                  {impl_->cfg.numWorlds * consts::numAgents,
-                   impl_->cfg.renderHeight,
-                   impl_->cfg.renderWidth, 4}, gpu_id);
 }
 
 void Manager::triggerReset(int32_t world_idx)

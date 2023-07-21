@@ -15,16 +15,19 @@
 
 namespace GPUHideSeek {
 
+// The Manager class encapsulates the linkage between the outside training
+// code and the internal simulation state (src/sim.hpp / src/sim.cpp)
+//
+// Manager is responsible for initializing the simulator, loading physics
+// and rendering assets off disk, and mapping ECS components to tensors
+// for learning
 class Manager {
 public:
     struct Config {
-        madrona::ExecMode execMode;
-        int gpuID;
-        uint32_t numWorlds;
-        uint32_t renderWidth;
-        uint32_t renderHeight;
-        bool autoReset;
-        bool enableBatchRender;
+        madrona::ExecMode execMode; // CPU or CUDA
+        int gpuID; // Which GPU for CUDA backend?
+        uint32_t numWorlds; // Simulation batch size
+        bool autoReset; // Immediately generate new world on episode end
     };
 
     MGR_EXPORT Manager(
@@ -34,6 +37,8 @@ public:
 
     MGR_EXPORT void step();
 
+    // These functions export Tensor objects that link the ECS
+    // simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
     MGR_EXPORT madrona::py::Tensor resetTensor() const;
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
@@ -41,12 +46,10 @@ public:
     MGR_EXPORT madrona::py::Tensor positionObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor toOtherAgentsTensor() const;
     MGR_EXPORT madrona::py::Tensor toButtonsTensor() const;
-    MGR_EXPORT madrona::py::Tensor toGoalTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
-    MGR_EXPORT madrona::py::Tensor seedTensor() const;
-    MGR_EXPORT madrona::py::Tensor depthTensor() const;
-    MGR_EXPORT madrona::py::Tensor rgbTensor() const;
 
+    // These functions are used by the viewer to control the simulation
+    // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               int32_t x, int32_t y, int32_t r);
