@@ -143,12 +143,6 @@ int main(int argc, char *argv[])
         .autoReset = false,
     }, viewer.rendererBridge());
 
-    for (CountT i = 0; i < (CountT)num_worlds; i++) {
-        mgr.triggerReset(i);
-    }
-
-    mgr.step();
-
     auto replayStep = [&]() {
         if (cur_replay_step == num_replay_steps) {
             cur_replay_step = 0;

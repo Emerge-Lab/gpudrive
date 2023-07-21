@@ -50,11 +50,6 @@ actions = sim.action_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 
-resets = sim.reset_tensor().to_torch()
-actions.fill_(2)
-resets[:, 0] = 1
-sim.step()
-
 cur_rnn_states = []
 
 for shape in policy.recurrent_cfg.shapes:

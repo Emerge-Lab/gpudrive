@@ -362,9 +362,23 @@ Manager::Impl * Manager::Impl::init(
 }
 
 Manager::Manager(const Config &cfg,
-                                const viz::VizECSBridge *viz_bridge)
+                 const viz::VizECSBridge *viz_bridge)
     : impl_(Impl::init(cfg, viz_bridge))
-{}
+{
+    // Currently, there is no way to populate the initial set of observations
+    // without stepping the simulations in order to execute the taskgraph.
+    // Therefore, after setup, we step all the simulations with a forced reset
+    // that ensures the first real step will have valid observations in order
+    // to act on.
+    // This will be improved in the future with support for multiple task
+    // graphs, allowing a small task graph to be executed after initialization.
+    
+    for (int32_t i = 0; i < (int32_t)cfg.numWorlds; i++) {
+        triggerReset(i);
+    }
+
+    step();
+}
 
 Manager::~Manager() {}
 

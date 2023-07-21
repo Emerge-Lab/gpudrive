@@ -66,10 +66,6 @@ int main(int argc, char *argv[])
     std::mt19937 rand_gen(rd());
     std::uniform_int_distribution<int32_t> act_rand(0, 4);
 
-    for (CountT i = 0; i < (CountT)num_worlds; i++) {
-        mgr.triggerReset(i);
-    }
-
     auto start = std::chrono::system_clock::now();
 
     for (CountT i = 0; i < (CountT)num_steps; i++) {

@@ -119,11 +119,6 @@ actions = sim.action_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 
-resets = sim.reset_tensor().to_torch()
-actions.fill_(2)
-resets[:, 0] = 1
-sim.step()
-
 if args.restore:
     restore_ckpt = ckpt_dir / f"{args.restore}.pth"
 else:
