@@ -15,7 +15,7 @@ inline constexpr float doorWidth = consts::worldWidth / 3.f;
 enum class RoomType : uint32_t {
     SingleButton,
     DoubleButton,
-    GrabCube,
+    CubeButtons,
     NumTypes,
 };
 
@@ -326,6 +326,32 @@ static Entity makeButton(Engine &ctx,
     return button;
 }
 
+static Entity makeCube(Engine &ctx,
+                       float cube_x,
+                       float cube_y)
+{
+    Entity cube = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
+        ctx,
+        cube,
+        Vector3 {
+            cube_x,
+            cube_y,
+            1.f,
+        },
+        Quat { 1, 0, 0, 0 },
+        SimObject::Cube,
+        ResponseType::Dynamic,
+        Diag3x3 {
+            1.f,
+            1.f,
+            1.f,
+        });
+    registerRigidBodyEntity(ctx, cube, SimObject::Cube);
+
+    return cube;
+}
+
 static void setupDoor(Engine &ctx,
                       Entity door,
                       Span<const Entity> buttons,
@@ -396,69 +422,66 @@ static CountT makeDoubleButtonRoom(Engine &ctx,
     return 2;
 }
 
-static CountT makeGrabCubeRoom(Engine &ctx,
-                               Room &room,
-                               float y_min,
-                               float y_max)
+// This room has 2 buttons and 2 cubes. The buttons need to remain pressed
+// for the door to stay open. To progress, the agents must push at least one
+// cube onto one of the buttons, or more optimally, both.
+static CountT makeCubeButtonsRoom(Engine &ctx,
+                                  Room &room,
+                                  float y_min,
+                                  float y_max)
 {
-    float a_x = randBetween(ctx,
+    float button_a_x = randBetween(ctx,
         -consts::worldWidth / 2.f + consts::buttonWidth,
-        -consts::buttonWidth);
+        -consts::buttonWidth - consts::worldWidth / 4.f);
 
-    float a_y = randBetween(ctx,
-        y_min + consts::roomLength / 4.f,
-        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+    float button_a_y = randBetween(ctx,
+        y_min + consts::buttonWidth,
+        y_max - consts::roomLength / 4.f);
 
-    Entity a = makeButton(ctx, a_x, a_y);
+    Entity button_a = makeButton(ctx, button_a_x, button_a_y);
 
-    float b_x = randBetween(ctx,
-        consts::buttonWidth,
+    float button_b_x = randBetween(ctx,
+        consts::buttonWidth + consts::worldWidth / 4.f,
         consts::worldWidth / 2.f - consts::buttonWidth);
 
-    float b_y = randBetween(ctx,
-        y_min + consts::roomLength / 4.f,
-        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+    float button_b_y = randBetween(ctx,
+        y_min + consts::buttonWidth,
+        y_max - consts::roomLength / 4.f);
 
-    Entity b = makeButton(ctx, b_x, b_y);
+    Entity button_b = makeButton(ctx, button_b_x, button_b_y);
 
-    setupDoor(ctx, room.door, { a, b }, true);
+    setupDoor(ctx, room.door, { button_a, button_b }, false);
 
+    float cube_a_x = randBetween(ctx,
+        -consts::worldWidth / 4.f,
+        -0.5f);
 
-    float c_x = randBetween(ctx,
-        1.5f,
-        consts::worldWidth / 2.f - 1.5f);
-
-    float c_y = randBetween(ctx,
+    float cube_a_y = randBetween(ctx,
         y_min + 1.5f,
         y_max - consts::wallWidth - 1.5f);
 
-    Entity cube = ctx.makeEntity<PhysicsEntity>();
-    setupRigidBodyEntity(
-        ctx,
-        cube,
-        Vector3 {
-            c_x,
-            c_y,
-            1.f,
-        },
-        Quat { 1, 0, 0, 0 },
-        SimObject::Cube,
-        ResponseType::Dynamic,
-        Diag3x3 {
-            1.f,
-            1.f,
-            1.f,
-        });
-    registerRigidBodyEntity(ctx, cube, SimObject::Cube);
+    Entity cube_a = makeCube(ctx, cube_a_x, cube_a_y);
+
+    float cube_b_x = randBetween(ctx,
+        0.5f,
+        consts::worldWidth / 4.f);
+
+    float cube_b_y = randBetween(ctx,
+        y_min + 1.5f,
+        y_max - consts::wallWidth - 1.5f);
+
+    Entity cube_b = makeCube(ctx, cube_b_x, cube_b_y);
 
     room.entities[0].type = RoomEntityType::Button;
-    room.entities[0].e = a;
+    room.entities[0].e = button_a;
     room.entities[1].type = RoomEntityType::Button;
-    room.entities[1].e = b;
+    room.entities[1].e = button_b;
     room.entities[2].type = RoomEntityType::Cube;
-    room.entities[2].e = cube;
+    room.entities[2].e = cube_a;
+    room.entities[3].type = RoomEntityType::Cube;
+    room.entities[3].e = cube_b;
 
-    return 3;
+    return 4;
 }
 
 static void makeRoom(Engine &ctx,
@@ -482,9 +505,9 @@ static void makeRoom(Engine &ctx,
         num_room_entities =
             makeDoubleButtonRoom(ctx, room, room_y_min, room_y_max);
     } break;
-    case RoomType::GrabCube: {
+    case RoomType::CubeButtons: {
         num_room_entities =
-            makeGrabCubeRoom(ctx, room, room_y_min, room_y_max);
+            makeCubeButtonsRoom(ctx, room, room_y_min, room_y_max);
     } break;
     default: MADRONA_UNREACHABLE();
     }
@@ -498,9 +521,7 @@ static void generateLevel(Engine &ctx)
 {
     LevelState &level = ctx.singleton<LevelState>();
 
-    makeRoom(ctx, level, 0, RoomType::SingleButton);
-    
-    for (CountT i = 1; i < consts::numRooms; i++) {
+    for (CountT i = 0; i < consts::numRooms; i++) {
         RoomType room_type = (RoomType)(
             ctx.data().rng.rand() * (uint32_t)RoomType::NumTypes);
 

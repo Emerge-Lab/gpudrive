@@ -233,7 +233,7 @@ inline void setDoorPositionSystem(Engine &,
 }
 
 
-// Checks if button is pressed and update state accordingly
+// Checks if there is an entity standing on the button
 inline void buttonSystem(Engine &ctx,
                          Position pos,
                          ButtonState &state)
@@ -257,10 +257,11 @@ inline void buttonSystem(Engine &ctx,
         button_pressed = true;
     });
 
-
     state.isPressed = button_pressed;
 }
 
+// Check if all the buttons linked to the door are pressed and open if so.
+// Optionally, close the door if the buttons aren't pressed.
 inline void doorOpenSystem(Engine &ctx,
                            OpenState &open_state,
                            const DoorProperties &props)

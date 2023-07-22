@@ -186,9 +186,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         };
     };
 
-    setupHull(SimObject::Cube, 1.f, {
+    setupHull(SimObject::Cube, 0.5f, {
         .muS = 0.5f,
-        .muD = 0.5f,
+        .muD = 2.f,
     });
 
     setupHull(SimObject::Wall, 0.f, {
