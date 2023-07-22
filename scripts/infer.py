@@ -71,9 +71,8 @@ for i in range(args.num_steps):
     print()
     print("Pos:", obs[0])
     print("Others:", obs[1])
-    print("Buttons:", obs[2])
-    print("Goal:", obs[3])
-    print("Lidar:", obs[4])
+    print("Dyn Entities:", obs[2])
+    print("Lidar:", obs[3])
 
     print("X Probs")
     print(" ", np.array_str(probs[0][0].cpu().numpy(), precision=2, suppress_small=True))
