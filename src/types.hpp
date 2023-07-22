@@ -115,6 +115,10 @@ struct Progress {
     int32_t numProgressIncrements;
 };
 
+struct GrabState {
+    Entity constraintEntity;
+};
+
 enum class RoomEntityType : uint32_t {
     None,
     Button,
@@ -163,6 +167,7 @@ struct Agent : public madrona::Archetype<
     madrona::phys::broadphase::LeafID,
 
     // Internal logic state.
+    GrabState,
     Progress,
 
     // Input
