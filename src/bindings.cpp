@@ -33,7 +33,7 @@ NB_MODULE(madrona_3d_example, m) {
         .def("done_tensor", &Manager::doneTensor)
         .def("position_observation_tensor", &Manager::positionObservationTensor)
         .def("to_other_agents_tensor", &Manager::toOtherAgentsTensor)
-        .def("to_dyn_entities_tensor", &Manager::toDynEntitiesTensor)
+        .def("to_room_entities_tensor", &Manager::toRoomEntitiesTensor)
         .def("lidar_tensor", &Manager::lidarTensor)
     ;
 }

@@ -29,7 +29,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<ToOtherAgents>();
-    registry.registerComponent<ToDynamicEntities>();
+    registry.registerComponent<ToRoomEntities>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -52,8 +52,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::PositionObservation);
     registry.exportColumn<Agent, ToOtherAgents>(
         (uint32_t)ExportID::ToOtherAgents);
-    registry.exportColumn<Agent, ToDynamicEntities>(
-        (uint32_t)ExportID::ToDynamicEntities);
+    registry.exportColumn<Agent, ToRoomEntities>(
+        (uint32_t)ExportID::ToRoomEntities);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, Reward>(
@@ -251,7 +251,7 @@ static inline float distObs(float v)
     return v / consts::worldLength;
 }
 
-static inline float posObs(float v)
+static inline float globalPosObs(float v)
 {
     return v / consts::worldLength;
 }
@@ -294,14 +294,21 @@ inline void collectObservationsSystem(Engine &ctx,
                                       PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
                                       ToOtherAgents &to_other_agents,
-                                      ToDynamicEntities &to_dyn)
+                                      ToRoomEntities &to_room_ents)
 {
-    Quat to_view = rot.inv();
+    CountT cur_room_idx = CountT(pos.y / consts::roomLength);
+    cur_room_idx = std::max(CountT(0), 
+        std::min(consts::numRooms - 1, cur_room_idx));
 
-    pos_obs.x = posObs(pos.x);
-    pos_obs.y = posObs(pos.y);
-    pos_obs.z = posObs(pos.z);
+    pos_obs.roomX = pos.x / (consts::worldWidth / 2.f);
+    pos_obs.roomY = (pos.y - cur_room_idx * consts::roomLength) /
+        consts::roomLength;
+    pos_obs.globalX = globalPosObs(pos.x);
+    pos_obs.globalY = globalPosObs(pos.y);
+    pos_obs.globalZ = globalPosObs(pos.z);
     pos_obs.theta = angleObs(computeZAngle(rot));
+
+    Quat to_view = rot.inv();
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
@@ -314,47 +321,23 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     const LevelState &level = ctx.singleton<LevelState>();
+    const Room &room = level.rooms[cur_room_idx];
 
-#pragma unroll
-    for (CountT room_idx = 0; room_idx < consts::numRooms;
-         room_idx++) {
-        const Room &room = level.rooms[room_idx];
+    for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
+        DynEntityState entity_info = room.entities[i];
+        EntityObservation ob;
+        ob.encodedType = encodeDynType(entity_info.type);
 
-#pragma unroll
-        for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
-            DynEntityState entity_info = room.entities[i];
-            EntityObservation ob;
-            ob.encodedType = encodeDynType(entity_info.type);
-
-            if (entity_info.type == DynEntityType::None) {
-                ob.polar = { 0.f, 1.f };
-            } else {
-                Vector3 entity_pos = ctx.get<Position>(entity_info.e);
-                Vector3 to_entity = entity_pos - pos;
-                ob.polar = xyToPolar(to_view.rotateVec(to_entity));
-            }
-
-            to_dyn.obs[room_idx][i] = ob;
+        if (entity_info.type == DynEntityType::None) {
+            ob.polar = { 0.f, 1.f };
+        } else {
+            Vector3 entity_pos = ctx.get<Position>(entity_info.e);
+            Vector3 to_entity = entity_pos - pos;
+            ob.polar = xyToPolar(to_view.rotateVec(to_entity));
         }
+
+        to_room_ents.obs[i] = ob;
     }
-
-#if 0
-    // Compute polar coords to buttons
-    CountT button_idx = 0;
-    for (; button_idx < ctx.data().leafCount; button_idx++) {
-        Room &room = ctx.data().rooms[ctx.data().leafs[button_idx]];
-
-        Vector2 button_pos = room.button.pos;
-        Vector3 to_button = Vector3 { button_pos.x, button_pos.y, 0 } - pos;
-
-        to_buttons.obs[button_idx] = xyToPolar(to_view.rotateVec(to_button));
-    }
-
-    for (; button_idx < consts::maxRooms; button_idx++) {
-        // FIXME: is this a good invalid output?
-        to_buttons.obs[button_idx] = { 0.f, 1.f };
-    }
-#endif
 }
 
 inline void lidarSystem(Engine &ctx,
@@ -584,7 +567,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             PositionObservation,
             OtherAgents,
             ToOtherAgents,
-            ToDynamicEntities
+            ToRoomEntities
         >>({post_reset_broadphase});
 
 #ifdef MADRONA_GPU_MODE

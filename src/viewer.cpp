@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
 
     auto pos_printer = mgr.positionObservationTensor().makePrinter();
     auto to_other_printer = mgr.toOtherAgentsTensor().makePrinter();
-    auto to_dyn_printer = mgr.toDynEntitiesTensor().makePrinter();
+    auto to_room_ents_printer = mgr.toRoomEntitiesTensor().makePrinter();
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
 
@@ -193,8 +193,8 @@ int main(int argc, char *argv[])
         printf("To Other\n");
         to_other_printer.print();
 
-        printf("To Dyn Entities\n");
-        to_dyn_printer.print();
+        printf("To Room Entities\n");
+        to_room_ents_printer.print();
 
         printf("Lidar\n");
         lidar_printer.print();

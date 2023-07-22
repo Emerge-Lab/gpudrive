@@ -16,7 +16,7 @@ import torch
 def setup_obs(sim):
     pos_obs_tensor = sim.position_observation_tensor().to_torch()
     to_others_tensor = sim.to_other_agents_tensor().to_torch()
-    to_dyn_tensor = sim.to_dyn_entities_tensor().to_torch()
+    to_room_ents_tensor = sim.to_room_entities_tensor().to_torch()
     lidar_tensor = sim.lidar_tensor().to_torch()
     
     obs_tensors = [
@@ -30,20 +30,20 @@ def setup_obs(sim):
     for tensor in obs_tensors:
         num_obs_features += math.prod(tensor.shape[1:])
 
-    def process_obs(pos_obs, to_others, to_dyns, lidar):
+    def process_obs(pos_obs, to_others, to_room_ents, lidar):
         assert(not torch.isnan(pos_obs).any())
         assert(not torch.isnan(to_others).any())
-        assert(not torch.isnan(to_dyns).any())
+        assert(not torch.isnan(to_room_ents).any())
         assert(not torch.isnan(lidar).any())
         assert(not torch.isinf(pos_obs).any())
         assert(not torch.isinf(to_others).any())
-        assert(not torch.isinf(to_dyns).any())
+        assert(not torch.isinf(to_room_ents).any())
         assert(not torch.isinf(lidar).any())
 
         return torch.cat([
             pos_obs.view(pos_obs.shape[0], -1),
             to_others.view(to_others.shape[0], -1),
-            to_dyns.view(to_dyns.shape[0], -1),
+            to_room_ents.view(to_room_ents.shape[0], -1),
             lidar
         ], dim=1)
 

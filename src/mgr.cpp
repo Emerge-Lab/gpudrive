@@ -431,7 +431,7 @@ Tensor Manager::positionObservationTensor() const
 {
     return impl_->exportTensor(ExportID::PositionObservation,
                                Tensor::ElementType::Float32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 4});
+                               {impl_->cfg.numWorlds * consts::numAgents, 6});
 }
 
 Tensor Manager::toOtherAgentsTensor() const
@@ -445,13 +445,12 @@ Tensor Manager::toOtherAgentsTensor() const
                                });
 }
 
-Tensor Manager::toDynEntitiesTensor() const
+Tensor Manager::toRoomEntitiesTensor() const
 {
-    return impl_->exportTensor(ExportID::ToDynamicEntities,
+    return impl_->exportTensor(ExportID::ToRoomEntities,
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds * consts::numAgents,
-                                   consts::numRooms,
                                    consts::maxEntitiesPerRoom,
                                    3, // Polar coordinates
                                });

@@ -52,9 +52,11 @@ struct Done {
 
 // Agent position rescaled to the bounds of the play area to assist training
 struct PositionObservation {
-    float x;
-    float y;
-    float z;
+    float roomX;
+    float roomY;
+    float globalX;
+    float globalY;
+    float globalZ;
     float theta;
 };
 
@@ -81,15 +83,13 @@ struct EntityObservation {
     PolarObservation polar;
 };
 
-struct ToDynamicEntities {
-    EntityObservation obs[consts::numRooms][
-        consts::maxEntitiesPerRoom];
+struct ToRoomEntities {
+    EntityObservation obs[consts::maxEntitiesPerRoom];
 };
 
-// ToDynamicEntities is exported as a
-// N, numRooms, maxEntitiesPerRoom, 3 tensor to pytorch
-static_assert(sizeof(ToDynamicEntities) == sizeof(float) *
-              consts::numRooms * consts::maxEntitiesPerRoom * 3);
+// ToRoomEntities is exported as a N, maxEntitiesPerRoom, 3 tensor to pytorch
+static_assert(sizeof(ToRoomEntities) == sizeof(float) *
+    consts::maxEntitiesPerRoom * 3);
 
 struct Lidar {
     float depth[30];
@@ -170,7 +170,7 @@ struct Agent : public madrona::Archetype<
     PositionObservation,
     OtherAgents,
     ToOtherAgents,
-    ToDynamicEntities,
+    ToRoomEntities,
     Lidar,
 
     // Reward, episode termination

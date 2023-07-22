@@ -2,7 +2,6 @@
 
 #include <madrona/taskgraph.hpp>
 #include <madrona/custom_context.hpp>
-#include <madrona/viz/system.hpp>
 
 #include "consts.hpp"
 #include "types.hpp"
@@ -22,7 +21,7 @@ enum class ExportID : uint32_t {
     Done,
     PositionObservation,
     ToOtherAgents,
-    ToDynamicEntities,
+    ToRoomEntities,
     Lidar,
     NumExports,
 };
