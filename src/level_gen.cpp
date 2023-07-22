@@ -423,12 +423,6 @@ static CountT makeGrabCubeRoom(Engine &ctx,
 
     setupDoor(ctx, room.door, { a, b }, true);
 
-    room.entities[0].type = RoomEntityType::Button;
-    room.entities[0].e = a;
-
-    room.entities[1].type = RoomEntityType::Button;
-    room.entities[1].e = b;
-
 
     float c_x = randBetween(ctx,
         1.5f,
@@ -457,6 +451,10 @@ static CountT makeGrabCubeRoom(Engine &ctx,
         });
     registerRigidBodyEntity(ctx, cube, SimObject::Cube);
 
+    room.entities[0].type = RoomEntityType::Button;
+    room.entities[0].e = a;
+    room.entities[1].type = RoomEntityType::Button;
+    room.entities[1].e = b;
     room.entities[2].type = RoomEntityType::Cube;
     room.entities[2].e = cube;
 
