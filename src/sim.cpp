@@ -545,17 +545,18 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         >>({done_sys});
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
-
-    // This second BVH build is a limitation of the current taskgraph API.
-    // It's only necessary if the world was reset, but we don't have a way
-    // to conditionally queue taskgraph nodes yet.
-    auto post_reset_broadphase = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
-        builder, {clear_tmp});
+    (void)clear_tmp;
 
 #ifdef MADRONA_GPU_MODE
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_sys});
     (void)recycle_sys;
 #endif
+
+    // This second BVH build is a limitation of the current taskgraph API.
+    // It's only necessary if the world was reset, but we don't have a way
+    // to conditionally queue taskgraph nodes yet.
+    auto post_reset_broadphase = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
+        builder, {reset_sys});
 
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
