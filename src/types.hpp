@@ -29,11 +29,13 @@ struct WorldReset {
     int32_t reset;
 };
 
-// Discrete action component
+// Discrete action component. Ranges are defined by consts::numMoveBuckets (5),
+// repeated here for clarity
 struct Action {
-    int32_t x;
-    int32_t y;
-    int32_t r;
+    int32_t x; // [-2, 2]
+    int32_t y; // [-2, 2]
+    int32_t r; // [-2, 2]
+    int32_t g; // 0 = do nothing, 1 = grab / release
 };
 
 // Per-agent reward
@@ -113,21 +115,21 @@ struct Progress {
     int32_t numProgressIncrements;
 };
 
-enum class DynEntityType : uint32_t {
+enum class RoomEntityType : uint32_t {
     None,
     Button,
-    Block,
+    Cube,
     NumTypes,
 };
 
-struct DynEntityState {
+struct RoomEntityState {
     Entity e;
-    DynEntityType type;
+    RoomEntityType type;
 };
 
 struct Room {
     // These are entities the agent will interact with
-    DynEntityState entities[consts::maxEntitiesPerRoom];
+    RoomEntityState entities[consts::maxEntitiesPerRoom];
 
     // The walls that separate this room from the next
     Entity walls[2];

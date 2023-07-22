@@ -69,7 +69,7 @@ static inline void cleanupWorld(Engine &ctx)
     for (CountT i = 0; i < consts::numRooms; i++) {
         Room &room = level.rooms[i];
         for (CountT j = 0; j < consts::maxEntitiesPerRoom; j++) {
-            if (room.entities[j].type != DynEntityType::None) {
+            if (room.entities[j].type != RoomEntityType::None) {
                 ctx.destroyEntity(room.entities[j].e);
             }
         }
@@ -276,9 +276,9 @@ static inline PolarObservation xyToPolar(Vector3 v)
     };
 }
 
-static inline float encodeDynType(DynEntityType type)
+static inline float encodeDynType(RoomEntityType type)
 {
-    return (float)type / (float)DynEntityType::NumTypes;
+    return (float)type / (float)RoomEntityType::NumTypes;
 }
 
 static inline float computeZAngle(Quat q)
@@ -324,11 +324,11 @@ inline void collectObservationsSystem(Engine &ctx,
     const Room &room = level.rooms[cur_room_idx];
 
     for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
-        DynEntityState entity_info = room.entities[i];
+        RoomEntityState entity_info = room.entities[i];
         EntityObservation ob;
         ob.encodedType = encodeDynType(entity_info.type);
 
-        if (entity_info.type == DynEntityType::None) {
+        if (entity_info.type == RoomEntityType::None) {
             ob.polar = { 0.f, 1.f };
         } else {
             Vector3 entity_pos = ctx.get<Position>(entity_info.e);

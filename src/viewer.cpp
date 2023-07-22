@@ -172,8 +172,9 @@ int main(int argc, char *argv[])
                 int32_t x = (*replay_log)[base_idx];
                 int32_t y = (*replay_log)[base_idx + 1];
                 int32_t r = (*replay_log)[base_idx + 2];
+                int32_t g = (*replay_log)[base_idx + 3];
 
-                mgr.setAction(i, j, x, y, r);
+                mgr.setAction(i, j, x, y, r, g);
             }
         }
 
@@ -212,6 +213,7 @@ int main(int argc, char *argv[])
         int32_t x = 2;
         int32_t y = 2;
         int32_t r = 2;
+        int32_t g = 0;
 
         if (input.keyPressed(Key::R)) {
             mgr.triggerReset(world_idx);
@@ -238,7 +240,11 @@ int main(int argc, char *argv[])
             r -= 2;
         }
 
-        mgr.setAction(world_idx, agent_idx, x, y, r);
+        if (input.keyPressed(Key::G)) {
+            g = 1;
+        }
+
+        mgr.setAction(world_idx, agent_idx, x, y, r, g);
     }, [&mgr, &replay_log, &replayStep, &printObs]() {
         if (replay_log.has_value()) {
             replayStep();

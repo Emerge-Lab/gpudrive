@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
                     int32_t y = act_rand(rand_gen);
                     int32_t r = act_rand(rand_gen);
 
-                    mgr.setAction(j, k, x, y, r);
+                    mgr.setAction(j, k, x, y, r, 0);
                     
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                     action_store[base_idx] = x;

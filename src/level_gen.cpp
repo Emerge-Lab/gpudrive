@@ -15,6 +15,7 @@ inline constexpr float doorWidth = consts::worldWidth / 3.f;
 enum class RoomType : uint32_t {
     SingleButton,
     DoubleButton,
+    GrabCube,
     NumTypes,
 };
 
@@ -84,8 +85,7 @@ void createPersistentEntities(Engine &ctx)
         ResponseType::Static);
 
     // Create the outer wall entities
-    // Left
-
+    // Behind
     ctx.data().borders[0] = ctx.makeEntity<PhysicsEntity>();
     setupRigidBodyEntity(
         ctx,
@@ -104,7 +104,7 @@ void createPersistentEntities(Engine &ctx)
             2.f,
         });
 
-    // Top
+    // Right
     ctx.data().borders[1] = ctx.makeEntity<PhysicsEntity>();
     setupRigidBodyEntity(
         ctx,
@@ -123,7 +123,7 @@ void createPersistentEntities(Engine &ctx)
             2.f,
         });
 
-    // Bottom
+    // Left
     ctx.data().borders[2] = ctx.makeEntity<PhysicsEntity>();
     setupRigidBodyEntity(
         ctx,
@@ -364,7 +364,7 @@ static CountT makeSingleButtonRoom(Engine &ctx,
 
     setupDoor(ctx, room.door, { button }, true);
 
-    room.entities[0].type = DynEntityType::Button;
+    room.entities[0].type = RoomEntityType::Button;
     room.entities[0].e = button;
 
     return 1;
@@ -397,13 +397,53 @@ static CountT makeDoubleButtonRoom(Engine &ctx,
 
     setupDoor(ctx, room.door, { a, b }, true);
 
-    room.entities[0].type = DynEntityType::Button;
+    room.entities[0].type = RoomEntityType::Button;
     room.entities[0].e = a;
 
-    room.entities[1].type = DynEntityType::Button;
+    room.entities[1].type = RoomEntityType::Button;
     room.entities[1].e = b;
 
     return 2;
+}
+
+static CountT makeGrabCubeRoom(Engine &ctx,
+                               Room &room,
+                               float y_min,
+                               float y_max)
+{
+    makeDoubleButtonRoom(ctx, room, y_min, y_max);
+
+    float c_x = randBetween(ctx,
+        1.5f,
+        consts::worldWidth / 2.f - 1.5f);
+
+    float c_y = randBetween(ctx,
+        y_min + 1.5f,
+        y_max - consts::wallWidth - 1.5f);
+
+    Entity cube = ctx.makeEntity<PhysicsEntity>();
+    setupRigidBodyEntity(
+        ctx,
+        cube,
+        Vector3 {
+            c_x,
+            c_y,
+            1.f,
+        },
+        Quat { 1, 0, 0, 0 },
+        SimObject::Cube,
+        ResponseType::Dynamic,
+        Diag3x3 {
+            1.f,
+            1.f,
+            1.f,
+        });
+    registerRigidBodyEntity(ctx, cube, SimObject::Cube);
+
+    room.entities[2].type = RoomEntityType::Cube;
+    room.entities[2].e = cube;
+
+    return 3;
 }
 
 static void makeRoom(Engine &ctx,
@@ -427,11 +467,15 @@ static void makeRoom(Engine &ctx,
         num_room_entities =
             makeDoubleButtonRoom(ctx, room, room_y_min, room_y_max);
     } break;
+    case RoomType::GrabCube: {
+        num_room_entities =
+            makeGrabCubeRoom(ctx, room, room_y_min, room_y_max);
+    } break;
     default: MADRONA_UNREACHABLE();
     }
 
     for (CountT i = num_room_entities; i < consts::maxEntitiesPerRoom; i++) {
-        room.entities[i].type = DynEntityType::None;
+        room.entities[i].type = RoomEntityType::None;
     }
 }
 

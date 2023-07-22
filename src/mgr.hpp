@@ -52,7 +52,7 @@ public:
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
-                              int32_t x, int32_t y, int32_t r);
+                              int32_t x, int32_t y, int32_t r, int32_t g);
 
 private:
     struct Impl;

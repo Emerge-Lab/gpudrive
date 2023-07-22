@@ -86,6 +86,10 @@ for i in range(args.num_steps):
     print(" ", np.array_str(probs[2][0].cpu().numpy(), precision=2, suppress_small=True))
     print(" ", np.array_str(probs[2][1].cpu().numpy(), precision=2, suppress_small=True))
 
+    print("G Probs")
+    print(" ", np.array_str(probs[G][0].cpu().numpy(), precision=2, suppress_small=True))
+    print(" ", np.array_str(probs[G][1].cpu().numpy(), precision=2, suppress_small=True))
+
     print("Actions:\n", actions.cpu().numpy())
     print("Values:\n", values.cpu().numpy())
     sim.step()

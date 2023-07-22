@@ -91,6 +91,8 @@ def make_policy(process_obs_cb, num_obs_features, num_channels, separate_value):
     return ActorCritic(
         backbone = backbone,
         actor = LinearLayerDiscreteActor(
-            [move_action_dim, move_action_dim, move_action_dim], num_channels),
+            [move_action_dim, move_action_dim, move_action_dim, 2],
+            num_channels,
+        ),
         critic = LinearLayerCritic(num_channels),
     )
