@@ -37,14 +37,6 @@ public:
         return float(next) / float(0x01000000);
     }
 
-    inline uint32_t u32Rand() {
-        const uint32_t LCG_A = 1664525u;
-        const uint32_t LCG_C = 1013904223u;
-        v_ = (LCG_A * v_ + LCG_C);
-
-        return v_ & 0x00FFFFFF;
-    }
-
 private:
     uint32_t v_;
 };

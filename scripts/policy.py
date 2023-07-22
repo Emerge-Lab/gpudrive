@@ -22,7 +22,7 @@ def setup_obs(sim):
     obs_tensors = [
         pos_obs_tensor,
         to_others_tensor,
-        to_dyn_tensor,
+        to_room_ents_tensor,
         lidar_tensor,
     ]
 

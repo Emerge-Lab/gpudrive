@@ -43,9 +43,6 @@ policy = make_policy(process_obs_cb, num_obs_features,
 weights = LearningState.load_policy_weights(args.ckpt_path)
 policy.load_state_dict(weights)
 
-# Hack to fill out observations: Reset envs and take step to populate envs
-# FIXME: just make it possible to populate observations after init
-# (IE run subset of task graph after init)
 actions = sim.action_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
@@ -87,8 +84,8 @@ for i in range(args.num_steps):
     print(" ", np.array_str(probs[2][1].cpu().numpy(), precision=2, suppress_small=True))
 
     print("G Probs")
-    print(" ", np.array_str(probs[G][0].cpu().numpy(), precision=2, suppress_small=True))
-    print(" ", np.array_str(probs[G][1].cpu().numpy(), precision=2, suppress_small=True))
+    print(" ", np.array_str(probs[3][0].cpu().numpy(), precision=2, suppress_small=True))
+    print(" ", np.array_str(probs[3][1].cpu().numpy(), precision=2, suppress_small=True))
 
     print("Actions:\n", actions.cpu().numpy())
     print("Values:\n", values.cpu().numpy())

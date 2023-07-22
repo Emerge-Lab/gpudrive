@@ -76,10 +76,13 @@ struct PolarObservation {
     float theta;
 };
 
+// Egocentric observations of other agents
 struct ToOtherAgents {
     PolarObservation obs[consts::numAgents - 1];
 };
 
+// Per-agent egocentric observations for the interactable entities
+// in the current room.
 struct EntityObservation {
     float encodedType;
     PolarObservation polar;
@@ -93,30 +96,39 @@ struct ToRoomEntities {
 static_assert(sizeof(ToRoomEntities) == sizeof(float) *
     consts::maxEntitiesPerRoom * 3);
 
+// Linear depth values in a circle around the agent
 struct Lidar {
-    float depth[30];
+    float depth[consts::numLidarSamples];
 };
 
+// Tracks progress the agent has made through the challenge, used to add
+// reward when more progress has been made
+struct Progress {
+    int32_t numProgressIncrements;
+};
+
+// Tracks if an agent is currently grabbing another entity
+struct GrabState {
+    Entity constraintEntity;
+};
+
+
+// A per-door component that tracks whether or not the door should be open.
 struct OpenState {
     bool isOpen;
 };
 
+// Linked buttons that control the door opening and whether or not the door
+// should remain open after the buttons are pressed once.
 struct DoorProperties {
     Entity buttons[consts::maxEntitiesPerRoom];
     int32_t numButtons;
     bool isPersistent;
 };
 
+// Similar to OpenState, true during frames where a button is pressed
 struct ButtonState {
     bool isPressed;
-};
-
-struct Progress {
-    int32_t numProgressIncrements;
-};
-
-struct GrabState {
-    Entity constraintEntity;
 };
 
 enum class RoomEntityType : uint32_t {
