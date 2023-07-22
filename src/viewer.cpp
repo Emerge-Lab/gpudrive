@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 1000,
-        .defaultSimTickRate = 10,
+        .defaultSimTickRate = 20,
         .execMode = exec_mode,
     });
 

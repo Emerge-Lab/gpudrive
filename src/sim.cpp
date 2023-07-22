@@ -9,8 +9,8 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
-constexpr inline float wallSpeed = 12.0f;
-constexpr inline float deltaT = 0.075;
+constexpr inline float wallSpeed = 30.0f;
+constexpr inline float deltaT = 0.04f;
 constexpr inline CountT numPhysicsSubsteps = 4.f;
 constexpr inline int32_t episodeLen = 100;
 
@@ -136,9 +136,9 @@ inline void movementSystem(Engine &,
 {
     constexpr CountT discrete_action_buckets = consts::numMoveBuckets;
     constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_move_max = 300;
+    constexpr float discrete_move_max = 600;
     constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 40;
+    constexpr float discrete_turn_max = 80;
     constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
 
     Quat cur_rot = rot;
