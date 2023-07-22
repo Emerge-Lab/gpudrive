@@ -1,5 +1,10 @@
 #pragma once
 
+#include <madrona/components.hpp>
+#include <madrona/math.hpp>
+#include <madrona/physics.hpp>
+#include <madrona/viz/system.hpp>
+
 #include "consts.hpp"
 
 namespace GPUHideSeek {
@@ -16,24 +21,12 @@ using madrona::phys::ResponseType;
 using madrona::phys::ExternalForce;
 using madrona::phys::ExternalTorque;
 
+// WorldReset is a per-world singleton component that causes the current
+// episode to be terminated and the world regenerated
+// (Singleton components like WorldReset can be accessed via Context::singleton
+// (eg ctx.singleton<WorldReset>().reset = 1)
 struct WorldReset {
     int32_t reset;
-};
-
-struct OpenState {
-    bool isOpen;
-};
-
-struct LinkedDoor {
-    Entity e;
-};
-
-struct ButtonProperties {
-    bool isPersistent;
-};
-
-struct Progress {
-    int32_t numProgressIncrements;
 };
 
 // Discrete action component
@@ -102,6 +95,23 @@ struct Lidar {
     float depth[30];
 };
 
+struct OpenState {
+    bool isOpen;
+};
+
+struct LinkedDoor {
+    Entity e;
+};
+
+struct ButtonProperties {
+    bool isPersistent;
+};
+
+struct Progress {
+    int32_t numProgressIncrements;
+};
+
+
 enum class DynEntityType : uint32_t {
     None,
     Button,
@@ -133,7 +143,9 @@ struct LevelState {
 
 // There are 2 Agents in the environment trying to get to the destination
 struct Agent : public madrona::Archetype<
-    // Basic things
+    // Basic components required for physics. Note that the current physics
+    // implementation requires archetypes to have these components first
+    // in this exact order.
     Position,
     Rotation,
     Scale,
@@ -147,7 +159,7 @@ struct Agent : public madrona::Archetype<
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
 
-    // Internal state
+    // Internal logic state.
     Progress,
 
     // Input
@@ -160,14 +172,16 @@ struct Agent : public madrona::Archetype<
     ToDynamicEntities,
     Lidar,
 
-    // Data for training code
+    // Reward, episode termination
     Reward,
     Done,
 
-    // Render
+    // Visualization: In addition to the fly camera, src/viewer.cpp can
+    // view the scene from the perspective of entities with this component
     madrona::viz::VizCamera
 > {};
 
+// Archetype for the doors blocking the end of each challenge room
 struct DoorEntity : public madrona::Archetype<
     Position, 
     Rotation,
@@ -184,6 +198,18 @@ struct DoorEntity : public madrona::Archetype<
     OpenState
 > {};
 
+// Archetype for the button objects that open the doors
+// Buttons don't have collision but are rendered
+struct ButtonEntity : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID,
+    ButtonProperties,
+    LinkedDoor
+> {};
+
+// Generic archetype for entities that need physics but no other special state
 struct PhysicsEntity : public madrona::Archetype<
     Position, 
     Rotation,
@@ -198,16 +224,5 @@ struct PhysicsEntity : public madrona::Archetype<
     ExternalTorque,
     madrona::phys::broadphase::LeafID
 > {};
-
-// Button objects don't have collision
-struct ButtonEntity : public madrona::Archetype<
-    Position,
-    Rotation,
-    Scale,
-    ObjectID,
-    ButtonProperties,
-    LinkedDoor
-> {};
-
 
 }

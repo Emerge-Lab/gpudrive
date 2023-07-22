@@ -1,5 +1,7 @@
 #pragma once
 
+#include <madrona/types.hpp>
+
 namespace GPUHideSeek {
 
 namespace consts {

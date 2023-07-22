@@ -1,10 +1,7 @@
 #pragma once
 
 #include <madrona/taskgraph.hpp>
-#include <madrona/math.hpp>
 #include <madrona/custom_context.hpp>
-#include <madrona/components.hpp>
-#include <madrona/physics.hpp>
 #include <madrona/viz/system.hpp>
 
 #include "consts.hpp"
