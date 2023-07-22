@@ -451,8 +451,8 @@ Tensor Manager::toDynEntitiesTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds * consts::numAgents,
-                                   consts::numChallenges,
-                                   consts::maxEntitiesPerChallenge,
+                                   consts::numRooms,
+                                   consts::maxEntitiesPerRoom,
                                    3, // Polar coordinates
                                });
 }

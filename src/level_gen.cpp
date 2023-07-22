@@ -228,12 +228,12 @@ static void resetPersistentEntities(Engine &ctx)
      }
 }
 
-// Builds the two walls & door
-static Entity makeChallengeWall(Engine &ctx,
-                                ChallengeState &challenge,
-                                CountT challenge_idx)
+// Builds the two walls & door that block the end of the challenge room
+static Entity makeEndWall(Engine &ctx,
+                          Room &room,
+                          CountT room_idx)
 {
-    float y_pos = consts::challengeLength * (challenge_idx + 1) -
+    float y_pos = consts::roomLength * (room_idx + 1) -
         consts::wallWidth / 2.f;
 
     // Quarter door of buffer on both sides, place door and then build walls
@@ -301,21 +301,21 @@ static Entity makeChallengeWall(Engine &ctx,
     registerRigidBodyEntity(ctx, door, SimObject::Door);
     ctx.get<OpenState>(door).isOpen = false;
 
-    challenge.separators[0] = left_wall;
-    challenge.separators[1] = right_wall;
-    challenge.door = door;
+    room.separators[0] = left_wall;
+    room.separators[1] = right_wall;
+    room.door = door;
 
     return Entity::none();
 }
 
-static void makeSingleButtonChallenge(Engine &ctx,
-                                      ChallengeState &challenge,
+static void makeSingleButtonRoom(Engine &ctx,
+                                      Room &room,
                                       float y_min,
                                       float y_max)
 {
     float button_x = randInRangeCentered(ctx,
         consts::worldWidth / 2.f - consts::buttonWidth);
-    float button_y = randBetween(ctx, y_min + consts::challengeLength / 4.f,
+    float button_y = randBetween(ctx, y_min + consts::roomLength / 4.f,
         y_max - consts::wallWidth - consts::buttonWidth / 2.f);
 
     Entity button = ctx.makeEntity<ButtonEntity>();
@@ -333,25 +333,25 @@ static void makeSingleButtonChallenge(Engine &ctx,
     ctx.get<ObjectID>(button) = ObjectID { (int32_t)SimObject::Button };
     ctx.get<ButtonProperties>(button).isPersistent = true;
 
-    challenge.entities[0].type = DynEntityType::Button;
-    challenge.entities[0].e = button;
-    for (CountT i = 1; i < consts::maxEntitiesPerChallenge; i++) {
-        challenge.entities[i].type = DynEntityType::None;
+    room.entities[0].type = DynEntityType::Button;
+    room.entities[0].e = button;
+    for (CountT i = 1; i < consts::maxEntitiesPerRoom; i++) {
+        room.entities[i].type = DynEntityType::None;
     }
 
     ctx.get<LinkedDoor>(button).e =
-        challenge.door;
+        room.door;
 }
 
-static void makeRandomChallenge(Engine &ctx,
-                                ChallengeState &challenge,
-                                CountT challenge_idx)
+static void makeRandomRoom(Engine &ctx,
+                                Room &room,
+                                CountT room_idx)
 {
-    float challenge_y_min = challenge_idx * consts::challengeLength;
-    float challenge_y_max = (challenge_idx + 1) * consts::challengeLength;
+    float room_y_min = room_idx * consts::roomLength;
+    float room_y_max = (room_idx + 1) * consts::roomLength;
 
-    makeSingleButtonChallenge(
-        ctx, challenge, challenge_y_min, challenge_y_max);
+    makeSingleButtonRoom(
+        ctx, room, room_y_min, room_y_max);
 }
 
 static void generateLevel(Engine &ctx)
@@ -359,15 +359,15 @@ static void generateLevel(Engine &ctx)
     LevelState &level = ctx.singleton<LevelState>();
 
     {
-        ChallengeState &challenge = level.challenges[0];
-        makeChallengeWall(ctx, challenge, 0);
-        makeSingleButtonChallenge(ctx, challenge, 0, consts::challengeLength);
+        Room &room = level.rooms[0];
+        makeEndWall(ctx, room, 0);
+        makeSingleButtonRoom(ctx, room, 0, consts::roomLength);
     }
     
-    for (CountT i = 1; i < consts::numChallenges; i++) {
-        ChallengeState &challenge = level.challenges[i];
-        makeChallengeWall(ctx, challenge, i);
-        makeRandomChallenge(ctx, challenge, i);
+    for (CountT i = 1; i < consts::numRooms; i++) {
+        Room &room = level.rooms[i];
+        makeEndWall(ctx, room, i);
+        makeRandomRoom(ctx, room, i);
     }
 }
 

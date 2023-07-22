@@ -66,17 +66,17 @@ static inline void cleanupWorld(Engine &ctx)
 {
     // Destroy current level entities
     LevelState &level = ctx.singleton<LevelState>();
-    for (CountT i = 0; i < consts::numChallenges; i++) {
-        ChallengeState &challenge = level.challenges[i];
-        for (CountT j = 0; j < consts::maxEntitiesPerChallenge; j++) {
-            if (challenge.entities[j].type != DynEntityType::None) {
-                ctx.destroyEntity(challenge.entities[j].e);
+    for (CountT i = 0; i < consts::numRooms; i++) {
+        Room &room = level.rooms[i];
+        for (CountT j = 0; j < consts::maxEntitiesPerRoom; j++) {
+            if (room.entities[j].type != DynEntityType::None) {
+                ctx.destroyEntity(room.entities[j].e);
             }
         }
 
-        ctx.destroyEntity(challenge.separators[0]);
-        ctx.destroyEntity(challenge.separators[1]);
-        ctx.destroyEntity(challenge.door);
+        ctx.destroyEntity(room.separators[0]);
+        ctx.destroyEntity(room.separators[1]);
+        ctx.destroyEntity(room.door);
     }
 }
 
@@ -305,13 +305,13 @@ inline void collectObservationsSystem(Engine &ctx,
     const LevelState &level = ctx.singleton<LevelState>();
 
 #pragma unroll
-    for (CountT challenge_idx = 0; challenge_idx < consts::numChallenges;
-         challenge_idx++) {
-        const ChallengeState &challenge = level.challenges[challenge_idx];
+    for (CountT room_idx = 0; room_idx < consts::numRooms;
+         room_idx++) {
+        const Room &room = level.rooms[room_idx];
 
 #pragma unroll
-        for (CountT i = 0; i < consts::maxEntitiesPerChallenge; i++) {
-            DynEntityState entity_info = challenge.entities[i];
+        for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
+            DynEntityState entity_info = room.entities[i];
             EntityObservation ob;
             ob.encodedType = encodeDynType(entity_info.type);
 
@@ -323,7 +323,7 @@ inline void collectObservationsSystem(Engine &ctx,
                 ob.polar = xyToPolar(to_view.rotateVec(to_entity));
             }
 
-            to_dyn.obs[challenge_idx][i] = ob;
+            to_dyn.obs[room_idx][i] = ob;
         }
     }
 
@@ -610,10 +610,9 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    constexpr CountT max_total_entities =
-        consts::numAgents +
-        consts::numChallenges * consts::maxEntitiesPerChallenge +
-        4; // border walls + floor
+    constexpr CountT max_total_entities = consts::numAgents +
+        consts::numRooms * (consts::maxEntitiesPerRoom + 3) +
+        4; // side walls + floor
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
          numPhysicsSubsteps, -9.8 * math::up, max_total_entities,

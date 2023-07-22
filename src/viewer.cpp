@@ -1,7 +1,8 @@
 #include <madrona/viz/viewer.hpp>
 
-#include "mgr.hpp"
 #include "sim.hpp"
+#include "mgr.hpp"
+#include "types.hpp"
 
 #include <filesystem>
 #include <fstream>

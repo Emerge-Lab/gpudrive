@@ -82,14 +82,14 @@ struct EntityObservation {
 };
 
 struct ToDynamicEntities {
-    EntityObservation obs[consts::numChallenges][
-        consts::maxEntitiesPerChallenge];
+    EntityObservation obs[consts::numRooms][
+        consts::maxEntitiesPerRoom];
 };
 
 // ToDynamicEntities is exported as a
-// N, numChallenges, maxEntitiesPerChallenge, 3 tensor to pytorch
+// N, numRooms, maxEntitiesPerRoom, 3 tensor to pytorch
 static_assert(sizeof(ToDynamicEntities) == 3 * sizeof(float) *
-              consts::numChallenges * consts::maxEntitiesPerChallenge);
+              consts::numRooms * consts::maxEntitiesPerRoom);
 
 struct Lidar {
     float depth[30];
@@ -124,11 +124,11 @@ struct DynEntityState {
     DynEntityType type;
 };
 
-struct ChallengeState {
+struct Room {
     // These are entities the agent will interact with
-    DynEntityState entities[consts::maxEntitiesPerChallenge];
+    DynEntityState entities[consts::maxEntitiesPerRoom];
 
-    // The walls that separate this challenge from the next
+    // The walls that separate this room from the next
     Entity separators[2];
 
     // The door the agents need to figure out how to lower
@@ -136,7 +136,7 @@ struct ChallengeState {
 };
 
 struct LevelState {
-    ChallengeState challenges[consts::numChallenges];
+    Room rooms[consts::numRooms];
 };
 
 /* ECS Archetypes for the game */
