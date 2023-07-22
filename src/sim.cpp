@@ -212,35 +212,6 @@ inline void grabSystem(Engine &ctx,
         e, grab_entity, attach1, attach2, r1, r2, separation);
 }
 
-static bool isPressingButton(madrona::math::Vector3 agent_pos,
-                             madrona::math::Vector3 button_pos)
-{
-    constexpr float press_radius = 1.5f;
-    constexpr float button_dim = consts::buttonWidth + 0.05f;
-
-    float circle_dist_x = fabsf(agent_pos.x - button_pos.x);
-    float circle_dist_y = fabsf(agent_pos.y - button_pos.y);
-
-    if (circle_dist_x > (button_dim / 2 + press_radius) ||
-            circle_dist_y > (button_dim / 2 + press_radius)) {
-        return false;
-    }
-    
-
-    if (circle_dist_x <= (button_dim / 2) ||
-            circle_dist_y <= (button_dim / 2)) {
-        return true;
-    }
-
-    float corner_dist_x = circle_dist_x - button_dim;
-    float corner_dist_y = circle_dist_y - button_dim;
-
-    float corner_dist2 = corner_dist_x * corner_dist_x +
-        corner_dist_y * corner_dist_y;
-
-    return corner_dist2 <= press_radius * press_radius;
-}
-
 inline void setDoorPositionSystem(Engine &,
                                   Position &pos,
                                   OpenState &open_state)
@@ -267,16 +238,26 @@ inline void buttonSystem(Engine &ctx,
                          Position pos,
                          ButtonState &state)
 {
-    bool button_pressed = false;
-#pragma unroll
-    for (CountT i = 0; i < consts::numAgents; i++) {
-        Entity agent = ctx.data().agents[i];
-        Vector3 agent_pos = ctx.get<Position>(agent);
+    AABB button_aabb {
+        .pMin = pos + Vector3 { 
+            -consts::buttonWidth, 
+            -consts::buttonWidth,
+            0.f,
+        },
+        .pMax = pos + Vector3 { 
+            consts::buttonWidth, 
+            consts::buttonWidth,
+            0.25f
+        },
+    };
 
-        if (isPressingButton(agent_pos, pos)) {
-            button_pressed = true;
-        }
-    }
+    bool button_pressed = false;
+    RigidBodyPhysicsSystem::findOverlappingEntities(
+            ctx, button_aabb, [&](Entity) {
+        button_pressed = true;
+    });
+
+
     state.isPressed = button_pressed;
 }
 
@@ -287,7 +268,7 @@ inline void doorOpenSystem(Engine &ctx,
     bool all_pressed = true;
     for (int32_t i = 0; i < props.numButtons; i++) {
         Entity button = props.buttons[i];
-        all_pressed = all_pressed  && ctx.get<ButtonState>(button).isPressed;
+        all_pressed = all_pressed && ctx.get<ButtonState>(button).isPressed;
     }
 
     if (all_pressed) {

@@ -25,7 +25,7 @@ inline constexpr float agentRadius = 1.f;
 inline constexpr float roomLength = worldLength / numRooms;
 
 // Units of distance along the environment needed for further reward
-constexpr float distancePerProgress = 4.f;
+inline constexpr float distancePerProgress = 4.f;
 
 // How many discrete options for each movement action
 inline constexpr madrona::CountT numMoveBuckets = 5;

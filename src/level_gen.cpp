@@ -53,23 +53,6 @@ static void registerRigidBodyEntity(
         RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
-#if 0
-static Entity makeButtonEntity(Engine &ctx, Vector2 pos, Vector2 scale)
-{
-    Entity e = ctx.makeEntity<ButtonEntity>();
-    ctx.get<Position>(e) = Vector3 { pos.x, pos.y, 0.f };
-    ctx.get<Rotation>(e) = Quat::angleAxis(0, {1, 0, 0});
-    ctx.get<Scale>(e) = Diag3x3 {
-        scale.x * BUTTON_WIDTH,
-        scale.y * BUTTON_WIDTH,
-        0.2f,
-    };
-    ctx.get<ObjectID>(e) = ObjectID { 2 };
-
-    return e;
-}
-#endif
-
 // Creates floor, outer walls, and agent entities.
 // All these entities persist across all episodes.
 void createPersistentEntities(Engine &ctx)
@@ -418,7 +401,34 @@ static CountT makeGrabCubeRoom(Engine &ctx,
                                float y_min,
                                float y_max)
 {
-    makeDoubleButtonRoom(ctx, room, y_min, y_max);
+    float a_x = randBetween(ctx,
+        -consts::worldWidth / 2.f + consts::buttonWidth,
+        -consts::buttonWidth);
+
+    float a_y = randBetween(ctx,
+        y_min + consts::roomLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+
+    Entity a = makeButton(ctx, a_x, a_y);
+
+    float b_x = randBetween(ctx,
+        consts::buttonWidth,
+        consts::worldWidth / 2.f - consts::buttonWidth);
+
+    float b_y = randBetween(ctx,
+        y_min + consts::roomLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+
+    Entity b = makeButton(ctx, b_x, b_y);
+
+    setupDoor(ctx, room.door, { a, b }, true);
+
+    room.entities[0].type = RoomEntityType::Button;
+    room.entities[0].e = a;
+
+    room.entities[1].type = RoomEntityType::Button;
+    room.entities[1].e = b;
+
 
     float c_x = randBetween(ctx,
         1.5f,
