@@ -7,8 +7,16 @@ using namespace madrona::math;
 using namespace madrona::phys;
 
 namespace consts {
+
 inline constexpr float doorWidth = consts::worldWidth / 3.f;
+
 }
+
+enum class RoomType : uint32_t {
+    SingleButton,
+    DoubleButton,
+    NumTypes,
+};
 
 static inline void setupRigidBodyEntity(
     Engine &ctx,
@@ -229,9 +237,9 @@ static void resetPersistentEntities(Engine &ctx)
 }
 
 // Builds the two walls & door that block the end of the challenge room
-static Entity makeEndWall(Engine &ctx,
-                          Room &room,
-                          CountT room_idx)
+static void makeEndWall(Engine &ctx,
+                        Room &room,
+                        CountT room_idx)
 {
     float y_pos = consts::roomLength * (room_idx + 1) -
         consts::wallWidth / 2.f;
@@ -301,23 +309,15 @@ static Entity makeEndWall(Engine &ctx,
     registerRigidBodyEntity(ctx, door, SimObject::Door);
     ctx.get<OpenState>(door).isOpen = false;
 
-    room.separators[0] = left_wall;
-    room.separators[1] = right_wall;
+    room.walls[0] = left_wall;
+    room.walls[1] = right_wall;
     room.door = door;
-
-    return Entity::none();
 }
 
-static void makeSingleButtonRoom(Engine &ctx,
-                                      Room &room,
-                                      float y_min,
-                                      float y_max)
+static Entity makeButton(Engine &ctx,
+                         float button_x,
+                         float button_y)
 {
-    float button_x = randInRangeCentered(ctx,
-        consts::worldWidth / 2.f - consts::buttonWidth);
-    float button_y = randBetween(ctx, y_min + consts::roomLength / 4.f,
-        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
-
     Entity button = ctx.makeEntity<ButtonEntity>();
     ctx.get<Position>(button) = Vector3 {
         button_x,
@@ -331,43 +331,121 @@ static void makeSingleButtonRoom(Engine &ctx,
         0.2f,
     };
     ctx.get<ObjectID>(button) = ObjectID { (int32_t)SimObject::Button };
-    ctx.get<ButtonProperties>(button).isPersistent = true;
+    ctx.get<ButtonState>(button).isPressed = false;
+
+    return button;
+}
+
+static void setupDoor(Engine &ctx,
+                      Entity door,
+                      Span<const Entity> buttons,
+                      bool is_persistent)
+{
+    DoorProperties &props = ctx.get<DoorProperties>(door);
+
+    for (CountT i = 0; i < buttons.size(); i++) {
+        props.buttons[i] = buttons[i];
+    }
+    props.numButtons = (int32_t)buttons.size();
+    props.isPersistent = is_persistent;
+}
+
+static CountT makeSingleButtonRoom(Engine &ctx,
+                                   Room &room,
+                                   float y_min,
+                                   float y_max)
+{
+    float button_x = randInRangeCentered(ctx,
+        consts::worldWidth / 2.f - consts::buttonWidth);
+    float button_y = randBetween(ctx, y_min + consts::roomLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+
+    Entity button = makeButton(ctx, button_x, button_y);
+
+    setupDoor(ctx, room.door, { button }, true);
 
     room.entities[0].type = DynEntityType::Button;
     room.entities[0].e = button;
-    for (CountT i = 1; i < consts::maxEntitiesPerRoom; i++) {
-        room.entities[i].type = DynEntityType::None;
-    }
 
-    ctx.get<LinkedDoor>(button).e =
-        room.door;
+    return 1;
 }
 
-static void makeRandomRoom(Engine &ctx,
-                                Room &room,
-                                CountT room_idx)
+static CountT makeDoubleButtonRoom(Engine &ctx,
+                                   Room &room,
+                                   float y_min,
+                                   float y_max)
 {
+    float a_x = randBetween(ctx,
+        -consts::worldWidth / 2.f + consts::buttonWidth,
+        -consts::buttonWidth);
+
+    float a_y = randBetween(ctx,
+        y_min + consts::roomLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+
+    Entity a = makeButton(ctx, a_x, a_y);
+
+    float b_x = randBetween(ctx,
+        consts::buttonWidth,
+        consts::worldWidth / 2.f - consts::buttonWidth);
+
+    float b_y = randBetween(ctx,
+        y_min + consts::roomLength / 4.f,
+        y_max - consts::wallWidth - consts::buttonWidth / 2.f);
+
+    Entity b = makeButton(ctx, b_x, b_y);
+
+    setupDoor(ctx, room.door, { a, b }, true);
+
+    room.entities[0].type = DynEntityType::Button;
+    room.entities[0].e = a;
+
+    room.entities[1].type = DynEntityType::Button;
+    room.entities[1].e = b;
+
+    return 2;
+}
+
+static void makeRoom(Engine &ctx,
+                     LevelState &level,
+                     CountT room_idx,
+                     RoomType room_type)
+{
+    Room &room = level.rooms[room_idx];
+    makeEndWall(ctx, room, room_idx);
+
     float room_y_min = room_idx * consts::roomLength;
     float room_y_max = (room_idx + 1) * consts::roomLength;
 
-    makeSingleButtonRoom(
-        ctx, room, room_y_min, room_y_max);
+    CountT num_room_entities;
+    switch (room_type) {
+    case RoomType::SingleButton: {
+        num_room_entities =
+            makeSingleButtonRoom(ctx, room, room_y_min, room_y_max);
+    } break;
+    case RoomType::DoubleButton: {
+        num_room_entities =
+            makeDoubleButtonRoom(ctx, room, room_y_min, room_y_max);
+    } break;
+    default: MADRONA_UNREACHABLE();
+    }
+
+    for (CountT i = num_room_entities; i < consts::maxEntitiesPerRoom; i++) {
+        room.entities[i].type = DynEntityType::None;
+    }
 }
 
 static void generateLevel(Engine &ctx)
 {
     LevelState &level = ctx.singleton<LevelState>();
 
-    {
-        Room &room = level.rooms[0];
-        makeEndWall(ctx, room, 0);
-        makeSingleButtonRoom(ctx, room, 0, consts::roomLength);
-    }
+    makeRoom(ctx, level, 0, RoomType::SingleButton);
     
     for (CountT i = 1; i < consts::numRooms; i++) {
-        Room &room = level.rooms[i];
-        makeEndWall(ctx, room, i);
-        makeRandomRoom(ctx, room, i);
+        RoomType room_type = (RoomType)(
+            ctx.data().rng.rand() * (uint32_t)RoomType::NumTypes);
+
+        makeRoom(ctx, level, i, room_type);
     }
 }
 

@@ -30,9 +30,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<ToOtherAgents>();
     registry.registerComponent<ToDynamicEntities>();
-    registry.registerComponent<ButtonProperties>();
+    registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
-    registry.registerComponent<LinkedDoor>();
+    registry.registerComponent<DoorProperties>();
 
     registry.registerComponent<Lidar>();
 
@@ -74,8 +74,8 @@ static inline void cleanupWorld(Engine &ctx)
             }
         }
 
-        ctx.destroyEntity(room.separators[0]);
-        ctx.destroyEntity(room.separators[1]);
+        ctx.destroyEntity(room.walls[0]);
+        ctx.destroyEntity(room.walls[1]);
         ctx.destroyEntity(room.door);
     }
 }
@@ -179,33 +179,8 @@ static bool isPressingButton(madrona::math::Vector3 agent_pos,
     return corner_dist2 <= press_radius * press_radius;
 }
 
-// Checks if button is pressed and opens door if so
-inline void buttonSystem(Engine &ctx,
-                         Position pos,
-                         const ButtonProperties &props,
-                         const LinkedDoor &door)
-{
-    bool button_pressed = false;
-#pragma unroll
-    for (CountT i = 0; i < consts::numAgents; i++) {
-        Entity agent = ctx.data().agents[i];
-        Vector3 agent_pos = ctx.get<Position>(agent);
-
-        if (isPressingButton(agent_pos, pos)) {
-            button_pressed = true;
-        }
-    }
-
-    if (button_pressed) {
-        ctx.get<OpenState>(door.e).isOpen = true;
-    } else if (!props.isPersistent) {
-        ctx.get<OpenState>(door.e).isOpen = false;
-    }
-}
-
 inline void setDoorPositionSystem(Engine &,
                                   Position &pos,
-                                  Velocity &,
                                   OpenState &open_state)
 {
     if (open_state.isOpen) {
@@ -221,6 +196,42 @@ inline void setDoorPositionSystem(Engine &,
     
     if (pos.z >= 0.0f) {
         pos.z = 0.0f;
+    }
+}
+
+
+// Checks if button is pressed and update state accordingly
+inline void buttonSystem(Engine &ctx,
+                         Position pos,
+                         ButtonState &state)
+{
+    bool button_pressed = false;
+#pragma unroll
+    for (CountT i = 0; i < consts::numAgents; i++) {
+        Entity agent = ctx.data().agents[i];
+        Vector3 agent_pos = ctx.get<Position>(agent);
+
+        if (isPressingButton(agent_pos, pos)) {
+            button_pressed = true;
+        }
+    }
+    state.isPressed = button_pressed;
+}
+
+inline void doorOpenSystem(Engine &ctx,
+                           OpenState &open_state,
+                           const DoorProperties &props)
+{
+    bool all_pressed = true;
+    for (int32_t i = 0; i < props.numButtons; i++) {
+        Entity button = props.buttons[i];
+        all_pressed = all_pressed  && ctx.get<ButtonState>(button).isPressed;
+    }
+
+    if (all_pressed) {
+        open_state.isOpen = true;
+    } else if (!props.isPersistent) {
+        open_state.isOpen = false;
     }
 }
 
@@ -484,7 +495,6 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine,
         setDoorPositionSystem,
             Position,
-            Velocity,
             OpenState
         >>({move_sys});
 
@@ -495,6 +505,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
         {broadphase_setup_sys}, numPhysicsSubsteps);
 
+    // Improve controllability of agents by setting their velocity to 0
+    // after physics is done.
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
         agentZeroVelSystem, Velocity, Action>>(
             {substep_sys});
@@ -507,9 +519,15 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
     auto button_sys = builder.addToGraph<ParallelForNode<Engine,
         buttonSystem,
             Position,
-            ButtonProperties,
-            LinkedDoor
+            ButtonState
         >>({phys_done});
+
+    // Set door to start opening if button conditions are met
+    auto door_open_sys = builder.addToGraph<ParallelForNode<Engine,
+        doorOpenSystem,
+            OpenState,
+            DoorProperties
+        >>({button_sys});
 
     // Compute initial reward now that physics has updated the world state
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -517,7 +535,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             Position,
             Progress,
             Reward
-        >>({button_sys});
+        >>({door_open_sys});
 
     // Read partner's reward
     auto gather_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,

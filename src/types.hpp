@@ -88,8 +88,8 @@ struct ToDynamicEntities {
 
 // ToDynamicEntities is exported as a
 // N, numRooms, maxEntitiesPerRoom, 3 tensor to pytorch
-static_assert(sizeof(ToDynamicEntities) == 3 * sizeof(float) *
-              consts::numRooms * consts::maxEntitiesPerRoom);
+static_assert(sizeof(ToDynamicEntities) == sizeof(float) *
+              consts::numRooms * consts::maxEntitiesPerRoom * 3);
 
 struct Lidar {
     float depth[30];
@@ -99,18 +99,19 @@ struct OpenState {
     bool isOpen;
 };
 
-struct LinkedDoor {
-    Entity e;
+struct DoorProperties {
+    Entity buttons[consts::maxEntitiesPerRoom];
+    int32_t numButtons;
+    bool isPersistent;
 };
 
-struct ButtonProperties {
-    bool isPersistent;
+struct ButtonState {
+    bool isPressed;
 };
 
 struct Progress {
     int32_t numProgressIncrements;
 };
-
 
 enum class DynEntityType : uint32_t {
     None,
@@ -129,7 +130,7 @@ struct Room {
     DynEntityState entities[consts::maxEntitiesPerRoom];
 
     // The walls that separate this room from the next
-    Entity separators[2];
+    Entity walls[2];
 
     // The door the agents need to figure out how to lower
     Entity door;
@@ -195,7 +196,8 @@ struct DoorEntity : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
-    OpenState
+    OpenState,
+    DoorProperties
 > {};
 
 // Archetype for the button objects that open the doors
@@ -205,8 +207,7 @@ struct ButtonEntity : public madrona::Archetype<
     Rotation,
     Scale,
     ObjectID,
-    ButtonProperties,
-    LinkedDoor
+    ButtonState
 > {};
 
 // Generic archetype for entities that need physics but no other special state
