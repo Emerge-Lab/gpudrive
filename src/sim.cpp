@@ -240,19 +240,19 @@ inline void buttonSystem(Engine &ctx,
 {
     AABB button_aabb {
         .pMin = pos + Vector3 { 
-            -consts::buttonWidth, 
-            -consts::buttonWidth,
+            -consts::buttonWidth / 2.f, 
+            -consts::buttonWidth / 2.f,
             0.f,
         },
         .pMax = pos + Vector3 { 
-            consts::buttonWidth, 
-            consts::buttonWidth,
+            consts::buttonWidth / 2.f, 
+            consts::buttonWidth / 2.f,
             0.25f
         },
     };
 
     bool button_pressed = false;
-    RigidBodyPhysicsSystem::findOverlappingEntities(
+    RigidBodyPhysicsSystem::findEntitiesWithinAABB(
             ctx, button_aabb, [&](Entity) {
         button_pressed = true;
     });
