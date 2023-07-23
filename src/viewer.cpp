@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .autoReset = false,
+        .autoReset = replay_log.has_value(),
     }, viewer.rendererBridge());
 
     auto replayStep = [&]() {
