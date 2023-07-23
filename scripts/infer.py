@@ -71,19 +71,19 @@ for i in range(args.num_steps):
     print("Dyn Entities:", obs[2])
     print("Lidar:", obs[3])
 
-    print("X Probs")
+    print("Move Amount Probs")
     print(" ", np.array_str(probs[0][0].cpu().numpy(), precision=2, suppress_small=True))
     print(" ", np.array_str(probs[0][1].cpu().numpy(), precision=2, suppress_small=True))
 
-    print("Y Probs")
+    print("Move Angle Probs")
     print(" ", np.array_str(probs[1][0].cpu().numpy(), precision=2, suppress_small=True))
     print(" ", np.array_str(probs[1][1].cpu().numpy(), precision=2, suppress_small=True))
 
-    print("R Probs")
+    print("Rotate Probs")
     print(" ", np.array_str(probs[2][0].cpu().numpy(), precision=2, suppress_small=True))
     print(" ", np.array_str(probs[2][1].cpu().numpy(), precision=2, suppress_small=True))
 
-    print("G Probs")
+    print("Grab Probs")
     print(" ", np.array_str(probs[3][0].cpu().numpy(), precision=2, suppress_small=True))
     print(" ", np.array_str(probs[3][1].cpu().numpy(), precision=2, suppress_small=True))
 
