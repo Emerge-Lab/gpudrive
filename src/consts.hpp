@@ -30,12 +30,13 @@ inline constexpr float rewardPerDist = 0.05f;
 // penalty reward
 inline constexpr float slackReward = -0.005f;
 
-// How many discrete options for each movement action
-inline constexpr madrona::CountT numMoveBuckets = 5;
+// How many discrete options for actions
+inline constexpr madrona::CountT numMoveAmountBuckets = 4;
+inline constexpr madrona::CountT numMoveAngleBuckets = 8;
+inline constexpr madrona::CountT numTurnBuckets = 5;
 
 // Number of lidar samples, arranged in circle around agent
 inline constexpr madrona::CountT numLidarSamples = 30;
-
 
 }
 

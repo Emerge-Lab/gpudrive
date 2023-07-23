@@ -483,14 +483,18 @@ void Manager::triggerReset(int32_t world_idx)
     }
 }
 
-void Manager::setAction(int32_t world_idx, int32_t agent_idx,
-                        int32_t x, int32_t y, int32_t r, int32_t g)
+void Manager::setAction(int32_t world_idx,
+                        int32_t agent_idx,
+                        int32_t move_amount,
+                        int32_t move_angle,
+                        int32_t rotate,
+                        int32_t grab)
 {
     Action action { 
-        .x = x,
-        .y = y,
-        .r = r,
-        .g = g,
+        .moveAmount = move_amount,
+        .moveAngle = move_angle,
+        .rotate = rotate,
+        .grab = grab,
     };
 
     auto *action_ptr = impl_->agentActionsBuffer +

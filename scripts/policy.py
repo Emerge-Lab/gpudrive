@@ -50,8 +50,6 @@ def setup_obs(sim):
     return obs_tensors, process_obs, num_obs_features
 
 def make_policy(process_obs_cb, num_obs_features, num_channels, separate_value):
-    move_action_dim = 5
-    
     encoder = RecurrentBackboneEncoder(
         net = MLP(
             input_dim = num_obs_features,
@@ -99,7 +97,7 @@ def make_policy(process_obs_cb, num_obs_features, num_channels, separate_value):
     return ActorCritic(
         backbone = backbone,
         actor = LinearLayerDiscreteActor(
-            [move_action_dim, move_action_dim, move_action_dim, 2],
+            [4, 8, 5, 2],
             num_channels,
         ),
         critic = LinearLayerCritic(num_channels),

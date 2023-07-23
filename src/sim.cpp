@@ -134,18 +134,26 @@ inline void movementSystem(Engine &,
                            ExternalForce &external_force,
                            ExternalTorque &external_torque)
 {
-    constexpr CountT discrete_action_buckets = consts::numMoveBuckets;
-    constexpr CountT half_buckets = discrete_action_buckets / 2;
-    constexpr float discrete_move_max = 600;
-    constexpr float move_delta_per_bucket = discrete_move_max / half_buckets;
-    constexpr float discrete_turn_max = 80;
-    constexpr float turn_delta_per_bucket = discrete_turn_max / half_buckets;
+    constexpr float move_max = 1000;
+    constexpr float turn_max = 320;
 
     Quat cur_rot = rot;
 
-    float f_x = move_delta_per_bucket * (action.x - (int32_t)half_buckets);
-    float f_y = move_delta_per_bucket * (action.y - (int32_t)half_buckets);
-    float t_z = turn_delta_per_bucket * (action.r - (int32_t)half_buckets);
+    float move_amount = action.moveAmount *
+        (move_max / (consts::numMoveAmountBuckets - 1));
+
+    constexpr float move_angle_per_bucket =
+        2.f * math::pi / float(consts::numMoveAngleBuckets);
+
+    float move_angle = float(action.moveAngle) * move_angle_per_bucket;
+
+    float f_x = move_amount * sinf(move_angle);
+    float f_y = move_amount * cosf(move_angle);
+
+    constexpr float turn_delta_per_bucket = 
+        turn_max / (consts::numTurnBuckets / 2);
+    float t_z =
+        turn_delta_per_bucket * (action.rotate - consts::numTurnBuckets / 2);
 
     external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
     external_torque = Vector3 { 0, 0, t_z };
@@ -158,7 +166,7 @@ inline void grabSystem(Engine &ctx,
                        Action action,
                        GrabState &grab)
 {
-    if (action.g == 0) {
+    if (action.grab == 0) {
         return;
     }
 

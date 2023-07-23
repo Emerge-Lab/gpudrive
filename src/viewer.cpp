@@ -210,8 +210,8 @@ int main(int argc, char *argv[])
                        const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
 
-        int32_t x = 2;
-        int32_t y = 2;
+        int32_t x = 0;
+        int32_t y = 0;
         int32_t r = 2;
         int32_t g = 0;
 
@@ -219,32 +219,51 @@ int main(int argc, char *argv[])
             mgr.triggerReset(world_idx);
         }
 
+        bool shift_pressed = input.keyPressed(Key::Shift);
+
         if (input.keyPressed(Key::W)) {
-            y += 2;
+            y += 1;
         }
         if (input.keyPressed(Key::S)) {
-            y -= 2;
+            y -= 1;
         }
 
         if (input.keyPressed(Key::D)) {
-            x += 2;
+            x += 1;
         }
         if (input.keyPressed(Key::A)) {
-            x -= 2;
+            x -= 1;
         }
 
         if (input.keyPressed(Key::Q)) {
-            r += 2;
+            r += shift_pressed ? 2 : 1;
         }
         if (input.keyPressed(Key::E)) {
-            r -= 2;
+            r -= shift_pressed ? 2 : 1;
         }
 
         if (input.keyPressed(Key::G)) {
             g = 1;
         }
 
-        mgr.setAction(world_idx, agent_idx, x, y, r, g);
+        float angle = atan2f(x, y);
+        if (angle < 0.f) {
+            angle += math::pi * 2;
+        }
+
+        int32_t move_amount;
+        if (x == 0 && y == 0) {
+            move_amount = 0;
+        } else if (shift_pressed) {
+            move_amount = consts::numMoveAmountBuckets - 1;
+        } else {
+            move_amount = 1;
+        }
+
+        int32_t move_angle = consts::numMoveAngleBuckets *
+            angle / (math::pi * 2.f);
+
+        mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r, g);
     }, [&mgr, &replay_log, &replayStep, &printObs]() {
         if (replay_log.has_value()) {
             replayStep();

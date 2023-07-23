@@ -32,10 +32,10 @@ struct WorldReset {
 // Discrete action component. Ranges are defined by consts::numMoveBuckets (5),
 // repeated here for clarity
 struct Action {
-    int32_t x; // [-2, 2]
-    int32_t y; // [-2, 2]
-    int32_t r; // [-2, 2]
-    int32_t g; // 0 = do nothing, 1 = grab / release
+    int32_t moveAmount; // [0, 3]
+    int32_t moveAngle; // [0, 5]
+    int32_t rotate; // [-2, 2]
+    int32_t grab; // 0 = do nothing, 1 = grab / release
 };
 
 // Per-agent reward

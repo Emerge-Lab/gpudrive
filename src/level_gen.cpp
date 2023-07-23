@@ -216,9 +216,10 @@ static void resetPersistentEntities(Engine &ctx)
          ctx.get<ExternalForce>(agent_entity) = Vector3::zero();
          ctx.get<ExternalTorque>(agent_entity) = Vector3::zero();
          ctx.get<Action>(agent_entity) = Action {
-             .x = consts::numMoveBuckets / 2,
-             .y = consts::numMoveBuckets / 2,
-             .r = consts::numMoveBuckets / 2,
+             .moveAmount = 0,
+             .moveAngle = 0,
+             .rotate = consts::numTurnBuckets / 2,
+             .grab = 0,
          };
 
          ctx.get<Done>(agent_entity).v = 0;
