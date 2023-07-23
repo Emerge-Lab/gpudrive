@@ -342,9 +342,6 @@ inline void collectObservationsSystem(Engine &ctx,
                                       ToOtherAgents &to_other_agents,
                                       ToRoomEntities &to_room_ents)
 {
-    assert(!isnan(pos.x) && !isnan(pos.y) && !isnan(pos.z));
-    assert(!isnan(rot.w) && !isnan(rot.x) && !isnan(rot.y) && !isnan(rot.z));
-
     CountT cur_room_idx = CountT(pos.y / consts::roomLength);
     cur_room_idx = std::max(CountT(0), 
         std::min(consts::numRooms - 1, cur_room_idx));
@@ -381,14 +378,6 @@ inline void collectObservationsSystem(Engine &ctx,
             ob.polar = { 0.f, 1.f };
         } else {
             Vector3 entity_pos = ctx.get<Position>(entity_info.e);
-
-            if (isnan(entity_pos.x) ||
-                    isnan(entity_pos.y) ||
-                    isnan(entity_pos.z)) {
-                printf("%u\n", entity_info.type);
-                assert(false);
-            }
-
             Vector3 to_entity = entity_pos - pos;
             ob.polar = xyToPolar(to_view.rotateVec(to_entity));
         }
