@@ -437,46 +437,44 @@ inline void rewardSystem(Engine &,
                          Progress &progress,
                          Reward &out_reward)
 {
-    constexpr float progress_reward = 0.1f;
-    constexpr float slack_reward = -0.01f;
+    // Just in case agents do something crazy, clamp total reward
+    float reward_pos = fminf(pos.y, consts::worldLength * 2);
 
-    int32_t new_progress = int32_t(pos.y / consts::distancePerProgress);
+    float old_max_y = progress.maxY;
+
+    float new_progress = reward_pos - old_max_y;
 
     float reward;
-    if (new_progress > progress.numProgressIncrements) {
-        reward = progress_reward *
-            (new_progress - progress.numProgressIncrements);
-        progress.numProgressIncrements = new_progress;
+    if (new_progress > 0) {
+        reward = new_progress * consts::rewardPerDist;
+        progress.maxY = reward_pos;
     } else {
-        reward = slack_reward;
+        reward = consts::slackReward;
     }
 
     out_reward.v = reward;
 }
 
-// Each agent gets half the reward of the other agent in
-// order to encourage them to cooperate. Need to cache
-// the rewards in this system to avoid a race condition
-// when reading the rewards in the next system
-inline void gatherPartnerRewardSystem(Engine &ctx,
-                                      OtherAgents &others)
+// Each agent gets a small bonus to it's reward if the other agent has
+// progressed a similar distance, to encourage them to cooperate.
+inline void bonusRewardSystem(Engine &ctx,
+                              OtherAgents &others,
+                              Progress &progress,
+                              Reward &reward)
 {
+    bool partners_close = true;
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = others.e[i];
-        others.rewards[i] = ctx.get<Reward>(other).v / 2.f;
-    }
-}
+        Progress other_progress = ctx.get<Progress>(other);
 
-inline void assignPartnerRewardSystem(Engine &,
-                                      OtherAgents &others,
-                                      Reward &reward)
-{
-    float other_rewards = 0.f;
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
-        other_rewards += others.rewards[i];
+        if (fabsf(other_progress.maxY - progress.maxY) > 2.f) {
+            partners_close = false;
+        }
     }
 
-    reward.v += other_rewards / float(consts::numAgents - 1);
+    if (partners_close && reward.v > 0.f) {
+        reward.v *= 1.25f;
+    }
 }
 
 // Notify training that an episode has completed by
@@ -578,24 +576,19 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
             Reward
         >>({door_open_sys});
 
-    // Read partner's reward
-    auto gather_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         gatherPartnerRewardSystem,
-            OtherAgents
-        >>({reward_sys});
-
     // Assign partner's reward
-    auto assign_partner_reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         assignPartnerRewardSystem,
+    auto bonus_reward_sys = builder.addToGraph<ParallelForNode<Engine,
+         bonusRewardSystem,
             OtherAgents,
+            Progress,
             Reward
-        >>({gather_partner_reward_sys});
+        >>({reward_sys});
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<ParallelForNode<Engine,
         doneSystem,
             Done
-        >>({assign_partner_reward_sys});
+        >>({bonus_reward_sys});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -653,6 +646,8 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         builder, {sort_phys_objects});
     auto sort_walls = queueSortByWorld<DoorEntity>(
         builder, {sort_buttons});
+    auto sort_constraints = queueSortByWorld<ConstraintData>(
+        builder, {sort_walls});
     (void)sort_walls;
 #else
     (void)lidar;

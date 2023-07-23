@@ -186,8 +186,7 @@ static void resetPersistentEntities(Engine &ctx)
          Vector3 pos {
              randInRangeCentered(ctx, 
                  consts::worldWidth / 2.f - 2.5f * consts::agentRadius),
-             randBetween(ctx, 0.f, consts::distancePerProgress / 2.f) +
-                 1.1f * consts::agentRadius,
+             randBetween(ctx, consts::agentRadius * 1.1f,  2.f),
              0.f,
          };
 
@@ -208,7 +207,7 @@ static void resetPersistentEntities(Engine &ctx)
              grab_state.constraintEntity = Entity::none();
          }
 
-         ctx.get<Progress>(agent_entity).numProgressIncrements = 0;
+         ctx.get<Progress>(agent_entity).maxY = pos.y;
 
          ctx.get<Velocity>(agent_entity) = {
              Vector3::zero(),
@@ -521,12 +520,18 @@ static void generateLevel(Engine &ctx)
 {
     LevelState &level = ctx.singleton<LevelState>();
 
+    makeRoom(ctx, level, 0, RoomType::SingleButton);
+    makeRoom(ctx, level, 1, RoomType::DoubleButton);
+    makeRoom(ctx, level, 2, RoomType::CubeButtons);
+
+#if 0
     for (CountT i = 0; i < consts::numRooms; i++) {
         RoomType room_type = (RoomType)(
             ctx.data().rng.rand() * (uint32_t)RoomType::NumTypes);
 
         makeRoom(ctx, level, i, room_type);
     }
+#endif
 }
 
 // Randomly generate a new world for a training episode

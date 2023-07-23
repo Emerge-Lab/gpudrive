@@ -62,11 +62,9 @@ struct PositionObservation {
     float theta;
 };
 
-// Entity ID of the other agents as well as a place to cache their rewards
-// so each agent can get half of their partner's reward as well
+// Per-agent component storing Entity IDs of the other agents
 struct OtherAgents {
     madrona::Entity e[consts::numAgents - 1];
-    float rewards[consts::numAgents - 1];
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -104,14 +102,13 @@ struct Lidar {
 // Tracks progress the agent has made through the challenge, used to add
 // reward when more progress has been made
 struct Progress {
-    int32_t numProgressIncrements;
+    float maxY;
 };
 
 // Tracks if an agent is currently grabbing another entity
 struct GrabState {
     Entity constraintEntity;
 };
-
 
 // A per-door component that tracks whether or not the door should be open.
 struct OpenState {
