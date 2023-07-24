@@ -52,13 +52,6 @@ struct Done {
     int32_t v;
 };
 
-// Per-agent component, tracks the agent ID [0, consts::numAgents)
-// of the current agent. This isn't strictly necessary for this task,
-// but is useful as input to a separate value function (see MAPPO paper)
-struct AgentID {
-    int32_t id;
-};
-
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
@@ -68,11 +61,7 @@ struct SelfObservation {
     float globalY;
     float globalZ;
     float theta;
-};
-
-// Per-agent component storing Entity IDs of the other agents
-struct OtherAgents {
-    madrona::Entity e[consts::numAgents - 1];
+    float isGrabbing;
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -82,23 +71,34 @@ struct PolarObservation {
     float theta;
 };
 
+struct PartnerObservation {
+    PolarObservation polar;
+    float isGrabbing;
+};
+
 // Egocentric observations of other agents
 struct PartnerObservations {
-    PolarObservation obs[consts::numAgents - 1];
+    PartnerObservation obs[consts::numAgents - 1];
 };
+
+// PartnerObservations is exported as a
+// [N, A, consts::numAgents - 1, 3] // tensor to pytorch
+static_assert(sizeof(PartnerObservation) == sizeof(float) *
+    (consts::numAgents - 1) * 3);
 
 // Per-agent egocentric observations for the interactable entities
 // in the current room.
 struct EntityObservation {
-    float encodedType;
     PolarObservation polar;
+    float encodedType;
 };
 
 struct RoomEntityObservations {
     EntityObservation obs[consts::maxEntitiesPerRoom];
 };
 
-// RoomEntityObservations is exported as a N, maxEntitiesPerRoom, 3 tensor to pytorch
+// RoomEntityObservations is exported as a
+// [N, A, maxEntitiesPerRoom, 3] tensor to pytorch
 static_assert(sizeof(RoomEntityObservations) == sizeof(float) *
     consts::maxEntitiesPerRoom * 3);
 
@@ -111,6 +111,12 @@ struct Lidar {
 // reward when more progress has been made
 struct Progress {
     float maxY;
+};
+
+// Per-agent component storing Entity IDs of the other agents. Used to
+// build the egocentric observations of their state.
+struct OtherAgents {
+    madrona::Entity e[consts::numAgents - 1];
 };
 
 // Tracks if an agent is currently grabbing another entity
@@ -137,7 +143,7 @@ struct ButtonState {
 };
 
 // The following types are not components but are used by the singleton
-// component "LevelState," below
+// component "LevelState," below to represent the state of the full level
 enum class RoomEntityType : uint32_t {
     None,
     Button,

@@ -449,7 +449,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   6,
+                                   7,
                                });
 }
 
@@ -461,7 +461,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::numAgents - 1,
-                                   2, // Polar coordinates
+                                   3,
                                });
 }
 
@@ -473,7 +473,7 @@ Tensor Manager::roomEntityObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::maxEntitiesPerRoom,
-                                   3, // Polar coordinates
+                                   3,
                                });
 }
 

@@ -345,6 +345,7 @@ static inline float computeZAngle(Quat q)
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
                                       Rotation rot,
+                                      const GrabState &grab,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
@@ -361,6 +362,8 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.globalY = globalPosObs(pos.y);
     self_obs.globalZ = globalPosObs(pos.z);
     self_obs.theta = angleObs(computeZAngle(rot));
+    self_obs.isGrabbing = grab.constraintEntity != Entity::none() ?
+        1.f : 0.f;
 
     Quat to_view = rot.inv();
 
@@ -369,9 +372,14 @@ inline void collectObservationsSystem(Engine &ctx,
         Entity other = other_agents.e[i];
 
         Vector3 other_pos = ctx.get<Position>(other);
+        GrabState other_grab = ctx.get<GrabState>(other);
         Vector3 to_other = other_pos - pos;
 
-        partner_obs.obs[i] = xyToPolar(to_view.rotateVec(to_other));
+        partner_obs.obs[i] = {
+            .polar = xyToPolar(to_view.rotateVec(to_other)),
+            .isGrabbing = other_grab.constraintEntity != Entity::none() ?
+                1.f : 0.f,
+        };
     }
 
     const LevelState &level = ctx.singleton<LevelState>();
@@ -538,7 +546,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder, 
                                                            {set_door_pos_sys});
 
-    // Grab action, post broadphase for raycast
+    // Grab action, post BVH build to allow raycasting
     auto grab_sys = builder.addToGraph<ParallelForNode<Engine,
         grabSystem,
             Entity,
@@ -623,6 +631,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         collectObservationsSystem,
             Position,
             Rotation,
+            GrabState,
             OtherAgents,
             SelfObservation,
             PartnerObservations,
