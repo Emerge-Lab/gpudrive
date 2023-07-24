@@ -101,7 +101,7 @@ def make_policy(num_obs_features, num_channels, separate_value):
         )
     else:
         backbone = BackboneShared(
-            process_obs = process_obs_cb,
+            process_obs = process_obs,
             encoder = encoder,
         )
 

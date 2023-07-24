@@ -65,7 +65,6 @@ for i in range(args.num_steps):
         action_dists.best(actions)
 
         probs = action_dists.probs()
-        print(probs[0].shape)
 
     actions.numpy().tofile(action_log)
 
