@@ -246,11 +246,6 @@ int main(int argc, char *argv[])
             g = 1;
         }
 
-        float angle = atan2f(x, y);
-        if (angle < 0.f) {
-            angle += math::pi * 2;
-        }
-
         int32_t move_amount;
         if (x == 0 && y == 0) {
             move_amount = 0;
@@ -260,8 +255,26 @@ int main(int argc, char *argv[])
             move_amount = 1;
         }
 
-        int32_t move_angle = consts::numMoveAngleBuckets *
-            angle / (math::pi * 2.f);
+        int32_t move_angle;
+        if (x == 0 && y == 1) {
+            move_angle = 0;
+        } else if (x == 1 && y == 1) {
+            move_angle = 1;
+        } else if (x == 1 && y == 0) {
+            move_angle = 2;
+        } else if (x == 1 && y == -1) {
+            move_angle = 3;
+        } else if (x == 0 && y == -1) {
+            move_angle = 4;
+        } else if (x == -1 && y == -1) {
+            move_angle = 5;
+        } else if (x == -1 && y == 0) {
+            move_angle = 6;
+        } else if (x == -1 && y == 1) {
+            move_angle = 7;
+        } else {
+            move_angle = 0;
+        }
 
         mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r, g);
     }, [&mgr, &replay_log, &replayStep, &printObs]() {
