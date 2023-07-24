@@ -43,9 +43,9 @@ public:
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
-    MGR_EXPORT madrona::py::Tensor positionObservationTensor() const;
-    MGR_EXPORT madrona::py::Tensor toOtherAgentsTensor() const;
-    MGR_EXPORT madrona::py::Tensor toRoomEntitiesTensor() const;
+    MGR_EXPORT madrona::py::Tensor selfObservationTensor() const;
+    MGR_EXPORT madrona::py::Tensor partnerObservationsTensor() const;
+    MGR_EXPORT madrona::py::Tensor roomEntityObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
 
     // These functions are used by the viewer to control the simulation

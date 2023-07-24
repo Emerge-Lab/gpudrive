@@ -19,9 +19,9 @@ enum class ExportID : uint32_t {
     Action,
     Reward,
     Done,
-    PositionObservation,
-    ToOtherAgents,
-    ToRoomEntities,
+    SelfObservation,
+    PartnerObservations,
+    RoomEntityObservations,
     Lidar,
     NumExports,
 };

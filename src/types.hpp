@@ -52,8 +52,16 @@ struct Done {
     int32_t v;
 };
 
-// Agent position rescaled to the bounds of the play area to assist training
-struct PositionObservation {
+// Per-agent component, tracks the agent ID [0, consts::numAgents)
+// of the current agent. This isn't strictly necessary for this task,
+// but is useful as input to a separate value function (see MAPPO paper)
+struct AgentID {
+    int32_t id;
+};
+
+// Observation state for the current agent.
+// Positions are rescaled to the bounds of the play area to assist training.
+struct SelfObservation {
     float roomX;
     float roomY;
     float globalX;
@@ -75,7 +83,7 @@ struct PolarObservation {
 };
 
 // Egocentric observations of other agents
-struct ToOtherAgents {
+struct PartnerObservations {
     PolarObservation obs[consts::numAgents - 1];
 };
 
@@ -86,12 +94,12 @@ struct EntityObservation {
     PolarObservation polar;
 };
 
-struct ToRoomEntities {
+struct RoomEntityObservations {
     EntityObservation obs[consts::maxEntitiesPerRoom];
 };
 
-// ToRoomEntities is exported as a N, maxEntitiesPerRoom, 3 tensor to pytorch
-static_assert(sizeof(ToRoomEntities) == sizeof(float) *
+// RoomEntityObservations is exported as a N, maxEntitiesPerRoom, 3 tensor to pytorch
+static_assert(sizeof(RoomEntityObservations) == sizeof(float) *
     consts::maxEntitiesPerRoom * 3);
 
 // Linear depth values in a circle around the agent
@@ -128,6 +136,8 @@ struct ButtonState {
     bool isPressed;
 };
 
+// The following types are not components but are used by the singleton
+// component "LevelState," below
 enum class RoomEntityType : uint32_t {
     None,
     Button,
@@ -151,6 +161,8 @@ struct Room {
     Entity door;
 };
 
+// A singleton component storing the state of all the rooms in the current
+// randomly generated level
 struct LevelState {
     Room rooms[consts::numRooms];
 };
@@ -178,15 +190,15 @@ struct Agent : public madrona::Archetype<
     // Internal logic state.
     GrabState,
     Progress,
+    OtherAgents,
 
     // Input
     Action,
 
     // Observations
-    PositionObservation,
-    OtherAgents,
-    ToOtherAgents,
-    ToRoomEntities,
+    SelfObservation,
+    PartnerObservations,
+    RoomEntityObservations,
     Lidar,
 
     // Reward, episode termination

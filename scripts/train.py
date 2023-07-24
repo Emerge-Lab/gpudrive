@@ -109,16 +109,17 @@ else:
 
 ckpt_dir.mkdir(exist_ok=True, parents=True)
 
-obs, process_obs_cb, num_obs_features = setup_obs(sim)
-policy = make_policy(process_obs_cb, num_obs_features,
-                     args.num_channels, args.separate_value)
+obs, num_obs_features = setup_obs(sim)
+policy = make_policy(num_obs_features, args.num_channels, args.separate_value)
 
-# Hack to fill out observations: Reset envs and take step to populate envs
-# FIXME: just make it possible to populate observations after init
-# (IE run subset of task graph after init)
 actions = sim.action_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
+
+# Flatten N, A, ... tensors to N * A, ...
+actions = actions.view(-1, *actions.shape[2:])
+dones  = dones.view(-1, *dones.shape[2:])
+rewards = rewards.view(-1, *rewards.shape[2:])
 
 if args.restore:
     restore_ckpt = ckpt_dir / f"{args.restore}.pth"

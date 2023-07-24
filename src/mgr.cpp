@@ -406,51 +406,72 @@ Tensor Manager::resetTensor() const
 {
     return impl_->exportTensor(ExportID::Reset,
                                Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds, 1});
+                               {
+                                   impl_->cfg.numWorlds,
+                                   1,
+                               });
 }
 
 Tensor Manager::actionTensor() const
 {
     return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Int32,
-        {impl_->cfg.numWorlds * consts::numAgents, 4});
+        {
+            impl_->cfg.numWorlds,
+            consts::numAgents,
+            4,
+        });
 }
 
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, Tensor::ElementType::Float32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 1});
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
+                                   1,
+                               });
 }
 
 Tensor Manager::doneTensor() const
 {
     return impl_->exportTensor(ExportID::Done, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 1});
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
+                                   1,
+                               });
 }
 
-Tensor Manager::positionObservationTensor() const
+Tensor Manager::selfObservationTensor() const
 {
-    return impl_->exportTensor(ExportID::PositionObservation,
-                               Tensor::ElementType::Float32,
-                               {impl_->cfg.numWorlds * consts::numAgents, 6});
-}
-
-Tensor Manager::toOtherAgentsTensor() const
-{
-    return impl_->exportTensor(ExportID::ToOtherAgents,
+    return impl_->exportTensor(ExportID::SelfObservation,
                                Tensor::ElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
+                                   6,
+                               });
+}
+
+Tensor Manager::partnerObservationsTensor() const
+{
+    return impl_->exportTensor(ExportID::PartnerObservations,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
                                    consts::numAgents - 1,
                                    2, // Polar coordinates
                                });
 }
 
-Tensor Manager::toRoomEntitiesTensor() const
+Tensor Manager::roomEntityObservationsTensor() const
 {
-    return impl_->exportTensor(ExportID::ToRoomEntities,
+    return impl_->exportTensor(ExportID::RoomEntityObservations,
                                Tensor::ElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
                                    consts::maxEntitiesPerRoom,
                                    3, // Polar coordinates
                                });
@@ -460,7 +481,8 @@ Tensor Manager::lidarTensor() const
 {
     return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds * consts::numAgents,
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
                                    consts::numLidarSamples,
                                });
 }

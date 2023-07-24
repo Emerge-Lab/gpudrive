@@ -31,9 +31,10 @@ NB_MODULE(madrona_3d_example, m) {
         .def("action_tensor", &Manager::actionTensor)
         .def("reward_tensor", &Manager::rewardTensor)
         .def("done_tensor", &Manager::doneTensor)
-        .def("position_observation_tensor", &Manager::positionObservationTensor)
-        .def("to_other_agents_tensor", &Manager::toOtherAgentsTensor)
-        .def("to_room_entities_tensor", &Manager::toRoomEntitiesTensor)
+        .def("self_observation_tensor", &Manager::selfObservationTensor)
+        .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
+        .def("room_entity_observations_tensor",
+             &Manager::roomEntityObservationsTensor)
         .def("lidar_tensor", &Manager::lidarTensor)
     ;
 }

@@ -23,14 +23,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     viz::VizRenderingSystem::registerTypes(registry);
 
     registry.registerComponent<Action>();
-    registry.registerComponent<PositionObservation>();
+    registry.registerComponent<SelfObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
     registry.registerComponent<GrabState>();
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
-    registry.registerComponent<ToOtherAgents>();
-    registry.registerComponent<ToRoomEntities>();
+    registry.registerComponent<PartnerObservations>();
+    registry.registerComponent<RoomEntityObservations>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -49,12 +49,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Reset);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
-    registry.exportColumn<Agent, PositionObservation>(
-        (uint32_t)ExportID::PositionObservation);
-    registry.exportColumn<Agent, ToOtherAgents>(
-        (uint32_t)ExportID::ToOtherAgents);
-    registry.exportColumn<Agent, ToRoomEntities>(
-        (uint32_t)ExportID::ToRoomEntities);
+    registry.exportColumn<Agent, SelfObservation>(
+        (uint32_t)ExportID::SelfObservation);
+    registry.exportColumn<Agent, PartnerObservations>(
+        (uint32_t)ExportID::PartnerObservations);
+    registry.exportColumn<Agent, RoomEntityObservations>(
+        (uint32_t)ExportID::RoomEntityObservations);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, Reward>(
@@ -345,22 +345,22 @@ static inline float computeZAngle(Quat q)
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
                                       Rotation rot,
-                                      PositionObservation &pos_obs,
                                       const OtherAgents &other_agents,
-                                      ToOtherAgents &to_other_agents,
-                                      ToRoomEntities &to_room_ents)
+                                      SelfObservation &self_obs,
+                                      PartnerObservations &partner_obs,
+                                      RoomEntityObservations &room_ent_obs)
 {
     CountT cur_room_idx = CountT(pos.y / consts::roomLength);
     cur_room_idx = std::max(CountT(0), 
         std::min(consts::numRooms - 1, cur_room_idx));
 
-    pos_obs.roomX = pos.x / (consts::worldWidth / 2.f);
-    pos_obs.roomY = (pos.y - cur_room_idx * consts::roomLength) /
+    self_obs.roomX = pos.x / (consts::worldWidth / 2.f);
+    self_obs.roomY = (pos.y - cur_room_idx * consts::roomLength) /
         consts::roomLength;
-    pos_obs.globalX = globalPosObs(pos.x);
-    pos_obs.globalY = globalPosObs(pos.y);
-    pos_obs.globalZ = globalPosObs(pos.z);
-    pos_obs.theta = angleObs(computeZAngle(rot));
+    self_obs.globalX = globalPosObs(pos.x);
+    self_obs.globalY = globalPosObs(pos.y);
+    self_obs.globalZ = globalPosObs(pos.z);
+    self_obs.theta = angleObs(computeZAngle(rot));
 
     Quat to_view = rot.inv();
 
@@ -371,7 +371,7 @@ inline void collectObservationsSystem(Engine &ctx,
         Vector3 other_pos = ctx.get<Position>(other);
         Vector3 to_other = other_pos - pos;
 
-        to_other_agents.obs[i] = xyToPolar(to_view.rotateVec(to_other));
+        partner_obs.obs[i] = xyToPolar(to_view.rotateVec(to_other));
     }
 
     const LevelState &level = ctx.singleton<LevelState>();
@@ -390,7 +390,7 @@ inline void collectObservationsSystem(Engine &ctx,
             ob.polar = xyToPolar(to_view.rotateVec(to_entity));
         }
 
-        to_room_ents.obs[i] = ob;
+        room_ent_obs.obs[i] = ob;
     }
 }
 
@@ -623,10 +623,10 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
         collectObservationsSystem,
             Position,
             Rotation,
-            PositionObservation,
             OtherAgents,
-            ToOtherAgents,
-            ToRoomEntities
+            SelfObservation,
+            PartnerObservations,
+            RoomEntityObservations
         >>({post_reset_broadphase});
 
 #ifdef MADRONA_GPU_MODE

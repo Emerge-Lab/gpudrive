@@ -36,9 +36,8 @@ sim = madrona_3d_example.SimManager(
     auto_reset = True,
 )
 
-obs, process_obs_cb, num_obs_features = setup_obs(sim)
-policy = make_policy(process_obs_cb, num_obs_features,
-                     args.num_channels, args.separate_value)
+obs, num_obs_features = setup_obs(sim)
+policy = make_policy(num_obs_features, args.num_channels, args.separate_value)
 
 weights = LearningState.load_policy_weights(args.ckpt_path)
 policy.load_state_dict(weights)
@@ -47,11 +46,16 @@ actions = sim.action_tensor().to_torch()
 dones = sim.done_tensor().to_torch()
 rewards = sim.reward_tensor().to_torch()
 
+# Flatten N, A, ... tensors to N * A, ...
+actions = actions.view(-1, *action.shape[2:])
+dones  = dones.view(-1, *dones.shape[2:])
+rewards = rewards.view(-1, *rewards.shape[2:])
+
 cur_rnn_states = []
 
 for shape in policy.recurrent_cfg.shapes:
     cur_rnn_states.append(torch.zeros(
-        *shape[0:2], actions.shape[0], shape[2], dtype=torch.float32, device=torch.device('cpu')))
+        *shape[0:2], actions.shape[0] * actions.shape[1], shape[2], dtype=torch.float32, device=torch.device('cpu')))
 
 action_log = open('/tmp/actions', 'wb')
 
@@ -66,9 +70,9 @@ for i in range(args.num_steps):
     actions.numpy().tofile(action_log)
 
     print()
-    print("Pos:", obs[0])
-    print("Others:", obs[1])
-    print("Dyn Entities:", obs[2])
+    print("Self:", obs[0])
+    print("Partners:", obs[1])
+    print("Room Entities:", obs[2])
     print("Lidar:", obs[3])
 
     print("Move Amount Probs")

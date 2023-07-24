@@ -181,21 +181,21 @@ int main(int argc, char *argv[])
         cur_replay_step++;
     };
 
-    auto pos_printer = mgr.positionObservationTensor().makePrinter();
-    auto to_other_printer = mgr.toOtherAgentsTensor().makePrinter();
-    auto to_room_ents_printer = mgr.toRoomEntitiesTensor().makePrinter();
+    auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
+    auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Pos\n");
-        pos_printer.print();
+        printf("Self\n");
+        self_printer.print();
 
-        printf("To Other\n");
-        to_other_printer.print();
+        printf("Partner\n");
+        partner_printer.print();
 
-        printf("To Room Entities\n");
-        to_room_ents_printer.print();
+        printf("Room Entities\n");
+        room_ent_printer.print();
 
         printf("Lidar\n");
         lidar_printer.print();
