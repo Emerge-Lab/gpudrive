@@ -91,11 +91,16 @@ def make_policy(num_obs_features, num_channels, separate_value):
         backbone = BackboneSeparate(
             process_obs = process_obs,
             actor_encoder = encoder,
-            critic_encoder = BackboneEncoder(
+            critic_encoder = RecurrentBackboneEncoder(
                 net = MLP(
                     input_dim = num_obs_features,
                     num_channels = num_channels,
-                    num_layers = 3,
+                    num_layers = 2,
+                ),
+                rnn = LSTM(
+                    in_channels = num_channels,
+                    hidden_channels = num_channels,
+                    num_layers = 1,
                 ),
             )
         )
