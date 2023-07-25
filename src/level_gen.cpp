@@ -525,12 +525,18 @@ static void generateLevel(Engine &ctx)
     //makeRoom(ctx, level, 1, RoomType::DoubleButton);
     //makeRoom(ctx, level, 2, RoomType::CubeButtons);
 
+    makeRoom(ctx, level, 0, RoomType::CubeButtons);
+    makeRoom(ctx, level, 1, RoomType::CubeButtons);
+    makeRoom(ctx, level, 2, RoomType::CubeButtons);
+
+#if 0
     for (CountT i = 0; i < consts::numRooms; i++) {
         RoomType room_type = (RoomType)(
             ctx.data().rng.rand() * (uint32_t)RoomType::NumTypes);
 
         makeRoom(ctx, level, i, room_type);
     }
+#endif
 }
 
 // Randomly generate a new world for a training episode

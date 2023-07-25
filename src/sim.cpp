@@ -9,11 +9,6 @@ using namespace madrona::phys;
 
 namespace GPUHideSeek {
 
-constexpr inline float wallSpeed = 30.0f;
-constexpr inline float deltaT = 0.04f;
-constexpr inline CountT numPhysicsSubsteps = 4.f;
-constexpr inline int32_t episodeLen = 100;
-
 // Register all the ECS components and archetypes that will be
 // use in the simulation
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
@@ -228,11 +223,11 @@ inline void setDoorPositionSystem(Engine &,
         // Put underground
 
         if (pos.z > -4.5f)
-            pos.z += -wallSpeed * deltaT;
+            pos.z += -consts::doorSpeed * consts::deltaT;
     }
     else if (pos.z < 0.0f) {
         // Put back on surface
-        pos.z += wallSpeed * deltaT;
+        pos.z += consts::doorSpeed * consts::deltaT;
     }
     
     if (pos.z >= 0.0f) {
@@ -501,7 +496,7 @@ inline void doneSystem(Engine &ctx,
     int32_t cur_step = ctx.data().curEpisodeStep;
     if (cur_step == 0) {
         done.v = 0;
-    } else if (cur_step == episodeLen -1) {
+    } else if (cur_step == consts::episodeLen -1) {
         done.v = 1;
     }
 
@@ -558,7 +553,7 @@ void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
 
     // Physics collision detection and solver
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
-        {grab_sys}, numPhysicsSubsteps);
+        {grab_sys}, consts::numPhysicsSubsteps);
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
@@ -685,9 +680,10 @@ Sim::Sim(Engine &ctx,
         consts::numRooms * (consts::maxEntitiesPerRoom + 3) +
         4; // side walls + floor
 
-    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr, deltaT,
-         numPhysicsSubsteps, -9.8 * math::up, max_total_entities,
-         max_total_entities * max_total_entities / 2, consts::numAgents);
+    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
+        consts::deltaT, consts::numPhysicsSubsteps, -9.8 * math::up,
+        max_total_entities, max_total_entities * max_total_entities / 2,
+        consts::numAgents);
 
     curEpisodeStep = 0;
 
