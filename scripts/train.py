@@ -48,6 +48,9 @@ class LearningCallback:
             bootstrap_value_min = update_results.bootstrap_values.min().cpu().item()
             bootstrap_value_max = update_results.bootstrap_values.max().cpu().item()
 
+            vnorm_mu = learning_state.value_normalizer.mu.cpu().item()
+            vnorm_sigma = learning_state.value_normalizer.sigma.cpu().item()
+
         print(f"\nUpdate: {update_id}")
         print(f"    Loss: {ppo.loss: .3e}, A: {ppo.action_loss: .3e}, V: {ppo.value_loss: .3e}, E: {ppo.entropy_loss: .3e}")
         print()
@@ -55,6 +58,8 @@ class LearningCallback:
         print(f"    Values           => Avg: {value_mean: .3e}, Min: {value_min: .3e}, Max: {value_max: .3e}")
         print(f"    Advantages       => Avg: {advantage_mean: .3e}, Min: {advantage_min: .3e}, Max: {advantage_max: .3e}")
         print(f"    Bootstrap Values => Avg: {bootstrap_value_mean: .3e}, Min: {bootstrap_value_min: .3e}, Max: {bootstrap_value_max: .3e}")
+        print(f"    Returns          => Avg: {ppo.returns_mean}, σ: {ppo.returns_stddev}")
+        print(f"    Value Normalizer => Mean: {vnorm_mu: .3e}, σ: {vnorm_sigma :.3e}")
 
         if self.profile_report:
             print()
