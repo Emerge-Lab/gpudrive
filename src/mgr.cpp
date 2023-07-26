@@ -24,7 +24,7 @@ using namespace madrona::math;
 using namespace madrona::phys;
 using namespace madrona::py;
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 struct Manager::Impl {
     Config cfg;
@@ -294,7 +294,7 @@ Manager::Impl * Manager::Impl::init(
             .worldInitPtr = world_inits.data(),
             .numWorldInitBytes = sizeof(WorldInit),
             .userConfigPtr = (void *)&sim_cfg,
-            .numUserConvi RfigBytes = sizeof(Sim::Config),
+            .numUserConfigBytes = sizeof(Sim::Config),
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = mgr_cfg.numWorlds,

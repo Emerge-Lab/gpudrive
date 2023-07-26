@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 class Engine;
 

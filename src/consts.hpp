@@ -2,7 +2,7 @@
 
 #include <madrona/types.hpp>
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 namespace consts {
 // Each random world is composed of a fixed number of rooms that the agents

@@ -7,7 +7,7 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 // Register all the ECS components and archetypes that will be
 // use in the simulation

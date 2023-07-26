@@ -1,6 +1,6 @@
 #include "level_gen.hpp"
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 using namespace madrona;
 using namespace madrona::math;

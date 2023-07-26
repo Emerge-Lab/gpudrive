@@ -7,7 +7,7 @@
 
 #include "consts.hpp"
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;

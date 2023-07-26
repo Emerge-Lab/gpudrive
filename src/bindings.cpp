@@ -5,7 +5,7 @@
 
 namespace nb = nanobind;
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 // This file creates the python bindings used by the learning code.
 // Refer to the nanobind documentation for more details on these functions.

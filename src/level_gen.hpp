@@ -2,7 +2,7 @@
 
 #include "sim.hpp"
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 // Creates agents, outer walls and floor. Entities that will persist across
 // all episodes.

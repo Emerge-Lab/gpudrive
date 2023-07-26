@@ -2,7 +2,7 @@
 
 #include <madrona/physics.hpp>
 
-namespace GPUHideSeek {
+namespace Madrona3DExample {
 
 struct EpisodeManager {
     madrona::AtomicU32 curEpisode;
