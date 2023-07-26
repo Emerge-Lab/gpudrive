@@ -12,7 +12,7 @@ integration and end-to-end agent training in the engine.
 
 Building
 --------
-First, make sure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (briefly, recent python and cmake, as well as Xcode or Visual Studio on MacOS and Windows respectively).
+First, make sure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (briefly, recent python and cmake, as well as Xcode or Visual Studio on MacOS or Windows respectively).
 
 Additionally, the rendering functionality in this repository requires the X11 development headers on Linux (e.g. the `libx11-dev` package on Ubuntu). The training functionality requires PyTorch 2.0 or later as well.
 
@@ -31,7 +31,7 @@ make -j # cores to build with
 cd ..
 ```
 
-Or on Windows, open the root of the repository in Visual Studio and build
+Or on Windows, open the cloned repository in Visual Studio and build
 the project using the integrated `cmake` functionality.
 
 
@@ -56,7 +56,7 @@ As mentioned above, this repo is intended to document how to use Madrona to buil
 
 First, take an overview of [`src/types.hpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/types.hpp#L28). This file defines all the simulator's custom ECS components and archetypes. In particular, the `Agent` archetype defines all the components used by the agents in the simulation. Many of the `Agent` components are directly exported as PyTorch tensors.
 
-Next, to get an understanding of the simulation loop, view [`Sim::setupTasks`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp#L552). This function build the taskgraph that defines each step of the simulation across all worlds. Take note of the ECS system functions (`movementSystem, `collectObservationsSystem`, etc) that `setupTasks` enqueues into the taskgraph and the components they iterate over.
+Next, to get an understanding of the simulation loop, view [`Sim::setupTasks`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp#L552). This function builds the taskgraph that defines each step of the simulation across all worlds. Take note of the ECS system functions (`movementSystem`, `collectObservationsSystem`, etc) that `setupTasks` enqueues into the taskgraph and the components they iterate over.
 
 At this point, you can continue reading [`src/sim.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp) and ['src/sim.hpp](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.hpp) where all the core simulation logic is located, or visit the [`generateWorld`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp#L558) function in [`src/level_gen.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp) to see how the levels are randomly generated.
 
