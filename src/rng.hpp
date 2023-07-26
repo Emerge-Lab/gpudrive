@@ -4,6 +4,7 @@
 
 namespace GPUHideSeek {
 
+// Simple PRNG intended to be initialized with episode ID.
 class RNG {
 public:
     static inline RNG make(uint32_t idx)

@@ -92,9 +92,15 @@ static inline void initWorld(Engine &ctx)
     ctx.data().rng = RNG::make(episode_idx);
     ctx.data().curEpisodeIdx = episode_idx;
 
+    // Defined in src/level_gen.hpp / src/level_gen.cpp
     generateWorld(ctx);
 }
 
+// This system runs each frame and checks if the current episode is complete
+// or if code external to the application has forced a reset by writing to the
+// WorldReset singleton.
+//
+// If a reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
@@ -122,7 +128,8 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-// Provide forces for entities which are controlled by actions (the two agents in this case).
+// Translates discrete actions from the Action component to forces
+// used by the physics simulation.
 inline void movementSystem(Engine &,
                            Action &action, 
                            Rotation &rot, 
@@ -154,6 +161,8 @@ inline void movementSystem(Engine &,
     external_torque = Vector3 { 0, 0, t_z };
 }
 
+// Implements the grab action by casting a short ray in front of the agent
+// and creating a joint constraint if a grabbable entity is hit.
 inline void grabSystem(Engine &ctx,
                        Entity e,
                        Position pos,
@@ -215,15 +224,16 @@ inline void grabSystem(Engine &ctx,
         e, grab_entity, attach1, attach2, r1, r2, separation);
 }
 
+// Animates the doors opening and closing based on OpenState
 inline void setDoorPositionSystem(Engine &,
                                   Position &pos,
                                   OpenState &open_state)
 {
     if (open_state.isOpen) {
         // Put underground
-
-        if (pos.z > -4.5f)
+        if (pos.z > -4.5f) {
             pos.z += -consts::doorSpeed * consts::deltaT;
+        }
     }
     else if (pos.z < 0.0f) {
         // Put back on surface
@@ -236,7 +246,8 @@ inline void setDoorPositionSystem(Engine &,
 }
 
 
-// Checks if there is an entity standing on the button
+// Checks if there is an entity standing on the button and updates
+// ButtonState if so.
 inline void buttonSystem(Engine &ctx,
                          Position pos,
                          ButtonState &state)
@@ -282,6 +293,8 @@ inline void doorOpenSystem(Engine &ctx,
     }
 }
 
+// Make the agents easier to control by zeroing out their velocity
+// after each step.
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
                                Action &)
@@ -308,6 +321,7 @@ static inline float angleObs(float v)
     return v / math::pi;
 }
 
+// Translate xy delta to polar observations for learning.
 static inline PolarObservation xyToPolar(Vector3 v)
 {
     Vector2 xy { v.x, v.y };
@@ -534,7 +548,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-
+// Build the task graph
 void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
     // Turn policy actions into movement

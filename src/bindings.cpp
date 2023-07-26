@@ -7,7 +7,11 @@ namespace nb = nanobind;
 
 namespace GPUHideSeek {
 
+// This file creates the python bindings used by the learning code.
+// Refer to the nanobind documentation for more details on these functions.
 NB_MODULE(madrona_3d_example, m) {
+    // Each simulator has a madrona submodule that includes base types
+    // like madrona::py::Tensor and madrona::py::PyExecMode.
     madrona::py::setupMadronaSubmodule(m);
 
     nb::class_<Manager> (m, "SimManager")

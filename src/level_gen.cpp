@@ -19,6 +19,17 @@ enum class RoomType : uint32_t {
     NumTypes,
 };
 
+static inline float randInRangeCentered(Engine &ctx, float range)
+{
+    return ctx.data().rng.rand() * range - range / 2.f;
+}
+
+static inline float randBetween(Engine &ctx, float min, float max)
+{
+    return ctx.data().rng.rand() * (max - min) + min;
+}
+
+// Initialize the basic components needed for physics rigid body entities
 static inline void setupRigidBodyEntity(
     Engine &ctx,
     Entity e,
@@ -43,6 +54,10 @@ static inline void setupRigidBodyEntity(
     ctx.get<ExternalTorque>(e) = Vector3::zero();
 }
 
+// Register the entity with the broadphase system
+// This is needed for every entity with all the physics components.
+// Not registering an entity will cause a crash because the broadphase
+// systems will still execute over entities with the physics components.
 static void registerRigidBodyEntity(
     Engine &ctx,
     Entity e,
@@ -155,16 +170,9 @@ void createPersistentEntities(Engine &ctx)
     }
 }
 
-static inline float randInRangeCentered(Engine &ctx, float range)
-{
-    return ctx.data().rng.rand() * range - range / 2.f;
-}
-
-static inline float randBetween(Engine &ctx, float min, float max)
-{
-    return ctx.data().rng.rand() * (max - min) + min;
-}
-
+// Although agents and walls persist between episodes, we still need to
+// re-register them with the broadphase system and, in the case of the agents,
+// reset their positions.
 static void resetPersistentEntities(Engine &ctx)
 {
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
@@ -366,6 +374,7 @@ static void setupDoor(Engine &ctx,
     props.isPersistent = is_persistent;
 }
 
+// A room with a single button that needs to be pressed, the door stays open.
 static CountT makeSingleButtonRoom(Engine &ctx,
                                    Room &room,
                                    float y_min,
@@ -386,6 +395,8 @@ static CountT makeSingleButtonRoom(Engine &ctx,
     return 1;
 }
 
+// A room with two buttons that need to be pressed simultaneously,
+// the door stays open.
 static CountT makeDoubleButtonRoom(Engine &ctx,
                                    Room &room,
                                    float y_min,
@@ -484,6 +495,8 @@ static CountT makeCubeButtonsRoom(Engine &ctx,
     return 4;
 }
 
+// Make the doors and separator walls at the end of the room
+// before delegating to specific code based on room_type.
 static void makeRoom(Engine &ctx,
                      LevelState &level,
                      CountT room_idx,
@@ -512,6 +525,8 @@ static void makeRoom(Engine &ctx,
     default: MADRONA_UNREACHABLE();
     }
 
+    // Need to set any extra entities to type none so random uninitialized data
+    // from prior episodes isn't exported to pytorch as agent observations.
     for (CountT i = num_room_entities; i < consts::maxEntitiesPerRoom; i++) {
         room.entities[i].type = RoomEntityType::None;
     }

@@ -294,7 +294,7 @@ Manager::Impl * Manager::Impl::init(
             .worldInitPtr = world_inits.data(),
             .numWorldInitBytes = sizeof(WorldInit),
             .userConfigPtr = (void *)&sim_cfg,
-            .numUserConfigBytes = sizeof(Sim::Config),
+            .numUserConvi RfigBytes = sizeof(Sim::Config),
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = mgr_cfg.numWorlds,
