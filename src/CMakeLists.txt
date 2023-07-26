@@ -1,4 +1,5 @@
 set(SIMULATOR_SRCS
+    types.hpp
     sim.hpp sim.cpp
     init.hpp rng.hpp
     level_gen.hpp level_gen.cpp

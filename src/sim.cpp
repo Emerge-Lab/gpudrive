@@ -397,6 +397,10 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 }
 
+// Launches consts::numLidarSamples per agent.
+// This system is specially optimized in the GPU version:
+// a warp of threads is dispatched for each invocation of the system
+// and each thread in the warp traces one lidar ray for the agent.
 inline void lidarSystem(Engine &ctx,
                         Entity e,
                         Lidar &lidar)
@@ -430,7 +434,10 @@ inline void lidarSystem(Engine &ctx,
     };
 
 
+    // MADRONA_GPU_MODE guards GPU specific logic
 #ifdef MADRONA_GPU_MODE
+    // Can use standard cuda variables like threadIdx for 
+    // warp level programming
     int32_t idx = threadIdx.x % 32;
 
     if (idx < consts::numLidarSamples) {
@@ -443,6 +450,9 @@ inline void lidarSystem(Engine &ctx,
 #endif
 }
 
+// Computes reward for each agent and keeps track of the max distance achieved
+// so far through the challenge. Continuous reward is provided for any new
+// distance achieved.
 inline void rewardSystem(Engine &,
                          Position pos,
                          Progress &progress,
@@ -468,6 +478,8 @@ inline void rewardSystem(Engine &,
 
 // Each agent gets a small bonus to it's reward if the other agent has
 // progressed a similar distance, to encourage them to cooperate.
+// This system reads the values of the Progress component written by
+// rewardSystem for other agents, so it must run after.
 inline void bonusRewardSystem(Engine &ctx,
                               OtherAgents &others,
                               Progress &progress,
@@ -502,6 +514,11 @@ inline void doneSystem(Engine &ctx,
 
 }
 
+// Helper function for sorting nodes in the taskgraph.
+// Sorting is only supported / required on the GPU backend,
+// since the CPU backend currently keeps separate tables for each world.
+// This will likely change in the future with sorting required for both
+// environments
 #ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
 TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
@@ -611,6 +628,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     (void)clear_tmp;
 
 #ifdef MADRONA_GPU_MODE
+    // RecycleEntitiesNode is required on the GPU backend in order to reclaim
+    // deleted entity IDs.
     auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_sys});
     (void)recycle_sys;
 #endif
@@ -633,7 +652,12 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             RoomEntityObservations
         >>({post_reset_broadphase});
 
+    // The lidar system
 #ifdef MADRONA_GPU_MODE
+    // Note the use of CustomParallelForNode to create a taskgraph node
+    // that launches a warp of threads (32) for each invocation (1).
+    // The 32, 1 parameters could be changed to 32, 32 to create a system
+    // that cooperatively processes 32 entities within a warp.
     auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
         lidarSystem, 32, 1,
 #else
@@ -649,7 +673,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     }
 
 #ifdef MADRONA_GPU_MODE
-    // Sort entities, again, this could be conditional on reset.
+    // Sort entities, this could be conditional on reset like the second
+    // BVH build above.
     auto sort_agents = queueSortByWorld<Agent>(
         builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
@@ -681,7 +706,7 @@ Sim::Sim(Engine &ctx,
         4; // side walls + floor
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
-        consts::deltaT, consts::numPhysicsSubsteps, -9.8 * math::up,
+        consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
         consts::numAgents);
 
@@ -702,6 +727,10 @@ Sim::Sim(Engine &ctx,
     initWorld(ctx);
 }
 
+// This declaration is needed for the GPU backend in order to generate the
+// CUDA kernel for world initialization, which needs to be specialized to the
+// application's world data type (Sim) and config and initialization types.
+// On the CPU it is a no-op.
 MADRONA_BUILD_MWGPU_ENTRY(Engine, Sim, Sim::Config, WorldInit);
 
 }

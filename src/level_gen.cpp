@@ -521,13 +521,13 @@ static void generateLevel(Engine &ctx)
 {
     LevelState &level = ctx.singleton<LevelState>();
 
-    //makeRoom(ctx, level, 0, RoomType::SingleButton);
-    //makeRoom(ctx, level, 1, RoomType::DoubleButton);
-    //makeRoom(ctx, level, 2, RoomType::CubeButtons);
-
-    makeRoom(ctx, level, 0, RoomType::CubeButtons);
-    makeRoom(ctx, level, 1, RoomType::CubeButtons);
+    makeRoom(ctx, level, 0, RoomType::SingleButton);
+    makeRoom(ctx, level, 1, RoomType::DoubleButton);
     makeRoom(ctx, level, 2, RoomType::CubeButtons);
+
+    //makeRoom(ctx, level, 0, RoomType::CubeButtons);
+    //makeRoom(ctx, level, 1, RoomType::CubeButtons);
+    //makeRoom(ctx, level, 2, RoomType::CubeButtons);
 
 #if 0
     for (CountT i = 0; i < consts::numRooms; i++) {
