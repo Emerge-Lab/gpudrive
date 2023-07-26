@@ -301,7 +301,6 @@ Manager::Impl * Manager::Impl::init(
             .numExportedBuffers = (uint32_t)ExportID::NumExports, 
             .gpuID = (uint32_t)mgr_cfg.gpuID,
         }, {
-            "",
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,

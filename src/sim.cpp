@@ -518,7 +518,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 #endif
 
 
-void Sim::setupTasks(TaskGraph::Builder &builder, const Config &cfg)
+void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
     // Turn policy actions into movement
     auto move_sys = builder.addToGraph<ParallelForNode<Engine,
