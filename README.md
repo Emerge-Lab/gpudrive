@@ -79,7 +79,7 @@ If your machine doesn't support the GPU backend, simply remove the `--gpu-sim` a
 
 After 5000 updates, the policy should have finished training. You can run the policy and record a set of actions with:
 ```bash
-python scripts/infer.py build/checkpoints/5000.pth build/dumped_actions
+python scripts/infer.py --num-worlds 1 --num-steps 1000 --ckpt-path build/checkpoints/5000.pth --action-dump-path build/dumped_actions
 ```
 
 Finally, you can replay these actions in the `viewer` program to see how your agents behave:
