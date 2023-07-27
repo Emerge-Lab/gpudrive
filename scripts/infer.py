@@ -17,6 +17,7 @@ torch.manual_seed(0)
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('--gpu-id', type=int, default=0)
 arg_parser.add_argument('--ckpt-path', type=str, required=True)
+arg_parser.add_argument('--action-dump-path', type=str)
 
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-steps', type=int, required=True)
@@ -57,7 +58,10 @@ for shape in policy.recurrent_cfg.shapes:
     cur_rnn_states.append(torch.zeros(
         *shape[0:2], actions.shape[0], shape[2], dtype=torch.float32, device=torch.device('cpu')))
 
-action_log = open('/tmp/actions', 'wb')
+if args.action_dump_path:
+    action_log = open(args.action_dump_path, 'wb')
+else:
+    action_log = None
 
 for i in range(args.num_steps):
     with torch.no_grad():
@@ -66,7 +70,8 @@ for i in range(args.num_steps):
 
         probs = action_dists.probs()
 
-    actions.numpy().tofile(action_log)
+    if action_log:
+        actions.numpy().tofile(action_log)
 
     print()
     print("Self:", obs[0])
@@ -95,4 +100,5 @@ for i in range(args.num_steps):
     sim.step()
     print("Rewards:\n", rewards)
 
-action_log.close()
+if action_log:
+    action_log.close()

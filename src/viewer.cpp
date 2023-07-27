@@ -153,12 +153,8 @@ int main(int argc, char *argv[])
     }, viewer.rendererBridge());
 
     auto replayStep = [&]() {
-        if (cur_replay_step == num_replay_steps) {
-            cur_replay_step = 0;
-            for (uint32_t i = 0; i < num_worlds; i++) {
-                mgr.triggerReset(i);
-                mgr.step();
-            }
+        if (cur_replay_step == num_replay_steps - 1) {
+            return true;
         }
 
         printf("Step: %u\n", cur_replay_step);
@@ -181,6 +177,8 @@ int main(int argc, char *argv[])
         }
 
         cur_replay_step++;
+
+        return false;
     };
 
     auto self_printer = mgr.selfObservationTensor().makePrinter();
@@ -279,9 +277,13 @@ int main(int argc, char *argv[])
         }
 
         mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r, g);
-    }, [&mgr, &replay_log, &replayStep, &printObs]() {
+    }, [&]() {
         if (replay_log.has_value()) {
-            replayStep();
+            bool replay_finished = replayStep();
+
+            if (replay_finished) {
+                viewer.stopLoop();
+            }
         }
 
         mgr.step();
