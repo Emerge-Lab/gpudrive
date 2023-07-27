@@ -85,7 +85,7 @@ To get an understanding of the main simulation loop, view [`Sim::setupTasks`](ht
 
 At this point, you can continue reading [`src/sim.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp) and ['src/sim.hpp](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.hpp) where all the core simulation logic is located, or visit the [`generateWorld`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp#L558) function in [`src/level_gen.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp) to see how the levels are randomly generated.
 
-#### Connecting the Simulator to Python Training Code ####
+#### Initializing the Simulator and Interfacing with Python Training Code ####
 
 To see the bridging code that manages the data communication between PyTorch training code and the batch simulator, check out the `Manager` class in [`src/mgr.hpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/mgr.hpp) and [`src/mgr.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/mgr.cpp). On a related note, the python binding code lives in [`src/bindings.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/mgr.cpp). These bindings are just a thin wrapper around the `Manager` class using [`nanobind`](https://github.com/wjakob/nanobind).
 
