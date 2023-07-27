@@ -186,7 +186,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         };
     };
 
-    setupHull(SimObject::Cube, 0.5f, {
+    setupHull(SimObject::Cube, 0.1f, {
         .muS = 0.5f,
         .muD = 2.f,
     });
@@ -482,6 +482,17 @@ Tensor Manager::lidarTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::numLidarSamples,
+                               });
+}
+
+Tensor Manager::stepsRemainingTensor() const
+{
+    return impl_->exportTensor(ExportID::StepsRemaining,
+                               Tensor::ElementType::Int32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
+                                   1,
                                });
 }
 

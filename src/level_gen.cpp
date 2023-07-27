@@ -231,6 +231,7 @@ static void resetPersistentEntities(Engine &ctx)
          };
 
          ctx.get<Done>(agent_entity).v = 0;
+         ctx.get<StepsRemaining>(agent_entity).t = consts::episodeLen;
      }
 }
 
@@ -540,10 +541,8 @@ static void generateLevel(Engine &ctx)
     makeRoom(ctx, level, 1, RoomType::DoubleButton);
     makeRoom(ctx, level, 2, RoomType::CubeButtons);
 
-    //makeRoom(ctx, level, 0, RoomType::CubeButtons);
-    //makeRoom(ctx, level, 1, RoomType::CubeButtons);
-    //makeRoom(ctx, level, 2, RoomType::CubeButtons);
-
+    // An alternative implementation could randomly select the type for each
+    // room rather than a fixed progression of challenge difficulty
 #if 0
     for (CountT i = 0; i < consts::numRooms; i++) {
         RoomType room_type = (RoomType)(

@@ -156,6 +156,7 @@ train(
             num_epochs=2,
             clip_value_loss=args.clip_value_loss,
         ),
+        value_normalizer_decay = 0.999,
         mixed_precision = args.fp16,
     ),
     policy,

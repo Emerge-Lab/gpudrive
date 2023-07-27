@@ -29,8 +29,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
-
     registry.registerComponent<Lidar>();
+    registry.registerComponent<StepsRemaining>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -52,6 +52,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::RoomEntityObservations);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
+    registry.exportColumn<Agent, StepsRemaining>(
+        (uint32_t)ExportID::StepsRemaining);
     registry.exportColumn<Agent, Reward>(
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
@@ -78,8 +80,6 @@ static inline void cleanupWorld(Engine &ctx)
 
 static inline void initWorld(Engine &ctx)
 {
-    ctx.data().curEpisodeStep = 0;
-
     if (ctx.data().enableVizRender) {
         viz::VizRenderingSystem::reset(ctx);
     }
@@ -123,8 +123,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         if (ctx.data().enableVizRender) {
             viz::VizRenderingSystem::markEpisode(ctx);
         }
-    } else {
-        ctx.data().curEpisodeStep += 1;
     }
 }
 
@@ -354,6 +352,7 @@ static inline float computeZAngle(Quat q)
 inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
                                       Rotation rot,
+                                      const Progress &progress,
                                       const GrabState &grab,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
@@ -370,6 +369,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.globalX = globalPosObs(pos.x);
     self_obs.globalY = globalPosObs(pos.y);
     self_obs.globalZ = globalPosObs(pos.z);
+    self_obs.maxY = globalPosObs(progress.maxY);
     self_obs.theta = angleObs(computeZAngle(rot));
     self_obs.isGrabbing = grab.constraintEntity != Entity::none() ?
         1.f : 0.f;
@@ -514,15 +514,17 @@ inline void bonusRewardSystem(Engine &ctx,
     }
 }
 
-// Notify training that an episode has completed by
+// Keep track of the number of steps remaining in the episode and
+// notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
-inline void doneSystem(Engine &ctx,
-                       Done &done)
+inline void stepTrackerSystem(Engine &,
+                              StepsRemaining &steps_remaining,
+                              Done &done)
 {
-    int32_t cur_step = ctx.data().curEpisodeStep;
-    if (cur_step == 0) {
+    int32_t num_remaining = --steps_remaining.t;
+    if (num_remaining == consts::episodeLen - 1) {
         done.v = 0;
-    } else if (cur_step == consts::episodeLen -1) {
+    } else if (num_remaining == 0) {
         done.v = 1;
     }
 
@@ -628,7 +630,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<ParallelForNode<Engine,
-        doneSystem,
+        stepTrackerSystem,
+            StepsRemaining,
             Done
         >>({bonus_reward_sys});
 
@@ -659,6 +662,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         collectObservationsSystem,
             Position,
             Rotation,
+            Progress,
             GrabState,
             OtherAgents,
             SelfObservation,
@@ -723,8 +727,6 @@ Sim::Sim(Engine &ctx,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
         consts::numAgents);
-
-    curEpisodeStep = 0;
 
     enableVizRender = cfg.enableViewer;
 

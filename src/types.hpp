@@ -60,6 +60,7 @@ struct SelfObservation {
     float globalX;
     float globalY;
     float globalZ;
+    float maxY;
     float theta;
     float isGrabbing;
 };
@@ -105,6 +106,12 @@ static_assert(sizeof(RoomEntityObservations) == sizeof(float) *
 // Linear depth values in a circle around the agent
 struct Lidar {
     float depth[consts::numLidarSamples];
+};
+
+// Number of steps remaining in the episode. Allows non-recurrent policies
+// to track the progression of time.
+struct StepsRemaining {
+    uint32_t t;
 };
 
 // Tracks progress the agent has made through the challenge, used to add
@@ -206,6 +213,7 @@ struct Agent : public madrona::Archetype<
     PartnerObservations,
     RoomEntityObservations,
     Lidar,
+    StepsRemaining,
 
     // Reward, episode termination
     Reward,

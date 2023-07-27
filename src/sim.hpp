@@ -23,6 +23,7 @@ enum class ExportID : uint32_t {
     PartnerObservations,
     RoomEntityObservations,
     Lidar,
+    StepsRemaining,
     NumExports,
 };
 
@@ -86,9 +87,6 @@ struct Sim : public madrona::WorldBase {
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     Entity agents[consts::numAgents];
-
-    // Current step within this episode
-    int32_t curEpisodeStep;
 
     // Episode ID number
     int32_t curEpisodeIdx;

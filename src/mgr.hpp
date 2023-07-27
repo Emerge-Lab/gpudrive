@@ -47,6 +47,7 @@ public:
     MGR_EXPORT madrona::py::Tensor partnerObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor roomEntityObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
+    MGR_EXPORT madrona::py::Tensor stepsRemainingTensor() const;
 
     // These functions are used by the viewer to control the simulation
     // with keyboard inputs in place of DNN policy actions
