@@ -75,11 +75,11 @@ As mentioned above, this repo is intended to serve as a tutorial for how to use 
 
 We assume the reader is familiar with the key concepts of the entity component system (ECS) design pattern.  If you are unfamiliar with ECS concepts, we recommend that you check out Sander Martens' very useful [Entity Components FAQ](https://github.com/SanderMertens/ecs-faq). 
 
-#### Defining Simulator State: Components and Archetypes ####
+#### Defining the Simulation's State: Components and Archetypes ####
 
 Take a look at [`src/types.hpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/types.hpp#L28). This file defines the custom ECS components and archetypes used in the simulator. In particular, the `Agent` archetype defines all the components used by the agents in the simulation. Many of the `Agent` components are directly exported as PyTorch tensors.
 
-#### Defining Simulator Logic: Systems and the Task Graph ####
+#### Defining the Simulation's Logic: Systems and the Task Graph ####
 
 To get an understanding of the main simulation loop, view [`Sim::setupTasks`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp#L552). This function builds the task graph that defines the logic for each simulation step. Keep in mind this logic is carried out for all the unique worlds in a simulation batch. Take note of the ECS system functions (`movementSystem`, `collectObservationsSystem`, etc) that `setupTasks` enqueues into the task graph and the components they iterate over.
 
