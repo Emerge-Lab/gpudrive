@@ -11,19 +11,28 @@ If you're interested in using Madrona to implement a high-performance batch simu
 The Environment and Learning Task
 --------------
 
-As shown below, the simulated environment is a 3D environment consisting of two agents and a row of three rooms. All agents start in the first room, and must navigate to as many new rooms as possible. The agents must step on buttons or push movable blocks over buttons to trigger the opening of doors that lead to new rooms. Agents are rewarded based on their progress along the length of the level.
-
 [SMALL VIDEO CLIP HERE]
 
-Agents are controlled individually by the policy. The observation and action space are summarized below: 
+As shown above, the simulated environment is a 3D environment consisting of two agents and a row of three rooms. All agents start in the first room, and must navigate to as many new rooms as possible. The agents must step on buttons or push movable blocks over buttons to trigger the opening of doors that lead to new rooms. Agents are rewarded based on their progress along the length of the level.
 
-The inputs to the policy are:
- * TODO: XXXXXXX
+The codebase trains a shared policy that controls agents individually with direct engine inputs rather than pixel observations. Agents interact with the simulator as follows:
 
-The outputs of the policy (the agents' action space) are:
- * TODO: XXXXXXX
+Action Space:
+ * Movement amount: Egocentric polar coordinates for the direction and amount to move, translated to XY forces in the physics engine.
+ * Rotation amount: Torque applied to the agent to turn.
+ * Grab: Boolean, true to grab if possible or release if already holding an object.
 
-For specific details about the format of observations, refer to exported ECS components, referred to in the [walkthrough section](#simulator-code-walkthrough). 
+Observation Space:
+ * Global position.
+ * Position within the current room.
+ * Distance and direction to all the buttons and cubes in the current room (egocentric polar coordinates).
+ * 30 Lidar samples arrayed in a circle around the agent, giving distance to the nearest object along a direction.
+ * Whether the current room's door is open (boolean).
+ * Whether an object is currently grabbed (boolean).
+ * The max distance achieved so far in the level.
+ * The number of steps remaining in the episode.
+
+For specific details about the format of observations, refer to exported ECS components introduced in the [code walkthrough section](#simulator-code-walkthrough-learning-the-madrona-ecs-apis). 
 
 Overall the "full simulator" contains logic for three major concerns:
 * Procedurally generating a random 3D environment for each episode.
@@ -79,11 +88,11 @@ We assume the reader is familiar with the key concepts of the entity component s
 
 #### Defining the Simulation's State: Components and Archetypes ####
 
-Take a look at [`src/types.hpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/types.hpp#L28). This file defines the custom ECS components and archetypes used in the simulator. In particular, the `Agent` archetype defines all the components used by the agents in the simulation. Many of the `Agent` components are directly exported as PyTorch tensors.
+The first step to understanding the simulator's implementation is to understand the ECS components that make up the data in the simulation. All the custom logic in the simulation (as well as logic for built-in systems like physics) is written in terms of these data types. Take a look at [`src/types.hpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/types.hpp#L28). This file first defines all the ECS components as simple C++ structs and next declares the ECS archetypes in terms of the components they are composed of. For integration with learning, many of the components of the `Agent` archetype are directly exported as PyTorch tensors. For example, the `Action` component directly correspondes to the action space described above, and `RoomEntityObservations` is the agent observations of all the objects in each room.
 
 #### Defining the Simulation's Logic: Systems and the Task Graph ####
 
-To get an understanding of the main simulation loop, view [`Sim::setupTasks`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp#L552). This function builds the task graph that defines the logic for each simulation step. Keep in mind this logic is carried out for all the unique worlds in a simulation batch. Take note of the ECS system functions (`movementSystem`, `collectObservationsSystem`, etc) that `setupTasks` enqueues into the task graph and the components they iterate over.
+Next, to get an understanding of the main simulation loop, view [`Sim::setupTasks`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp#L552). This function builds the task graph that defines the logic for each simulation step. Keep in mind this logic is carried out for all the unique worlds in a simulation batch. Take note of the ECS system functions (`movementSystem`, `collectObservationsSystem`, etc) that `setupTasks` enqueues into the task graph and the components they iterate over.
 
 At this point, you can continue reading [`src/sim.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.cpp) and ['src/sim.hpp](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/sim.hpp) where all the core simulation logic is located, or visit the [`generateWorld`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp#L558) function in [`src/level_gen.cpp`](https://github.com/shacklettbp/madrona_3d_example/blob/main/src/level_gen.cpp) to see how the levels are randomly generated.
 
