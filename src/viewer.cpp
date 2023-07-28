@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 20,
+        .cameraMoveSpeed = 5.f,
         .execMode = exec_mode,
     });
 
@@ -297,5 +298,5 @@ int main(int argc, char *argv[])
         mgr.step();
         
         printObs();
-    });
+    }, []() {});
 }
