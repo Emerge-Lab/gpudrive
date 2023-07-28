@@ -110,9 +110,14 @@ struct DoorObservation {
     float isOpen; // 1.0 when open, 0.0 when closed.
 };
 
-// Linear depth values in a circle around the agent
+struct LidarSample {
+    float depth;
+    float encodedType;
+};
+
+// Linear depth values and entity type in a circle around the agent
 struct Lidar {
-    float depth[consts::numLidarSamples];
+    LidarSample samples[consts::numLidarSamples];
 };
 
 // Number of steps remaining in the episode. Allows non-recurrent policies
@@ -140,10 +145,13 @@ struct GrabState {
 
 // This enum is used to track the type of each entity for the purposes of
 // classifying the objects hit by each lidar sample.
-enum class RoomEntityType : uint32_t {
+enum class EntityType : uint32_t {
     None,
     Button,
     Cube,
+    Wall,
+    Agent,
+    Door,
     NumTypes,
 };
 
@@ -165,16 +173,11 @@ struct ButtonState {
     bool isPressed;
 };
 
-// The following types are not components but are used by the singleton
-// component "LevelState," below to represent the state of the full level
-struct RoomEntityState {
-    Entity e;
-    RoomEntityType type;
-};
-
+// Room itself is not a component but is used by the singleton
+// component "LevelState" (below) to represent the state of the full level
 struct Room {
     // These are entities the agent will interact with
-    RoomEntityState entities[consts::maxEntitiesPerRoom];
+    Entity entities[consts::maxEntitiesPerRoom];
 
     // The walls that separate this room from the next
     Entity walls[2];
@@ -213,6 +216,7 @@ struct Agent : public madrona::Archetype<
     GrabState,
     Progress,
     OtherAgents,
+    EntityType,
 
     // Input
     Action,
@@ -249,7 +253,8 @@ struct DoorEntity : public madrona::Archetype<
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
     OpenState,
-    DoorProperties
+    DoorProperties,
+    EntityType
 > {};
 
 // Archetype for the button objects that open the doors
@@ -259,10 +264,12 @@ struct ButtonEntity : public madrona::Archetype<
     Rotation,
     Scale,
     ObjectID,
-    ButtonState
+    ButtonState,
+    EntityType
 > {};
 
-// Generic archetype for entities that need physics but no other special state
+// Generic archetype for entities that need physics but don't have custom
+// logic associated with them.
 struct PhysicsEntity : public madrona::Archetype<
     Position, 
     Rotation,
@@ -275,7 +282,8 @@ struct PhysicsEntity : public madrona::Archetype<
     madrona::phys::solver::PreSolveVelocity,
     ExternalForce,
     ExternalTorque,
-    madrona::phys::broadphase::LeafID
+    madrona::phys::broadphase::LeafID,
+    EntityType
 > {};
 
 }

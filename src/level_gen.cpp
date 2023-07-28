@@ -36,6 +36,7 @@ static inline void setupRigidBodyEntity(
     Vector3 pos,
     Quat rot,
     SimObject sim_obj,
+    EntityType entity_type,
     ResponseType response_type = ResponseType::Dynamic,
     Diag3x3 scale = {1, 1, 1})
 {
@@ -52,6 +53,7 @@ static inline void setupRigidBodyEntity(
     ctx.get<ResponseType>(e) = response_type;
     ctx.get<ExternalForce>(e) = Vector3::zero();
     ctx.get<ExternalTorque>(e) = Vector3::zero();
+    ctx.get<EntityType>(e) = entity_type;
 }
 
 // Register the entity with the broadphase system
@@ -80,6 +82,7 @@ void createPersistentEntities(Engine &ctx)
         Vector3 { 0, 0, 0 },
         Quat { 1, 0, 0, 0 },
         SimObject::Plane,
+        EntityType::None, // Floor plane type should never be queried
         ResponseType::Static);
 
     // Create the outer wall entities
@@ -95,6 +98,7 @@ void createPersistentEntities(Engine &ctx)
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
+        EntityType::Wall,
         ResponseType::Static,
         Diag3x3 {
             consts::worldWidth + consts::wallWidth * 2,
@@ -114,6 +118,7 @@ void createPersistentEntities(Engine &ctx)
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
+        EntityType::Wall,
         ResponseType::Static,
         Diag3x3 {
             consts::wallWidth,
@@ -133,6 +138,7 @@ void createPersistentEntities(Engine &ctx)
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
+        EntityType::Wall,
         ResponseType::Static,
         Diag3x3 {
             consts::wallWidth,
@@ -150,6 +156,7 @@ void createPersistentEntities(Engine &ctx)
         ctx.get<ObjectID>(agent) = ObjectID { (int32_t)SimObject::Agent };
         ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
         ctx.get<GrabState>(agent).constraintEntity = Entity::none();
+        ctx.get<EntityType>(agent) = EntityType::Agent;
     }
 
     // Populate OtherAgents component, which maintains a reference to the
@@ -259,6 +266,7 @@ static void makeEndWall(Engine &ctx,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
+        EntityType::Wall,
         ResponseType::Static,
         Diag3x3 {
             left_len,
@@ -280,6 +288,7 @@ static void makeEndWall(Engine &ctx,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Wall,
+        EntityType::Wall,
         ResponseType::Static,
         Diag3x3 {
             right_len,
@@ -299,6 +308,7 @@ static void makeEndWall(Engine &ctx,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Door,
+        EntityType::Door,
         ResponseType::Static,
         Diag3x3 {
             consts::doorWidth * 0.8f,
@@ -331,6 +341,7 @@ static Entity makeButton(Engine &ctx,
     };
     ctx.get<ObjectID>(button) = ObjectID { (int32_t)SimObject::Button };
     ctx.get<ButtonState>(button).isPressed = false;
+    ctx.get<EntityType>(button) = EntityType::Button;
 
     return button;
 }
@@ -350,6 +361,7 @@ static Entity makeCube(Engine &ctx,
         },
         Quat { 1, 0, 0, 0 },
         SimObject::Cube,
+        EntityType::Cube,
         ResponseType::Dynamic,
         Diag3x3 {
             1.f,
@@ -390,8 +402,7 @@ static CountT makeSingleButtonRoom(Engine &ctx,
 
     setupDoor(ctx, room.door, { button }, true);
 
-    room.entities[0].type = RoomEntityType::Button;
-    room.entities[0].e = button;
+    room.entities[0] = button;
 
     return 1;
 }
@@ -425,11 +436,8 @@ static CountT makeDoubleButtonRoom(Engine &ctx,
 
     setupDoor(ctx, room.door, { a, b }, true);
 
-    room.entities[0].type = RoomEntityType::Button;
-    room.entities[0].e = a;
-
-    room.entities[1].type = RoomEntityType::Button;
-    room.entities[1].e = b;
+    room.entities[0] = a;
+    room.entities[1] = b;
 
     return 2;
 }
@@ -484,14 +492,10 @@ static CountT makeCubeButtonsRoom(Engine &ctx,
 
     Entity cube_b = makeCube(ctx, cube_b_x, cube_b_y);
 
-    room.entities[0].type = RoomEntityType::Button;
-    room.entities[0].e = button_a;
-    room.entities[1].type = RoomEntityType::Button;
-    room.entities[1].e = button_b;
-    room.entities[2].type = RoomEntityType::Cube;
-    room.entities[2].e = cube_a;
-    room.entities[3].type = RoomEntityType::Cube;
-    room.entities[3].e = cube_b;
+    room.entities[0] = button_a;
+    room.entities[1] = button_b;
+    room.entities[2] = cube_a;
+    room.entities[3] = cube_b;
 
     return 4;
 }
@@ -529,7 +533,7 @@ static void makeRoom(Engine &ctx,
     // Need to set any extra entities to type none so random uninitialized data
     // from prior episodes isn't exported to pytorch as agent observations.
     for (CountT i = num_room_entities; i < consts::maxEntitiesPerRoom; i++) {
-        room.entities[i].type = RoomEntityType::None;
+        room.entities[i] = Entity::none();
     }
 }
 

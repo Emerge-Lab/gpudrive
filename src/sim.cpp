@@ -32,6 +32,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<DoorProperties>();
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
+    registry.registerComponent<EntityType>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -70,8 +71,8 @@ static inline void cleanupWorld(Engine &ctx)
     for (CountT i = 0; i < consts::numRooms; i++) {
         Room &room = level.rooms[i];
         for (CountT j = 0; j < consts::maxEntitiesPerRoom; j++) {
-            if (room.entities[j].type != RoomEntityType::None) {
-                ctx.destroyEntity(room.entities[j].e);
+            if (room.entities[j] != Entity::none()) {
+                ctx.destroyEntity(room.entities[j]);
             }
         }
 
@@ -201,6 +202,11 @@ inline void grabSystem(Engine &ctx,
 
     auto response_type = ctx.get<ResponseType>(grab_entity);
     if (response_type != ResponseType::Dynamic) {
+        return;
+    }
+
+    auto entity_type = ctx.get<EntityType>(grab_entity);
+    if (entity_type == EntityType::Agent) {
         return;
     }
 
@@ -338,9 +344,9 @@ static inline PolarObservation xyToPolar(Vector3 v)
     };
 }
 
-static inline float encodeDynType(RoomEntityType type)
+static inline float encodeType(EntityType type)
 {
-    return (float)type / (float)RoomEntityType::NumTypes;
+    return (float)type / (float)EntityType::NumTypes;
 }
 
 static inline float computeZAngle(Quat q)
@@ -399,16 +405,19 @@ inline void collectObservationsSystem(Engine &ctx,
     const Room &room = level.rooms[cur_room_idx];
 
     for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
-        RoomEntityState entity_info = room.entities[i];
-        EntityObservation ob;
-        ob.encodedType = encodeDynType(entity_info.type);
+        Entity entity = room.entities[i];
 
-        if (entity_info.type == RoomEntityType::None) {
+        EntityObservation ob;
+        if (entity == Entity::none()) {
             ob.polar = { 0.f, 1.f };
+            ob.encodedType = encodeType(EntityType::None);
         } else {
-            Vector3 entity_pos = ctx.get<Position>(entity_info.e);
+            Vector3 entity_pos = ctx.get<Position>(entity);
+            EntityType entity_type = ctx.get<EntityType>(entity);
+
             Vector3 to_entity = entity_pos - pos;
             ob.polar = xyToPolar(to_view.rotateVec(to_entity));
+            ob.encodedType = encodeType(entity_type);
         }
 
         room_ent_obs.obs[i] = ob;
@@ -452,9 +461,17 @@ inline void lidarSystem(Engine &ctx,
                          &hit_normal, 200.f);
 
         if (hit_entity == Entity::none()) {
-            lidar.depth[idx] = 0.f;
+            lidar.samples[idx] = {
+                .depth = 0.f,
+                .encodedType = encodeType(EntityType::None),
+            };
         } else {
-            lidar.depth[idx] = distObs(hit_t);
+            EntityType entity_type = ctx.get<EntityType>(hit_entity);
+
+            lidar.samples[idx] = {
+                .depth = distObs(hit_t),
+                .encodedType = encodeType(entity_type),
+            };
         }
     };
 

@@ -70,7 +70,7 @@ def process_obs(self_obs, partner_obs, room_ent_obs,
         partner_obs.view(partner_obs.shape[0], -1),
         room_ent_obs.view(room_ent_obs.shape[0], -1),
         door_obs.view(door_obs.shape[0], -1),
-        lidar,
+        lidar.view(lidar.shape[0], -1),
         steps_remaining.float() / 200,
         ids,
     ], dim=1)
