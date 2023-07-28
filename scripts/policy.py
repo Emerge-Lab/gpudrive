@@ -73,26 +73,26 @@ def process_obs(self_obs, partner_obs, room_ent_obs,
     ], dim=1)
 
 def make_policy(num_obs_features, num_channels, separate_value):
-    encoder = RecurrentBackboneEncoder(
-        net = MLP(
-            input_dim = num_obs_features,
-            num_channels = num_channels,
-            num_layers = 2,
-        ),
-        rnn = LSTM(
-            in_channels = num_channels,
-            hidden_channels = num_channels,
-            num_layers = 1,
-        ),
-    )
-
-    #encoder = BackboneEncoder(
+    #encoder = RecurrentBackboneEncoder(
     #    net = MLP(
     #        input_dim = num_obs_features,
     #        num_channels = num_channels,
-    #        num_layers = 3,
+    #        num_layers = 2,
+    #    ),
+    #    rnn = LSTM(
+    #        in_channels = num_channels,
+    #        hidden_channels = num_channels,
+    #        num_layers = 1,
     #    ),
     #)
+
+    encoder = BackboneEncoder(
+        net = MLP(
+            input_dim = num_obs_features,
+            num_channels = num_channels,
+            num_layers = 3,
+        ),
+    )
 
     if separate_value:
         backbone = BackboneSeparate(

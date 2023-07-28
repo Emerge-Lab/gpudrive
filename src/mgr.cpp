@@ -447,7 +447,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   7,
+                                   8,
                                });
 }
 
