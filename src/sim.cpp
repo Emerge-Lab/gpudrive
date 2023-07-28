@@ -26,6 +26,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
     registry.registerComponent<RoomEntityObservations>();
+    registry.registerComponent<DoorObservation>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -50,6 +51,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::PartnerObservations);
     registry.exportColumn<Agent, RoomEntityObservations>(
         (uint32_t)ExportID::RoomEntityObservations);
+    registry.exportColumn<Agent, DoorObservation>(
+        (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
@@ -357,7 +360,8 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
-                                      RoomEntityObservations &room_ent_obs)
+                                      RoomEntityObservations &room_ent_obs,
+                                      DoorObservation &door_obs)
 {
     CountT cur_room_idx = CountT(pos.y / consts::roomLength);
     cur_room_idx = std::max(CountT(0), 
@@ -409,6 +413,13 @@ inline void collectObservationsSystem(Engine &ctx,
 
         room_ent_obs.obs[i] = ob;
     }
+
+    Entity cur_door = room.door;
+    Vector3 door_pos = ctx.get<Position>(cur_door);
+    OpenState door_open_state = ctx.get<OpenState>(cur_door);
+
+    door_obs.polar = xyToPolar(to_view.rotateVec(door_pos - pos));
+    door_obs.isOpen = door_open_state.isOpen ? 1.f : 0.f;
 }
 
 // Launches consts::numLidarSamples per agent.
@@ -667,7 +678,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             OtherAgents,
             SelfObservation,
             PartnerObservations,
-            RoomEntityObservations
+            RoomEntityObservations,
+            DoorObservation
         >>({post_reset_broadphase});
 
     // The lidar system

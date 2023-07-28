@@ -475,6 +475,17 @@ Tensor Manager::roomEntityObservationsTensor() const
                                });
 }
 
+Tensor Manager::doorObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::DoorObservation,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numAgents,
+                                   3,
+                               });
+}
+
 Tensor Manager::lidarTensor() const
 {
     return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,

@@ -537,20 +537,20 @@ static void generateLevel(Engine &ctx)
 {
     LevelState &level = ctx.singleton<LevelState>();
 
+#if 0
     makeRoom(ctx, level, 0, RoomType::SingleButton);
     makeRoom(ctx, level, 1, RoomType::DoubleButton);
     makeRoom(ctx, level, 2, RoomType::CubeButtons);
+#endif
 
     // An alternative implementation could randomly select the type for each
     // room rather than a fixed progression of challenge difficulty
-#if 0
     for (CountT i = 0; i < consts::numRooms; i++) {
         RoomType room_type = (RoomType)(
             ctx.data().rng.rand() * (uint32_t)RoomType::NumTypes);
 
         makeRoom(ctx, level, i, room_type);
     }
-#endif
 }
 
 // Randomly generate a new world for a training episode

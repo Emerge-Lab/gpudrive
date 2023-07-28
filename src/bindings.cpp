@@ -39,6 +39,8 @@ NB_MODULE(madrona_3d_example, m) {
         .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
         .def("room_entity_observations_tensor",
              &Manager::roomEntityObservationsTensor)
+        .def("door_observation_tensor",
+             &Manager::doorObservationTensor)
         .def("lidar_tensor", &Manager::lidarTensor)
         .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
     ;

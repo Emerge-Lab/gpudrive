@@ -184,6 +184,7 @@ int main(int argc, char *argv[])
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
     auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
+    auto door_printer = mgr.doorObservationTensor().makePrinter();
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
@@ -197,6 +198,9 @@ int main(int argc, char *argv[])
 
         printf("Room Entities\n");
         room_ent_printer.print();
+
+        printf("Door\n");
+        door_printer.print();
 
         printf("Lidar\n");
         lidar_printer.print();

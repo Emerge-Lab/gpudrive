@@ -103,6 +103,13 @@ struct RoomEntityObservations {
 static_assert(sizeof(RoomEntityObservations) == sizeof(float) *
     consts::maxEntitiesPerRoom * 3);
 
+// Observation of the current room's door. It's relative position and
+// whether or not it is ope
+struct DoorObservation {
+    PolarObservation polar;
+    float isOpen; // 1.0 when open, 0.0 when closed.
+};
+
 // Linear depth values in a circle around the agent
 struct Lidar {
     float depth[consts::numLidarSamples];
@@ -131,6 +138,15 @@ struct GrabState {
     Entity constraintEntity;
 };
 
+// This enum is used to track the type of each entity for the purposes of
+// classifying the objects hit by each lidar sample.
+enum class RoomEntityType : uint32_t {
+    None,
+    Button,
+    Cube,
+    NumTypes,
+};
+
 // A per-door component that tracks whether or not the door should be open.
 struct OpenState {
     bool isOpen;
@@ -151,13 +167,6 @@ struct ButtonState {
 
 // The following types are not components but are used by the singleton
 // component "LevelState," below to represent the state of the full level
-enum class RoomEntityType : uint32_t {
-    None,
-    Button,
-    Cube,
-    NumTypes,
-};
-
 struct RoomEntityState {
     Entity e;
     RoomEntityType type;
@@ -212,6 +221,7 @@ struct Agent : public madrona::Archetype<
     SelfObservation,
     PartnerObservations,
     RoomEntityObservations,
+    DoorObservation,
     Lidar,
     StepsRemaining,
 
