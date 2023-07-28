@@ -4,7 +4,7 @@ Madrona 3D Example Simulator
 This is an example RL environment simulator built on the [Madrona Engine](https://madrona-engine.github.io). 
 The goal of this repository is to provide a simple reference that demonstrates how to use Madrona's ECS APIs and 
 how to interface with the engine's rigid body physics and rendering functionality.
-This example also demonstrates how to integrate the simulator with python code for evaluating agent polices and/or policy learning. (In this case, the external learning code is a PyTorch PPO training loop.) We also provide a simple training script that performs end-to-end agent training, so readers with a fast GPU should be able to train useful policies in minutes.
+This example also demonstrates how to integrate the simulator with python code for evaluating agent polices and/or policy learning. Specifically, this codebase includes a simple PyTorch PPO training loop integrated with the simulator that can train agents in under an hour on high end GPUs.
 
 If you're interested in using Madrona to implement a high-performance batch simulator for a new environment or RL training task, we highly recommend forking this repo and adding/removing code as needed, rather than starting from scratch. This will ensure the build system and backends are setup correctly.
 
@@ -15,13 +15,15 @@ As shown below, the simulated environment is a 3D environment consisting of two 
 
 [SMALL VIDEO CLIP HERE]
 
-All agents use the same policy.
+Agents are controlled individually by the policy. The observation and action space are summarized below: 
 
 The inputs to the policy are:
  * TODO: XXXXXXX
 
 The outputs of the policy (the agents' action space) are:
  * TODO: XXXXXXX
+
+For specific details about the format of observations, refer to exported ECS components, referred to in the [walkthrough section](#simulator-code-walkthrough). 
 
 Overall the "full simulator" contains logic for three major concerns:
 * Procedurally generating a random 3D environment for each episode.
