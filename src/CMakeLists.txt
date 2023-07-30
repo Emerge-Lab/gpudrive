@@ -30,7 +30,7 @@ target_link_libraries(madrona_3d_example_mgr
         madrona_mw_cpu
         madrona_common
         madrona_importer
-        madrona_physics_assets
+        madrona_physics_loader
 )
 
 if (TARGET madrona_mw_gpu)

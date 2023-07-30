@@ -3,7 +3,7 @@
 
 #include <madrona/utils.hpp>
 #include <madrona/importer.hpp>
-#include <madrona/physics_assets.hpp>
+#include <madrona/physics_loader.hpp>
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
 
@@ -130,9 +130,6 @@ struct Manager::CUDAImpl final : Manager::Impl {
 
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
-    using SourceCollisionObject = PhysicsLoader::SourceCollisionObject;
-    using SourceCollisionPrimitive = PhysicsLoader::SourceCollisionPrimitive;
-
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
@@ -151,12 +148,15 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     }
 
     char import_err_buffer[4096];
-    auto imported_hulls = imp::ImportedAssets::importFromDisk(
+    auto imported_src_hulls = imp::ImportedAssets::importFromDisk(
         asset_cstrs, import_err_buffer, true);
 
-    if (!imported_hulls.has_value()) {
+    if (!imported_src_hulls.has_value()) {
         FATAL("%s", import_err_buffer);
     }
+
+    DynArray<imp::SourceMesh> src_convex_hulls(
+        imported_src_hulls->objects.size());
 
     DynArray<DynArray<SourceCollisionPrimitive>> prim_arrays(0);
     HeapArray<SourceCollisionObject> src_objs(
@@ -165,14 +165,15 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     auto setupHull = [&](SimObject obj_id,
                          float inv_mass,
                          RigidBodyFrictionData friction) {
-        auto meshes = imported_hulls->objects[(CountT)obj_id].meshes;
+        auto meshes = imported_src_hulls->objects[(CountT)obj_id].meshes;
         DynArray<SourceCollisionPrimitive> prims(meshes.size());
 
         for (const imp::SourceMesh &mesh : meshes) {
+            src_convex_hulls.push_back(mesh);
             prims.push_back({
                 .type = CollisionPrimitive::Type::Hull,
                 .hullInput = {
-                    .mesh = &mesh,
+                    .hullIDX = uint32_t(src_convex_hulls.size() - 1),
                 },
             });
         }
@@ -224,39 +225,31 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         },
     };
 
-    auto phys_objs_res = loader.importRigidBodyData(
-        src_objs.data(), src_objs.size(), false);
+    StackAlloc tmp_alloc;
+    RigidBodyAssets rigid_body_assets;
+    CountT num_rigid_body_data_bytes;
+    void *rigid_body_data = RigidBodyAssets::processRigidBodyAssets(
+        src_convex_hulls,
+        src_objs,
+        false,
+        tmp_alloc,
+        &rigid_body_assets,
+        &num_rigid_body_data_bytes);
 
-    if (!phys_objs_res.has_value()) {
+    if (rigid_body_data == nullptr) {
         FATAL("Invalid collision hull input");
     }
-
-    auto &phys_objs = *phys_objs_res;
 
     // This is a bit hacky, but in order to make sure the agents
     // remain controllable by the policy, they are only allowed to
     // rotate around the Z axis (infinite inertia in x & y axes)
-    phys_objs.metadatas[
+    rigid_body_assets.metadatas[
         (CountT)SimObject::Agent].mass.invInertiaTensor.x = 0.f;
-    phys_objs.metadatas[
+    rigid_body_assets.metadatas[
         (CountT)SimObject::Agent].mass.invInertiaTensor.y = 0.f;
 
-    loader.loadObjects(
-        phys_objs.metadatas.data(),
-        phys_objs.objectAABBs.data(),
-        phys_objs.primOffsets.data(),
-        phys_objs.primCounts.data(),
-        phys_objs.metadatas.size(),
-        phys_objs.collisionPrimitives.data(),
-        phys_objs.primitiveAABBs.data(),
-        phys_objs.collisionPrimitives.size(),
-        phys_objs.hullData.halfEdges.data(),
-        phys_objs.hullData.halfEdges.size(),
-        phys_objs.hullData.faceBaseHEs.data(),
-        phys_objs.hullData.facePlanes.data(),
-        phys_objs.hullData.facePlanes.size(),
-        phys_objs.hullData.positions.data(),
-        phys_objs.hullData.positions.size());
+    loader.loadRigidBodies(rigid_body_assets);
+    free(rigid_body_data);
 }
 
 Manager::Impl * Manager::Impl::init(
