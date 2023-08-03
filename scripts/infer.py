@@ -1,4 +1,4 @@
-import madrona_3d_example
+import madrona_escape_room
 
 from madrona_learn import LearningState
 
@@ -30,8 +30,8 @@ arg_parser.add_argument('--gpu-sim', action='store_true')
 
 args = arg_parser.parse_args()
 
-sim = madrona_3d_example.SimManager(
-    exec_mode = madrona_3d_example.madrona.ExecMode.CUDA if args.gpu_sim else madrona_3d_example.madrona.ExecMode.CPU,
+sim = madrona_escape_room.SimManager(
+    exec_mode = madrona_escape_room.madrona.ExecMode.CUDA if args.gpu_sim else madrona_escape_room.madrona.ExecMode.CPU,
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
     auto_reset = True,
