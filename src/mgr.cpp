@@ -24,7 +24,7 @@ using namespace madrona::math;
 using namespace madrona::phys;
 using namespace madrona::py;
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 struct Manager::Impl {
     Config cfg;

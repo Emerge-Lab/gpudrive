@@ -24,7 +24,7 @@ using namespace madrona::viz;
 
 int main(int argc, char *argv[])
 {
-    using namespace Madrona3DExample;
+    using namespace madEscape;
 
     if (argc < 4) {
         fprintf(stderr, "%s TYPE NUM_WORLDS NUM_STEPS [--rand-actions]\n", argv[0]);

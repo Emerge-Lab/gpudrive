@@ -4,9 +4,9 @@ build-backend = "madrona-py-build"
 backend-path = ["external/madrona/py"]
 
 [project]
-name = "madrona_3d_example"
+name = "madrona_escape_room"
 version = "0.0.1"
 
-[tool.madrona.packages.madrona_3d_example]
+[tool.madrona.packages.madrona_escape_room]
 ext-only = true
 ext-out-dir = "build"

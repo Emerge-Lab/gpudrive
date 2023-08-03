@@ -1,6 +1,6 @@
 #include "level_gen.hpp"
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 using namespace madrona;
 using namespace madrona::math;

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 // Simple PRNG intended to be initialized with episode ID.
 class RNG {

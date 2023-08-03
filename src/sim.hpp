@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 class Engine;
 

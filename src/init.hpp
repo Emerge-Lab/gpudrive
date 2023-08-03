@@ -2,7 +2,7 @@
 
 #include <madrona/physics.hpp>
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 struct EpisodeManager {
     madrona::AtomicU32 curEpisode;

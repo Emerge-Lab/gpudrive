@@ -2,7 +2,7 @@
 
 #include "sim.hpp"
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 // Creates agents, outer walls and floor. Entities that will persist across
 // all episodes.

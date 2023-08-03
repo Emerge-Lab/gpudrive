@@ -7,7 +7,7 @@
 
 #include "consts.hpp"
 
-namespace Madrona3DExample {
+namespace madEscape {
 
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;

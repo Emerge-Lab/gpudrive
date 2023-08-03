@@ -45,7 +45,7 @@ static HeapArray<int32_t> readReplayLog(const char *path)
 
 int main(int argc, char *argv[])
 {
-    using namespace Madrona3DExample;
+    using namespace madEscape;
 
     constexpr int64_t num_views = 2;
 
