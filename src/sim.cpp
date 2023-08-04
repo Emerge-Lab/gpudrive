@@ -10,7 +10,7 @@ using namespace madrona::phys;
 namespace madEscape {
 
 // Register all the ECS components and archetypes that will be
-// use in the simulation
+// used in the simulation
 void Sim::registerTypes(ECSRegistry &registry, const Config &)
 {
     base::registerTypes(registry);
