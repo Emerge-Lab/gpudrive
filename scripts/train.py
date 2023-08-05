@@ -1,6 +1,6 @@
 import madrona_escape_room
 
-from madrona_learn import (
+from madrona_escape_room_learn import (
     train, profile, TrainConfig, PPOConfig, SimInterface,
 )
 

@@ -4,7 +4,7 @@ Madrona Escape Room
 This is an example RL environment simulator built on the [Madrona Engine](https://madrona-engine.github.io). 
 The goal of this repository is to provide a simple reference that demonstrates how to use Madrona's ECS APIs and 
 how to interface with the engine's rigid body physics and rendering functionality.
-This example also demonstrates how to integrate the simulator with python code for evaluating agent polices and/or policy learning. Specifically, this codebase includes a simple PyTorch PPO training loop integrated with the simulator that can train agents in under an hour on high end GPUs.
+This example also demonstrates how to integrate the simulator with python code for evaluating agent polices and/or policy learning. Specifically, this codebase includes a simple PyTorch PPO training loop integrated with the simulator that can train agents in under an hour on a high end GPU.
 
 If you're interested in using Madrona to implement a high-performance batch simulator for a new environment or RL training task, we highly recommend forking this repo and adding/removing code as needed, rather than starting from scratch. This will ensure the build system and backends are setup correctly.
 
@@ -112,16 +112,16 @@ Training Agents
 
 In addition to the simulator itself, this repo contains a simple PPO implementation (in PyTorch) to demonstrate how to integrate a training codebase with a Madrona batch simulator. [`scripts/train.py`](https://github.com/shacklettbp/madrona_escape_room/blob/main/scripts/train.py) is the training code entry point.
 
-For example, the following settings will produce agents that can at least solve the first two rooms in just a few minutes on a RTX 3090:
+For example, the following settings will produce agents that should be able to solve all three rooms fairly consistently:
 ```bash
-python scripts/train.py --num-worlds 8192 --num-updates 5000 --gpu-sim --ckpt-dir build/checkpoints/
+python scripts/train.py --num-worlds 8192 --num-updates 5000 --profile-report --fp16 --gpu-sim --ckpt-dir build/checkpoints/
 ```
 
 If your machine doesn't support the GPU backend, simply remove the `--gpu-sim` argument above and consider reducing the `--num-worlds` argument to reduce the batch size. 
 
 After 5000 updates, the policy should have finished training. You can run the policy and record a set of actions with:
 ```bash
-python scripts/infer.py --num-worlds 1 --num-steps 1000 --ckpt-path build/checkpoints/5000.pth --action-dump-path build/dumped_actions
+python scripts/infer.py --num-worlds 1 --num-steps 1000 --fp16 --ckpt-path build/checkpoints/5000.pth --action-dump-path build/dumped_actions
 ```
 
 Finally, you can replay these actions in the `viewer` program to see how your agents behave:
@@ -131,9 +131,11 @@ Finally, you can replay these actions in the `viewer` program to see how your ag
 
 Hold down right click and use WASD to fly around the environment, or use controls in the UI to following a viewer in first-person mode. Hopefully your agents perform similarly to those in the video at the start of this README!
 
+Note that the hyperparameters chosen in scripts/train.py are likely non-optimal. Let us know if you find ones that train faster.
+
 Citation
 --------
-If you use Madrona in a research project, please cite our SIGGRAPH paper!
+If you use Madrona in a research project, please cite our SIGGRAPH paper.
 
 ```
 @article{shacklett23madrona,

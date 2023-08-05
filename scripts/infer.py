@@ -1,6 +1,6 @@
 import madrona_escape_room
 
-from madrona_learn import LearningState
+from madrona_escape_room_learn import LearningState
 
 from policy import make_policy, setup_obs
 
@@ -22,7 +22,7 @@ arg_parser.add_argument('--action-dump-path', type=str)
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-steps', type=int, required=True)
 
-arg_parser.add_argument('--num-channels', type=int, default=1024)
+arg_parser.add_argument('--num-channels', type=int, default=512)
 arg_parser.add_argument('--separate-value', action='store_true')
 arg_parser.add_argument('--fp16', action='store_true')
 

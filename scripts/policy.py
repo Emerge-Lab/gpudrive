@@ -1,14 +1,14 @@
-from madrona_learn import (
+from madrona_escape_room_learn import (
     ActorCritic, DiscreteActor, Critic, 
     BackboneShared, BackboneSeparate,
     BackboneEncoder, RecurrentBackboneEncoder,
 )
 
-from madrona_learn.models import (
+from madrona_escape_room_learn.models import (
     MLP, LinearLayerDiscreteActor, LinearLayerCritic,
 )
 
-from madrona_learn.rnn import LSTM, FastLSTM
+from madrona_escape_room_learn.rnn import LSTM
 
 import math
 import torch

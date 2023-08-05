@@ -10,3 +10,7 @@ version = "0.0.1"
 [tool.madrona.packages.madrona_escape_room]
 ext-only = true
 ext-out-dir = "build"
+
+# This module includes the PPO implementation for the training demo
+[tool.madrona.packages.madrona_escape_room_learn]
+path = "train_src/madrona_escape_room_learn"
