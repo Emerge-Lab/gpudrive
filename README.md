@@ -110,7 +110,7 @@ The code that integrates with our visualization infrastructure is located in [`s
 Training Agents 
 --------------------------------
 
-In addition to the simulator itself, this repo contains a simple PPO implementation (in PyTorch) to demonstrate how to integrate a training codebase with a Madrona batch simulator. [`scripts/train.py`](https://github.com/shacklettbp/madrona_escape_room/blob/main/scripts/train.py) is the training code entry point, while the bulk of the PPO implementation is in `train_src/madrona_escape_room_learn`. 
+In addition to the simulator itself, this repo contains a simple PPO implementation (in PyTorch) to demonstrate how to integrate a training codebase with a Madrona batch simulator. [`scripts/train.py`](https://github.com/shacklettbp/madrona_escape_room/blob/main/scripts/train.py) is the training code entry point, while the bulk of the PPO implementation is in [train_src/madrona_escape_room_learn](https://github.com/shacklettbp/madrona_escape_room/blob/main/train_src/madrona_escape_room_learn). 
 
 For example, the following settings will produce agents that should be able to solve all three rooms fairly consistently:
 ```bash
