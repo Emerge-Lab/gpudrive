@@ -22,7 +22,7 @@ arg_parser.add_argument('--action-dump-path', type=str)
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-steps', type=int, required=True)
 
-arg_parser.add_argument('--num-channels', type=int, default=512)
+arg_parser.add_argument('--num-channels', type=int, default=256)
 arg_parser.add_argument('--separate-value', action='store_true')
 arg_parser.add_argument('--fp16', action='store_true')
 

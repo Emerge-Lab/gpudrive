@@ -126,7 +126,7 @@ python scripts/infer.py --num-worlds 1 --num-steps 1000 --fp16 --ckpt-path build
 
 Finally, you can replay these actions in the `viewer` program to see how your agents behave:
 ```bash
-./build/viewer --cpu 1 build/dumped_actions
+./build/viewer 1 --cpu build/dumped_actions
 ```
 
 Hold down right click and use WASD to fly around the environment, or use controls in the UI to following a viewer in first-person mode. Hopefully your agents perform similarly to those in the video at the start of this README!
