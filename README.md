@@ -11,7 +11,7 @@ If you're interested in using Madrona to implement a high-performance batch simu
 The Environment and Learning Task
 --------------
 
-https://github.com/shacklettbp/madrona_escape_room/assets/1111429/607019f0-f32d-457d-88f8-854b13eb22dc
+https://github.com/shacklettbp/madrona_escape_room/assets/1111429/ec6231c8-a74b-4f0a-8a1a-b1bcdc7111cd
 
 As shown above, the simulator implements a 3D environment consisting of two agents and a row of three rooms. All agents start in the first room, and must navigate to as many new rooms as possible. The agents must step on buttons or push movable blocks over buttons to trigger the opening of doors that lead to new rooms. Agents are rewarded based on their progress along the length of the level.
 
