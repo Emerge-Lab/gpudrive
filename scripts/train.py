@@ -78,16 +78,16 @@ arg_parser.add_argument('--restore', type=int)
 
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-updates', type=int, required=True)
-arg_parser.add_argument('--steps-per-update', type=int, default=50)
-arg_parser.add_argument('--num-bptt-chunks', type=int, default=1)
+arg_parser.add_argument('--steps-per-update', type=int, default=40)
+arg_parser.add_argument('--num-bptt-chunks', type=int, default=8)
 
-arg_parser.add_argument('--lr', type=float, default=0.01)
+arg_parser.add_argument('--lr', type=float, default=1e-4)
 arg_parser.add_argument('--gamma', type=float, default=0.998)
-arg_parser.add_argument('--entropy-loss-coef', type=float, default=0.3)
+arg_parser.add_argument('--entropy-loss-coef', type=float, default=0.01)
 arg_parser.add_argument('--value-loss-coef', type=float, default=0.5)
 arg_parser.add_argument('--clip-value-loss', action='store_true')
 
-arg_parser.add_argument('--num-channels', type=int, default=1024)
+arg_parser.add_argument('--num-channels', type=int, default=256)
 arg_parser.add_argument('--separate-value', action='store_true')
 arg_parser.add_argument('--fp16', action='store_true')
 

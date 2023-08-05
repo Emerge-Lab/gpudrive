@@ -444,6 +444,10 @@ static CountT makeDoubleButtonRoom(Engine &ctx,
     return 2;
 }
 
+// This room has 3 cubes blocking the exit door as well as two buttons.
+// The agents either need to pull the middle cube out of the way and
+// open the door or open the door with the buttons and push the cubes
+// into the next room.
 static CountT makeCubeBlockingRoom(Engine &ctx,
                                    Room &room,
                                    float y_min,
