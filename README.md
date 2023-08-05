@@ -38,7 +38,7 @@ The codebase trains a shared policy that controls agents individually with direc
 For specific details about the format of observations, refer to exported ECS components introduced in the [code walkthrough section](#simulator-code-walkthrough-learning-the-madrona-ecs-apis). 
 
 Overall the "full simulator" contains logic for three major concerns:
-* Procedurally generating a random 3D environment for each episode.
+* Procedurally generating a new random level for each episode.
 * Time stepping the environment, which includes executing rigid body physics and evaluating game logic in response to agent actions.
 * Generating agent observations from the state of the environment, which are communicated as PyTorch tensors to external policy evaluation or learning code.
 
@@ -85,9 +85,9 @@ python scripts/train.py --num-worlds 1024 --num-updates 100
 Simulator Code Walkthrough (Learning the Madrona ECS APIs)
 -----------------------------------------------------------
 
-As mentioned above, this repo is intended to serve as a tutorial for how to use Madrona to implement a batch simulator for a simple 3D environment. If you're not interested in implementing your own novel environment simulator in Madrona and just want to try training agents, skip to the next section.
+As mentioned above, this repo is intended to serve as a tutorial for how to use Madrona to implement a batch simulator for a simple 3D environment. If you're not interested in implementing your own novel environment simulator in Madrona and just want to try training agents, [skip to the next section](#training-agents).
 
-We assume the reader is familiar with the key concepts of the entity component system (ECS) design pattern.  If you are unfamiliar with ECS concepts, we recommend that you check out Sander Martens' very useful [Entity Components FAQ](https://github.com/SanderMertens/ecs-faq). 
+We assume the reader is familiar with the key concepts of the entity component system (ECS) design pattern.  If you are unfamiliar with ECS concepts, we recommend that you check out Sander Mertens' very useful [Entity Components FAQ](https://github.com/SanderMertens/ecs-faq). 
 
 #### Defining the Simulation's State: Components and Archetypes ####
 
