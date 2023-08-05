@@ -46,9 +46,15 @@ Build Instructions
 --------
 First, make sure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (briefly, recent python and cmake, as well as Xcode or Visual Studio on MacOS or Windows respectively).
 
-Additionally, the rendering functionality in this repository requires the X11 development headers on Linux (e.g. the `libx11-dev` package on Ubuntu). The training functionality requires PyTorch 2.0 or later as well.
+To build the simulator with visualization support on Linux (`build/viewer`), you also need to install X11 and OpenGL development libraries. Equivalent dependencies should already be installed by Xcode on MacOS.
+For example, on Ubuntu:
+```bash
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
+```
 
-Next, fetch the repo (don't forget `--recursive`!):
+The built-in training functionality requires [PyTorch 2.0](https://pytorch.org/get-started/locally/) or later as well.
+
+Now that you have the required dependencies, fetch the repo (don't forget `--recursive`!):
 ```bash
 git clone --recursive https://github.com/shacklettbp/madrona_escape_room.git
 cd madrona_escape_room
@@ -77,9 +83,9 @@ You can then view the environment by running:
 ./build/viewer
 ```
 
-Or test the PyTorch training integration: (first, [install pytorch](https://pytorch.org/get-started/locally/))
+Or test the PyTorch training integration:
 ```bash
-python scripts/train.py --num-worlds 1024 --num-updates 100
+python scripts/train.py --num-worlds 1024 --num-updates 100 --ckpt-dir build/ckpts
 ```
 
 Simulator Code Walkthrough (Learning the Madrona ECS APIs)
