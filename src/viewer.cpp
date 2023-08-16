@@ -45,7 +45,7 @@ static HeapArray<int32_t> readReplayLog(const char *path)
 
 int main(int argc, char *argv[])
 {
-    using namespace madEscape;
+    using namespace gpudrive;
 
     constexpr int64_t num_views = 2;
 

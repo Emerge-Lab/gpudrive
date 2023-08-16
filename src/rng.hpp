@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace madEscape {
+namespace gpudrive {
 
 // Simple PRNG intended to be initialized with episode ID.
 class RNG {

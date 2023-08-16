@@ -2,7 +2,7 @@
 
 #include "sim.hpp"
 
-namespace madEscape {
+namespace gpudrive {
 
 // Creates agents, outer walls and floor. Entities that will persist across
 // all episodes.

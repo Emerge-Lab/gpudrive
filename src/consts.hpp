@@ -2,7 +2,7 @@
 
 #include <madrona/types.hpp>
 
-namespace madEscape {
+namespace gpudrive {
 
 namespace consts {
 // Each random world is composed of a fixed number of rooms that the agents

@@ -2,7 +2,7 @@
 
 #include <madrona/physics.hpp>
 
-namespace madEscape {
+namespace gpudrive {
 
 struct EpisodeManager {
     madrona::AtomicU32 curEpisode;

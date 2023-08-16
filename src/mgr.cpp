@@ -24,7 +24,7 @@ using namespace madrona::math;
 using namespace madrona::phys;
 using namespace madrona::py;
 
-namespace madEscape {
+namespace gpudrive {
 
 struct Manager::Impl {
     Config cfg;
