@@ -13,7 +13,7 @@
 #include <madrona/render/mw.hpp>
 #include <madrona/viz/system.hpp>
 
-namespace madEscape {
+namespace gpudrive {
 
 // The Manager class encapsulates the linkage between the outside training
 // code and the internal simulation state (src/sim.hpp / src/sim.cpp)

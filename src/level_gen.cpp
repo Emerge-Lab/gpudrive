@@ -1,6 +1,6 @@
 #include "level_gen.hpp"
 
-namespace madEscape {
+namespace gpudrive {
 
 using namespace madrona;
 using namespace madrona::math;

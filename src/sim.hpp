@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace madEscape {
+namespace gpudrive {
 
 class Engine;
 

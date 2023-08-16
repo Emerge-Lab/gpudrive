@@ -5,7 +5,7 @@
 
 namespace nb = nanobind;
 
-namespace madEscape {
+namespace gpudrive {
 
 // This file creates the python bindings used by the learning code.
 // Refer to the nanobind documentation for more details on these functions.

@@ -7,7 +7,7 @@
 
 #include "consts.hpp"
 
-namespace madEscape {
+namespace gpudrive {
 
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;

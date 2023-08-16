@@ -7,7 +7,7 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
-namespace madEscape {
+namespace gpudrive {
 
 // Register all the ECS components and archetypes that will be
 // used in the simulation
