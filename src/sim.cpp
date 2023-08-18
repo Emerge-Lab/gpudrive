@@ -1,7 +1,10 @@
+#include <algorithm>
+#include <limits>
 #include <madrona/mw_gpu_entry.hpp>
 
 #include "sim.hpp"
 #include "level_gen.hpp"
+#include "utils.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -130,105 +133,49 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-// Translates discrete actions from the Action component to forces
-// used by the physics simulation.
 inline void movementSystem(Engine &,
-                           Action &action, 
-                           Rotation &rot, 
-                           ExternalForce &external_force,
-                           ExternalTorque &external_torque)
+			   Action &action,
+			   BicycleModel& model,
+			   VehicleSize& size,
+			   Rotation &rotation,
+			   Position& position,
+			   Velocity& velocity) 
 {
-    constexpr float move_max = 1000;
-    constexpr float turn_max = 320;
+  // TODO(samk): The following constants are configurable in Nocturne but look to
+  // always use the same hard-coded value in practice. Use in-line constants
+  // until the configuration is built out.
+  const float maxSpeed{std::numeric_limits<float>::max()};
+  const float dt{0.1};
 
-    Quat cur_rot = rot;
+  auto clipSpeed = [maxSpeed](float speed) {
+    return std::max(std::min(speed, maxSpeed), -maxSpeed);
+  };
+  // TODO(samk): hoist into Vector2::PolarToVector2D
+  auto polarToVector2D = [](float r, float theta) {
+    return math::Vector2{r * cosf(theta), r * sinf(theta)};
+  };
 
-    float move_amount = action.moveAmount *
-        (move_max / (consts::numMoveAmountBuckets - 1));
+  // Average speed
+  const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
+  const float tanDelta{tanf(action.steering)};
+  // Assume center of mass lies at the middle of length, then l / L == 0.5.
+  const float beta{std::atan(0.5f * tanDelta)};
+  const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
+  const float w{v * std::cos(beta) * tanDelta / size.length};
 
-    constexpr float move_angle_per_bucket =
-        2.f * math::pi / float(consts::numMoveAngleBuckets);
+  model.position += d * dt;
+  model.heading = utils::AngleAdd(model.heading, w * dt);
+  model.speed = clipSpeed(model.speed + action.acceleration * dt);
 
-    float move_angle = float(action.moveAngle) * move_angle_per_bucket;
+  // The BVH machinery requires the components rotation, position, and velocity
+  // to perform calculations. Thus, to reuse the BVH machinery, we need to also
+  // updates these components.
 
-    float f_x = move_amount * sinf(move_angle);
-    float f_y = move_amount * cosf(move_angle);
-
-    constexpr float turn_delta_per_bucket = 
-        turn_max / (consts::numTurnBuckets / 2);
-    float t_z =
-        turn_delta_per_bucket * (action.rotate - consts::numTurnBuckets / 2);
-
-    external_force = cur_rot.rotateVec({ f_x, f_y, 0 });
-    external_torque = Vector3 { 0, 0, t_z };
-}
-
-// Implements the grab action by casting a short ray in front of the agent
-// and creating a joint constraint if a grabbable entity is hit.
-inline void grabSystem(Engine &ctx,
-                       Entity e,
-                       Position pos,
-                       Rotation rot,
-                       Action action,
-                       GrabState &grab)
-{
-    if (action.grab == 0) {
-        return;
-    }
-
-    // if a grab is currently in progress, triggering the grab action
-    // just releases the object
-    if (grab.constraintEntity != Entity::none()) {
-        ctx.destroyEntity(grab.constraintEntity);
-        grab.constraintEntity = Entity::none();
-        
-        return;
-    } 
-
-    // Get the per-world BVH singleton component
-    auto &bvh = ctx.singleton<broadphase::BVH>();
-    float hit_t;
-    Vector3 hit_normal;
-
-    Vector3 ray_o = pos + 0.5f * math::up;
-    Vector3 ray_d = rot.rotateVec(math::fwd);
-
-    Entity grab_entity =
-        bvh.traceRay(ray_o, ray_d, &hit_t, &hit_normal, 2.0f);
-
-    if (grab_entity == Entity::none()) {
-        return;
-    }
-
-    auto response_type = ctx.get<ResponseType>(grab_entity);
-    if (response_type != ResponseType::Dynamic) {
-        return;
-    }
-
-    auto entity_type = ctx.get<EntityType>(grab_entity);
-    if (entity_type == EntityType::Agent) {
-        return;
-    }
-
-    Entity constraint_entity = ctx.makeEntity<ConstraintData>();
-    grab.constraintEntity = constraint_entity;
-
-    Vector3 other_pos = ctx.get<Position>(grab_entity);
-    Quat other_rot = ctx.get<Rotation>(grab_entity);
-
-    Vector3 r1 = 1.25f * math::fwd + 0.5f * math::up;
-
-    Vector3 hit_pos = ray_o + ray_d * hit_t;
-    Vector3 r2 =
-        other_rot.inv().rotateVec(hit_pos - other_pos);
-
-    Quat attach1 = { 1, 0, 0, 0 };
-    Quat attach2 = (other_rot.inv() * rot).normalize();
-
-    float separation = hit_t - 1.25f;
-
-    ctx.get<JointConstraint>(constraint_entity) = JointConstraint::setupFixed(
-        e, grab_entity, attach1, attach2, r1, r2, separation);
+  // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
+  position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
+  rotation = Quat::angleAxis(0, madrona::math::up);
+  velocity.linear = Vector3::zero();
+  velocity.angular = Vector3::zero();
 }
 
 // Animates the doors opening and closing based on OpenState
@@ -582,12 +529,14 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
     // Turn policy actions into movement
-    auto move_sys = builder.addToGraph<ParallelForNode<Engine,
+    auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             Action,
+            BicycleModel,
+            VehicleSize,
             Rotation,
-            ExternalForce,
-            ExternalTorque
+            Position,
+            Velocity
         >>({});
 
     // Scripted door behavior
@@ -595,26 +544,33 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         setDoorPositionSystem,
             Position,
             OpenState
-        >>({move_sys});
+        >>({moveSystem});
 
     // Build BVH for broadphase / raycasting
+    // setupBroadphaseTasks consists of the following sub-tasks:
+    // 1. updateLeafPositionsEntry
+    // 2. broadphase::updateBVHEntry
+    // 3. broadphase::refitEntry
     auto broadphase_setup_sys =
         phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder, 
                                                            {set_door_pos_sys});
 
-    // Grab action, post BVH build to allow raycasting
-    auto grab_sys = builder.addToGraph<ParallelForNode<Engine,
-        grabSystem,
-            Entity,
-            Position,
-            Rotation,
-            Action,
-            GrabState
-        >>({broadphase_setup_sys});
-
     // Physics collision detection and solver
+    // setupSubstepTasks consists of the following sub-tasks:
+    // 1. broadphase::findOverlapping
+    // 2. collectConstraintSystem
+    // 3. substepRigidBodies
+    // 4. narrowPhase
+    // 5. solvePositions
+    // 6. setVelocities
+    // 7. solveVelocities
+    // 8. updateLeafPositionsEntry
+    // 9. refitEntry
+    // Tasks 2-7 are executed in a loop where the iteration count is determined
+    // by consts::numPhysicsSubsteps. Subtasks 2-7 can be skipped by setting
+    // this constant to 0.
     auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
-        {grab_sys}, consts::numPhysicsSubsteps);
+        {broadphase_setup_sys}, consts::numPhysicsSubsteps);
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
