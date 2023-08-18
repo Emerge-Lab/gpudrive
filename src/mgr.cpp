@@ -524,26 +524,6 @@ void Manager::setAction(int32_t world_idx,
                         int32_t move_amount,
                         int32_t move_angle,
                         int32_t rotate,
-                        int32_t grab)
-{
-    Action action { 
-        .moveAmount = move_amount,
-        .moveAngle = move_angle,
-        .rotate = rotate,
-        .grab = grab,
-    };
-
-    auto *action_ptr = impl_->agentActionsBuffer +
-        world_idx * consts::numAgents + agent_idx;
-
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        cudaMemcpy(action_ptr, &action, sizeof(Action),
-                   cudaMemcpyHostToDevice);
-#endif
-    } else {
-        *action_ptr = action;
-    }
-}
+                        int32_t grab) {}
 
 }

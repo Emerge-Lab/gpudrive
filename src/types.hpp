@@ -27,8 +27,6 @@ struct BicycleModel {
     float speed;
 };
 
-// TODO(samk): Does this vary for vehicles? If not, there is no need to store it
-// per-vehicle.
 struct VehicleSize {
   float length;
   float width;
@@ -43,8 +41,6 @@ struct WorldReset {
 };
 
 // TODO(samk): need to wrap elements in std::optional to match Nocturne?
-// TODO(samk): should these elements be discretized or should that be the
-//  responsbility of the learning component?
 struct Action {
     float acceleration;
     float steering;
