@@ -36,6 +36,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
+    registry.registerComponent<BicycleModel>();
+    registry.registerComponent<VehicleSize>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -173,7 +175,7 @@ inline void movementSystem(Engine &,
 
   // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
   position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
-  rotation = Quat::angleAxis(0, madrona::math::up);
+  rotation = Quat::angleAxis(model.heading, madrona::math::up);
   velocity.linear = Vector3::zero();
   velocity.angular = Vector3::zero();
 }
