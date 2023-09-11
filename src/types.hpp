@@ -21,6 +21,17 @@ using madrona::phys::ResponseType;
 using madrona::phys::ExternalForce;
 using madrona::phys::ExternalTorque;
 
+struct BicycleModel {
+    madrona::math::Vector2 position;
+    float heading;
+    float speed;
+};
+
+struct VehicleSize {
+  float length;
+  float width;
+};
+
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -29,13 +40,11 @@ struct WorldReset {
     int32_t reset;
 };
 
-// Discrete action component. Ranges are defined by consts::numMoveBuckets (5),
-// repeated here for clarity
+// TODO(samk): need to wrap elements in std::optional to match Nocturne?
 struct Action {
-    int32_t moveAmount; // [0, 3]
-    int32_t moveAngle; // [0, 7]
-    int32_t rotate; // [-2, 2]
-    int32_t grab; // 0 = do nothing, 1 = grab / release
+    float acceleration;
+    float steering;
+    float headAngle;
 };
 
 // Per-agent reward
@@ -217,6 +226,10 @@ struct Agent : public madrona::Archetype<
     Progress,
     OtherAgents,
     EntityType,
+
+    // gpudrive
+    BicycleModel,
+    VehicleSize,
 
     // Input
     Action,
