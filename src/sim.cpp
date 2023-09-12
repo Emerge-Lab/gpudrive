@@ -706,9 +706,8 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    constexpr CountT max_total_entities = consts::numAgents +
-        consts::numRooms * (consts::maxEntitiesPerRoom + 3) +
-        4; // side walls + floor
+    constexpr CountT max_total_entities =
+        consts::numAgents + consts::numRoadSegments;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,

@@ -9,8 +9,11 @@ namespace consts {
 // must solve in order to maximize their reward.
 inline constexpr madrona::CountT numRooms = 3;
 
-// Generated levels assume 2 agents
-inline constexpr madrona::CountT numAgents = 2;
+// TODO(samk): This number is specifically derived for
+// tfrecord-00004-of-00150_246.json. Once we move to multiple map files, it will
+// have to be updated.
+inline constexpr madrona::CountT numAgents = 42;
+inline constexpr madrona::CountT numRoadSegments = 4425;
 
 // Maximum number of interactive objects per challenge room. This is needed
 // in order to setup the fixed-size learning tensors appropriately.
@@ -48,8 +51,10 @@ inline constexpr float deltaT = 0.04f;
 inline constexpr float doorSpeed = 30.f;
 
 // Number of physics substeps
-inline constexpr madrona::CountT numPhysicsSubsteps = 4.f;
+inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
 
+inline constexpr float zDimensionScale = 1;
+inline constexpr float xDimensionScaleRoadSegment = 1;
 }
 
 }
