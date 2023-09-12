@@ -13,6 +13,7 @@ target_link_libraries(mad_escape_cpu_impl
     PUBLIC
         madrona_mw_core
     PRIVATE
+        nlohmann_json::nlohmann_json
         madrona_common
         madrona_mw_physics
         madrona_viz_system
