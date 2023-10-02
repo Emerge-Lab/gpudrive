@@ -4,8 +4,6 @@
 
 namespace gpudrive {
 
-// Creates agents, outer walls and floor. Entities that will persist across
-// all episodes.
 void createPersistentEntities(Engine &ctx);
 
 // Randomly generate a new world for a training episode

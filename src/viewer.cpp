@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 {
     using namespace gpudrive;
 
-    constexpr int64_t num_views = 2;
+    constexpr int64_t num_views = 42;
 
     uint32_t num_worlds = 1;
     if (argc >= 2) {

@@ -267,117 +267,9 @@ static inline float distObs(float v)
     return v / consts::worldLength;
 }
 
-static inline float globalPosObs(float v)
-{
-    return v / consts::worldLength;
-}
-
-static inline float angleObs(float v)
-{
-    return v / math::pi;
-}
-
-// Translate xy delta to polar observations for learning.
-static inline PolarObservation xyToPolar(Vector3 v)
-{
-    Vector2 xy { v.x, v.y };
-
-    float r = xy.length();
-
-    // Note that this is angle off y-forward
-    float theta = atan2f(xy.x, xy.y);
-
-    return PolarObservation {
-        .r = distObs(r),
-        .theta = angleObs(theta),
-    };
-}
-
 static inline float encodeType(EntityType type)
 {
     return (float)type / (float)EntityType::NumTypes;
-}
-
-static inline float computeZAngle(Quat q)
-{
-    float siny_cosp = 2.f * (q.w * q.z + q.x * q.y);
-    float cosy_cosp = 1.f - 2.f * (q.y * q.y + q.z * q.z);
-    return atan2f(siny_cosp, cosy_cosp);
-}
-
-// This system packages all the egocentric observations together 
-// for the policy inputs.
-inline void collectObservationsSystem(Engine &ctx,
-                                      Position pos,
-                                      Rotation rot,
-                                      const Progress &progress,
-                                      const GrabState &grab,
-                                      const OtherAgents &other_agents,
-                                      SelfObservation &self_obs,
-                                      PartnerObservations &partner_obs,
-                                      RoomEntityObservations &room_ent_obs,
-                                      DoorObservation &door_obs)
-{
-    CountT cur_room_idx = CountT(pos.y / consts::roomLength);
-    cur_room_idx = std::max(CountT(0), 
-        std::min(consts::numRooms - 1, cur_room_idx));
-
-    self_obs.roomX = pos.x / (consts::worldWidth / 2.f);
-    self_obs.roomY = (pos.y - cur_room_idx * consts::roomLength) /
-        consts::roomLength;
-    self_obs.globalX = globalPosObs(pos.x);
-    self_obs.globalY = globalPosObs(pos.y);
-    self_obs.globalZ = globalPosObs(pos.z);
-    self_obs.maxY = globalPosObs(progress.maxY);
-    self_obs.theta = angleObs(computeZAngle(rot));
-    self_obs.isGrabbing = grab.constraintEntity != Entity::none() ?
-        1.f : 0.f;
-
-    Quat to_view = rot.inv();
-
-#pragma unroll
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
-        Entity other = other_agents.e[i];
-
-        Vector3 other_pos = ctx.get<Position>(other);
-        GrabState other_grab = ctx.get<GrabState>(other);
-        Vector3 to_other = other_pos - pos;
-
-        partner_obs.obs[i] = {
-            .polar = xyToPolar(to_view.rotateVec(to_other)),
-            .isGrabbing = other_grab.constraintEntity != Entity::none() ?
-                1.f : 0.f,
-        };
-    }
-
-    const LevelState &level = ctx.singleton<LevelState>();
-    const Room &room = level.rooms[cur_room_idx];
-
-    for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
-        Entity entity = room.entities[i];
-
-        EntityObservation ob;
-        if (entity == Entity::none()) {
-            ob.polar = { 0.f, 1.f };
-            ob.encodedType = encodeType(EntityType::None);
-        } else {
-            Vector3 entity_pos = ctx.get<Position>(entity);
-            EntityType entity_type = ctx.get<EntityType>(entity);
-
-            Vector3 to_entity = entity_pos - pos;
-            ob.polar = xyToPolar(to_view.rotateVec(to_entity));
-            ob.encodedType = encodeType(entity_type);
-        }
-
-        room_ent_obs.obs[i] = ob;
-    }
-
-    Entity cur_door = room.door;
-    Vector3 door_pos = ctx.get<Position>(cur_door);
-    OpenState door_open_state = ctx.get<OpenState>(cur_door);
-
-    door_obs.polar = xyToPolar(to_view.rotateVec(door_pos - pos));
-    door_obs.isOpen = door_open_state.isOpen ? 1.f : 0.f;
 }
 
 // Launches consts::numLidarSamples per agent.
@@ -541,21 +433,13 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Velocity
         >>({});
 
-    // Scripted door behavior
-    auto set_door_pos_sys = builder.addToGraph<ParallelForNode<Engine,
-        setDoorPositionSystem,
-            Position,
-            OpenState
-        >>({moveSystem});
-
-    // Build BVH for broadphase / raycasting
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder, 
-                                                           {set_door_pos_sys});
+        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+                                                           {moveSystem});
 
     // Physics collision detection and solver
     // setupSubstepTasks consists of the following sub-tasks:
@@ -584,42 +468,10 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
-    // Check buttons
-    auto button_sys = builder.addToGraph<ParallelForNode<Engine,
-        buttonSystem,
-            Position,
-            ButtonState
-        >>({phys_done});
-
-    // Set door to start opening if button conditions are met
-    auto door_open_sys = builder.addToGraph<ParallelForNode<Engine,
-        doorOpenSystem,
-            OpenState,
-            DoorProperties
-        >>({button_sys});
-
-    // Compute initial reward now that physics has updated the world state
-    auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         rewardSystem,
-            Position,
-            Progress,
-            Reward
-        >>({door_open_sys});
-
-    // Assign partner's reward
-    auto bonus_reward_sys = builder.addToGraph<ParallelForNode<Engine,
-         bonusRewardSystem,
-            OtherAgents,
-            Progress,
-            Reward
-        >>({reward_sys});
-
     // Check if the episode is over
-    auto done_sys = builder.addToGraph<ParallelForNode<Engine,
-        stepTrackerSystem,
-            StepsRemaining,
-            Done
-        >>({bonus_reward_sys});
+    auto done_sys = builder.addToGraph<
+        ParallelForNode<Engine, stepTrackerSystem, StepsRemaining, Done>>(
+        {phys_done});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -640,22 +492,9 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // This second BVH build is a limitation of the current taskgraph API.
     // It's only necessary if the world was reset, but we don't have a way
     // to conditionally queue taskgraph nodes yet.
-    auto post_reset_broadphase = phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(
-        builder, {reset_sys});
-
-    // Finally, collect observations for the next step.
-    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
-        collectObservationsSystem,
-            Position,
-            Rotation,
-            Progress,
-            GrabState,
-            OtherAgents,
-            SelfObservation,
-            PartnerObservations,
-            RoomEntityObservations,
-            DoorObservation
-        >>({post_reset_broadphase});
+    auto post_reset_broadphase =
+        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+                                                           {reset_sys});
 
     // The lidar system
 #ifdef MADRONA_GPU_MODE
@@ -680,8 +519,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 #ifdef MADRONA_GPU_MODE
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
-    auto sort_agents = queueSortByWorld<Agent>(
-        builder, {lidar, collect_obs});
+    auto sort_agents =
+        queueSortByWorld<Agent>(builder, {lidar, post_reset_broadphase});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     auto sort_buttons = queueSortByWorld<ButtonEntity>(
@@ -693,7 +532,6 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     (void)sort_walls;
 #else
     (void)lidar;
-    (void)collect_obs;
 #endif
 }
 
@@ -706,9 +544,8 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    constexpr CountT max_total_entities = consts::numAgents +
-        consts::numRooms * (consts::maxEntitiesPerRoom + 3) +
-        4; // side walls + floor
+    constexpr CountT max_total_entities =
+        consts::numAgents + consts::numRoadSegments;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
