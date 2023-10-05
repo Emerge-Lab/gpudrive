@@ -238,7 +238,6 @@ static void resetPersistentEntities(Engine &ctx)
              .grab = 0,
          };
 
-         ctx.get<Done>(agent_entity).v = 0;
          ctx.get<StepsRemaining>(agent_entity).t = consts::episodeLen;
      }
 }
