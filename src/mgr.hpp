@@ -54,11 +54,10 @@ public:
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx,
-                              int32_t agent_idx,
-                              int32_t move_amount,
-                              int32_t move_angle,
-                              int32_t rotate,
-                              int32_t grab);
+                        int32_t agent_idx,
+                        float acceleration,
+                        float steering,
+                        float headAngle);
 
 private:
     struct Impl;

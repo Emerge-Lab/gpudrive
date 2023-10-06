@@ -34,6 +34,10 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                       .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
+    Velocity vel;
+    vel.linear = Vector3{.x = speed * cosf(heading), .y = speed * sinf(heading), .z = 0};
+    vel.angular = Vector3::zero();
+    ctx.get<Velocity>(vehicle) = vel;
     ctx.get<Scale>(vehicle) =
         Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
@@ -60,8 +64,8 @@ static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
     std::ifstream data(
-        "/Users/samk/src/nocturne/data/nocturne_mini/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+        "/home/aarav/gpudrive/nocturne_data/"
+        "formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
     assert(data.is_open());
 
     using nlohmann::json;
@@ -71,18 +75,29 @@ static void generateLevel(Engine &ctx) {
 
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
-    for (const auto &obj : rawJson["objects"]) {
-      assert(agentCount < consts::numAgents);
+    // for (const auto &obj : rawJson["objects"]) {
+    //   assert(agentCount < consts::numAgents);
+    auto obj = rawJson["objects"][0];
+    auto vehicle = createVehicle(
+        ctx,
+        // TODO(samk): Nocturne allows for configuring the initial position
+        // but in practice it looks to always be set to 0.
+        obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
+        obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
 
-      auto vehicle = createVehicle(
-          ctx,
-          // TODO(samk): Nocturne allows for configuring the initial position
-          // but in practice it looks to always be set to 0.
-          obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
+    ctx.data().agents[agentCount++] = vehicle;
+    obj = rawJson["objects"][1];
+    vehicle = createVehicle(
+        ctx,
+        // TODO(samk): Nocturne allows for configuring the initial position
+        // but in practice it looks to always be set to 0.
+        obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
+        obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
 
-      ctx.data().agents[agentCount++] = vehicle;
-    }
+    
+
+    ctx.data().agents[agentCount++] = vehicle;
+    
 }
 
 void generateWorld(Engine &ctx)

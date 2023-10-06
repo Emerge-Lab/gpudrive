@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     HeapArray<int32_t> action_store(
         num_worlds * 2 * num_steps * 3);
 
-    bool rand_actions = false;
+    bool rand_actions = true;
     if (argc >= 5) {
         if (std::string(argv[4]) == "--rand-actions") {
             rand_actions = true;
@@ -67,7 +67,37 @@ int main(int argc, char *argv[])
     std::uniform_int_distribution<int32_t> act_rand(0, 4);
 
     auto start = std::chrono::system_clock::now();
+    auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
+    auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
+    auto door_printer = mgr.doorObservationTensor().makePrinter();
+    auto lidar_printer = mgr.lidarTensor().makePrinter();
+    auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
+    auto reward_printer = mgr.rewardTensor().makePrinter();
+        auto printObs = [&]() {
+        printf("Self\n");
+        self_printer.print();
 
+        // printf("Partner\n");
+        // partner_printer.print();
+
+        // printf("Room Entities\n");
+        // room_ent_printer.print();
+
+        // printf("Door\n");
+        // door_printer.print();
+
+        // printf("Lidar\n");
+        // lidar_printer.print();
+
+        // printf("Steps Remaining\n");
+        // steps_remaining_printer.print();
+
+        // printf("Reward\n");
+        // reward_printer.print();
+
+        printf("\n");
+    };
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
@@ -76,7 +106,7 @@ int main(int argc, char *argv[])
                     int32_t y = act_rand(rand_gen);
                     int32_t r = act_rand(rand_gen);
 
-                    mgr.setAction(j, k, x, y, r, 0);
+                    mgr.setAction(j, k, x, y, r);
                     
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                     action_store[base_idx] = x;
@@ -86,7 +116,9 @@ int main(int argc, char *argv[])
             }
         }
         mgr.step();
+        printObs();
     }
+
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = end - start;

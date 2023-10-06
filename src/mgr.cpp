@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -519,11 +520,32 @@ void Manager::triggerReset(int32_t world_idx)
     }
 }
 
+// void Manager::setAction(int32_t world_idx,
+//                         int32_t agent_idx,
+//                         int32_t move_amount,
+//                         int32_t move_angle,
+//                         int32_t rotate,
+//                         int32_t grab) {}
+
 void Manager::setAction(int32_t world_idx,
                         int32_t agent_idx,
-                        int32_t move_amount,
-                        int32_t move_angle,
-                        int32_t rotate,
-                        int32_t grab) {}
+                        float acceleration,
+                        float steering,
+                        float headAngle) 
+{
+    Action action { 
+        .acceleration = acceleration,
+        .steering = steering,
+        .headAngle = headAngle,
+    };
+
+    auto *action_ptr = impl_->agentActionsBuffer +
+        world_idx * consts::numAgents + agent_idx;
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+        std::cerr << "CUDA support not implemented." << std::endl;
+        std::abort();
+    }
+    *action_ptr = action;
+}
 
 }
