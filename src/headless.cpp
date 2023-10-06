@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
     std::uniform_int_distribution<int32_t> act_rand(0, 4);
 
     auto start = std::chrono::system_clock::now();
+    auto action_printer = mgr.actionTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
     auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
@@ -74,10 +75,12 @@ int main(int argc, char *argv[])
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
-        auto printObs = [&]() {
+    auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();
 
+        printf("Actions\n");
+        action_printer.print();
         // printf("Partner\n");
         // partner_printer.print();
 

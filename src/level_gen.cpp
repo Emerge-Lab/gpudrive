@@ -50,6 +50,13 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
+    ctx.get<Action>(vehicle) = Action {
+      .acceleration = 0,
+      .steering = 0,
+      .headAngle = 0
+    };
+
+
 
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(

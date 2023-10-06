@@ -187,20 +187,18 @@ inline void movementSystem(Engine &e,
   // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 
   // gradually.
 
+
   //Clipping actions. Technically this shouldnt be needed. But clipping because the initial values are garbage.
   // Should be handled in the agent code.
   action.acceleration = std::max(std::min(action.acceleration, 2.0f), -3.0f);
   action.steering = std::max(std::min(action.steering, 0.7f), -0.7f);
   action.headAngle = std::max(std::min(action.headAngle, 1.6f), -1.6f);
 
-
   // TODO(samk): The following constants are configurable in Nocturne but look to
   // always use the same hard-coded value in practice. Use in-line constants
   // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
   const float maxSpeed{std::numeric_limits<float>::max()};
   const float dt{0.1};
-
-  
 
   auto clipSpeed = [maxSpeed](float speed) {
     return std::max(std::min(speed, maxSpeed), -maxSpeed);
