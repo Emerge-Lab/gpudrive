@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
-#include <iostream>
 
 using namespace madrona;
 using namespace madrona::viz;

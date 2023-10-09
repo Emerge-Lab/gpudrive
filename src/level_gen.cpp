@@ -32,11 +32,12 @@ float degreesToRadians(float degrees) {
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
                                    float speed, int32_t idx) {
+    heading = degreesToRadians(heading); // C++ math libraries expect angle in radians.
     auto vehicle = ctx.makeEntity<Agent>();
 
     ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
-                                      .heading = degreesToRadians(heading),
+                                      .heading = heading,
                                       .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
