@@ -414,13 +414,13 @@ Tensor Manager::actionTensor() const
         });
 }
 
-Tensor Manager::modelTensor() const
+Tensor Manager::bicycleModelTensor() const
 {
     return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
             consts::numAgents,
-            4, // Num_actions
+            4, // Number of states for the bicycle model
         });
 }
 

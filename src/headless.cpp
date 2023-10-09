@@ -1,4 +1,5 @@
 #include "mgr.hpp"
+#include "consts.hpp"
 
 #include <cstdio>
 #include <chrono>
@@ -47,10 +48,10 @@ int main(int argc, char *argv[])
     uint64_t num_worlds = std::stoul(argv[2]);
     uint64_t num_steps = std::stoul(argv[3]);
 
-    HeapArray<int32_t> action_store(
+    HeapArray<float> action_store(
         num_worlds * 2 * num_steps * 3);
 
-    bool rand_actions = true;
+    bool rand_actions = false;
     if (argc >= 5) {
         if (std::string(argv[4]) == "--rand-actions") {
             rand_actions = true;
@@ -66,18 +67,13 @@ int main(int argc, char *argv[])
 
     std::random_device rd;
     std::mt19937 rand_gen(rd());
-    std::uniform_int_distribution<int32_t> act_rand(0, 4);
+    std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
+    std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
     auto start = std::chrono::system_clock::now();
     auto action_printer = mgr.actionTensor().makePrinter();
-    auto model_printer = mgr.modelTensor().makePrinter();
+    auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
-    auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
-    auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
-    auto door_printer = mgr.doorObservationTensor().makePrinter();
-    auto lidar_printer = mgr.lidarTensor().makePrinter();
-    auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
-    auto reward_printer = mgr.rewardTensor().makePrinter();
     auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();
@@ -90,27 +86,24 @@ int main(int argc, char *argv[])
 
         printf("\n");
     };
-    rand_actions = false;
+    printObs();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
-        // if (rand_actions) {
-        //     for (CountT j = 0; j < (CountT)num_worlds; j++) {
-        //         for (CountT k = 0; k < 2; k++) {
-        //             int32_t x = act_rand(rand_gen);
-        //             int32_t y = act_rand(rand_gen);
-        //             int32_t r = act_rand(rand_gen);
+        if (rand_actions) {
+            for (CountT j = 0; j < (CountT)num_worlds; j++) {
+                for (CountT k = 0; k < gpudrive::consts::numAgents; k++) {
+                    float acc = acc_gen(rand_gen);
+                    float steer = steer_gen(rand_gen);
+                    float head = 0;
 
-        //             mgr.setAction(j, k, x, y, r);
+                    mgr.setAction(j, k, acc, steer, head);
                     
-        //             int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
-        //             action_store[base_idx] = x;
-        //             action_store[base_idx + 1] = y;
-        //             action_store[base_idx + 2] = r;
-        //         }
-        //     }
-        // }
-        mgr.setAction(0,0,1,1,1); // (world_idx, agent_idx, acceleration, steering, head_angle)
-        mgr.setAction(0,1,1,1,1);
-        printObs();
+                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
+                    action_store[base_idx] = acc;
+                    action_store[base_idx + 1] = steer;
+                    action_store[base_idx + 2] = head;
+                }
+            }
+        }
         mgr.step();
         printObs();
     }

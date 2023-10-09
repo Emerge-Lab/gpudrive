@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
                 int32_t turn = (*replay_log)[base_idx + 2];
                 int32_t g = (*replay_log)[base_idx + 3];
 
-                printf("%d, %d: %d %d %d %d\n",
+                printf("%d, %d: %d %d %dd\n",
                        i, j, move_amount, move_angle, turn);
                 mgr.setAction(i, j, move_amount, move_angle, turn);
             }

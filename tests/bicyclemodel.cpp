@@ -151,7 +151,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(theta_next);
         expected.push_back(speed_next);
     }
-    auto obs = mgr.modelTensor(); 
+    auto obs = mgr.bicycleModelTensor(); 
     auto [valid, errorMsg] = validateTensor(obs, initialState);
     ASSERT_TRUE(valid);
     
@@ -171,7 +171,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
             expected.push_back(speed_next);
         }
         mgr.step();
-        obs = mgr.modelTensor(); 
+        obs = mgr.bicycleModelTensor(); 
         std::tie(valid, errorMsg) = validateTensor(obs, expected);
         ASSERT_TRUE(valid);
     }
