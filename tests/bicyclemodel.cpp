@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+#include "consts.hpp"
 #include "mgr.hpp"
 #include <nlohmann/json.hpp>
 
@@ -8,6 +9,7 @@
 #include <vector>
 #include <random>
 
+
 using namespace madrona;
 using nlohmann::json;
 
@@ -15,8 +17,10 @@ using nlohmann::json;
 float degreesToRadians(float degrees) {
     return degrees * M_PI / 180.0;
 }
+
 // TODO: Add the dynamic files here to be able to test from any json file.
-const float EPSILON = 0.001f; // Define epsilon as a constant
+
+const float EPSILON = 0.00001f; // Define epsilon as a constant
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:
@@ -27,10 +31,10 @@ protected:
         .autoReset = false,
     });
     
-    int64_t num_agents = 2;
+    int64_t num_agents = gpudrive::consts::numAgents;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
-    std::unordered_map<int64_t, int64_t> agent_length_map;
+    std::unordered_map<int64_t, float> agent_length_map;
     std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
     
     std::vector<float> initialState;
@@ -60,10 +64,15 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     float v = speed_curr + 0.5 * acceleration * dt; //Nocturne uses average speed
 
     float beta = atan(tan(steering_action) * (L/2) / L);
+
     float w = v * cos(beta) * tan(steering_action) / L;
+
     float x_next = x + v * cos(theta + beta) * dt;
     float y_next = y + v * sin(theta + beta) * dt;
-    float theta_next = theta + w * dt;
+
+    float theta_next = std::fmod(theta + w * dt, M_PI*2); // Clipping necessary to follow the implementation in madrona
+    theta_next = theta_next > M_PI ? theta_next -  M_PI*2 : (theta_next < - M_PI ? theta_next +  M_PI*2 : theta_next);
+    
     float speed_next = speed_curr + acceleration * dt;
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
@@ -155,7 +164,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
             float acc =  acc_distribution(generator);
             float steering = steering_distribution(generator);
             mgr.setAction(0,j,acc,steering,0);
-            auto [x_next, y_next, theta_next, speed_next] = StepBicycleModel(prev_state[4*j], prev_state[4*j+1], prev_state[4*j+2], prev_state[4*j+3], acc, steering, 0.1, agent_length_map[i]);
+            auto [x_next, y_next, theta_next, speed_next] = StepBicycleModel(prev_state[4*j], prev_state[4*j+1], prev_state[4*j+2], prev_state[4*j+3], acc, steering, 0.1, agent_length_map[j]);
             expected.push_back(x_next);
             expected.push_back(y_next);
             expected.push_back(theta_next);

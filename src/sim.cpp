@@ -505,7 +505,6 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 #else
     (void)lidar;
 #endif
-    printGraph(builder);
 }
 
 Sim::Sim(Engine &ctx,

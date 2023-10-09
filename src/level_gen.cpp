@@ -87,27 +87,23 @@ static void generateLevel(Engine &ctx) {
 
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
-    // for (const auto &obj : rawJson["objects"]) {
+    for (const auto &obj : rawJson["objects"]) {
     //   assert(agentCount < consts::numAgents);
-    auto obj = rawJson["objects"][0];
-    auto vehicle = createVehicle(
-        ctx,
-        // TODO(samk): Nocturne allows for configuring the initial position
-        // but in practice it looks to always be set to 0.
-        obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-        obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
+      if(agentCount == consts::numAgents) {
+        break; //changed this to allow less number of agents than in the file.
+      }
+      if (obj["type"] != "vehicle") {
+        continue;
+      }
+      auto vehicle = createVehicle(
+          ctx,
+          // TODO(samk): Nocturne allows for configuring the initial position
+          // but in practice it looks to always be set to 0.
+          obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
+          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
 
-    ctx.data().agents[agentCount++] = vehicle;
-    obj = rawJson["objects"][1];
-    vehicle = createVehicle(
-        ctx,
-        // TODO(samk): Nocturne allows for configuring the initial position
-        // but in practice it looks to always be set to 0.
-        obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-        obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
-
-    ctx.data().agents[agentCount++] = vehicle;
-    
+      ctx.data().agents[agentCount++] = vehicle;
+    }
 }
 
 void generateWorld(Engine &ctx)

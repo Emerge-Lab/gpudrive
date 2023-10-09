@@ -24,58 +24,6 @@ using namespace madrona::viz;
 }
 
 
-template <typename T>
-bool validateTensor(const py::Tensor& tensor, const std::vector<T>& expected) {
-    int64_t num_elems = 1;
-    for (int i = 0; i < tensor.numDims(); i++) {
-        num_elems *= tensor.dims()[i];
-    }
-
-    // Check if the sizes match
-    if (num_elems != expected.size()) {
-        std::cerr << "Size mismatch between tensor and expected values." << std::endl;
-        return false;
-    }
-
-    if constexpr (std::is_same<T, int64_t>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Int64) {
-            std::cerr << "Type mismatch: Expected Int64." << std::endl;
-            return false;
-        }
-    } else if constexpr (std::is_same<T, float>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Float32) {
-            std::cerr << "Type mismatch: Expected Float32." << std::endl;
-            return false;
-        }
-    } // Add more types if needed
-
-    switch (tensor.type()) {
-        case py::Tensor::ElementType::Int64: {
-            int64_t* ptr = static_cast<int64_t*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                if (ptr[i] != static_cast<int64_t>(expected[i])) {
-                    return false;
-                }
-            }
-            break;
-        }
-        case py::Tensor::ElementType::Float32: {
-            float* ptr = static_cast<float*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                if (ptr[i] != static_cast<float>(expected[i])) {
-                    return false;
-                }
-            }
-            break;
-        }
-        default:
-            std::cerr << "Unhandled data type!";
-            return false;
-    }
-
-    return true;
-}
-
 int main(int argc, char *argv[])
 {
     using namespace gpudrive;
@@ -166,10 +114,6 @@ int main(int argc, char *argv[])
         mgr.step();
         printObs();
     }
-
-    std::vector<float> expected = {809.614, -4799.32, 2.78503, -21.443, 790.831, -4794.45, 2.92268, -19.855};
-    bool valid = validateTensor(mgr.modelTensor(), expected);
-    printf("Model tensor validation: %s\n", valid ? "PASSED" : "FAILED");
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = end - start;
