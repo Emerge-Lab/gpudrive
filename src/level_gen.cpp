@@ -2,6 +2,7 @@
 #include <cassert>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <cmath>
 
 namespace gpudrive {
 
@@ -23,6 +24,11 @@ static void registerRigidBodyEntity(
         RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
+
+float degreesToRadians(float degrees) {
+    return degrees * M_PI / 180.0;
+}
+
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
                                    float speed, int32_t idx) {
@@ -30,7 +36,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
 
     ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
-                                      .heading = heading,
+                                      .heading = degreesToRadians(heading),
                                       .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
@@ -56,12 +62,11 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
       .headAngle = 0
     };
 
-
-
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
-
+    LevelState &level = ctx.singleton<LevelState>();
+    level.entities[idx] = vehicle;
     return vehicle;
 }
 
@@ -100,8 +105,6 @@ static void generateLevel(Engine &ctx) {
         // but in practice it looks to always be set to 0.
         obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
         obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
-
-    
 
     ctx.data().agents[agentCount++] = vehicle;
     

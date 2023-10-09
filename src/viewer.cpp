@@ -178,8 +178,8 @@ int main(int argc, char *argv[])
                 int32_t g = (*replay_log)[base_idx + 3];
 
                 printf("%d, %d: %d %d %d %d\n",
-                       i, j, move_amount, move_angle, turn, g);
-                mgr.setAction(i, j, move_amount, move_angle, turn, g);
+                       i, j, move_amount, move_angle, turn);
+                mgr.setAction(i, j, move_amount, move_angle, turn);
             }
         }
 
@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
             move_angle = 0;
         }
 
-        mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r, g);
+        mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r);
     }, [&]() {
         if (replay_log.has_value()) {
             bool replay_finished = replayStep();

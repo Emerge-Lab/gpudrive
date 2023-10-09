@@ -61,12 +61,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
-    registry.registerComponent<GrabState>();
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
-    registry.registerComponent<RoomEntityObservations>();
-    registry.registerComponent<DoorObservation>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -81,8 +78,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
-    registry.registerArchetype<DoorEntity>();
-    registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -90,12 +85,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
+
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
-    registry.exportColumn<Agent, RoomEntityObservations>(
-        (uint32_t)ExportID::RoomEntityObservations);
-    registry.exportColumn<Agent, DoorObservation>(
-        (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
@@ -104,23 +96,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
         (uint32_t)ExportID::Done);
+    registry.exportColumn<Agent, BicycleModel>(
+        (uint32_t) ExportID::BicycleModel);
 }
 
 static inline void cleanupWorld(Engine &ctx)
 {
     // Destroy current level entities
     LevelState &level = ctx.singleton<LevelState>();
-    for (CountT i = 0; i < consts::numRooms; i++) {
-        Room &room = level.rooms[i];
-        for (CountT j = 0; j < consts::maxEntitiesPerRoom; j++) {
-            if (room.entities[j] != Entity::none()) {
-                ctx.destroyEntity(room.entities[j]);
-            }
-        }
-
-        ctx.destroyEntity(room.walls[0]);
-        ctx.destroyEntity(room.walls[1]);
-        ctx.destroyEntity(room.door);
+    for (CountT i = 0; i < consts::numAgents + consts::numRoadSegments; i++) {
+        ctx.destroyEntity(level.entities[i]);
     }
 }
 

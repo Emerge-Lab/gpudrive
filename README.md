@@ -49,7 +49,8 @@ First, make sure you have all the dependencies listed [here](https://github.com/
 To build the simulator with visualization support on Linux (`build/viewer`), you also need to install X11 and OpenGL development libraries. Equivalent dependencies should already be installed by Xcode on MacOS.
 For example, on Ubuntu:
 ```bash
-sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
+
 ```
 
 The built-in training functionality requires [PyTorch 2.0](https://pytorch.org/get-started/locally/) or later as well.

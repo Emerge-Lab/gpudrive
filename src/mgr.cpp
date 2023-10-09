@@ -406,13 +406,24 @@ Tensor Manager::resetTensor() const
 
 Tensor Manager::actionTensor() const
 {
-    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Int32,
+    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
             consts::numAgents,
-            4,
+            3, // Num_actions
         });
 }
+
+Tensor Manager::modelTensor() const
+{
+    return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
+        {
+            impl_->cfg.numWorlds,
+            consts::numAgents,
+            4, // Num_actions
+        });
+}
+
 
 Tensor Manager::rewardTensor() const
 {
@@ -441,7 +452,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   8,
+                                   4
                                });
 }
 
