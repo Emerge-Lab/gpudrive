@@ -14,7 +14,7 @@ inline constexpr madrona::CountT numRooms = 3;
 // have to be updated. Total num of vehicles are 29 but we are only using 5 valid ones. 
 // TODO: Need to dynamically figure this number out based on the number of valid vehicles.
 // TODO: Need to handle pedestrians and other types separately from agents.
-inline constexpr madrona::CountT numAgents = 5;
+inline constexpr madrona::CountT numAgents = 2;
 inline constexpr madrona::CountT numRoadSegments = 0;
 
 // Maximum number of interactive objects per challenge room. This is needed

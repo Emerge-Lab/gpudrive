@@ -103,10 +103,10 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 static inline void cleanupWorld(Engine &ctx)
 {
     // Destroy current level entities
-    LevelState &level = ctx.singleton<LevelState>();
-    for (CountT i = 0; i < consts::numAgents + consts::numRoadSegments; i++) {
-        ctx.destroyEntity(level.entities[i]);
-    }
+    // LevelState &level = ctx.singleton<LevelState>();
+    // for (CountT i = 0; i < consts::numAgents + consts::numRoadSegments; i++) {
+    //     ctx.destroyEntity(level.entities[i]);
+    // }
 }
 
 static inline void initWorld(Engine &ctx)
@@ -157,7 +157,107 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-//movementSystem does not seem to be getting the correct model params
+float quatToYaw(Rotation q) {
+    // From https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion_to_Euler_angles_(in_3-2-1_sequence)_conversion
+    return atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.y * q.y + q.z * q.z)); 
+}
+
+
+// This system packages all the egocentric observations together 
+// for the policy inputs.
+inline void collectObservationsSystem(Engine &ctx,
+                                      Entity& e,
+                                      BicycleModel model,
+                                      VehicleSize& size,
+                                      Position pos,
+                                      Rotation rot,
+                                      Velocity vel,
+                                      const Progress &progress,
+                                      const OtherAgents &other_agents,
+                                      SelfObservation &self_obs,
+                                      PartnerObservations &partner_obs)
+{
+    self_obs.bicycle_model = model;
+    self_obs.length = size.length;
+    self_obs.width = size.width;
+    self_obs.goalX = 0.f;
+    self_obs.goalY = 0.f;
+
+#pragma unroll
+    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+        Entity other = other_agents.e[i];
+
+        Vector3 other_pos = ctx.get<Position>(other);
+        Vector3 other_vel = ctx.get<Velocity>(other).linear;
+        Rotation other_rot = ctx.get<Rotation>(other);
+
+
+        Vector3 relative_pos = other_pos - pos;
+        Vector3 relative_vel = other_vel - vel.linear;
+
+        relative_pos = rot.rotateVec(relative_pos);
+        relative_vel = rot.rotateVec(relative_vel);
+
+        Rotation relative_orientation = rot.inv() * other_rot;
+
+        float relative_heading = quatToYaw(relative_orientation);
+
+        partner_obs.obs[i] = {
+            .speedX = relative_vel.x,
+            .speedY = relative_vel.y,
+            .posX = relative_pos.x,
+            .posY = relative_pos.y,
+            .heading = relative_heading
+        };
+    }
+//     Quat to_view = rot.inv();
+
+// #pragma unroll
+//     for (CountT i = 0; i < consts::numAgents - 1; i++) {
+//         Entity other = other_agents.e[i];
+
+//         Vector3 other_pos = ctx.get<Position>(other);
+//         GrabState other_grab = ctx.get<GrabState>(other);
+//         Vector3 to_other = other_pos - pos;
+
+//         partner_obs.obs[i] = {
+//             .polar = xyToPolar(to_view.rotateVec(to_other)),
+//             .isGrabbing = other_grab.constraintEntity != Entity::none() ?
+//                 1.f : 0.f,
+//         };
+//     }
+
+//     const LevelState &level = ctx.singleton<LevelState>();
+//     const Room &room = level.rooms[cur_room_idx];
+
+//     for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
+//         Entity entity = room.entities[i];
+
+//         EntityObservation ob;
+//         if (entity == Entity::none()) {
+//             ob.polar = { 0.f, 1.f };
+//             ob.encodedType = encodeType(EntityType::None);
+//         } else {
+//             Vector3 entity_pos = ctx.get<Position>(entity);
+//             EntityType entity_type = ctx.get<EntityType>(entity);
+
+//             Vector3 to_entity = entity_pos - pos;
+//             ob.polar = xyToPolar(to_view.rotateVec(to_entity));
+//             ob.encodedType = encodeType(entity_type);
+//         }
+
+//         room_ent_obs.obs[i] = ob;
+//     }
+
+//     Entity cur_door = room.door;
+//     Vector3 door_pos = ctx.get<Position>(cur_door);
+//     OpenState door_open_state = ctx.get<OpenState>(cur_door);
+
+//     door_obs.polar = xyToPolar(to_view.rotateVec(door_pos - pos));
+//     door_obs.isOpen = door_open_state.isOpen ? 1.f : 0.f;
+}
+
+
 inline void movementSystem(Engine &e,
 			   Action &action,
 			   BicycleModel& model,
@@ -222,7 +322,6 @@ inline void agentZeroVelSystem(Engine &,
     vel.linear.x = 0;
     vel.linear.y = 0;
     vel.linear.z = fminf(vel.linear.z, 0);
-
     vel.angular = Vector3::zero();
 }
 
@@ -460,6 +559,22 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     auto post_reset_broadphase =
         phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
                                                            {reset_sys});
+
+    // Finally, collect observations for the next step.
+    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectObservationsSystem,
+            Entity,
+            BicycleModel,
+            VehicleSize,
+            Position,
+            Rotation,
+            Velocity,
+            Progress,
+            OtherAgents,
+            SelfObservation,
+            PartnerObservations
+        >>({post_reset_broadphase});
+
 
     // The lidar system
 #ifdef MADRONA_GPU_MODE

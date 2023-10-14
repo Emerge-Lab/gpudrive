@@ -452,7 +452,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   4
+                                   8
                                });
 }
 
@@ -464,7 +464,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::numAgents - 1,
-                                   3,
+                                   5,
                                });
 }
 

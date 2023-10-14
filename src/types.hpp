@@ -65,6 +65,10 @@ struct Done {
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
     BicycleModel bicycle_model;
+    float width;
+    float length;
+    float goalX;
+    float goalY;
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -75,8 +79,11 @@ struct PolarObservation {
 };
 
 struct PartnerObservation {
-    PolarObservation polar;
-    float isGrabbing;
+    float speedX;
+    float speedY;
+    float posX;
+    float posY;
+    float heading;
 };
 
 // Egocentric observations of other agents
@@ -87,7 +94,7 @@ struct PartnerObservations {
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::numAgents - 1) * 3);
+    (consts::numAgents - 1) * 5);
 
 // Per-agent egocentric observations for the interactable entities
 // in the current room.

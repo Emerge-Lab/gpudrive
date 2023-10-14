@@ -35,7 +35,9 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     heading = degreesToRadians(heading); // C++ math libraries expect angle in radians.
     auto vehicle = ctx.makeEntity<Agent>();
 
-    ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
+    xCoord = xCoord - 798.275;
+    yCoord = yCoord - (-4796.7815);
+    ctx.get<VehicleSize>(vehicle) = {.length = length , .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
                                       .heading = heading,
                                       .speed = speed};
@@ -49,10 +51,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
         Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
 
-    // TODO(samk): compute velocity
 
-    // TODO(samk): look into what this value controls. Should it be set to
-    // ResponseType::Kinematic?
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
@@ -66,8 +65,6 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
-    LevelState &level = ctx.singleton<LevelState>();
-    level.entities[idx] = vehicle;
     return vehicle;
 }
 
@@ -111,6 +108,21 @@ void generateWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
     generateLevel(ctx);
+
+    for (CountT i = 0; i < consts::numAgents; i++) {
+        Entity cur_agent = ctx.data().agents[i];
+
+        OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
+        CountT out_idx = 0;
+        for (CountT j = 0; j < consts::numAgents; j++) {
+            if (i == j) {
+                continue;
+            }
+
+            Entity other_agent = ctx.data().agents[j];
+            other_agents.e[out_idx++] = other_agent;
+        }
+    }
 }
 
 }

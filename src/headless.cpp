@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     });
 
     std::random_device rd;
-    std::mt19937 rand_gen(rd());
+    std::mt19937 rand_gen(42);
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
     auto action_printer = mgr.actionTensor().makePrinter();
     auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
     auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();
@@ -83,6 +84,8 @@ int main(int argc, char *argv[])
         printf("Model \n");
         model_printer.print();
 
+        printf("Partner Obs\n");
+        partner_obs_printer.print();
         printf("\n");
     };
     printObs();
