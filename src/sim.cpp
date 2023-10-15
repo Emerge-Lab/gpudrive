@@ -166,9 +166,8 @@ float quatToYaw(Rotation q) {
 // This system packages all the egocentric observations together 
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      Entity& e,
-                                      BicycleModel model,
-                                      VehicleSize& size,
+                                      BicycleModel &model,
+                                      VehicleSize &size,
                                       Position pos,
                                       Rotation rot,
                                       Velocity vel,
@@ -182,6 +181,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.width = size.width;
     self_obs.goalX = 0.f;
     self_obs.goalY = 0.f;
+
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
@@ -319,10 +319,10 @@ inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
                                Action &)
 {
-    vel.linear.x = 0;
-    vel.linear.y = 0;
-    vel.linear.z = fminf(vel.linear.z, 0);
-    vel.angular = Vector3::zero();
+    // vel.linear.x = 0;
+    // vel.linear.y = 0;
+    // vel.linear.z = fminf(vel.linear.z, 0);
+    // vel.angular = Vector3::zero();
 }
 
 static inline float distObs(float v)
@@ -563,7 +563,6 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
-            Entity,
             BicycleModel,
             VehicleSize,
             Position,
@@ -612,6 +611,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     (void)sort_walls;
 #else
     (void)lidar;
+    (void)collect_obs;
 #endif
 }
 

@@ -35,8 +35,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     heading = degreesToRadians(heading); // C++ math libraries expect angle in radians.
     auto vehicle = ctx.makeEntity<Agent>();
 
-    xCoord = xCoord - 798.275;
-    yCoord = yCoord - (-4796.7815);
+    // xCoord = xCoord - 798.275;
+    // yCoord = yCoord - (-4796.7815);
     ctx.get<VehicleSize>(vehicle) = {.length = length , .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
                                       .heading = heading,
@@ -75,7 +75,7 @@ static void resetPersistentEntities(Engine &ctx) {}
 static void generateLevel(Engine &ctx) {
     std::ifstream data(
         "/home/aarav/gpudrive/nocturne_data/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
+        "example.json");
     assert(data.is_open());
 
     using nlohmann::json;
