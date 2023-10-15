@@ -31,7 +31,7 @@ float degreesToRadians(float degrees) {
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speed, int32_t idx) {
+                                   float speedx, float speedy, int32_t idx) {
     heading = degreesToRadians(heading); // C++ math libraries expect angle in radians.
     auto vehicle = ctx.makeEntity<Agent>();
 
@@ -40,16 +40,16 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<VehicleSize>(vehicle) = {.length = length , .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
                                       .heading = heading,
-                                      .speed = speed};
+                                      .speed = speedx};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     Velocity vel;
-    vel.linear = Vector3{.x = speed * cosf(heading), .y = speed * sinf(heading), .z = 0};
+    vel.linear = Vector3{.x = speedx, .y = speedy, .z = 0}; //not sure if this is correct but it makes viz simpler.
     vel.angular = Vector3::zero();
     ctx.get<Velocity>(vehicle) = vel;
     ctx.get<Scale>(vehicle) =
         Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
-    ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
+    ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
 
 
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
@@ -62,7 +62,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
       .headAngle = 0
     };
 
-    registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
+    // registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
     return vehicle;
@@ -74,7 +74,7 @@ static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
     std::ifstream data(
-        "/home/aarav/gpudrive/nocturne_data/"
+        "/home/emerge/aarav/gpudrive/nocturne_data/"
         "example.json");
     assert(data.is_open());
 
@@ -98,7 +98,7 @@ static void generateLevel(Engine &ctx) {
           // TODO(samk): Nocturne allows for configuring the initial position
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
+          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], obj["velocity"][0]["y"], agentCount);
 
       ctx.data().agents[agentCount++] = vehicle;
     }
@@ -111,7 +111,7 @@ void generateWorld(Engine &ctx)
 
     for (CountT i = 0; i < consts::numAgents; i++) {
         Entity cur_agent = ctx.data().agents[i];
-
+        registerRigidBodyEntity(ctx, cur_agent, SimObject::Agent);
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
         for (CountT j = 0; j < consts::numAgents; j++) {
@@ -123,6 +123,7 @@ void generateWorld(Engine &ctx)
             other_agents.e[out_idx++] = other_agent;
         }
     }
+
 }
 
 }

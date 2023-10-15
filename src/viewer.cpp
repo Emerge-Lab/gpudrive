@@ -113,20 +113,19 @@ int main(int argc, char *argv[])
         { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
     });
 
-    math::Quat initial_camera_rotation =
-        (math::Quat::angleAxis(-math::pi / 2.f, math::up) *
-        math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+    math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
+
 
     Viewer viewer({
         .gpuID = 0,
-        .renderWidth = 2730,
-        .renderHeight = 1536,
+        .renderWidth = 640,
+        .renderHeight = 480,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 20,
-        .cameraMoveSpeed = 10.f,
-        .cameraPosition = { 0, consts::worldLength / 2.f, 30 },
+        .cameraMoveSpeed = 20.f,
+        .cameraPosition = 10.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,
     });
@@ -190,11 +189,7 @@ int main(int argc, char *argv[])
 
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
-    auto room_ent_printer = mgr.roomEntityObservationsTensor().makePrinter();
-    auto door_printer = mgr.doorObservationTensor().makePrinter();
-    auto lidar_printer = mgr.lidarTensor().makePrinter();
-    auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
-    auto reward_printer = mgr.rewardTensor().makePrinter();
+    
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -202,23 +197,6 @@ int main(int argc, char *argv[])
 
         printf("Partner\n");
         partner_printer.print();
-
-        printf("Room Entities\n");
-        room_ent_printer.print();
-
-        printf("Door\n");
-        door_printer.print();
-
-        printf("Lidar\n");
-        lidar_printer.print();
-
-        printf("Steps Remaining\n");
-        steps_remaining_printer.print();
-
-        printf("Reward\n");
-        reward_printer.print();
-
-        printf("\n");
     };
 
     viewer.loop([&mgr](CountT world_idx, CountT agent_idx,

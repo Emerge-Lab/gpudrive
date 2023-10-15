@@ -12,38 +12,6 @@
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
-namespace madrona {
-
-void printGraph(const TaskGraphBuilder& builder)
-{
-    nlohmann::json j;
-
-    for (int i = 0; i < builder.staged_.size(); i++)
-    {
-        nlohmann::json nodeJson;
-        auto node = builder.staged_[i];
-        nodeJson["Node idx"] = i;
-        nodeJson["Node dependencies"] = node.numDependencies;
-        nodeJson["Node dependency offset"] = node.dependencyOffset;
-        nodeJson["Node parent ID"] = node.parentID;
-        j["Nodes"].push_back(nodeJson);
-    }
-
-    nlohmann::json dependenciesJson;
-    for (auto node : builder.all_dependencies_)
-    {
-        dependenciesJson.push_back(node.id);
-    }
-    j["Dependencies"] = dependenciesJson;
-
-    // Write JSON to file
-    std::ofstream file("output.json");
-    file << j.dump(4);
-
-    std::cout<<"Wrote the json to file"<<std::endl;
-}
-
-}
 
 
 
