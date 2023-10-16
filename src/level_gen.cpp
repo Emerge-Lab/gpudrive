@@ -1,5 +1,6 @@
 #include "level_gen.hpp"
 #include <cassert>
+#include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -23,22 +24,22 @@ static void registerRigidBodyEntity(
         RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
+float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
+
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
                                    float speed, int32_t idx) {
+    heading = degreesToRadians(heading);
     auto vehicle = ctx.makeEntity<Agent>();
 
     ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
-    ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
-                                      .heading = heading,
-                                      .speed = speed};
-    ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
+    ctx.get<BicycleModel>(vehicle) = {
+        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = 0};
+    ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
-    ctx.get<Scale>(vehicle) =
-        Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
+    ctx.get<Scale>(vehicle) = Diag3x3{.d0 = width, .d1 = length, .d2 = 1};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
-
-    // TODO(samk): compute velocity
+    ctx.get<Velocity>(vehicle) = {Vector3::zero(), Vector3::zero()};
 
     // TODO(samk): look into what this value controls. Should it be set to
     // ResponseType::Kinematic?
@@ -46,6 +47,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
+    ctx.get<Action>(vehicle) =
+        Action{.acceleration = 0, .steering = 0, .headAngle = 0};
 
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
@@ -72,7 +75,12 @@ static void generateLevel(Engine &ctx) {
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
-      assert(agentCount < consts::numAgents);
+      if (agentCount == consts::numAgents) {
+        break;
+      }
+      if (obj["type"] != "vehicle") {
+        continue;
+      }
 
       auto vehicle = createVehicle(
           ctx,

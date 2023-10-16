@@ -519,11 +519,21 @@ void Manager::triggerReset(int32_t world_idx)
     }
 }
 
-void Manager::setAction(int32_t world_idx,
-                        int32_t agent_idx,
-                        int32_t move_amount,
-                        int32_t move_angle,
-                        int32_t rotate,
-                        int32_t grab) {}
+void Manager::setAction(int32_t world_idx, int32_t agent_idx,
+                        float acceleration, float steering, float headAngle) {
+    Action action{.acceleration = acceleration,
+                  .steering = steering,
+                  .headAngle = headAngle};
 
+    auto *action_ptr =
+        impl_->agentActionsBuffer + world_idx * consts::numAgents + agent_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(action_ptr, &action, sizeof(Action), cudaMemcpyHostToDevice);
+#endif
+    } else {
+        *action_ptr = action;
+    }
+}
 }
