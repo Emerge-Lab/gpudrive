@@ -40,6 +40,9 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+    ctx.get<CollisionEvent>(vehicle).hasCollided.store_release(0);
+#endif
 }
 
 static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
@@ -50,7 +53,7 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
     ctx.get<VehicleSize>(vehicle) = {.length = agentInit.length, .width = agentInit.width};
     ctx.get<Scale>(vehicle) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
-    ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
+    ctx.get<ResponseType>(vehicle) = ResponseType::Kinematic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
     ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     // Since position, heading, and speed may vary within an episode, their
@@ -229,9 +232,12 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Static;
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
+    ctx.get<ExternalForce>(agent) = Vector3::zero();
+    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+#endif
 
     return agent;
 }
@@ -245,8 +251,8 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
+    ctx.get<ExternalForce>(physicsEntity) = Vector3::zero();
+    ctx.get<ExternalTorque>(physicsEntity) = Vector3::zero();
     ctx.get<MapObservation>(physicsEntity) = MapObservation{
         .position = Vector2{.x = 0, .y = 0}, .heading = 0, .type = 0};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
