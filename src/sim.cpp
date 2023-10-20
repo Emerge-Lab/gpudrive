@@ -69,21 +69,11 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Done);
 }
 
-static inline void cleanupWorld(Engine &ctx)
-{
-    // Destroy current level entities
-    LevelState &level = ctx.singleton<LevelState>();
-    for (CountT i = 0; i < consts::numRooms; i++) {
-        Room &room = level.rooms[i];
-        for (CountT j = 0; j < consts::maxEntitiesPerRoom; j++) {
-            if (room.entities[j] != Entity::none()) {
-                ctx.destroyEntity(room.entities[j]);
-            }
-        }
-
-        ctx.destroyEntity(room.walls[0]);
-        ctx.destroyEntity(room.walls[1]);
-        ctx.destroyEntity(room.door);
+static inline void cleanupWorld(Engine &ctx) {
+    for (CountT i = 0; i < consts::numAgents; i++) {
+      if (level.vehicles[i] != Entity::none()) {
+        ctx.destroyEntity(level.vehicles[i]);
+      }
     }
 }
 

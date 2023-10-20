@@ -182,23 +182,8 @@ struct ButtonState {
     bool isPressed;
 };
 
-// Room itself is not a component but is used by the singleton
-// component "LevelState" (below) to represent the state of the full level
-struct Room {
-    // These are entities the agent will interact with
-    Entity entities[consts::maxEntitiesPerRoom];
-
-    // The walls that separate this room from the next
-    Entity walls[2];
-
-    // The door the agents need to figure out how to lower
-    Entity door;
-};
-
-// A singleton component storing the state of all the rooms in the current
-// randomly generated level
 struct LevelState {
-    Room rooms[consts::numRooms];
+    Entity vehicles[consts::numAgents];
 };
 
 /* ECS Archetypes for the game */

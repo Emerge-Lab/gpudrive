@@ -57,11 +57,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     return vehicle;
 }
 
-void createPersistentEntities(Engine &ctx) {}
-
-static void resetPersistentEntities(Engine &ctx) {}
-
-static void generateLevel(Engine &ctx) {
+void createPersistentEntities(Engine &ctx) {
     std::ifstream data(
         "/Users/samk/src/nocturne/data/nocturne_mini/"
         "formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
@@ -92,6 +88,10 @@ static void generateLevel(Engine &ctx) {
       ctx.data().agents[agentCount++] = vehicle;
     }
 }
+
+static void resetPersistentEntities(Engine &ctx) {}
+
+static void generateLevel(Engine &ctx) {}
 
 void generateWorld(Engine &ctx)
 {
