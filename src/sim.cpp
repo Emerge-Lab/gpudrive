@@ -71,14 +71,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::BicycleModel);
 }
 
-static inline void cleanupWorld(Engine &ctx)
-{
-    // Destroy current level entities
-    LevelState &level = ctx.singleton<LevelState>();
-    for (CountT i = 0; i < consts::numAgents + consts::numRoadSegments; i++) {
-        ctx.destroyEntity(level.entities[i]);
-    }
-}
+
+static inline void cleanupWorld(Engine &ctx) {}
 
 static inline void initWorld(Engine &ctx)
 {

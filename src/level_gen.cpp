@@ -67,11 +67,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     return vehicle;
 }
 
-void createPersistentEntities(Engine &ctx) {}
-
-static void resetPersistentEntities(Engine &ctx) {}
-
-static void generateLevel(Engine &ctx) {
+void createPersistentEntities(Engine &ctx) {
     std::ifstream data("../example.json");
     assert(data.is_open());
 
@@ -100,6 +96,10 @@ static void generateLevel(Engine &ctx) {
       ctx.data().agents[agentCount++] = vehicle;
     }
 }
+
+static void resetPersistentEntities(Engine &ctx) {}
+
+static void generateLevel(Engine &ctx) {}
 
 void generateWorld(Engine &ctx)
 {
