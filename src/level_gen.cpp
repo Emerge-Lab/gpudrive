@@ -57,10 +57,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     return vehicle;
 }
 
-void createPersistentEntities(Engine &ctx) {
-    std::ifstream data(
-        "/Users/samk/src/nocturne/data/nocturne_mini/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
+    std::ifstream data(pathToScenario);
     assert(data.is_open());
 
     using nlohmann::json;
@@ -85,11 +83,40 @@ void createPersistentEntities(Engine &ctx) {
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
           obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
 
-      ctx.data().agents[agentCount++] = vehicle;
+      ctx.data().agents[agentCount] = vehicle;
+
+      ctx.data().agentToInitialLocation[agentCount].x = obj["position"][0]["x"];
+      ctx.data().agentToInitialLocation[agentCount].y = obj["position"][0]["y"];
+      ctx.data().agentToInitialLocation[agentCount].heading = obj["heading"][0];
+
+      ++agentCount;
     }
 }
 
-static void resetPersistentEntities(Engine &ctx) {}
+static void resetPersistentEntities(Engine &ctx) {
+    for (CountT idx = 0; idx < consts::numAgents; ++idx) {
+      Entity vehicle = ctx.data().agents[idx];
+      registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
+
+      ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
+          ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
+
+      auto &initialLocation = ctx.data().agentToInitialLocation[idx];
+      ctx.get<BicycleModel>(vehicle) = {
+          .position = {.x = initialLocation.x, .y = initialLocation.y},
+          .heading = initialLocation.heading,
+          .speed = 0};
+      ctx.get<Position>(vehicle) =
+          Vector3{.x = initialLocation.x, .y = initialLocation.y, .z = 1};
+
+      ctx.get<Rotation>(vehicle) =
+          Quat::angleAxis(initialLocation.heading, madrona::math::up);
+
+      ctx.get<Velocity>(vehicle) = {Vector3::zero(), Vector3::zero()};
+      ctx.get<Action>(vehicle) = Action{0, 0, 0};
+      ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
+    }
+}
 
 static void generateLevel(Engine &ctx) {}
 
