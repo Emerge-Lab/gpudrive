@@ -1,5 +1,6 @@
 #include "level_gen.hpp"
 #include <cassert>
+#include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
@@ -51,20 +52,18 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
         Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
 
-
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
-    ctx.get<Action>(vehicle) = Action {
-      .acceleration = 0,
-      .steering = 0,
-      .headAngle = 0
-    };
+    ctx.get<Action>(vehicle) =
+        Action{.acceleration = 0, .steering = 0, .headAngle = 0};
 
     // registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
+    LevelState &level = ctx.singleton<LevelState>();
+    level.entities[idx] = vehicle;
     return vehicle;
 }
 
@@ -86,9 +85,8 @@ static void generateLevel(Engine &ctx) {
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
-    //   assert(agentCount < consts::numAgents);
-      if(agentCount == consts::numAgents) {
-        break; //changed this to allow less number of agents than in the file.
+      if (agentCount == consts::numAgents) {
+        break;
       }
       if (obj["type"] != "vehicle") {
         continue;

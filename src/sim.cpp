@@ -75,6 +75,7 @@ static inline void cleanupWorld(Engine &ctx)
     // for (CountT i = 0; i < consts::numAgents + consts::numRoadSegments; i++) {
     //     ctx.destroyEntity(level.entities[i]);
     // }
+
 }
 
 static inline void initWorld(Engine &ctx)
@@ -124,6 +125,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         }
     }
 }
+
 
 float quatToYaw(Rotation q) {
     // From https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion_to_Euler_angles_(in_3-2-1_sequence)_conversion
@@ -224,7 +226,6 @@ inline void collectObservationsSystem(Engine &ctx,
 //     door_obs.polar = xyToPolar(to_view.rotateVec(door_pos - pos));
 //     door_obs.isOpen = door_open_state.isOpen ? 1.f : 0.f;
 }
-
 
 inline void movementSystem(Engine &e,
 			   Action &action,

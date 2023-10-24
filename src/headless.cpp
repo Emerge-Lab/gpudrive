@@ -11,16 +11,14 @@
 using namespace madrona;
 using namespace madrona::viz;
 
-[[maybe_unused]] static void saveWorldActions(
-    const HeapArray<int32_t> &action_store,
-    int32_t total_num_steps,
-    int32_t world_idx)
-{
-    const int32_t *world_base = action_store.data() + world_idx * total_num_steps * 2 * 3;
+[[maybe_unused]] static void
+saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,
+                 int32_t world_idx) {
+  const float *world_base =
+      action_store.data() + world_idx * total_num_steps * 2 * 3;
 
-    std::ofstream f("/tmp/actions", std::ios::binary);
-    f.write((char *)world_base,
-            sizeof(uint32_t) * total_num_steps * 2 * 3);
+  std::ofstream f("/tmp/actions", std::ios::binary);
+  f.write((char *)world_base, sizeof(float) * total_num_steps * 2 * 3);
 }
 
 
@@ -47,8 +45,7 @@ int main(int argc, char *argv[])
     uint64_t num_worlds = std::stoul(argv[2]);
     uint64_t num_steps = std::stoul(argv[3]);
 
-    HeapArray<float> action_store(
-        num_worlds * 2 * num_steps * 3);
+    HeapArray<float> action_store(num_worlds * 2 * num_steps * 3);
 
     bool rand_actions = false;
     if (argc >= 5) {
@@ -65,7 +62,7 @@ int main(int argc, char *argv[])
     });
 
     std::random_device rd;
-    std::mt19937 rand_gen(42);
+    std::mt19937 rand_gen(rd());
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
@@ -74,6 +71,7 @@ int main(int argc, char *argv[])
     auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
+
     auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();

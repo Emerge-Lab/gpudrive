@@ -69,6 +69,7 @@ struct SelfObservation {
     float length;
     float goalX;
     float goalY;
+
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -101,6 +102,19 @@ static_assert(sizeof(PartnerObservations) == sizeof(float) *
 struct EntityObservation {
     PolarObservation polar;
     float encodedType;
+};
+
+
+struct RoomEntityObservations {
+    EntityObservation obs[consts::maxEntitiesPerRoom];
+};
+
+
+// Observation of the current room's door. It's relative position and
+// whether or not it is ope
+struct DoorObservation {
+    PolarObservation polar;
+    float isOpen; // 1.0 when open, 0.0 when closed.
 };
 
 

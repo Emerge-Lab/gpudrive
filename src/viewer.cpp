@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 using namespace madrona;
 using namespace madrona::viz;
@@ -29,16 +30,15 @@ static inline math::Vector4 rgb8ToFloat(uint8_t r, uint8_t g, uint8_t b)
     };
 }
 
-static HeapArray<int32_t> readReplayLog(const char *path)
-{
+static HeapArray<float> readReplayLog(const char *path) {
     std::ifstream replay_log(path, std::ios::binary);
     replay_log.seekg(0, std::ios::end);
     int64_t size = replay_log.tellg();
     replay_log.seekg(0, std::ios::beg);
 
-    HeapArray<int32_t> log(size / sizeof(int32_t));
+    HeapArray<float> log(size / sizeof(float));
 
-    replay_log.read((char *)log.data(), (size / sizeof(int32_t)) * sizeof(int32_t));
+    replay_log.read((char *)log.data(), (size / sizeof(float)) * sizeof(float));
 
     return log;
 }
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 {
     using namespace gpudrive;
 
-    constexpr int64_t num_views = 42;
+    constexpr int64_t num_views = 2;
 
     uint32_t num_worlds = 1;
     if (argc >= 2) {
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
         replay_log_path = argv[3];
     }
 
-    auto replay_log = Optional<HeapArray<int32_t>>::none();
+    std::optional<HeapArray<float>> replay_log;
     uint32_t cur_replay_step = 0;
     uint32_t num_replay_steps = 0;
     if (replay_log_path != nullptr) {
@@ -171,14 +171,14 @@ int main(int argc, char *argv[])
                 base_idx = 4 * (cur_replay_step * num_views * num_worlds +
                     i * num_views + j);
 
-                int32_t move_amount = (*replay_log)[base_idx];
-                int32_t move_angle = (*replay_log)[base_idx + 1];
-                int32_t turn = (*replay_log)[base_idx + 2];
-                int32_t g = (*replay_log)[base_idx + 3];
+                auto acceleration = (*replay_log)[base_idx];
+                auto steering = (*replay_log)[base_idx + 1];
+                auto headAngle = (*replay_log)[base_idx + 2];
 
-                printf("%d, %d: %d %d %dd\n",
-                       i, j, move_amount, move_angle, turn);
-                mgr.setAction(i, j, move_amount, move_angle, turn);
+
+                printf("%d, %d: %f %f %f\n", i, j, acceleration, steering,
+                       headAngle);
+                mgr.setAction(i, j, acceleration, steering, headAngle);
             }
         }
 
@@ -203,10 +203,11 @@ int main(int argc, char *argv[])
                        const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
 
-        int32_t x = 0;
-        int32_t y = 0;
-        int32_t r = 2;
-        int32_t g = 0;
+        float steering{0};
+        const float steeringDelta{math::pi / 8};
+
+        float acceleration{0};
+        const float accelerationDelta{1};
 
         if (input.keyPressed(Key::R)) {
             mgr.triggerReset(world_idx);
@@ -215,61 +216,21 @@ int main(int argc, char *argv[])
         bool shift_pressed = input.keyPressed(Key::Shift);
 
         if (input.keyPressed(Key::W)) {
-            y += 1;
+            acceleration += accelerationDelta;
         }
         if (input.keyPressed(Key::S)) {
-            y -= 1;
+            acceleration -= accelerationDelta;
         }
 
         if (input.keyPressed(Key::D)) {
-            x += 1;
+            steering += steeringDelta;
         }
         if (input.keyPressed(Key::A)) {
-            x -= 1;
+            steering -= steeringDelta;
         }
 
-        if (input.keyPressed(Key::Q)) {
-            r += shift_pressed ? 2 : 1;
-        }
-        if (input.keyPressed(Key::E)) {
-            r -= shift_pressed ? 2 : 1;
-        }
+        mgr.setAction(world_idx, agent_idx, acceleration, steering, 0);
 
-        if (input.keyPressed(Key::G)) {
-            g = 1;
-        }
-
-        int32_t move_amount;
-        if (x == 0 && y == 0) {
-            move_amount = 0;
-        } else if (shift_pressed) {
-            move_amount = consts::numMoveAmountBuckets - 1;
-        } else {
-            move_amount = 1;
-        }
-
-        int32_t move_angle;
-        if (x == 0 && y == 1) {
-            move_angle = 0;
-        } else if (x == 1 && y == 1) {
-            move_angle = 1;
-        } else if (x == 1 && y == 0) {
-            move_angle = 2;
-        } else if (x == 1 && y == -1) {
-            move_angle = 3;
-        } else if (x == 0 && y == -1) {
-            move_angle = 4;
-        } else if (x == -1 && y == -1) {
-            move_angle = 5;
-        } else if (x == -1 && y == 0) {
-            move_angle = 6;
-        } else if (x == -1 && y == 1) {
-            move_angle = 7;
-        } else {
-            move_angle = 0;
-        }
-
-        mgr.setAction(world_idx, agent_idx, move_amount, move_angle, r);
     }, [&]() {
         if (replay_log.has_value()) {
             bool replay_finished = replayStep();
