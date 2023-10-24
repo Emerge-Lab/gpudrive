@@ -1,9 +1,6 @@
-#include <iostream>
-#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <limits>
 #include <madrona/mw_gpu_entry.hpp>
-#include <fstream>
 
 #include "sim.hpp"
 #include "level_gen.hpp"
@@ -12,40 +9,6 @@
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
-namespace madrona {
-
-void printGraph(const TaskGraphBuilder& builder)
-{
-    nlohmann::json j;
-
-    for (int i = 0; i < builder.staged_.size(); i++)
-    {
-        nlohmann::json nodeJson;
-        auto node = builder.staged_[i];
-        nodeJson["Node idx"] = i;
-        nodeJson["Node dependencies"] = node.numDependencies;
-        nodeJson["Node dependency offset"] = node.dependencyOffset;
-        nodeJson["Node parent ID"] = node.parentID;
-        j["Nodes"].push_back(nodeJson);
-    }
-
-    nlohmann::json dependenciesJson;
-    for (auto node : builder.all_dependencies_)
-    {
-        dependenciesJson.push_back(node.id);
-    }
-    j["Dependencies"] = dependenciesJson;
-
-    // Write JSON to file
-    std::ofstream file("output.json");
-    file << j.dump(4);
-
-    std::cout<<"Wrote the json to file"<<std::endl;
-}
-
-}
-
-
 
 namespace gpudrive {
 
@@ -61,9 +24,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
+    registry.registerComponent<GrabState>();
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
+    registry.registerComponent<RoomEntityObservations>();
+    registry.registerComponent<DoorObservation>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -78,6 +44,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<DoorEntity>();
+    registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -85,9 +53,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
-
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
+    registry.exportColumn<Agent, RoomEntityObservations>(
+        (uint32_t)ExportID::RoomEntityObservations);
+    registry.exportColumn<Agent, DoorObservation>(
+        (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
@@ -157,7 +128,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-//movementSystem does not seem to be getting the correct model params
 inline void movementSystem(Engine &e,
 			   Action &action,
 			   BicycleModel& model,

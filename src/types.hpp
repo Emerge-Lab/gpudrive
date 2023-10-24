@@ -96,6 +96,17 @@ struct EntityObservation {
     float encodedType;
 };
 
+struct RoomEntityObservations {
+    EntityObservation obs[consts::maxEntitiesPerRoom];
+};
+
+
+// Observation of the current room's door. It's relative position and
+// whether or not it is ope
+struct DoorObservation {
+    PolarObservation polar;
+    float isOpen; // 1.0 when open, 0.0 when closed.
+};
 
 struct LidarSample {
     float depth;
@@ -125,12 +136,20 @@ struct OtherAgents {
     madrona::Entity e[consts::numAgents - 1];
 };
 
+// Tracks if an agent is currently grabbing another entity
+struct GrabState {
+    Entity constraintEntity;
+};
+
 // This enum is used to track the type of each entity for the purposes of
 // classifying the objects hit by each lidar sample.
 enum class EntityType : uint32_t {
     None,
+    Button,
     Cube,
+    Wall,
     Agent,
+    Door,
     NumTypes,
 };
 
@@ -150,6 +169,19 @@ struct DoorProperties {
 // Similar to OpenState, true during frames where a button is pressed
 struct ButtonState {
     bool isPressed;
+};
+
+// Room itself is not a component but is used by the singleton
+// component "LevelState" (below) to represent the state of the full level
+struct Room {
+    // These are entities the agent will interact with
+    Entity entities[consts::maxEntitiesPerRoom];
+
+    // The walls that separate this room from the next
+    Entity walls[2];
+
+    // The door the agents need to figure out how to lower
+    Entity door;
 };
 
 // A singleton component storing the state of all the rooms in the current
@@ -179,6 +211,7 @@ struct Agent : public madrona::Archetype<
     madrona::phys::broadphase::LeafID,
 
     // Internal logic state.
+    GrabState,
     Progress,
     OtherAgents,
     EntityType,
@@ -193,6 +226,8 @@ struct Agent : public madrona::Archetype<
     // Observations
     SelfObservation,
     PartnerObservations,
+    RoomEntityObservations,
+    DoorObservation,
     Lidar,
     StepsRemaining,
 
@@ -205,6 +240,35 @@ struct Agent : public madrona::Archetype<
     madrona::viz::VizCamera
 > {};
 
+// Archetype for the doors blocking the end of each challenge room
+struct DoorEntity : public madrona::Archetype<
+    Position, 
+    Rotation,
+    Scale,
+    Velocity,
+    ObjectID,
+    ResponseType,
+    madrona::phys::solver::SubstepPrevState,
+    madrona::phys::solver::PreSolvePositional,
+    madrona::phys::solver::PreSolveVelocity,
+    ExternalForce,
+    ExternalTorque,
+    madrona::phys::broadphase::LeafID,
+    OpenState,
+    DoorProperties,
+    EntityType
+> {};
+
+// Archetype for the button objects that open the doors
+// Buttons don't have collision but are rendered
+struct ButtonEntity : public madrona::Archetype<
+    Position,
+    Rotation,
+    Scale,
+    ObjectID,
+    ButtonState,
+    EntityType
+> {};
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
