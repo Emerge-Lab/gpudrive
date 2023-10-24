@@ -531,25 +531,21 @@ void Manager::triggerReset(int32_t world_idx)
     }
 }
 
-void Manager::setAction(int32_t world_idx,
-                        int32_t agent_idx,
-                        float acceleration,
-                        float steering,
-                        float headAngle) 
-{
-    Action action { 
-        .acceleration = acceleration,
-        .steering = steering,
-        .headAngle = headAngle,
-    };
+void Manager::setAction(int32_t world_idx, int32_t agent_idx,
+                        float acceleration, float steering, float headAngle) {
+    Action action{.acceleration = acceleration,
+                  .steering = steering,
+                  .headAngle = headAngle};
 
-    auto *action_ptr = impl_->agentActionsBuffer +
-        world_idx * consts::numAgents + agent_idx;
+    auto *action_ptr =
+        impl_->agentActionsBuffer + world_idx * consts::numAgents + agent_idx;
+
     if (impl_->cfg.execMode == ExecMode::CUDA) {
-        std::cerr << "CUDA support not implemented." << std::endl;
-        std::abort();
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(action_ptr, &action, sizeof(Action), cudaMemcpyHostToDevice);
+#endif
+    } else {
+        *action_ptr = action;
     }
-    *action_ptr = action;
 }
-
 }

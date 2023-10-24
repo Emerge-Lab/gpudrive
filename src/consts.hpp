@@ -10,11 +10,9 @@ namespace consts {
 inline constexpr madrona::CountT numRooms = 3;
 
 // TODO(samk): This number is specifically derived for
-// tfrecord-00100-of-00150_139.json. Once we move to multiple map files, it will
-// have to be updated. Total num of vehicles are 29 but we are only using 5 valid ones. 
-// TODO: Need to dynamically figure this number out based on the number of valid vehicles.
-// TODO: Need to handle pedestrians and other types separately from agents.
-inline constexpr madrona::CountT numAgents = 5;
+// tfrecord-00004-of-00150_246.json. Once we move to multiple map files, it will
+// have to be updated.
+inline constexpr madrona::CountT numAgents = 2;
 inline constexpr madrona::CountT numRoadSegments = 0;
 
 // Maximum number of interactive objects per challenge room. This is needed
