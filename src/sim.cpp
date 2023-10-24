@@ -1,9 +1,6 @@
-#include <iostream>
-#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <limits>
 #include <madrona/mw_gpu_entry.hpp>
-#include <fstream>
 
 #include "sim.hpp"
 #include "level_gen.hpp"
