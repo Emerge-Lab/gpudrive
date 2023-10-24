@@ -38,7 +38,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
 
     ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
     ctx.get<BicycleModel>(vehicle) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = 0};
+        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     Velocity vel;
