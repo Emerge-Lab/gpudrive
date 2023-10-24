@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <cmath>
 
 namespace gpudrive {
 
@@ -24,20 +25,28 @@ static void registerRigidBodyEntity(
         RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
+
 float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
+
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
                                    float speed, int32_t idx) {
+
     heading = degreesToRadians(heading);
     auto vehicle = ctx.makeEntity<Agent>();
 
     ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
     ctx.get<BicycleModel>(vehicle) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = 0};
+        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
+    Velocity vel;
+    vel.linear = Vector3{.x = speed * cosf(heading), .y = speed * sinf(heading), .z = 0};
+    vel.angular = Vector3::zero();
+    ctx.get<Velocity>(vehicle) = vel;
     ctx.get<Scale>(vehicle) = Diag3x3{.d0 = width, .d1 = length, .d2 = 1};
+
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<Velocity>(vehicle) = {Vector3::zero(), Vector3::zero()};
 
@@ -53,7 +62,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
-
+    LevelState &level = ctx.singleton<LevelState>();
+    level.entities[idx] = vehicle;
     return vehicle;
 }
 
@@ -63,8 +73,8 @@ static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
     std::ifstream data(
-        "/Users/samk/src/nocturne/data/nocturne_mini/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+        "/home/aarav/gpudrive/nocturne_data/"
+        "formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
     assert(data.is_open());
 
     using nlohmann::json;
@@ -81,7 +91,6 @@ static void generateLevel(Engine &ctx) {
       if (obj["type"] != "vehicle") {
         continue;
       }
-
       auto vehicle = createVehicle(
           ctx,
           // TODO(samk): Nocturne allows for configuring the initial position
