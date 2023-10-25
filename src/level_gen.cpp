@@ -26,14 +26,14 @@ static void registerRigidBodyEntity(
 }
 
 
-float degreesToRadians(float degrees) {
-    return degrees * M_PI / 180.0;
-}
+float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speedx, float speedy, int32_t idx) {
-    heading = degreesToRadians(heading); // C++ math libraries expect angle in radians.
+                                   float speedX, float speedY, int32_t idx) {
+    auto speed = Vector2{.x = speedX, .y = speedY}.length();
+
+    heading = degreesToRadians(heading);
     auto vehicle = ctx.makeEntity<Agent>();
 
     // xCoord = xCoord - 798.275;
@@ -45,7 +45,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     Velocity vel;
-    vel.linear = Vector3{.x = speedx, .y = speedy, .z = 0}; //not sure if this is correct but it makes viz simpler.
+
+    vel.linear = Vector3{.x = speedX, .y = speedY, .z = 0};
     vel.angular = Vector3::zero();
     ctx.get<Velocity>(vehicle) = vel;
     ctx.get<Scale>(vehicle) =
@@ -72,9 +73,8 @@ void createPersistentEntities(Engine &ctx) {}
 static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
-    std::ifstream data(
-        "/home/emerge/aarav/gpudrive/nocturne_data/"
-        "example.json");
+
+    std::ifstream data("../example.json");
     assert(data.is_open());
 
     using nlohmann::json;
@@ -96,7 +96,8 @@ static void generateLevel(Engine &ctx) {
           // TODO(samk): Nocturne allows for configuring the initial position
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], obj["velocity"][0]["y"], agentCount);
+          obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
+          obj["velocity"][0]["y"], agentCount);
 
       ctx.data().agents[agentCount++] = vehicle;
     }
