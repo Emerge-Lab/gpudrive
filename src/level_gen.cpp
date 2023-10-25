@@ -28,10 +28,10 @@ static void registerRigidBodyEntity(
 
 float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
 
-
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speed, int32_t idx) {
+                                   float speedX, float speedY, int32_t idx) {
+    auto speed = Vector2{.x = speedX, .y = speedY}.length();
 
     heading = degreesToRadians(heading);
     auto vehicle = ctx.makeEntity<Agent>();
@@ -42,7 +42,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     Velocity vel;
-    vel.linear = Vector3{.x = speed * cosf(heading), .y = speed * sinf(heading), .z = 0};
+    vel.linear = Vector3{.x = speedX, .y = speedY, .z = 0};
     vel.angular = Vector3::zero();
     ctx.get<Velocity>(vehicle) = vel;
     ctx.get<Scale>(vehicle) = Diag3x3{.d0 = width, .d1 = length, .d2 = 1};
@@ -72,9 +72,7 @@ void createPersistentEntities(Engine &ctx) {}
 static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
-    std::ifstream data(
-        "/home/aarav/gpudrive/nocturne_data/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
+    std::ifstream data("../example.json");
     assert(data.is_open());
 
     using nlohmann::json;
@@ -96,7 +94,8 @@ static void generateLevel(Engine &ctx) {
           // TODO(samk): Nocturne allows for configuring the initial position
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-          obj["width"], obj["heading"][0], obj["velocity"][0]["x"], agentCount);
+          obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
+          obj["velocity"][0]["y"], agentCount);
 
       ctx.data().agents[agentCount++] = vehicle;
     }
