@@ -41,7 +41,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<VehicleSize>(vehicle) = {.length = length , .width = width};
     ctx.get<BicycleModel>(vehicle) = {.position = {.x = xCoord, .y = yCoord},
                                       .heading = heading,
-                                      .speed = speedx};
+                                      .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     Velocity vel;
@@ -74,7 +74,7 @@ static void resetPersistentEntities(Engine &ctx) {}
 
 static void generateLevel(Engine &ctx) {
 
-    std::ifstream data("../example.json");
+    std::ifstream data("../nocturne_data/example.json");
     assert(data.is_open());
 
     using nlohmann::json;
