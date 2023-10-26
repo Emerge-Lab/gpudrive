@@ -4,9 +4,8 @@
 
 namespace gpudrive {
 
-void createPersistentEntities(Engine &ctx);
+void createPersistentEntities(Engine &ctx, const std::string &path);
 
-// Randomly generate a new world for a training episode
 // First, destroys any non-persistent state for the current world and then
 // generates a new play area.
 void generateWorld(Engine &ctx);

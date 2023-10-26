@@ -99,6 +99,17 @@ struct Sim : public madrona::WorldBase {
 
     // Are we visualizing the simulation in the viewer?
     bool enableVizRender;
+
+    struct InitialLocation {
+        float x;
+        float y;
+        float heading;
+        float speed;
+        float speedX;
+        float speedY;
+    };
+
+    InitialLocation agentToInitialLocation[consts::numAgents];
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {

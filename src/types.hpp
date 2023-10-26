@@ -173,8 +173,6 @@ struct ButtonState {
     bool isPressed;
 };
 
-// A singleton component storing the state of all the rooms in the current
-// randomly generated level
 struct LevelState {
     Entity entities[consts::numAgents + consts::numRoadSegments];
 };
