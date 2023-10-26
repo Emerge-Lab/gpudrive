@@ -26,9 +26,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
+    registry.registerComponent<GrabState>();
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
+    registry.registerComponent<RoomEntityObservations>();	
+    registry.registerComponent<DoorObservation>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
     registry.registerComponent<DoorProperties>();
@@ -44,6 +47,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<DoorEntity>();	
+    registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -54,6 +59,10 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
+    registry.exportColumn<Agent, RoomEntityObservations>(	
+        (uint32_t)ExportID::RoomEntityObservations);	
+    registry.exportColumn<Agent, DoorObservation>(	
+        (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
