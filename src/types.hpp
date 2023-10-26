@@ -64,14 +64,7 @@ struct Done {
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
-    float roomX;
-    float roomY;
-    float globalX;
-    float globalY;
-    float globalZ;
-    float maxY;
-    float theta;
-    float isGrabbing;
+    BicycleModel bicycle_model;
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -107,10 +100,6 @@ struct RoomEntityObservations {
     EntityObservation obs[consts::maxEntitiesPerRoom];
 };
 
-// RoomEntityObservations is exported as a
-// [N, A, maxEntitiesPerRoom, 3] tensor to pytorch
-static_assert(sizeof(RoomEntityObservations) == sizeof(float) *
-    consts::maxEntitiesPerRoom * 3);
 
 // Observation of the current room's door. It's relative position and
 // whether or not it is ope
@@ -183,7 +172,7 @@ struct ButtonState {
 };
 
 struct LevelState {
-    Entity vehicles[consts::numAgents];
+    Entity entities[consts::numAgents + consts::numRoadSegments];
 };
 
 /* ECS Archetypes for the game */

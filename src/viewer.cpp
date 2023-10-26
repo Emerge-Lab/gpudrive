@@ -251,6 +251,7 @@ int main(int argc, char *argv[])
         }
 
         mgr.setAction(world_idx, agent_idx, acceleration, steering, 0);
+
     }, [&]() {
         if (replay_log.has_value()) {
             bool replay_finished = replayStep();

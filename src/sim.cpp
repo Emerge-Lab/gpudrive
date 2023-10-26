@@ -67,17 +67,20 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
         (uint32_t)ExportID::Done);
+    registry.exportColumn<Agent, BicycleModel>(
+        (uint32_t) ExportID::BicycleModel);
 }
 
 static inline void cleanupWorld(Engine &ctx) {
     auto &level = ctx.singleton<LevelState>();
 
-    for (CountT i = 0; i < consts::numAgents; i++) {
+    for (CountT i = 0; i < (consts::numAgents + consts::numRoadSegments); i++) {
       if (level.vehicles[i] == Entity::none()) {
         continue;
       }
 
       ctx.destroyEntity(level.vehicles[i]);
+
     }
 }
 
@@ -129,7 +132,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-inline void movementSystem(Engine &,
+inline void movementSystem(Engine &e,
 			   Action &action,
 			   BicycleModel& model,
 			   VehicleSize& size,
@@ -137,9 +140,15 @@ inline void movementSystem(Engine &,
 			   Position& position,
 			   Velocity& velocity) 
 {
+
+  //TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions 
+  // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
+  // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 
+  // gradually.
+
   // TODO(samk): The following constants are configurable in Nocturne but look to
   // always use the same hard-coded value in practice. Use in-line constants
-  // until the configuration is built out.
+  // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
   const float maxSpeed{std::numeric_limits<float>::max()};
   const float dt{0.1};
 
@@ -170,77 +179,12 @@ inline void movementSystem(Engine &,
   // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
   position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
   rotation = Quat::angleAxis(model.heading, madrona::math::up);
-  velocity.linear = Vector3::zero();
+//   velocity.linear = Vector3::zero();
+  velocity.linear.x = model.speed * cosf(model.heading);
+  velocity.linear.y = model.speed * sinf(model.heading);
+  velocity.linear.z = 0;
   velocity.angular = Vector3::zero();
-}
-
-// Animates the doors opening and closing based on OpenState
-inline void setDoorPositionSystem(Engine &,
-                                  Position &pos,
-                                  OpenState &open_state)
-{
-    if (open_state.isOpen) {
-        // Put underground
-        if (pos.z > -4.5f) {
-            pos.z += -consts::doorSpeed * consts::deltaT;
-        }
-    }
-    else if (pos.z < 0.0f) {
-        // Put back on surface
-        pos.z += consts::doorSpeed * consts::deltaT;
-    }
-    
-    if (pos.z >= 0.0f) {
-        pos.z = 0.0f;
-    }
-}
-
-
-// Checks if there is an entity standing on the button and updates
-// ButtonState if so.
-inline void buttonSystem(Engine &ctx,
-                         Position pos,
-                         ButtonState &state)
-{
-    AABB button_aabb {
-        .pMin = pos + Vector3 { 
-            -consts::buttonWidth / 2.f, 
-            -consts::buttonWidth / 2.f,
-            0.f,
-        },
-        .pMax = pos + Vector3 { 
-            consts::buttonWidth / 2.f, 
-            consts::buttonWidth / 2.f,
-            0.25f
-        },
-    };
-
-    bool button_pressed = false;
-    RigidBodyPhysicsSystem::findEntitiesWithinAABB(
-            ctx, button_aabb, [&](Entity) {
-        button_pressed = true;
-    });
-
-    state.isPressed = button_pressed;
-}
-
-// Check if all the buttons linked to the door are pressed and open if so.
-// Optionally, close the door if the buttons aren't pressed.
-inline void doorOpenSystem(Engine &ctx,
-                           OpenState &open_state,
-                           const DoorProperties &props)
-{
-    bool all_pressed = true;
-    for (int32_t i = 0; i < props.numButtons; i++) {
-        Entity button = props.buttons[i];
-        all_pressed = all_pressed && ctx.get<ButtonState>(button).isPressed;
-    }
-
-    if (all_pressed) {
-        open_state.isOpen = true;
-    } else if (!props.isPersistent) {
-        open_state.isOpen = false;
-    }
+  velocity.angular.z = w;
 }
 
 // Make the agents easier to control by zeroing out their velocity
@@ -413,6 +357,8 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
+
+
 // Build the task graph
 void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
@@ -426,7 +372,6 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Position,
             Velocity
         >>({});
-
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
@@ -455,8 +400,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, Action>>(
-            {substep_sys});
+        agentZeroVelSystem, Velocity, Action>>({substep_sys});
 
     // Finalize physics subsystem work
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
@@ -475,6 +419,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
     (void)clear_tmp;
+
 
 #ifdef MADRONA_GPU_MODE
     // RecycleEntitiesNode is required on the GPU backend in order to reclaim

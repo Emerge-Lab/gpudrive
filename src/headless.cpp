@@ -1,4 +1,5 @@
 #include "mgr.hpp"
+#include "consts.hpp"
 
 #include <cstdio>
 #include <chrono>
@@ -19,6 +20,7 @@ saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,
   std::ofstream f("/tmp/actions", std::ios::binary);
   f.write((char *)world_base, sizeof(float) * total_num_steps * 2 * 3);
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -43,6 +45,7 @@ int main(int argc, char *argv[])
     uint64_t num_worlds = std::stoul(argv[2]);
     uint64_t num_steps = std::stoul(argv[3]);
 
+
     HeapArray<float> action_store(num_worlds * 2 * num_steps * 3);
 
     bool rand_actions = false;
@@ -61,28 +64,47 @@ int main(int argc, char *argv[])
 
     std::random_device rd;
     std::mt19937 rand_gen(rd());
-    std::uniform_real_distribution<float> act_rand(0, 4);
+    std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
+    std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
+
 
     auto start = std::chrono::system_clock::now();
+    auto action_printer = mgr.actionTensor().makePrinter();
+    auto model_printer = mgr.bicycleModelTensor().makePrinter();
+    auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto printObs = [&]() {
+        printf("Self\n");
+        self_printer.print();
 
+        printf("Actions\n");
+        action_printer.print();
+
+        printf("Model \n");
+        model_printer.print();
+
+        printf("\n");
+    };
+    printObs();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
-                for (CountT k = 0; k < 2; k++) {
-                  auto acceleration = act_rand(rand_gen);
-                  auto steering = act_rand(rand_gen);
-                  auto headAngle = act_rand(rand_gen);
+                for (CountT k = 0; k < gpudrive::consts::numAgents; k++) {
+                    float acc = acc_gen(rand_gen);
+                    float steer = steer_gen(rand_gen);
+                    float head = 0;
 
-                  mgr.setAction(j, k, acceleration, steering, headAngle);
+                    mgr.setAction(j, k, acc, steer, head);
+                    
+                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
+                    action_store[base_idx] = acc;
+                    action_store[base_idx + 1] = steer;
+                    action_store[base_idx + 2] = head;
 
-                  int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
-                  action_store[base_idx] = acceleration;
-                  action_store[base_idx + 1] = steering;
-                  action_store[base_idx + 2] = headAngle;
                 }
             }
         }
         mgr.step();
+        printObs();
     }
 
     auto end = std::chrono::system_clock::now();

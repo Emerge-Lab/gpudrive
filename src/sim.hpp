@@ -25,7 +25,8 @@ enum class ExportID : uint32_t {
     DoorObservation,
     Lidar,
     StepsRemaining,
-    NumExports,
+    BicycleModel,
+    NumExports
 };
 
 // Stores values for the ObjectID component that links entities to

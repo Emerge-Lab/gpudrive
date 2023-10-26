@@ -49,7 +49,7 @@ public:
     MGR_EXPORT madrona::py::Tensor doorObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
     MGR_EXPORT madrona::py::Tensor stepsRemainingTensor() const;
-
+    MGR_EXPORT madrona::py::Tensor bicycleModelTensor() const;
     // These functions are used by the viewer to control the simulation
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);

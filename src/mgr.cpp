@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -405,13 +406,24 @@ Tensor Manager::resetTensor() const
 
 Tensor Manager::actionTensor() const
 {
-    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Int32,
+    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
             consts::numAgents,
-            4,
+            3, // Num_actions
         });
 }
+
+Tensor Manager::bicycleModelTensor() const
+{
+    return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
+        {
+            impl_->cfg.numWorlds,
+            consts::numAgents,
+            4, // Number of states for the bicycle model
+        });
+}
+
 
 Tensor Manager::rewardTensor() const
 {
@@ -440,7 +452,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   8,
+                                   4
                                });
 }
 
