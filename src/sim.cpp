@@ -176,51 +176,6 @@ inline void collectObservationsSystem(Engine &ctx,
             .heading = relative_heading
         };
     }
-//     Quat to_view = rot.inv();
-
-// #pragma unroll
-//     for (CountT i = 0; i < consts::numAgents - 1; i++) {
-//         Entity other = other_agents.e[i];
-
-//         Vector3 other_pos = ctx.get<Position>(other);
-//         GrabState other_grab = ctx.get<GrabState>(other);
-//         Vector3 to_other = other_pos - pos;
-
-//         partner_obs.obs[i] = {
-//             .polar = xyToPolar(to_view.rotateVec(to_other)),
-//             .isGrabbing = other_grab.constraintEntity != Entity::none() ?
-//                 1.f : 0.f,
-//         };
-//     }
-
-//     const LevelState &level = ctx.singleton<LevelState>();
-//     const Room &room = level.rooms[cur_room_idx];
-
-//     for (CountT i = 0; i < consts::maxEntitiesPerRoom; i++) {
-//         Entity entity = room.entities[i];
-
-//         EntityObservation ob;
-//         if (entity == Entity::none()) {
-//             ob.polar = { 0.f, 1.f };
-//             ob.encodedType = encodeType(EntityType::None);
-//         } else {
-//             Vector3 entity_pos = ctx.get<Position>(entity);
-//             EntityType entity_type = ctx.get<EntityType>(entity);
-
-//             Vector3 to_entity = entity_pos - pos;
-//             ob.polar = xyToPolar(to_view.rotateVec(to_entity));
-//             ob.encodedType = encodeType(entity_type);
-//         }
-
-//         room_ent_obs.obs[i] = ob;
-//     }
-
-//     Entity cur_door = room.door;
-//     Vector3 door_pos = ctx.get<Position>(cur_door);
-//     OpenState door_open_state = ctx.get<OpenState>(cur_door);
-
-//     door_obs.polar = xyToPolar(to_view.rotateVec(door_pos - pos));
-//     door_obs.isOpen = door_open_state.isOpen ? 1.f : 0.f;
 }
 
 inline void movementSystem(Engine &e,
