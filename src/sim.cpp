@@ -75,11 +75,11 @@ static inline void cleanupWorld(Engine &ctx) {
     auto &level = ctx.singleton<LevelState>();
 
     for (CountT i = 0; i < (consts::numAgents + consts::numRoadSegments); i++) {
-      if (level.vehicles[i] == Entity::none()) {
+      if (level.entities[i] == Entity::none()) {
         continue;
       }
 
-      ctx.destroyEntity(level.vehicles[i]);
+      ctx.destroyEntity(level.entities[i]);
 
     }
 }

@@ -62,8 +62,11 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
-    LevelState &level = ctx.singleton<LevelState>();
-    level.entities[idx] = vehicle;
+
+    // Filling correct values of initial location here. 
+    ctx.data().agents[idx] = vehicle;
+    ctx.data().agentToInitialLocation[idx] = {xCoord, yCoord, heading, speed, speedX, speedY};
+
     return vehicle;
 }
 
@@ -93,11 +96,6 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
           obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
           obj["velocity"][0]["y"], agentCount);
 
-      ctx.data().agents[agentCount] = vehicle;
-
-      ctx.data().agentToInitialLocation[agentCount].x = obj["position"][0]["x"];
-      ctx.data().agentToInitialLocation[agentCount].y = obj["position"][0]["y"];
-      ctx.data().agentToInitialLocation[agentCount].heading = obj["heading"][0];
 
       ++agentCount;
     }
@@ -115,14 +113,17 @@ static void resetPersistentEntities(Engine &ctx) {
       ctx.get<BicycleModel>(vehicle) = {
           .position = {.x = initialLocation.x, .y = initialLocation.y},
           .heading = initialLocation.heading,
-          .speed = 0};
+          .speed = initialLocation.speed};
       ctx.get<Position>(vehicle) =
           Vector3{.x = initialLocation.x, .y = initialLocation.y, .z = 1};
 
       ctx.get<Rotation>(vehicle) =
           Quat::angleAxis(initialLocation.heading, madrona::math::up);
 
-      ctx.get<Velocity>(vehicle) = {Vector3::zero(), Vector3::zero()};
+      auto vel = Vector3{.x = initialLocation.speedX,
+                         .y = initialLocation.speedY,
+                         .z = 0};
+      ctx.get<Velocity>(vehicle) = {vel, Vector3::zero()};
       ctx.get<Action>(vehicle) = Action{0, 0, 0};
       ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
     }

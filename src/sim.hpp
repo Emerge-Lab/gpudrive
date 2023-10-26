@@ -104,6 +104,9 @@ struct Sim : public madrona::WorldBase {
         float x;
         float y;
         float heading;
+        float speed;
+        float speedX;
+        float speedY;
     };
 
     InitialLocation agentToInitialLocation[consts::numAgents];
