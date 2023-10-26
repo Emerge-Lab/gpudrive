@@ -37,6 +37,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<EntityType>();
     registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
+    registry.registerComponent<Goal>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -141,6 +142,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       Position pos,
                                       Rotation rot,
                                       Velocity vel,
+                                      Goal goal,
                                       const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
@@ -149,8 +151,8 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.bicycle_model = model;
     self_obs.length = size.length;
     self_obs.width = size.width;
-    self_obs.goalX = 0.f;
-    self_obs.goalY = 0.f;
+    self_obs.goalX = goal.position.x;
+    self_obs.goalY = goal.position.y;
 
 
 #pragma unroll
@@ -162,8 +164,6 @@ inline void collectObservationsSystem(Engine &ctx,
 
         Vector3 relative_pos = other_pos - pos;
         float relative_speed = ctx.get<BicycleModel>(other).speed - model.speed;
-
-        relative_pos = rot.rotateVec(relative_pos);
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -533,6 +533,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Position,
             Rotation,
             Velocity,
+            Goal,
             Progress,
             OtherAgents,
             SelfObservation,

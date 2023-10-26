@@ -31,7 +31,7 @@ float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speedX, float speedY, int32_t idx) {
+                                   float speedX, float speedY, float goalX, float goalY, int32_t idx) {
     auto speed = Vector2{.x = speedX, .y = speedY}.length();
 
     heading = degreesToRadians(heading);
@@ -45,11 +45,13 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                       .speed = speed};
     ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 0};
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
+    
     Velocity vel;
 
     vel.linear = Vector3{.x = speedX, .y = speedY, .z = 0};
     vel.angular = Vector3::zero();
     ctx.get<Velocity>(vehicle) = vel;
+    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = goalX, .y = goalY}};
     ctx.get<Scale>(vehicle) =
         Diag3x3{.d0 = width, .d1 = length, .d2 = consts::zDimensionScale};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
@@ -60,6 +62,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
+    
 
     registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
@@ -67,7 +70,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
 
     // Filling correct values of initial location here. 
     ctx.data().agents[idx] = vehicle;
-    ctx.data().agentToInitialLocation[idx] = {xCoord, yCoord, heading, speed, speedX, speedY};
+    ctx.data().agentToInitialLocation[idx] = {xCoord, yCoord, heading, speed, speedX, speedY, goalX, goalY};
 
     return vehicle;
 }
@@ -96,7 +99,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
           obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
-          obj["velocity"][0]["y"], agentCount);
+          obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"], agentCount);
 
 
       ++agentCount;

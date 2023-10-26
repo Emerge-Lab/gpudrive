@@ -32,6 +32,9 @@ struct VehicleSize {
   float width;
 };
 
+struct Goal{
+    madrona::math::Vector2 position;
+};
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -204,6 +207,7 @@ struct Agent : public madrona::Archetype<
     // gpudrive
     BicycleModel,
     VehicleSize,
+    Goal,
 
     // Input
     Action,
