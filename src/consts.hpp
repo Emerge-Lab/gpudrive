@@ -55,6 +55,8 @@ inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
 
 inline constexpr float zDimensionScale = 1;
 inline constexpr float xDimensionScaleRoadSegment = 1;
+
+inline constexpr madrona::CountT kTrajectoryLength = 1;
 }
 
 }

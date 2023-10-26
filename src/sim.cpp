@@ -38,6 +38,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<EntityType>();
     registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
+    registry.registerComponent<Trajectory>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
