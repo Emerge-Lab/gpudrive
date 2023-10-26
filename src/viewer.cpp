@@ -113,8 +113,10 @@ int main(int argc, char *argv[])
         { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
     });
 
-    math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
-
+    // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
+    math::Quat initial_camera_rotation =
+            (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
     Viewer viewer({
         .gpuID = 0,
@@ -125,7 +127,7 @@ int main(int argc, char *argv[])
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 20,
         .cameraMoveSpeed = 20.f,
-        .cameraPosition = 10.f * math::up,
+        .cameraPosition = 20.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,
     });

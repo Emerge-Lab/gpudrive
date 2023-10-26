@@ -66,16 +66,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 }
 
 static inline void cleanupWorld(Engine &ctx) {
-    auto &level = ctx.singleton<LevelState>();
+    // auto &level = ctx.singleton<LevelState>();
 
-    for (CountT i = 0; i < (consts::numAgents + consts::numRoadSegments); i++) {
-      if (level.entities[i] == Entity::none()) {
-        continue;
-      }
+    // for (CountT i = 0; i < (consts::numAgents + consts::numRoadSegments); i++) {
+    //   if (level.entities[i] == Entity::none()) {
+    //     continue;
+    //   }
 
-      ctx.destroyEntity(level.entities[i]);
+    //   ctx.destroyEntity(level.entities[i]);
 
-    }
+    // }
 }
 
 static inline void initWorld(Engine &ctx)
@@ -116,7 +116,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 
     if (should_reset != 0) {
         reset.reset = 0;
-
+        
         cleanupWorld(ctx);
         initWorld(ctx);
 
@@ -273,7 +273,7 @@ inline void movementSystem(Engine &e,
 
   // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
   position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
-  rotation = Quat::angleAxis(model.heading, madrona::math::up);
+  rotation = Quat::angleAxis(model.heading - M_PI/2, madrona::math::up);
 //   velocity.linear = Vector3::zero();
   velocity.linear.x = model.speed * cosf(model.heading);
   velocity.linear.y = model.speed * sinf(model.heading);

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
+#include <iostream>
 
 namespace gpudrive {
 
@@ -60,7 +61,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
 
-    // registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
+    registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
     ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
         ctx, 90.f, 0.001f, 1.5f * math::up, idx);
 
@@ -79,7 +80,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
     json rawJson;
     data >> rawJson;
-
+    
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
@@ -89,7 +90,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
       if (obj["type"] != "vehicle") {
         continue;
       }
-      auto vehicle = createVehicle(
+      createVehicle(
           ctx,
           // TODO(samk): Nocturne allows for configuring the initial position
           // but in practice it looks to always be set to 0.
@@ -105,7 +106,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 static void resetPersistentEntities(Engine &ctx) {
     for (CountT idx = 0; idx < consts::numAgents; ++idx) {
       Entity vehicle = ctx.data().agents[idx];
-      registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
+      registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
 
       ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
           ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
@@ -130,16 +131,10 @@ static void resetPersistentEntities(Engine &ctx) {
     }
 }
 
-static void generateLevel(Engine &ctx) {}
-
-void generateWorld(Engine &ctx)
-{
-    resetPersistentEntities(ctx);
-    generateLevel(ctx);
-
-    for (CountT i = 0; i < consts::numAgents; i++) {
+static void generateLevel(Engine &ctx) {
+       for (CountT i = 0; i < consts::numAgents; i++) {
         Entity cur_agent = ctx.data().agents[i];
-        registerRigidBodyEntity(ctx, cur_agent, SimObject::Agent);
+        // registerRigidBodyEntity(ctx, cur_agent, SimObject::Agent);
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
         for (CountT j = 0; j < consts::numAgents; j++) {
@@ -151,7 +146,12 @@ void generateWorld(Engine &ctx)
             other_agents.e[out_idx++] = other_agent;
         }
     }
+}
 
+void generateWorld(Engine &ctx)
+{
+    resetPersistentEntities(ctx);
+    generateLevel(ctx);
 }
 
 }

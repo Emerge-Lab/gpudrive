@@ -265,8 +265,7 @@ Manager::Impl * Manager::Impl::init(
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
     const std::string pathToScenario(
-        "/Users/samk/src/nocturne/data/nocturne_mini/"
-        "formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+        "../nocturne_data/example.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -333,7 +332,7 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          world_inits[i] =
+            world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, pathToScenario};
         }
 
