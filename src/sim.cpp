@@ -116,7 +116,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 
     if (should_reset != 0) {
         reset.reset = 0;
-        
+
         cleanupWorld(ctx);
         initWorld(ctx);
 
@@ -158,23 +158,19 @@ inline void collectObservationsSystem(Engine &ctx,
         Entity other = other_agents.e[i];
 
         Vector3 other_pos = ctx.get<Position>(other);
-        Vector3 other_vel = ctx.get<Velocity>(other).linear;
         Rotation other_rot = ctx.get<Rotation>(other);
 
-
         Vector3 relative_pos = other_pos - pos;
-        Vector3 relative_vel = other_vel - vel.linear;
+        float relative_speed = ctx.get<BicycleModel>(other).speed - model.speed;
 
         relative_pos = rot.rotateVec(relative_pos);
-        relative_vel = rot.rotateVec(relative_vel);
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
         float relative_heading = quatToYaw(relative_orientation);
 
         partner_obs.obs[i] = {
-            .speedX = relative_vel.x,
-            .speedY = relative_vel.y,
+            .speed = relative_speed,
             .posX = relative_pos.x,
             .posY = relative_pos.y,
             .heading = relative_heading
@@ -273,7 +269,7 @@ inline void movementSystem(Engine &e,
 
   // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
   position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
-  rotation = Quat::angleAxis(model.heading - M_PI/2, madrona::math::up);
+  rotation = Quat::angleAxis(model.heading, madrona::math::up);
 //   velocity.linear = Vector3::zero();
   velocity.linear.x = model.speed * cosf(model.heading);
   velocity.linear.y = model.speed * sinf(model.heading);
