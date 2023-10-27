@@ -41,6 +41,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
+    registry.registerComponent<Trajectory>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -75,18 +76,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::BicycleModel);
 }
 
-static inline void cleanupWorld(Engine &ctx) {
-    // auto &level = ctx.singleton<LevelState>();
-
-    // for (CountT i = 0; i < (consts::numAgents + consts::numRoadSegments); i++) {
-    //   if (level.entities[i] == Entity::none()) {
-    //     continue;
-    //   }
-
-    //   ctx.destroyEntity(level.entities[i]);
-
-    // }
-}
+static inline void cleanupWorld(Engine &ctx) {}
 
 static inline void initWorld(Engine &ctx)
 {

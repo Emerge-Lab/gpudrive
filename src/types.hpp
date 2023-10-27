@@ -200,6 +200,12 @@ struct LevelState {
     Entity entities[consts::numAgents + consts::numRoadSegments];
 };
 
+struct Trajectory {
+    madrona::math::Vector2 positions[consts::kTrajectoryLength];
+    madrona::math::Vector2 velocities[consts::kTrajectoryLength];
+    float initialHeading;
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -230,6 +236,7 @@ struct Agent : public madrona::Archetype<
     BicycleModel,
     VehicleSize,
     Goal,
+    Trajectory,
 
     // Input
     Action,
