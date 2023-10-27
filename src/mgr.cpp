@@ -264,7 +264,7 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
-    std::string pathToScenario("../example.json");
+    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/example.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {

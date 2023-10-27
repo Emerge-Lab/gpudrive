@@ -4,6 +4,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
+#include <iostream>
 
 namespace gpudrive {
 
@@ -77,6 +78,64 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     return vehicle;
 }
 
+
+static inline int32_t createRoad(Engine &ctx, const nlohmann::json& geometryList, std::string type, int32_t idx) {
+    // Access elements in geometryList
+    if (type == "road_edge")
+    {    
+        size_t numPoints = geometryList.size();
+        std::cout<<"Number of points: "<<numPoints<<std::endl;
+        int32_t ctr = 0;
+        int32_t start_idx = -1;
+        int32_t end_idx = -1;
+        for(size_t i = 0; i < numPoints - 2; )
+        {   
+            start_idx = i;
+            // x1, y1 = geometryList[i]["x"], geometryList[i]["y"]
+            float x1 = geometryList[i]["x"] ; float y1 = geometryList[i]["y"] ;
+            float x2 = geometryList[i+1]["x"] ; float y2 = geometryList[i+1]["y"] ;
+            float x3 = geometryList[i+2]["x"] ; float y3 = geometryList[i+2]["y"] ;
+            // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
+            // Checking for collinearity using area of triangle formed by 3 points
+            // Naively, we can using slopes, but that has division which is expensive
+            float shoelace_area = std::abs((x1*y2 + x2*y3 + x3*y1) - (x2*y1 + x3*y2 + x1*y3)); 
+            std::cout<<"Shoelace area: "<<shoelace_area<<std::endl;
+            if(shoelace_area < 0.001){
+                end_idx = i+2;
+                i += 2;
+            }
+            else
+            {
+                if(end_idx == -1)
+                {
+                    end_idx = i+1;
+                }
+                ctr++;
+                x1 = geometryList[start_idx]["x"]; y1 = geometryList[start_idx]["y"];
+                x2 = geometryList[end_idx]["x"]; y2 = geometryList[end_idx]["y"] ;
+                Vector3 start = Vector3{.x = x1 + 452, .y = y1 + 10353, .z = 0};
+                Vector3 end = Vector3{.x = x2 + 452, .y = y2 + 10353, .z = 0};
+                float distance = end.distance(start);
+                auto road_edge = ctx.makeEntity<PhysicsEntity>();
+                ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
+                ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
+                ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance, .d1 = 0.1, .d2 = consts::zDimensionScale};
+                ctx.get<EntityType>(road_edge) = EntityType::Cube;
+                ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
+                registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
+                ctx.get<ResponseType>(road_edge) = ResponseType::Static;
+                ctx.data().roads[ctr] = road_edge;
+                start_idx = -1;
+                end_idx = -1;
+                i+=1;
+            }
+
+        } 
+        return ctr;
+    }
+    return 0;
+}
+
 void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
     std::ifstream data(pathToScenario);
     assert(data.is_open());
@@ -105,6 +164,19 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
       ctx.data().agents[agentCount++] = vehicle;
     }
+
+    std::cout<<"Agent count: "<<agentCount<<std::endl;
+    size_t roadCount{0};
+    for (const auto &obj : rawJson["roads"]) {
+      if (roadCount >= consts::numRoadSegments) break;
+      auto geometrylist = obj["geometry"];
+      std::string type = obj["type"];
+      std::cout<<"Type: "<<type<<std::endl;
+      roadCount += createRoad(
+          ctx, geometrylist, type, roadCount);
+    }
+    ctx.data().num_roads = roadCount;
+    std::cout<<"Road count: "<<roadCount<<std::endl;
 }
 
  
@@ -134,6 +206,13 @@ static void resetPersistentEntities(Engine &ctx) {
 
       ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
           ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
+    }
+
+    std::cout<<"Resetting roads"<<std::endl;
+    for (CountT idx = 0; idx < ctx.data().num_roads; idx++) {
+      Entity road = ctx.data().roads[idx];
+      if(road == Entity::none()) break;
+      registerRigidBodyEntity(ctx, road, SimObject::Cube);
     }
 }
 
