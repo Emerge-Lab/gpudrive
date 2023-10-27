@@ -78,8 +78,8 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     return vehicle;
 }
 
-void createPersistentEntities(Engine &ctx) {
-    std::ifstream data("../example.json");
+void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
+    std::ifstream data(pathToScenario);
     assert(data.is_open());
 
     using nlohmann::json;

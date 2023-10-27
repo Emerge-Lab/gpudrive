@@ -491,7 +491,7 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx);
+    createPersistentEntities(ctx, init.path);
 
     // Generate initial world state
     initWorld(ctx);
