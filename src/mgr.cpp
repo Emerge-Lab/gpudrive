@@ -132,16 +132,12 @@ struct Manager::CUDAImpl final : Manager::Impl {
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
-    asset_paths[(size_t)SimObject::Cube] =
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    asset_paths[(size_t)SimObject::Wall] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
-    asset_paths[(size_t)SimObject::Door] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
-    asset_paths[(size_t)SimObject::Agent] =
-        (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
-    asset_paths[(size_t)SimObject::Button] =
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    std::cout<<"DATA DIR: "<<DATA_DIR<<std::endl;
+    asset_paths[(size_t)SimObject::Cube] = "/home/emerge/aarav/gpudrive/data/cube_collision.obj";
+    asset_paths[(size_t)SimObject::Wall] = "/home/emerge/aarav/gpudrive/data/wall_collision.obj";
+    asset_paths[(size_t)SimObject::Door] = "/home/emerge/aarav/gpudrive/data/wall_collision.obj";
+    asset_paths[(size_t)SimObject::Agent] = "/home/emerge/aarav/gpudrive/data/agent_collision_simplified.obj";
+    asset_paths[(size_t)SimObject::Button] = "/home/emerge/aarav/gpudrive/data/cube_collision.obj";
 
     std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
@@ -264,7 +260,7 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
-    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/example.json");
+    std::string pathToScenario("/home/emerge/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
