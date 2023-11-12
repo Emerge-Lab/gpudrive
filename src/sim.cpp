@@ -519,7 +519,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
     auto sort_agents =
-        queueSortByWorld<Agent>(builder, {lidar, post_reset_broadphase});
+        queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     auto sort_buttons = queueSortByWorld<ButtonEntity>(
