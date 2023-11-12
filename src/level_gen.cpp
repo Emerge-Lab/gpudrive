@@ -83,7 +83,7 @@ static Entity makeRoadEdge(Engine &ctx,
                          const nlohmann::json& p1,
                          const nlohmann::json& p2)
 {
-    float x1 = p1["x"]; float y1 = p2["y"];
+    float x1 = p1["x"]; float y1 = p1["y"];
     float x2 = p2["x"]; float y2 = p2["y"] ;
     Vector3 start = Vector3{.x = x1 + 452, .y = y1 + 10353, .z = 0};
     Vector3 end = Vector3{.x = x2 + 452, .y = y2 + 10353, .z = 0};
@@ -91,7 +91,7 @@ static Entity makeRoadEdge(Engine &ctx,
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
-    ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance, .d1 = 0.1, .d2 = 0.1};
+    ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
     ctx.get<EntityType>(road_edge) = EntityType::Cube;
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
@@ -102,15 +102,11 @@ static Entity makeRoadEdge(Engine &ctx,
 static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geometryList, std::string type, int32_t idx) {
     // Access elements in geometryList
     bool reduceRoad = true;
-    if (type == "road_edge")
+    if (type == "road_edge" || type == "lane")
     {    
         if (reduceRoad)
         {
-            std::cout<<"****** NEW ROAD LINE ******"<<std::endl;
-                    std::vector<int32_t> indices;
-                    std::vector<std::pair<int32_t,int32_t>> edges;
                     size_t numPoints = geometryList.size();
-                    std::cout<<"Number of points: "<<numPoints<<std::endl;
 
                     int32_t start = 0;
                     int32_t j = 0;
@@ -120,7 +116,7 @@ static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geom
                         float x2 = geometryList[j+1]["x"] ; float y2 = geometryList[j+1]["y"] ;
                         float x3 = geometryList[j+2]["x"] ; float y3 = geometryList[j+2]["y"] ;
                         float shoelace_area = std::abs((x1-x3)*(y2-y1) - (x1-x2)*(y3-y1));
-                        if(shoelace_area == 0)
+                        if(shoelace_area < 0.01)
                         {
                             j++;
                         }
@@ -129,47 +125,29 @@ static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geom
                             if(j != start)
                             {
                                 auto road_edge = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
-                                indices.push_back(start); indices.push_back(j);
-                                edges.push_back(std::make_pair(start, j));
                                 ctx.data().roads[idx++] = road_edge;
                                 start = j;
                             }
                             else
                             {
                                 auto road_edge = makeRoadEdge(ctx, geometryList[j], geometryList[j+1]);
-                                indices.push_back(j); indices.push_back(j+1);
-                                edges.push_back(std::make_pair(j, j+1));
                                 ctx.data().roads[idx++] = road_edge;
                                 start = j + 1;
                                 j += 1;
                             }
                         }
                     }
-
-
-                    if (j == numPoints - 2 && j != start)
+                    if (j != start)
                     {
                         auto road_edge = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
                         ctx.data().roads[idx++] = road_edge;
-                        indices.push_back(start); indices.push_back(j);
-                        edges.push_back(std::make_pair(start, j));
                     }
-                    if(j == numPoints - 2)
+                    if(j == start)
                     {
                         auto road_edge = makeRoadEdge(ctx, geometryList[j], geometryList[j+1]);
                         ctx.data().roads[idx++] = road_edge;
-                        indices.push_back(j); indices.push_back(j+1);
-                        edges.push_back(std::make_pair(j, j+1));
                     }
-                    for(int i =0 ; i< indices.size(); i++)
-                    {
-                        std::cout<<indices[i]<<" ";
-                    }
-                    std::cout<<std::endl;
-                    for(int i =0 ; i< edges.size(); i++)
-                    {
-                        std::cout<<edges[i].first<<" "<<edges[i].second<<std::endl;
-                    }
+
         }
         else
         {
