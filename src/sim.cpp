@@ -148,11 +148,8 @@ inline void collectObservationsSystem(Engine &ctx,
                                       PartnerObservations &partner_obs)
 {
     self_obs.bicycle_model = model;
-    self_obs.length = size.length;
-    self_obs.width = size.width;
-    self_obs.goalX = goal.position.x;
-    self_obs.goalY = goal.position.y;
-
+    self_obs.vehicle_size = size; 
+    self_obs.goal = goal;
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
@@ -170,8 +167,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
         partner_obs.obs[i] = {
             .speed = relative_speed,
-            .posX = relative_pos.x,
-            .posY = relative_pos.y,
+            .position = Vector2{relative_pos.x, relative_pos.y},
             .heading = relative_heading
         };
     }
