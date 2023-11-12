@@ -136,12 +136,12 @@ float quatToYaw(Rotation q) {
 // This system packages all the egocentric observations together 
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      BicycleModel &model,
-                                      VehicleSize &size,
-                                      Position pos,
-                                      Rotation rot,
-                                      Velocity vel,
-                                      Goal goal,
+                                      const BicycleModel &model,
+                                      const VehicleSize &size,
+                                      const Position &pos,
+                                      const Rotation &rot,
+                                      const Velocity &vel,
+                                      const Goal &goal,
                                       const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
