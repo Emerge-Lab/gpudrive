@@ -155,11 +155,11 @@ inline void collectObservationsSystem(Engine &ctx,
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
-        Vector3 other_pos = ctx.get<Position>(other);
+        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
         Rotation other_rot = ctx.get<Rotation>(other);
 
-        Vector3 relative_pos = other_pos - pos;
-        float relative_speed = ctx.get<BicycleModel>(other).speed - model.speed;
+        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        float relative_speed = other_bicycle_model.speed - model.speed;
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -167,7 +167,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
         partner_obs.obs[i] = {
             .speed = relative_speed,
-            .position = Vector2{relative_pos.x, relative_pos.y},
+            .position = relative_pos,
             .heading = relative_heading
         };
     }
@@ -234,10 +234,10 @@ inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
                                Action &)
 {
-    // vel.linear.x = 0;
-    // vel.linear.y = 0;
-    // vel.linear.z = fminf(vel.linear.z, 0);
-    // vel.angular = Vector3::zero();
+    vel.linear.x = 0;
+    vel.linear.y = 0;
+    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.angular = Vector3::zero();
 }
 
 static inline float distObs(float v)
