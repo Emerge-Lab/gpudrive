@@ -149,7 +149,7 @@ inline void collectObservationsSystem(Engine &ctx,
 {
     self_obs.bicycle_model = model;
     self_obs.vehicle_size = size; 
-    self_obs.goal = goal;
+    self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
