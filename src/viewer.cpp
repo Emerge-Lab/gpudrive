@@ -114,19 +114,19 @@ int main(int argc, char *argv[])
     });
 
     math::Quat initial_camera_rotation =
-        (math::Quat::angleAxis(-math::pi / 2.f, math::up) *
-        math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+            (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
     Viewer viewer({
         .gpuID = 0,
-        .renderWidth = 2730,
-        .renderHeight = 1536,
+        .renderWidth = 640,
+        .renderHeight = 480,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 1000,
         .defaultSimTickRate = 20,
-        .cameraMoveSpeed = 10.f,
-        .cameraPosition = { 0, consts::worldLength / 2.f, 30 },
+        .cameraMoveSpeed = 20.f,
+        .cameraPosition = 20.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,
     });
@@ -175,6 +175,7 @@ int main(int argc, char *argv[])
                 auto acceleration = (*replay_log)[base_idx];
                 auto steering = (*replay_log)[base_idx + 1];
                 auto headAngle = (*replay_log)[base_idx + 2];
+
 
                 printf("%d, %d: %f %f %f\n", i, j, acceleration, steering,
                        headAngle);

@@ -45,7 +45,6 @@ int main(int argc, char *argv[])
     uint64_t num_worlds = std::stoul(argv[2]);
     uint64_t num_steps = std::stoul(argv[3]);
 
-
     HeapArray<float> action_store(num_worlds * 2 * num_steps * 3);
 
     bool rand_actions = false;
@@ -67,11 +66,12 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
-
     auto start = std::chrono::system_clock::now();
     auto action_printer = mgr.actionTensor().makePrinter();
     auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
+
     auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();
@@ -82,6 +82,8 @@ int main(int argc, char *argv[])
         printf("Model \n");
         model_printer.print();
 
+        printf("Partner Obs\n");
+        partner_obs_printer.print();
         printf("\n");
     };
     printObs();
@@ -99,7 +101,6 @@ int main(int argc, char *argv[])
                     action_store[base_idx] = acc;
                     action_store[base_idx + 1] = steer;
                     action_store[base_idx + 2] = head;
-
                 }
             }
         }

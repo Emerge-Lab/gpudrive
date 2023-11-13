@@ -10,6 +10,8 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
+
+
 namespace gpudrive {
 
 // Register all the ECS components and archetypes that will be
@@ -28,7 +30,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
-    registry.registerComponent<RoomEntityObservations>();
+    registry.registerComponent<RoomEntityObservations>();	
     registry.registerComponent<DoorObservation>();
     registry.registerComponent<ButtonState>();
     registry.registerComponent<OpenState>();
@@ -38,6 +40,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<EntityType>();
     registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
+    registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
 
     registry.registerSingleton<WorldReset>();
@@ -45,7 +48,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
-    registry.registerArchetype<DoorEntity>();
+    registry.registerArchetype<DoorEntity>();	
     registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
@@ -54,11 +57,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
+
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
-    registry.exportColumn<Agent, RoomEntityObservations>(
-        (uint32_t)ExportID::RoomEntityObservations);
-    registry.exportColumn<Agent, DoorObservation>(
+    registry.exportColumn<Agent, RoomEntityObservations>(	
+        (uint32_t)ExportID::RoomEntityObservations);	
+    registry.exportColumn<Agent, DoorObservation>(	
         (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
@@ -71,7 +75,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.exportColumn<Agent, BicycleModel>(
         (uint32_t) ExportID::BicycleModel);
 }
-
 
 static inline void cleanupWorld(Engine &ctx) {}
 
@@ -120,6 +123,53 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         if (ctx.data().enableVizRender) {
             viz::VizRenderingSystem::markEpisode(ctx);
         }
+    }
+}
+
+
+float quatToYaw(Rotation q) {
+    // From https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion_to_Euler_angles_(in_3-2-1_sequence)_conversion
+    return atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.y * q.y + q.z * q.z)); 
+}
+
+
+// This system packages all the egocentric observations together 
+// for the policy inputs.
+inline void collectObservationsSystem(Engine &ctx,
+                                      const BicycleModel &model,
+                                      const VehicleSize &size,
+                                      const Position &pos,
+                                      const Rotation &rot,
+                                      const Velocity &vel,
+                                      const Goal &goal,
+                                      const Progress &progress,
+                                      const OtherAgents &other_agents,
+                                      SelfObservation &self_obs,
+                                      PartnerObservations &partner_obs)
+{
+    self_obs.bicycle_model = model;
+    self_obs.vehicle_size = size; 
+    self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
+
+#pragma unroll
+    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+        Entity other = other_agents.e[i];
+
+        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
+        Rotation other_rot = ctx.get<Rotation>(other);
+
+        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        float relative_speed = other_bicycle_model.speed - model.speed;
+
+        Rotation relative_orientation = rot.inv() * other_rot;
+
+        float relative_heading = quatToYaw(relative_orientation);
+
+        partner_obs.obs[i] = {
+            .speed = relative_speed,
+            .position = relative_pos,
+            .heading = relative_heading
+        };
     }
 }
 
@@ -187,7 +237,6 @@ inline void agentZeroVelSystem(Engine &,
     vel.linear.x = 0;
     vel.linear.y = 0;
     vel.linear.z = fminf(vel.linear.z, 0);
-
     vel.angular = Vector3::zero();
 }
 
@@ -426,6 +475,22 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
                                                            {reset_sys});
 
+    // Finally, collect observations for the next step.
+    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectObservationsSystem,
+            BicycleModel,
+            VehicleSize,
+            Position,
+            Rotation,
+            Velocity,
+            Goal,
+            Progress,
+            OtherAgents,
+            SelfObservation,
+            PartnerObservations
+        >>({post_reset_broadphase});
+
+
     // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
@@ -450,7 +515,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
     auto sort_agents =
-        queueSortByWorld<Agent>(builder, {lidar, post_reset_broadphase});
+        queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     auto sort_buttons = queueSortByWorld<ButtonEntity>(
@@ -462,6 +527,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     (void)sort_walls;
 #else
     (void)lidar;
+    (void)collect_obs;
 #endif
 }
 

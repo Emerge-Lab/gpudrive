@@ -32,6 +32,9 @@ struct VehicleSize {
   float width;
 };
 
+struct Goal{
+    madrona::math::Vector2 position;
+};
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -65,6 +68,8 @@ struct Done {
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
     BicycleModel bicycle_model;
+    VehicleSize vehicle_size;
+    Goal goal;
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -75,8 +80,9 @@ struct PolarObservation {
 };
 
 struct PartnerObservation {
-    PolarObservation polar;
-    float isGrabbing;
+    float speed;
+    madrona::math::Vector2 position;
+    float heading;
 };
 
 // Egocentric observations of other agents
@@ -87,7 +93,7 @@ struct PartnerObservations {
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::numAgents - 1) * 3);
+    (consts::numAgents - 1) * 4);
 
 // Per-agent egocentric observations for the interactable entities
 // in the current room.
@@ -95,6 +101,7 @@ struct EntityObservation {
     PolarObservation polar;
     float encodedType;
 };
+
 
 struct RoomEntityObservations {
     EntityObservation obs[consts::maxEntitiesPerRoom];
@@ -107,6 +114,7 @@ struct DoorObservation {
     PolarObservation polar;
     float isOpen; // 1.0 when open, 0.0 when closed.
 };
+
 
 struct LidarSample {
     float depth;
@@ -184,8 +192,6 @@ struct Room {
     Entity door;
 };
 
-// A singleton component storing the state of all the rooms in the current
-// randomly generated level
 struct LevelState {
     Entity entities[consts::numAgents + consts::numRoadSegments];
 };
@@ -225,6 +231,7 @@ struct Agent : public madrona::Archetype<
     // gpudrive
     BicycleModel,
     VehicleSize,
+    Goal,
     Trajectory,
 
     // Input
@@ -276,6 +283,7 @@ struct ButtonEntity : public madrona::Archetype<
     ButtonState,
     EntityType
 > {};
+
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.

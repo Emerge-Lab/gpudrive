@@ -450,7 +450,8 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
-                                   4
+                                   8
+
                                });
 }
 
@@ -462,7 +463,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::numAgents - 1,
-                                   3,
+                                   4,
                                });
 }
 
@@ -528,6 +529,7 @@ void Manager::triggerReset(int32_t world_idx)
         *reset_ptr = reset;
     }
 }
+
 
 void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                         float acceleration, float steering, float headAngle) {

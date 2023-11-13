@@ -42,7 +42,6 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(vehicle) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
     ctx.get<Action>(vehicle) =
@@ -52,7 +51,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speedX, float speedY, int32_t idx) {
+                                   float speedX, float speedY, float goalX, float goalY, int32_t idx) {
     auto vehicle = ctx.makeEntity<Agent>();
 
     // The following components do not vary within an episode and so need only
@@ -62,7 +61,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
-
+    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = goalX, .y = goalY}};
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
@@ -86,7 +85,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
     json rawJson;
     data >> rawJson;
-
+    
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
@@ -102,26 +101,46 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
           obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
-          obj["velocity"][0]["y"], agentCount);
+          obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"], agentCount);
 
       ctx.data().agents[agentCount++] = vehicle;
     }
 }
 
-static void resetPersistentEntities(Engine &ctx) {
-    for (CountT idx = 0; idx < consts::numAgents; ++idx) {
-      Entity vehicle = ctx.data().agents[idx];
+ 
+static void generateLevel(Engine &ctx) {}
 
-      resetVehicle(ctx, vehicle);
+static void resetPersistentEntities(Engine &ctx)
+{
+    for (CountT idx = 0; idx < consts::numAgents; ++idx)
+    {
+        Entity vehicle = ctx.data().agents[idx];
 
-      registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
+        resetVehicle(ctx, vehicle);
 
-      ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
-          ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
+        registerRigidBodyEntity(ctx, vehicle, SimObject::Cube);
+
+        ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
+            ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
+    }
+
+    for (CountT i = 0; i < consts::numAgents; i++)
+    {
+        Entity cur_agent = ctx.data().agents[i];
+        OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
+        CountT out_idx = 0;
+        for (CountT j = 0; j < consts::numAgents; j++)
+        {
+            if (i == j)
+            {
+                continue;
+            }
+
+            Entity other_agent = ctx.data().agents[j];
+            other_agents.e[out_idx++] = other_agent;
+        }
     }
 }
-
-static void generateLevel(Engine &ctx) {}
 
 void generateWorld(Engine &ctx)
 {
