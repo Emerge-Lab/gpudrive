@@ -52,7 +52,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
 
 static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
                                    float length, float width, float heading,
-                                   float speedX, float speedY, float goalX, float goalY, int32_t idx) {
+                                   float speedX, float speedY, float goalX, float goalY) {
     auto vehicle = ctx.makeEntity<Agent>();
 
     // The following components do not vary within an episode and so need only
@@ -67,7 +67,7 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     ctx.get<Trajectory>(vehicle).positions[0] =
-        Vector2{.x = xCoord + 452, .y = yCoord + 10353};
+        Vector2{.x = xCoord - ctx.data().mean.first, .y = yCoord - ctx.data().mean.second};
     ctx.get<Trajectory>(vehicle).initialHeading = degreesToRadians(heading);
     ctx.get<Trajectory>(vehicle).velocities[0] =
         Vector2{.x = speedX, .y = speedY};
@@ -84,8 +84,8 @@ static Entity makeRoadEdge(Engine &ctx,
 {
     float x1 = p1["x"]; float y1 = p1["y"];
     float x2 = p2["x"]; float y2 = p2["y"] ;
-    Vector3 start = Vector3{.x = x1 + 452, .y = y1 + 10353, .z = 0};
-    Vector3 end = Vector3{.x = x2 + 452, .y = y2 + 10353, .z = 0};
+    Vector3 start = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0};
+    Vector3 end = Vector3{.x = x2 - ctx.data().mean.first, .y = y2 - ctx.data().mean.second, .z = 0};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
@@ -149,11 +149,11 @@ static Entity makeSpeedBump(Engine &ctx, const nlohmann::json& geometryList)
         default:
             break;
     }
-    // Calculate rotation angle (assuming longer side is between points 1 and 2)
+    // Calculate rotation angle (assuming longer side is used to calculate angle)
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 + 452, .y = (y1 + y2 + y3 + y4)/4 + 10353, .z = 1};
+    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.first, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.second, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     ctx.get<EntityType>(speed_bump) = EntityType::Cube;
@@ -167,7 +167,7 @@ static Entity makeStopSign(Engine &ctx, const nlohmann::json& geomeryList)
 {
     float x1 = geomeryList[0]["x"]; float y1 = geomeryList[0]["y"];
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(stop_sign) = Vector3{.x = x1 + 452, .y = y1 + 10353, .z = 0.5};
+    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
     ctx.get<EntityType>(stop_sign) = EntityType::Cube;
@@ -177,14 +177,13 @@ static Entity makeStopSign(Engine &ctx, const nlohmann::json& geomeryList)
     return stop_sign;
 }
 
-static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geometryList, std::string type, int32_t idx) {
-    // Access elements in geometryList
+static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geometryList,const std::string type, size_t &idx) {
     if (type == "road_edge" || type == "lane")
     {
         size_t numPoints = geometryList.size();
 
-        int32_t start = 0;
-        int32_t j = 0;
+        size_t start = 0;
+        size_t j = 0;
         while (j < numPoints - 2)
         {
             float x1 = geometryList[j]["x"]; float y1 = geometryList[j]["y"];
@@ -192,53 +191,41 @@ static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geom
             float x3 = geometryList[j + 2]["x"]; float y3 = geometryList[j + 2]["y"];
             float shoelace_area = std::abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1)); // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
             if (shoelace_area < 0.01)
-                j++;
+                j++; // Skip over points that are too close together
             else
             {
                 if (j != start)
                 {
-                    auto road_edge = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
-                    ctx.data().roads[idx++] = road_edge;
+                    ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
                     start = j;
                 }
                 else
                 {
-                    auto road_edge = makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
-                    ctx.data().roads[idx++] = road_edge;
-                    start = j + 1;
-                    j += 1;
+                    ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
+                    start = ++j;
                 }
             }
         }
-        if (j != start)
-        {
-            auto road_edge = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
-            ctx.data().roads[idx++] = road_edge;
-        }
-        else
-        {
-            auto road_edge = makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
-            ctx.data().roads[idx++] = road_edge;
-        }
+
+        //Handle last point
+        ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, geometryList[start], geometryList[j]) : makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
     }
     else if(type == "speed_bump")
     {
         assert(geometryList.size() == 4);
-        auto speed_bump = makeSpeedBump(ctx, geometryList);
-        ctx.data().roads[idx++] = speed_bump;
+        ctx.data().roads[idx++] = makeSpeedBump(ctx, geometryList);
     }
     else if(type == "stop_sign")
     {
         assert(geometryList.size() == 1);
-        auto stop_sign = makeStopSign(ctx, geometryList);
-        ctx.data().roads[idx++] = stop_sign;
+        ctx.data().roads[idx++] = makeStopSign(ctx, geometryList);
     }
 
     return idx;
 }
 
-void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
-
+static void createFloorPlane(Engine &ctx)
+{
     ctx.data().floorPlane = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(ctx.data().floorPlane) = Vector3{.x = 0, .y = 0, .z = 0};
     ctx.get<Rotation>(ctx.data().floorPlane) = Quat { 1, 0, 0, 0 };
@@ -250,6 +237,11 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
+}
+
+void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
+
+    createFloorPlane(ctx);
 
     std::ifstream data(pathToScenario);
     assert(data.is_open());
@@ -258,7 +250,36 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
     json rawJson;
     data >> rawJson;
-    
+
+    ctx.data().mean = std::make_pair(0, 0);
+    size_t numEntities = 0;
+    for (const auto &obj : rawJson["objects"])
+    {
+        if (obj["type"] != "vehicle")
+        {
+            continue;
+        }
+        numEntities++;
+        float newX = obj["position"][0]["x"];
+        float newY = obj["position"][0]["y"];
+
+        // Update mean incrementally
+        ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
+        ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
+    }
+    for (const auto &obj: rawJson["roads"])
+    {
+        for (const auto &point: obj["geometry"])
+        {   
+            numEntities++;
+            float newX = point["x"];
+            float newY = point["y"];
+
+            // Update mean incrementally
+            ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
+            ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
+        }
+    }
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
@@ -274,7 +295,7 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
           // but in practice it looks to always be set to 0.
           obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
           obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
-          obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"], agentCount);
+          obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"]);
 
       ctx.data().agents[agentCount++] = vehicle;
     }
@@ -284,14 +305,14 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
       if (roadCount >= consts::numRoadSegments) break;
       auto geometrylist = obj["geometry"];
       std::string type = obj["type"];
-      roadCount = createRoadEntities(
+      createRoadEntities(
           ctx, geometrylist, type, roadCount);
     }
     ctx.data().num_roads = roadCount;
 }
 
 
-static void generateLevel(Engine &ctx) {}
+static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
@@ -301,7 +322,7 @@ static void resetPersistentEntities(Engine &ctx)
 
         resetVehicle(ctx, vehicle);
 
-      registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
+        registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
 
 
         ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
