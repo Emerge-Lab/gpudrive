@@ -162,6 +162,7 @@ enum class EntityType : uint32_t {
     Wall,
     Agent,
     Door,
+    Cylinder,
     NumTypes,
 };
 

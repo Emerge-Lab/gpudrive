@@ -12,8 +12,8 @@ inline constexpr madrona::CountT numRooms = 3;
 // TODO(samk): This number is specifically derived for
 // tfrecord-00004-of-00150_246.json. Once we move to multiple map files, it will
 // have to be updated.
-inline constexpr madrona::CountT numAgents = 2;
-inline constexpr madrona::CountT numRoadSegments = 2000;
+inline constexpr madrona::CountT numAgents = 20;
+inline constexpr madrona::CountT numRoadSegments = 500;
 
 // Maximum number of interactive objects per challenge room. This is needed
 // in order to setup the fixed-size learning tensors appropriately.

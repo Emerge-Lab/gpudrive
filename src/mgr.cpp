@@ -132,12 +132,22 @@ struct Manager::CUDAImpl final : Manager::Impl {
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
-    std::cout<<"DATA DIR: "<<DATA_DIR<<std::endl;
-    asset_paths[(size_t)SimObject::Cube] = "/home/emerge/aarav/gpudrive/data/cube_collision.obj";
-    asset_paths[(size_t)SimObject::Wall] = "/home/emerge/aarav/gpudrive/data/wall_collision.obj";
-    asset_paths[(size_t)SimObject::Door] = "/home/emerge/aarav/gpudrive/data/wall_collision.obj";
-    asset_paths[(size_t)SimObject::Agent] = "/home/emerge/aarav/gpudrive/data/agent_collision_simplified.obj";
-    asset_paths[(size_t)SimObject::Button] = "/home/emerge/aarav/gpudrive/data/cube_collision.obj";
+    asset_paths[(size_t)SimObject::Cube] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::Wall] =
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
+    asset_paths[(size_t)SimObject::Door] =
+        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
+    asset_paths[(size_t)SimObject::Agent] =
+        (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
+    asset_paths[(size_t)SimObject::Button] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::StopSign] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::SpeedBump] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    // asset_paths[(size_t)SimObject::Cylinder] =
+    //     (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
@@ -208,6 +218,11 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muS = 0.5f,
         .muD = 0.5f,
     });
+
+    // setupHull(SimObject::Cylinder, 0.075f, {
+    //     .muS = 0.5f,
+    //     .muD = 0.75f,
+    // });
 
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,

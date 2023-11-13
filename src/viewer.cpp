@@ -89,6 +89,12 @@ int main(int argc, char *argv[])
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::Plane] =
         (std::filesystem::path(DATA_DIR) / "plane.obj").string();
+    render_asset_paths[(size_t)SimObject::StopSign] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::SpeedBump] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    // render_asset_paths[(size_t)SimObject::Cylinder] =
+    //     (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
     for (size_t i = 0; i < render_asset_paths.size(); i++) {
@@ -104,13 +110,15 @@ int main(int argc, char *argv[])
     }
 
     auto materials = std::to_array<imp::SourceMaterial>({
-        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 0.2f },
+        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 1.0f },
         { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
         { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
         { rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
         { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
         { rgb8ToFloat(230, 20, 20),   -1, 0.8f, 1.0f },
         { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
+        { rgb8ToFloat(255,0,0), -1, 0.8f, 1.0f},
+        { rgb8ToFloat(0,0,0), -1, 0.8f, 0.2f}
     });
 
     // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
@@ -124,7 +132,7 @@ int main(int argc, char *argv[])
         .renderHeight = 480,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
-        .maxInstancesPerWorld = 1500,
+        .maxInstancesPerWorld = 450,
         .defaultSimTickRate = 20,
         .cameraMoveSpeed = 200.f,
         .cameraPosition = 20.f * math::up,
@@ -141,6 +149,9 @@ int main(int argc, char *argv[])
     render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
     render_assets->objects[(CountT)SimObject::Button].meshes[0].materialIDX = 6;
     render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
+    render_assets->objects[(CountT)SimObject::StopSign].meshes[0].materialIDX = 7;
+    render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
+    // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
 
     viewer.loadObjects(render_assets->objects, materials, {
         { (std::filesystem::path(DATA_DIR) /
