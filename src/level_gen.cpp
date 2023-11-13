@@ -313,16 +313,22 @@ static void generateLevel(Engine &ctx) {
     std::cout<<"Level Generated."<<std::endl;
 }
 
-static void resetPersistentEntities(Engine &ctx) {
-    for (CountT idx = 0; idx < consts::numAgents; ++idx) {
-      Entity vehicle = ctx.data().agents[idx];
+ 
+static void generateLevel(Engine &ctx) {}
 
-      resetVehicle(ctx, vehicle);
+static void resetPersistentEntities(Engine &ctx)
+{
+    for (CountT idx = 0; idx < consts::numAgents; ++idx)
+    {
+        Entity vehicle = ctx.data().agents[idx];
+
+        resetVehicle(ctx, vehicle);
 
       registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
 
-      ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
-          ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
+
+        ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
+            ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 
     std::cout<<"Resetting roads"<<std::endl;
@@ -340,6 +346,23 @@ static void resetPersistentEntities(Engine &ctx) {
       }
     }
     std::cout<<"Resetting roads done"<<std::endl;
+  
+    for (CountT i = 0; i < consts::numAgents; i++)
+    {
+        Entity cur_agent = ctx.data().agents[i];
+        OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
+        CountT out_idx = 0;
+        for (CountT j = 0; j < consts::numAgents; j++)
+        {
+            if (i == j)
+            {
+                continue;
+            }
+
+            Entity other_agent = ctx.data().agents[j];
+            other_agents.e[out_idx++] = other_agent;
+        }
+    }
 }
 
 void generateWorld(Engine &ctx)

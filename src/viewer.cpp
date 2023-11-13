@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 450,
         .defaultSimTickRate = 20,
-        .cameraMoveSpeed = 200.f,
+        .cameraMoveSpeed = 20.f,
         .cameraPosition = 20.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,

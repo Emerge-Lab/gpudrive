@@ -68,11 +68,8 @@ struct Done {
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
     BicycleModel bicycle_model;
-    float width;
-    float length;
-    float goalX;
-    float goalY;
-
+    VehicleSize vehicle_size;
+    Goal goal;
 };
 
 // The state of the world is passed to each agent in terms of egocentric
@@ -84,8 +81,7 @@ struct PolarObservation {
 
 struct PartnerObservation {
     float speed;
-    float posX;
-    float posY;
+    madrona::math::Vector2 position;
     float heading;
 };
 

@@ -136,33 +136,30 @@ float quatToYaw(Rotation q) {
 // This system packages all the egocentric observations together 
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      BicycleModel &model,
-                                      VehicleSize &size,
-                                      Position pos,
-                                      Rotation rot,
-                                      Velocity vel,
-                                      Goal goal,
+                                      const BicycleModel &model,
+                                      const VehicleSize &size,
+                                      const Position &pos,
+                                      const Rotation &rot,
+                                      const Velocity &vel,
+                                      const Goal &goal,
                                       const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs)
 {
     self_obs.bicycle_model = model;
-    self_obs.length = size.length;
-    self_obs.width = size.width;
-    self_obs.goalX = goal.position.x;
-    self_obs.goalY = goal.position.y;
-
+    self_obs.vehicle_size = size; 
+    self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
     for (CountT i = 0; i < consts::numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
-        Vector3 other_pos = ctx.get<Position>(other);
+        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
         Rotation other_rot = ctx.get<Rotation>(other);
 
-        Vector3 relative_pos = other_pos - pos;
-        float relative_speed = ctx.get<BicycleModel>(other).speed - model.speed;
+        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        float relative_speed = other_bicycle_model.speed - model.speed;
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -170,8 +167,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
         partner_obs.obs[i] = {
             .speed = relative_speed,
-            .posX = relative_pos.x,
-            .posY = relative_pos.y,
+            .position = relative_pos,
             .heading = relative_heading
         };
     }
@@ -238,10 +234,10 @@ inline void agentZeroVelSystem(Engine &,
                                Velocity &vel,
                                Action &)
 {
-    // vel.linear.x = 0;
-    // vel.linear.y = 0;
-    // vel.linear.z = fminf(vel.linear.z, 0);
-    // vel.angular = Vector3::zero();
+    vel.linear.x = 0;
+    vel.linear.y = 0;
+    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.angular = Vector3::zero();
 }
 
 static inline float distObs(float v)
@@ -519,7 +515,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
     auto sort_agents =
-        queueSortByWorld<Agent>(builder, {lidar, post_reset_broadphase});
+        queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     auto sort_buttons = queueSortByWorld<ButtonEntity>(
