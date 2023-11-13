@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
         partner_obs_printer.print();
         printf("\n");
     };
-    // printObs();
+    printObs();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
             }
         }
         mgr.step();
-        // printObs();
+        printObs();
     }
 
     auto end = std::chrono::system_clock::now();

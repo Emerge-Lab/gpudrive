@@ -4,7 +4,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
-#include <iostream>
 #include <vector>
 
 namespace gpudrive {
@@ -148,7 +147,7 @@ static Entity makeSpeedBump(Engine &ctx, const nlohmann::json& geometryList)
             coords[2] = x1; coords[3] = y1;
             break;
         default:
-            std::cout<<"Error in switch statement"<<std::endl;
+            break;
     }
     // Calculate rotation angle (assuming longer side is between points 1 and 2)
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
@@ -234,9 +233,7 @@ static inline int32_t createRoadEntities(Engine &ctx, const nlohmann::json& geom
         auto stop_sign = makeStopSign(ctx, geometryList);
         ctx.data().roads[idx++] = stop_sign;
     }
-    else{
-        std::cout<<"Unknown road type: "<<type<<std::endl;
-    }
+
     return idx;
 }
 
@@ -282,7 +279,6 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
       ctx.data().agents[agentCount++] = vehicle;
     }
 
-    std::cout<<"Agent count: "<<agentCount<<std::endl;
     size_t roadCount{0};
     for (const auto &obj : rawJson["roads"]) {
       if (roadCount >= consts::numRoadSegments) break;
@@ -292,28 +288,9 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
           ctx, geometrylist, type, roadCount);
     }
     ctx.data().num_roads = roadCount;
-    std::cout<<"Road count: "<<roadCount<<std::endl;
 }
 
- 
-static void generateLevel(Engine &ctx) {
-       for (CountT i = 0; i < consts::numAgents; i++) {
-        Entity cur_agent = ctx.data().agents[i];
-        OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
-        CountT out_idx = 0;
-        for (CountT j = 0; j < consts::numAgents; j++) {
-            if (i == j) {
-                continue;
-            }
 
-            Entity other_agent = ctx.data().agents[j];
-            other_agents.e[out_idx++] = other_agent;
-        }
-    }
-    std::cout<<"Level Generated."<<std::endl;
-}
-
- 
 static void generateLevel(Engine &ctx) {}
 
 static void resetPersistentEntities(Engine &ctx)
@@ -331,7 +308,6 @@ static void resetPersistentEntities(Engine &ctx)
             ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 
-    std::cout<<"Resetting roads"<<std::endl;
     for (CountT idx = 0; idx < ctx.data().num_roads; idx++) {
       Entity road = ctx.data().roads[idx];
       if(road == Entity::none()) break;
@@ -345,7 +321,6 @@ static void resetPersistentEntities(Engine &ctx)
         registerRigidBodyEntity(ctx, road, SimObject::SpeedBump);
       }
     }
-    std::cout<<"Resetting roads done"<<std::endl;
   
     for (CountT i = 0; i < consts::numAgents; i++)
     {
