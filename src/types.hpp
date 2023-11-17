@@ -9,6 +9,68 @@
 
 namespace gpudrive {
 
+constexpr size_t MAX_OBJECTS = 50;
+constexpr size_t MAX_ROADS = 50;
+constexpr size_t MAX_POSITIONS = 100;
+constexpr size_t MAX_HEADINGS = 100;
+constexpr size_t MAX_VELOCITIES = 100;
+constexpr size_t MAX_GEOMETRY = 50;
+
+struct MapPosition {
+    double x, y;
+};
+
+enum class MapObjectType : uint32_t {
+    vehicle,
+    pedestrian,
+    cyclist,
+    invalid
+};
+
+enum class MapRoadType : uint32_t
+{
+    road_edge,
+    road_line,
+    lane,
+    crosswalk,
+    speed_bump,
+    stop_sign,
+    invalid
+};
+
+struct MapObject {
+    MapPosition position[MAX_POSITIONS];
+    int width;
+    int length;
+    double heading[MAX_HEADINGS]; 
+    MapPosition velocity[MAX_VELOCITIES];
+    bool valid[MAX_VELOCITIES];
+    MapPosition goalPosition;
+    MapObjectType type;
+
+    uint32_t numPositions;
+    uint32_t numHeadings;
+    uint32_t numVelocities;
+    uint32_t numValid;
+};
+
+struct MapRoad {
+    // std::array<MapPosition, MAX_POSITIONS> geometry;
+    MapPosition geometry[MAX_GEOMETRY];
+    MapRoadType type;
+    uint32_t numPositions;
+};
+
+struct Map {
+    MapObject objects[MAX_OBJECTS];
+    MapRoad roads[MAX_ROADS];
+
+    uint32_t numObjects;
+    uint32_t numRoads;
+
+    // Constructor  
+    Map() = default;
+};
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;
 using madrona::CountT;
@@ -202,6 +264,8 @@ struct Trajectory {
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
     float initialHeading;
 };
+
+
 
 /* ECS Archetypes for the game */
 

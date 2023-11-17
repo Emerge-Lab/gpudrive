@@ -6,7 +6,7 @@
 #endif
 
 #include <memory>
-
+#include <filesystem>
 #include <madrona/py/utils.hpp>
 #include <madrona/exec_mode.hpp>
 
@@ -28,6 +28,8 @@ public:
         int gpuID; // Which GPU for CUDA backend?
         uint32_t numWorlds; // Simulation batch size
         bool autoReset; // Immediately generate new world on episode end
+        // TODO: Add Train/Test split support
+        std::filesystem::path mapsPath; // Path to maps directory. 
     };
 
     MGR_EXPORT Manager(

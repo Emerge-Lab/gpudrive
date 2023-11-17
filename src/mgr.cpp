@@ -14,6 +14,9 @@
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <nlohmann/json.hpp>
+#include "types.hpp"
+#include "json_serialization.hpp"
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -33,17 +36,20 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
+    uint32_t* mapIndices;
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
-                Action *action_buffer)
+                Action *action_buffer,
+                uint32_t* map_indices)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
-          agentActionsBuffer(action_buffer)
+          agentActionsBuffer(action_buffer),
+          mapIndices(map_indices)
     {}
 
     inline virtual ~Impl() {}
@@ -69,9 +75,10 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   uint32_t* map_indices,
                    TaskGraphT &&cpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer),
+               ep_mgr, reset_buffer, action_buffer, map_indices),
           cpuExec(std::move(cpu_exec))
     {}
 
@@ -103,9 +110,10 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   uint32_t* map_indices,
                    MWCudaExecutor &&gpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer),
+               ep_mgr, reset_buffer, action_buffer, map_indices),
           gpuExec(std::move(gpu_exec))
     {}
 
@@ -264,6 +272,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
+
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg,
     const viz::VizECSBridge *viz_bridge)
@@ -273,9 +282,48 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    // TODO: To run multiple worlds in parallel, this path would have to be
-    // varied aross different input files.
-    std::string pathToScenario("/home/emerge/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
+    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
+    for (int i = 0; i < mgr_cfg.numWorlds; ++i)
+        mapIndices[i] = i;
+
+    std::vector<Map> maps;
+    std::vector<std::string> jsonFilePaths;
+    nlohmann::json validFilesJson;
+
+    std::filesystem::path validFilesJsonPath = mgr_cfg.mapsPath / "valid_files.json";
+
+    std::ifstream validFilesFile(validFilesJsonPath);
+    if (validFilesFile.is_open()) {
+        validFilesFile >> validFilesJson;
+        validFilesFile.close();
+
+        // Extract file paths from the JSON keys
+        for (auto& [key, value] : validFilesJson.items()) {
+            std::filesystem::path fullPath = mgr_cfg.mapsPath / key;
+            jsonFilePaths.push_back(fullPath.string());
+        }
+    }
+
+    // Read and parse JSON files to create Map objects
+    for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
+        std::ifstream file(jsonFilePaths[mapIndices[i]]);
+        nlohmann::json jsonData;
+        if (file.is_open()) {
+            file >> jsonData;
+            file.close();
+            maps.push_back(jsonData.get<Map>());
+        }
+    }
+
+    // for(const auto& map: maps) {
+    //     std::cout << "Map numObjects: " << map.numObjects << std::endl;
+    //     std::cout << "Map numRoads: " << map.numRoads << std::endl;
+    // }
+
+    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
+
+
+
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -325,6 +373,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            mapIndices,
             std::move(gpu_exec),
         };
 #else
@@ -367,6 +416,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            mapIndices,
             std::move(cpu_exec),
         };
 

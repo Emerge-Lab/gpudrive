@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
+        .mapsPath = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid",
     });
 
     std::random_device rd;
