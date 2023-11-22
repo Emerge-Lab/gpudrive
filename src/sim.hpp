@@ -78,6 +78,8 @@ struct Sim : public madrona::WorldBase {
     // simulation.
     EpisodeManager *episodeMgr;
 
+    Map *map;
+
     // Simple random number generator seeded with episode ID.
     RNG rng;
 

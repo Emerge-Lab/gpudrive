@@ -239,7 +239,9 @@ static void createFloorPlane(Engine &ctx)
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 }
 
-void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
+void createPersistentEntities(Engine &ctx) {
+
+    const std::string pathToScenario = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json";
 
     createFloorPlane(ctx);
 

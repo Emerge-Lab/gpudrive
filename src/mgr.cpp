@@ -18,6 +18,9 @@
 #include "types.hpp"
 #include "json_serialization.hpp"
 
+#include <chrono>
+#include <thread>
+
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
 #include <madrona/cuda_utils.hpp>
@@ -272,21 +275,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
-
-Manager::Impl * Manager::Impl::init(
-    const Manager::Config &mgr_cfg,
-    const viz::VizECSBridge *viz_bridge)
-{
-    Sim::Config sim_cfg {
-        viz_bridge != nullptr,
-        mgr_cfg.autoReset,
-    };
-
-    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
-    for (int i = 0; i < mgr_cfg.numWorlds; ++i)
-        mapIndices[i] = i;
-
-    std::vector<Map> maps;
+static Map* GetMaps(const Manager::Config &mgr_cfg) {
+    std::array<Map,15> mapArray;
     std::vector<std::string> jsonFilePaths;
     nlohmann::json validFilesJson;
 
@@ -298,32 +288,52 @@ Manager::Impl * Manager::Impl::init(
         validFilesFile.close();
 
         // Extract file paths from the JSON keys
+        auto ctr = 0;
         for (auto& [key, value] : validFilesJson.items()) {
             std::filesystem::path fullPath = mgr_cfg.mapsPath / key;
-            jsonFilePaths.push_back(fullPath.string());
+            jsonFilePaths.emplace_back(fullPath.string());
         }
     }
 
     // Read and parse JSON files to create Map objects
-    for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
-        std::ifstream file(jsonFilePaths[mapIndices[i]]);
+    for (int i = 0; i < mgr_cfg.numWorlds; i++) {
+        std::ifstream jsonfile(jsonFilePaths[i]);
         nlohmann::json jsonData;
-        if (file.is_open()) {
-            file >> jsonData;
-            file.close();
-            maps.push_back(jsonData.get<Map>());
+        if (jsonfile.is_open()) {
+            jsonfile >> jsonData;
+            mapArray[i] = (jsonData.get<Map>());
+            jsonfile.close();
         }
     }
 
-    // for(const auto& map: maps) {
-    //     std::cout << "Map numObjects: " << map.numObjects << std::endl;
-    //     std::cout << "Map numRoads: " << map.numRoads << std::endl;
+    return mapArray.data();
+}
+
+Manager::Impl * Manager::Impl::init(
+    const Manager::Config &mgr_cfg,
+    const viz::VizECSBridge *viz_bridge)
+{
+    Sim::Config sim_cfg {
+        viz_bridge != nullptr,
+        mgr_cfg.autoReset,
+    };
+
+    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
+
+    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+
+    // nlohmann::json jsonData;
+    // std::ifstream jsonFile(pathToScenario);
+    // if (jsonFile.is_open()) {
+    //     jsonFile >> jsonData;
+    //     maps.emplace_back(jsonData.get<Map>());
+    //     jsonFile.close();
     // }
 
-    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
+    // std::cout << "Map numObjects: " << mapArray[0].numObjects << std::endl;
+    // std::cout << "Map numRoads: " << mapArray[0].numRoads << std::endl;
 
-
-
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -341,7 +351,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, pathToScenario};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, nullptr};
         }
 
         MWCudaExecutor gpu_exec({
@@ -390,9 +400,11 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
+        Map* mapArray = GetMaps(mgr_cfg);
+
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, pathToScenario};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, &mapArray[i]};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

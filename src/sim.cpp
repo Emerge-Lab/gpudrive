@@ -535,7 +535,8 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr)
+      episodeMgr(init.episodeMgr),
+      map(init.map)
 {
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
@@ -557,7 +558,7 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.path);
+    createPersistentEntities(ctx);
 
     // Generate initial world state
     initWorld(ctx);
