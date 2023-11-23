@@ -41,7 +41,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
-    registry.registerComponent<Trajectory>();
+    // registry.registerComponent<Trajectory>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
@@ -105,7 +105,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
     if (ctx.data().autoReset) {
-        for (CountT i = 0; i < consts::numAgents; i++) {
+        for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
             Done done = ctx.get<Done>(agent);
             if (done.v) {
@@ -152,7 +152,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);

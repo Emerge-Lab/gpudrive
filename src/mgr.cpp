@@ -40,19 +40,22 @@ struct Manager::Impl {
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
     uint32_t* mapIndices;
+    Map** maps;
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
                 Action *action_buffer,
-                uint32_t* map_indices)
+                uint32_t* map_indices,
+                Map** maps)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
           agentActionsBuffer(action_buffer),
-          mapIndices(map_indices)
+          mapIndices(map_indices),
+          maps(maps)
     {}
 
     inline virtual ~Impl() {}
@@ -79,9 +82,10 @@ struct Manager::CPUImpl final : Manager::Impl {
                    WorldReset *reset_buffer,
                    Action *action_buffer,
                    uint32_t* map_indices,
+                   Map** maps,
                    TaskGraphT &&cpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, map_indices),
+               ep_mgr, reset_buffer, action_buffer, map_indices, maps),
           cpuExec(std::move(cpu_exec))
     {}
 
@@ -114,9 +118,10 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    WorldReset *reset_buffer,
                    Action *action_buffer,
                    uint32_t* map_indices,
+                   Map** maps,
                    MWCudaExecutor &&gpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, map_indices),
+               ep_mgr, reset_buffer, action_buffer, map_indices, maps),
           gpuExec(std::move(gpu_exec))
     {}
 
@@ -145,14 +150,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    asset_paths[(size_t)SimObject::Wall] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
-    asset_paths[(size_t)SimObject::Door] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
     asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
-    asset_paths[(size_t)SimObject::Button] =
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::StopSign] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::SpeedBump] =
@@ -210,30 +209,10 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.75f,
     });
 
-    setupHull(SimObject::Wall, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    setupHull(SimObject::Door, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
     setupHull(SimObject::Agent, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
-
-    setupHull(SimObject::Button, 1.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    // setupHull(SimObject::Cylinder, 0.075f, {
-    //     .muS = 0.5f,
-    //     .muD = 0.75f,
-    // });
 
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,
@@ -275,13 +254,12 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
-static Map* GetMaps(const Manager::Config &mgr_cfg) {
-    std::array<Map,15> mapArray;
+static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
+
     std::vector<std::string> jsonFilePaths;
     nlohmann::json validFilesJson;
-
     std::filesystem::path validFilesJsonPath = mgr_cfg.mapsPath / "valid_files.json";
-
+    uint32_t numValidFiles = 0;
     std::ifstream validFilesFile(validFilesJsonPath);
     if (validFilesFile.is_open()) {
         validFilesFile >> validFilesJson;
@@ -294,9 +272,13 @@ static Map* GetMaps(const Manager::Config &mgr_cfg) {
             jsonFilePaths.emplace_back(fullPath.string());
         }
     }
+    std::array<Map, 5> mapArray;
+
+    // std::array<Map*, 5> mapPtrArray;
 
     // Read and parse JSON files to create Map objects
     for (int i = 0; i < mgr_cfg.numWorlds; i++) {
+        std::cout<< "Reading file: " << jsonFilePaths[i] << std::endl;
         std::ifstream jsonfile(jsonFilePaths[i]);
         nlohmann::json jsonData;
         if (jsonfile.is_open()) {
@@ -306,7 +288,30 @@ static Map* GetMaps(const Manager::Config &mgr_cfg) {
         }
     }
 
-    return mapArray.data();
+    switch (mgr_cfg.execMode)
+    {
+        case ExecMode::CUDA:
+        {
+            #ifdef MADRONA_CUDA_SUPPORT
+
+                // Allocate memory for each Map object on the GPU and store the pointer in the CPU array
+                for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
+                    mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
+                    REQ_CUDA(cudaMemcpy(mapPtrArray[i], &mapArray[i], sizeof(Map), cudaMemcpyHostToDevice));
+                }
+            #else
+                FATAL("Madrona was not compiled with CUDA support");
+            #endif
+        } break;
+        case ExecMode::CPU:
+        {            
+            for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
+                mapPtrArray[i] = &mapArray[i];
+            }
+        }break;
+        default:
+            MADRONA_UNREACHABLE();
+    }
 }
 
 Manager::Impl * Manager::Impl::init(
@@ -318,7 +323,8 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
+    // uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
+    std::array<uint32_t, 5> mapIndices;
 
     std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
 
@@ -338,6 +344,8 @@ Manager::Impl * Manager::Impl::init(
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
+        CUcontext cu_ctx = MWCudaExecutor::initCUDA(mgr_cfg.gpuID);
+
         EpisodeManager *episode_mgr = 
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
@@ -346,6 +354,8 @@ Manager::Impl * Manager::Impl::init(
         loadPhysicsObjects(phys_loader);
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
+        Map** mapPtrArray = new Map*[5];
+        GetMaps(mgr_cfg, mapPtrArray);
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
@@ -362,13 +372,12 @@ Manager::Impl * Manager::Impl::init(
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = mgr_cfg.numWorlds,
-            .numExportedBuffers = (uint32_t)ExportID::NumExports, 
-            .gpuID = (uint32_t)mgr_cfg.gpuID,
+            .numExportedBuffers = (uint32_t)ExportID::NumExports,
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
-        });
+        }, cu_ctx);
 
         WorldReset *world_reset_buffer = 
             (WorldReset *)gpu_exec.getExported((uint32_t)ExportID::Reset);
@@ -383,7 +392,8 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices,
+            mapIndices.data(),
+            nullptr,
             std::move(gpu_exec),
         };
 #else
@@ -400,11 +410,12 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        Map* mapArray = GetMaps(mgr_cfg);
+        Map** mapArray = new Map*[5];
+        GetMaps(mgr_cfg, mapArray);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, &mapArray[i]};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mapArray[i]};
         }
 
         CPUImpl::TaskGraphT cpu_exec {
@@ -428,7 +439,8 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices,
+            mapIndices.data(),
+            mapArray,
             std::move(cpu_exec),
         };
 

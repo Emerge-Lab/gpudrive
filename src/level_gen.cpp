@@ -1,10 +1,4 @@
 #include "level_gen.hpp"
-#include <cassert>
-#include <cmath>
-#include <fstream>
-#include <nlohmann/json.hpp>
-#include <cmath>
-#include <vector>
 
 namespace gpudrive {
 
@@ -27,15 +21,21 @@ static void registerRigidBodyEntity(
 }
 
 
-float degreesToRadians(float degrees) { return degrees * M_PI / 180.0; }
+float degreesToRadians(float degrees) { return degrees *  math::pi / 180.0; }
 
-static inline void resetVehicle(Engine &ctx, Entity vehicle) {
-    auto xCoord = ctx.get<Trajectory>(vehicle).positions[0].x;
-    auto yCoord = ctx.get<Trajectory>(vehicle).positions[0].y;
-    auto xVelocity = ctx.get<Trajectory>(vehicle).velocities[0].x;
-    auto yVelocity = ctx.get<Trajectory>(vehicle).velocities[0].y;
-    auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
-    auto heading = ctx.get<Trajectory>(vehicle).initialHeading;
+static inline void resetVehicle(Engine &ctx, Entity vehicle, CountT idx) {
+    // auto xCoord = ctx.get<Trajectory>(vehicle).positions[0].x;
+    // auto yCoord = ctx.get<Trajectory>(vehicle).positions[0].y;
+    // auto xVelocity = ctx.get<Trajectory>(vehicle).velocities[0].x;
+    // auto yVelocity = ctx.get<Trajectory>(vehicle).velocities[0].y;
+    // auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
+    // auto heading = ctx.get<Trajectory>(vehicle).initialHeading;
+    auto xCoord = ctx.data().map->objects[idx].position[0].x;
+    auto yCoord = ctx.data().map->objects[idx].position[0].y;
+    auto xVelocity = ctx.data().map->objects[idx].velocity[0].x;
+    auto yVelocity = ctx.data().map->objects[idx].velocity[0].y;
+    auto speed = ctx.data().map->objects[idx].velocity[0].x;
+    auto heading = ctx.data().map->objects[idx].heading[0];
 
     ctx.get<BicycleModel>(vehicle) = {
         .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
@@ -66,24 +66,24 @@ static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
-    ctx.get<Trajectory>(vehicle).positions[0] =
-        Vector2{.x = xCoord - ctx.data().mean.first, .y = yCoord - ctx.data().mean.second};
-    ctx.get<Trajectory>(vehicle).initialHeading = degreesToRadians(heading);
-    ctx.get<Trajectory>(vehicle).velocities[0] =
-        Vector2{.x = speedX, .y = speedY};
+    // ctx.get<Trajectory>(vehicle).positions[0] =
+    //     Vector2{.x = xCoord - ctx.data().mean.first, .y = yCoord - ctx.data().mean.second};
+    // ctx.get<Trajectory>(vehicle).initialHeading = degreesToRadians(heading);
+    // ctx.get<Trajectory>(vehicle).velocities[0] =
+    //     Vector2{.x = speedX, .y = speedY};
 
     // This is not stricly necessary since , but is kept here for consistency
-    resetVehicle(ctx, vehicle);
+    // resetVehicle(ctx, vehicle);
 
     return vehicle;
 }
 
 static Entity makeRoadEdge(Engine &ctx,
-                         const nlohmann::json& p1,
-                         const nlohmann::json& p2)
+                         const MapPosition& p1,
+                         const MapPosition& p2)
 {
-    float x1 = p1["x"]; float y1 = p1["y"];
-    float x2 = p2["x"]; float y2 = p2["y"] ;
+    float x1 = p1.x; float y1 = p1.y;
+    float x2 = p2.x; float y2 = p2.y ;
     Vector3 start = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0};
     Vector3 end = Vector3{.x = x2 - ctx.data().mean.first, .y = y2 - ctx.data().mean.second, .z = 0};
     float distance = end.distance(start);
@@ -102,12 +102,12 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, const nlohmann::json& geometryList)
+static Entity makeSpeedBump(Engine &ctx, const MapPosition* geometryList)
 {    // Extract coordinates
-    float x1 = geometryList[0]["x"]; float y1 = geometryList[0]["y"];
-    float x2 = geometryList[1]["x"]; float y2 = geometryList[1]["y"];
-    float x3 = geometryList[2]["x"]; float y3 = geometryList[2]["y"];
-    float x4 = geometryList[3]["x"]; float y4 = geometryList[3]["y"];
+    float x1 = geometryList[0].x; float y1 = geometryList[0].y;
+    float x2 = geometryList[1].x; float y2 = geometryList[1].y;
+    float x3 = geometryList[2].x; float y3 = geometryList[2].y;
+    float x4 = geometryList[3].x; float y4 = geometryList[3].y;
 
     // Calculate distances (sides and diagonals)
     float d12 = calculateDistance(x1, y1, x2, y2); // Side 1-2
@@ -163,9 +163,9 @@ static Entity makeSpeedBump(Engine &ctx, const nlohmann::json& geometryList)
     return speed_bump;
 }
 
-static Entity makeStopSign(Engine &ctx, const nlohmann::json& geomeryList)
+static Entity makeStopSign(Engine &ctx, const MapPosition* geomeryList)
 {
-    float x1 = geomeryList[0]["x"]; float y1 = geomeryList[0]["y"];
+    float x1 = geomeryList[0].x; float y1 = geomeryList[0].y;
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
@@ -177,18 +177,20 @@ static Entity makeStopSign(Engine &ctx, const nlohmann::json& geomeryList)
     return stop_sign;
 }
 
-static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geometryList,const std::string type, size_t &idx) {
-    if (type == "road_edge" || type == "lane")
+static inline size_t createRoadEntities(Engine &ctx, const MapRoad road, size_t &idx) {
+    // if (type == "road_edge" || type == "lane")
+    if (road.type == MapRoadType::road_edge || road.type == MapRoadType::lane || road.type == MapRoadType::road_line)
     {
-        size_t numPoints = geometryList.size();
+        // size_t numPoints = geometryList.size();
+        size_t numPoints = road.numPositions;
 
         size_t start = 0;
         size_t j = 0;
         while (j < numPoints - 2)
         {
-            float x1 = geometryList[j]["x"]; float y1 = geometryList[j]["y"];
-            float x2 = geometryList[j + 1]["x"]; float y2 = geometryList[j + 1]["y"];
-            float x3 = geometryList[j + 2]["x"]; float y3 = geometryList[j + 2]["y"];
+            float x1 = road.geometry[j].x; float y1 = road.geometry[j].y;
+            float x2 = road.geometry[j + 1].x; float y2 = road.geometry[j + 1].y;
+            float x3 = road.geometry[j + 2].x; float y3 = road.geometry[j + 2].y;
             float shoelace_area = std::abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1)); // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
             if (shoelace_area < 0.01)
                 j++; // Skip over points that are too close together
@@ -196,29 +198,34 @@ static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geome
             {
                 if (j != start)
                 {
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
+                    if(idx >= consts::numRoadSegments) return idx;
+                    ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[start], road.geometry[j]);
                     start = j;
                 }
                 else
                 {
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
+                    if(idx >= consts::numRoadSegments) return idx;
+                    ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[j], road.geometry[j + 1]);
                     start = ++j;
                 }
             }
         }
 
         //Handle last point
-        ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, geometryList[start], geometryList[j]) : makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
+        if(idx >= consts::numRoadSegments) return idx;
+        ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, road.geometry[start], road.geometry[j]) : makeRoadEdge(ctx, road.geometry[j], road.geometry[j + 1]);
     }
-    else if(type == "speed_bump")
+    else if(road.type == MapRoadType::speed_bump)
     {
-        assert(geometryList.size() == 4);
-        ctx.data().roads[idx++] = makeSpeedBump(ctx, geometryList);
+        assert(road.numPositions== 4);
+        if(idx >= consts::numRoadSegments) return idx;
+        ctx.data().roads[idx++] = makeSpeedBump(ctx, road.geometry);
     }
-    else if(type == "stop_sign")
+    else if(road.type == MapRoadType::stop_sign)
     {
-        assert(geometryList.size() == 1);
-        ctx.data().roads[idx++] = makeStopSign(ctx, geometryList);
+        assert(road.numPositions == 1);
+        if(idx >= consts::numRoadSegments) return idx;
+        ctx.data().roads[idx++] = makeStopSign(ctx, road.geometry);
     }
 
     return idx;
@@ -241,41 +248,39 @@ static void createFloorPlane(Engine &ctx)
 
 void createPersistentEntities(Engine &ctx) {
 
-    const std::string pathToScenario = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json";
-
     createFloorPlane(ctx);
-
-    std::ifstream data(pathToScenario);
-    assert(data.is_open());
-
-    using nlohmann::json;
-
-    json rawJson;
-    data >> rawJson;
 
     ctx.data().mean = std::make_pair(0, 0);
     size_t numEntities = 0;
-    for (const auto &obj : rawJson["objects"])
+
+    // for (const auto &obj : ctx.data().map->objects)
+    for(size_t i = 0; i < ctx.data().map->numObjects; i++)
     {
-        if (obj["type"] != "vehicle")
+        MapObject obj = ctx.data().map->objects[i];
+        if (obj.type != MapObjectType::vehicle)
         {
             continue;
         }
         numEntities++;
-        float newX = obj["position"][0]["x"];
-        float newY = obj["position"][0]["y"];
+        float newX = obj.position[0].x;
+        float newY = obj.position[0].y;
 
         // Update mean incrementally
         ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
         ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
     }
-    for (const auto &obj: rawJson["roads"])
+    for(size_t i = 0; i < ctx.data().map->numRoads; i++)
     {
-        for (const auto &point: obj["geometry"])
+        MapRoad obj = ctx.data().map->roads[i];
+        if (obj.type != MapRoadType::road_edge)
+        {
+            continue;
+        }
+        for (const auto &point: obj.geometry)
         {   
             numEntities++;
-            float newX = point["x"];
-            float newY = point["y"];
+            float newX = point.x;
+            float newY = point.y;
 
             // Update mean incrementally
             ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
@@ -284,33 +289,46 @@ void createPersistentEntities(Engine &ctx) {
     }
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
-    for (const auto &obj : rawJson["objects"]) {
+    for(size_t i = 0; i < ctx.data().map->numObjects; i++) {
+        MapObject obj = ctx.data().map->objects[i];
       if (agentCount == consts::numAgents) {
         break;
       }
-      if (obj["type"] != "vehicle") {
+      if(obj.type != MapObjectType::vehicle) {
         continue;
       }
-      auto vehicle = createVehicle(
+    //   if (obj["type"] != "vehicle") {
+    //     continue;
+    //   }
+    //   auto vehicle = createVehicle(
+    //       ctx,
+    //       // TODO(samk): Nocturne allows for configuring the initial position
+    //       // but in practice it looks to always be set to 0.
+    //       obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
+    //       obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
+    //       obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"]);
+        auto vehicle = createVehicle(
           ctx,
-          // TODO(samk): Nocturne allows for configuring the initial position
-          // but in practice it looks to always be set to 0.
-          obj["position"][0]["x"], obj["position"][0]["y"], obj["length"],
-          obj["width"], obj["heading"][0], obj["velocity"][0]["x"],
-          obj["velocity"][0]["y"], obj["goalPosition"]["x"], obj["goalPosition"]["y"]);
-
+          obj.position[0].x, obj.position[0].y, obj.length,
+          obj.width, obj.heading[0], obj.velocity[0].x,
+          obj.velocity[0].y, obj.goalPosition.x, obj.goalPosition.y);
       ctx.data().agents[agentCount++] = vehicle;
     }
+    ctx.data().numAgents = agentCount;
+    // std::cout<<"numAgents: "<<ctx.data().numAgents<<std::endl;
 
     size_t roadCount{0};
-    for (const auto &obj : rawJson["roads"]) {
+    for(size_t i = 0; i < ctx.data().map->numRoads; i++) {
+      if(roadCount >= consts::numRoadSegments) {
+        break;
+      }
+      MapRoad obj = ctx.data().map->roads[i];
       if (roadCount >= consts::numRoadSegments) break;
-      auto geometrylist = obj["geometry"];
-      std::string type = obj["type"];
       createRoadEntities(
-          ctx, geometrylist, type, roadCount);
+          ctx, obj, roadCount);
     }
     ctx.data().num_roads = roadCount;
+    // std::cout<<"numRoads: "<<ctx.data().num_roads<<std::endl;
 }
 
 
@@ -318,11 +336,11 @@ static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    for (CountT idx = 0; idx < consts::numAgents; ++idx)
+    for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
     {
         Entity vehicle = ctx.data().agents[idx];
 
-        resetVehicle(ctx, vehicle);
+        resetVehicle(ctx, vehicle, idx);
 
         registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
 
@@ -345,12 +363,12 @@ static void resetPersistentEntities(Engine &ctx)
       }
     }
   
-    for (CountT i = 0; i < consts::numAgents; i++)
+    for (CountT i = 0; i < ctx.data().numAgents; i++)
     {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
-        for (CountT j = 0; j < consts::numAgents; j++)
+        for (CountT j = 0; j < ctx.data().numAgents; j++)
         {
             if (i == j)
             {

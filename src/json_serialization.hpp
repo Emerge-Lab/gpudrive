@@ -91,7 +91,7 @@ namespace gpudrive
         int i = 0;
         for (const auto &geom : j.at("geometry"))
         {
-            if (i < MAX_POSITIONS)
+            if (i < MAX_GEOMETRY)
             {
                 geom.get_to(road.geometry[i]);
                 ++i;

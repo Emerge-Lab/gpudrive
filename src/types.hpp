@@ -9,15 +9,15 @@
 
 namespace gpudrive {
 
-constexpr size_t MAX_OBJECTS = 50;
-constexpr size_t MAX_ROADS = 50;
+constexpr size_t MAX_OBJECTS = 100;
+constexpr size_t MAX_ROADS = 300;
 constexpr size_t MAX_POSITIONS = 100;
 constexpr size_t MAX_HEADINGS = 100;
 constexpr size_t MAX_VELOCITIES = 100;
-constexpr size_t MAX_GEOMETRY = 50;
+constexpr size_t MAX_GEOMETRY = 450;
 
 struct MapPosition {
-    double x, y;
+    float x, y;
 };
 
 enum class MapObjectType : uint32_t {
@@ -42,7 +42,7 @@ struct MapObject {
     MapPosition position[MAX_POSITIONS];
     int width;
     int length;
-    double heading[MAX_HEADINGS]; 
+    float heading[MAX_HEADINGS]; 
     MapPosition velocity[MAX_VELOCITIES];
     bool valid[MAX_VELOCITIES];
     MapPosition goalPosition;
@@ -259,11 +259,11 @@ struct LevelState {
     Entity entities[consts::numAgents + consts::numRoadSegments];
 };
 
-struct Trajectory {
-    madrona::math::Vector2 positions[consts::kTrajectoryLength];
-    madrona::math::Vector2 velocities[consts::kTrajectoryLength];
-    float initialHeading;
-};
+// struct Trajectory {
+//     madrona::math::Vector2 positions[consts::kTrajectoryLength];
+//     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
+//     float initialHeading;
+// };
 
 
 
@@ -297,7 +297,6 @@ struct Agent : public madrona::Archetype<
     BicycleModel,
     VehicleSize,
     Goal,
-    Trajectory,
 
     // Input
     Action,
