@@ -376,7 +376,7 @@ Manager::Impl * Manager::Impl::init(
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
-            CompileConfig::OptMode::Debug
+            CompileConfig::OptMode::LTO
         }, cu_ctx);
 
         WorldReset *world_reset_buffer = 
