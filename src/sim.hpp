@@ -94,7 +94,8 @@ struct Sim : public madrona::WorldBase {
     int32_t num_roads;
     Entity roads[consts::numRoadSegments];
 
-    std::pair<float, float> mean;
+    float meanx;
+    float meany;
 
     // Episode ID number
     int32_t curEpisodeIdx;

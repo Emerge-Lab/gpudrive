@@ -361,7 +361,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, nullptr};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mapPtrArray[i]};
         }
 
         MWCudaExecutor gpu_exec({
@@ -376,7 +376,7 @@ Manager::Impl * Manager::Impl::init(
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
-            CompileConfig::OptMode::LTO,
+            CompileConfig::OptMode::Debug
         }, cu_ctx);
 
         WorldReset *world_reset_buffer = 
@@ -393,7 +393,7 @@ Manager::Impl * Manager::Impl::init(
             world_reset_buffer,
             agent_actions_buffer,
             mapIndices.data(),
-            nullptr,
+            mapPtrArray,
             std::move(gpu_exec),
         };
 #else

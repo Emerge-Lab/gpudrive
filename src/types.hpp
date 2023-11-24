@@ -40,8 +40,8 @@ enum class MapRoadType : uint32_t
 
 struct MapObject {
     MapPosition position[MAX_POSITIONS];
-    int width;
-    int length;
+    float width;
+    float length;
     float heading[MAX_HEADINGS]; 
     MapPosition velocity[MAX_VELOCITIES];
     bool valid[MAX_VELOCITIES];
