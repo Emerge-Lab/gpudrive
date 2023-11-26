@@ -65,7 +65,7 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &obj) {
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     // ctx.get<Trajectory>(vehicle).positions[0] =
-    //     Vector2{.x = xCoord - ctx.data().meanx, .y = yCoord - ctx.data().meany};
+    //     Vector2{.x = xCoord - ctx.data().map->meanx, .y = yCoord - ctx.data().map->meany};
     // ctx.get<Trajectory>(vehicle).initialHeading = degreesToRadians(heading);
     // ctx.get<Trajectory>(vehicle).velocities[0] =
     //     Vector2{.x = speedX, .y = speedY};
@@ -82,8 +82,8 @@ static Entity makeRoadEdge(Engine &ctx,
 {
     float x1 = p1.x; float y1 = p1.y;
     float x2 = p2.x; float y2 = p2.y ;
-    Vector3 start = Vector3{.x = x1 - ctx.data().meanx, .y = y1 - ctx.data().meany, .z = 0};
-    Vector3 end = Vector3{.x = x2 - ctx.data().meanx, .y = y2 - ctx.data().meany, .z = 0};
+    Vector3 start = Vector3{.x = x1 - ctx.data().map->meanx, .y = y1 - ctx.data().map->meany, .z = 0};
+    Vector3 end = Vector3{.x = x2 - ctx.data().map->meanx, .y = y2 - ctx.data().map->meany, .z = 0};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
@@ -151,7 +151,7 @@ static Entity makeSpeedBump(Engine &ctx, const MapPosition* geometryList)
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().meanx, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().meany, .z = 1};
+    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().map->meanx, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().map->meany, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     ctx.get<EntityType>(speed_bump) = EntityType::Cube;
@@ -165,7 +165,7 @@ static Entity makeStopSign(Engine &ctx, const MapPosition* geomeryList)
 {
     float x1 = geomeryList[0].x; float y1 = geomeryList[0].y;
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().meanx, .y = y1 - ctx.data().meany, .z = 0.5};
+    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().map->meanx, .y = y1 - ctx.data().map->meany, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
     ctx.get<EntityType>(stop_sign) = EntityType::Cube;
@@ -176,42 +176,11 @@ static Entity makeStopSign(Engine &ctx, const MapPosition* geomeryList)
 }
 
 static inline size_t createRoadEntities(Engine &ctx, const MapRoad &road, size_t &idx) {
-    // if (type == "road_edge" || type == "lane")
     if (road.type == MapRoadType::road_edge || road.type == MapRoadType::lane || road.type == MapRoadType::road_line)
     {
-        // size_t numPoints = geometryList.size();
         size_t numPoints = road.numPositions;
-
-        size_t start = 0;
-        size_t j = 0;
-        while (j < numPoints - 3)
-        {
-            float x1 = road.geometry[j].x; float y1 = road.geometry[j].y;
-            float x2 = road.geometry[j + 1].x; float y2 = road.geometry[j + 1].y;
-            float x3 = road.geometry[j + 2].x; float y3 = road.geometry[j + 2].y;
-            float shoelace_area = std::abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1)); // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
-            if (shoelace_area < 0.01)
-                j++; // Skip over points that are too close together
-            else
-            {
-                if (j != start)
-                {
-                    if(idx >= consts::numRoadSegments) return idx;
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[start], road.geometry[j]);
-                    start = j;
-                }
-                else
-                {
-                    if(idx >= consts::numRoadSegments) return idx;
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[j], road.geometry[j + 1]);
-                    start = ++j;
-                }
-            }
-        }
-
-        //Handle last point
-        if(idx >= consts::numRoadSegments) return idx;
-        ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, road.geometry[start], road.geometry[j]) : makeRoadEdge(ctx, road.geometry[j], road.geometry[j + 1]);
+        for(size_t j = 1; j <= numPoints - 1; j++)
+            ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[j-1], road.geometry[j]);
     }
     else if(road.type == MapRoadType::speed_bump)
     {
@@ -247,36 +216,7 @@ static void createFloorPlane(Engine &ctx)
 void createPersistentEntities(Engine &ctx) {
 
     createFloorPlane(ctx);
-
-    size_t numEntities = 0;
     
-
-    for(size_t i = 0; i < ctx.data().map->numObjects; i++)
-    {
-        const auto &obj = ctx.data().map->objects[i];
-        if (ctx.data().map->objects[i].type != MapObjectType::vehicle)
-        {
-            continue;
-        }
-        if(obj.numPositions == 0) continue;
-        ctx.data().meanx += (ctx.data().map->objects[i].position[0].x - ctx.data().meanx) / ++numEntities;
-        ctx.data().meany += (ctx.data().map->objects[i].position[0].y - ctx.data().meany) / numEntities;
-    }
-
-    for(size_t i = 0; i < ctx.data().map->numRoads; i++)
-    {
-        if (ctx.data().map->roads[i].type != MapRoadType::road_edge)
-        {
-            continue;
-        }
-
-        for (size_t j = 0; j < ctx.data().map->roads[i].numPositions; j++)
-        {
-            // Increment numEntities and update mean in one step
-            ctx.data().meanx += (ctx.data().map->roads[i].geometry[j].x - ctx.data().meanx) / ++numEntities;
-            ctx.data().meany += (ctx.data().map->roads[i].geometry[j].y - ctx.data().meany) / numEntities;
-        }
-    }
     // TODO(samk): handle keys not existing
     size_t agentCount = 0;
 

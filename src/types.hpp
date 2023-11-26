@@ -52,6 +52,8 @@ struct MapObject {
     uint32_t numHeadings;
     uint32_t numVelocities;
     uint32_t numValid;
+    float meanx;
+    float meany;
 };
 
 struct MapRoad {
@@ -59,6 +61,8 @@ struct MapRoad {
     MapPosition geometry[MAX_GEOMETRY];
     MapRoadType type;
     uint32_t numPositions;
+    float meanx;
+    float meany;
 };
 
 struct Map {
@@ -67,6 +71,8 @@ struct Map {
 
     uint32_t numObjects;
     uint32_t numRoads;
+    float meanx;
+    float meany;
 
     // Constructor  
     Map() = default;
