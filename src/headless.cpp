@@ -108,10 +108,36 @@ int main(int argc, char *argv[])
         mgr.step();
         // printObs();
     }
-
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = end - start;
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);
+    mgr.triggerReset(0);
+    std::array<int32_t, 5> world_idxs = {0, 1, 2, 3, 4};
+    mgr.setMap(world_idxs.data());
+        for (CountT i = 0; i < (CountT)num_steps; i++) {
+        if (rand_actions) {
+            for (CountT j = 0; j < (CountT)num_worlds; j++) {
+                for (CountT k = 0; k < gpudrive::consts::numAgents; k++) {
+                    float acc = acc_gen(rand_gen);
+                    float steer = steer_gen(rand_gen);
+                    float head = 0;
+
+                    mgr.setAction(j, k, acc, steer, head);
+                    
+                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
+                    action_store[base_idx] = acc;
+                    action_store[base_idx + 1] = steer;
+                    action_store[base_idx + 2] = head;
+                }
+            }
+        }
+        mgr.step();
+        // printObs();
+    }
+
+    printf("Done\n");
+
+
 }

@@ -259,7 +259,6 @@ static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
     std::vector<std::string> jsonFilePaths;
     nlohmann::json validFilesJson;
     std::filesystem::path validFilesJsonPath = mgr_cfg.mapsPath / "valid_files.json";
-    uint32_t numValidFiles = 0;
     std::ifstream validFilesFile(validFilesJsonPath);
     if (validFilesFile.is_open()) {
         validFilesFile >> validFilesJson;
@@ -273,8 +272,6 @@ static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
         }
     }
     std::array<Map, 5> mapArray;
-
-    // std::array<Map*, 5> mapPtrArray;
 
     // Read and parse JSON files to create Map objects
     for (int i = 0; i < mgr_cfg.numWorlds; i++) {
@@ -325,21 +322,11 @@ Manager::Impl * Manager::Impl::init(
 
     // uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
     std::array<uint32_t, 5> mapIndices;
+    for (int i = 0; i < 5; ++i) {
+        mapIndices[i] = i;
+    }
 
     std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
-
-    // nlohmann::json jsonData;
-    // std::ifstream jsonFile(pathToScenario);
-    // if (jsonFile.is_open()) {
-    //     jsonFile >> jsonData;
-    //     maps.emplace_back(jsonData.get<Map>());
-    //     jsonFile.close();
-    // }
-
-    // std::cout << "Map numObjects: " << mapArray[0].numObjects << std::endl;
-    // std::cout << "Map numRoads: " << mapArray[0].numRoads << std::endl;
-
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -633,4 +620,26 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
         *action_ptr = action;
     }
 }
+
+void Manager::setMap(int32_t* indices) {
+    // TODO: check if reset is called before setMap. Or integrate setMap into reset.
+
+    for (int i = 0; i < 5; ++i) {
+        impl_->mapIndices[i] = indices[i];
+    }
+    if(impl_->cfg.execMode == ExecMode::CUDA) {
+        for(int i = 0; i < 5; ++i) {
+            cudaFree(impl_->maps[i]);
+        }
+        GetMaps(impl_->cfg, impl_->maps);
+    }
+    else {
+        for(int i = 0; i < 5; ++i) {
+            impl_->maps[i] = new Map();
+        }
+        GetMaps(impl_->cfg, impl_->maps);
+    }
+
 }
+
+} // namespace gpudrive
