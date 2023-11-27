@@ -30,12 +30,21 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle, CountT idx) {
     // auto yVelocity = ctx.get<Trajectory>(vehicle).velocities[0].y;
     // auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
     // auto heading = ctx.get<Trajectory>(vehicle).initialHeading;
-    auto xCoord = ctx.data().map->objects[idx].position[0].x;
-    auto yCoord = ctx.data().map->objects[idx].position[0].y;
-    auto xVelocity = ctx.data().map->objects[idx].velocity[0].x;
-    auto yVelocity = ctx.data().map->objects[idx].velocity[0].y;
-    auto speed = ctx.data().map->objects[idx].velocity[0].x;
-    auto heading = ctx.data().map->objects[idx].heading[0];
+    int32_t valid_idx = 0;
+    for(uint32_t i = 0; i < ctx.data().map->objects[idx].numPositions; i++)
+    {
+        if(ctx.data().map->objects[idx].valid[i] == true)
+        {
+            valid_idx = i;
+            break;
+        }
+    }
+    auto xCoord = ctx.data().map->objects[idx].position[valid_idx].x - ctx.data().map->meanx;
+    auto yCoord = ctx.data().map->objects[idx].position[valid_idx].y - ctx.data().map->meany;
+    auto xVelocity = ctx.data().map->objects[idx].velocity[valid_idx].x;
+    auto yVelocity = ctx.data().map->objects[idx].velocity[valid_idx].y;
+    auto speed = ctx.data().map->objects[idx].velocity[valid_idx].x;
+    auto heading = degreesToRadians(ctx.data().map->objects[idx].heading[valid_idx]);
 
     ctx.get<BicycleModel>(vehicle) = {
         .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};

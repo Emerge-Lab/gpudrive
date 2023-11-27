@@ -12,6 +12,8 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
+        const auto &valid = j.at("valid");
+
         obj.meanx = 0;
         obj.meany = 0;
         int i = 0;
@@ -20,8 +22,11 @@ namespace gpudrive
             if (i < MAX_POSITIONS)
             {
                 pos.get_to(obj.position[i]);
-                obj.meanx += (obj.position[i].x - obj.meanx)/(i+1);
-                obj.meany += (obj.position[i].y - obj.meany)/(i+1);
+                if(valid[i] == true)
+                {
+                    obj.meanx += (obj.position[i].x - obj.meanx)/(i+1);
+                    obj.meany += (obj.position[i].y - obj.meany)/(i+1);
+                }
                 ++i;
             }
             else
