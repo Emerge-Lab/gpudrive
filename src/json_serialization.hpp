@@ -184,6 +184,8 @@ namespace gpudrive
         {
             if (i < MAX_OBJECTS)
             {
+                if(obj.at("type") != "vehicle")
+                    continue;
                 obj.get_to(map.objects[i]);    
                 size_t objPoints = map.objects[i].numPositions;
                 map.meanx = ((map.meanx * totalPoints) + (map.objects[i].meanx * objPoints)) / (totalPoints + objPoints);
@@ -218,11 +220,6 @@ namespace gpudrive
             }
         }
         map.numRoads = i;
-        std::cout << "Total points: " << totalPoints << std::endl;
-        std::cout << "Mean x: " << map.meanx << std::endl;
-        std::cout << "Mean y: " << map.meany << std::endl;
-        std::cout << "Road points: " << count_road_points << std::endl;
-        std::cout << "objs: " << map.numObjects << std::endl;
         // tl_states is ignored as it"s always empty
     }
 }
