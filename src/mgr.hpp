@@ -44,6 +44,7 @@ public:
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
     MGR_EXPORT madrona::py::Tensor selfObservationTensor() const;
+    MGR_EXPORT madrona::py::Tensor mapObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor partnerObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor roomEntityObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor doorObservationTensor() const;

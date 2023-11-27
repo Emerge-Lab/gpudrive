@@ -275,7 +275,7 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
-    std::string pathToScenario("/home/emerge/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
+    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -463,6 +463,17 @@ Tensor Manager::selfObservationTensor() const
                                    consts::numAgents,
                                    8
 
+                               });
+}
+
+Tensor Manager::mapObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::MapObservation,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numRoadSegments,
+                                   4
                                });
 }
 

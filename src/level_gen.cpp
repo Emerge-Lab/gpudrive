@@ -95,6 +95,7 @@ static Entity makeRoadEdge(Engine &ctx,
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
+    ctx.get<MapObservation>(road_edge) = MapObservation{.position = Vector2{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2}, .heading = atan2(end.y - start.y, end.x - start.x), .type = 0};
     return road_edge;
 }
 
@@ -160,6 +161,7 @@ static Entity makeSpeedBump(Engine &ctx, const nlohmann::json& geometryList)
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.first, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.second}, .heading = angle, .type = 1};
     return speed_bump;
 }
 
@@ -174,6 +176,7 @@ static Entity makeStopSign(Engine &ctx, const nlohmann::json& geomeryList)
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
+    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second}, .heading = 0, .type = 2};
     return stop_sign;
 }
 
