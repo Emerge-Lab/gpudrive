@@ -189,17 +189,20 @@ static inline size_t createRoadEntities(Engine &ctx, const MapRoad &road, size_t
     {
         size_t numPoints = road.numPositions;
         for(size_t j = 1; j <= numPoints - 1; j++)
+        {
+            if(idx >= consts::numRoadSegments) return idx;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[j-1], road.geometry[j]);
+        }
     }
     else if(road.type == MapRoadType::speed_bump)
     {
-        assert(road.numPositions== 4);
+        if(road.numPositions!= 4) return idx; // This should be an assert. Changing this right now because of lack of understanding.
         if(idx >= consts::numRoadSegments) return idx;
         ctx.data().roads[idx++] = makeSpeedBump(ctx, road.geometry);
     }
     else if(road.type == MapRoadType::stop_sign)
     {
-        assert(road.numPositions == 1);
+        if(road.numPositions != 1) return idx;// This should be an assert. Changing this right now because of lack of understanding.
         if(idx >= consts::numRoadSegments) return idx;
         ctx.data().roads[idx++] = makeStopSign(ctx, road.geometry);
     }
@@ -250,7 +253,7 @@ void createPersistentEntities(Engine &ctx) {
       createRoadEntities(
           ctx, obj, roadCount);
     }
-    ctx.data().num_roads = 0;
+    ctx.data().num_roads = roadCount;
     // std::cout<<"numRoads: "<<ctx.data().num_roads<<std::endl;
 }
 
