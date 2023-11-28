@@ -95,6 +95,7 @@ struct Manager::CPUImpl final : Manager::Impl {
         for(int i = 0; i < cfg.numWorlds; ++i) {
             delete maps[i];
         }
+        delete [] maps;
     }
 
     inline virtual void run()
@@ -134,6 +135,7 @@ struct Manager::CUDAImpl final : Manager::Impl {
         for(int i = 0; i < cfg.numWorlds; ++i) {
             REQ_CUDA(cudaFree(maps[i]));
         }
+        delete [] maps;
     }
 
     inline virtual void run()
@@ -350,19 +352,20 @@ static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
     // Read and parse JSON files to create Map objects
     for (int i = 0; i < mgr_cfg.numWorlds; i++) {
         std::filesystem::path fullPath = mgr_cfg.mapsPath / jsonFilePaths[i];
+        // std::cout<< "Reading file: " << fullPath << std::endl;
         std::ifstream jsonfile(fullPath);
         nlohmann::json jsonData;
         if (jsonfile.is_open()) {
             jsonfile >> jsonData;
             jsonfile.close();
 
-            Map *mapObj = new Map(jsonData.get<Map>());
-
             switch (mgr_cfg.execMode)
             {
                 case ExecMode::CUDA:
                 {
                     #ifdef MADRONA_CUDA_SUPPORT
+                        Map *mapObj = new Map();
+                        from_json(jsonData, *mapObj);
                         // Allocate memory for each Map object on the GPU
                         mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
                         // madrona::cu::cpyCPUToGPU(stream, mapPtrArray[i], mapObj, sizeof(Map));
@@ -375,7 +378,13 @@ static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
 
                 case ExecMode::CPU:
                 {
-                    mapPtrArray[i] = mapObj; // Directly assign the CPU object
+                    if(mapPtrArray[i] != nullptr) {
+                        from_json(jsonData, *mapPtrArray[i]);
+                    }
+                    else {
+                        mapPtrArray[i] = new Map();
+                        from_json(jsonData, *mapPtrArray[i]);
+                    }
                 } break;
 
                 default:
@@ -403,8 +412,8 @@ Manager::Impl * Manager::Impl::init(
     };
 
     // uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
-    std::array<uint32_t, 5> mapIndices;
-    for (int i = 0; i < 5; ++i) {
+    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
+    for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
         mapIndices[i] = i;
     }
 
@@ -445,7 +454,7 @@ Manager::Impl * Manager::Impl::init(
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
-            CompileConfig::OptMode::Debug
+            CompileConfig::OptMode::LTO
         }, cu_ctx);
 
         WorldReset *world_reset_buffer = 
@@ -461,7 +470,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices.data(),
+            mapIndices,
             mapPtrArray,
             std::move(gpu_exec),
         };
@@ -511,7 +520,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices.data(),
+            mapIndices,
             mapArray,
             std::move(cpu_exec),
         };
@@ -706,16 +715,23 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     }
 }
 
-void Manager::setMap(int32_t* indices) {
+void Manager::setMap(uint32_t* indices) {
     // TODO: check if reset is called before setMap. Or integrate setMap into reset.
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < impl_->cfg.numWorlds; ++i) {
         impl_->mapIndices[i] = indices[i];
     }
     if(impl_->cfg.execMode == ExecMode::CUDA) {
         GetMaps(impl_->cfg, impl_->maps);
     }
     else {
+        // for(int i = 0; i < impl_->cfg.numWorlds; ++i) {
+        //     if(impl_->maps[i] != nullptr) {
+        //         Map* temp = impl_->maps[i];
+        //         impl_->maps[i] = nullptr;
+        //         delete temp;
+        //     }
+        // }
         GetMaps(impl_->cfg, impl_->maps);
     }
 

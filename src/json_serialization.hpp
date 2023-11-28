@@ -41,7 +41,7 @@ namespace gpudrive
         i = 0;
         for (const auto &h : j.at("heading"))
         {
-            if (i < MAX_HEADINGS)
+            if (i < MAX_POSITIONS)
             {
                 h.get_to(obj.heading[i]);
                 ++i;
@@ -56,7 +56,7 @@ namespace gpudrive
         i = 0;
         for (const auto &v : j.at("velocity"))
         {
-            if (i < MAX_VELOCITIES)
+            if (i < MAX_POSITIONS)
             {
                 v.get_to(obj.velocity[i]);
                 ++i;
@@ -71,7 +71,7 @@ namespace gpudrive
         i = 0;
         for (const auto &v : j.at("valid"))
         {
-            if (i < MAX_VELOCITIES)
+            if (i < MAX_POSITIONS)
             {
                 v.get_to(obj.valid[i]);
                 ++i;

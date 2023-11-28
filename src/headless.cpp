@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .mapsPath = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid",
+        .mapsPath = "/home/aarav/nocturne_data/formatted_json_v2_no_tl_valid",
     });
 
     std::random_device rd;
@@ -114,9 +114,12 @@ int main(int argc, char *argv[])
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);
     mgr.triggerReset(0);
-    std::array<int32_t, 5> world_idxs = {0, 1, 2, 3, 4};
-    mgr.setMap(world_idxs.data());
-        for (CountT i = 0; i < (CountT)num_steps; i++) {
+    uint32_t* world_idxs = new uint32_t[num_worlds];
+    for (uint32_t i = 0; i < num_worlds; i++) {
+        world_idxs[i] = i;
+    }
+    mgr.setMap(world_idxs);
+    for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
                 for (CountT k = 0; k < gpudrive::consts::numAgents; k++) {
@@ -137,7 +140,8 @@ int main(int argc, char *argv[])
         // printObs();
     }
 
+    // delete mgr;
     printf("Done\n");
-
+    return 0;
 
 }

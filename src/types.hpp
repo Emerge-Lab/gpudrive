@@ -9,12 +9,10 @@
 
 namespace gpudrive {
 
-constexpr size_t MAX_OBJECTS = 100;
-constexpr size_t MAX_ROADS = 300;
-constexpr size_t MAX_POSITIONS = 100;
-constexpr size_t MAX_HEADINGS = 100;
-constexpr size_t MAX_VELOCITIES = 100;
-constexpr size_t MAX_GEOMETRY = 450;
+constexpr size_t MAX_OBJECTS = 515;
+constexpr size_t MAX_ROADS = 956;
+constexpr size_t MAX_POSITIONS = 91;
+constexpr size_t MAX_GEOMETRY = 1746;
 
 struct MapPosition {
     float x, y;
@@ -42,9 +40,9 @@ struct MapObject {
     MapPosition position[MAX_POSITIONS];
     float width;
     float length;
-    float heading[MAX_HEADINGS]; 
-    MapPosition velocity[MAX_VELOCITIES];
-    bool valid[MAX_VELOCITIES];
+    float heading[MAX_POSITIONS]; 
+    MapPosition velocity[MAX_POSITIONS];
+    bool valid[MAX_POSITIONS];
     MapPosition goalPosition;
     MapObjectType type;
 
