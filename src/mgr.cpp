@@ -92,6 +92,9 @@ struct Manager::CPUImpl final : Manager::Impl {
     inline virtual ~CPUImpl() final
     {
         delete episodeMgr;
+        for(int i = 0; i < cfg.numWorlds; ++i) {
+            delete maps[i];
+        }
     }
 
     inline virtual void run()
@@ -128,6 +131,9 @@ struct Manager::CUDAImpl final : Manager::Impl {
     inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
+        for(int i = 0; i < cfg.numWorlds; ++i) {
+            REQ_CUDA(cudaFree(maps[i]));
+        }
     }
 
     inline virtual void run()
@@ -474,6 +480,9 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         Map** mapArray = new Map*[mgr_cfg.numWorlds];
+        for(int i = 0; i < mgr_cfg.numWorlds; ++i) {
+            mapArray[i] = nullptr;
+        }
         GetMaps(mgr_cfg, mapArray);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
