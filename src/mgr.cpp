@@ -367,8 +367,9 @@ static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
                         Map *mapObj = new Map();
                         from_json(jsonData, *mapObj);
                         // Allocate memory for each Map object on the GPU
-                        mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
-                        // madrona::cu::cpyCPUToGPU(stream, mapPtrArray[i], mapObj, sizeof(Map));
+                        if(mapPtrArray[i] == nullptr) {
+                            mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
+                        }
                         REQ_CUDA(cudaMemcpy(mapPtrArray[i], mapObj, sizeof(Map), cudaMemcpyHostToDevice));
                         delete mapObj;
                     #else
