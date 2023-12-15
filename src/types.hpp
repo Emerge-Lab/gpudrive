@@ -72,6 +72,12 @@ struct SelfObservation {
     Goal goal;
 };
 
+struct MapObservation {
+    madrona::math::Vector2 position;
+    float heading;
+    float type;
+};
+
 // The state of the world is passed to each agent in terms of egocentric
 // polar coordinates. theta is degrees off agent forward.
 struct PolarObservation {
@@ -158,6 +164,7 @@ enum class EntityType : uint32_t {
     Wall,
     Agent,
     Door,
+    Cylinder,
     NumTypes,
 };
 
@@ -300,6 +307,10 @@ struct PhysicsEntity : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
+
+    //Observations
+    MapObservation,
+
     EntityType
 > {};
 

@@ -142,6 +142,12 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
     asset_paths[(size_t)SimObject::Button] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::StopSign] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::SpeedBump] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    // asset_paths[(size_t)SimObject::Cylinder] =
+    //     (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
@@ -213,6 +219,11 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.5f,
     });
 
+    // setupHull(SimObject::Cylinder, 0.075f, {
+    //     .muS = 0.5f,
+    //     .muD = 0.75f,
+    // });
+
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,
     };
@@ -264,7 +275,7 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
-    std::string pathToScenario("../example.json");
+    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -452,6 +463,17 @@ Tensor Manager::selfObservationTensor() const
                                    consts::numAgents,
                                    8
 
+                               });
+}
+
+Tensor Manager::mapObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::MapObservation,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::numRoadSegments,
+                                   4
                                });
 }
 

@@ -26,6 +26,7 @@ enum class ExportID : uint32_t {
     Lidar,
     StepsRemaining,
     BicycleModel,
+    MapObservation,
     NumExports
 };
 
@@ -37,6 +38,8 @@ enum class SimObject : uint32_t {
     Door,
     Agent,
     Button,
+    StopSign,
+    SpeedBump,
     Plane,
     NumObjects,
 };
@@ -89,6 +92,10 @@ struct Sim : public madrona::WorldBase {
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     Entity agents[consts::numAgents];
+    int32_t num_roads;
+    Entity roads[consts::numRoadSegments];
+
+    std::pair<float, float> mean;
 
     // Episode ID number
     int32_t curEpisodeIdx;
