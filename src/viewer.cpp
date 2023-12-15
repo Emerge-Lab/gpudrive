@@ -93,8 +93,6 @@ int main(int argc, char *argv[])
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::SpeedBump] =
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
-    // render_asset_paths[(size_t)SimObject::Cylinder] =
-    //     (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
     for (size_t i = 0; i < render_asset_paths.size(); i++) {
