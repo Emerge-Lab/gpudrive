@@ -84,8 +84,8 @@ static Entity makeRoadEdge(Engine &ctx,
 {
     float x1 = p1["x"]; float y1 = p1["y"];
     float x2 = p2["x"]; float y2 = p2["y"] ;
-    Vector3 start = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0};
-    Vector3 end = Vector3{.x = x2 - ctx.data().mean.first, .y = y2 - ctx.data().mean.second, .z = 0};
+    Vector3 start{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0};
+    Vector3 end{.x = x2 - ctx.data().mean.first, .y = y2 - ctx.data().mean.second, .z = 0};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
