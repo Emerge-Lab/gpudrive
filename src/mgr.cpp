@@ -219,10 +219,15 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.5f,
     });
 
-    // setupHull(SimObject::Cylinder, 0.075f, {
-    //     .muS = 0.5f,
-    //     .muD = 0.75f,
-    // });
+    setupHull(SimObject::StopSign, 1.f, {
+    .muS = 0.5f,
+    .muD = 0.5f,
+        });
+
+    setupHull(SimObject::SpeedBump, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
 
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,
