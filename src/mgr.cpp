@@ -434,6 +434,9 @@ Manager::Impl * Manager::Impl::init(
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
         Map** mapPtrArray = new Map*[mgr_cfg.numWorlds];
+        for(int i = 0; i < mgr_cfg.numWorlds; ++i) {
+            mapPtrArray[i] = nullptr;
+        }
         GetMaps(mgr_cfg, mapPtrArray);
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);

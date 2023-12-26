@@ -434,13 +434,13 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // Tasks 2-7 are executed in a loop where the iteration count is determined
     // by consts::numPhysicsSubsteps. Subtasks 2-7 can be skipped by setting
     // this constant to 0.
-    auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
-        {broadphase_setup_sys}, consts::numPhysicsSubsteps);
+    // auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
+    //     {broadphase_setup_sys}, consts::numPhysicsSubsteps);
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
     auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, Action>>({substep_sys});
+        agentZeroVelSystem, Velocity, Action>>({broadphase_setup_sys});
 
     // Finalize physics subsystem work
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
