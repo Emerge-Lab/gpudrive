@@ -134,14 +134,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    asset_paths[(size_t)SimObject::Wall] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
-    asset_paths[(size_t)SimObject::Door] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
     asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
-    asset_paths[(size_t)SimObject::Button] =
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::StopSign] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::SpeedBump] =
@@ -199,22 +193,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.75f,
     });
 
-    setupHull(SimObject::Wall, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    setupHull(SimObject::Door, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
     setupHull(SimObject::Agent, 1.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    setupHull(SimObject::Button, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
@@ -502,17 +481,6 @@ Tensor Manager::roomEntityObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::numAgents,
                                    consts::maxEntitiesPerRoom,
-                                   3,
-                               });
-}
-
-Tensor Manager::doorObservationTensor() const
-{
-    return impl_->exportTensor(ExportID::DoorObservation,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   consts::numAgents,
                                    3,
                                });
 }
