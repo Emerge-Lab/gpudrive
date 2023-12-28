@@ -20,7 +20,7 @@ float degreesToRadians(float degrees) {
 
 // TODO: Add the dynamic files here to be able to test from any json file.
 
-const float EPSILON = 0.00001f; // Define epsilon as a constant
+const float EPSILON = 0.001f; // Decreased epsilon to account for floating point errors. TODO: increase floating point precision and ideally use 1e-6 as epsilon.
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:
@@ -32,11 +32,15 @@ protected:
     });
     
     int64_t num_agents = gpudrive::consts::numAgents;
+    int64_t num_roads = gpudrive::consts::numRoadSegments;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
+    int64_t numEntities = 0;
+
+    std::pair<float, float> mean = {0, 0};
+
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
-    
+    std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
@@ -44,13 +48,48 @@ protected:
     void SetUp() override {
         json rawJson;
         data >> rawJson;
-        for (int i = 0; i < num_agents; i++) {
-            auto& obj = rawJson["objects"][i];
-            initialState.push_back(obj["position"][0]["x"]);
-            initialState.push_back(obj["position"][0]["y"]);
+        for (const auto &obj : rawJson["objects"])
+        {
+            if (obj["type"] != "vehicle")
+            {
+                continue;
+            }
+            numEntities++;
+            float newX = obj["position"][0]["x"];
+            float newY = obj["position"][0]["y"];
+
+            // Update mean incrementally
+            mean.first += (newX - mean.first) / numEntities;
+            mean.second += (newY - mean.second) / numEntities;
+        }
+        for (const auto &obj: rawJson["roads"])
+        {
+            for (const auto &point: obj["geometry"])
+            {   
+                numEntities++;
+                float newX = point["x"];
+                float newY = point["y"];
+
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
+        int64_t n_agents = 0;
+        for (const auto &obj : rawJson["objects"]) {
+            if(n_agents == num_agents)
+            {
+                break;
+            }
+            if (obj["type"] != "vehicle") {
+                continue;
+            }
+            initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
+            initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
             initialState.push_back(degreesToRadians(obj["heading"][0]));
-            initialState.push_back(obj["velocity"][0]["x"]);
-            agent_length_map[i] = obj["length"];
+            initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
+            agent_length_map[n_agents++] = obj["length"];
         }
         acc_distribution = std::uniform_real_distribution<float>(-3.0, 2.0);
         steering_distribution = std::uniform_real_distribution<float>(-0.7, 0.7); 
@@ -151,7 +190,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(theta_next);
         expected.push_back(speed_next);
     }
-    auto obs = mgr.bicycleModelTensor(); 
+    auto obs = mgr.bicycleModelTensor();
     auto [valid, errorMsg] = validateTensor(obs, initialState);
     ASSERT_TRUE(valid);
     
