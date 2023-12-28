@@ -2,6 +2,7 @@
 #include "consts.hpp"
 #include "mgr.hpp"
 #include <nlohmann/json.hpp>
+#include "test_utils.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -20,7 +21,7 @@ float degreesToRadians(float degrees) {
 
 // TODO: Add the dynamic files here to be able to test from any json file.
 
-const float EPSILON = 0.001f; // Decreased epsilon to account for floating point errors. TODO: increase floating point precision and ideally use 1e-6 as epsilon.
+
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:
@@ -116,69 +117,6 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
 
-template <typename T>
-std::pair<bool, std::string> validateTensor(const py::Tensor& tensor, const std::vector<T>& expected) {
-    int64_t num_elems = 1;
-    for (int i = 0; i < tensor.numDims(); i++) {
-        num_elems *= tensor.dims()[i];
-    }
-
-    if (num_elems != expected.size()) {
-        return {false, "Size mismatch between tensor and expected values."};
-    }
-
-    if constexpr (std::is_same<T, int64_t>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Int64) {
-            return {false, "Type mismatch: Expected Int64."};
-        }
-    } else if constexpr (std::is_same<T, float>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Float32) {
-             return {false, "Type mismatch: Expected Float32."};
-        }
-    } 
-
-    switch (tensor.type()) {
-        case py::Tensor::ElementType::Int64: {
-            int64_t* ptr = static_cast<int64_t*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                if(std::abs(ptr[i] - static_cast<int64_t>(expected[i])) > EPSILON) {
-                    return {false, "Value mismatch."};
-                }
-            }
-            break;
-        }
-        case py::Tensor::ElementType::Float32: {
-            float* ptr = static_cast<float*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                auto orig = static_cast<float>(ptr[i]);
-                auto exp = expected[i];
-                if(std::abs(orig - exp) > EPSILON) {
-                    return {false, "Value mismatch."};
-                }
-            }
-            break;
-        }
-        default:
-            return {false, "Unhandled data type!"};
-    }
-
-    return {true, ""};
-}
-
-std::vector<float> flatten_obs(const py::Tensor& obs) {
-    int64_t num_elems = 1;
-    for (int i = 0; i < obs.numDims(); i++) {
-        num_elems *= obs.dims()[i];
-    }
-    float* ptr = static_cast<float*>(obs.devicePtr());
-    std::vector<float> flattened;
-    for(int i = 0 ; i < num_elems; i++)
-    {
-        flattened.push_back(static_cast<float>(ptr[i]));
-    }
-    return flattened;
-}
-
 TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     std::vector<float> expected;
     //Check first step -
@@ -191,13 +129,13 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(speed_next);
     }
     auto obs = mgr.bicycleModelTensor();
-    auto [valid, errorMsg] = validateTensor(obs, initialState);
+    auto [valid, errorMsg] = test_utils::validateTensor(obs, initialState);
     ASSERT_TRUE(valid);
     
     for(int i = 0; i < num_steps; i++)
     {
         expected.clear();
-        auto prev_state = flatten_obs(obs); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
+        auto prev_state = test_utils::flatten_obs(obs); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
         for(int j = 0; j < num_agents; j++)
         {
             float acc =  acc_distribution(generator);
@@ -211,7 +149,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         }
         mgr.step();
         obs = mgr.bicycleModelTensor(); 
-        std::tie(valid, errorMsg) = validateTensor(obs, expected);
+        std::tie(valid, errorMsg) = test_utils::validateTensor(obs, expected);
         ASSERT_TRUE(valid);
     }
 
