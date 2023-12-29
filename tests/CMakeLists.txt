@@ -3,12 +3,12 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/test.json COPYONLY)
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/external/madrona
 )
-
-
 
 # Add your test file(s) to the add_executable command
 add_executable(my_tests

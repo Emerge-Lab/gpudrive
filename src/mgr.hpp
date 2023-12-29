@@ -13,6 +13,8 @@
 #include <madrona/render/mw.hpp>
 #include <madrona/viz/system.hpp>
 
+#include "init.hpp"
+
 namespace gpudrive {
 
 // The Manager class encapsulates the linkage between the outside training
@@ -28,6 +30,7 @@ public:
         int gpuID; // Which GPU for CUDA backend?
         uint32_t numWorlds; // Simulation batch size
         bool autoReset; // Immediately generate new world on episode end
+        Parameters params;
     };
 
     MGR_EXPORT Manager(

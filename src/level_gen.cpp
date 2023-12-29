@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <cmath>
 #include <vector>
+#include <iostream>
 
 namespace gpudrive {
 
@@ -245,7 +246,7 @@ static void createFloorPlane(Engine &ctx)
 void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
     createFloorPlane(ctx);
-
+    std::cout<<"CTEST Path to scenario: "<<pathToScenario<<std::endl;
     std::ifstream data(pathToScenario);
     assert(data.is_open());
 
@@ -283,10 +284,13 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
             ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
         }
     }
+
+    std::cout<<"Mean: "<<ctx.data().mean.first<<", "<<ctx.data().mean.second<<"\n";
+
     // TODO(samk): handle keys not existing
     size_t agentCount{0};
     for (const auto &obj : rawJson["objects"]) {
-      if (agentCount == consts::numAgents) {
+      if (agentCount == ctx.data().max_num_agents) {
         break;
       }
       if (obj["type"] != "vehicle") {
@@ -302,10 +306,11 @@ void createPersistentEntities(Engine &ctx, const std::string &pathToScenario) {
 
       ctx.data().agents[agentCount++] = vehicle;
     }
+    ctx.data().num_agents = agentCount;
 
     size_t roadCount{0};
     for (const auto &obj : rawJson["roads"]) {
-      if (roadCount >= consts::numRoadSegments) break;
+      if (roadCount >= ctx.data().max_num_roads) break;
       auto geometrylist = obj["geometry"];
       std::string type = obj["type"];
       createRoadEntities(
@@ -319,7 +324,7 @@ static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    for (CountT idx = 0; idx < consts::numAgents; ++idx)
+    for (CountT idx = 0; idx < ctx.data().num_agents; ++idx)
     {
         Entity vehicle = ctx.data().agents[idx];
 
@@ -346,12 +351,12 @@ static void resetPersistentEntities(Engine &ctx)
       }
     }
   
-    for (CountT i = 0; i < consts::numAgents; i++)
+    for (CountT i = 0; i < ctx.data().num_agents; i++)
     {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
-        for (CountT j = 0; j < consts::numAgents; j++)
+        for (CountT j = 0; j < ctx.data().num_agents; j++)
         {
             if (i == j)
             {

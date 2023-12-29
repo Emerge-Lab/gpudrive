@@ -280,7 +280,6 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
-    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -298,7 +297,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, pathToScenario};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mgr_cfg.params}; // TODO: refactor this for multi world. This will fail for cuda.
         }
 
         MWCudaExecutor gpu_exec({
@@ -348,7 +347,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, pathToScenario};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mgr_cfg.params};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

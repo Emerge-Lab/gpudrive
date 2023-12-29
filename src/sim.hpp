@@ -89,10 +89,16 @@ struct Sim : public madrona::WorldBase {
     // play area. These are constant across all episodes.
     Entity borders[3];
 
+    // Max number of agents and roads in the episode to be initialized.
+    CountT max_num_agents; 
+    CountT max_num_roads;
+
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
-    Entity agents[consts::numAgents];
-    int32_t num_roads;
+    CountT num_agents;
+    Entity agents[consts::numAgents]; // Cannot replace the consts.
+
+    CountT num_roads;
     Entity roads[consts::numRoadSegments];
 
     std::pair<float, float> mean;

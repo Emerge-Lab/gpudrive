@@ -155,7 +155,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+    for (CountT i = 0; i < ctx.data().num_agents-1; i++) {
         Entity other = other_agents.e[i];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
@@ -543,8 +543,10 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    constexpr CountT max_total_entities =
-        consts::numAgents + consts::numRoadSegments;
+    max_num_agents = init.params.numAgents;
+    max_num_roads = init.params.numRoadSegments;
+
+    CountT max_total_entities = max_num_agents + max_num_roads;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
@@ -560,7 +562,7 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.path);
+    createPersistentEntities(ctx, init.params.jsonPath);
 
     // Generate initial world state
     initWorld(ctx);
