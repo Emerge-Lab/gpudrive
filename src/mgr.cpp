@@ -464,7 +464,7 @@ Tensor Manager::selfObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   impl_->cfg.params.numAgents,
                                    8
 
                                });
@@ -476,7 +476,7 @@ Tensor Manager::mapObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numRoadSegments,
+                                   impl_->cfg.params.numRoadSegments,
                                    4
                                });
 }

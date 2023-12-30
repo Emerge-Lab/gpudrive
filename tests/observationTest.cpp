@@ -26,6 +26,13 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
+        .params = {
+            .jsonPath = "tests/test.json",
+            .polylineReductionThreshold = 0.001,
+            .observationRadius = 100.0,
+            .numAgents = 3,
+            .numRoadSegments = 600,
+        }
     });
     
     int64_t num_agents = gpudrive::consts::numAgents;
@@ -112,6 +119,21 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     float speed_next = speed_curr + acceleration * dt;
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
+
+TEST_F(ObservationsTest, TestObservations) {
+    std::vector<float> expected;
+    for(int i = 0; i < num_agents; i++)
+    {
+        expected.push_back(initialState[4*i]);
+        expected.push_back(initialState[4*i+1]);
+        expected.push_back(initialState[4*i+2]);
+        expected.push_back(initialState[4*i+3]);
+    }
+    auto obs = mgr.selfObservationTensor();
+    auto [valid, errorMsg] = test_utils::validateTensor(obs, expected);
+    ASSERT_TRUE(valid);
+}
+
 
 // TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
 //     std::vector<float> expected;

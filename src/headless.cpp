@@ -61,10 +61,10 @@ int main(int argc, char *argv[])
         .autoReset = false,
         .params = {
             .jsonPath = "tests/test.json",
-            .polylineReductionThreshold = 0.001,
+            .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
-            .numAgents = 3,
-            .numRoadSegments = 600,
+            .numAgents = 2,
+            .numRoadSegments = 4050,
         }
     });
 

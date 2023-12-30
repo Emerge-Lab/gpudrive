@@ -200,11 +200,13 @@ static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geome
             {
                 if (j != start)
                 {
+                    if(idx == ctx.data().max_num_roads) return idx; // TODO: Handle this better. Will be solved by the GPU version
                     ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[start], geometryList[j]);
                     start = j;
                 }
                 else
                 {
+                    if(idx == ctx.data().max_num_roads) return idx; // TODO: Handle this better. Will be solved by the GPU version
                     ctx.data().roads[idx++] = makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
                     start = ++j;
                 }
@@ -212,16 +214,19 @@ static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geome
         }
 
         //Handle last point
+        if(idx == ctx.data().max_num_roads) return idx; // TODO: Handle this better. Will be solved by the GPU version
         ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, geometryList[start], geometryList[j]) : makeRoadEdge(ctx, geometryList[j], geometryList[j + 1]);
     }
     else if(type == "speed_bump")
     {
         assert(geometryList.size() == 4);
+        if(idx == ctx.data().max_num_roads) return idx; // TODO: Not necessary here since we only make one speedbump. Kept for consistency.
         ctx.data().roads[idx++] = makeSpeedBump(ctx, geometryList);
     }
     else if(type == "stop_sign")
     {
         assert(geometryList.size() == 1);
+        if(idx == ctx.data().max_num_roads) return idx; // TODO: Not necessary here since we only make one speedbump. Kept for consistency.
         ctx.data().roads[idx++] = makeStopSign(ctx, geometryList);
     }
 

@@ -12,8 +12,8 @@ inline constexpr madrona::CountT numRooms = 3;
 // TODO(samk): This number is specifically derived for
 // tfrecord-00004-of-00150_246.json. Once we move to multiple map files, it will
 // have to be updated.
-inline constexpr madrona::CountT numAgents = 10;
-inline constexpr madrona::CountT numRoadSegments = 500;
+inline constexpr madrona::CountT numAgents = 50; // Very high number but they are not used now to init BVH trees so its fine. 
+inline constexpr madrona::CountT numRoadSegments = 15000; // Very high number but they are not used now to init BVH trees so its fine.
 
 // Maximum number of interactive objects per challenge room. This is needed
 // in order to setup the fixed-size learning tensors appropriately.

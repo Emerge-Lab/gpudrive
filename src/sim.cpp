@@ -551,7 +551,7 @@ Sim::Sim(Engine &ctx,
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::numAgents);
+        max_num_agents);
 
     enableVizRender = cfg.enableViewer;
 
