@@ -1,6 +1,7 @@
 #include "mgr.hpp"
 #include <string>
 #include <vector>
+#include <iostream>
 
 
 using namespace madrona;
@@ -20,6 +21,7 @@ namespace test_utils
 
         if (num_elems != expected.size())
         {
+            std::cout<<"Expected size: "<<expected.size()<<" Actual size: "<<num_elems<<std::endl;
             return {false, "Size mismatch between tensor and expected values."};
         }
 
