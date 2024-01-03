@@ -510,13 +510,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
-    auto sort_buttons = queueSortByWorld<ButtonEntity>(
-        builder, {sort_phys_objects});
-    auto sort_walls = queueSortByWorld<DoorEntity>(
-        builder, {sort_buttons});
-    auto sort_constraints = queueSortByWorld<ConstraintData>(
-        builder, {sort_walls});
-    (void)sort_walls;
+    (void)sort_phys_objects;
 #else
     (void)lidar;
     (void)collect_obs;
