@@ -211,24 +211,6 @@ struct Agent : public madrona::Archetype<
     madrona::viz::VizCamera
 > {};
 
-// Archetype for the doors blocking the end of each challenge room
-struct DoorEntity : public madrona::Archetype<
-    Position, 
-    Rotation,
-    Scale,
-    Velocity,
-    ObjectID,
-    ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
-    madrona::phys::broadphase::LeafID,
-    EntityType
-> {};
-
-
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
 struct PhysicsEntity : public madrona::Archetype<
