@@ -186,10 +186,12 @@ inline void movementSystem(Engine &e,
     return;
   }
   
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
   if (collisionEvent.hasCollided.load_relaxed()) {
     return;
   }
-
+#endif
+ 
   //TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions 
   // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
   // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 

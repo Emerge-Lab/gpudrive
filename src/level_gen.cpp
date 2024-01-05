@@ -278,7 +278,10 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
 
+#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
     createFloorPlane(ctx);
+#endif
+
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
         if(agentIdx >= consts::kMaxAgentCount)

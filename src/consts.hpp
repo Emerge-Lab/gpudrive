@@ -31,7 +31,11 @@ inline constexpr float deltaT = 0.04f;
 
 
 // Number of physics substeps
+#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
+inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
+#else
 inline constexpr madrona::CountT numPhysicsSubsteps = 1.f;
+#endif
 
 inline constexpr float zDimensionScale = 1;
 inline constexpr float xDimensionScaleRoadSegment = 1;
