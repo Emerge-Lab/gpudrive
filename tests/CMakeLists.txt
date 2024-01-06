@@ -13,6 +13,8 @@ include_directories(
 # Add your test file(s) to the add_executable command
 add_executable(my_tests
     bicyclemodel.cpp
+    observationTest.cpp
+    test_utils.cpp
     # Add other test files if needed
 )
 
@@ -22,7 +24,6 @@ target_link_libraries(my_tests
     mad_escape_mgr
     nlohmann_json::nlohmann_json
 )
-
 
 # Include GoogleTest module functions and discover tests in the executable
 include(GoogleTest)

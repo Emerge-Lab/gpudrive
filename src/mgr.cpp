@@ -487,8 +487,8 @@ Tensor Manager::partnerObservationsTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
-                                   consts::numAgents - 1,
+                                   impl_->cfg.params.numAgents,
+                                   impl_->cfg.params.numAgents - 1,
                                    4,
                                });
 }

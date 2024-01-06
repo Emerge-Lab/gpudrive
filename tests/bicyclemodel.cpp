@@ -14,14 +14,7 @@
 using namespace madrona;
 using nlohmann::json;
 
-
-float degreesToRadians(float degrees) {
-    return degrees * M_PI / 180.0;
-}
-
 // TODO: Add the dynamic files here to be able to test from any json file.
-
-
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:    
@@ -95,7 +88,7 @@ protected:
             }
             initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
             initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
-            initialState.push_back(degreesToRadians(obj["heading"][0]));
+            initialState.push_back(test_utils::degreesToRadians(obj["heading"][0]));
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
             agent_length_map[n_agents++] = obj["length"];
         }
