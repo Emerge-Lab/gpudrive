@@ -28,7 +28,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
-    registry.registerComponent<RoomEntityObservations>();	
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
@@ -54,8 +53,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
-    registry.exportColumn<Agent, RoomEntityObservations>(	
-        (uint32_t)ExportID::RoomEntityObservations);	
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
