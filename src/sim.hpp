@@ -75,6 +75,8 @@ struct Sim : public madrona::WorldBase {
         const Config &cfg,
         const WorldInit &init);
 
+    float polylineReductionThreshold;
+
     // EpisodeManager globally tracks episode IDs with an atomic across the
     // simulation.
     EpisodeManager *episodeMgr;

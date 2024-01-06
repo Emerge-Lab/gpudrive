@@ -194,7 +194,7 @@ static inline size_t createRoadEntities(Engine &ctx, const nlohmann::json& geome
             float x2 = geometryList[j + 1]["x"]; float y2 = geometryList[j + 1]["y"];
             float x3 = geometryList[j + 2]["x"]; float y3 = geometryList[j + 2]["y"];
             float shoelace_area = std::abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1)); // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
-            if (shoelace_area < 0.0)
+            if (shoelace_area < ctx.data().polylineReductionThreshold)
                 j++; // Skip over points that are too close together
             else
             {

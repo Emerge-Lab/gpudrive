@@ -540,6 +540,8 @@ Sim::Sim(Engine &ctx,
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
+    polylineReductionThreshold = init.params.polylineReductionThreshold;
+
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
