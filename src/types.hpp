@@ -114,14 +114,6 @@ struct RoomEntityObservations {
 };
 
 
-// Observation of the current room's door. It's relative position and
-// whether or not it is ope
-struct DoorObservation {
-    PolarObservation polar;
-    float isOpen; // 1.0 when open, 0.0 when closed.
-};
-
-
 struct LidarSample {
     float depth;
     float encodedType;
@@ -138,8 +130,7 @@ struct StepsRemaining {
     uint32_t t;
 };
 
-// Tracks progress the agent has made through the challenge, used to add
-// reward when more progress has been made
+// Can be refactored for rewards
 struct Progress {
     float maxY;
 };
@@ -150,53 +141,14 @@ struct OtherAgents {
     madrona::Entity e[consts::numAgents - 1];
 };
 
-// Tracks if an agent is currently grabbing another entity
-struct GrabState {
-    Entity constraintEntity;
-};
-
 // This enum is used to track the type of each entity for the purposes of
 // classifying the objects hit by each lidar sample.
 enum class EntityType : uint32_t {
     None,
     Button,
     Cube,
-    Wall,
     Agent,
-    Door,
-    Cylinder,
     NumTypes,
-};
-
-// A per-door component that tracks whether or not the door should be open.
-struct OpenState {
-    bool isOpen;
-};
-
-// Linked buttons that control the door opening and whether or not the door
-// should remain open after the buttons are pressed once.
-struct DoorProperties {
-    Entity buttons[consts::maxEntitiesPerRoom];
-    int32_t numButtons;
-    bool isPersistent;
-};
-
-// Similar to OpenState, true during frames where a button is pressed
-struct ButtonState {
-    bool isPressed;
-};
-
-// Room itself is not a component but is used by the singleton
-// component "LevelState" (below) to represent the state of the full level
-struct Room {
-    // These are entities the agent will interact with
-    Entity entities[consts::maxEntitiesPerRoom];
-
-    // The walls that separate this room from the next
-    Entity walls[2];
-
-    // The door the agents need to figure out how to lower
-    Entity door;
 };
 
 struct LevelState {
@@ -230,7 +182,6 @@ struct Agent : public madrona::Archetype<
     madrona::phys::broadphase::LeafID,
 
     // Internal logic state.
-    GrabState,
     Progress,
     OtherAgents,
     EntityType,
@@ -248,7 +199,6 @@ struct Agent : public madrona::Archetype<
     SelfObservation,
     PartnerObservations,
     RoomEntityObservations,
-    DoorObservation,
     Lidar,
     StepsRemaining,
 
@@ -275,19 +225,6 @@ struct DoorEntity : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
-    OpenState,
-    DoorProperties,
-    EntityType
-> {};
-
-// Archetype for the button objects that open the doors
-// Buttons don't have collision but are rendered
-struct ButtonEntity : public madrona::Archetype<
-    Position,
-    Rotation,
-    Scale,
-    ObjectID,
-    ButtonState,
     EntityType
 > {};
 
