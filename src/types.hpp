@@ -78,13 +78,6 @@ struct MapObservation {
     float type;
 };
 
-// The state of the world is passed to each agent in terms of egocentric
-// polar coordinates. theta is degrees off agent forward.
-struct PolarObservation {
-    float r;
-    float theta;
-};
-
 struct PartnerObservation {
     float speed;
     madrona::math::Vector2 position;
@@ -100,19 +93,6 @@ struct PartnerObservations {
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::numAgents - 1) * 4);
-
-// Per-agent egocentric observations for the interactable entities
-// in the current room.
-struct EntityObservation {
-    PolarObservation polar;
-    float encodedType;
-};
-
-
-struct RoomEntityObservations {
-    EntityObservation obs[consts::maxEntitiesPerRoom];
-};
-
 
 struct LidarSample {
     float depth;
@@ -198,7 +178,6 @@ struct Agent : public madrona::Archetype<
     // Observations
     SelfObservation,
     PartnerObservations,
-    RoomEntityObservations,
     Lidar,
     StepsRemaining,
 
@@ -210,24 +189,6 @@ struct Agent : public madrona::Archetype<
     // view the scene from the perspective of entities with this component
     madrona::viz::VizCamera
 > {};
-
-// Archetype for the doors blocking the end of each challenge room
-struct DoorEntity : public madrona::Archetype<
-    Position, 
-    Rotation,
-    Scale,
-    Velocity,
-    ObjectID,
-    ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
-    madrona::phys::broadphase::LeafID,
-    EntityType
-> {};
-
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.

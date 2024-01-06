@@ -28,7 +28,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
-    registry.registerComponent<RoomEntityObservations>();	
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
@@ -54,8 +53,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
-    registry.exportColumn<Agent, RoomEntityObservations>(	
-        (uint32_t)ExportID::RoomEntityObservations);	
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
@@ -510,13 +507,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
-    auto sort_buttons = queueSortByWorld<ButtonEntity>(
-        builder, {sort_phys_objects});
-    auto sort_walls = queueSortByWorld<DoorEntity>(
-        builder, {sort_buttons});
-    auto sort_constraints = queueSortByWorld<ConstraintData>(
-        builder, {sort_walls});
-    (void)sort_walls;
+    (void)sort_phys_objects;
 #else
     (void)lidar;
     (void)collect_obs;
