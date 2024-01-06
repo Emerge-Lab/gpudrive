@@ -27,7 +27,7 @@ protected:
         .numWorlds = 1,
         .autoReset = false,
         .params = {
-            .jsonPath = "/home/aarav/gpudrive/build/tests/test.json",
+            .jsonPath = "test.json",
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .numAgents = num_agents,
@@ -41,7 +41,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("/home/aarav/gpudrive/build/tests/test.json");
+    std::ifstream data = std::ifstream("test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
