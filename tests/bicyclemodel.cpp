@@ -2,6 +2,7 @@
 #include "consts.hpp"
 #include "mgr.hpp"
 #include <nlohmann/json.hpp>
+#include "test_utils.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -20,7 +21,7 @@ float degreesToRadians(float degrees) {
 
 // TODO: Add the dynamic files here to be able to test from any json file.
 
-const float EPSILON = 0.00001f; // Define epsilon as a constant
+
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:
@@ -32,11 +33,15 @@ protected:
     });
     
     int64_t num_agents = gpudrive::consts::numAgents;
+    int64_t num_roads = gpudrive::consts::numRoadSegments;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
+    int64_t numEntities = 0;
+
+    std::pair<float, float> mean = {0, 0};
+
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00100-of-00150_139.json");
-    
+    std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
@@ -44,13 +49,48 @@ protected:
     void SetUp() override {
         json rawJson;
         data >> rawJson;
-        for (int i = 0; i < num_agents; i++) {
-            auto& obj = rawJson["objects"][i];
-            initialState.push_back(obj["position"][0]["x"]);
-            initialState.push_back(obj["position"][0]["y"]);
+        for (const auto &obj : rawJson["objects"])
+        {
+            if (obj["type"] != "vehicle")
+            {
+                continue;
+            }
+            numEntities++;
+            float newX = obj["position"][0]["x"];
+            float newY = obj["position"][0]["y"];
+
+            // Update mean incrementally
+            mean.first += (newX - mean.first) / numEntities;
+            mean.second += (newY - mean.second) / numEntities;
+        }
+        for (const auto &obj: rawJson["roads"])
+        {
+            for (const auto &point: obj["geometry"])
+            {   
+                numEntities++;
+                float newX = point["x"];
+                float newY = point["y"];
+
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
+        int64_t n_agents = 0;
+        for (const auto &obj : rawJson["objects"]) {
+            if(n_agents == num_agents)
+            {
+                break;
+            }
+            if (obj["type"] != "vehicle") {
+                continue;
+            }
+            initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
+            initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
             initialState.push_back(degreesToRadians(obj["heading"][0]));
-            initialState.push_back(obj["velocity"][0]["x"]);
-            agent_length_map[i] = obj["length"];
+            initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
+            agent_length_map[n_agents++] = obj["length"];
         }
         acc_distribution = std::uniform_real_distribution<float>(-3.0, 2.0);
         steering_distribution = std::uniform_real_distribution<float>(-0.7, 0.7); 
@@ -77,69 +117,6 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
 
-template <typename T>
-std::pair<bool, std::string> validateTensor(const py::Tensor& tensor, const std::vector<T>& expected) {
-    int64_t num_elems = 1;
-    for (int i = 0; i < tensor.numDims(); i++) {
-        num_elems *= tensor.dims()[i];
-    }
-
-    if (num_elems != expected.size()) {
-        return {false, "Size mismatch between tensor and expected values."};
-    }
-
-    if constexpr (std::is_same<T, int64_t>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Int64) {
-            return {false, "Type mismatch: Expected Int64."};
-        }
-    } else if constexpr (std::is_same<T, float>::value) {
-        if (tensor.type() != py::Tensor::ElementType::Float32) {
-             return {false, "Type mismatch: Expected Float32."};
-        }
-    } 
-
-    switch (tensor.type()) {
-        case py::Tensor::ElementType::Int64: {
-            int64_t* ptr = static_cast<int64_t*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                if(std::abs(ptr[i] - static_cast<int64_t>(expected[i])) > EPSILON) {
-                    return {false, "Value mismatch."};
-                }
-            }
-            break;
-        }
-        case py::Tensor::ElementType::Float32: {
-            float* ptr = static_cast<float*>(tensor.devicePtr());
-            for (int64_t i = 0; i < num_elems; ++i) {
-                auto orig = static_cast<float>(ptr[i]);
-                auto exp = expected[i];
-                if(std::abs(orig - exp) > EPSILON) {
-                    return {false, "Value mismatch."};
-                }
-            }
-            break;
-        }
-        default:
-            return {false, "Unhandled data type!"};
-    }
-
-    return {true, ""};
-}
-
-std::vector<float> flatten_obs(const py::Tensor& obs) {
-    int64_t num_elems = 1;
-    for (int i = 0; i < obs.numDims(); i++) {
-        num_elems *= obs.dims()[i];
-    }
-    float* ptr = static_cast<float*>(obs.devicePtr());
-    std::vector<float> flattened;
-    for(int i = 0 ; i < num_elems; i++)
-    {
-        flattened.push_back(static_cast<float>(ptr[i]));
-    }
-    return flattened;
-}
-
 TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     std::vector<float> expected;
     //Check first step -
@@ -151,14 +128,14 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(theta_next);
         expected.push_back(speed_next);
     }
-    auto obs = mgr.bicycleModelTensor(); 
-    auto [valid, errorMsg] = validateTensor(obs, initialState);
+    auto obs = mgr.bicycleModelTensor();
+    auto [valid, errorMsg] = test_utils::validateTensor(obs, initialState);
     ASSERT_TRUE(valid);
     
     for(int i = 0; i < num_steps; i++)
     {
         expected.clear();
-        auto prev_state = flatten_obs(obs); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
+        auto prev_state = test_utils::flatten_obs(obs); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
         for(int j = 0; j < num_agents; j++)
         {
             float acc =  acc_distribution(generator);
@@ -172,7 +149,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         }
         mgr.step();
         obs = mgr.bicycleModelTensor(); 
-        std::tie(valid, errorMsg) = validateTensor(obs, expected);
+        std::tie(valid, errorMsg) = test_utils::validateTensor(obs, expected);
         ASSERT_TRUE(valid);
     }
 

@@ -260,6 +260,7 @@ Manager::Impl * Manager::Impl::init(
 
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
+
     std::string pathToScenario("../tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
