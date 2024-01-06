@@ -260,6 +260,7 @@ static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
+
     for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
     {
         Entity vehicle = ctx.data().agents[idx];
@@ -273,7 +274,8 @@ static void resetPersistentEntities(Engine &ctx)
             ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 
-    for (CountT idx = 0; idx < ctx.data().numRoads; idx++) {
+    for (CountT idx = 0; idx < ctx.data().numRoads; idx++)
+    {
       Entity road = ctx.data().roads[idx];
       if(road == Entity::none()) break;
       if(ctx.get<ObjectID>(road).idx == (int32_t)SimObject::Cube){
@@ -287,8 +289,7 @@ static void resetPersistentEntities(Engine &ctx)
       }
     }
   
-    for (CountT i = 0; i < ctx.data().numAgents; i++)
-    {
+    for (CountT i = 0; i < ctx.data().numAgents; i++) {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;

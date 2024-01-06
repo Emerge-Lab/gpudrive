@@ -11,7 +11,6 @@ namespace gpudrive {
 
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;
-using madrona::CountT;
 using madrona::base::Position;
 using madrona::base::Rotation;
 using madrona::base::Scale;
@@ -86,13 +85,13 @@ struct PartnerObservation {
 
 // Egocentric observations of other agents
 struct PartnerObservations {
-    PartnerObservation obs[consts::numAgents - 1];
+    PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::numAgents - 1) * 4);
+    (consts::kMaxAgentCount - 1) * 4);
 
 struct LidarSample {
     float depth;
@@ -118,7 +117,7 @@ struct Progress {
 // Per-agent component storing Entity IDs of the other agents. Used to
 // build the egocentric observations of their state.
 struct OtherAgents {
-    madrona::Entity e[consts::numAgents - 1];
+    madrona::Entity e[consts::kMaxAgentCount - 1];
 };
 
 // This enum is used to track the type of each entity for the purposes of
@@ -129,10 +128,6 @@ enum class EntityType : uint32_t {
     Cube,
     Agent,
     NumTypes,
-};
-
-struct LevelState {
-    Entity entities[consts::numAgents + consts::numRoadSegments];
 };
 
 struct Trajectory {

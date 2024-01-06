@@ -32,8 +32,8 @@ protected:
         .autoReset = false,
     });
     
-    int64_t num_agents = gpudrive::consts::numAgents;
-    int64_t num_roads = gpudrive::consts::numRoadSegments;
+    int64_t num_agents = gpudrive::consts::kMaxAgentCount;
+    int64_t num_roads = gpudrive::consts::kMaxRoadEntityCount;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
     int64_t numEntities = 0;

@@ -37,7 +37,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Trajectory>();
 
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<LevelState>();
     registry.registerSingleton<Shape>();
 
     registry.registerArchetype<Agent>();
@@ -96,7 +95,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
     if (ctx.data().autoReset) {
-        for (CountT i = 0; i < consts::numAgents; i++) {
+        for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
             Done done = ctx.get<Done>(agent);
             if (done.v) {
@@ -338,7 +337,7 @@ inline void bonusRewardSystem(Engine &ctx,
                               Reward &reward)
 {
     bool partners_close = true;
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
         Entity other = others.e[i];
         Progress other_progress = ctx.get<Progress>(other);
 
@@ -536,7 +535,7 @@ Sim::Sim(Engine &ctx,
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::numAgents);
+        consts::kMaxAgentCount);
 
     enableVizRender = cfg.enableViewer;
 

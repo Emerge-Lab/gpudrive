@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
-                for (CountT k = 0; k < gpudrive::consts::numAgents; k++) {
+                for (CountT k = 0; k < gpudrive::consts::kMaxAgentCount; k++) {
                     float acc = acc_gen(rand_gen);
                     float steer = steer_gen(rand_gen);
                     float head = 0;
