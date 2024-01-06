@@ -481,18 +481,6 @@ Tensor Manager::partnerObservationsTensor() const
                                });
 }
 
-Tensor Manager::roomEntityObservationsTensor() const
-{
-    return impl_->exportTensor(ExportID::RoomEntityObservations,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   consts::numAgents,
-                                   consts::maxEntitiesPerRoom,
-                                   3,
-                               });
-}
-
 Tensor Manager::lidarTensor() const
 {
     return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,

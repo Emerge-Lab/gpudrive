@@ -38,8 +38,6 @@ NB_MODULE(madrona_escape_room, m) {
         .def("self_observation_tensor", &Manager::selfObservationTensor)
         .def("map_observation_tensor", &Manager::mapObservationTensor)
         .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
-        .def("room_entity_observations_tensor",
-             &Manager::roomEntityObservationsTensor)
         .def("lidar_tensor", &Manager::lidarTensor)
         .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
     ;
