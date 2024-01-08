@@ -1,4 +1,5 @@
 #include "mgr.hpp"
+#include "MapReader.hpp"
 #include "sim.hpp"
 
 #include <madrona/utils.hpp>
@@ -134,14 +135,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    asset_paths[(size_t)SimObject::Wall] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
-    asset_paths[(size_t)SimObject::Door] =
-        (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string();
     asset_paths[(size_t)SimObject::Agent] =
         (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
-    asset_paths[(size_t)SimObject::Button] =
-        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::StopSign] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::SpeedBump] =
@@ -199,22 +194,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.75f,
     });
 
-    setupHull(SimObject::Wall, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    setupHull(SimObject::Door, 0.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
     setupHull(SimObject::Agent, 1.f, {
-        .muS = 0.5f,
-        .muD = 0.5f,
-    });
-
-    setupHull(SimObject::Button, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
@@ -296,8 +276,11 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+          auto [agentInits, agentCount, roadInits, roadCount] =
+              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mgr_cfg.params}; // TODO: refactor this for multi world. This will fail for cuda.
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
+                        agentCount,  roadInits,    roadCount,  ExecMode::CUDA, mgr_cfg.params};
         }
 
         MWCudaExecutor gpu_exec({
@@ -346,8 +329,12 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+          auto [agentInits, agentCount, roadInits, roadCount] =
+              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
+
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mgr_cfg.params};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
+                        agentCount,  roadInits,    roadCount,  ExecMode::CPU, mgr_cfg.params};
         }
 
         CPUImpl::TaskGraphT cpu_exec {
@@ -490,29 +477,6 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.params.numAgents,
                                    impl_->cfg.params.numAgents - 1,
                                    4,
-                               });
-}
-
-Tensor Manager::roomEntityObservationsTensor() const
-{
-    return impl_->exportTensor(ExportID::RoomEntityObservations,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   consts::numAgents,
-                                   consts::maxEntitiesPerRoom,
-                                   3,
-                               });
-}
-
-Tensor Manager::doorObservationTensor() const
-{
-    return impl_->exportTensor(ExportID::DoorObservation,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   consts::numAgents,
-                                   3,
                                });
 }
 

@@ -1,7 +1,8 @@
 set(SIMULATOR_SRCS
     types.hpp
     sim.hpp sim.cpp
-    init.hpp rng.hpp
+    init.hpp init.cpp
+    rng.hpp
     level_gen.hpp level_gen.cpp
 )
 
@@ -13,7 +14,6 @@ target_link_libraries(mad_escape_cpu_impl
     PUBLIC
         madrona_mw_core
     PRIVATE
-        nlohmann_json::nlohmann_json
         madrona_common
         madrona_mw_physics
         madrona_viz_system
@@ -21,12 +21,14 @@ target_link_libraries(mad_escape_cpu_impl
 
 add_library(mad_escape_mgr SHARED
     mgr.hpp mgr.cpp
+    MapReader.hpp MapReader.cpp
 )
 
 target_link_libraries(mad_escape_mgr 
     PUBLIC
         madrona_python_utils
     PRIVATE
+        nlohmann_json::nlohmann_json
         mad_escape_cpu_impl
         madrona_mw_cpu
         madrona_common

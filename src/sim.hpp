@@ -22,7 +22,6 @@ enum class ExportID : uint32_t {
     SelfObservation,
     PartnerObservations,
     RoomEntityObservations,
-    DoorObservation,
     Lidar,
     StepsRemaining,
     BicycleModel,
@@ -34,10 +33,7 @@ enum class ExportID : uint32_t {
 // render / physics assets.
 enum class SimObject : uint32_t {
     Cube,
-    Wall,
-    Door,
     Agent,
-    Button,
     StopSign,
     SpeedBump,
     Plane,
@@ -97,10 +93,9 @@ struct Sim : public madrona::WorldBase {
 
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
-    CountT num_agents;
-    Entity agents[consts::numAgents]; // Cannot replace the consts.
-
-    CountT num_roads;
+    madrona::CountT numAgents;
+    Entity agents[consts::numAgents];
+    madrona::CountT numRoads;
     Entity roads[consts::numRoadSegments];
 
     std::pair<float, float> mean;

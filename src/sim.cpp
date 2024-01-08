@@ -10,8 +10,6 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
-
-
 namespace gpudrive {
 
 // Register all the ECS components and archetypes that will be
@@ -27,15 +25,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<MapObservation>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
-    registry.registerComponent<GrabState>();
     registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
-    registry.registerComponent<RoomEntityObservations>();	
-    registry.registerComponent<DoorObservation>();
-    registry.registerComponent<ButtonState>();
-    registry.registerComponent<OpenState>();
-    registry.registerComponent<DoorProperties>();
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
@@ -49,8 +41,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
-    registry.registerArchetype<DoorEntity>();	
-    registry.registerArchetype<ButtonEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -63,10 +53,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.exportColumn<Agent, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
-    registry.exportColumn<Agent, RoomEntityObservations>(	
-        (uint32_t)ExportID::RoomEntityObservations);	
-    registry.exportColumn<Agent, DoorObservation>(	
-        (uint32_t)ExportID::DoorObservation);
     registry.exportColumn<Agent, Lidar>(
         (uint32_t)ExportID::Lidar);
     registry.exportColumn<Agent, StepsRemaining>(
@@ -521,13 +507,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         queueSortByWorld<Agent>(builder, {lidar, collect_obs});
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
-    auto sort_buttons = queueSortByWorld<ButtonEntity>(
-        builder, {sort_phys_objects});
-    auto sort_walls = queueSortByWorld<DoorEntity>(
-        builder, {sort_buttons});
-    auto sort_constraints = queueSortByWorld<ConstraintData>(
-        builder, {sort_walls});
-    (void)sort_walls;
+    (void)sort_phys_objects;
 #else
     (void)lidar;
     (void)collect_obs;
@@ -545,6 +525,7 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
+    auto max_total_entities = init.computeEntityUpperBound();
     max_num_agents = init.params.numAgents;
     max_num_roads = init.params.numRoadSegments;
 
@@ -564,7 +545,25 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.params.jsonPath);
+    createPersistentEntities(ctx, init.agentInits, init.agentInitsCount,
+                             init.roadInits, init.roadInitsCount);
+
+    // TODO: Wrap below pointers with std::unique_ptr with a custom deleter.
+    // Even with unique_ptr, these pointers would need to be explicitly free'd
+    // with a call to, say, reset(), because their lifetime does not match that
+    // of WorldInit.
+    if (init.mode == madrona::ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        madrona::cu::deallocGPU(init.agentInits);
+        madrona::cu::deallocGPU(init.roadInits);
+#else
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    } else {
+        assert(init.mode == madrona::ExecMode::CPU);
+        free(init.agentInits);
+        free(init.roadInits);
+    }
 
     // Generate initial world state
     initWorld(ctx);
