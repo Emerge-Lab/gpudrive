@@ -29,8 +29,8 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
+        .jsonPath = "test.json",
         .params = {
-            .jsonPath = "test.json",
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .numAgents = num_agents,

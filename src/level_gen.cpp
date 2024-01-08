@@ -182,7 +182,7 @@ static Entity makeStopSign(Engine &ctx, Vector2 p1) {
 
 static inline void createRoadEntities(Engine &ctx, const RoadInit &roadInit,
                                       madrona::CountT& idx) {
-    if (roadInit.type == RoadInitType::RoadEdge || roadInit.type == RoadInitType::Lane)
+    if (roadInit.type == RoadInitType::RoadEdge || roadInit.type == RoadInitType::Lane || roadInit.type == RoadInitType::RoadLine)
     {
         madrona::CountT numPoints = roadInit.numPoints;
         const auto &points = roadInit.points;
@@ -295,7 +295,7 @@ static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    for (CountT idx = 0; idx < ctx.data().num_agents; ++idx)
+    for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
     {
         Entity vehicle = ctx.data().agents[idx];
 
@@ -322,12 +322,12 @@ static void resetPersistentEntities(Engine &ctx)
       }
     }
   
-    for (CountT i = 0; i < ctx.data().num_agents; i++)
+    for (CountT i = 0; i < ctx.data().numAgents; i++)
     {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
-        for (CountT j = 0; j < ctx.data().num_agents; j++)
+        for (CountT j = 0; j < ctx.data().numAgents; j++)
         {
             if (i == j)
             {

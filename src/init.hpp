@@ -29,7 +29,7 @@ struct AgentInit {
 };
 
 // TODO: reuse ObjectID?
-enum class RoadInitType : uint64_t { SpeedBump, StopSign, RoadEdge, Lane };
+enum class RoadInitType : uint64_t { SpeedBump, StopSign, RoadEdge, Lane, RoadLine };
 
 struct RoadInit {
     RoadInitType type;
@@ -38,7 +38,6 @@ struct RoadInit {
 };
 
 struct Parameters{
-    std::string jsonPath; // This is supposed to be replaced with a directory path in future.
     float polylineReductionThreshold;
     float observationRadius;
     madrona::CountT numAgents = 10;

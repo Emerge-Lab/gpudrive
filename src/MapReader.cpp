@@ -73,9 +73,15 @@ void MapReader::doParse() {
     auto &roadInit = roadInits_.emplace_back();
 
     auto rawType = obj["type"];
-    if (rawType == "road_edge" || rawType == "lane") {
-      roadInit.type =
-          rawType == "road_edge" ? RoadInitType::RoadEdge : RoadInitType::Lane;
+    if (rawType == "road_edge" || rawType == "lane" || rawType == "road_line") {
+      
+      if(rawType == "road_edge"){
+          roadInit.type = RoadInitType::RoadEdge;
+      } else if(rawType == "lane"){
+          roadInit.type = RoadInitType::Lane;
+      } else if(rawType == "road_line"){
+          roadInit.type = RoadInitType::RoadLine;
+      }
 
       madrona::CountT idx;
       for (idx = 0; idx < static_cast<madrona::CountT>(rawPoints.size());

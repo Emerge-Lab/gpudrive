@@ -277,7 +277,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto [agentInits, agentCount, roadInits, roadCount] =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
+              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA);
           world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
                         agentCount,  roadInits,    roadCount,  ExecMode::CUDA, mgr_cfg.params};
@@ -330,7 +330,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto [agentInits, agentCount, roadInits, roadCount] =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
+              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU);
 
           world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,

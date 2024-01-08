@@ -3,7 +3,6 @@
 #include "mgr.hpp"
 #include <nlohmann/json.hpp>
 #include "test_utils.hpp"
-#include "test_utils.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -27,8 +26,8 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
+        .jsonPath = "test.json",
         .params = {
-            .jsonPath = "test.json",
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .numAgents = num_agents,
@@ -37,10 +36,6 @@ protected:
     });
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
-    int64_t numEntities = 0;
-
-    std::pair<float, float> mean = {0, 0};
-
     int64_t numEntities = 0;
 
     std::pair<float, float> mean = {0, 0};

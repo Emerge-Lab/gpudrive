@@ -141,7 +141,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
-    for (CountT i = 0; i < ctx.data().num_agents-1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents-1; i++) {
         Entity other = other_agents.e[i];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
@@ -527,9 +527,14 @@ Sim::Sim(Engine &ctx,
     // a future release.
     auto max_total_entities = init.computeEntityUpperBound();
     max_num_agents = init.params.numAgents;
-    max_num_roads = init.params.numRoadSegments;
+    max_num_roads = init.params.numRoadSegments; // Probably not needed since we would be mostly be concerned with the number of agents.
 
-    CountT max_total_entities = max_num_agents + max_num_roads;
+    CountT max_entities_to_init = max_num_agents + max_num_roads; // User set limit
+
+    if(max_total_entities > max_entities_to_init)
+    {
+        max_total_entities = max_entities_to_init;
+    }
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
