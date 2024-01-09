@@ -19,6 +19,7 @@ public:
 
 private:
   MapReader(const std::string &pathToFile);
+  ~MapReader();
   void doParse();
 
   std::ifstream in_;

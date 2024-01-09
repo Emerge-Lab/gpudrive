@@ -48,6 +48,10 @@ MapReader::MapReader(const std::string &pathToFile) : in_(pathToFile) {
   map_ = new gpudrive::Map();
 }
 
+MapReader::~MapReader() {
+    delete map_;
+}
+
 void MapReader::doParse() {
   nlohmann::json rawJson;
   in_ >> rawJson;
