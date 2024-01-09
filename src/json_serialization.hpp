@@ -6,10 +6,8 @@ namespace gpudrive
 {
     void from_json(const nlohmann::json &j, madrona::math::Vector2 &p)
     {
-        // j.at("x").get_to(p.x);
-        // j.at("y").get_to(p.y);
-        p.x = j.at("x").get<float>();  // Assuming p.x is of type float
-        p.y = j.at("y").get<float>();  // Assuming p.y is of type float
+        p.x = j.at("x").get<float>();
+        p.y = j.at("y").get<float>();
     }
 
     void from_json(const nlohmann::json &j, MapObject &obj)
@@ -17,12 +15,11 @@ namespace gpudrive
         const auto &valid = j.at("valid");
 
         obj.mean = {0,0};
-        uint32_t i = 0;
+        CountT i = 0;
         for (const auto &pos : j.at("position"))
         { 
             if (i < MAX_POSITIONS)
             {
-                // pos.get_to(obj.position[i]);
                 from_json(pos, obj.position[i]);
                 if(valid[i] == true)
                 {
@@ -60,7 +57,6 @@ namespace gpudrive
         {
             if (i < MAX_POSITIONS)
             {
-                // v.get_to(obj.velocity[i]);
                 from_json(v, obj.velocity[i]);
                 ++i;
             }
@@ -86,9 +82,8 @@ namespace gpudrive
         }
         obj.numValid = i;
 
-        // j.at("goalPosition").get_to(obj.goalPosition);
+
         from_json(j.at("goalPosition"), obj.goalPosition);
-        // j.at("type").get_to(obj.type);
         std::string type = j.at("type");
         if(type == "vehicle")
             obj.type = MapObjectType::vehicle;
@@ -119,14 +114,13 @@ namespace gpudrive
         else
             road.type = MapRoadType::Invalid;
 
-        size_t i = 0;
+        CountT i = 0;
         if (road.type == MapRoadType::RoadEdge || road.type == MapRoadType::RoadLine || road.type == MapRoadType::Lane)
         {
             for (const auto &geom : j.at("geometry"))
             {
                 if (i < 2)
                 {
-                    // geom.get_to(road.geometry[i]);
                     from_json(geom, road.geometry[i]);
                     i++;
                     
@@ -139,9 +133,8 @@ namespace gpudrive
                 float x3 = geom["x"];
                 float y3 = geom["y"];
                 float shoelace_area = 0.5 * abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1));
-                if (shoelace_area > 0.0)
+                if (shoelace_area > 1.0)
                 {
-                    // geom.get_to(road.geometry[i]);
                     from_json(geom, road.geometry[i]);
                     ++i;
                     if (i == MAX_GEOMETRY)
@@ -149,7 +142,6 @@ namespace gpudrive
                 }
                 else
                 {
-                    // geom.get_to(road.geometry[i - 1]);
                     from_json(geom, road.geometry[i]);
                 }
             }
@@ -161,7 +153,6 @@ namespace gpudrive
             {
                 if (i < MAX_GEOMETRY)
                 {
-                    // geom.get_to(road.geometry[i]);
                     from_json(geom, road.geometry[i]);
                     ++i;
                 }
@@ -185,7 +176,7 @@ namespace gpudrive
     {
         map.mean = {0,0};
         size_t totalPoints = 0; // Total count of points
-        int i = 0;
+        CountT i = 0;
         for (const auto &obj : j.at("objects"))
         {
             if (i < MAX_OBJECTS)
