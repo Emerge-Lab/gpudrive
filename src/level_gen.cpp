@@ -44,27 +44,25 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
 }
 
-static inline Entity createVehicle(Engine &ctx, float xCoord, float yCoord,
-                                   float length, float width, float heading,
-                                   float speedX, float speedY, float goalX, float goalY) {
+static inline Entity createVehicle(Engine &ctx, MapObject agentInit) {
     auto vehicle = ctx.makeEntity<Agent>();
-
+    
     // The following components do not vary within an episode and so need only
     // be set once
-    ctx.get<VehicleSize>(vehicle) = {.length = length, .width = width};
-    ctx.get<Scale>(vehicle) = Diag3x3{.d0 = length/2, .d1 = width/2, .d2 = 1};
+    ctx.get<VehicleSize>(vehicle) = {.length = agentInit.length, .width = agentInit.width};
+    ctx.get<Scale>(vehicle) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
-    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = goalX, .y = goalY}};
+    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x, .y = agentInit.goalPosition.y}};
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     ctx.get<Trajectory>(vehicle).positions[0] =
-        Vector2{.x = xCoord - ctx.data().mean.first, .y = yCoord - ctx.data().mean.second};
-    ctx.get<Trajectory>(vehicle).initialHeading = toRadians(heading);
+        Vector2{.x = agentInit.position[0].x - ctx.data().mean.first, .y = agentInit.position[0].y - ctx.data().mean.second};
+    ctx.get<Trajectory>(vehicle).initialHeading = toRadians(agentInit.heading[0]);
     ctx.get<Trajectory>(vehicle).velocities[0] =
-        Vector2{.x = speedX, .y = speedY};
+        Vector2{.x = agentInit.velocity[0].x, .y = agentInit.velocity[0].y};
 
     // This is not stricly necessary since , but is kept here for consistency
     resetVehicle(ctx, vehicle);
@@ -180,47 +178,30 @@ static Entity makeStopSign(Engine &ctx, Vector2 p1) {
     return stop_sign;
 }
 
-static inline void createRoadEntities(Engine &ctx, const RoadInit &roadInit,
-                                      madrona::CountT& idx) {
-    if (roadInit.type == RoadInitType::RoadEdge || roadInit.type == RoadInitType::Lane)
+static inline void createRoadEntities(Engine &ctx, MapRoad roadInit, CountT &idx, CountT &roadCtr) {
+    if (roadInit.type == MapRoadType::RoadEdge || roadInit.type == MapRoadType::RoadLine || roadInit.type == MapRoadType::Lane)
     {
-        madrona::CountT numPoints = roadInit.numPoints;
-        const auto &points = roadInit.points;
-
-        madrona::CountT start = 0;
-        madrona::CountT j = 0;
-        while (j < numPoints - 2)
+        size_t numPoints = roadInit.numPoints;
+        for(size_t j = 1; j <= numPoints - 1; j++)
         {
-            float x1 = points[j].x; float y1 = points[j].y;
-            float x2 = points[j + 1].x; float y2 = points[j + 1].y;
-            float x3 = points[j + 2].x; float y3 = points[j + 2].y;
-            float shoelace_area = std::abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1)); // https://en.wikipedia.org/wiki/Shoelace_formula#Triangle_form,_determinant_form
-            if (shoelace_area < 0.01)
-                j++; // Skip over points that are too close together
-            else
-            {
-                if (j != start)
-                {
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, points[start], points[j]);
-                    start = j;
-                }
-                else
-                {
-                    ctx.data().roads[idx++] = makeRoadEdge(ctx, points[j], points[j + 1]);
-                    start = ++j;
-                }
-            }
+            if(idx >= consts::numRoadSegments)
+                 return;
+            ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j]);
         }
-
-        //Handle last point
-        ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, points[start], points[j]) : makeRoadEdge(ctx, points[j], points[j + 1]);
-    } else if (roadInit.type == RoadInitType::SpeedBump) {
+    } else if (roadInit.type == MapRoadType::SpeedBump) {
       assert(roadInit.numPoints == 4);
-      ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.points[0], roadInit.points[1], roadInit.points[2], roadInit.points[3]);
-    } else if (roadInit.type == RoadInitType::StopSign) {
+      // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
+      if(idx >= consts::numRoadSegments)
+        return;
+      ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
+    } else if (roadInit.type == MapRoadType::StopSign) {
       assert(roadInit.numPoints == 1);
-      ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.points[0]);
+      // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
+      if(idx >= consts::numRoadSegments)
+        return;
+      ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.geometry[0]);
     } else {
+      // TODO: Need to handle Cross Walk.
       assert(false);
     }
 }
@@ -240,53 +221,30 @@ static void createFloorPlane(Engine &ctx)
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 }
 
-void createPersistentEntities(Engine &ctx, const AgentInit *agentInits,
-                              madrona::CountT agentCount, RoadInit *roadInits,
-                              madrona::CountT roadInitsCount) {
+void createPersistentEntities(Engine &ctx, Map *map) {
+
+    ctx.data().mean = std::make_pair(map->meanx, map->meany);
+
     createFloorPlane(ctx);
-
-    ctx.data().mean = std::make_pair(0, 0);
-    madrona::CountT numEntities{0};
-    for (madrona::CountT agentIdx = 0; agentIdx < agentCount; ++agentIdx) {
-        numEntities++;
-        float newX = agentInits[agentIdx].xCoord;
-        float newY = agentInits[agentIdx].yCoord;
-
-        // Update mean incrementally
-        ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
-        ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
-    }
-
-    for (madrona::CountT roadIdx = 0; roadIdx < roadInitsCount; ++roadIdx) {
-        const auto &roadInit = roadInits[roadIdx];
-
-        for (madrona::CountT pointIdx = 0; pointIdx < roadInit.numPoints;
-             ++pointIdx) {
-            numEntities++;
-            float newX = roadInit.points[pointIdx].x;
-            float newY = roadInit.points[pointIdx].y;
-
-            // Update mean incrementally
-            ctx.data().mean.first += (newX - ctx.data().mean.first) / numEntities;
-            ctx.data().mean.second += (newY - ctx.data().mean.second) / numEntities;
-        }
-    }
-
     CountT agentIdx;
-    for (agentIdx = 0; agentIdx < agentCount; ++agentIdx) {
-        auto agentInit = agentInits[agentIdx];
+    for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
+        if(agentIdx >= consts::numAgents)
+            break;
+        auto agentInit = map->objects[agentIdx];
         auto vehicle = createVehicle(
-            ctx, agentInit.xCoord, agentInit.yCoord, agentInit.length,
-            agentInit.width, agentInit.heading, agentInit.speedX,
-            agentInit.speedY, agentInit.goalX, agentInit.goalY);
+            ctx, agentInit);
         ctx.data().agents[agentIdx] = vehicle;
-    }
-    ctx.data().numAgents = agentIdx;
+    } 
+    
+    ctx.data().numAgents = agentIdx; 
 
-    CountT roadIdx;
-    for (roadIdx = 0; roadIdx < roadInitsCount; ) {
-        const auto &roadInit = roadInits[roadIdx];
-        createRoadEntities(ctx, roadInit, roadIdx);
+    CountT roadIdx = 0;
+    for(CountT roadCtr = 0; roadCtr < map->numRoads; roadCtr++)
+    {
+        if(roadIdx >= consts::numRoadSegments)
+            break;
+        const auto &roadInit = map->roads[roadCtr];
+        createRoadEntities(ctx, roadInit, roadIdx, roadCtr);
     }
     ctx.data().numRoads = roadIdx;
 }
@@ -295,7 +253,7 @@ static void generateLevel(Engine &) {}
 
 static void resetPersistentEntities(Engine &ctx)
 {
-    for (CountT idx = 0; idx < consts::numAgents; ++idx)
+    for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
     {
         Entity vehicle = ctx.data().agents[idx];
 
@@ -322,12 +280,12 @@ static void resetPersistentEntities(Engine &ctx)
       }
     }
   
-    for (CountT i = 0; i < consts::numAgents; i++)
+    for (CountT i = 0; i < ctx.data().numAgents; i++)
     {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);
         CountT out_idx = 0;
-        for (CountT j = 0; j < consts::numAgents; j++)
+        for (CountT j = 0; j < ctx.data().numAgents; j++)
         {
             if (i == j)
             {

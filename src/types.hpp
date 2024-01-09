@@ -9,6 +9,71 @@
 
 namespace gpudrive {
 
+
+constexpr size_t MAX_OBJECTS = 515;
+constexpr size_t MAX_ROADS = 956;
+constexpr size_t MAX_POSITIONS = 91;
+constexpr size_t MAX_GEOMETRY = 1746;
+
+enum class MapObjectType : uint32_t {
+    vehicle,
+    pedestrian,
+    cyclist,
+    invalid
+};
+
+enum class MapRoadType : uint32_t
+{
+    RoadEdge,
+    RoadLine,
+    Lane,
+    CrossWalk,
+    SpeedBump,
+    StopSign,
+    Invalid
+};
+
+struct MapObject {
+    madrona::math::Vector2 position[MAX_POSITIONS];
+    float width;
+    float length;
+    float heading[MAX_POSITIONS]; 
+    madrona::math::Vector2 velocity[MAX_POSITIONS];
+    bool valid[MAX_POSITIONS];
+    madrona::math::Vector2 goalPosition;
+    MapObjectType type;
+
+    uint32_t numPositions;
+    uint32_t numHeadings;
+    uint32_t numVelocities;
+    uint32_t numValid;
+    float meanx;
+    float meany;
+};
+
+struct MapRoad {
+    // std::array<MapPosition, MAX_POSITIONS> geometry;
+    madrona::math::Vector2 geometry[MAX_GEOMETRY];
+    MapRoadType type;
+    uint32_t numPoints;
+    float meanx;
+    float meany;
+};
+
+struct Map {
+    MapObject objects[MAX_OBJECTS];
+    MapRoad roads[MAX_ROADS];
+
+    uint32_t numObjects;
+    uint32_t numRoads;
+    uint32_t numRoadSegments;
+    float meanx;
+    float meany;
+
+    // Constructor  
+    Map() = default;
+};
+
 // Include several madrona types into the simulator namespace for convenience
 using madrona::Entity;
 using madrona::CountT;

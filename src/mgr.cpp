@@ -261,7 +261,7 @@ Manager::Impl * Manager::Impl::init(
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
 
-    std::string pathToScenario("../tfrecord-00012-of-00150_204.json");
+    std::string pathToScenario("/home/aarav/gpudrive/tests/test_orig.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -278,11 +278,10 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto [agentInits, agentCount, roadInits, roadCount] =
+          auto map_ =
               MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
-                        agentCount,  roadInits,    roadCount,  ExecMode::CUDA};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
         }
 
         MWCudaExecutor gpu_exec({
@@ -331,12 +330,13 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto [agentInits, agentCount, roadInits, roadCount] =
+          std::cout<<"i: "<<i<<std::endl;
+          std::cout<<"pathToScenario: "<<pathToScenario<<std::endl;
+          auto map_ =
               MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
 
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
-                        agentCount,  roadInits,    roadCount,  ExecMode::CPU};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

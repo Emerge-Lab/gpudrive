@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "types.hpp"
 
 namespace gpudrive {
 
@@ -14,16 +15,14 @@ struct AgentInit;
 
 class MapReader {
 public:
-  static std::tuple<AgentInit *, madrona::CountT, RoadInit *, madrona::CountT>
-  parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode);
+  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode);
 
 private:
   MapReader(const std::string &pathToFile);
   void doParse();
 
   std::ifstream in_;
-  std::vector<AgentInit> agentInits_;
-  std::vector<RoadInit> roadInits_;
+  gpudrive::Map *map_;
 };
 
 } // namespace gpudrive

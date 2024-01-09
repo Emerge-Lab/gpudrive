@@ -141,7 +141,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
@@ -520,15 +520,19 @@ Sim::Sim(Engine &ctx,
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    // Currently the physics system needs an upper bound on the number of
-    // entities that will be stored in the BVH. We plan to fix this in
-    // a future release.
-    auto max_total_entities = init.computeEntityUpperBound();
+    // // Currently the physics system needs an upper bound on the number of
+    // // entities that will be stored in the BVH. We plan to fix this in
+    // // a future release.
+    // auto max_total_entities = init.computeEntityUpperBound();
+    
+    auto max_total_entities = consts::numAgents + consts::numRoadSegments + 100;
+
+    // auto max_total_entities = init.map->numObjects + init.map->numRoadSegments; //TODO: Ideally we want to do this. 
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::numAgents);
+        init.map->numObjects);
 
     enableVizRender = cfg.enableViewer;
 
@@ -539,25 +543,26 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.agentInits, init.agentInitsCount,
-                             init.roadInits, init.roadInitsCount);
+    createPersistentEntities(ctx, init.map);
 
     // TODO: Wrap below pointers with std::unique_ptr with a custom deleter.
     // Even with unique_ptr, these pointers would need to be explicitly free'd
     // with a call to, say, reset(), because their lifetime does not match that
     // of WorldInit.
-    if (init.mode == madrona::ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        madrona::cu::deallocGPU(init.agentInits);
-        madrona::cu::deallocGPU(init.roadInits);
-#else
-        FATAL("Madrona was not compiled with CUDA support");
-#endif
-    } else {
-        assert(init.mode == madrona::ExecMode::CPU);
-        free(init.agentInits);
-        free(init.roadInits);
-    }
+//     if (init.mode == madrona::ExecMode::CUDA) {
+// #ifdef MADRONA_CUDA_SUPPORT
+//         madrona::cu::deallocGPU(init.agentInits);
+//         madrona::cu::deallocGPU(init.roadInits);
+// #else
+//         FATAL("Madrona was not compiled with CUDA support");
+// #endif
+//     } else {
+//         assert(init.mode == madrona::ExecMode::CPU);
+//         free(init.agentInits);
+//         free(init.roadInits);
+//     } 
+
+
 
     // Generate initial world state
     initWorld(ctx);

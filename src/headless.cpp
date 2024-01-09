@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
         partner_obs_printer.print();
 
         printf("Map Obs\n");
-        // map_obs_printer.print();
+        map_obs_printer.print();
         printf("\n");
     };
     // printObs();
