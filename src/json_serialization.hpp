@@ -16,8 +16,7 @@ namespace gpudrive
     {
         const auto &valid = j.at("valid");
 
-        obj.meanx = 0;
-        obj.meany = 0;
+        obj.mean = {0,0};
         uint32_t i = 0;
         for (const auto &pos : j.at("position"))
         { 
@@ -27,8 +26,8 @@ namespace gpudrive
                 from_json(pos, obj.position[i]);
                 if(valid[i] == true)
                 {
-                    obj.meanx += (obj.position[i].x - obj.meanx)/(i+1);
-                    obj.meany += (obj.position[i].y - obj.meany)/(i+1);
+                    obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
+                    obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
                 }
                 ++i;
             }
@@ -103,8 +102,7 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, MapRoad &road)
     {
-        road.meanx = 0;
-        road.meany = 0;
+        road.mean = {0,0};
         std::string type = j.at("type");
         if(type == "road_edge")
             road.type = MapRoadType::RoadEdge;
@@ -177,16 +175,15 @@ namespace gpudrive
 
         for (size_t j = 0; j < road.numPoints; j++)
         {
-            road.meanx += (road.geometry[j].x - road.meanx)/(j+1);
-            road.meany += (road.geometry[j].y - road.meany)/(j+1);
+            road.mean.x += (road.geometry[j].x - road.mean.x)/(j+1);
+            road.mean.y += (road.geometry[j].y - road.mean.y)/(j+1);
         }
 
     }
 
     void from_json(const nlohmann::json &j, Map &map)
     {
-        map.meanx = 0;
-        map.meany = 0;
+        map.mean = {0,0};
         size_t totalPoints = 0; // Total count of points
         int i = 0;
         for (const auto &obj : j.at("objects"))
@@ -197,8 +194,8 @@ namespace gpudrive
                     continue;
                 obj.get_to(map.objects[i]);    
                 size_t objPoints = map.objects[i].numPositions;
-                map.meanx = ((map.meanx * totalPoints) + (map.objects[i].meanx * objPoints)) / (totalPoints + objPoints);
-                map.meany = ((map.meany * totalPoints) + (map.objects[i].meany * objPoints)) / (totalPoints + objPoints);
+                map.mean.x = ((map.mean.x * totalPoints) + (map.objects[i].mean.x * objPoints)) / (totalPoints + objPoints);
+                map.mean.y = ((map.mean.y * totalPoints) + (map.objects[i].mean.y * objPoints)) / (totalPoints + objPoints);
                 totalPoints += objPoints;
                 ++i;
             }
@@ -217,8 +214,8 @@ namespace gpudrive
             {
                 road.get_to(map.roads[i]);
                 size_t roadPoints = map.roads[i].numPoints;
-                map.meanx = ((map.meanx * totalPoints) + (map.roads[i].meanx * roadPoints)) / (totalPoints + roadPoints);
-                map.meany = ((map.meany * totalPoints) + (map.roads[i].meany * roadPoints)) / (totalPoints + roadPoints);
+                map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
+                map.mean.y = ((map.mean.y * totalPoints) + (map.roads[i].mean.y * roadPoints)) / (totalPoints + roadPoints);
                 totalPoints += roadPoints;
                 count_road_points += roadPoints;
                 ++i;

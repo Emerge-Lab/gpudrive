@@ -9,11 +9,11 @@
 
 namespace gpudrive {
 
-
-constexpr size_t MAX_OBJECTS = 515;
-constexpr size_t MAX_ROADS = 956;
-constexpr size_t MAX_POSITIONS = 91;
-constexpr size_t MAX_GEOMETRY = 1746;
+// Constants computed from train files. 
+constexpr madrona::CountT MAX_OBJECTS = 515;
+constexpr madrona::CountT MAX_ROADS = 956;
+constexpr madrona::CountT MAX_POSITIONS = 91;
+constexpr madrona::CountT MAX_GEOMETRY = 1746;
 
 enum class MapObjectType : uint32_t {
     vehicle,
@@ -43,32 +43,29 @@ struct MapObject {
     madrona::math::Vector2 goalPosition;
     MapObjectType type;
 
-    uint32_t numPositions;
-    uint32_t numHeadings;
-    uint32_t numVelocities;
-    uint32_t numValid;
-    float meanx;
-    float meany;
+    madrona::CountT numPositions;
+    madrona::CountT numHeadings;
+    madrona::CountT numVelocities;
+    madrona::CountT numValid;
+    madrona::math::Vector2 mean;
 };
 
 struct MapRoad {
     // std::array<MapPosition, MAX_POSITIONS> geometry;
     madrona::math::Vector2 geometry[MAX_GEOMETRY];
     MapRoadType type;
-    uint32_t numPoints;
-    float meanx;
-    float meany;
+    madrona::CountT numPoints;
+    madrona::math::Vector2 mean;
 };
 
 struct Map {
     MapObject objects[MAX_OBJECTS];
     MapRoad roads[MAX_ROADS];
 
-    uint32_t numObjects;
-    uint32_t numRoads;
-    uint32_t numRoadSegments;
-    float meanx;
-    float meany;
+    madrona::CountT numObjects;
+    madrona::CountT numRoads;
+    madrona::CountT numRoadSegments;
+    madrona::math::Vector2 mean;
 
     // Constructor  
     Map() = default;

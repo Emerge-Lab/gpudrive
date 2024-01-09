@@ -59,7 +59,7 @@ static inline Entity createVehicle(Engine &ctx, MapObject agentInit) {
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     ctx.get<Trajectory>(vehicle).positions[0] =
-        Vector2{.x = agentInit.position[0].x - ctx.data().mean.first, .y = agentInit.position[0].y - ctx.data().mean.second};
+        Vector2{.x = agentInit.position[0].x - ctx.data().mean.x, .y = agentInit.position[0].y - ctx.data().mean.y};
     ctx.get<Trajectory>(vehicle).initialHeading = toRadians(agentInit.heading[0]);
     ctx.get<Trajectory>(vehicle).velocities[0] =
         Vector2{.x = agentInit.velocity[0].x, .y = agentInit.velocity[0].y};
@@ -77,8 +77,8 @@ static Entity makeRoadEdge(Engine &ctx, madrona::math::Vector2 p1,
     float x2 = p2.x;
     float y2 = p2.y;
 
-    Vector3 start{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0};
-    Vector3 end{.x = x2 - ctx.data().mean.first, .y = y2 - ctx.data().mean.second, .z = 0};
+    Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0};
+    Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = 0};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
@@ -151,14 +151,14 @@ static Entity makeSpeedBump(Engine &ctx, Vector2 p1, Vector2 p2, Vector2 p3,
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.first, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.second, .z = 1};
+    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     ctx.get<EntityType>(speed_bump) = EntityType::Cube;
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.first, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.second}, .heading = angle, .type = 1};
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = 1};
     return speed_bump;
 }
 
@@ -167,14 +167,14 @@ static Entity makeStopSign(Engine &ctx, Vector2 p1) {
     float y1 = p1.y;
 
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second, .z = 0.5};
+    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
     ctx.get<EntityType>(stop_sign) = EntityType::Cube;
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
-    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.first, .y = y1 - ctx.data().mean.second}, .heading = 0, .type = 2};
+    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = 2};
     return stop_sign;
 }
 
@@ -223,7 +223,7 @@ static void createFloorPlane(Engine &ctx)
 
 void createPersistentEntities(Engine &ctx, Map *map) {
 
-    ctx.data().mean = std::make_pair(map->meanx, map->meany);
+    ctx.data().mean = map->mean;
 
     createFloorPlane(ctx);
     CountT agentIdx;
