@@ -520,14 +520,16 @@ Sim::Sim(Engine &ctx,
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
-    // // Currently the physics system needs an upper bound on the number of
-    // // entities that will be stored in the BVH. We plan to fix this in
-    // // a future release.
-    // auto max_total_entities = init.computeEntityUpperBound();
+    // Currently the physics system needs an upper bound on the number of
+    // entities that will be stored in the BVH. We plan to fix this in
+    // a future release.
     
-    auto max_total_entities = consts::numAgents + consts::numRoadSegments + 100;
+    auto max_total_entities = consts::numAgents + consts::numRoadSegments;
 
-    // auto max_total_entities = init.map->numObjects + init.map->numRoadSegments; //TODO: Ideally we want to do this. 
+    auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
+
+    if(entities_from_map < max_total_entities)
+        max_total_entities = entities_from_map;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
