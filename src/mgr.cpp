@@ -330,8 +330,6 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          std::cout<<"i: "<<i<<std::endl;
-          std::cout<<"pathToScenario: "<<pathToScenario<<std::endl;
           auto map_ =
               MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
 

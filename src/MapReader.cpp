@@ -43,7 +43,6 @@ gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
 namespace gpudrive {
 
 MapReader::MapReader(const std::string &pathToFile) : in_(pathToFile) {
-  std::cout<<"MapReader::MapReader"<<std::endl;
   assert(in_.is_open());
   map_ = new gpudrive::Map();
 }
@@ -61,12 +60,7 @@ void MapReader::doParse() {
 
 gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
                             madrona::ExecMode executionMode) {
-  std::cout<<"MapReader::parseAndWriteOut"<<std::endl;
-  std::cout<<"path: "<<path<<std::endl;
-  
-  // auto map = new gpudrive::Map();
   MapReader reader(path);
-  // return map;
   reader.doParse();
 
   gpudrive::Map *copiedMap = copyToArrayOnHostOrDevice(reader.map_, executionMode);
