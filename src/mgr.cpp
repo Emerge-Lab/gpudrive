@@ -504,6 +504,11 @@ Tensor Manager::stepsRemainingTensor() const
                                });
 }
 
+Tensor Manager::shapeTensor() const {
+    return impl_->exportTensor(ExportID::Shape, Tensor::ElementType::Int32,
+                               {impl_->cfg.numWorlds, 2});
+}
+
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
