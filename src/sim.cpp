@@ -525,21 +525,23 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = init.computeEntityUpperBound();
-    max_num_agents = init.params.numAgents;
-    max_num_roads = init.params.numRoadSegments; // Probably not needed since we would be mostly be concerned with the number of agents.
+    // auto max_total_entities = init.computeEntityUpperBound();
+    // max_num_agents = init.params.numAgents;
+    // max_num_roads = init.params.numRoadSegments; // Probably not needed since we would be mostly be concerned with the number of agents.
 
-    CountT max_entities_to_init = max_num_agents + max_num_roads; // User set limit
+    // CountT max_entities_to_init = max_num_agents + max_num_roads; // User set limit
 
-    if(max_total_entities > max_entities_to_init)
-    {
-        max_total_entities = max_entities_to_init;
-    }
+    auto max_total_entities = consts::numAgents + consts::numRoadSegments;
+
+    // if(max_total_entities > max_entities_to_init)
+    // {
+    //     max_total_entities = max_entities_to_init;
+    // }
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        max_num_agents);
+        consts::numAgents);
 
     enableVizRender = cfg.enableViewer;
 

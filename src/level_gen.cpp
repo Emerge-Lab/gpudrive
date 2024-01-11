@@ -201,11 +201,13 @@ static inline void createRoadEntities(Engine &ctx, const RoadInit &roadInit,
             {
                 if (j != start)
                 {
+                    if(idx >= consts::numRoadSegments) return;
                     ctx.data().roads[idx++] = makeRoadEdge(ctx, points[start], points[j]);
                     start = j;
                 }
                 else
                 {
+                    if(idx >= consts::numRoadSegments) return;
                     ctx.data().roads[idx++] = makeRoadEdge(ctx, points[j], points[j + 1]);
                     start = ++j;
                 }
@@ -213,12 +215,15 @@ static inline void createRoadEntities(Engine &ctx, const RoadInit &roadInit,
         }
 
         //Handle last point
+        if(idx >= consts::numRoadSegments) return;
         ctx.data().roads[idx++] = j!=start ? makeRoadEdge(ctx, points[start], points[j]) : makeRoadEdge(ctx, points[j], points[j + 1]);
     } else if (roadInit.type == RoadInitType::SpeedBump) {
       assert(roadInit.numPoints == 4);
+      if(idx >= consts::numRoadSegments) return;
       ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.points[0], roadInit.points[1], roadInit.points[2], roadInit.points[3]);
     } else if (roadInit.type == RoadInitType::StopSign) {
       assert(roadInit.numPoints == 1);
+      if(idx >= consts::numRoadSegments) return;
       ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.points[0]);
     } else {
       assert(false);
@@ -283,9 +288,10 @@ void createPersistentEntities(Engine &ctx, const AgentInit *agentInits,
     }
     ctx.data().numAgents = agentIdx;
 
-    CountT roadIdx;
-    for (roadIdx = 0; roadIdx < roadInitsCount; ) {
-        const auto &roadInit = roadInits[roadIdx];
+    CountT roadIdx = 0;
+    for (CountT roadCtr = 0; roadCtr < roadInitsCount; roadCtr++ ) {
+        if(roadIdx >= consts::numRoadSegments) break;
+        const auto &roadInit = roadInits[roadCtr];
         createRoadEntities(ctx, roadInit, roadIdx);
     }
     ctx.data().numRoads = roadIdx;

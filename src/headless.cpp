@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .numAgents = 2,
-            .numRoadSegments = 4050,
+            .numRoadSegments = 4422,
         }
     });
 
