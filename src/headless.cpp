@@ -1,12 +1,15 @@
 #include "mgr.hpp"
 #include "consts.hpp"
+#include "types.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <chrono>
 #include <string>
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <vector>
 
 using namespace madrona;
 using namespace madrona::viz;
@@ -88,17 +91,22 @@ int main(int argc, char *argv[])
         partner_obs_printer.print();
 
         printf("Map Obs\n");
-        // map_obs_printer.print();
+        map_obs_printer.print();
         printf("\n");
 
         printf("Shape\n");
         shapePrinter.print();
     };
     // printObs();
+
+    auto worldToShape =
+	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
-                for (CountT k = 0; k < gpudrive::consts::kMaxAgentCount; k++) {
+	        auto agentCount = worldToShape.at(j).agentEntityCount;
+                for (CountT k = 0; k < agentCount; k++) {
                     float acc = acc_gen(rand_gen);
                     float steer = steer_gen(rand_gen);
                     float head = 0;

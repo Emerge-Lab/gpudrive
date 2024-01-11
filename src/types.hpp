@@ -127,6 +127,7 @@ enum class EntityType : uint32_t {
     Button,
     Cube,
     Agent,
+    Padding,
     NumTypes,
 };
 
@@ -171,6 +172,7 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
+
     // Input
     Action,
 

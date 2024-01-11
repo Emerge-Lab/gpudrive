@@ -1,12 +1,14 @@
 #pragma once
 
+#include <limits>
+#include <madrona/math.hpp>
 #include <madrona/types.hpp>
 
 namespace gpudrive {
 
 namespace consts {
-inline constexpr madrona::CountT kMaxAgentCount = 17;
-inline constexpr madrona::CountT kMaxRoadEntityCount = 5448;
+inline constexpr madrona::CountT kMaxAgentCount = 3;
+inline constexpr madrona::CountT kMaxRoadEntityCount = 3557;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
@@ -36,6 +38,9 @@ inline constexpr float xDimensionScaleRoadSegment = 1;
 inline constexpr madrona::CountT kTrajectoryLength = 1;
 
 inline constexpr madrona::CountT kMaxRoadGeometryLength = 1810;
+
+inline constexpr madrona::math::Vector3 kPaddingPosition = {
+    0, 0, std::numeric_limits<float>::max()};
 }
 
 }

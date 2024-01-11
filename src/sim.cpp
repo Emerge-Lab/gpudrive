@@ -135,8 +135,12 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
-                                      PartnerObservations &partner_obs)
-{
+                                      PartnerObservations &partner_obs,
+				      const EntityType& entityType) {
+     if (entityType == EntityType::Padding) {
+       return;
+     }
+  
     self_obs.bicycle_model = model;
     self_obs.vehicle_size = size; 
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
@@ -169,9 +173,12 @@ inline void movementSystem(Engine &e,
 			   VehicleSize& size,
 			   Rotation &rotation,
 			   Position& position,
-			   Velocity& velocity) 
-{
-
+			   Velocity& velocity,
+			   const EntityType& entityType) {
+  if (entityType == EntityType::Padding) {
+    return;
+  }
+  
   //TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions 
   // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
   // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 
@@ -400,8 +407,10 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             VehicleSize,
             Rotation,
             Position,
-            Velocity
+            Velocity,
+	    EntityType
         >>({});
+
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
@@ -477,7 +486,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Progress,
             OtherAgents,
             SelfObservation,
-            PartnerObservations
+	    PartnerObservations,
+            EntityType
         >>({post_reset_broadphase});
 
 
@@ -521,16 +531,13 @@ Sim::Sim(Engine &ctx,
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr)
 {
+    // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
+    assert(init.map->numObjects);
+
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-
-    //Below checks are used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
-    if(init.map->numObjects == 0)
-        printf("Map numObjects is 0\n");
-    assert(init.map->numObjects != 0);
-
-    auto max_total_entities = consts::numAgents + consts::numRoadSegments;
+    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,

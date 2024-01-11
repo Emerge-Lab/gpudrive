@@ -277,10 +277,12 @@ Manager::Impl * Manager::Impl::init(
 
 	int64_t worldIdx{0};
 	for (auto const& mapFile : std::filesystem::directory_iterator(pathToMapDirectory)) {
-	  Map *map_ = (Map* )MapReader::parseAndWriteOut(mapFile.path(), ExecMode::CUDA);
-          world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA};
+          Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                         ExecMode::CUDA);
+          world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                              viz_bridge, map_, ExecMode::CUDA};
         }
-	assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
         MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
@@ -334,10 +336,11 @@ Manager::Impl * Manager::Impl::init(
 
 	int64_t worldIdx{0};
 	for (auto const& mapFile : std::filesystem::directory_iterator(pathToMapDirectory)) {
-          Map* map_ = MapReader::parseAndWriteOut(mapFile.path(), ExecMode::CPU);
+          Map *map_ =
+              MapReader::parseAndWriteOut(mapFile.path(), ExecMode::CPU);
           world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU};
         }
-	assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
@@ -365,7 +368,6 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
-
           delete init.map;
         }
 
@@ -550,5 +552,32 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     } else {
         *action_ptr = action;
     }
+}
+
+std::vector<Shape>
+Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
+                                        uint32_t numWorlds) {
+    const auto &tensor = shapeTensor();
+
+    const std::size_t floatsPerShape{2};
+    const std::size_t tensorByteCount{sizeof(float) * floatsPerShape *
+                                      numWorlds};
+
+    std::vector<Shape> worldToShape(numWorlds);
+    switch (impl_->cfg.execMode) {
+    case ExecMode::CUDA:
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(worldToShape.data(), tensor.devicePtr(), tensorByteCount,
+                   cudaMemcpyDeviceToHost);
+#else
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+        break;
+    case ExecMode::CPU:
+        std::memcpy(worldToShape.data(), tensor.devicePtr(), tensorByteCount);
+        break;
+    }
+
+    return worldToShape;
 }
 }
