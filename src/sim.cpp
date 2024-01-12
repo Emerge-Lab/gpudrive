@@ -38,12 +38,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
+    registry.registerSingleton<Shape>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
+    registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(

@@ -141,6 +141,11 @@ struct Trajectory {
     float initialHeading;
 };
 
+struct Shape {
+    int32_t agentEntityCount;
+    int32_t roadEntityCount;
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -171,7 +176,6 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
-
     // Input
     Action,
 
