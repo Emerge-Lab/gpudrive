@@ -554,16 +554,17 @@ Sim::Sim(Engine &ctx,
     // Even with unique_ptr, these pointers would need to be explicitly free'd
     // with a call to, say, reset(), because their lifetime does not match that
     // of WorldInit.
-    if (init.mode == madrona::ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        madrona::cu::deallocGPU(init.map);
-#else
-        FATAL("Madrona was not compiled with CUDA support");
-#endif
-    } else {
-        assert(init.mode == madrona::ExecMode::CPU);
-        delete init.map;
-    }
+    // TOFIX: Below CUDA code is not compiling.
+//     if (init.mode == madrona::ExecMode::CUDA) {
+// #ifdef MADRONA_CUDA_SUPPORT
+//         madrona::cu::deallocGPU(init.map);
+// #else
+//         FATAL("Madrona was not compiled with CUDA support");
+// #endif
+//     } else {
+//         assert(init.mode == madrona::ExecMode::CPU);
+//         delete init.map;
+//     }
 
 
     // Generate initial world state
