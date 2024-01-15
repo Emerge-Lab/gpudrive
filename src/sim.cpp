@@ -518,23 +518,27 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr)
+      episodeMgr(init.episodeMgr),
+      map(init.map)
 {
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    
+
+    printf("Map numObjects: %d\n", init.map->numObjects);
+    printf("Sim Map numObjects: %d\n", map->numObjects);
     auto max_total_entities = consts::numAgents + consts::numRoadSegments;
 
-    auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
+    // auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
 
-    if(entities_from_map < max_total_entities)
-        max_total_entities = entities_from_map;
+    // if(entities_from_map < max_total_entities)
+    //     max_total_entities = entities_from_map;
 
+    printf("max_total_entities: %d\n", max_total_entities);
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        init.map->numObjects);
+        consts::numAgents);
 
     enableVizRender = cfg.enableViewer;
 
@@ -551,11 +555,11 @@ Sim::Sim(Engine &ctx,
     // Even with unique_ptr, these pointers would need to be explicitly free'd
     // with a call to, say, reset(), because their lifetime does not match that
     // of WorldInit.
-#ifdef MADRONA_GPU_MODE
-        madrona::cu::deallocGPU(init.map);
-#else
-        delete init.map;
-#endif
+// #ifdef MADRONA_GPU_MODE
+//         madrona::cu::deallocGPU(init.map);
+// #else
+//         delete init.map;
+// #endif
 
 
     // Generate initial world state

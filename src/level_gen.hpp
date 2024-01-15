@@ -1,9 +1,6 @@
 #pragma once
 
-#include "init.hpp"
 #include "sim.hpp"
-
-#include <madrona/types.hpp>
 
 namespace gpudrive {
 

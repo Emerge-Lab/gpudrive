@@ -10,10 +10,10 @@
 namespace gpudrive {
 
 // Constants computed from train files. 
-constexpr madrona::CountT MAX_OBJECTS = 515;
-constexpr madrona::CountT MAX_ROADS = 956;
-constexpr madrona::CountT MAX_POSITIONS = 91;
-constexpr madrona::CountT MAX_GEOMETRY = 1746;
+constexpr madrona::CountT MAX_OBJECTS = 10;
+constexpr madrona::CountT MAX_ROADS = 100;
+constexpr madrona::CountT MAX_POSITIONS = 50;
+constexpr madrona::CountT MAX_GEOMETRY = 50;
 
 enum class MapObjectType : uint32_t {
     vehicle,

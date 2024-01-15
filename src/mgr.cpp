@@ -1,6 +1,8 @@
 #include "mgr.hpp"
-#include "MapReader.hpp"
+// #include "MapReader.hpp"
 #include "sim.hpp"
+// #include <nlohmann/json.hpp>
+#include "json_serialization.hpp"
 
 #include <madrona/utils.hpp>
 #include <madrona/importer.hpp>
@@ -262,6 +264,11 @@ Manager::Impl * Manager::Impl::init(
     // varied aross different input files.
 
     std::string pathToScenario("/home/aarav/gpudrive/tests/test_orig.json");
+    std::ifstream in(pathToScenario);
+    nlohmann::json rawJson;
+    in >> rawJson;
+
+
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -278,8 +285,13 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto map_ =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
+            Map* origmap = new Map();
+            from_json(rawJson, *origmap);
+            printf("origmap number of objects: %d\n", origmap->numObjects);
+            Map* map_ = static_cast<Map*>(madrona::cu::allocGPU(sizeof(Map)));
+            cudaMemcpy(map_, origmap, sizeof(Map), cudaMemcpyHostToDevice);
+        //   Map* map_ =
+        //       MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
           world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
         }
@@ -330,8 +342,10 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto map_ =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
+        //   Map* map_ =
+        //       MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
+          Map* map_ = new Map();
+          from_json(rawJson, *map_);
 
           world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};

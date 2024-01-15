@@ -21,8 +21,20 @@ gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
 
   if (hostOrDevice == madrona::ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
+    printf("Copying map to device\n");
+    printf("in number of objects: %d\n", in->numObjects);
     map = static_cast<gpudrive::Map*>(madrona::cu::allocGPU(sizeof(gpudrive::Map)));
+    if (map == nullptr) {
+      FATAL("Failed to allocate map on device");
+    }
+    printf("Allocated map on device\n");
     cudaMemcpy(map, in, sizeof(gpudrive::Map), cudaMemcpyHostToDevice);
+    printf("Copied map to device\n");
+    auto error = cudaGetLastError();
+    if (error != cudaSuccess) {
+      FATAL("Failed to copy map to device");
+    }
+    
 #else
     FATAL("Madrona was not compiled with CUDA support");
 #endif
@@ -63,8 +75,7 @@ gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
   MapReader reader(path);
   reader.doParse();
 
-  gpudrive::Map *copiedMap = copyToArrayOnHostOrDevice(reader.map_, executionMode);
+  return copyToArrayOnHostOrDevice(reader.map_, executionMode);
 
-  return copiedMap;
 } 
 } // namespace gpudrive

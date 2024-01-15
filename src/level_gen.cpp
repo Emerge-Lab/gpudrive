@@ -1,7 +1,5 @@
 #include "level_gen.hpp"
-#include <cassert>
-#include <cmath>
-#include <madrona/math.hpp>
+
 
 namespace gpudrive {
 
@@ -202,7 +200,8 @@ static inline void createRoadEntities(Engine &ctx, MapRoad roadInit, CountT &idx
       ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.geometry[0]);
     } else {
       // TODO: Need to handle Cross Walk.
-      assert(false);
+    //   assert(false);
+        return;
     }
 }
 
