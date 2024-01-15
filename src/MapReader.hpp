@@ -1,12 +1,8 @@
 #pragma once
 
-#include "init.hpp"
 #include <fstream>
 #include <madrona/exec_mode.hpp>
-#include <madrona/types.hpp>
-#include <string>
-#include <utility>
-#include <vector>
+
 #include "types.hpp"
 
 namespace gpudrive {

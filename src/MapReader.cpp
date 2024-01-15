@@ -1,14 +1,5 @@
 #include "MapReader.hpp"
-#include "consts.hpp"
-#include "init.hpp"
 #include "json_serialization.hpp"
-#include "types.hpp"
-
-#include <algorithm>
-#include <cassert>
-#include <nlohmann/json.hpp>
-#include <string>
-#include <vector>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/cuda_utils.hpp>

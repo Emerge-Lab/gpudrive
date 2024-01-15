@@ -21,6 +21,7 @@ target_link_libraries(mad_escape_cpu_impl
 
 add_library(mad_escape_mgr SHARED
     mgr.hpp mgr.cpp
+    MapReader.hpp MapReader.cpp
 )
 
 target_link_libraries(mad_escape_mgr 
