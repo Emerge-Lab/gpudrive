@@ -10,10 +10,10 @@
 namespace gpudrive {
 
 // Constants computed from train files. 
-constexpr madrona::CountT MAX_OBJECTS = 10;
-constexpr madrona::CountT MAX_ROADS = 100;
-constexpr madrona::CountT MAX_POSITIONS = 50;
-constexpr madrona::CountT MAX_GEOMETRY = 50;
+constexpr uint32_t MAX_OBJECTS = 10;
+constexpr uint32_t MAX_ROADS = 100;
+constexpr uint32_t MAX_POSITIONS = 50;
+constexpr uint32_t MAX_GEOMETRY = 50;
 
 enum class MapObjectType : uint32_t {
     vehicle,
@@ -33,39 +33,46 @@ enum class MapRoadType : uint32_t
     Invalid
 };
 
+// Cannot use Madrona::math::Vector2 because it is not a POD type. 
+// Getting all zeros if using any madrona types.
+struct MapVector2 {
+    float x;
+    float y;
+};
+
 struct MapObject {
-    madrona::math::Vector2 position[MAX_POSITIONS];
+    MapVector2 position[MAX_POSITIONS];
     float width;
     float length;
     float heading[MAX_POSITIONS]; 
-    madrona::math::Vector2 velocity[MAX_POSITIONS];
+    MapVector2 velocity[MAX_POSITIONS];
     bool valid[MAX_POSITIONS];
-    madrona::math::Vector2 goalPosition;
+    MapVector2 goalPosition;
     MapObjectType type;
 
-    madrona::CountT numPositions;
-    madrona::CountT numHeadings;
-    madrona::CountT numVelocities;
-    madrona::CountT numValid;
-    madrona::math::Vector2 mean;
+    uint32_t numPositions;
+    uint32_t numHeadings;
+    uint32_t numVelocities;
+    uint32_t numValid;
+    MapVector2 mean;
 };
 
 struct MapRoad {
     // std::array<MapPosition, MAX_POSITIONS> geometry;
-    madrona::math::Vector2 geometry[MAX_GEOMETRY];
+    MapVector2 geometry[MAX_GEOMETRY];
     MapRoadType type;
-    madrona::CountT numPoints;
-    madrona::math::Vector2 mean;
+    uint32_t numPoints;
+    MapVector2 mean;
 };
 
 struct Map {
     MapObject objects[MAX_OBJECTS];
     MapRoad roads[MAX_ROADS];
 
-    madrona::CountT numObjects;
-    madrona::CountT numRoads;
-    madrona::CountT numRoadSegments;
-    madrona::math::Vector2 mean;
+    uint32_t numObjects;
+    uint32_t numRoads;
+    uint32_t numRoadSegments;
+    MapVector2 mean;
 
     // Constructor  
     Map() = default;

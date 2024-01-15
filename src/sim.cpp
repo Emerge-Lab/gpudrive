@@ -518,27 +518,26 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr),
-      map(init.map)
+      episodeMgr(init.episodeMgr)
 {
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
+    if(init.map->numObjects == 0)
+        printf("Map numObjects is 0\n");
+    assert(init.map->numObjects != 0);
 
-    printf("Map numObjects: %d\n", init.map->numObjects);
-    printf("Sim Map numObjects: %d\n", map->numObjects);
     auto max_total_entities = consts::numAgents + consts::numRoadSegments;
 
-    // auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
+    auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
 
-    // if(entities_from_map < max_total_entities)
-    //     max_total_entities = entities_from_map;
+    if(entities_from_map < max_total_entities)
+        max_total_entities = entities_from_map;
 
-    printf("max_total_entities: %d\n", max_total_entities);
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::numAgents);
+        init.map->numObjects);
 
     enableVizRender = cfg.enableViewer;
 
@@ -555,11 +554,16 @@ Sim::Sim(Engine &ctx,
     // Even with unique_ptr, these pointers would need to be explicitly free'd
     // with a call to, say, reset(), because their lifetime does not match that
     // of WorldInit.
-// #ifdef MADRONA_GPU_MODE
-//         madrona::cu::deallocGPU(init.map);
-// #else
-//         delete init.map;
-// #endif
+    if (init.mode == madrona::ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        madrona::cu::deallocGPU(init.map);
+#else
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    } else {
+        assert(init.mode == madrona::ExecMode::CPU);
+        delete init.map;
+    }
 
 
     // Generate initial world state

@@ -1,5 +1,6 @@
 #pragma once
 #include <madrona/physics.hpp>
+#include <madrona/exec_mode.hpp>
 namespace gpudrive
 {
     struct EpisodeManager
@@ -12,6 +13,7 @@ namespace gpudrive
         madrona::phys::ObjectManager *rigidBodyObjMgr;
         const madrona::viz::VizECSBridge *vizBridge;
         Map *map;
+        madrona::ExecMode mode;
     };
 
 }

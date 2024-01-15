@@ -281,10 +281,10 @@ Manager::Impl * Manager::Impl::init(
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
         {
             Map *map_ =
-                MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
+               (Map* )MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
 
             world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
+                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA};
         }
 
         MWCudaExecutor gpu_exec({
@@ -337,7 +337,7 @@ Manager::Impl * Manager::Impl::init(
               MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
 
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

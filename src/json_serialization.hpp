@@ -6,7 +6,7 @@
 
 namespace gpudrive
 {
-    void from_json(const nlohmann::json &j, madrona::math::Vector2 &p)
+    void from_json(const nlohmann::json &j, MapVector2 &p)
     {
         p.x = j.at("x").get<float>();
         p.y = j.at("y").get<float>();

@@ -68,8 +68,8 @@ static inline Entity createVehicle(Engine &ctx, MapObject agentInit) {
     return vehicle;
 }
 
-static Entity makeRoadEdge(Engine &ctx, madrona::math::Vector2 p1,
-                           madrona::math::Vector2 p2) {
+static Entity makeRoadEdge(Engine &ctx, MapVector2 p1,
+                           MapVector2 p2) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -94,8 +94,8 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, Vector2 p1, Vector2 p2, Vector2 p3,
-                            Vector2 p4) {
+static Entity makeSpeedBump(Engine &ctx, MapVector2  p1, MapVector2  p2,MapVector2 p3,
+                            MapVector2  p4) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -160,7 +160,7 @@ static Entity makeSpeedBump(Engine &ctx, Vector2 p1, Vector2 p2, Vector2 p3,
     return speed_bump;
 }
 
-static Entity makeStopSign(Engine &ctx, Vector2 p1) {
+static Entity makeStopSign(Engine &ctx, MapVector2 p1) {
     float x1 = p1.x;
     float y1 = p1.y;
 
@@ -222,7 +222,9 @@ static void createFloorPlane(Engine &ctx)
 
 void createPersistentEntities(Engine &ctx, Map *map) {
 
-    ctx.data().mean = map->mean;
+    ctx.data().mean = {0, 0};
+    ctx.data().mean.x = map->mean.x;
+    ctx.data().mean.y = map->mean.y;
 
     createFloorPlane(ctx);
     CountT agentIdx;
