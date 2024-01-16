@@ -3,7 +3,7 @@
 #include <fstream>
 #include <madrona/exec_mode.hpp>
 
-#include "types.hpp"
+#include "init.hpp"
 
 namespace gpudrive {
 

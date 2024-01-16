@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.hpp"
+#include "init.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -17,7 +17,7 @@ namespace gpudrive
         const auto &valid = j.at("valid");
 
         obj.mean = {0,0};
-        CountT i = 0;
+        uint32_t i = 0;
         for (const auto &pos : j.at("position"))
         { 
             if (i < MAX_POSITIONS)
@@ -116,7 +116,7 @@ namespace gpudrive
         else
             road.type = MapRoadType::Invalid;
 
-        CountT i = 0;
+        uint32_t i = 0;
         if (road.type == MapRoadType::RoadEdge || road.type == MapRoadType::RoadLine || road.type == MapRoadType::Lane)
         {
             for (const auto &geom : j.at("geometry"))
@@ -178,7 +178,7 @@ namespace gpudrive
     {
         map.mean = {0,0};
         size_t totalPoints = 0; // Total count of points
-        CountT i = 0;
+        uint32_t i = 0;
         for (const auto &obj : j.at("objects"))
         {
             if (i < MAX_OBJECTS)

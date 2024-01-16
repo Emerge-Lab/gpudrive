@@ -523,21 +523,18 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
+
+    //Below checks are used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     if(init.map->numObjects == 0)
         printf("Map numObjects is 0\n");
     assert(init.map->numObjects != 0);
 
     auto max_total_entities = consts::numAgents + consts::numRoadSegments;
 
-    auto entities_from_map = init.map->numObjects + init.map->numRoadSegments;
-
-    if(entities_from_map < max_total_entities)
-        max_total_entities = entities_from_map;
-
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        init.map->numObjects);
+        consts::numAgents);
 
     enableVizRender = cfg.enableViewer;
 
