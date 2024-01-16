@@ -307,6 +307,11 @@ Manager::Impl * Manager::Impl::init(
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
+        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+          auto &init = world_inits[i];
+          madrona::cu::deallocGPU(init.agentInits);
+          madrona::cu::deallocGPU(init.roadInits);
+        }
 
         return new CUDAImpl {
             mgr_cfg,
@@ -316,6 +321,7 @@ Manager::Impl * Manager::Impl::init(
             agent_actions_buffer,
             std::move(gpu_exec),
         };
+
 #else
         FATAL("Madrona was not compiled with CUDA support");
 #endif
@@ -362,6 +368,13 @@ Manager::Impl * Manager::Impl::init(
             agent_actions_buffer,
             std::move(cpu_exec),
         };
+
+        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+          auto &init = world_inits[i];
+
+          free(init.agentInits);
+          free(init.roadInits);
+        }
 
         return cpu_impl;
     } break;
