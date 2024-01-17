@@ -38,12 +38,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
+    registry.registerSingleton<Shape>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
+    registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
@@ -141,7 +143,7 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
 
 #pragma unroll
-    for (CountT i = 0; i < ctx.data().numAgents-1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
         Entity other = other_agents.e[i];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
@@ -525,18 +527,13 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    // auto max_total_entities = init.computeEntityUpperBound();
-    // max_num_agents = init.params.numAgents;
-    // max_num_roads = init.params.numRoadSegments; // Probably not needed since we would be mostly be concerned with the number of agents.
 
-    // CountT max_entities_to_init = max_num_agents + max_num_roads; // User set limit
+    //Below checks are used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
+    if(init.map->numObjects == 0)
+        printf("Map numObjects is 0\n");
+    assert(init.map->numObjects != 0);
 
     auto max_total_entities = consts::numAgents + consts::numRoadSegments;
-
-    // if(max_total_entities > max_entities_to_init)
-    // {
-    //     max_total_entities = max_entities_to_init;
-    // }
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
@@ -552,25 +549,7 @@ Sim::Sim(Engine &ctx,
     autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.agentInits, init.agentInitsCount,
-                             init.roadInits, init.roadInitsCount);
-
-    // TODO: Wrap below pointers with std::unique_ptr with a custom deleter.
-    // Even with unique_ptr, these pointers would need to be explicitly free'd
-    // with a call to, say, reset(), because their lifetime does not match that
-    // of WorldInit.
-    if (init.mode == madrona::ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        madrona::cu::deallocGPU(init.agentInits);
-        madrona::cu::deallocGPU(init.roadInits);
-#else
-        FATAL("Madrona was not compiled with CUDA support");
-#endif
-    } else {
-        assert(init.mode == madrona::ExecMode::CPU);
-        free(init.agentInits);
-        free(init.roadInits);
-    }
+    createPersistentEntities(ctx, init.map);
 
     // Generate initial world state
     initWorld(ctx);
