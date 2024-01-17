@@ -18,9 +18,7 @@ gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
     }
     cudaMemcpy(map, in, sizeof(gpudrive::Map), cudaMemcpyHostToDevice);
     auto error = cudaGetLastError();
-    if (error != cudaSuccess) {
-      FATAL("Failed to copy map to device");
-    }
+    assert (error != cudaSuccess);
     
 #else
     FATAL("Madrona was not compiled with CUDA support");
