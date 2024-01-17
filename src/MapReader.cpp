@@ -13,12 +13,9 @@ gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
   if (hostOrDevice == madrona::ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
     map = static_cast<gpudrive::Map*>(madrona::cu::allocGPU(sizeof(gpudrive::Map)));
-    if (map == nullptr) {
-      FATAL("Failed to allocate map on device");
-    }
     cudaMemcpy(map, in, sizeof(gpudrive::Map), cudaMemcpyHostToDevice);
     auto error = cudaGetLastError();
-    assert (error != cudaSuccess);
+    assert (error == cudaSuccess);
     
 #else
     FATAL("Madrona was not compiled with CUDA support");
