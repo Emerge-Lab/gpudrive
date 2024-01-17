@@ -1,12 +1,9 @@
 #pragma once
 
-#include "init.hpp"
 #include <fstream>
 #include <madrona/exec_mode.hpp>
-#include <madrona/types.hpp>
-#include <string>
-#include <utility>
-#include <vector>
+
+#include "init.hpp"
 
 namespace gpudrive {
 
@@ -14,16 +11,15 @@ struct AgentInit;
 
 class MapReader {
 public:
-  static std::tuple<AgentInit *, madrona::CountT, RoadInit *, madrona::CountT>
-  parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode);
+  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode);
 
 private:
   MapReader(const std::string &pathToFile);
+  ~MapReader();
   void doParse();
 
   std::ifstream in_;
-  std::vector<AgentInit> agentInits_;
-  std::vector<RoadInit> roadInits_;
+  gpudrive::Map *map_;
 };
 
 } // namespace gpudrive

@@ -261,7 +261,8 @@ Manager::Impl * Manager::Impl::init(
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
 
-    std::string pathToScenario("../tfrecord-00012-of-00150_204.json");
+    std::string pathToScenario("/home/aarav/gpudrive/tests/test_orig.json");
+
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -277,12 +278,13 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto [agentInits, agentCount, roadInits, roadCount] =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
-          world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
-                        agentCount,  roadInits,    roadCount,  ExecMode::CUDA};
+        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
+        {
+            Map *map_ =
+               (Map* )MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
+
+            world_inits[i] =
+                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA};
         }
 
         MWCudaExecutor gpu_exec({
@@ -309,8 +311,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
-          madrona::cu::deallocGPU(init.agentInits);
-          madrona::cu::deallocGPU(init.roadInits);
+          madrona::cu::deallocGPU(init.map);
         }
 
         return new CUDAImpl {
@@ -337,12 +338,11 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          auto [agentInits, agentCount, roadInits, roadCount] =
+          Map* map_ =
               MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
 
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, agentInits,
-                        agentCount,  roadInits,    roadCount,  ExecMode::CPU};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU};
         }
 
         CPUImpl::TaskGraphT cpu_exec {
@@ -372,8 +372,7 @@ Manager::Impl * Manager::Impl::init(
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
 
-          free(init.agentInits);
-          free(init.roadInits);
+          delete init.map;
         }
 
         return cpu_impl;

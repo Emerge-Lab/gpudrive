@@ -71,7 +71,6 @@ struct Sim : public madrona::WorldBase {
     Sim(Engine &ctx,
         const Config &cfg,
         const WorldInit &init);
-
     // EpisodeManager globally tracks episode IDs with an atomic across the
     // simulation.
     EpisodeManager *episodeMgr;
@@ -93,7 +92,7 @@ struct Sim : public madrona::WorldBase {
     madrona::CountT numRoads;
     Entity roads[consts::numRoadSegments];
 
-    std::pair<float, float> mean;
+    madrona::math::Vector2 mean;
 
     // Episode ID number
     int32_t curEpisodeIdx;
