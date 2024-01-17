@@ -311,8 +311,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
-          madrona::cu::deallocGPU(init.agentInits);
-          madrona::cu::deallocGPU(init.roadInits);
+          madrona::cu::deallocGPU(init.map);
         }
 
         return new CUDAImpl {
@@ -373,8 +372,7 @@ Manager::Impl * Manager::Impl::init(
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
 
-          free(init.agentInits);
-          free(init.roadInits);
+          delete init.map;
         }
 
         return cpu_impl;
