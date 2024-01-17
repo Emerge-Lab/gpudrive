@@ -38,12 +38,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<LevelState>();
+    registry.registerSingleton<Shape>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
+    registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
@@ -546,23 +548,6 @@ Sim::Sim(Engine &ctx,
 
     // Creates agents, walls, etc.
     createPersistentEntities(ctx, init.map);
-
-    // TODO: Wrap below pointers with std::unique_ptr with a custom deleter.
-    // Even with unique_ptr, these pointers would need to be explicitly free'd
-    // with a call to, say, reset(), because their lifetime does not match that
-    // of WorldInit.
-    // TOFIX: Below CUDA code is not compiling.
-//     if (init.mode == madrona::ExecMode::CUDA) {
-// #ifdef MADRONA_CUDA_SUPPORT
-//         madrona::cu::deallocGPU(init.map);
-// #else
-//         FATAL("Madrona was not compiled with CUDA support");
-// #endif
-//     } else {
-//         assert(init.mode == madrona::ExecMode::CPU);
-//         delete init.map;
-//     }
-
 
     // Generate initial world state
     initWorld(ctx);

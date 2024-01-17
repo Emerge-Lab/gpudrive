@@ -248,6 +248,10 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         createRoadEntities(ctx, roadInit, roadIdx, roadCtr);
     }
     ctx.data().numRoads = roadIdx;
+
+    auto &shape = ctx.singleton<Shape>();
+    shape.agentEntityCount = ctx.data().numAgents;
+    shape.roadEntityCount = ctx.data().numRoads;
 }
 
 static void generateLevel(Engine &) {}
