@@ -544,23 +544,6 @@ Sim::Sim(Engine &ctx,
     createPersistentEntities(ctx, init.agentInits, init.agentInitsCount,
                              init.roadInits, init.roadInitsCount);
 
-    // TODO: Wrap below pointers with std::unique_ptr with a custom deleter.
-    // Even with unique_ptr, these pointers would need to be explicitly free'd
-    // with a call to, say, reset(), because their lifetime does not match that
-    // of WorldInit.
-    if (init.mode == madrona::ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        madrona::cu::deallocGPU(init.agentInits);
-        madrona::cu::deallocGPU(init.roadInits);
-#else
-        FATAL("Madrona was not compiled with CUDA support");
-#endif
-    } else {
-        assert(init.mode == madrona::ExecMode::CPU);
-        free(init.agentInits);
-        free(init.roadInits);
-    }
-
     // Generate initial world state
     initWorld(ctx);
 }
