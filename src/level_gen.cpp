@@ -232,6 +232,8 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         if(agentIdx >= consts::numAgents)
             break;
         auto agentInit = map->objects[agentIdx];
+        if(agentInit.type != MapObjectType::Vehicle)
+            continue;
         auto vehicle = createVehicle(
             ctx, agentInit);
         ctx.data().agents[agentIdx] = vehicle;

@@ -88,13 +88,13 @@ namespace gpudrive
         from_json(j.at("goalPosition"), obj.goalPosition);
         std::string type = j.at("type");
         if(type == "vehicle")
-            obj.type = MapObjectType::vehicle;
+            obj.type = MapObjectType::Vehicle;
         else if(type == "pedestrian")
-            obj.type = MapObjectType::pedestrian;
+            obj.type = MapObjectType::Pedestrian;
         else if(type == "cyclist")
-            obj.type = MapObjectType::cyclist;
+            obj.type = MapObjectType::Cyclist;
         else
-            obj.type = MapObjectType::invalid;
+            obj.type = MapObjectType::Invalid;
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road)

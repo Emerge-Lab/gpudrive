@@ -20,10 +20,10 @@ namespace gpudrive
 
     enum class MapObjectType : uint32_t
     {
-        vehicle,
-        pedestrian,
-        cyclist,
-        invalid
+        Vehicle,
+        Pedestrian,
+        Cyclist,
+        Invalid
     };
 
     enum class MapRoadType : uint32_t
