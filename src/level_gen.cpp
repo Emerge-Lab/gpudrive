@@ -39,8 +39,8 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle, CountT idx) {
             break;
         }
     }
-    auto xCoord = ctx.data().map->objects[idx].position[valid_idx].x - ctx.data().map->meanx;
-    auto yCoord = ctx.data().map->objects[idx].position[valid_idx].y - ctx.data().map->meany;
+    auto xCoord = ctx.data().map->objects[idx].position[valid_idx].x - ctx.data().map->mean.x;
+    auto yCoord = ctx.data().map->objects[idx].position[valid_idx].y - ctx.data().map->mean.y;
     auto xVelocity = ctx.data().map->objects[idx].velocity[valid_idx].x;
     auto yVelocity = ctx.data().map->objects[idx].velocity[valid_idx].y;
     auto speed = ctx.data().map->objects[idx].velocity[valid_idx].x;
@@ -69,12 +69,12 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &obj) {
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
-    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x =  obj.goalPosition.x - ctx.data().map->meanx, .y =  obj.goalPosition.y - ctx.data().map->meany}};
+    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x =  obj.goalPosition.x - ctx.data().map->mean.x, .y =  obj.goalPosition.y - ctx.data().map->mean.y}};
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     // ctx.get<Trajectory>(vehicle).positions[0] =
-    //     Vector2{.x = xCoord - ctx.data().map->meanx, .y = yCoord - ctx.data().map->meany};
+    //     Vector2{.x = xCoord - ctx.data().map->mean.x, .y = yCoord - ctx.data().map->mean.y};
     // ctx.get<Trajectory>(vehicle).initialHeading = degreesToRadians(heading);
     // ctx.get<Trajectory>(vehicle).velocities[0] =
     //     Vector2{.x = speedX, .y = speedY};
@@ -86,13 +86,13 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &obj) {
 }
 
 static Entity makeRoadEdge(Engine &ctx,
-                         const MapPosition& p1,
-                         const MapPosition& p2)
+                         const MapVector2& p1,
+                         const MapVector2& p2)
 {
     float x1 = p1.x; float y1 = p1.y;
     float x2 = p2.x; float y2 = p2.y ;
-    Vector3 start = Vector3{.x = x1 - ctx.data().map->meanx, .y = y1 - ctx.data().map->meany, .z = 0};
-    Vector3 end = Vector3{.x = x2 - ctx.data().map->meanx, .y = y2 - ctx.data().map->meany, .z = 0};
+    Vector3 start = Vector3{.x = x1 - ctx.data().map->mean.x, .y = y1 - ctx.data().map->mean.y, .z = 0};
+    Vector3 end = Vector3{.x = x2 - ctx.data().map->mean.x, .y = y2 - ctx.data().map->mean.y, .z = 0};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
@@ -109,7 +109,7 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, const MapPosition* geometryList)
+static Entity makeSpeedBump(Engine &ctx, const MapVector2* geometryList)
 {    // Extract coordinates
     float x1 = geometryList[0].x; float y1 = geometryList[0].y;
     float x2 = geometryList[1].x; float y2 = geometryList[1].y;
@@ -160,7 +160,7 @@ static Entity makeSpeedBump(Engine &ctx, const MapPosition* geometryList)
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().map->meanx, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().map->meany, .z = 1};
+    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().map->mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().map->mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     ctx.get<EntityType>(speed_bump) = EntityType::Cube;
@@ -170,11 +170,11 @@ static Entity makeSpeedBump(Engine &ctx, const MapPosition* geometryList)
     return speed_bump;
 }
 
-static Entity makeStopSign(Engine &ctx, const MapPosition* geomeryList)
+static Entity makeStopSign(Engine &ctx, const MapVector2* geomeryList)
 {
     float x1 = geomeryList[0].x; float y1 = geomeryList[0].y;
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().map->meanx, .y = y1 - ctx.data().map->meany, .z = 0.5};
+    ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().map->mean.x, .y = y1 - ctx.data().map->mean.y, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
     ctx.get<EntityType>(stop_sign) = EntityType::Cube;
@@ -185,24 +185,24 @@ static Entity makeStopSign(Engine &ctx, const MapPosition* geomeryList)
 }
 
 static inline size_t createRoadEntities(Engine &ctx, const MapRoad &road, size_t &idx) {
-    if (road.type == MapRoadType::road_edge || road.type == MapRoadType::lane || road.type == MapRoadType::road_line)
+    if (road.type == MapRoadType::RoadEdge| road.type == MapRoadType::Lane|| road.type == MapRoadType::RoadLine)
     {
-        size_t numPoints = road.numPositions;
+        size_t numPoints = road.numPoints;
         for(size_t j = 1; j <= numPoints - 1; j++)
         {
             if(idx >= consts::numRoadSegments) return idx;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, road.geometry[j-1], road.geometry[j]);
         }
     }
-    else if(road.type == MapRoadType::speed_bump)
+    else if(road.type == MapRoadType::SpeedBump)
     {
-        if(road.numPositions!= 4) return idx; // This should be an assert. Changing this right now because of lack of understanding.
+        if(road.numPoints!= 4) return idx; // This should be an assert. Changing this right now because of lack of understanding.
         if(idx >= consts::numRoadSegments) return idx;
         ctx.data().roads[idx++] = makeSpeedBump(ctx, road.geometry);
     }
-    else if(road.type == MapRoadType::stop_sign)
+    else if(road.type == MapRoadType::StopSign)
     {
-        if(road.numPositions != 1) return idx;// This should be an assert. Changing this right now because of lack of understanding.
+        if(road.numPoints != 1) return idx;// This should be an assert. Changing this right now because of lack of understanding.
         if(idx >= consts::numRoadSegments) return idx;
         ctx.data().roads[idx++] = makeStopSign(ctx, road.geometry);
     }
@@ -235,7 +235,7 @@ void createPersistentEntities(Engine &ctx) {
     for(size_t i = 0; i < ctx.data().map->numObjects && agentCount < consts::numAgents; i++) {
         const auto &obj = ctx.data().map->objects[i];
 
-        if(obj.type == MapObjectType::vehicle) {
+        if(obj.type == MapObjectType::Vehicle){
             ctx.data().agents[agentCount++] = createVehicle(
                 ctx, obj
             );

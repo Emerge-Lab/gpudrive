@@ -57,8 +57,7 @@ public:
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
-                              float headAngle);
-    MGR_EXPORT void setMap(uint32_t* indices);                       
+                              float headAngle);                 
 
   private:
     struct Impl;

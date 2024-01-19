@@ -1,5 +1,6 @@
 #include "mgr.hpp"
 #include "sim.hpp"
+#include "MapReader.hpp"
 
 #include <madrona/utils.hpp>
 #include <madrona/importer.hpp>
@@ -16,7 +17,7 @@
 #include <cstdlib>
 #include <nlohmann/json.hpp>
 #include "types.hpp"
-#include "json_serialization.hpp"
+// #include "json_serialization.hpp"
 
 #include <chrono>
 #include <thread>
@@ -39,23 +40,17 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
-    uint32_t* mapIndices;
-    Map** maps;
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
-                Action *action_buffer,
-                uint32_t* map_indices,
-                Map** maps)
+                Action *action_buffer)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
-          agentActionsBuffer(action_buffer),
-          mapIndices(map_indices),
-          maps(maps)
+          agentActionsBuffer(action_buffer)
     {}
 
     inline virtual ~Impl() {}
@@ -81,21 +76,15 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   uint32_t* map_indices,
-                   Map** maps,
                    TaskGraphT &&cpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, map_indices, maps),
+               ep_mgr, reset_buffer, action_buffer),
           cpuExec(std::move(cpu_exec))
     {}
 
     inline virtual ~CPUImpl() final
     {
         delete episodeMgr;
-        for(int i = 0; i < cfg.numWorlds; ++i) {
-            delete maps[i];
-        }
-        delete [] maps;
     }
 
     inline virtual void run()
@@ -121,21 +110,15 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   uint32_t* map_indices,
-                   Map** maps,
                    MWCudaExecutor &&gpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, map_indices, maps),
+               ep_mgr, reset_buffer, action_buffer),
           gpuExec(std::move(gpu_exec))
     {}
 
     inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
-        for(int i = 0; i < cfg.numWorlds; ++i) {
-            REQ_CUDA(cudaFree(maps[i]));
-        }
-        delete [] maps;
     }
 
     inline virtual void run()
@@ -272,137 +255,6 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
-// static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
-
-//     std::vector<std::string> jsonFilePaths;
-//     nlohmann::json validFilesJson;
-//     std::filesystem::path validFilesJsonPath = mgr_cfg.mapsPath / "valid_files.json";
-//     std::ifstream validFilesFile(validFilesJsonPath);
-//     if (validFilesFile.is_open()) {
-//         validFilesFile >> validFilesJson;
-//         validFilesFile.close();
-
-//         // Extract file paths from the JSON keys
-//         auto ctr = 0;
-//         for (auto& [key, value] : validFilesJson.items()) {
-//             std::filesystem::path fullPath = mgr_cfg.mapsPath / key;
-//             jsonFilePaths.emplace_back(fullPath.string());
-//         }
-//     }
-//     std::array<Map, 25> mapArray;
-
-//     // Read and parse JSON files to create Map objects
-//     for (int i = 0; i < mgr_cfg.numWorlds; i++) {
-//         std::cout<< "Reading file: " << jsonFilePaths[i] << std::endl;
-//         std::ifstream jsonfile(jsonFilePaths[i]);
-//         nlohmann::json jsonData;
-//         if (jsonfile.is_open()) {
-//             jsonfile >> jsonData;
-//             mapArray[i] = (jsonData.get<Map>());
-//             jsonfile.close();
-//         }
-//     }
-
-//     switch (mgr_cfg.execMode)
-//     {
-//         case ExecMode::CUDA:
-//         {
-//             #ifdef MADRONA_CUDA_SUPPORT
-
-//                 // Allocate memory for each Map object on the GPU and store the pointer in the CPU array
-//                 for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
-//                     mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
-//                     REQ_CUDA(cudaMemcpy(mapPtrArray[i], &mapArray[i], sizeof(Map), cudaMemcpyHostToDevice));
-//                 }
-//             #else
-//                 FATAL("Madrona was not compiled with CUDA support");
-//             #endif
-//         } break;
-//         case ExecMode::CPU:
-//         {            
-//             for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
-//                 mapPtrArray[i] = &mapArray[i];
-//             }
-//         }break;
-//         default:
-//             MADRONA_UNREACHABLE();
-//     }
-// }
-
-static void GetMaps(const Manager::Config &mgr_cfg, Map** mapPtrArray) {
-    // #ifdef MADRONA_CUDA_SUPPORT
-    // cudaStream_t stream = madrona::cu::makeStream();
-    // #endif
-
-    std::filesystem::path validFilesJsonPath = mgr_cfg.mapsPath / "valid_files.json";
-    std::ifstream validFilesFile(validFilesJsonPath);
-    nlohmann::json validFilesJson;
-    
-    if (validFilesFile.is_open()) {
-        validFilesFile >> validFilesJson;
-        validFilesFile.close();
-    }
-
-    std::vector<std::string> jsonFilePaths;
-    for (auto& [key, value] : validFilesJson.items()) {
-        std::filesystem::path fullPath = mgr_cfg.mapsPath / key;
-        jsonFilePaths.emplace_back(fullPath.string());
-    }
-
-    // Read and parse JSON files to create Map objects
-    for (int i = 0; i < mgr_cfg.numWorlds; i++) {
-        std::filesystem::path fullPath = mgr_cfg.mapsPath / jsonFilePaths[i];
-        // std::cout<< "Reading file: " << fullPath << std::endl;
-        std::ifstream jsonfile(fullPath);
-        nlohmann::json jsonData;
-        if (jsonfile.is_open()) {
-            jsonfile >> jsonData;
-            jsonfile.close();
-
-            switch (mgr_cfg.execMode)
-            {
-                case ExecMode::CUDA:
-                {
-                    #ifdef MADRONA_CUDA_SUPPORT
-                        Map *mapObj = new Map();
-                        from_json(jsonData, *mapObj);
-                        // Allocate memory for each Map object on the GPU
-                        if(mapPtrArray[i] == nullptr) {
-                            mapPtrArray[i] = static_cast<Map*>(cu::allocGPU(sizeof(Map)));
-                        }
-                        REQ_CUDA(cudaMemcpy(mapPtrArray[i], mapObj, sizeof(Map), cudaMemcpyHostToDevice));
-                        delete mapObj;
-                    #else
-                        FATAL("Madrona was not compiled with CUDA support");
-                    #endif
-                } break;
-
-                case ExecMode::CPU:
-                {
-                    if(mapPtrArray[i] != nullptr) {
-                        from_json(jsonData, *mapPtrArray[i]);
-                    }
-                    else {
-                        mapPtrArray[i] = new Map();
-                        from_json(jsonData, *mapPtrArray[i]);
-                    }
-                } break;
-
-                default:
-                    MADRONA_UNREACHABLE();
-            }
-            
-        }
-    }
-    // #ifdef MADRONA_CUDA_SUPPORT
-    // if(mgr_cfg.execMode == ExecMode::CUDA)
-    // {
-    //     REQ_CUDA(cudaStreamSynchronize(stream)); // wait for all the copies to finish
-    // }
-    // REQ_CUDA(cudaStreamDestroy(stream));
-    // #endif
-}
-
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg,
     const viz::VizECSBridge *viz_bridge)
@@ -412,13 +264,7 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    // uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
-    uint32_t* mapIndices = new uint32_t[mgr_cfg.numWorlds](); // Initialize to 0
-    for (int i = 0; i < mgr_cfg.numWorlds; ++i) {
-        mapIndices[i] = i;
-    }
-
-    std::string pathToScenario("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+    std::string pathToScenario("/home/aarav/gpudrive/tests/test_orig.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -433,17 +279,14 @@ Manager::Impl * Manager::Impl::init(
         loadPhysicsObjects(phys_loader);
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
-        Map** mapPtrArray = new Map*[mgr_cfg.numWorlds];
-        for(int i = 0; i < mgr_cfg.numWorlds; ++i) {
-            mapPtrArray[i] = nullptr;
-        }
-        GetMaps(mgr_cfg, mapPtrArray);
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+             Map *map_ =
+               (Map* )MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mapPtrArray[i]};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
         }
 
         MWCudaExecutor gpu_exec({
@@ -474,9 +317,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices,
-            mapPtrArray,
-            std::move(gpu_exec),
+            std::move(gpu_exec)
         };
 #else
         FATAL("Madrona was not compiled with CUDA support");
@@ -492,15 +333,12 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        Map** mapArray = new Map*[mgr_cfg.numWorlds];
-        for(int i = 0; i < mgr_cfg.numWorlds; ++i) {
-            mapArray[i] = nullptr;
-        }
-        GetMaps(mgr_cfg, mapArray);
-
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+
+        Map *map_ =
+               (Map* )MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, mapArray[i]};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_};
         }
 
         CPUImpl::TaskGraphT cpu_exec {
@@ -524,9 +362,7 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
-            mapIndices,
-            mapArray,
-            std::move(cpu_exec),
+            std::move(cpu_exec)
         };
 
         return cpu_impl;
@@ -718,27 +554,4 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
         *action_ptr = action;
     }
 }
-
-void Manager::setMap(uint32_t* indices) {
-    // TODO: check if reset is called before setMap. Or integrate setMap into reset.
-
-    for (int i = 0; i < impl_->cfg.numWorlds; ++i) {
-        impl_->mapIndices[i] = indices[i];
-    }
-    if(impl_->cfg.execMode == ExecMode::CUDA) {
-        GetMaps(impl_->cfg, impl_->maps);
-    }
-    else {
-        // for(int i = 0; i < impl_->cfg.numWorlds; ++i) {
-        //     if(impl_->maps[i] != nullptr) {
-        //         Map* temp = impl_->maps[i];
-        //         impl_->maps[i] = nullptr;
-        //         delete temp;
-        //     }
-        // }
-        GetMaps(impl_->cfg, impl_->maps);
-    }
-
-}
-
 } // namespace gpudrive

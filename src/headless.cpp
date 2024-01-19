@@ -118,7 +118,6 @@ int main(int argc, char *argv[])
     for (uint32_t i = 0; i < num_worlds; i++) {
         world_idxs[i] = i;
     }
-    mgr.setMap(world_idxs);
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
