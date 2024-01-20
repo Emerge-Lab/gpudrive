@@ -432,7 +432,7 @@ Tensor Manager::bicycleModelTensor() const
     return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
-            impl_->cfg.params.numAgents,
+            consts::numAgents,
             4, // Number of states for the bicycle model
         });
 }
@@ -464,7 +464,7 @@ Tensor Manager::selfObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->cfg.params.numAgents,
+                                   consts::numAgents,
                                    8
 
                                });
@@ -476,7 +476,7 @@ Tensor Manager::mapObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->cfg.params.numRoadSegments,
+                                   consts::numRoadSegments,
                                    4
                                });
 }
@@ -487,8 +487,8 @@ Tensor Manager::partnerObservationsTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->cfg.params.numAgents,
-                                   impl_->cfg.params.numAgents - 1,
+                                   consts::numAgents,
+                                   consts::numAgents - 1,
                                    4,
                                });
 }

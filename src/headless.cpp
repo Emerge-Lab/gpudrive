@@ -62,9 +62,7 @@ int main(int argc, char *argv[])
         .jsonPath = "tests/test.json",
         .params = {
             .polylineReductionThreshold = 0.0,
-            .observationRadius = 100.0,
-            .numAgents = 2,
-            .numRoadSegments = 4422,
+            .observationRadius = 100.0
         }
     });
 

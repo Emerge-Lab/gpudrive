@@ -29,9 +29,7 @@ protected:
         .jsonPath = "test.json",
         .params = {
             .polylineReductionThreshold = 0.0,
-            .observationRadius = 100.0,
-            .numAgents = num_agents,
-            .numRoadSegments = num_roads,
+            .observationRadius = 100.0
         }
     });
     int64_t num_steps = 10;

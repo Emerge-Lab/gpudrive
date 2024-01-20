@@ -94,9 +94,6 @@ namespace gpudrive
     struct Parameters{
     float polylineReductionThreshold;
     float observationRadius;
-    madrona::CountT numAgents = 10;
-    madrona::CountT numRoadSegments = 500;
-    // More params to be added here.
     };
 
     struct WorldInit
