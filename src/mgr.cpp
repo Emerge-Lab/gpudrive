@@ -277,13 +277,16 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
+        Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
+        REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
+
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
         {
             Map *map_ =
                (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
 
             world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, &(mgr_cfg.params)};
+                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
         }
 
         MWCudaExecutor gpu_exec({
@@ -308,6 +311,7 @@ Manager::Impl * Manager::Impl::init(
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
+        madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
           madrona::cu::deallocGPU(init.map);
