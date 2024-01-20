@@ -280,7 +280,7 @@ Manager::Impl * Manager::Impl::init(
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
         {
             Map *map_ =
-               (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA);
+               (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
 
             world_inits[i] =
                 WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, mgr_cfg.params};
@@ -338,7 +338,7 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           Map* map_ =
-              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU);
+              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
 
           world_inits[i] =
               WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, mgr_cfg.params};

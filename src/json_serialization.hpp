@@ -97,7 +97,7 @@ namespace gpudrive
             obj.type = MapObjectType::Invalid;
     }
 
-    void from_json(const nlohmann::json &j, MapRoad &road)
+    void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
     {
         road.mean = {0,0};
         std::string type = j.at("type");
@@ -135,7 +135,7 @@ namespace gpudrive
                 float x3 = geom["x"];
                 float y3 = geom["y"];
                 float shoelace_area = 0.5 * abs((x1 - x3) * (y2 - y1) - (x1 - x2) * (y3 - y1));
-                if (shoelace_area > 1.0)
+                if (shoelace_area > polylineReductionThreshold)
                 {
                     from_json(geom, road.geometry[i]);
                     ++i;
@@ -174,7 +174,7 @@ namespace gpudrive
 
     }
 
-    void from_json(const nlohmann::json &j, Map &map)
+    void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
         map.mean = {0,0};
         size_t totalPoints = 0; // Total count of points
@@ -205,7 +205,8 @@ namespace gpudrive
         {
             if (i < MAX_ROADS)
             {
-                road.get_to(map.roads[i]);
+                // road.get_to(map.roads[i]);
+                from_json(road, map.roads[i], polylineReductionThreshold);
                 size_t roadPoints = map.roads[i].numPoints;
                 map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
                 map.mean.y = ((map.mean.y * totalPoints) + (map.roads[i].mean.y * roadPoints)) / (totalPoints + roadPoints);

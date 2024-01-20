@@ -45,17 +45,17 @@ MapReader::~MapReader() {
     delete map_;
 }
 
-void MapReader::doParse() {
+void MapReader::doParse(float polylineReductionThreshold) {
   nlohmann::json rawJson;
   in_ >> rawJson;
 
-  from_json(rawJson, *map_);
+  from_json(rawJson, *map_, polylineReductionThreshold);
 }
 
 gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
-                            madrona::ExecMode executionMode) {
+                            madrona::ExecMode executionMode, float polylineReductionThreshold) {
   MapReader reader(path);
-  reader.doParse();
+  reader.doParse(polylineReductionThreshold);
 
   return copyToArrayOnHostOrDevice(reader.map_, executionMode);
 
