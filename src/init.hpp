@@ -15,7 +15,7 @@ namespace gpudrive
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;
     constexpr size_t MAX_ROADS = 956;
-    constexpr size_t MAX_POSITIONS = 91;
+    constexpr size_t MAX_POSITIONS = 100;
     constexpr size_t MAX_GEOMETRY = 1746;
 
     enum class MapObjectType : uint32_t

@@ -26,7 +26,7 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
-        .jsonPath = "test.json",
+        .jsonPath = "/home/aarav/gpudrive/tests/test.json",
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0
@@ -39,7 +39,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("test.json");
+    std::ifstream data = std::ifstream("/home/aarav/gpudrive/tests/test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
@@ -53,13 +53,15 @@ protected:
             {
                 continue;
             }
-            numEntities++;
-            float newX = obj["position"][0]["x"];
-            float newY = obj["position"][0]["y"];
-
-            // Update mean incrementally
-            mean.first += (newX - mean.first) / numEntities;
-            mean.second += (newY - mean.second) / numEntities;
+            for(const auto &pos: obj["position"])
+            {   
+                numEntities++;
+                float newX = pos["x"];
+                float newY = pos["y"];
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
         }
         for (const auto &obj: rawJson["roads"])
         {
