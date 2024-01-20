@@ -149,8 +149,6 @@ static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    auto centerx = (x1 + x2 + x3 + x4)/4;
-    auto centery = (y1 + y2 + y3 + y4)/4;
     ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
