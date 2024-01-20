@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
     auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
+    auto donePrinter = mgr.doneTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -107,6 +108,9 @@ int main(int argc, char *argv[])
 
         printf("Reward\n");
         rewardPrinter.print();
+
+        printf("Done\n");
+        donePrinter.print();
     };
     // printObs();
     for (CountT i = 0; i < (CountT)num_steps; i++) {

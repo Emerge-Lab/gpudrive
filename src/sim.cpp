@@ -363,15 +363,28 @@ inline void bonusRewardSystem(Engine &ctx,
 // Keep track of the number of steps remaining in the episode and
 // notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
-inline void stepTrackerSystem(Engine &,
+inline void stepTrackerSystem(Engine &ctx,
+                              const BicycleModel &model,
+                              const Goal &goal,
                               StepsRemaining &steps_remaining,
                               Done &done)
 {
+    // Absolute done is 90 steps.
     int32_t num_remaining = --steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1) {
+    if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
         done.v = 0;
     } else if (num_remaining == 0) {
         done.v = 1;
+    }
+
+    // An agent can be done early if it reaches the goal
+    if(done.v != 1)
+    {
+        float dist = (model.position - goal.position).length();
+        if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+        {
+            done.v = 1;
+        }
     }
 
 }
@@ -457,7 +470,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<
-        ParallelForNode<Engine, stepTrackerSystem, StepsRemaining, Done>>(
+        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, StepsRemaining, Done>>(
         {reward_sys});
 
     // Conditionally reset the world if the episode is over
