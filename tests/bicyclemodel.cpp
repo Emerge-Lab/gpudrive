@@ -1,7 +1,6 @@
 #include "gtest/gtest.h"
 #include "consts.hpp"
 #include "mgr.hpp"
-#include <nlohmann/json.hpp>
 #include "test_utils.hpp"
 
 #include <iostream>
@@ -47,35 +46,7 @@ protected:
     void SetUp() override {
         json rawJson;
         data >> rawJson;
-        for (const auto &obj : rawJson["objects"])
-        {
-            if (obj["type"] != "vehicle")
-            {
-                continue;
-            }
-            for(const auto &pos: obj["position"])
-            {   
-                numEntities++;
-                float newX = pos["x"];
-                float newY = pos["y"];
-                // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-            }
-        }
-        for (const auto &obj: rawJson["roads"])
-        {
-            for (const auto &point: obj["geometry"])
-            {   
-                numEntities++;
-                float newX = point["x"];
-                float newY = point["y"];
-
-                // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-            }
-        }
+        mean = test_utils::calcMean(rawJson);
         std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
         int64_t n_agents = 0;
         for (const auto &obj : rawJson["objects"]) {

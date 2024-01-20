@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 using namespace madrona;
 
@@ -77,4 +78,6 @@ namespace test_utils
     std::vector<float> flatten_obs(const py::Tensor &obs);
 
     float degreesToRadians(float degrees);
+
+    std::pair<float, float> calcMean(const nlohmann::json &rawJson);
 } // namespace utils

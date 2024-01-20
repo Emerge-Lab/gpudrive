@@ -8,7 +8,7 @@ namespace consts {
 // TODO: Rename numAgents to maxNumAgents and numRoadSegments to
 // maxNumRoadSegments
 inline constexpr madrona::CountT numAgents = 3;
-inline constexpr madrona::CountT numRoadSegments = 3557;
+inline constexpr madrona::CountT numRoadSegments = 4475;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;

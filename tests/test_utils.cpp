@@ -22,4 +22,40 @@ namespace test_utils
         }
         return flattened;
     }
+
+    std::pair<float, float> calcMean(const nlohmann::json &rawJson)
+    {
+        std::pair<float, float> mean = {0, 0};
+        int64_t numEntities = 0;
+        for (const auto &obj : rawJson["objects"])
+        {
+            if (obj["type"] != "vehicle")
+            {
+                continue;
+            }
+            for (const auto &pos : obj["position"])
+            {
+                numEntities++;
+                float newX = pos["x"];
+                float newY = pos["y"];
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        for (const auto &obj : rawJson["roads"])
+        {
+            for (const auto &point : obj["geometry"])
+            {
+                numEntities++;
+                float newX = point["x"];
+                float newY = point["y"];
+
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        return mean;
+    }
 }
