@@ -283,7 +283,7 @@ Manager::Impl * Manager::Impl::init(
                (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
 
             world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, mgr_cfg.params};
+                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, &(mgr_cfg.params)};
         }
 
         MWCudaExecutor gpu_exec({
@@ -341,7 +341,7 @@ Manager::Impl * Manager::Impl::init(
               MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
 
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, mgr_cfg.params};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, &(mgr_cfg.params)};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

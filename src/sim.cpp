@@ -305,27 +305,35 @@ inline void lidarSystem(Engine &ctx,
 // Computes reward for each agent and keeps track of the max distance achieved
 // so far through the challenge. Continuous reward is provided for any new
 // distance achieved.
-inline void rewardSystem(Engine &,
-                         Position pos,
+inline void rewardSystem(Engine &ctx,
+                         const BicycleModel &model,
+                         const Trajectory &trajectory,
+                         const Goal &goal,
                          Progress &progress,
                          Reward &out_reward)
 {
-    // Just in case agents do something crazy, clamp total reward
-    float reward_pos = fminf(pos.y, consts::worldLength * 2);
 
-    float old_max_y = progress.maxY;
-
-    float new_progress = reward_pos - old_max_y;
-
-    float reward;
-    if (new_progress > 0) {
-        reward = new_progress * consts::rewardPerDist;
-        progress.maxY = reward_pos;
-    } else {
-        reward = consts::slackReward;
+    const auto &rewardType = ctx.data().params.rewardParams.rewardType;
+    if(rewardType == RewardType::DistanceBased)
+    {
+        float dist = (model.position - goal.position).length();
+        float reward = -dist;
+        out_reward.v = reward;
+    }
+    else if(rewardType == RewardType::OnGoalAchieved)
+    {
+        float dist = (model.position - goal.position).length();
+        float reward = (dist < ctx.data().params.rewardParams.distanceToGoalThreshold) ? 1.f : 0.f;
+        out_reward.v = reward;
+    }
+    else if(rewardType == RewardType::Dense)
+    {
+        // TODO: Implement full trajectory reward
+        // printf("Invalid Reward Type\n");
     }
 
-    out_reward.v = reward;
+    // Just in case agents do something crazy, clamp total reward
+    // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
 }
 
 // Each agent gets a small bonus to it's reward if the other agent has
@@ -437,10 +445,20 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
+    auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
+         rewardSystem,
+            BicycleModel,
+            Trajectory,
+            Goal,
+            Progress,
+            Reward
+        >>({phys_done});
+
+
     // Check if the episode is over
     auto done_sys = builder.addToGraph<
         ParallelForNode<Engine, stepTrackerSystem, StepsRemaining, Done>>(
-        {phys_done});
+        {reward_sys});
 
     // Conditionally reset the world if the episode is over
     auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -520,10 +538,9 @@ Sim::Sim(Engine &ctx,
          const Config &cfg,
          const WorldInit &init)
     : WorldBase(ctx),
-      episodeMgr(init.episodeMgr)
+      episodeMgr(init.episodeMgr),
+      params(*init.params)
 {
-    polylineReductionThreshold = init.params.polylineReductionThreshold;
-
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.

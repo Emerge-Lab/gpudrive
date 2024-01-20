@@ -61,8 +61,13 @@ int main(int argc, char *argv[])
         .autoReset = false,
         .jsonPath = "tests/test.json",
         .params = {
-            .polylineReductionThreshold = 0.0,
-            .observationRadius = 100.0
+            .polylineReductionThreshold = 1.0,
+            .observationRadius = 100.0,
+            .rewardParams = {
+                .rewardType = RewardType::DistanceBased,
+                .distanceToGoalThreshold = 0.5,
+                .distanceToExpertThreshold = 0.5
+            }
         }
     });
 
@@ -78,6 +83,7 @@ int main(int argc, char *argv[])
     auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
     auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
     auto shapePrinter = mgr.shapeTensor().makePrinter();
+    auto rewardPrinter = mgr.rewardTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -98,6 +104,9 @@ int main(int argc, char *argv[])
 
         printf("Shape\n");
         shapePrinter.print();
+
+        printf("Reward\n");
+        rewardPrinter.print();
     };
     // printObs();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
