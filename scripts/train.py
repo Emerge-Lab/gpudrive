@@ -1,4 +1,4 @@
-import gpudrive_learn
+import gpudrive
 
 from gpudrive_learn import (
     train, profile, TrainConfig, PPOConfig, SimInterface,
@@ -96,11 +96,24 @@ arg_parser.add_argument('--profile-report', action='store_true')
 
 args = arg_parser.parse_args()
 
+reward_params = gpudrive.RewardParams()
+reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved  # Or any other value from the enum
+reward_params.distanceToGoalThreshold = 1.0  # Set appropriate values
+reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
+
+# Create an instance of Parameters
+params = gpudrive.Parameters()
+params.polylineReductionThreshold = 1.0  # Set appropriate value
+params.observationRadius = 10.0  # Set appropriate value
+params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
+
 sim = gpudrive.SimManager(
     exec_mode = gpudrive.madrona.ExecMode.CUDA if args.gpu_sim else gpudrive.madrona.ExecMode.CPU,
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
     auto_reset = True,
+    json_path = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json",
+    params = params
 )
 
 ckpt_dir = Path(args.ckpt_dir)
