@@ -13,10 +13,10 @@ struct VizECSBridge;
 namespace gpudrive
 {
     // Constants computed from train files.
-    constexpr uint32_t MAX_OBJECTS = 10;
-    constexpr uint32_t MAX_ROADS = 100;
-    constexpr uint32_t MAX_POSITIONS = 50;
-    constexpr uint32_t MAX_GEOMETRY = 50;
+    constexpr size_t MAX_OBJECTS = 515;
+    constexpr size_t MAX_ROADS = 956;
+    constexpr size_t MAX_POSITIONS = 91;
+    constexpr size_t MAX_GEOMETRY = 1746;
 
     enum class MapObjectType : uint32_t
     {

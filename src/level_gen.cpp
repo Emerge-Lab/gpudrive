@@ -42,7 +42,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
 }
 
-static inline Entity createVehicle(Engine &ctx, MapObject agentInit) {
+static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
     auto vehicle = ctx.makeEntity<Agent>();
     
     // The following components do not vary within an episode and so need only
@@ -68,8 +68,8 @@ static inline Entity createVehicle(Engine &ctx, MapObject agentInit) {
     return vehicle;
 }
 
-static Entity makeRoadEdge(Engine &ctx, MapVector2 p1,
-                           MapVector2 p2) {
+static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
+                           const MapVector2 &p2) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -94,8 +94,8 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, MapVector2  p1, MapVector2  p2,MapVector2 p3,
-                            MapVector2  p4) {
+static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
+                            const MapVector2 &p4) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -160,7 +160,7 @@ static Entity makeSpeedBump(Engine &ctx, MapVector2  p1, MapVector2  p2,MapVecto
     return speed_bump;
 }
 
-static Entity makeStopSign(Engine &ctx, MapVector2 p1) {
+static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     float x1 = p1.x;
     float y1 = p1.y;
 
@@ -176,7 +176,7 @@ static Entity makeStopSign(Engine &ctx, MapVector2 p1) {
     return stop_sign;
 }
 
-static inline void createRoadEntities(Engine &ctx, MapRoad roadInit, CountT &idx, CountT &roadCtr) {
+static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, CountT &idx) {
     if (roadInit.type == MapRoadType::RoadEdge || roadInit.type == MapRoadType::RoadLine || roadInit.type == MapRoadType::Lane)
     {
         size_t numPoints = roadInit.numPoints;
@@ -231,7 +231,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
         if(agentIdx >= consts::numAgents)
             break;
-        auto agentInit = map->objects[agentIdx];
+        const auto &agentInit = map->objects[agentIdx];
         if(agentInit.type != MapObjectType::Vehicle)
             continue;
         auto vehicle = createVehicle(
@@ -247,7 +247,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         if(roadIdx >= consts::numRoadSegments)
             break;
         const auto &roadInit = map->roads[roadCtr];
-        createRoadEntities(ctx, roadInit, roadIdx, roadCtr);
+        createRoadEntities(ctx, roadInit, roadIdx);
     }
     ctx.data().numRoads = roadIdx;
 
