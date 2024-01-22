@@ -27,6 +27,7 @@ enum class ExportID : uint32_t {
     BicycleModel,
     MapObservation,
     Shape,
+    ValidState,
     NumExports
 };
 
