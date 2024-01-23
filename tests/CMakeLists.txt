@@ -3,16 +3,18 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/test.json COPYONLY)
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/external/madrona
 )
 
-
-
 # Add your test file(s) to the add_executable command
 add_executable(my_tests
     bicyclemodel.cpp
+    observationTest.cpp
+    test_utils.cpp
     # Add other test files if needed
 )
 
@@ -22,7 +24,6 @@ target_link_libraries(my_tests
     mad_escape_mgr
     nlohmann_json::nlohmann_json
 )
-
 
 # Include GoogleTest module functions and discover tests in the executable
 include(GoogleTest)

@@ -1,7 +1,6 @@
 #include "gtest/gtest.h"
 #include "consts.hpp"
 #include "mgr.hpp"
-#include <nlohmann/json.hpp>
 #include "test_utils.hpp"
 
 #include <iostream>
@@ -14,26 +13,24 @@
 using namespace madrona;
 using nlohmann::json;
 
-
-float degreesToRadians(float degrees) {
-    return degrees * M_PI / 180.0;
-}
-
 // TODO: Add the dynamic files here to be able to test from any json file.
 
-
-
 class BicycleKinematicModelTest : public ::testing::Test {
-protected:
+protected:    
+    int64_t num_agents = 3;
+    int64_t num_roads = 4050;
+    
     gpudrive::Manager mgr = gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
+        .jsonPath = "test.json",
+        .params = {
+            .polylineReductionThreshold = 0.0,
+            .observationRadius = 100.0
+        }
     });
-    
-    int64_t num_agents = gpudrive::consts::numAgents;
-    int64_t num_roads = gpudrive::consts::numRoadSegments;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
     int64_t numEntities = 0;
@@ -41,7 +38,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json");
+    std::ifstream data = std::ifstream("test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
@@ -49,33 +46,7 @@ protected:
     void SetUp() override {
         json rawJson;
         data >> rawJson;
-        for (const auto &obj : rawJson["objects"])
-        {
-            if (obj["type"] != "vehicle")
-            {
-                continue;
-            }
-            numEntities++;
-            float newX = obj["position"][0]["x"];
-            float newY = obj["position"][0]["y"];
-
-            // Update mean incrementally
-            mean.first += (newX - mean.first) / numEntities;
-            mean.second += (newY - mean.second) / numEntities;
-        }
-        for (const auto &obj: rawJson["roads"])
-        {
-            for (const auto &point: obj["geometry"])
-            {   
-                numEntities++;
-                float newX = point["x"];
-                float newY = point["y"];
-
-                // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-            }
-        }
+        mean = test_utils::calcMean(rawJson);
         std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
         int64_t n_agents = 0;
         for (const auto &obj : rawJson["objects"]) {
@@ -88,7 +59,7 @@ protected:
             }
             initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
             initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
-            initialState.push_back(degreesToRadians(obj["heading"][0]));
+            initialState.push_back(test_utils::degreesToRadians(obj["heading"][0]));
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
             agent_length_map[n_agents++] = obj["length"];
         }

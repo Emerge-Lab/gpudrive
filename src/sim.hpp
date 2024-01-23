@@ -73,6 +73,9 @@ struct Sim : public madrona::WorldBase {
     Sim(Engine &ctx,
         const Config &cfg,
         const WorldInit &init);
+
+    float polylineReductionThreshold;
+
     // EpisodeManager globally tracks episode IDs with an atomic across the
     // simulation.
     EpisodeManager *episodeMgr;
@@ -87,6 +90,10 @@ struct Sim : public madrona::WorldBase {
     // play area. These are constant across all episodes.
     Entity borders[3];
 
+    // Max number of agents and roads in the episode to be initialized.
+    CountT max_num_agents; 
+    CountT max_num_roads;
+
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     madrona::CountT numAgents;
@@ -95,6 +102,8 @@ struct Sim : public madrona::WorldBase {
     Entity roads[consts::numRoadSegments];
 
     madrona::math::Vector2 mean;
+
+    Parameters params;
 
     // Episode ID number
     int32_t curEpisodeIdx;

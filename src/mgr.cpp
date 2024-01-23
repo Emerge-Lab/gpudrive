@@ -261,8 +261,7 @@ Manager::Impl * Manager::Impl::init(
     // TODO: To run multiple worlds in parallel, this path would have to be
     // varied aross different input files.
 
-    std::string pathToScenario("/home/aarav/gpudrive/tests/test_orig.json");
-
+    std::string pathToScenario("../tfrecord-00012-of-00150_204.json");
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -278,13 +277,16 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
+        Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
+        REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
+
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
         {
             Map *map_ =
-               (Map* )MapReader::parseAndWriteOut(pathToScenario, ExecMode::CUDA);
+               (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
 
             world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA};
+                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
         }
 
         MWCudaExecutor gpu_exec({
@@ -309,6 +311,7 @@ Manager::Impl * Manager::Impl::init(
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
+        madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
           madrona::cu::deallocGPU(init.map);
@@ -339,10 +342,10 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           Map* map_ =
-              MapReader::parseAndWriteOut(pathToScenario, ExecMode::CPU);
+              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
 
           world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU};
+              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, &(mgr_cfg.params)};
         }
 
         CPUImpl::TaskGraphT cpu_exec {

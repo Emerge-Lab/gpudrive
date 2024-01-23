@@ -54,7 +54,7 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
-    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x, .y = agentInit.goalPosition.y}};
+    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
@@ -75,7 +75,7 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
 }
 
 static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
-                           const MapVector2 &p2) {
+                           const MapVector2 &p2, const MapRoadType &type) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -92,7 +92,7 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
-    ctx.get<MapObservation>(road_edge) = MapObservation{.position = Vector2{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2}, .heading = atan2(end.y - start.y, end.x - start.x), .type = 0};
+    ctx.get<MapObservation>(road_edge) = MapObservation{.position = Vector2{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2}, .heading = atan2(end.y - start.y, end.x - start.x), .type = (float)type};
     return road_edge;
 }
 
@@ -162,7 +162,7 @@ static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = 1};
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)MapRoadType::SpeedBump};
     return speed_bump;
 }
 
@@ -178,7 +178,7 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
-    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = 2};
+    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = (float)MapRoadType::StopSign};
     return stop_sign;
 }
 
@@ -190,7 +190,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         {
             if(idx >= consts::numRoadSegments)
                  return;
-            ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j]);
+            ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
     } else if (roadInit.type == MapRoadType::SpeedBump) {
       assert(roadInit.numPoints == 4);
