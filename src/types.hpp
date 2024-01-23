@@ -147,6 +147,10 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
+struct ValidState {
+    int32_t isValid; // Tells if the current state is valid or not
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -177,6 +181,7 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
+    ValidState,
     // Input
     Action,
 

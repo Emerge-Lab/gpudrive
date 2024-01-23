@@ -64,7 +64,8 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];
     }
-    
+
+    ctx.get<ValidState>(vehicle) = ValidState{.isValid = agentInit.valid[0]};
     // This is not stricly necessary since , but is kept here for consistency
     resetVehicle(ctx, vehicle);
 
