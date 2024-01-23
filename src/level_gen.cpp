@@ -21,53 +21,68 @@ static void registerRigidBodyEntity(
         RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
-static inline void resetVehicle(Engine &ctx, Entity vehicle) {
-    auto xCoord = ctx.get<Trajectory>(vehicle).positions[0].x;
-    auto yCoord = ctx.get<Trajectory>(vehicle).positions[0].y;
-    auto xVelocity = ctx.get<Trajectory>(vehicle).velocities[0].x;
-    auto yVelocity = ctx.get<Trajectory>(vehicle).velocities[0].y;
-    auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
-    auto heading = ctx.get<Trajectory>(vehicle).headings[0];
-    auto valid = ctx.get<Trajectory>(vehicle).valids[0];
+static inline void resetAgent(Engine &ctx, Entity agent) {
+    auto xCoord = ctx.get<Trajectory>(agent).positions[0].x;
+    auto yCoord = ctx.get<Trajectory>(agent).positions[0].y;
+    auto xVelocity = ctx.get<Trajectory>(agent).velocities[0].x;
+    auto yVelocity = ctx.get<Trajectory>(agent).velocities[0].y;
+    auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
+    auto heading = ctx.get<Trajectory>(agent).headings[0];
+    auto valid = ctx.get<Trajectory>(agent).valids[0];
 
-    ctx.get<BicycleModel>(vehicle) = {
+    ctx.get<BicycleModel>(agent) = {
         .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
-    ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
-    ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
-    ctx.get<Velocity>(vehicle) = {
+    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
+    ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
+    ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    ctx.get<ExternalForce>(vehicle) = Vector3::zero();
-    ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
-    ctx.get<ValidState>(vehicle) = ValidState{.isValid = valid};
-    ctx.get<Action>(vehicle) =
+    ctx.get<ExternalForce>(agent) = Vector3::zero();
+    ctx.get<ExternalTorque>(agent) = Vector3::zero();
+    ctx.get<ValidState>(agent) = ValidState{.isValid = valid};
+    ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
-    ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
+    ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
 }
 
-static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
-    auto vehicle = ctx.makeEntity<Agent>();
+static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
+    auto agent = ctx.makeEntity<Agent>();
     
     // The following components do not vary within an episode and so need only
     // be set once
-    ctx.get<VehicleSize>(vehicle) = {.length = agentInit.length, .width = agentInit.width};
-    ctx.get<Scale>(vehicle) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
-    ctx.get<ObjectID>(vehicle) = ObjectID{(int32_t)SimObject::Agent};
-    ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
-    ctx.get<EntityType>(vehicle) = EntityType::Agent;
-    ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles)
+    ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
+    ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
+    ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
+    if(agentInit.type == MapObjectType::Vehicle)
     {
-        ctx.get<ControlledState>(vehicle) = ControlledState{.controlledState = 1};
+        ctx.get<EntityType>(agent) = EntityType::Vehicle;
+    }
+    else if(agentInit.type == MapObjectType::Pedestrian)
+    {
+        ctx.get<EntityType>(agent) = EntityType::Pedestrian;
+    }
+    else if(agentInit.type == MapObjectType::Cyclist)
+    {
+        ctx.get<EntityType>(agent) = EntityType::Cyclist;
+    }
+    else
+    {
+        ctx.get<EntityType>(agent) = EntityType::Invalid;
+    }
+    ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle)
+    {
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = 1};
         ctx.data().numControlledVehicles++;
     }
     else
     {
-        ctx.get<ControlledState>(vehicle) = ControlledState{.controlledState = 0};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = 0};
     }
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
-    auto &trajectory = ctx.get<Trajectory>(vehicle);
+    auto &trajectory = ctx.get<Trajectory>(agent);
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
         trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
@@ -76,11 +91,11 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    ctx.get<ValidState>(vehicle) = ValidState{.isValid = agentInit.valid[0]};
+    ctx.get<ValidState>(agent) = ValidState{.isValid = agentInit.valid[0]};
     // This is not stricly necessary since , but is kept here for consistency
-    resetVehicle(ctx, vehicle);
+    resetAgent(ctx, agent);
 
-    return vehicle;
+    return agent;
 }
 
 static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
@@ -247,11 +262,9 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         if(agentIdx >= consts::numAgents)
             break;
         const auto &agentInit = map->objects[agentIdx];
-        if(agentInit.type != MapObjectType::Vehicle)
-            continue;
-        auto vehicle = createVehicle(
+        auto agent = createAgent(
             ctx, agentInit);
-        ctx.data().agents[agentIdx] = vehicle;
+        ctx.data().agents[agentIdx] = agent;
     } 
     
     ctx.data().numAgents = agentIdx; 
@@ -277,14 +290,14 @@ static void resetPersistentEntities(Engine &ctx)
 {
     for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
     {
-        Entity vehicle = ctx.data().agents[idx];
+        Entity agent = ctx.data().agents[idx];
 
-        resetVehicle(ctx, vehicle);
+        resetAgent(ctx, agent);
 
-        registerRigidBodyEntity(ctx, vehicle, SimObject::Agent);
+        registerRigidBodyEntity(ctx, agent, SimObject::Agent);
 
 
-        ctx.get<viz::VizCamera>(vehicle) = viz::VizRenderingSystem::setupView(
+        ctx.get<viz::VizCamera>(agent) = viz::VizRenderingSystem::setupView(
             ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 

@@ -127,7 +127,10 @@ enum class EntityType : uint32_t {
     None,
     Button,
     Cube,
-    Agent,
+    Vehicle,
+    Pedestrian,
+    Cyclist,
+    Invalid,
     NumTypes,
 };
 

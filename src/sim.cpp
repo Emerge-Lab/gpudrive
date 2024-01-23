@@ -176,53 +176,78 @@ inline void movementSystem(Engine &e,
 			   VehicleSize& size,
 			   Rotation &rotation,
 			   Position& position,
-			   Velocity& velocity) 
+			   Velocity& velocity,
+               ValidState& validState,
+               const ControlledState& controlledState,
+               const EntityType& type,
+               const StepsRemaining& stepsRemaining,
+               const Trajectory& trajectory)
 {
+    if (type == EntityType::Vehicle && controlledState.controlledState == 1)
+    { 
+        // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
-  //TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions 
-  // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
-  // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 
-  // gradually.
+        // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
+        // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
+        // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change
+        // gradually.
 
-  // TODO(samk): The following constants are configurable in Nocturne but look to
-  // always use the same hard-coded value in practice. Use in-line constants
-  // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
-  const float maxSpeed{std::numeric_limits<float>::max()};
-  const float dt{0.1};
+        // TODO(samk): The following constants are configurable in Nocturne but look to
+        // always use the same hard-coded value in practice. Use in-line constants
+        // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
+        const float maxSpeed{std::numeric_limits<float>::max()};
+        const float dt{0.1};
 
-  auto clipSpeed = [maxSpeed](float speed) {
-    return std::max(std::min(speed, maxSpeed), -maxSpeed);
-  };
-  // TODO(samk): hoist into Vector2::PolarToVector2D
-  auto polarToVector2D = [](float r, float theta) {
-    return math::Vector2{r * cosf(theta), r * sinf(theta)};
-  };
+        auto clipSpeed = [maxSpeed](float speed)
+        {
+            return std::max(std::min(speed, maxSpeed), -maxSpeed);
+        };
+        // TODO(samk): hoist into Vector2::PolarToVector2D
+        auto polarToVector2D = [](float r, float theta)
+        {
+            return math::Vector2{r * cosf(theta), r * sinf(theta)};
+        };
 
-  // Average speed
-  const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
-  const float tanDelta{tanf(action.steering)};
-  // Assume center of mass lies at the middle of length, then l / L == 0.5.
-  const float beta{std::atan(0.5f * tanDelta)};
-  const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
-  const float w{v * std::cos(beta) * tanDelta / size.length};
+        // Average speed
+        const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
+        const float tanDelta{tanf(action.steering)};
+        // Assume center of mass lies at the middle of length, then l / L == 0.5.
+        const float beta{std::atan(0.5f * tanDelta)};
+        const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
+        const float w{v * std::cos(beta) * tanDelta / size.length};
 
-  model.position += d * dt;
-  model.heading = utils::AngleAdd(model.heading, w * dt);
-  model.speed = clipSpeed(model.speed + action.acceleration * dt);
+        model.position += d * dt;
+        model.heading = utils::AngleAdd(model.heading, w * dt);
+        model.speed = clipSpeed(model.speed + action.acceleration * dt);
 
-  // The BVH machinery requires the components rotation, position, and velocity
-  // to perform calculations. Thus, to reuse the BVH machinery, we need to also
-  // updates these components.
+        // The BVH machinery requires the components rotation, position, and velocity
+        // to perform calculations. Thus, to reuse the BVH machinery, we need to also
+        // updates these components.
 
-  // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
-  position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
-  rotation = Quat::angleAxis(model.heading, madrona::math::up);
-//   velocity.linear = Vector3::zero();
-  velocity.linear.x = model.speed * cosf(model.heading);
-  velocity.linear.y = model.speed * sinf(model.heading);
-  velocity.linear.z = 0;
-  velocity.angular = Vector3::zero();
-  velocity.angular.z = w;
+        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
+        position = madrona::base::Position({.x = model.position.x, .y = model.position.y, .z = 1});
+        rotation = Quat::angleAxis(model.heading, madrona::math::up);
+        //   velocity.linear = Vector3::zero();
+        velocity.linear.x = model.speed * cosf(model.heading);
+        velocity.linear.y = model.speed * sinf(model.heading);
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        velocity.angular.z = w;
+    }
+    else
+    {
+        // Follow expert trajectory
+        CountT curStepIdx = consts::episodeLen - stepsRemaining.t;
+        model.position= trajectory.positions[curStepIdx];
+        model.heading = trajectory.headings[curStepIdx];
+        model.speed = trajectory.velocities[curStepIdx].length();
+        position.x = trajectory.positions[curStepIdx].x;
+        position.y = trajectory.positions[curStepIdx].y;
+        velocity.linear.x = trajectory.velocities[curStepIdx].x;
+        velocity.linear.y = trajectory.velocities[curStepIdx].y;
+        rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
+        validState.isValid = trajectory.valids[curStepIdx]; // An object can be invalid for a few steps but then become valid or vice versa.
+    }
 }
 
 // Make the agents easier to control by zeroing out their velocity
@@ -428,7 +453,12 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             VehicleSize,
             Rotation,
             Position,
-            Velocity
+            Velocity,
+            ValidState,
+            ControlledState,
+            EntityType,
+            StepsRemaining,
+            Trajectory
         >>({});
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
