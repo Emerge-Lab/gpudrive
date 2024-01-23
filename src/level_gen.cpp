@@ -27,7 +27,8 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     auto xVelocity = ctx.get<Trajectory>(vehicle).velocities[0].x;
     auto yVelocity = ctx.get<Trajectory>(vehicle).velocities[0].y;
     auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
-    auto heading = ctx.get<Trajectory>(vehicle).initialHeading;
+    auto heading = ctx.get<Trajectory>(vehicle).headings[0];
+    auto valid = ctx.get<Trajectory>(vehicle).valids[0];
 
     ctx.get<BicycleModel>(vehicle) = {
         .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
@@ -37,6 +38,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
     ctx.get<ExternalForce>(vehicle) = Vector3::zero();
     ctx.get<ExternalTorque>(vehicle) = Vector3::zero();
+    ctx.get<ValidState>(vehicle) = ValidState{.isValid = valid};
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;

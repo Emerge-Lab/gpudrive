@@ -151,6 +151,10 @@ struct ValidState {
     int32_t isValid; // Tells if the current state is valid or not
 };
 
+struct ControlledState{
+    int32_t controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+}
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -182,6 +186,7 @@ struct Agent : public madrona::Archetype<
     Goal,
     Trajectory,
     ValidState,
+    ControlledState,
     // Input
     Action,
 
