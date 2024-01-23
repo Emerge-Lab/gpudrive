@@ -35,7 +35,7 @@ inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
 inline constexpr float zDimensionScale = 1;
 inline constexpr float xDimensionScaleRoadSegment = 1;
 
-inline constexpr madrona::CountT kTrajectoryLength = 1;
+inline constexpr madrona::CountT kTrajectoryLength = 91; // Nocturne has 90 timesteps per episode. making it 91 as a buffer.
 
 inline constexpr madrona::CountT kMaxRoadGeometryLength = 1810;
 }

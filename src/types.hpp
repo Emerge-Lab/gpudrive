@@ -138,7 +138,8 @@ struct LevelState {
 struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
-    float initialHeading;
+    float headings[consts::kTrajectoryLength];
+    int32_t valids[consts::kTrajectoryLength];
 };
 
 struct Shape {

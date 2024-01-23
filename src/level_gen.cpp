@@ -56,12 +56,15 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
-    ctx.get<Trajectory>(vehicle).positions[0] =
-        Vector2{.x = agentInit.position[0].x - ctx.data().mean.x, .y = agentInit.position[0].y - ctx.data().mean.y};
-    ctx.get<Trajectory>(vehicle).initialHeading = toRadians(agentInit.heading[0]);
-    ctx.get<Trajectory>(vehicle).velocities[0] =
-        Vector2{.x = agentInit.velocity[0].x, .y = agentInit.velocity[0].y};
-
+    auto &trajectory = ctx.get<Trajectory>(vehicle);
+    for(CountT i = 0; i < agentInit.numPositions; i++)
+    {
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
+        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.valids[i] = agentInit.valid[i];
+    }
+    
     // This is not stricly necessary since , but is kept here for consistency
     resetVehicle(ctx, vehicle);
 
