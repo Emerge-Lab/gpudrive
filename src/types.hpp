@@ -153,7 +153,7 @@ struct ValidState {
 
 struct ControlledState{
     int32_t controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
-}
+};
 
 /* ECS Archetypes for the game */
 

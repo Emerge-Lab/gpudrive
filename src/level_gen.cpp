@@ -55,6 +55,15 @@ static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ResponseType>(vehicle) = ResponseType::Dynamic;
     ctx.get<EntityType>(vehicle) = EntityType::Agent;
     ctx.get<Goal>(vehicle)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles)
+    {
+        ctx.get<ControlledState>(vehicle) = ControlledState{.controlledState = 1};
+        ctx.data().numControlledVehicles++;
+    }
+    else
+    {
+        ctx.get<ControlledState>(vehicle) = ControlledState{.controlledState = 0};
+    }
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.

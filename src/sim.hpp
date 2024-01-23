@@ -101,6 +101,8 @@ struct Sim : public madrona::WorldBase {
     madrona::CountT numRoads;
     Entity roads[consts::numRoadSegments];
 
+    CountT numControlledVehicles;
+
     madrona::math::Vector2 mean;
 
     Parameters params;
