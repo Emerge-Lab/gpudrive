@@ -21,7 +21,6 @@ enum class ExportID : uint32_t {
     Done,
     SelfObservation,
     PartnerObservations,
-    RoomEntityObservations,
     Lidar,
     StepsRemaining,
     BicycleModel,
@@ -95,9 +94,9 @@ struct Sim : public madrona::WorldBase {
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     madrona::CountT numAgents;
-    Entity agents[consts::numAgents];
+    Entity agents[consts::kMaxAgentCount];
     madrona::CountT numRoads;
-    Entity roads[consts::numRoadSegments];
+    Entity roads[consts::kMaxRoadEntityCount];
 
     madrona::math::Vector2 mean;
 

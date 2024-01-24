@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+#include <madrona/math.hpp>
 #include <madrona/types.hpp>
 
 namespace gpudrive {
@@ -38,6 +40,9 @@ inline constexpr float xDimensionScaleRoadSegment = 1;
 inline constexpr madrona::CountT kTrajectoryLength = 1;
 
 inline constexpr madrona::CountT kMaxRoadGeometryLength = 1810;
+
+inline constexpr madrona::math::Vector3 kPaddingPosition = {
+    0, 0, std::numeric_limits<float>::max()};
 }
 
 }
