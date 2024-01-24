@@ -3,7 +3,11 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/test.json COPYONLY)
+# Create the testJsons directory if it doesn't exist
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testJsons)
+
+# Copy test.json to the testJsons directory
+configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/testJsons/test.json COPYONLY)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
