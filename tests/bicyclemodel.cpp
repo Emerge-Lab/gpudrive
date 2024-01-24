@@ -17,15 +17,12 @@ using nlohmann::json;
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:    
-    int64_t num_agents = 3;
-    int64_t num_roads = 4050;
-    
     gpudrive::Manager mgr = gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
-        .jsonPath = "test.json",
+        .jsonPath = "testJsons",
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0
@@ -41,7 +38,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("test.json");
+    std::ifstream data = std::ifstream("testJsons/test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;

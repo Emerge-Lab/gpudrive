@@ -275,13 +275,13 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
+        int64_t worldIdx{0};
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
-            Map *map_ =
-               (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
-
-            world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, mgr_cfg.params};
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CUDA};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -335,14 +335,16 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          Map* map_ =
-              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-
-          world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, mgr_cfg.params};
+        int64_t worldIdx{0};
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        {
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CPU};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {

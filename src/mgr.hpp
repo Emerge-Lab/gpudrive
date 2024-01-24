@@ -15,6 +15,7 @@
 #include <madrona/viz/system.hpp>
 
 #include "init.hpp"
+#include "types.hpp"
 
 namespace gpudrive {
 
