@@ -28,7 +28,7 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
-        .jsonPath = "test.json",
+        .jsonPath = "testJsons",
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0
@@ -41,7 +41,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
-    std::ifstream data = std::ifstream("test.json");
+    std::ifstream data = std::ifstream("testJsons/test.json");
     std::vector<std::vector<std::pair<float, float>>> roadGeoms;
     std::vector<float> roadTypes;
     std::default_random_engine generator;
