@@ -259,8 +259,6 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    const std::string pathToMapDirectory("/home/samk/gpudrive/maps");
-
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
