@@ -305,11 +305,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
 }
 
 static void resetPaddingEntities(Engine &ctx) {
-    for (CountT agentIdx = ctx.data().numAgents; agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-      Entity agent = ctx.data().agents[agentIdx];
-      registerRigidBodyEntity(ctx, agent, SimObject::Agent);
-    }
-
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
