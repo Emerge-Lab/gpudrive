@@ -39,7 +39,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<ControlledState>();
 
     registry.registerSingleton<WorldReset>();
-    registry.registerSingleton<LevelState>();
     registry.registerSingleton<Shape>();
 
     registry.registerArchetype<Agent>();
@@ -102,7 +101,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
     if (ctx.data().autoReset) {
-        for (CountT i = 0; i < consts::numAgents; i++) {
+        for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
             Done done = ctx.get<Done>(agent);
             if (done.v) {
@@ -142,8 +141,12 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
-                                      PartnerObservations &partner_obs)
-{
+                                      PartnerObservations &partner_obs,
+				      const EntityType& entityType) {
+     if (entityType == EntityType::Padding) {
+       return;
+     }
+  
     self_obs.bicycle_model = model;
     self_obs.vehicle_size = size; 
     self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
@@ -183,6 +186,8 @@ inline void movementSystem(Engine &e,
                const StepsRemaining& stepsRemaining,
                const Trajectory& trajectory)
 {
+    if (entityType == EntityType::Padding) {
+    return;
     if (type == EntityType::Vehicle && controlledState.controlledState == 1)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
@@ -377,7 +382,7 @@ inline void bonusRewardSystem(Engine &ctx,
                               Reward &reward)
 {
     bool partners_close = true;
-    for (CountT i = 0; i < consts::numAgents - 1; i++) {
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
         Entity other = others.e[i];
         Progress other_progress = ctx.get<Progress>(other);
 
@@ -460,6 +465,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             StepsRemaining,
             Trajectory
         >>({});
+
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
@@ -545,7 +551,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Progress,
             OtherAgents,
             SelfObservation,
-            PartnerObservations
+	    PartnerObservations,
+            EntityType
         >>({post_reset_broadphase});
 
 
@@ -593,18 +600,12 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-
-    //Below checks are used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
-    if(init.map->numObjects == 0)
-        printf("Map numObjects is 0\n");
-    assert(init.map->numObjects != 0);
-
-    auto max_total_entities = consts::numAgents + consts::numRoadSegments;
+    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::numAgents);
+        consts::kMaxAgentCount);
 
     enableVizRender = cfg.enableViewer;
 

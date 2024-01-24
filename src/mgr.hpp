@@ -6,6 +6,7 @@
 #endif
 
 #include <memory>
+#include <vector>
 
 #include <madrona/py/utils.hpp>
 #include <madrona/exec_mode.hpp>
@@ -14,6 +15,7 @@
 #include <madrona/viz/system.hpp>
 
 #include "init.hpp"
+#include "types.hpp"
 
 namespace gpudrive {
 
@@ -62,6 +64,10 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
+
+    // TODO: remove parameters
+    MGR_EXPORT std::vector<Shape>
+    getShapeTensorFromDeviceMemory(madrona::ExecMode mode, uint32_t numWorlds);
 
   private:
     struct Impl;

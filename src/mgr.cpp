@@ -11,6 +11,7 @@
 #include <array>
 #include <charconv>
 #include <iostream>
+#include <iterator>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -258,11 +259,6 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    // TODO: To run multiple worlds in parallel, this path would have to be
-    // varied aross different input files.
-
-    std::string pathToScenario("../tfrecord-00012-of-00150_204.json");
-
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -276,18 +272,16 @@ Manager::Impl * Manager::Impl::init(
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
-
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
-
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
         {
-            Map *map_ =
-               (Map* )MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
-
-            world_inits[i] =
-                WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
         }
+        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
         MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
@@ -340,13 +334,16 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
-          Map* map_ =
-              MapReader::parseAndWriteOut(mgr_cfg.jsonPath, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-
-          world_inits[i] =
-              WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU, &(mgr_cfg.params)};
+        int64_t worldIdx{0};
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        {
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CPU,  &(mgr_cfg.params)};
         }
+        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
@@ -374,7 +371,6 @@ Manager::Impl * Manager::Impl::init(
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
-
           delete init.map;
         }
 
@@ -426,7 +422,7 @@ Tensor Manager::actionTensor() const
     return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
-            consts::numAgents,
+            consts::kMaxAgentCount,
             3, // Num_actions
         });
 }
@@ -436,7 +432,7 @@ Tensor Manager::bicycleModelTensor() const
     return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
-            consts::numAgents,
+            consts::kMaxAgentCount,
             4, // Number of states for the bicycle model
         });
 }
@@ -447,7 +443,7 @@ Tensor Manager::rewardTensor() const
     return impl_->exportTensor(ExportID::Reward, Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -457,7 +453,7 @@ Tensor Manager::doneTensor() const
     return impl_->exportTensor(ExportID::Done, Tensor::ElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -468,7 +464,7 @@ Tensor Manager::selfObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   consts::kMaxAgentCount,
                                    8
 
                                });
@@ -480,7 +476,7 @@ Tensor Manager::mapObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numRoadSegments,
+                                   consts::kMaxRoadEntityCount,
                                    4
                                });
 }
@@ -491,8 +487,8 @@ Tensor Manager::partnerObservationsTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
-                                   consts::numAgents - 1,
+                                   consts::kMaxAgentCount,
+                                   consts::kMaxAgentCount - 1,
                                    4,
                                });
 }
@@ -502,7 +498,7 @@ Tensor Manager::lidarTensor() const
     return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   consts::kMaxAgentCount,
                                    consts::numLidarSamples,
                                    2,
                                });
@@ -514,7 +510,7 @@ Tensor Manager::stepsRemainingTensor() const
                                Tensor::ElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
-                                   consts::numAgents,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -560,7 +556,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                   .headAngle = headAngle};
 
     auto *action_ptr =
-        impl_->agentActionsBuffer + world_idx * consts::numAgents + agent_idx;
+        impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -569,5 +565,32 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     } else {
         *action_ptr = action;
     }
+}
+
+std::vector<Shape>
+Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
+                                        uint32_t numWorlds) {
+    const auto &tensor = shapeTensor();
+
+    const std::size_t floatsPerShape{2};
+    const std::size_t tensorByteCount{sizeof(float) * floatsPerShape *
+                                      numWorlds};
+
+    std::vector<Shape> worldToShape(numWorlds);
+    switch (impl_->cfg.execMode) {
+    case ExecMode::CUDA:
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(worldToShape.data(), tensor.devicePtr(), tensorByteCount,
+                   cudaMemcpyDeviceToHost);
+#else
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+        break;
+    case ExecMode::CPU:
+        std::memcpy(worldToShape.data(), tensor.devicePtr(), tensorByteCount);
+        break;
+    }
+
+    return worldToShape;
 }
 }
