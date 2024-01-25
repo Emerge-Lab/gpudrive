@@ -20,13 +20,12 @@ float degreesToRadians(float degrees) {
 
 class ObservationsTest : public ::testing::Test {
 protected:    
-    int64_t num_agents = 3;
-    int64_t num_roads = 4500;
+    uint32_t num_worlds = 1;
     
     gpudrive::Manager mgr = gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
-        .numWorlds = 1,
+        .numWorlds = num_worlds,
         .autoReset = false,
         .jsonPath = "testJsons",
         .params = {
@@ -34,19 +33,14 @@ protected:
             .observationRadius = 100.0
         }
     });
-    int64_t num_steps = 10;
-    int64_t num_worlds = 1;
-    int64_t numEntities = 0;
+
 
     std::pair<float, float> mean = {0, 0};
 
-    std::unordered_map<int64_t, float> agent_length_map;
     std::ifstream data = std::ifstream("testJsons/test.json");
     std::vector<std::vector<std::pair<float, float>>> roadGeoms;
     std::vector<float> roadTypes;
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> acc_distribution;
-    std::uniform_real_distribution<float> steering_distribution; 
+
     void SetUp() override {
         json rawJson;
         data >> rawJson;
@@ -55,7 +49,6 @@ protected:
         std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
 
         int64_t n_roads = 0;
-        roadGeoms.reserve(num_roads);
         for (const auto &obj : rawJson["roads"]) {
             std::vector<std::pair<float, float>> roadGeom;
             for (const auto &point: obj["geometry"])
