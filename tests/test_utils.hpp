@@ -1,14 +1,15 @@
 #include "mgr.hpp"
 #include <string>
 #include <vector>
-
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 using namespace madrona;
 
 namespace test_utils
 {
     const float EPSILON = 0.001f; // Decreased epsilon to account for floating point errors. TODO: increase floating point precision and ideally use 1e-6 as epsilon.
-    
+
     template <typename T>
     std::pair<bool, std::string> validateTensor(const py::Tensor &tensor, const std::vector<T> &expected)
     {
@@ -20,6 +21,7 @@ namespace test_utils
 
         if (num_elems != expected.size())
         {
+            std::cout << "Expected size: " << expected.size() << " Actual size: " << num_elems << std::endl;
             return {false, "Size mismatch between tensor and expected values."};
         }
 
@@ -73,20 +75,9 @@ namespace test_utils
         return {true, ""};
     }
 
-    std::vector<float> flatten_obs(const py::Tensor &obs)
-    {
-        int64_t num_elems = 1;
-        for (int i = 0; i < obs.numDims(); i++)
-        {
-            num_elems *= obs.dims()[i];
-        }
-        float *ptr = static_cast<float *>(obs.devicePtr());
-        std::vector<float> flattened;
-        for (int i = 0; i < num_elems; i++)
-        {
-            flattened.push_back(static_cast<float>(ptr[i]));
-        }
-        return flattened;
-    }
+    std::vector<float> flatten_obs(const py::Tensor &obs);
 
+    float degreesToRadians(float degrees);
+
+    std::pair<float, float> calcMean(const nlohmann::json &rawJson);
 } // namespace utils

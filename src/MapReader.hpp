@@ -11,12 +11,12 @@ struct AgentInit;
 
 class MapReader {
 public:
-  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode);
+  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode, float polylineReductionThreshold);
 
 private:
   MapReader(const std::string &pathToFile);
   ~MapReader();
-  void doParse();
+  void doParse(float polylineReductionThreshold);
 
   std::ifstream in_;
   gpudrive::Map *map_;
