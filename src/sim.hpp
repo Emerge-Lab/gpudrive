@@ -94,7 +94,7 @@ struct Sim : public madrona::WorldBase {
     madrona::CountT numRoads;
     Entity roads[consts::kMaxRoadEntityCount];
 
-    CountT numControlledVehicles;
+    madrona::CountT numControlledVehicles;
 
     madrona::math::Vector2 mean;
 

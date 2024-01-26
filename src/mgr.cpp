@@ -527,12 +527,12 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::validStateTensor() const {
     return impl_->exportTensor(ExportID::ValidState, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds,consts::numAgents, 1});
+                               {impl_->cfg.numWorlds,consts::kMaxAgentCount, 1});
 }
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds,consts::numAgents, 1});
+                               {impl_->cfg.numWorlds,consts::kMaxAgentCount, 1});
 }
 
 void Manager::triggerReset(int32_t world_idx)

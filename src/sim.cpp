@@ -186,8 +186,9 @@ inline void movementSystem(Engine &e,
                const StepsRemaining& stepsRemaining,
                const Trajectory& trajectory)
 {
-    if (entityType == EntityType::Padding) {
-    return;
+    if (type == EntityType::Padding) {
+        return;
+    }
     if (type == EntityType::Vehicle && controlledState.controlledState == 1)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
