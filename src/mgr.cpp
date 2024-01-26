@@ -272,8 +272,13 @@ Manager::Impl * Manager::Impl::init(
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
+
+
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
+        
+        int64_t worldIdx{0};
+
         for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
