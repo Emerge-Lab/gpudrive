@@ -274,7 +274,7 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++)
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
