@@ -156,8 +156,13 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .numWorlds = num_worlds,
+        .numWorlds = (uint32_t)num_worlds,
         .autoReset = replay_log.has_value(),
+        .jsonPath = "tests/testJsons",
+        .params = {
+            .polylineReductionThreshold = 1.0,
+            .observationRadius = 100.0,
+        }
     }, viewer.rendererBridge());
 
     auto replayStep = [&]() {
