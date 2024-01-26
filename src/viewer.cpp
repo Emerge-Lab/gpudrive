@@ -158,6 +158,11 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
+        .jsonPath = "tests/testJsons",
+        .params = {
+            .polylineReductionThreshold = 1.0,
+            .observationRadius = 100.0,
+        }
     }, viewer.rendererBridge());
 
     auto replayStep = [&]() {
