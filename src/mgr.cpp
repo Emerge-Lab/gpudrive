@@ -259,8 +259,6 @@ Manager::Impl * Manager::Impl::init(
         mgr_cfg.autoReset,
     };
 
-    const std::string pathToMapDirectory("/home/samk/gpudrive/maps");
-
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -275,12 +273,13 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-	int64_t worldIdx{0};
-	for (auto const& mapFile : std::filesystem::directory_iterator(pathToMapDirectory)) {
-          Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
-                                                         ExecMode::CUDA);
-          world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                              viz_bridge, map_, ExecMode::CUDA};
+        int64_t worldIdx{0};
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        {
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CUDA};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -334,13 +333,16 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-	int64_t worldIdx{0};
-	for (auto const& mapFile : std::filesystem::directory_iterator(pathToMapDirectory)) {
-          Map *map_ =
-              MapReader::parseAndWriteOut(mapFile.path(), ExecMode::CPU);
-          world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, viz_bridge, map_, ExecMode::CPU};
+        int64_t worldIdx{0};
+        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        {
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+                                                viz_bridge, map_, ExecMode::CPU};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {

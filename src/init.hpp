@@ -90,6 +90,12 @@ namespace gpudrive
     {
         madrona::AtomicU32 curEpisode;
     };
+
+    struct Parameters{
+    float polylineReductionThreshold;
+    float observationRadius;
+    };
+
     struct WorldInit
     {
         EpisodeManager *episodeMgr;
@@ -97,6 +103,7 @@ namespace gpudrive
         const madrona::viz::VizECSBridge *vizBridge;
         Map *map;
         madrona::ExecMode mode;
+        Parameters params;
     };
 
 }

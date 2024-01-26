@@ -14,6 +14,7 @@
 #include <madrona/render/mw.hpp>
 #include <madrona/viz/system.hpp>
 
+#include "init.hpp"
 #include "types.hpp"
 
 namespace gpudrive {
@@ -31,6 +32,8 @@ public:
         int gpuID; // Which GPU for CUDA backend?
         uint32_t numWorlds; // Simulation batch size
         bool autoReset; // Immediately generate new world on episode end
+        std::string jsonPath; // Directory path to jsons. Should contain exactly numWorlds files.
+        Parameters params;
     };
 
     MGR_EXPORT Manager(

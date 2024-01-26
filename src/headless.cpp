@@ -62,6 +62,11 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
+        .jsonPath = "tests/testJsons",
+        .params = {
+            .polylineReductionThreshold = 0.0,
+            .observationRadius = 100.0
+        }
     });
 
     std::random_device rd;

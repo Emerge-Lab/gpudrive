@@ -70,6 +70,7 @@ struct Sim : public madrona::WorldBase {
     Sim(Engine &ctx,
         const Config &cfg,
         const WorldInit &init);
+
     // EpisodeManager globally tracks episode IDs with an atomic across the
     // simulation.
     EpisodeManager *episodeMgr;
