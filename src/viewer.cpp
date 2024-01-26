@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .numWorlds = (uint32_t)num_worlds,
+        .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
         .jsonPath = "tests/testJsons",
         .params = {
