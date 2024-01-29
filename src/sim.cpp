@@ -366,7 +366,7 @@ inline void rewardSystem(Engine &ctx,
     else if(rewardType == RewardType::Dense)
     {
         // TODO: Implement full trajectory reward
-        // printf("Invalid Reward Type\n");
+        assert(false);
     }
 
     // Just in case agents do something crazy, clamp total reward
