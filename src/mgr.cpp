@@ -273,13 +273,18 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
+
+        Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
+        REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
+        
         int64_t worldIdx{0};
+
         for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, ExecMode::CUDA};
+                                                viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -305,6 +310,7 @@ Manager::Impl * Manager::Impl::init(
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
 
+        madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
           auto &init = world_inits[i];
           madrona::cu::deallocGPU(init.map);
@@ -339,7 +345,7 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, ExecMode::CPU};
+                                                viz_bridge, map_, ExecMode::CPU,  &(mgr_cfg.params)};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 

@@ -95,6 +95,8 @@ struct Sim : public madrona::WorldBase {
 
     madrona::math::Vector2 mean;
 
+    Parameters params;
+
     // Episode ID number
     int32_t curEpisodeIdx;
 

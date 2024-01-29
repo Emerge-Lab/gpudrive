@@ -91,9 +91,25 @@ namespace gpudrive
         madrona::AtomicU32 curEpisode;
     };
 
-    struct Parameters{
-    float polylineReductionThreshold;
-    float observationRadius;
+    enum class RewardType : uint32_t
+    {
+        DistanceBased, // negative distance to goal
+        OnGoalAchieved, // 1 if on goal, 0 otherwise
+        Dense // negative distance to expert trajectory
+    };
+
+    struct RewardParams
+    {
+        RewardType rewardType;
+        float distanceToGoalThreshold;
+        float distanceToExpertThreshold;
+    };
+
+    struct Parameters
+    {
+        float polylineReductionThreshold;
+        float observationRadius;
+        RewardParams rewardParams;
     };
 
     struct WorldInit
@@ -103,7 +119,7 @@ namespace gpudrive
         const madrona::viz::VizECSBridge *vizBridge;
         Map *map;
         madrona::ExecMode mode;
-        Parameters params;
+        const Parameters *params;
     };
 
 }
