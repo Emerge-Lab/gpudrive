@@ -1,5 +1,6 @@
 #include "MapReader.hpp"
 #include "json_serialization.hpp"
+#include "init.hpp"
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/cuda_utils.hpp>
@@ -52,12 +53,11 @@ void MapReader::doParse(float polylineReductionThreshold) {
   from_json(rawJson, *map_, polylineReductionThreshold);
 }
 
-gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
+std::tuple<gpudrive::Map*, std::pair<uint32_t, uint32_t>> MapReader::parseAndWriteOut(const std::string &path,
                             madrona::ExecMode executionMode, float polylineReductionThreshold) {
   MapReader reader(path);
   reader.doParse(polylineReductionThreshold);
-
-  return copyToArrayOnHostOrDevice(reader.map_, executionMode);
-
+  std::pair<uint32_t, uint32_t> agentRoadCounts = std::make_pair(reader.map_->numObjects, reader.map_->numRoadSegments);
+  return std::make_tuple(copyToArrayOnHostOrDevice(reader.map_, executionMode), agentRoadCounts);
 } 
 } // namespace gpudrive
