@@ -1,6 +1,5 @@
 #include "MapReader.hpp"
 #include "json_serialization.hpp"
-#include "init.hpp"
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/cuda_utils.hpp>
