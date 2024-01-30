@@ -25,7 +25,7 @@ add_executable(my_tests
 # Link against required libraries. Ensure that the paths and names are correct.
 target_link_libraries(my_tests
     gtest_main
-    mad_escape_mgr
+    gpudrive_mgr
     nlohmann_json::nlohmann_json
 )
 
