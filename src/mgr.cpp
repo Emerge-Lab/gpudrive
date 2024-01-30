@@ -448,7 +448,6 @@ Tensor Manager::resetTensor() const
 
 Tensor Manager::actionTensor() const
 {
-    printf("impl_->agentRoadCounts.first: %d\n", impl_->agentRoadCounts.first);
     return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
@@ -502,6 +501,7 @@ Tensor Manager::selfObservationTensor() const
 
 Tensor Manager::mapObservationTensor() const
 {
+    printf("impl_->agentRoadCounts.second: %d\n", impl_->agentRoadCounts.second);
     return impl_->exportTensor(ExportID::MapObservation,
                                Tensor::ElementType::Float32,
                                {
