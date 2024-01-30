@@ -88,6 +88,8 @@ int main(int argc, char *argv[])
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
+    auto validStatePrinter = mgr.validStateTensor().makePrinter();
+    auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -114,6 +116,12 @@ int main(int argc, char *argv[])
 
         printf("Done\n");
         donePrinter.print();
+
+        printf("Valid State\n");
+        validStatePrinter.print();
+
+        printf("Controlled State\n");
+        controlledStatePrinter.print();
     };
     // printObs();
 
