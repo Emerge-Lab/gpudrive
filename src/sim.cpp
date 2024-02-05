@@ -35,6 +35,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
+    registry.registerComponent<CollisionEvent>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -64,6 +65,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Done);
     registry.exportColumn<Agent, BicycleModel>(
         (uint32_t) ExportID::BicycleModel);
+
+    registry.exportColumn<Agent, CollisionEvent>(
+        static_cast<uint32_t>(ExportID::Collision));
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -174,11 +178,20 @@ inline void movementSystem(Engine &e,
 			   Rotation &rotation,
 			   Position& position,
 			   Velocity& velocity,
-			   const EntityType& entityType) {
+			   const EntityType& entityType,
+			   ExternalForce &external_force,
+                           ExternalTorque &external_torque,
+			   const CollisionEvent& collisionEvent) {
   if (entityType == EntityType::Padding) {
     return;
   }
   
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+  if (collisionEvent.hasCollided.load_relaxed()) {
+    return;
+  }
+#endif
+ 
   //TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions 
   // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
   // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change 
@@ -217,13 +230,15 @@ inline void movementSystem(Engine &e,
   // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
   position = madrona::base::Position({ .x = model.position.x, .y = model.position.y, .z = 1 });
   rotation = Quat::angleAxis(model.heading, madrona::math::up);
-//   velocity.linear = Vector3::zero();
   velocity.linear.x = model.speed * cosf(model.heading);
   velocity.linear.y = model.speed * sinf(model.heading);
   velocity.linear.z = 0;
   velocity.angular = Vector3::zero();
   velocity.angular.z = w;
+  external_force = Vector3::zero();
+  external_torque = Vector3::zero();
 }
+
 
 // Make the agents easier to control by zeroing out their velocity
 // after each step.
@@ -415,8 +430,6 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-
-
 // Build the task graph
 void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
@@ -429,8 +442,10 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Rotation,
             Position,
             Velocity,
-	    EntityType
-        >>({});
+            EntityType,
+            ExternalForce,
+            ExternalTorque,
+            CollisionEvent>>({});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
@@ -442,7 +457,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 
     // Physics collision detection and solver
     // setupSubstepTasks consists of the following sub-tasks:
-    // 1. broadphase::findOverlapping
+    // 1. broadphase::findOverlappingEntry
     // 2. collectConstraintSystem
     // 3. substepRigidBodies
     // 4. narrowPhase

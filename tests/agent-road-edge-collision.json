@@ -1,0 +1,48 @@
+{
+    "name": "tfrecord-00100-of-00150_139.json",
+    "objects": [
+        {
+            "position": [
+                 {
+                    "x": 0,
+                    "y": 0
+                }
+            ],
+            "width": 1,
+            "length": 1,
+            "heading": [ 
+		0
+            ],
+            "velocity": [
+                {
+                    "x": 0,
+                    "y": 1
+                }
+            ],
+            "valid": [
+                true
+            ],
+            "goalPosition": {
+                "x": 606.9762573242188,
+                "y": -4803.1611328125
+            },
+            "type": "vehicle"
+        }
+    ],
+    "roads": [
+        {
+            "geometry": [
+                {
+                    "x": 10,
+                    "y": 10
+                },
+                {
+                    "x": -10,
+                    "y": -10
+                }
+            ],
+            "type": "road_edge"
+        }
+    ],
+    "tl_states": {}
+}

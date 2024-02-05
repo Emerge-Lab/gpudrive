@@ -5,6 +5,12 @@ set(SIMULATOR_SRCS
     level_gen.hpp level_gen.cpp
 )
 
+option(GPUDRIVE_DISABLE_NARROW_PHASE "Disable using Madrona's narrow-phase for collision detection" OFF)
+
+if (GPUDRIVE_DISABLE_NARROW_PHASE)
+add_compile_definitions(GPUDRIVE_DISABLE_NARROW_PHASE)
+endif()
+
 add_library(gpudrive_cpu_impl STATIC
     ${SIMULATOR_SRCS}
 )
@@ -36,6 +42,7 @@ target_link_libraries(gpudrive_mgr
 )
 
 if (TARGET madrona_mw_gpu)
+if (GPUDRIVE_DISABLE_NARROW_PHASE)
     madrona_build_compile_defns(
         OUT_TARGET
             gpudrive_gpu_srcs
@@ -45,8 +52,25 @@ if (TARGET madrona_mw_gpu)
             GPU_HIDESEEK_COMPILE_FLAGS 
         SRCS
             ${SIMULATOR_SRCS}
+	CUSTOM_FLAGS
+            -DGPUDRIVE_DISABLE_NARROW_PHASE=1
     )
 
+    target_link_libraries(gpudrive_mgr PRIVATE
+        gpudrive_gpu_srcs
+    )
+else()
+    madrona_build_compile_defns(
+        OUT_TARGET
+            gpudrive_gpu_srcs
+        SOURCES_DEFN
+            GPU_HIDESEEK_SRC_LIST
+        FLAGS_DEFN
+            GPU_HIDESEEK_COMPILE_FLAGS
+        SRCS
+            ${SIMULATOR_SRCS}
+    )
+endif()
     target_link_libraries(gpudrive_mgr PRIVATE
         gpudrive_gpu_srcs
         madrona_mw_gpu

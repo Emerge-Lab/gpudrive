@@ -120,8 +120,8 @@ int main(int argc, char *argv[])
 
     Viewer viewer({
         .gpuID = 0,
-        .renderWidth = 640,
-        .renderHeight = 480,
+        .renderWidth = 2730,
+        .renderHeight = 1536,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 450,
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "../maps",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -199,6 +199,7 @@ int main(int argc, char *argv[])
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
+    auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -215,6 +216,9 @@ int main(int argc, char *argv[])
 
         printf("Reward\n");
         reward_printer.print();
+
+        printf("Collision\n");
+        collisionPrinter.print();
 
         printf("\n");
     };

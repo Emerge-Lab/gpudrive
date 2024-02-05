@@ -8,8 +8,8 @@ namespace gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 3;
-inline constexpr madrona::CountT kMaxRoadEntityCount = 5000;
+inline constexpr madrona::CountT kMaxAgentCount = 2;
+inline constexpr madrona::CountT kMaxRoadEntityCount = 3;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
@@ -31,7 +31,11 @@ inline constexpr float deltaT = 0.04f;
 
 
 // Number of physics substeps
+#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
 inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
+#else
+inline constexpr madrona::CountT numPhysicsSubsteps = 1.f;
+#endif
 
 inline constexpr float zDimensionScale = 1;
 inline constexpr float xDimensionScaleRoadSegment = 1;

@@ -88,6 +88,7 @@ int main(int argc, char *argv[])
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
+    auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -114,6 +115,9 @@ int main(int argc, char *argv[])
 
         printf("Done\n");
         donePrinter.print();
+
+        printf("Collision\n");
+        collisionPrinter.print();
     };
     // printObs();
 
