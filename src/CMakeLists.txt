@@ -3,6 +3,8 @@ set(SIMULATOR_SRCS
     sim.hpp sim.cpp
     init.hpp rng.hpp
     level_gen.hpp level_gen.cpp
+    obb.hpp
+    utils.hpp
 )
 
 add_library(gpudrive_cpu_impl STATIC

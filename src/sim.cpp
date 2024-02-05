@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <limits>
 #include <madrona/mw_gpu_entry.hpp>
+#include <madrona/physics.hpp>
 
-#include "sim.hpp"
 #include "level_gen.hpp"
+#include "obb.hpp"
+#include "sim.hpp"
 #include "utils.hpp"
 
 using namespace madrona;
@@ -120,13 +122,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-
-float quatToYaw(Rotation q) {
-    // From https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion_to_Euler_angles_(in_3-2-1_sequence)_conversion
-    return atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.y * q.y + q.z * q.z)); 
-}
-
-
 // This system packages all the egocentric observations together 
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
@@ -161,7 +156,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
-        float relative_heading = quatToYaw(relative_orientation);
+        float relative_heading = utils::quatToYaw(relative_orientation);
 
         partner_obs.obs[i] = {
             .speed = relative_speed,
@@ -410,6 +405,43 @@ inline void stepTrackerSystem(Engine &ctx,
 
 }
 
+void collisionDetectionSystem(Engine &ctx,
+                              const CandidateCollision &candidateCollision) {
+    const Loc locationA{candidateCollision.a};
+    const Position positionA{
+        ctx.getDirect<Position>(Cols::Position, locationA)};
+    const Rotation rotationA{
+        ctx.getDirect<Rotation>(Cols::Rotation, locationA)};
+    const Scale scaleA{ctx.getDirect<Scale>(Cols::Scale, locationA)};
+
+    const Loc locationB{candidateCollision.b};
+    const Position positionB{
+        ctx.getDirect<Position>(Cols::Position, locationB)};
+    const Rotation rotationB{
+        ctx.getDirect<Rotation>(Cols::Rotation, locationB)};
+    const Scale scaleB{ctx.getDirect<Scale>(Cols::Scale, locationB)};
+
+    auto obbA = OrientedBoundingBox2D::from(positionA, rotationA, scaleA);
+    auto obbB = OrientedBoundingBox2D::from(positionB, rotationB, scaleB);
+
+    bool hasCollided = OrientedBoundingBox2D::hasCollided(obbA, obbB);
+    if (not hasCollided) {
+        return;
+    }
+
+    auto maybeCollisionEventA =
+        ctx.getSafe<CollisionEvent>(candidateCollision.aEntity);
+    if (maybeCollisionEventA.valid()) {
+        maybeCollisionEventA.value().hasCollided.store_relaxed(1);
+    }
+
+    auto maybeCollisionEventB =
+        ctx.getSafe<CollisionEvent>(candidateCollision.bEntity);
+    if (maybeCollisionEventB.valid()) {
+        maybeCollisionEventB.value().hasCollided.store_relaxed(1);
+    }
+}
+
 // Helper function for sorting nodes in the taskgraph.
 // Sorting is only supported / required on the GPU backend,
 // since the CPU backend currently keeps separate tables for each world.
@@ -455,27 +487,19 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
                                                            {moveSystem});
 
-    // Physics collision detection and solver
-    // setupSubstepTasks consists of the following sub-tasks:
-    // 1. broadphase::findOverlappingEntry
-    // 2. collectConstraintSystem
-    // 3. substepRigidBodies
-    // 4. narrowPhase
-    // 5. solvePositions
-    // 6. setVelocities
-    // 7. solveVelocities
-    // 8. updateLeafPositionsEntry
-    // 9. refitEntry
-    // Tasks 2-7 are executed in a loop where the iteration count is determined
-    // by consts::numPhysicsSubsteps. Subtasks 2-7 can be skipped by setting
-    // this constant to 0.
-    auto substep_sys = phys::RigidBodyPhysicsSystem::setupSubstepTasks(builder,
-        {broadphase_setup_sys}, consts::numPhysicsSubsteps);
+    auto findOverlappingEntities =
+        phys::RigidBodyPhysicsSystem::setupBroadphaseFindOverlappingTask(
+            builder, {broadphase_setup_sys});
+
+    auto detectCollisions = builder.addToGraph<
+        ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
+        {broadphase_setup_sys});
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
-    auto agent_zero_vel = builder.addToGraph<ParallelForNode<Engine,
-        agentZeroVelSystem, Velocity, Action>>({substep_sys});
+    auto agent_zero_vel = builder.addToGraph<
+        ParallelForNode<Engine, agentZeroVelSystem, Velocity, Action>>(
+        {detectCollisions});
 
     // Finalize physics subsystem work
     auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
