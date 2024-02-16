@@ -27,6 +27,7 @@ enum class ExportID : uint32_t {
     MapObservation,
     Shape,
     ValidState,
+    Collision,
     NumExports
 };
 

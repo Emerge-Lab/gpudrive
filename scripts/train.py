@@ -1,6 +1,6 @@
-import madrona_escape_room
+import gpudrive_learn
 
-from madrona_escape_room_learn import (
+from gpudrive_learn import (
     train, profile, TrainConfig, PPOConfig, SimInterface,
 )
 
@@ -96,8 +96,8 @@ arg_parser.add_argument('--profile-report', action='store_true')
 
 args = arg_parser.parse_args()
 
-sim = madrona_escape_room.SimManager(
-    exec_mode = madrona_escape_room.madrona.ExecMode.CUDA if args.gpu_sim else madrona_escape_room.madrona.ExecMode.CPU,
+sim = gpudrive.SimManager(
+    exec_mode = gpudrive.madrona.ExecMode.CUDA if args.gpu_sim else gpudrive.madrona.ExecMode.CPU,
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
     auto_reset = True,
