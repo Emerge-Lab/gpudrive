@@ -288,7 +288,6 @@ Manager::Impl * Manager::Impl::init(
     
         for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
-            // Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(), ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
                                                 viz_bridge, map_, mgr_cfg.execMode, paramsDevicePtr};
