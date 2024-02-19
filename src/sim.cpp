@@ -576,20 +576,24 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr),
-      params(*init.params)
+      params(*init.params),
+      MaxAgentCount(cfg.kMaxAgentCount),
+      MaxRoadEntityCount(cfg.kMaxRoadEntityCount)
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
+    assert(MaxAgentCount);
+    assert(MaxRoadEntityCount);
 
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
+    auto max_total_entities = MaxAgentCount + MaxRoadEntityCount;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::kMaxAgentCount);
+        MaxAgentCount);
 
     enableVizRender = cfg.enableViewer;
 

@@ -52,6 +52,8 @@ struct Sim : public madrona::WorldBase {
     struct Config {
         bool enableViewer;
         bool autoReset;
+        uint32_t kMaxAgentCount;
+        uint32_t kMaxRoadEntityCount;
     };
 
     // Sim::registerTypes is called during initialization
@@ -85,6 +87,9 @@ struct Sim : public madrona::WorldBase {
     // Border wall entities: 3 walls to the left, up and down that define
     // play area. These are constant across all episodes.
     Entity borders[3];
+
+    madrona::CountT MaxAgentCount;
+    madrona::CountT MaxRoadEntityCount;
 
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
