@@ -87,8 +87,8 @@ struct Sim : public madrona::WorldBase {
     // play area. These are constant across all episodes.
     Entity borders[3];
 
-    madrona::CountT _kMaxAgentCount;
-    madrona::CountT _kMaxRoadEntityCount;
+    madrona::CountT MaxAgentCount;
+    madrona::CountT MaxRoadEntityCount;
 
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
