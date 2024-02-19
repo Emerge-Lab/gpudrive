@@ -500,7 +500,6 @@ Tensor Manager::selfObservationTensor() const
 
 Tensor Manager::mapObservationTensor() const
 {
-    printf("impl_->agentRoadCounts.second: %d\n", impl_->agentRoadCounts.second);
     return impl_->exportTensor(ExportID::MapObservation,
                                Tensor::ElementType::Float32,
                                {
