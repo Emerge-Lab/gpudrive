@@ -56,7 +56,7 @@ std::tuple<gpudrive::Map*, std::pair<uint32_t, uint32_t>> MapReader::parseAndWri
                             madrona::ExecMode executionMode, float polylineReductionThreshold) {
   MapReader reader(path);
   reader.doParse(polylineReductionThreshold);
-  std::pair<uint32_t, uint32_t> agentRoadCounts = std::make_pair(reader.map_->numObjects, reader.map_->numRoadSegments);
+  std::pair<uint32_t, uint32_t> agentRoadCounts(reader.map_->numObjects, reader.map_->numRoadSegments);
   return std::make_tuple(copyToArrayOnHostOrDevice(reader.map_, executionMode), agentRoadCounts);
 } 
 } // namespace gpudrive
