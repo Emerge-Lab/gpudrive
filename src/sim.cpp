@@ -266,10 +266,12 @@ static inline float encodeType(EntityType type)
 // This system is specially optimized in the GPU version:
 // a warp of threads is dispatched for each invocation of the system
 // and each thread in the warp traces one lidar ray for the agent.
-inline void lidarSystem(Engine &ctx,
-                        Entity e,
-                        Lidar &lidar)
-{
+inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
+                        EntityType &entityType) {
+    assert(entityType != EntityType::None);
+    if (entityType == EntityType::Padding) {
+        return;
+    }
     Vector3 pos = ctx.get<Position>(e);
     Quat rot = ctx.get<Rotation>(e);
     auto &bvh = ctx.singleton<broadphase::BVH>();
@@ -550,7 +552,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         lidarSystem,
 #endif
             Entity,
-            Lidar
+            Lidar,
+            EntityType
         >>({post_reset_broadphase});
 
     if (cfg.enableViewer) {
