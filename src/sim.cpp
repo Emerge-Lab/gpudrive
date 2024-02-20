@@ -268,6 +268,7 @@ static inline float encodeType(EntityType type)
 // and each thread in the warp traces one lidar ray for the agent.
 inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
                         EntityType &entityType) {
+    assert(entityType != EntityType::None);
     if (entityType == EntityType::Padding) {
         return;
     }
