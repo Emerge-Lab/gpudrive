@@ -7,6 +7,7 @@
 #include <madrona/physics_loader.hpp>
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
+#include <madrona/render/api.hpp>
 
 #include <array>
 #include <charconv>
@@ -28,6 +29,62 @@ using namespace madrona::phys;
 using namespace madrona::py;
 
 namespace gpudrive {
+
+struct RenderGPUState {
+    render::APILibHandle apiLib;
+    render::APIManager apiMgr;
+    render::GPUHandle gpu;
+};
+
+
+static inline Optional<RenderGPUState> initRenderGPUState(
+    const Manager::Config &mgr_cfg)
+{
+    if (mgr_cfg.extRenderDev || !mgr_cfg.enableBatchRenderer) {
+        return Optional<RenderGPUState>::none();
+    }
+
+    auto render_api_lib = render::APIManager::loadDefaultLib();
+    render::APIManager render_api_mgr(render_api_lib.lib());
+    render::GPUHandle gpu = render_api_mgr.initGPU(mgr_cfg.gpuID);
+
+    return RenderGPUState {
+        .apiLib = std::move(render_api_lib),
+        .apiMgr = std::move(render_api_mgr),
+        .gpu = std::move(gpu),
+    };
+}
+
+static inline Optional<render::RenderManager> initRenderManager(
+    const Manager::Config &mgr_cfg,
+    const Optional<RenderGPUState> &render_gpu_state)
+{
+    if (!mgr_cfg.extRenderDev && !mgr_cfg.enableBatchRenderer) {
+        return Optional<render::RenderManager>::none();
+    }
+
+    render::APIBackend *render_api;
+    render::GPUDevice *render_dev;
+
+    if (render_gpu_state.has_value()) {
+        render_api = render_gpu_state->apiMgr.backend();
+        render_dev = render_gpu_state->gpu.device();
+    } else {
+        render_api = mgr_cfg.extRenderAPI;
+        render_dev = mgr_cfg.extRenderDev;
+    }
+
+    return render::RenderManager(render_api, render_dev, {
+        .enableBatchRenderer = mgr_cfg.enableBatchRenderer,
+        .agentViewWidth = mgr_cfg.batchRenderViewWidth,
+        .agentViewHeight = mgr_cfg.batchRenderViewHeight,
+        .numWorlds = mgr_cfg.numWorlds,
+        .maxViewsPerWorld = consts::kMaxAgentCount,
+        .maxInstancesPerWorld = 1000,
+        .execMode = mgr_cfg.execMode,
+        .voxelCfg = {},
+    });
+}
 
 struct Manager::Impl {
     Config cfg;
@@ -56,11 +113,10 @@ struct Manager::Impl {
     virtual void run() = 0;
 
     virtual Tensor exportTensor(ExportID slot,
-        Tensor::ElementType type,
+        TensorElementType type,
         madrona::Span<const int64_t> dimensions) const = 0;
 
-    static inline Impl * init(const Config &cfg,
-                              const viz::VizECSBridge *viz_bridge);
+    static inline Impl * init(const Config &cfg);
 };
 
 struct Manager::CPUImpl final : Manager::Impl {
@@ -92,7 +148,7 @@ struct Manager::CPUImpl final : Manager::Impl {
     }
 
     virtual inline Tensor exportTensor(ExportID slot,
-        Tensor::ElementType type,
+        TensorElementType type,
         madrona::Span<const int64_t> dims) const final
     {
         void *dev_ptr = cpuExec.getExported((uint32_t)slot);
@@ -127,7 +183,7 @@ struct Manager::CUDAImpl final : Manager::Impl {
     }
 
     virtual inline Tensor exportTensor(ExportID slot,
-        Tensor::ElementType type,
+        TensorElementType type,
         madrona::Span<const int64_t> dims) const final
     {
         void *dev_ptr = gpuExec.getExported((uint32_t)slot);
@@ -256,8 +312,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 }
 
 Manager::Impl * Manager::Impl::init(
-    const Manager::Config &mgr_cfg,
-    const viz::VizECSBridge *viz_bridge)
+    const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg {
         viz_bridge != nullptr,
@@ -408,9 +463,8 @@ Manager::Impl * Manager::Impl::init(
     }
 }
 
-Manager::Manager(const Config &cfg,
-                 const viz::VizECSBridge *viz_bridge)
-    : impl_(Impl::init(cfg, viz_bridge))
+Manager::Manager(const Config &cfg)
+    : impl_(Impl::init(cfg))
 {
     // Currently, there is no way to populate the initial set of observations
     // without stepping the simulations in order to execute the taskgraph.
@@ -438,7 +492,7 @@ void Manager::step()
 Tensor Manager::resetTensor() const
 {
     return impl_->exportTensor(ExportID::Reset,
-                               Tensor::ElementType::Int32,
+                               TensorElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
                                    1,
@@ -447,7 +501,7 @@ Tensor Manager::resetTensor() const
 
 Tensor Manager::actionTensor() const
 {
-    return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
+    return impl_->exportTensor(ExportID::Action, TensorElementType::Float32,
         {
             impl_->cfg.numWorlds,
             impl_->agentRoadCounts.first,
@@ -457,7 +511,7 @@ Tensor Manager::actionTensor() const
 
 Tensor Manager::bicycleModelTensor() const
 {
-    return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
+    return impl_->exportTensor(ExportID::BicycleModel, TensorElementType::Float32,
         {
             impl_->cfg.numWorlds,
             impl_->agentRoadCounts.first,
@@ -468,7 +522,7 @@ Tensor Manager::bicycleModelTensor() const
 
 Tensor Manager::rewardTensor() const
 {
-    return impl_->exportTensor(ExportID::Reward, Tensor::ElementType::Float32,
+    return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -478,7 +532,7 @@ Tensor Manager::rewardTensor() const
 
 Tensor Manager::doneTensor() const
 {
-    return impl_->exportTensor(ExportID::Done, Tensor::ElementType::Int32,
+    return impl_->exportTensor(ExportID::Done, TensorElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -489,7 +543,7 @@ Tensor Manager::doneTensor() const
 Tensor Manager::selfObservationTensor() const
 {
     return impl_->exportTensor(ExportID::SelfObservation,
-                               Tensor::ElementType::Float32,
+                               TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -501,7 +555,7 @@ Tensor Manager::selfObservationTensor() const
 Tensor Manager::mapObservationTensor() const
 {
     return impl_->exportTensor(ExportID::MapObservation,
-                               Tensor::ElementType::Float32,
+                               TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.second,
@@ -512,7 +566,7 @@ Tensor Manager::mapObservationTensor() const
 Tensor Manager::partnerObservationsTensor() const
 {
     return impl_->exportTensor(ExportID::PartnerObservations,
-                               Tensor::ElementType::Float32,
+                               TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -523,7 +577,7 @@ Tensor Manager::partnerObservationsTensor() const
 
 Tensor Manager::lidarTensor() const
 {
-    return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,
+    return impl_->exportTensor(ExportID::Lidar, TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -535,7 +589,7 @@ Tensor Manager::lidarTensor() const
 Tensor Manager::stepsRemainingTensor() const
 {
     return impl_->exportTensor(ExportID::StepsRemaining,
-                               Tensor::ElementType::Int32,
+                               TensorElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
@@ -544,7 +598,7 @@ Tensor Manager::stepsRemainingTensor() const
 }
 
 Tensor Manager::shapeTensor() const {
-    return impl_->exportTensor(ExportID::Shape, Tensor::ElementType::Int32,
+    return impl_->exportTensor(ExportID::Shape, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, 2});
 }
 
@@ -587,7 +641,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 
 Tensor Manager::collisionTensor() const {
     return impl_->exportTensor(
-        ExportID::Collision, Tensor::ElementType::Int32,
+        ExportID::Collision, TensorElementType::Int32,
         {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
