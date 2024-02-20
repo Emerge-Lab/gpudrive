@@ -45,8 +45,9 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 #endif
 }
 
+
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
-    auto agent = ctx.makeEntity<Agent>();
+    auto agent = ctx.makeRenderableEntity<Agent>();
     
     // The following components do not vary within an episode and so need only
     // be set once
@@ -97,6 +98,13 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
+
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
 
     return agent;
 }
@@ -360,10 +368,6 @@ static void resetPersistentEntities(Engine &ctx)
         resetAgent(ctx, agent);
 
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
-
-
-        ctx.get<viz::VizCamera>(agent) = viz::VizRenderingSystem::setupView(
-            ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 
     for (CountT idx = 0; idx < ctx.data().numRoads; idx++)

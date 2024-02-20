@@ -51,8 +51,8 @@ enum class SimObject : uint32_t {
 // in this class in order to ensure efficient access patterns.
 struct Sim : public madrona::WorldBase {
     struct Config {
-        bool enableViewer;
         bool autoReset;
+        const madrona::render::RenderECSBridge *renderBridge;
     };
 
     // Sim::registerTypes is called during initialization
@@ -108,11 +108,20 @@ struct Sim : public madrona::WorldBase {
     bool autoReset;
 
     // Are we visualizing the simulation in the viewer?
-    bool enableVizRender;
+    bool enableRender;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {
+public:
     using CustomContext::CustomContext;
+
+    // These are convenience helpers for creating renderable
+    // entities when rendering isn't necessarily enabled
+    template <typename ArchetypeT>
+    inline madrona::Entity makeRenderableEntity();
+    inline void destroyRenderableEntity(Entity e);
 };
 
 }
+
+#include "sim.inl"
