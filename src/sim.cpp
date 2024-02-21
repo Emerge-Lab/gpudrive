@@ -37,6 +37,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ValidState>();
     registry.registerComponent<ControlledState>();
+    registry.registerComponent<CollisionEvent>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -70,6 +71,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::ValidState);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
+    registry.exportColumn<Agent, CollisionEvent>(
+        static_cast<uint32_t>(ExportID::Collision));
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -180,15 +183,25 @@ inline void movementSystem(Engine &e,
 			   Rotation &rotation,
 			   Position& position,
 			   Velocity& velocity,
-               ValidState& validState,
-               const ControlledState& controlledState,
-               const EntityType& type,
-               const StepsRemaining& stepsRemaining,
-               const Trajectory& trajectory)
+         ValidState& validState,
+         const ControlledState& controlledState,
+         const EntityType& type,
+         const StepsRemaining& stepsRemaining,
+         const Trajectory& trajectory,
+         ExternalForce &external_force,
+         ExternalTorque &external_torque,
+         const CollisionEvent& collisionEvent)
 {
     if (type == EntityType::Padding) {
         return;
     }
+    
+    #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+    if (collisionEvent.hasCollided.load_relaxed()) {
+      return;
+    }
+    #endif
+    
     if (type == EntityType::Vehicle && controlledState.controlledState == 1)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
@@ -233,12 +246,13 @@ inline void movementSystem(Engine &e,
         // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
         position = madrona::base::Position({.x = model.position.x, .y = model.position.y, .z = 1});
         rotation = Quat::angleAxis(model.heading, madrona::math::up);
-        //   velocity.linear = Vector3::zero();
         velocity.linear.x = model.speed * cosf(model.heading);
         velocity.linear.y = model.speed * sinf(model.heading);
         velocity.linear.z = 0;
         velocity.angular = Vector3::zero();
         velocity.angular.z = w;
+        external_force = Vector3::zero();
+        external_torque = Vector3::zero();
     }
     else
     {
@@ -253,8 +267,11 @@ inline void movementSystem(Engine &e,
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
         validState.isValid = trajectory.valids[curStepIdx]; // An object can be invalid for a few steps but then become valid or vice versa.
+        external_force = Vector3::zero();
+        external_torque = Vector3::zero();
     }
 }
+
 
 // Make the agents easier to control by zeroing out their velocity
 // after each step.
@@ -282,10 +299,12 @@ static inline float encodeType(EntityType type)
 // This system is specially optimized in the GPU version:
 // a warp of threads is dispatched for each invocation of the system
 // and each thread in the warp traces one lidar ray for the agent.
-inline void lidarSystem(Engine &ctx,
-                        Entity e,
-                        Lidar &lidar)
-{
+inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
+                        EntityType &entityType) {
+    assert(entityType != EntityType::None);
+    if (entityType == EntityType::Padding) {
+        return;
+    }
     Vector3 pos = ctx.get<Position>(e);
     Quat rot = ctx.get<Rotation>(e);
     auto &bvh = ctx.singleton<broadphase::BVH>();
@@ -446,8 +465,6 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-
-
 // Build the task graph
 void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 {
@@ -464,7 +481,10 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             ControlledState,
             EntityType,
             StepsRemaining,
-            Trajectory
+            Trajectory,
+             ExternalForce,
+            ExternalTorque,
+            CollisionEvent
         >>({});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
@@ -477,7 +497,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
 
     // Physics collision detection and solver
     // setupSubstepTasks consists of the following sub-tasks:
-    // 1. broadphase::findOverlapping
+    // 1. broadphase::findOverlappingEntry
     // 2. collectConstraintSystem
     // 3. substepRigidBodies
     // 4. narrowPhase
@@ -570,7 +590,8 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         lidarSystem,
 #endif
             Entity,
-            Lidar
+            Lidar,
+            EntityType
         >>({post_reset_broadphase});
 
     if (cfg.enableViewer) {
@@ -596,20 +617,24 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr),
-      params(*init.params)
+      params(*init.params),
+      MaxAgentCount(cfg.kMaxAgentCount),
+      MaxRoadEntityCount(cfg.kMaxRoadEntityCount)
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
+    assert(MaxAgentCount);
+    assert(MaxRoadEntityCount);
 
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
+    auto max_total_entities = MaxAgentCount + MaxRoadEntityCount;
 
     phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::kMaxAgentCount);
+        MaxAgentCount);
 
     enableVizRender = cfg.enableViewer;
 

@@ -1,0 +1,81 @@
+From 9ced7be22c2a7e6276abdfa50d88fdfbcc3e6fa8 Mon Sep 17 00:00:00 2001
+From: Saman Kazemkhani <skazemkhani@gmail.com>
+Date: Thu, 1 Feb 2024 19:44:19 -0500
+Subject: [PATCH] Narrowphase
+
+---
+ include/madrona/physics.hpp |  6 ++++--
+ src/physics/broadphase.cpp  |  2 ++
+ src/physics/narrowphase.cpp | 12 ++++++++++++
+ 3 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/include/madrona/physics.hpp b/include/madrona/physics.hpp
+index 01f2f48..40561c3 100644
+--- a/include/madrona/physics.hpp
++++ b/include/madrona/physics.hpp
+@@ -67,8 +67,7 @@ struct Velocity {
+ };
+ 
+ struct CollisionEvent {
+-    Entity a;
+-    Entity b;
++    AtomicI32 hasCollided{false};
+ };
+ 
+ struct CandidateCollision {
+@@ -76,6 +75,8 @@ struct CandidateCollision {
+     Loc b;
+     uint32_t aPrim;
+     uint32_t bPrim;
++    Entity aEntity;
++    Entity bEntity;
+ };
+ 
+ struct CandidateTemporary : Archetype<CandidateCollision> {};
+@@ -373,6 +374,7 @@ struct Cols {
+     static constexpr inline CountT ExternalForce = 11;
+     static constexpr inline CountT ExternalTorque = 12;
+     static constexpr inline CountT LeafID = 13;
++    static constexpr inline CountT CollisionEvent = 14;
+ 
+     static constexpr inline CountT CandidateCollision = 2;
+ };
+diff --git a/src/physics/broadphase.cpp b/src/physics/broadphase.cpp
+index 219a3d1..afe6b3c 100644
+--- a/src/physics/broadphase.cpp
++++ b/src/physics/broadphase.cpp
+@@ -986,6 +986,8 @@ inline void findOverlappingEntry(
+                 candidate.b = b_loc;
+                 candidate.aPrim = a_prim_idx;
+                 candidate.bPrim = b_prim_idx;
++		candidate.aEntity = e;
++		candidate.bEntity = overlapping_entity;
+             }
+         }
+     });
+diff --git a/src/physics/narrowphase.cpp b/src/physics/narrowphase.cpp
+index dadbfba..1b2e8b4 100644
+--- a/src/physics/narrowphase.cpp
++++ b/src/physics/narrowphase.cpp
+@@ -1743,6 +1743,18 @@ static inline void runNarrowphase(
+                      tmp_faces_buffer,
+                      tmp_faces_buffer + max_num_tmp_faces / 2);
+ #endif
++
++    if (result.sat.type != SATResult::Type::None) {
++      auto maybeCollisionEventA = ctx.getSafe<CollisionEvent>(candidate_collision.aEntity);
++      if (maybeCollisionEventA.valid()) {
++	maybeCollisionEventA.value().hasCollided.store_relaxed(1);
++      }
++
++      auto maybeCollisionEventB = ctx.getSafe<CollisionEvent>(candidate_collision.bEntity);
++      if (maybeCollisionEventB.valid()) {
++	maybeCollisionEventB.value().hasCollided.store_relaxed(1);
++      }
++    }
+ }
+ 
+ inline void runNarrowphaseSystem(
+-- 
+2.39.2 (Apple Git-143)
+

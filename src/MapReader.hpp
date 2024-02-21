@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <madrona/exec_mode.hpp>
+#include <tuple>
 
 #include "init.hpp"
 
@@ -11,7 +12,7 @@ struct AgentInit;
 
 class MapReader {
 public:
-  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode, float polylineReductionThreshold);
+  static std::tuple<gpudrive::Map*, std::pair<uint32_t, uint32_t>> parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode, float polylineReductionThreshold);
 
 private:
   MapReader(const std::string &pathToFile);
