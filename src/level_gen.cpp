@@ -42,6 +42,9 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+#endif
 }
 
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
@@ -79,6 +82,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = 0};
     }
+
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
@@ -105,11 +109,11 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     float x2 = p2.x;
     float y2 = p2.y;
 
-    Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0};
-    Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = 0};
+    Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 1};
+    Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = 1};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0};
+    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 1};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
     ctx.get<EntityType>(road_edge) = EntityType::Cube;
@@ -212,20 +216,20 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         size_t numPoints = roadInit.numPoints;
         for(size_t j = 1; j <= numPoints - 1; j++)
         {
-            if(idx >= consts::kMaxRoadEntityCount)
+            if(idx >= ctx.data().MaxRoadEntityCount)
                  return;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
     } else if (roadInit.type == MapRoadType::SpeedBump) {
       assert(roadInit.numPoints == 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
-      if(idx >= consts::kMaxRoadEntityCount)
+      if(idx >= ctx.data().MaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
     } else if (roadInit.type == MapRoadType::StopSign) {
       assert(roadInit.numPoints == 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
-      if(idx >= consts::kMaxRoadEntityCount)
+      if(idx >= ctx.data().MaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.geometry[0]);
     } else {
@@ -259,9 +263,12 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Static;
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
+    ctx.get<ExternalForce>(agent) = Vector3::zero();
+    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
+#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
+    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+#endif
 
     return agent;
 }
@@ -275,8 +282,8 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
+    ctx.get<ExternalForce>(physicsEntity) = Vector3::zero();
+    ctx.get<ExternalTorque>(physicsEntity) = Vector3::zero();
     ctx.get<MapObservation>(physicsEntity) = MapObservation{
         .position = Vector2{.x = 0, .y = 0}, .heading = 0, .type = 0};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
@@ -284,14 +291,16 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     return physicsEntity;
 }
 
-void createPaddingEntities(Engine &ctx) {
-    for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
+void createPaddingEntities(Engine &ctx)
+{
+    for (CountT agentIdx = ctx.data().numAgents; agentIdx < ctx.data().MaxAgentCount; ++agentIdx)
+    {
         ctx.data().agents[agentIdx] = createAgentPadding(ctx);
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
-         roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
+         roadIdx < ctx.data().MaxRoadEntityCount; ++roadIdx)
+    {
         ctx.data().roads[roadIdx] = createPhysicsEntityPadding(ctx);
     }
 }
@@ -302,10 +311,13 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
 
+#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
     createFloorPlane(ctx);
+#endif
+
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
-        if(agentIdx >= consts::kMaxAgentCount)
+        if(agentIdx >= ctx.data().MaxAgentCount)
             break;
         const auto &agentInit = map->objects[agentIdx];
         auto agent = createAgent(
@@ -318,7 +330,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     CountT roadIdx = 0;
     for(CountT roadCtr = 0; roadCtr < map->numRoads; roadCtr++)
     {
-        if(roadIdx >= consts::kMaxRoadEntityCount)
+        if(roadIdx >= ctx.data().MaxRoadEntityCount)
             break;
         const auto &roadInit = map->roads[roadCtr];
         createRoadEntities(ctx, roadInit, roadIdx);
@@ -334,13 +346,13 @@ void createPersistentEntities(Engine &ctx, Map *map) {
 
 static void resetPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
+         agentIdx < ctx.data().MaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
-         roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
+         roadIdx < ctx.data().MaxRoadEntityCount; ++roadIdx) {
         Entity road = ctx.data().roads[roadIdx];
         registerRigidBodyEntity(ctx, road, SimObject::Cube);
     }

@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto validStatePrinter = mgr.validStateTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
+    auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -122,6 +123,8 @@ int main(int argc, char *argv[])
 
         printf("Controlled State\n");
         controlledStatePrinter.print();
+        printf("Collision\n");
+        collisionPrinter.print();
     };
     // printObs();
 
@@ -155,4 +158,13 @@ int main(int argc, char *argv[])
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);
+
+    uint64_t totalAgentCount{0};
+    for (CountT j = 0; j < (CountT)num_worlds; j++) {
+      auto agentCount = worldToShape.at(j).agentEntityCount;
+      totalAgentCount += agentCount;
+    }
+
+    float fpsNormalized = fps * totalAgentCount;
+    printf("Agent-Normalized FPS %f\n", fpsNormalized);
 }

@@ -173,7 +173,8 @@ struct Agent : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
-
+    madrona::phys::CollisionEvent,
+  
     // Internal logic state.
     Progress,
     OtherAgents,
@@ -219,10 +220,7 @@ struct PhysicsEntity : public madrona::Archetype<
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
-
-    //Observations
     MapObservation,
-
     EntityType
 > {};
 
