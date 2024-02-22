@@ -368,12 +368,13 @@ inline void rewardSystem(Engine &ctx,
                          Progress &progress,
                          Reward &out_reward)
 {
-
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
         float dist = (model.position - goal.position).length();
-        float reward = -dist;
+        float total_length = (goal.position - trajectory.positions[0]).length();
+        float reward = (total_length - dist) / total_length;
+        // float reward = -dist;
         out_reward.v = reward;
     }
     else if(rewardType == RewardType::OnGoalAchieved)

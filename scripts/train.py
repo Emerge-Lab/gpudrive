@@ -78,8 +78,8 @@ arg_parser.add_argument('--restore', type=int)
 
 arg_parser.add_argument('--num-worlds', type=int, required=True)
 arg_parser.add_argument('--num-updates', type=int, required=True)
-arg_parser.add_argument('--steps-per-update', type=int, default=40)
-arg_parser.add_argument('--num-bptt-chunks', type=int, default=8)
+arg_parser.add_argument('--steps-per-update', type=int, default=90)
+arg_parser.add_argument('--num-bptt-chunks', type=int, default=9)
 
 arg_parser.add_argument('--lr', type=float, default=1e-4)
 arg_parser.add_argument('--gamma', type=float, default=0.998)
@@ -97,7 +97,7 @@ arg_parser.add_argument('--profile-report', action='store_true')
 args = arg_parser.parse_args()
 
 reward_params = gpudrive.RewardParams()
-reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved  # Or any other value from the enum
+reward_params.rewardType = gpudrive.RewardType.DistanceBased  # Or any other value from the enum
 reward_params.distanceToGoalThreshold = 1.0  # Set appropriate values
 reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
 
@@ -112,7 +112,7 @@ sim = gpudrive.SimManager(
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
     auto_reset = True,
-    json_path = "/home/aarav/gpudrive/nocturne_data/formatted_json_v2_no_tl_valid/tfrecord-00004-of-00150_246.json",
+    json_path = "/home/aarav/gpudrive/build/tests/testJsons",
     params = params
 )
 
