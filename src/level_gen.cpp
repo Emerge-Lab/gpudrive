@@ -40,9 +40,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
-#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionEvent>(vehicle).hasCollided.store_release(0);
-#endif
 }
 
 static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
@@ -235,9 +233,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
-#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
-#endif
 
     return agent;
 }
@@ -279,10 +275,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
-
-#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
-    createFloorPlane(ctx);
-#endif
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
