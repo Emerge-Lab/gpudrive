@@ -38,7 +38,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
-    ctx.get<ValidState>(agent) = ValidState{.isValid = valid};
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
@@ -95,7 +94,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    ctx.get<ValidState>(agent) = ValidState{.isValid = agentInit.valid[0]};
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
 

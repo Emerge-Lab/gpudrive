@@ -88,7 +88,6 @@ int main(int argc, char *argv[])
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
-    auto validStatePrinter = mgr.validStateTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
@@ -117,9 +116,6 @@ int main(int argc, char *argv[])
 
         printf("Done\n");
         donePrinter.print();
-
-        printf("Valid State\n");
-        validStatePrinter.print();
 
         printf("Controlled State\n");
         controlledStatePrinter.print();

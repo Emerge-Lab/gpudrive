@@ -35,7 +35,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
-    registry.registerComponent<ValidState>();
     registry.registerComponent<ControlledState>();
     registry.registerComponent<CollisionEvent>();
 
@@ -67,8 +66,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Done);
     registry.exportColumn<Agent, BicycleModel>(
         (uint32_t) ExportID::BicycleModel);
-    registry.exportColumn<Agent, ValidState>(
-        (uint32_t) ExportID::ValidState);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
     registry.exportColumn<Agent, CollisionEvent>(
@@ -183,7 +180,6 @@ inline void movementSystem(Engine &e,
 			   Rotation &rotation,
 			   Position& position,
 			   Velocity& velocity,
-         ValidState& validState,
          const ControlledState& controlledState,
          const EntityType& type,
          const StepsRemaining& stepsRemaining,
@@ -266,7 +262,6 @@ inline void movementSystem(Engine &e,
         velocity.linear.x = trajectory.velocities[curStepIdx].x;
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
-        validState.isValid = trajectory.valids[curStepIdx]; // An object can be invalid for a few steps but then become valid or vice versa.
         external_force = Vector3::zero();
         external_torque = Vector3::zero();
     }
@@ -477,7 +472,6 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Rotation,
             Position,
             Velocity,
-            ValidState,
             ControlledState,
             EntityType,
             StepsRemaining,

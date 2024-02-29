@@ -146,10 +146,6 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-struct ValidState {
-    int32_t isValid; // Tells if the current state is valid or not
-};
-
 struct ControlledState{
     int32_t controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
@@ -185,7 +181,6 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
-    ValidState,
     ControlledState,
     // Input
     Action,
