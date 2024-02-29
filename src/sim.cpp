@@ -106,7 +106,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
             Entity agent = ctx.data().agents[i];
             Done done = ctx.get<Done>(agent);
             ControlledState controlledState = ctx.get<ControlledState>(agent);
-            if (controlledState.controlledState == 1 && !done.v) {
+            if (controlledState.controlledState == ControlMode::BICYCLE && !done.v) {
                 areAllControlledAgentsDone = 0;
             }
         }
@@ -201,7 +201,7 @@ inline void movementSystem(Engine &e,
     }
     #endif
     
-    if (type == EntityType::Vehicle && controlledState.controlledState == 1)
+    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
