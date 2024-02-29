@@ -19,7 +19,7 @@ add_executable(my_tests
     bicyclemodel.cpp
     observationTest.cpp
     test_utils.cpp
-    # Add other test files if needed
+    CollisionDetectionTests.cpp
 )
 
 # Link against required libraries. Ensure that the paths and names are correct.

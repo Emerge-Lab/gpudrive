@@ -29,9 +29,11 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     auto speed = ctx.get<Trajectory>(vehicle).velocities[0].length();
     auto heading = ctx.get<Trajectory>(vehicle).initialHeading;
 
+    Position center{{.x = xCoord + ctx.get<Scale>(vehicle).d0, .y = yCoord + ctx.get<Scale>(vehicle).d1, .z = 1}};
+
     ctx.get<BicycleModel>(vehicle) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
-    ctx.get<Position>(vehicle) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
+        .position = {.x = center.x, .y = center.y}, .heading = heading, .speed = speed};
+    ctx.get<Position>(vehicle) = center;
     ctx.get<Rotation>(vehicle) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(vehicle) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
@@ -40,9 +42,7 @@ static inline void resetVehicle(Engine &ctx, Entity vehicle) {
     ctx.get<Action>(vehicle) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(vehicle).t = consts::episodeLen;
-#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionEvent>(vehicle).hasCollided.store_release(0);
-#endif
 }
 
 static inline Entity createVehicle(Engine &ctx, const MapObject &agentInit) {
@@ -190,13 +190,13 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
     } else if (roadInit.type == MapRoadType::SpeedBump) {
-      assert(roadInit.numPoints == 4);
+      assert(roadInit.numPoints >= 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
       if(idx >= ctx.data().MaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
     } else if (roadInit.type == MapRoadType::StopSign) {
-      assert(roadInit.numPoints == 1);
+      assert(roadInit.numPoints >= 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
       if(idx >= ctx.data().MaxRoadEntityCount)
         return;
@@ -235,9 +235,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
-#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
-#endif
 
     return agent;
 }
@@ -279,10 +277,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
-
-#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
-    createFloorPlane(ctx);
-#endif
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {

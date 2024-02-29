@@ -15,6 +15,6 @@ add_subdirectory(external)
 add_subdirectory(src)
 add_subdirectory(tests)  # Add your tests directory
 
-execute_process(COMMAND ${GIT_EXECUTABLE} apply ../../0001-Narrowphase.patch
+execute_process(COMMAND ${GIT_EXECUTABLE} apply ../../0001-RigidBodyPhysicsSystem.patch
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/external/madrona
   COMMAND_ERROR_IS_FATAL ANY)
