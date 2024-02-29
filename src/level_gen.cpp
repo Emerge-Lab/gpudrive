@@ -28,17 +28,16 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto yVelocity = ctx.get<Trajectory>(agent).velocities[0].y;
     auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
-    auto valid = ctx.get<Trajectory>(agent).valids[0];
 
+    Position center{{.x = xCoord + ctx.get<Scale>(agent).d0, .y = yCoord + ctx.get<Scale>(agent).d1, .z = 1}};
     ctx.get<BicycleModel>(agent) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
-    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
+        .position = {.x = center.x, .y = center.y}, .heading = heading, .speed = speed};
+    ctx.get<Position>(agent) = center;
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
-    ctx.get<ValidState>(agent) = ValidState{.isValid = valid};
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
@@ -70,17 +69,17 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     }
     else
     {
-        ctx.get<EntityType>(agent) = EntityType::Invalid;
+        MADRONA_UNREACHABLE();
     }
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle)
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle && agentInit.valid[0])
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = 1};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = 0};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
 
     // Since position, heading, and speed may vary within an episode, their
@@ -95,7 +94,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    ctx.get<ValidState>(agent) = ValidState{.isValid = agentInit.valid[0]};
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
 
@@ -221,13 +219,13 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
     } else if (roadInit.type == MapRoadType::SpeedBump) {
-      assert(roadInit.numPoints == 4);
+      assert(roadInit.numPoints >= 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
       if(idx >= ctx.data().MaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
     } else if (roadInit.type == MapRoadType::StopSign) {
-      assert(roadInit.numPoints == 1);
+      assert(roadInit.numPoints >= 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
       if(idx >= ctx.data().MaxRoadEntityCount)
         return;
@@ -266,9 +264,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
-#ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
-#endif
 
     return agent;
 }
@@ -310,10 +306,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
-
-#ifdef GPUDRIVE_DISABLE_NARROW_PHASE
-    createFloorPlane(ctx);
-#endif
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {

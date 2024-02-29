@@ -129,7 +129,6 @@ enum class EntityType : uint32_t {
     Vehicle,
     Pedestrian,
     Cyclist,
-    Invalid,
     Padding,
     NumTypes,
 };
@@ -146,12 +145,13 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-struct ValidState {
-    int32_t isValid; // Tells if the current state is valid or not
+enum class ControlMode {
+   EXPERT,
+   BICYCLE
 };
 
-struct ControlledState{
-    int32_t controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+struct ControlledState {
+   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
 
 /* ECS Archetypes for the game */
@@ -185,7 +185,6 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
-    ValidState,
     ControlledState,
     // Input
     Action,

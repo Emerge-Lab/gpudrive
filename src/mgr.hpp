@@ -56,7 +56,6 @@ public:
     MGR_EXPORT madrona::py::Tensor stepsRemainingTensor() const;
     MGR_EXPORT madrona::py::Tensor bicycleModelTensor() const;
     MGR_EXPORT madrona::py::Tensor shapeTensor() const;
-    MGR_EXPORT madrona::py::Tensor validStateTensor() const;
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
     MGR_EXPORT madrona::py::Tensor collisionTensor() const;
     // These functions are used by the viewer to control the simulation

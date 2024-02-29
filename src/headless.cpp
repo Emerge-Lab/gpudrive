@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "../maps.small",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -88,7 +88,6 @@ int main(int argc, char *argv[])
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
-    auto validStatePrinter = mgr.validStateTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
@@ -118,9 +117,6 @@ int main(int argc, char *argv[])
         printf("Done\n");
         donePrinter.print();
 
-        printf("Valid State\n");
-        validStatePrinter.print();
-
         printf("Controlled State\n");
         controlledStatePrinter.print();
         printf("Collision\n");
@@ -130,6 +126,7 @@ int main(int argc, char *argv[])
 
     auto worldToShape =
 	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+
 
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
