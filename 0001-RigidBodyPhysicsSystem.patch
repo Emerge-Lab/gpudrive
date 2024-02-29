@@ -1,0 +1,100 @@
+From e0d26388add688e8d4d7147edc9d1ef8e9a7a920 Mon Sep 17 00:00:00 2001
+From: SamanKazemkhani <skazemkhani@gmail.com>
+Date: Sat, 24 Feb 2024 16:52:55 -0500
+Subject: [PATCH] RigidBodyPhysicsSystem
+
+---
+ include/madrona/physics.hpp | 11 +++++++++--
+ src/physics/broadphase.cpp  |  2 ++
+ src/physics/physics.cpp     | 12 +++++++-----
+ 3 files changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/include/madrona/physics.hpp b/include/madrona/physics.hpp
+index 01f2f48..ecae713 100644
+--- a/include/madrona/physics.hpp
++++ b/include/madrona/physics.hpp
+@@ -67,8 +67,7 @@ struct Velocity {
+ };
+ 
+ struct CollisionEvent {
+-    Entity a;
+-    Entity b;
++    AtomicI32 hasCollided{false};
+ };
+ 
+ struct CandidateCollision {
+@@ -76,6 +75,8 @@ struct CandidateCollision {
+     Loc b;
+     uint32_t aPrim;
+     uint32_t bPrim;
++    Entity aEntity;
++    Entity bEntity;
+ };
+ 
+ struct CandidateTemporary : Archetype<CandidateCollision> {};
+@@ -358,6 +359,11 @@ struct RigidBodyPhysicsSystem {
+     static TaskGraphNodeID setupCleanupTasks(
+         TaskGraphBuilder &builder,
+         Span<const TaskGraphNodeID> deps);
++
++    static TaskGraphNodeID setupBroadphaseFindOverlappingTask(
++        TaskGraphBuilder &builder,
++        Span<const TaskGraphNodeID> deps);
++
+ };
+ 
+ struct Cols {
+@@ -373,6 +379,7 @@ struct Cols {
+     static constexpr inline CountT ExternalForce = 11;
+     static constexpr inline CountT ExternalTorque = 12;
+     static constexpr inline CountT LeafID = 13;
++    static constexpr inline CountT CollisionEvent = 14;
+ 
+     static constexpr inline CountT CandidateCollision = 2;
+ };
+diff --git a/src/physics/broadphase.cpp b/src/physics/broadphase.cpp
+index 219a3d1..afe6b3c 100644
+--- a/src/physics/broadphase.cpp
++++ b/src/physics/broadphase.cpp
+@@ -986,6 +986,8 @@ inline void findOverlappingEntry(
+                 candidate.b = b_loc;
+                 candidate.aPrim = a_prim_idx;
+                 candidate.bPrim = b_prim_idx;
++		candidate.aEntity = e;
++		candidate.bEntity = overlapping_entity;
+             }
+         }
+     });
+diff --git a/src/physics/physics.cpp b/src/physics/physics.cpp
+index c7d9852..eff7a99 100644
+--- a/src/physics/physics.cpp
++++ b/src/physics/physics.cpp
+@@ -1046,11 +1046,6 @@ void RigidBodyPhysicsSystem::init(Context &ctx,
+         obj_mgr, max_dynamic_objects, 2.f * delta_t,
+         max_inst_accel * delta_t * delta_t);
+ 
+-    SolverData &solver = ctx.singleton<SolverData>();
+-    new (&solver) SolverData(max_contacts_per_world, 
+-                             max_joint_constraints_per_world,
+-                             delta_t, num_substeps, gravity);
+-
+     ObjectData &objs = ctx.singleton<ObjectData>();
+     new (&objs) ObjectData { obj_mgr };
+ }
+@@ -1252,6 +1247,13 @@ inline void reportNarrowphaseClocks(Engine &ctx,
+ }
+ #endif
+ 
++TaskGraphNodeID RigidBodyPhysicsSystem::setupBroadphaseFindOverlappingTask(
++    TaskGraphBuilder &builder,
++    Span<const TaskGraphNodeID> deps)
++{
++    return broadphase::setupPreIntegrationTasks(builder, deps);
++}
++
+ TaskGraphNodeID RigidBodyPhysicsSystem::setupBroadphaseTasks(
+     TaskGraphBuilder &builder,
+     Span<const TaskGraphNodeID> deps)
+-- 
+2.34.1
+

@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "../maps.small",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -126,6 +126,7 @@ int main(int argc, char *argv[])
 
     auto worldToShape =
 	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+
 
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
