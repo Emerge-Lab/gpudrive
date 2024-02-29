@@ -26,6 +26,7 @@ enum class ExportID : uint32_t {
     BicycleModel,
     MapObservation,
     Shape,
+    ControlledState,
     Collision,
     NumExports
 };
@@ -97,6 +98,8 @@ struct Sim : public madrona::WorldBase {
     Entity agents[consts::kMaxAgentCount];
     madrona::CountT numRoads;
     Entity roads[consts::kMaxRoadEntityCount];
+
+    madrona::CountT numControlledVehicles;
 
     madrona::math::Vector2 mean;
 

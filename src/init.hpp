@@ -110,6 +110,7 @@ namespace gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
+        uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
     };
 
     struct WorldInit
