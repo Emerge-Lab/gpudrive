@@ -100,15 +100,18 @@ static inline void initWorld(Engine &ctx)
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
+    int32_t areAllControlledAgentsDone = 1;
     if (ctx.data().autoReset) {
         for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
             Done done = ctx.get<Done>(agent);
-            if (done.v) {
-                should_reset = 1;
+            ControlledState controlledState = ctx.get<ControlledState>(agent);
+            if (controlledState.controlledState == 1 && !done.v) {
+                areAllControlledAgentsDone = 0;
             }
         }
     }
+    should_reset = areAllControlledAgentsDone;
 
     if (should_reset != 0) {
         reset.reset = 0;
