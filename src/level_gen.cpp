@@ -69,7 +69,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     }
     else
     {
-        ctx.get<EntityType>(agent) = EntityType::Invalid;
+        MADRONA_UNREACHABLE();
     }
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle)

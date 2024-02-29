@@ -129,7 +129,6 @@ enum class EntityType : uint32_t {
     Vehicle,
     Pedestrian,
     Cyclist,
-    Invalid,
     Padding,
     NumTypes,
 };
