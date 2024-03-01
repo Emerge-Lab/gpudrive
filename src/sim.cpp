@@ -180,6 +180,12 @@ inline void collectObservationsSystem(Engine &ctx,
         Entity road = ctx.data().roads[i];
         map_obs.obs[i] = ctx.get<MapObservation>(road);
         map_obs.obs[i].position = map_obs.obs[i].position - model.position;   
+        if(map_obs.obs[i].position.length() > ctx.data().params.observationRadius)
+        {
+            map_obs.obs[i].position *= 0.0;
+            map_obs.obs[i].heading = 0.0;
+            map_obs.obs[i].type = (float)MapRoadType::Invalid;
+        }
     }
 }
 
