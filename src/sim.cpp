@@ -25,6 +25,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Action>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
+    registry.registerComponent<AgentMapObservations>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
     registry.registerComponent<Progress>();
@@ -53,6 +54,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
+    registry.exportColumn<Agent, AgentMapObservations>(
+        (uint32_t)ExportID::AgentMapObservations);
     registry.exportColumn<PhysicsEntity, MapObservation>(
         (uint32_t)ExportID::MapObservation);
 
@@ -140,14 +143,15 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
+                                      AgentMapObservations &map_obs,
 				      const EntityType& entityType) {
      if (entityType == EntityType::Padding) {
        return;
      }
   
-    self_obs.bicycle_model = model;
+    self_obs.speed = model.speed;
     self_obs.vehicle_size = size; 
-    self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
+    self_obs.goal.position = Vector2{goal.position.x - model.position.x, goal.position.y - model.position.y};
 
 #pragma unroll
     for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
@@ -155,6 +159,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
         Rotation other_rot = ctx.get<Rotation>(other);
+        VehicleSize other_size = ctx.get<VehicleSize>(other);
 
         Vector2 relative_pos = other_bicycle_model.position - model.position;
         float relative_speed = other_bicycle_model.speed - model.speed;
@@ -166,8 +171,15 @@ inline void collectObservationsSystem(Engine &ctx,
         partner_obs.obs[i] = {
             .speed = relative_speed,
             .position = relative_pos,
-            .heading = relative_heading
+            .heading = relative_heading,
+            .vehicle_size = other_size
         };
+    }
+
+    for (CountT i = 0; i < ctx.data().numRoads; i++) {
+        Entity road = ctx.data().roads[i];
+        map_obs.obs[i] = ctx.get<MapObservation>(road);
+        map_obs.obs[i].position = map_obs.obs[i].position - model.position;   
     }
 }
 
@@ -592,6 +604,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             OtherAgents,
             SelfObservation,
 	    PartnerObservations,
+        AgentMapObservations,
             EntityType
         >>({post_reset_broadphase});
 
