@@ -168,6 +168,13 @@ inline void collectObservationsSystem(Engine &ctx,
 
         float relative_heading = utils::quatToYaw(relative_orientation);
 
+        if(relative_pos.length() > ctx.data().params.observationRadius)
+        {
+            relative_pos *= 0.0;
+            relative_heading = 0.0;
+            relative_speed = 0.0;
+            other_size = VehicleSize{0.0, 0.0};
+        }
         partner_obs.obs[i] = {
             .speed = relative_speed,
             .position = relative_pos,
@@ -190,28 +197,29 @@ inline void collectObservationsSystem(Engine &ctx,
 }
 
 inline void movementSystem(Engine &e,
-			   Action &action,
-			   BicycleModel& model,
-			   VehicleSize& size,
-			   Rotation &rotation,
-			   Position& position,
-			   Velocity& velocity,
-         const ControlledState& controlledState,
-         const EntityType& type,
-         const StepsRemaining& stepsRemaining,
-         const Trajectory& trajectory,
-         ExternalForce &external_force,
-         ExternalTorque &external_torque,
-         const CollisionEvent& collisionEvent)
+                           Action &action,
+                           BicycleModel &model,
+                           VehicleSize &size,
+                           Rotation &rotation,
+                           Position &position,
+                           Velocity &velocity,
+                           const ControlledState &controlledState,
+                           const EntityType &type,
+                           const StepsRemaining &stepsRemaining,
+                           const Trajectory &trajectory,
+                           ExternalForce &external_force,
+                           ExternalTorque &external_torque,
+                           const CollisionEvent &collisionEvent)
 {
     if (type == EntityType::Padding) {
         return;
     }
-    
-        if (collisionEvent.hasCollided.load_relaxed()) {
-      return;
+
+    if (collisionEvent.hasCollided.load_relaxed())
+    {
+        return;
     }
-        
+
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
