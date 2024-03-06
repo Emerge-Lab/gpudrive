@@ -141,14 +141,19 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
     asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    asset_paths[(size_t)SimObject::Agent] =
-        (std::filesystem::path(DATA_DIR) / "agent_collision_simplified.obj").string();
+    asset_paths[(size_t)SimObject::ControlledAgent] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::ExpertAgent] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::StopSign] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
     asset_paths[(size_t)SimObject::SpeedBump] =
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
-    // asset_paths[(size_t)SimObject::Cylinder] =
-    //     (std::filesystem::path(DATA_DIR) / "cylinder_collision.obj").string();
+    asset_paths[(size_t)SimObject::Pedestrian] =
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+    asset_paths[(size_t)SimObject::Cyclist] = 
+        (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string();
+
 
     std::array<const char *, (size_t)SimObject::NumObjects - 1> asset_cstrs;
     for (size_t i = 0; i < asset_paths.size(); i++) {
@@ -200,7 +205,12 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.75f,
     });
 
-    setupHull(SimObject::Agent, 1.f, {
+    setupHull(SimObject::ControlledAgent, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
+
+    setupHull(SimObject::ExpertAgent, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
@@ -211,6 +221,16 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         });
 
     setupHull(SimObject::SpeedBump, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
+
+    setupHull(SimObject::Pedestrian, 1.f, {
+        .muS = 0.5f,
+        .muD = 0.5f,
+    });
+
+    setupHull(SimObject::Cyclist, 1.f, {
         .muS = 0.5f,
         .muD = 0.5f,
     });
@@ -247,9 +267,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     // remain controllable by the policy, they are only allowed to
     // rotate around the Z axis (infinite inertia in x & y axes)
     rigid_body_assets.metadatas[
-        (CountT)SimObject::Agent].mass.invInertiaTensor.x = 0.f;
+        (CountT)SimObject::ControlledAgent].mass.invInertiaTensor.x = 0.f;
     rigid_body_assets.metadatas[
-        (CountT)SimObject::Agent].mass.invInertiaTensor.y = 0.f;
+        (CountT)SimObject::ControlledAgent].mass.invInertiaTensor.y = 0.f;
 
     loader.loadRigidBodies(rigid_body_assets);
     free(rigid_body_data);

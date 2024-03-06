@@ -79,13 +79,19 @@ int main(int argc, char *argv[])
     std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
     render_asset_paths[(size_t)SimObject::Cube] =
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
-    render_asset_paths[(size_t)SimObject::Agent] =
-        (std::filesystem::path(DATA_DIR) / "agent_render.obj").string();
+    render_asset_paths[(size_t)SimObject::ControlledAgent] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::ExpertAgent] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::Plane] =
         (std::filesystem::path(DATA_DIR) / "plane.obj").string();
     render_asset_paths[(size_t)SimObject::StopSign] =
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
     render_asset_paths[(size_t)SimObject::SpeedBump] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Pedestrian] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Cyclist] =
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
 
     std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
@@ -102,15 +108,19 @@ int main(int argc, char *argv[])
     }
 
     auto materials = std::to_array<imp::SourceMaterial>({
-        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 1.0f },
+        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 1.0f }, // Yellow, Road Lines
         { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
         { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
         { rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
         { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
         { rgb8ToFloat(230, 20, 20),   -1, 0.8f, 1.0f },
         { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
-        { rgb8ToFloat(255,0,0), -1, 0.8f, 1.0f},
-        { rgb8ToFloat(0,0,0), -1, 0.8f, 0.2f}
+        { rgb8ToFloat(255,0,0), -1, 0.8f, 1.0f},  // Stop Sign, Red
+        { rgb8ToFloat(0,0,0), -1, 0.8f, 0.2f}, // Speed Bump, Black
+        { rgb8ToFloat(0, 0, 255), -1, 0.8f, 0.2f}, // Expert Agent, Blue
+        { rgb8ToFloat(0,255,0), -1, 0.8f, 0.2f}, // Controlled Agent, Green
+        { rgb8ToFloat(255, 90, 255), -1, 0.8f, 0.2f}, // Pedestrian, Pink
+        { rgb8ToFloat(90, 255, 255), -1, 0.8f, 0.2f}, // Cyclist, Cyan
     });
 
     // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
@@ -120,27 +130,27 @@ int main(int argc, char *argv[])
 
     Viewer viewer({
         .gpuID = 0,
-        .renderWidth = 2730,
-        .renderHeight = 1536,
+        .renderWidth = 640,
+        .renderHeight = 480,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 450,
         .defaultSimTickRate = 20,
-        .cameraMoveSpeed = 20.f,
-        .cameraPosition = 20.f * math::up,
+        .cameraMoveSpeed = 100.f,
+        .cameraPosition = 1550.f * math::right + -57*math::fwd + 200.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,
     });
 
     // Override materials
     render_assets->objects[(CountT)SimObject::Cube].meshes[0].materialIDX = 0;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[0].materialIDX = 2;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[1].materialIDX = 3;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::ControlledAgent].meshes[0].materialIDX = 10;
     render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
     render_assets->objects[(CountT)SimObject::StopSign].meshes[0].materialIDX = 7;
     render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
-    // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
+    render_assets->objects[(CountT)SimObject::ExpertAgent].meshes[0].materialIDX = 9;
+    render_assets->objects[(CountT)SimObject::Pedestrian].meshes[0].materialIDX = 11;
+    render_assets->objects[(CountT)SimObject::Cyclist].meshes[0].materialIDX = 12;
 
     viewer.loadObjects(render_assets->objects, materials, {
         { (std::filesystem::path(DATA_DIR) /
@@ -160,8 +170,9 @@ int main(int argc, char *argv[])
         .autoReset = replay_log.has_value(),
         .jsonPath = "../maps",
         .params = {
-            .polylineReductionThreshold = 1.0,
+            .polylineReductionThreshold = 0.5,
             .observationRadius = 100.0,
+            .maxNumControlledVehicles = 1
         }
     }, viewer.rendererBridge());
 
@@ -200,7 +211,7 @@ int main(int argc, char *argv[])
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
     auto collisionPrinter = mgr.collisionTensor().makePrinter();
-
+    auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto printObs = [&]() {
         printf("Self\n");
         self_printer.print();

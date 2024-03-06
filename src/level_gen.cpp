@@ -53,19 +53,23 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // be set once
     ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
     ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
-    ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
+    ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT}; // By default Expert.
+    // TODO: Investigate if we can use ObjectID to store the type of agent instead of EntityType.
     if(agentInit.type == MapObjectType::Vehicle)
     {
         ctx.get<EntityType>(agent) = EntityType::Vehicle;
+        ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::ExpertAgent}; 
     }
     else if(agentInit.type == MapObjectType::Pedestrian)
     {
         ctx.get<EntityType>(agent) = EntityType::Pedestrian;
+        ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Pedestrian};
     }
     else if(agentInit.type == MapObjectType::Cyclist)
     {
         ctx.get<EntityType>(agent) = EntityType::Cyclist;
+        ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Cyclist};
     }
     else
     {
@@ -75,12 +79,10 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle && agentInit.valid[0])
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
+        ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::ControlledAgent};
         ctx.data().numControlledVehicles++;
     }
-    else
-    {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
-    }
+
 
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
@@ -259,7 +261,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(agent) = Diag3x3{.d0 = 0, .d1 = 0, .d2 = 0};
     ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
+    ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::ExpertAgent};
     ctx.get<ResponseType>(agent) = ResponseType::Static;
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
@@ -306,6 +308,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
+    ctx.data().numControlledVehicles = 0;
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
@@ -340,7 +343,7 @@ static void resetPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < ctx.data().MaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
-        registerRigidBodyEntity(ctx, agent, SimObject::Agent);
+        registerRigidBodyEntity(ctx, agent, SimObject::ExpertAgent);
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
@@ -359,7 +362,7 @@ static void resetPersistentEntities(Engine &ctx)
 
         resetAgent(ctx, agent);
 
-        registerRigidBodyEntity(ctx, agent, SimObject::Agent);
+        registerRigidBodyEntity(ctx, agent, (SimObject)ctx.get<ObjectID>(agent).idx);
 
 
         ctx.get<viz::VizCamera>(agent) = viz::VizRenderingSystem::setupView(
