@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     uint32_t num_replay_steps = 0;
     if (replay_log_path != nullptr) {
         replay_log = readReplayLog(replay_log_path);
-        num_replay_steps = replay_log->size() / (num_worlds * num_views * 4);
+        num_replay_steps = replay_log->size() / (num_worlds * num_views * 3);
     }
 
     std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
         for (uint32_t i = 0; i < num_worlds; i++) {
             for (uint32_t j = 0; j < num_views; j++) {
                 uint32_t base_idx = 0;
-                base_idx = 4 * (cur_replay_step * num_views * num_worlds +
+                base_idx = 3 * (cur_replay_step * num_views * num_worlds +
                     i * num_views + j);
 
                 auto acceleration = (*replay_log)[base_idx];
