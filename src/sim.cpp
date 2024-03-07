@@ -153,9 +153,10 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.vehicle_size = size; 
     self_obs.goal.position = Vector2{goal.position.x - model.position.x, goal.position.y - model.position.y};
 
-#pragma unroll
-    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
-        Entity other = other_agents.e[i];
+    CountT arrIndex = 0; CountT agentIdx = 0;
+    while(agentIdx < ctx.data().numAgents - 1)
+    {
+        Entity other = other_agents.e[agentIdx++];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
         Rotation other_rot = ctx.get<Rotation>(other);
@@ -168,31 +169,44 @@ inline void collectObservationsSystem(Engine &ctx,
 
         float relative_heading = utils::quatToYaw(relative_orientation);
 
-        if(relative_pos.length() > ctx.data().params.observationRadius)
+        if(relative_pos.length() > ctx.data().params.observationRadius || ctx.get<EntityType>(other) == EntityType::Padding)
         {
-            relative_pos *= 0.0;
-            relative_heading = 0.0;
-            relative_speed = 0.0;
-            other_size = VehicleSize{0.0, 0.0};
+            continue;
         }
-        partner_obs.obs[i] = {
+        partner_obs.obs[arrIndex++] = {
             .speed = relative_speed,
             .position = relative_pos,
             .heading = relative_heading,
-            .vehicle_size = other_size
+            .vehicle_size = other_size,
+            .type = (float)ctx.get<EntityType>(other)
         };
     }
+    while(arrIndex < consts::kMaxAgentCount - 1)
+    {
+        partner_obs.obs[arrIndex] = PartnerObservation();
+        partner_obs.obs[arrIndex].type = (float)EntityType::Invalid;
+        arrIndex++;
+    }
 
-    for (CountT i = 0; i < ctx.data().numRoads; i++) {
-        Entity road = ctx.data().roads[i];
-        map_obs.obs[i] = ctx.get<MapObservation>(road);
-        map_obs.obs[i].position = map_obs.obs[i].position - model.position;   
-        if(map_obs.obs[i].position.length() > ctx.data().params.observationRadius)
+    arrIndex = 0; CountT roadIdx = 0;
+    while(roadIdx < ctx.data().numRoads) {
+        Entity road = ctx.data().roads[roadIdx++];
+        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+        if(relative_pos.length() > ctx.data().params.observationRadius)
         {
-            map_obs.obs[i].position *= 0.0;
-            map_obs.obs[i].heading = 0.0;
-            map_obs.obs[i].type = (float)MapRoadType::Invalid;
+            continue;
         }
+        map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
+        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
+        arrIndex++;
+    }
+    while (arrIndex < consts::kMaxRoadEntityCount)
+    {
+        map_obs.obs[arrIndex] = MapObservation();
+        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
+        map_obs.obs[arrIndex].heading = 0.f;
+        map_obs.obs[arrIndex].type = (float)EntityType::Invalid;
+        arrIndex++;
     }
 }
 

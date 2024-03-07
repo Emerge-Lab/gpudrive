@@ -82,6 +82,7 @@ struct PartnerObservation {
     madrona::math::Vector2 position;
     float heading;
     VehicleSize vehicle_size;
+    float type;
 };
 
 // Egocentric observations of other agents
@@ -92,7 +93,7 @@ struct PartnerObservations {
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 6);
+    (consts::kMaxAgentCount - 1) * 7);
 
 struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
@@ -137,6 +138,7 @@ enum class EntityType : uint32_t {
     Pedestrian,
     Cyclist,
     Padding,
+    Invalid,
     NumTypes,
 };
 
