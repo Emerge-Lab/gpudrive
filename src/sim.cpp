@@ -183,7 +183,6 @@ inline void collectObservationsSystem(Engine &ctx,
     }
     while(arrIndex < consts::kMaxAgentCount - 1)
     {
-        partner_obs.obs[arrIndex] = PartnerObservation();
         partner_obs.obs[arrIndex].type = (float)EntityType::None;
         arrIndex++;
     }
@@ -202,7 +201,6 @@ inline void collectObservationsSystem(Engine &ctx,
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
     {
-        map_obs.obs[arrIndex] = MapObservation();
         map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
         map_obs.obs[arrIndex].heading = 0.f;
         map_obs.obs[arrIndex].type = (float)EntityType::None;
