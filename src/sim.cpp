@@ -25,6 +25,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Action>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
+    registry.registerComponent<AgentMapObservations>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
     registry.registerComponent<Progress>();
@@ -53,6 +54,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
+    registry.exportColumn<Agent, AgentMapObservations>(
+        (uint32_t)ExportID::AgentMapObservations);
     registry.exportColumn<PhysicsEntity, MapObservation>(
         (uint32_t)ExportID::MapObservation);
 
@@ -140,21 +143,24 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
+                                      AgentMapObservations &map_obs,
 				      const EntityType& entityType) {
      if (entityType == EntityType::Padding) {
        return;
      }
   
-    self_obs.bicycle_model = model;
+    self_obs.speed = model.speed;
     self_obs.vehicle_size = size; 
-    self_obs.goal.position = Vector2{goal.position.x - pos.x, goal.position.y - pos.y};
+    self_obs.goal.position = goal.position - model.position;
 
-#pragma unroll
-    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
-        Entity other = other_agents.e[i];
+    CountT arrIndex = 0; CountT agentIdx = 0;
+    while(agentIdx < ctx.data().numAgents - 1)
+    {
+        Entity other = other_agents.e[agentIdx++];
 
         BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
         Rotation other_rot = ctx.get<Rotation>(other);
+        VehicleSize other_size = ctx.get<VehicleSize>(other);
 
         Vector2 relative_pos = other_bicycle_model.position - model.position;
         float relative_speed = other_bicycle_model.speed - model.speed;
@@ -163,37 +169,69 @@ inline void collectObservationsSystem(Engine &ctx,
 
         float relative_heading = utils::quatToYaw(relative_orientation);
 
-        partner_obs.obs[i] = {
+        if(relative_pos.length() > ctx.data().params.observationRadius || ctx.get<EntityType>(other) == EntityType::Padding)
+        {
+            continue;
+        }
+        partner_obs.obs[arrIndex++] = {
             .speed = relative_speed,
             .position = relative_pos,
-            .heading = relative_heading
+            .heading = relative_heading,
+            .vehicle_size = other_size,
+            .type = (float)ctx.get<EntityType>(other)
         };
+    }
+    while(arrIndex < consts::kMaxAgentCount - 1)
+    {
+        partner_obs.obs[arrIndex].type = (float)EntityType::None;
+        arrIndex++;
+    }
+
+    arrIndex = 0; CountT roadIdx = 0;
+    while(roadIdx < ctx.data().numRoads) {
+        Entity road = ctx.data().roads[roadIdx++];
+        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+        if(relative_pos.length() > ctx.data().params.observationRadius)
+        {
+            continue;
+        }
+        map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
+        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
+        arrIndex++;
+    }
+    while (arrIndex < consts::kMaxRoadEntityCount)
+    {
+        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
+        map_obs.obs[arrIndex].heading = 0.f;
+        map_obs.obs[arrIndex].type = (float)EntityType::None;
+        arrIndex++;
     }
 }
 
 inline void movementSystem(Engine &e,
-			   Action &action,
-			   BicycleModel& model,
-			   VehicleSize& size,
-			   Rotation &rotation,
-			   Position& position,
-			   Velocity& velocity,
-         const ControlledState& controlledState,
-         const EntityType& type,
-         const StepsRemaining& stepsRemaining,
-         const Trajectory& trajectory,
-         ExternalForce &external_force,
-         ExternalTorque &external_torque,
-         const CollisionEvent& collisionEvent)
+                           Action &action,
+                           BicycleModel &model,
+                           VehicleSize &size,
+                           Rotation &rotation,
+                           Position &position,
+                           Velocity &velocity,
+                           const ControlledState &controlledState,
+                           const EntityType &type,
+                           const StepsRemaining &stepsRemaining,
+                           const Trajectory &trajectory,
+                           ExternalForce &external_force,
+                           ExternalTorque &external_torque,
+                           const CollisionEvent &collisionEvent)
 {
     if (type == EntityType::Padding) {
         return;
     }
-    
-        if (collisionEvent.hasCollided.load_relaxed()) {
-      return;
+
+    if (collisionEvent.hasCollided.load_relaxed())
+    {
+        return;
     }
-        
+
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     { 
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
@@ -592,6 +630,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             OtherAgents,
             SelfObservation,
 	    PartnerObservations,
+        AgentMapObservations,
             EntityType
         >>({post_reset_broadphase});
 
