@@ -494,7 +494,6 @@ Tensor Manager::selfObservationTensor() const
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
                                    8
-
                                });
 }
 
@@ -516,7 +515,7 @@ Tensor Manager::partnerObservationsTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   consts::kMaxAgentCount,
+                                   consts::kMaxAgentCount-1,
                                    7,
                                });
 }
