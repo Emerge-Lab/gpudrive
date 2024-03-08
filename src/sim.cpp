@@ -151,7 +151,7 @@ inline void collectObservationsSystem(Engine &ctx,
   
     self_obs.speed = model.speed;
     self_obs.vehicle_size = size; 
-    self_obs.goal.position = Vector2{goal.position.x - model.position.x, goal.position.y - model.position.y};
+    self_obs.goal.position = goal.position - model.position;
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
