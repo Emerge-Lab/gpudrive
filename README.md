@@ -1,4 +1,4 @@
-Madrona Escape Room
+GPUDrive
 ============================
 
 This is an example RL environment simulator built on the [Madrona Engine](https://madrona-engine.github.io). 
@@ -57,9 +57,11 @@ The built-in training functionality requires [PyTorch 2.0](https://pytorch.org/g
 
 Now that you have the required dependencies, fetch the repo (don't forget `--recursive`!):
 ```bash
-git clone --recursive https://github.com/shacklettbp/madrona_escape_room.git
-cd madrona_escape_room
+git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+cd gpudrive
 ```
+
+# Manual Install
 
 Next, for Linux and MacOS: Run `cmake` and then `make` to build the simulator:
 ```bash
@@ -88,6 +90,19 @@ Or test the PyTorch training integration:
 ```bash
 python scripts/train.py --num-worlds 1024 --num-updates 100 --ckpt-dir build/ckpts
 ```
+
+# Poetry install
+
+### Conda 
+
+Create a conda environment using `environment.yml` and then run `poetry install`
+
+```bash
+conda env create -f environment.yml`
+poetry install
+```
+
+
 
 Simulator Code Walkthrough (Learning the Madrona ECS APIs)
 -----------------------------------------------------------
