@@ -114,9 +114,9 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = 1};
     float distance = end.distance(start);
     auto road_edge = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 1};
+    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 0.1};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
-    ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
+    ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.2};
     ctx.get<EntityType>(road_edge) = EntityType::Cube;
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
@@ -184,9 +184,9 @@ static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
     auto speed_bump = ctx.makeEntity<PhysicsEntity>();
-    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
+    ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 0.1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
-    ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
+    ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.2};
     ctx.get<EntityType>(speed_bump) = EntityType::Cube;
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
@@ -202,7 +202,7 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     auto stop_sign = ctx.makeEntity<PhysicsEntity>();
     ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
-    ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
+    ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 1};
     ctx.get<EntityType>(stop_sign) = EntityType::Cube;
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
