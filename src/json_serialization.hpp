@@ -215,8 +215,6 @@ namespace gpudrive
         {
             if (i < MAX_OBJECTS)
             {
-                if(obj.at("type") != "vehicle")
-                    continue;
                 obj.get_to(map.objects[i]);    
                 size_t objPoints = map.objects[i].numPositions;
                 map.mean.x = ((map.mean.x * totalPoints) + (map.objects[i].mean.x * objPoints)) / (totalPoints + objPoints);
@@ -237,7 +235,6 @@ namespace gpudrive
         {
             if (i < MAX_ROADS)
             {
-                // road.get_to(map.roads[i]);
                 from_json(road, map.roads[i], polylineReductionThreshold);
                 size_t roadPoints = map.roads[i].numPoints;
                 map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
