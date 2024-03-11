@@ -69,6 +69,7 @@ struct SelfObservation {
     float speed;
     VehicleSize vehicle_size;
     Goal goal;
+    float collisionState;
 };
 
 struct MapObservation {
