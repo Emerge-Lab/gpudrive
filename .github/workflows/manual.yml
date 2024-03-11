@@ -21,9 +21,6 @@ jobs:
       with:
          activate-environment: gpudrive
          environment-file: environment.yml
-    - name: Install Poetry
-      run: |
-        pip install poetry
 
     - name: Install dependencies and build the project with Poetry
       run: |
