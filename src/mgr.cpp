@@ -493,7 +493,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   8
+                                   6
                                });
 }
 
@@ -600,12 +600,6 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     } else {
         *action_ptr = action;
     }
-}
-
-Tensor Manager::collisionTensor() const {
-    return impl_->exportTensor(
-        ExportID::Collision, Tensor::ElementType::Int32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
 std::vector<Shape>
