@@ -21,7 +21,6 @@ jobs:
       with:
          activate-environment: gpudrive
          environment-file: environment.yml
-         python-version: 3.8.11
     - name: Install Poetry
       run: |
         pip install poetry
