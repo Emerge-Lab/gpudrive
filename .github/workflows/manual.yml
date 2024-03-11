@@ -1,0 +1,36 @@
+name: Run C++ tests
+
+on:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
+        
+    - name: Setup Conda environment.
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+         activate-environment: gpudrive
+         environment-file: environment.yml
+         python-version: 3.8.11
+    - name: Install Poetry
+      run: |
+        pip install poetry
+
+    - name: Install dependencies and build the project with Poetry
+      run: |
+        poetry install
+
+    - name: Run tests
+      run: |
+        cd build/
+        ctest
