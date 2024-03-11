@@ -24,6 +24,7 @@ jobs:
 
     - name: Install dependencies and build the project with Poetry
       run: |
+        conda activate gpudrive
         poetry install
 
     - name: Run tests
