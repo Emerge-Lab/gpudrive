@@ -68,7 +68,8 @@ namespace gpudrive
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
             .def("lidar_tensor", &Manager::lidarTensor)
             .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
-            .def("shape_tensor", &Manager::shapeTensor);
+            .def("shape_tensor", &Manager::shapeTensor)
+            .def("collision_tensor", &Manager::collisionTensor);
     }
 
 }
