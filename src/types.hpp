@@ -26,6 +26,10 @@ struct BicycleModel {
     float speed;
 };
 
+const int BicycleModelExportSize = 4;
+
+static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
+
 struct VehicleSize {
   float length;
   float width;
@@ -71,11 +75,23 @@ struct SelfObservation {
     Goal goal;
 };
 
+const int SelfObservationExportSize = 5;
+
+// SelfObservation is exported as a
+// [N, A, 5] float tensor to pytorch
+static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
+
 struct MapObservation {
     madrona::math::Vector2 position;
     float heading;
     float type;
 };
+
+const int MapObservationExportSize = 4;
+
+// MapObservation is exported as a
+// [N, numRoadEntities, 4] float tensor to pytorch
+static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
 struct PartnerObservation {
     float speed;
@@ -90,15 +106,24 @@ struct PartnerObservations {
     PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
+const int PartnerObservationExportSize = 7;
+
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 7);
+    (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
+const int AgentMapObservationExportSize = 4;
+
+// AgentMapObservations is exported as a
+// [N, A, numRoadEntities, 4] float tensor to pytorch
+
+static_assert(sizeof(AgentMapObservations) == sizeof(float) *
+    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
 
 
 struct LidarSample {
