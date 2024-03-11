@@ -38,6 +38,11 @@ namespace gpudrive
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("rewardParams", &Parameters::rewardParams);
 
+        // Define CollisionBehaviour enum
+        nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
+            .value("AgentStop", CollisionBehaviour::AgentStop)
+            .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
+            .value("Ignore", CollisionBehaviour::Ignore);
 
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")

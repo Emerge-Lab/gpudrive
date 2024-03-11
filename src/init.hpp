@@ -98,6 +98,13 @@ namespace gpudrive
         Dense // negative distance to expert trajectory
     };
 
+    enum class CollisionBehaviour: uint32_t
+    {
+        AgentStop,
+        AgentRemoved, // Unimplemented
+        Ignore
+    };
+
     struct RewardParams
     {
         RewardType rewardType;
@@ -110,6 +117,7 @@ namespace gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
+        CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
     };
 

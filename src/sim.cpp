@@ -227,7 +227,7 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (collisionEvent.hasCollided.load_relaxed())
+    if (collisionEvent.hasCollided.load_relaxed() && e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop)
     {
         return;
     }
