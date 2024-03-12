@@ -21,8 +21,11 @@ class GPUDriveEnv(gym.Env):
         self.map_obs_tensor = self.sim.map_observation_tensor().to_torch()
         self.obs_tensors, self.num_obs_features = self.setup_obs()
 
+        self.num_envs = self.self_obs_tensor.shape[0].item()
+        self.num_agents = self.self_obs_tensor.shape[1].item()
+
         # self.observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.num_obs_features,), dtype=torch.float32)
-        self.observation_space = gym.spaces.Dict({
+        self.single_observation_space = gym.spaces.Dict({
             "self_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[0].shape, dtype=np.float64),
             "partner_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[1].shape, dtype=np.float64),
             "map_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[2].shape, dtype=np.float64),

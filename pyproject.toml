@@ -21,9 +21,12 @@ script = "build.py"
 [tool.poetry.dependencies]
 python = "^3.11"
 torch = "^2.2.1"
-numpy = "^1.26.4"
+numpy = "1.23.3"
 gymnasium = "^0.29.1"
 stable-baselines3 = "^2.2.1"
+pufferlib = "^0.7.2"
+tqdm = "^4.66.2"
+wandb = "^0.16.4"
 
 [tool.poetry]
 name = "gpudrive"
