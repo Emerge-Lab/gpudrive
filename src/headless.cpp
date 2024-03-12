@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "/home/aarav/gpudrive/nocturne_data",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -92,35 +92,35 @@ int main(int argc, char *argv[])
     auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
-        printf("Model \n");
-        model_printer.print();
+        // printf("Model \n");
+        // model_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
-        printf("\n");
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
 
         printf("Shape\n");
         shapePrinter.print();
 
-        printf("Reward\n");
-        rewardPrinter.print();
+        // printf("Reward\n");
+        // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
-        printf("Controlled State\n");
-        controlledStatePrinter.print();
-        printf("Collision\n");
-        collisionPrinter.print();
+        // printf("Controlled State\n");
+        // controlledStatePrinter.print();
+        // printf("Collision\n");
+        // collisionPrinter.print();
     };
     // printObs();
 

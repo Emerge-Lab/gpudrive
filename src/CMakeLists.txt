@@ -69,7 +69,7 @@ target_link_libraries(gpudrive PRIVATE
 if (TARGET madrona_viewer)
     add_executable(viewer viewer.cpp)
     target_link_libraries(viewer madrona_viewer
-        madrona_mw_core gpudrive_mgr)
+        madrona_mw_core gpudrive_mgr nlohmann_json::nlohmann_json)
 
     target_compile_definitions(viewer PRIVATE
         -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"

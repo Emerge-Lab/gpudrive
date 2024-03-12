@@ -8,6 +8,8 @@
 #include <fstream>
 #include <optional>
 
+#include "json_serialization.hpp"
+
 using namespace madrona;
 using namespace madrona::viz;
 
@@ -128,16 +130,32 @@ int main(int argc, char *argv[])
             (math::Quat::angleAxis(0, math::up) *
             math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
+
+    std::string path = "/home/aarav/gpudrive/nocturne_data";
+    std::string mapPath;
+    for (auto const &mapFile : std::filesystem::directory_iterator(path))
+    {
+        if (mapFile.path().extension() == ".json")
+        {
+            mapPath = mapFile.path().string();
+            break;
+        }
+    }
+    std::cout<<mapPath<<std::endl;
+    std::ifstream in(mapPath);
+    nlohmann::json rawJson;
+    in >> rawJson;
+    auto mean = calc_mean(rawJson);
     Viewer viewer({
         .gpuID = 0,
-        .renderWidth = 640,
-        .renderHeight = 480,
+        .renderWidth = 1920,
+        .renderHeight = 1080,
         .numWorlds = num_worlds,
         .maxViewsPerWorld = num_views,
         .maxInstancesPerWorld = 450,
         .defaultSimTickRate = 20,
         .cameraMoveSpeed = 100.f,
-        .cameraPosition = 1550.f * math::right + -57*math::fwd + 200.f * math::up,
+        .cameraPosition = mean.first * math::right + mean.second*math::fwd + 200.f * math::up,
         .cameraRotation = initial_camera_rotation,
         .execMode = exec_mode,
     });
@@ -168,11 +186,11 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
-        .jsonPath = "../maps",
+        .jsonPath = path,
         .params = {
             .polylineReductionThreshold = 0.5,
             .observationRadius = 100.0,
-            .maxNumControlledVehicles = 1
+            .maxNumControlledVehicles = 0
         }
     }, viewer.rendererBridge());
 
@@ -205,34 +223,34 @@ int main(int argc, char *argv[])
         return false;
     };
 
-    auto self_printer = mgr.selfObservationTensor().makePrinter();
-    auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
-    auto lidar_printer = mgr.lidarTensor().makePrinter();
-    auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
-    auto reward_printer = mgr.rewardTensor().makePrinter();
-    auto collisionPrinter = mgr.collisionTensor().makePrinter();
-    auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
-    auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+    // auto self_printer = mgr.selfObservationTensor().makePrinter();
+    // auto partner_printer = mgr.partnerObservationsTensor().makePrinter();
+    // auto lidar_printer = mgr.lidarTensor().makePrinter();
+    // auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
+    // auto reward_printer = mgr.rewardTensor().makePrinter();
+    // auto collisionPrinter = mgr.collisionTensor().makePrinter();
+    // auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
+    // auto printObs = [&]() {
+    //     printf("Self\n");
+    //     self_printer.print();
 
-        printf("Partner\n");
-        partner_printer.print();
+    //     printf("Partner\n");
+    //     partner_printer.print();
         
-        printf("Lidar\n");
-        lidar_printer.print();
+    //     printf("Lidar\n");
+    //     lidar_printer.print();
 
-        printf("Steps Remaining\n");
-        steps_remaining_printer.print();
+    //     printf("Steps Remaining\n");
+    //     steps_remaining_printer.print();
 
-        printf("Reward\n");
-        reward_printer.print();
+    //     printf("Reward\n");
+    //     reward_printer.print();
 
-        printf("Collision\n");
-        collisionPrinter.print();
+    //     printf("Collision\n");
+    //     collisionPrinter.print();
 
-        printf("\n");
-    };
+    //     printf("\n");
+    // };
 
     viewer.loop([&mgr](CountT world_idx, CountT agent_idx,
                        const Viewer::UserInput &input) {
@@ -277,6 +295,6 @@ int main(int argc, char *argv[])
 
         mgr.step();
         
-        printObs();
+        // printObs();
     }, []() {});
 }

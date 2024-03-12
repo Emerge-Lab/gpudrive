@@ -215,7 +215,7 @@ namespace gpudrive
             int i = 0;
             for (const auto &pos : obj["position"])
             {
-                if(obj['valid'][i++] == false)
+                if(obj["valid"][i++] == false)
                     continue;
                 numEntities++;
                 float newX = pos["x"];
@@ -254,19 +254,18 @@ namespace gpudrive
             obj.get_to(map.objects[idx++]);
         }
 
-        map.numRoads = 0;
+        map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
         idx = 0;
         for (const auto &road : j.at("roads"))
         {
+            if (idx >= map.numRoads)
+                break;
             from_json(road, map.roads[idx], polylineReductionThreshold);
             size_t roadPoints = map.roads[idx].numPoints;
             countRoadPoints += (map.roads[idx].type <= MapRoadType::Lane) ? (roadPoints - 1) : 1;
-            if (countRoadPoints >= map.numRoads)
-                break; // If after adding the current road, the number of road points exceeds the maximum, then we break
             ++idx;
         }
-        map.numRoads = idx;
         map.numRoadSegments = countRoadPoints;
     }
 }
