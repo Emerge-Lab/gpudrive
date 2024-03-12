@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "../maps.small",
+        .jsonPath = "/home/samk/gpudrive/maps.small",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
-    auto collisionPrinter = mgr.collisionTensor().makePrinter();
+    auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -119,8 +119,9 @@ int main(int argc, char *argv[])
 
         printf("Controlled State\n");
         controlledStatePrinter.print();
-        printf("Collision\n");
-        collisionPrinter.print();
+        
+        printf("Agent Map Obs\n");
+        agent_map_obs_printer.print();
     };
     // printObs();
 

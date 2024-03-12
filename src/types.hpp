@@ -66,9 +66,10 @@ struct Done {
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
-    BicycleModel bicycle_model;
+    float speed;
     VehicleSize vehicle_size;
     Goal goal;
+    float collisionState;
 };
 
 struct MapObservation {
@@ -81,6 +82,8 @@ struct PartnerObservation {
     float speed;
     madrona::math::Vector2 position;
     float heading;
+    VehicleSize vehicle_size;
+    float type;
 };
 
 // Egocentric observations of other agents
@@ -91,7 +94,13 @@ struct PartnerObservations {
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 4);
+    (consts::kMaxAgentCount - 1) * 7);
+
+struct AgentMapObservations {
+    MapObservation obs[consts::kMaxRoadEntityCount];
+};
+
+
 
 struct LidarSample {
     float depth;
@@ -192,6 +201,7 @@ struct Agent : public madrona::Archetype<
     // Observations
     SelfObservation,
     PartnerObservations,
+    AgentMapObservations,
     Lidar,
     StepsRemaining,
 
