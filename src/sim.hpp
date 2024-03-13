@@ -72,9 +72,9 @@ struct Sim : public madrona::WorldBase {
     static madrona::InlineArray<std::pair<EntityType, EntityType>, 64> initializeCollisionPairs() {
         madrona::InlineArray<std::pair<EntityType, EntityType>, 64> collisionPairs;
         collisionPairs.push_back({EntityType::Pedestrian, EntityType::Pedestrian});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::Cube});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadEdge});
         collisionPairs.push_back({EntityType::Cyclist, EntityType::Pedestrian});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::Cube});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadEdge});
         // TODO: Break Cube into road types for better control over collisions
         return collisionPairs;
     }

@@ -59,31 +59,31 @@ protected:
 
             if(obj["type"] == "road_edge")
             {
-                roadTypes.push_back(0);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadEdge);
             }
             else if(obj["type"] == "road_line")
             {
-                roadTypes.push_back(1);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadLine);
             }
             else if(obj["type"] == "lane")
             {
-                roadTypes.push_back(2);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadLane);
             }
             else if(obj["type"] == "crosswalk")
             {
-                roadTypes.push_back(3);
+                roadTypes.push_back((float)gpudrive::EntityType::CrossWalk);
             }
             else if(obj["type"] == "speed_bump")
             {
-                roadTypes.push_back(4);
+                roadTypes.push_back((float)gpudrive::EntityType::SpeedBump);
             }
             else if(obj["type"] == "stop_sign")
             {
-                roadTypes.push_back(5);
+                roadTypes.push_back((float)gpudrive::EntityType::StopSign);
             }
             else if(obj["type"] == "invalid")
             {
-                roadTypes.push_back(6);
+                roadTypes.push_back(0);
             }
         }
     }

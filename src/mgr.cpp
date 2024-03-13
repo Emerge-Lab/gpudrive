@@ -295,7 +295,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, paramsDevicePtr};
+                                                viz_bridge, map_, paramsDevicePtr};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
@@ -365,7 +365,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, &(mgr_cfg.params)};
+                                                viz_bridge, map_, &(mgr_cfg.params)};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
