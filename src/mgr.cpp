@@ -607,12 +607,6 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     }
 }
 
-Tensor Manager::collisionTensor() const {
-    return impl_->exportTensor(
-        ExportID::Collision, Tensor::ElementType::Int32,
-        {impl_->cfg.numWorlds, impl_->agentRoadCounts.first, 1});
-}
-
 std::vector<Shape>
 Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
                                         uint32_t numWorlds) {
