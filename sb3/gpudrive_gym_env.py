@@ -1,128 +1,177 @@
-from dataclasses import dataclass
-import glob
-import math
-import time
+"""Gym Environment that interfaces with the GPU Drive simulator."""
 
+from dataclasses import dataclass
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
-
+from itertools import islice, product
+# Simulator
 import gpudrive
+import logging
+
+logging.getLogger(__name__)
+
+# Utils
 from logger import MetricsLogger
 
-
-@dataclass
-class StepReturn:
-    """Return type for step() method"""
-
-    state: torch.Tensor
-    reward: torch.Tensor
-    done: torch.Tensor
-    valids: torch.Tensor
-
-class Env:
-    def __init__(self):
-        # Create an instance of RewardParams
+class Env:  
+    """
+    GPU Drive Gym Environment.
+    """
+    def __init__(self, num_worlds, max_cont_agents, data_dir="nocturne_data", device="cuda", auto_reset=True):
+        
+        # Configure rewards 
+        #TODO: Make this configurable on the Python side and add docs
         reward_params = gpudrive.RewardParams()
         reward_params.rewardType = gpudrive.RewardType.DistanceBased  # Or any other value from the enum
         reward_params.distanceToGoalThreshold = 1.0  # Set appropriate values
         reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
-
-        # Create an instance of Parameters
+        
+        # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 0.5  # Set appropriate value
-        params.observationRadius = 10.0  # Set appropriate value
-        params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
-
-        data_dir = "waymo_data"
-        NUM_WORLDS = len(glob.glob(f"{data_dir}/*.json"))
-        self.num_sims = NUM_WORLDS
-        device = 'cuda'
-        # Now use the 'params' instance when creating SimManager
+        params.polylineReductionThreshold = 0.5 
+        params.observationRadius = 10.0  
+        params.rewardParams = reward_params 
+        
+        # Set number of controlled vehicles
+        params.maxNumControlledVehicles = max_cont_agents
+    
+        self.data_dir = data_dir
+        self.num_sims = num_worlds
+        self.device = device    
+        self.action_types = 3
+        
+        # Initialize the simulator
         self.sim = gpudrive.SimManager(
             exec_mode=gpudrive.madrona.ExecMode.CPU if device == 'cpu' else gpudrive.madrona.ExecMode.CUDA,
             gpu_id=0,
-            num_worlds=NUM_WORLDS,
-            auto_reset=True,
-            json_path="waymo_data",
-            params=params
-        )
-        self.num_agents = self.sim.shape_tensor().to_torch()[0, 0]
-        # TODO(ev) remove hardcoding
-        self.steer_actions = torch.tensor([-0.6, 0, 0.6], device=device)
-        self.accel_actions = torch.tensor([-3, 0, 3], device=device)
-        # self.head_actions = torch.tensor([0], device=device)
-        # create a tensor of all possible actions that has dimensions
-        # (N * A, self.steer_actions.shape[0] * self.accel_actions.shape[0], 2)
-        # TODO(ev) don't loop like this
-        self.actions = torch.zeros((self.steer_actions.shape[0] * self.accel_actions.shape[0], 2), device=device)
-        idx = 0
-        for steer in self.steer_actions:
-            for accel in self.accel_actions:
-                # TODO(ev) remove head angle harcoding
-                self.actions[idx] = torch.tensor([steer, accel])
-                idx += 1
-        # TODO(ev) this will break when there is more than 1 world but it'll do for now
-        self.actions = self.actions.unsqueeze(0).expand(NUM_WORLDS * self.sim.shape_tensor().to_torch()[0, 0], -1, -1) 
-        # TODO(ev) remove this fake thing
-        self.head_action = torch.zeros((self.num_sims, self.num_agents, 1), device=device)   
+            num_worlds=self.num_sims,
+            auto_reset=auto_reset,
+            json_path=self.data_dir,
+            params=params,
+        ) 
         
-        cfg = {"num_sims": self.num_sims, "num_agents": self.num_agents, "device": device}
-        self.metrics = MetricsLogger(cfg)
+        # We only want to obtain information from vehicles we control
+        # By default, the sim returns information for all vehicles in a scene 
+        # We construct a mask to filter out the information from the expert controlled vehicles (0)
+        #TODO: Check
+        self.all_agents = self.sim.controlled_state_tensor().to_torch().shape[1]
+        self.cont_agent_idx = torch.where(self.sim.controlled_state_tensor().to_torch()[0, :, 0] == 1)[0]
+        self.max_cont_agents = max_cont_agents
         
-    def setup_actions(self):
-        action_tensor = self.sim.action_tensor().to_torch()
-        return action_tensor.shape
+        # Set up action space (TODO: Make this work for multiple worlds)
+        self.action_space = self._set_discrete_action_space()
         
-    @property
-    def action_space(self):
-        # TODO(ev) hardcoding
-        return Discrete(n=int(self.actions.shape[1]))
+        # Set observation space        
+        self.observation_space = self._set_observation_space()
 
-    @property
-    def observation_space(self):
-        # TODO(ev) make this configurable
-        # self.observation_space = gym.spaces.Dict({
-        #     "self_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[0].shape, dtype=np.float64),
-        #     "partner_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[1].shape, dtype=np.float64),
-        #     "map_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[2].shape, dtype=np.float64),
-        #     "steps_remaining": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[3].shape, dtype=np.float64),
-        #     "id": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[4].shape, dtype=np.float64),
-        # })
+        # Configure logger
+        # TODO: Complete logger
+        self.metrics = MetricsLogger({"num_sims": self.num_sims, "num_agents": self.max_cont_agents, "device": device})
+                
+    def reset(self):
+        """Reset the worlds and return the initial observations."""
+        for sim_idx in range(self.num_sims):
+            self.sim.reset(sim_idx)
+            
+        obs = self.get_obs()
+        # Filter out the observations for the expert controlled vehicles, 
+        # Make sure shape is consistent: (num_worlds, max_cont_agents, num_features)
+        obs = torch.index_select(obs, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        return obs
+
+    def step(self, actions):
+        """Take simultaneous actions for each agent in all `num_worlds` environments.
+
+        Args:
+            actions (torch.Tensor): The action indices for all agents in all worlds.
+        """
+        # Convert action indices to action values
+        actions_shape = self.sim.action_tensor().to_torch().shape[1]
+        action_values = torch.zeros((self.num_sims, actions_shape, self.action_types))
+        
+        # GPU Drive expects a tensor of shape (num_worlds, all_agents)
+        # We insert the actions for the controlled vehicles, the others will be ignored
+        for agent_idx in range(self.cont_agent_idx.shape[0]):
+            action_idx = actions[:, agent_idx].item()
+            action_values[:, agent_idx, :] = torch.Tensor(self.action_key_to_values[action_idx])
+
+        # Feed the actual action values to GPU Drive 
+        self.sim.action_tensor().to_torch().copy_(action_values)
+        
+        # Step the simulator
+        self.sim.step()
+        
+        # Obtain the next observations, rewards, and done flags
+        obs = self.get_obs()
+        reward = self.sim.reward_tensor().to_torch()
+        done = self.sim.done_tensor().to_torch()
+        
+        # Filter out the expert controlled vehicle information
+        obs = torch.index_select(obs, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        reward = torch.index_select(reward, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        done = torch.index_select(done, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        
+        # The episode is reset automatically if all agents reach their goal
+        # or the episode is over 
+        # We also reset when all agents have collided
+        is_collided = torch.index_select(self.sim.self_observation_tensor().to_torch()[:, :, 5], dim=1, index=self.cont_agent_idx)
+        
+        return obs, reward, done, {}
+    
+    def _set_discrete_action_space(self) -> None:
+        """Configure the discrete action space."""
+        
+        self.steer_actions = torch.tensor([-0.6, 0, 0.6], device=self.device)
+        self.accel_actions = torch.tensor([-3, 0, 3], device=self.device)
+        self.head_actions = torch.tensor([0], device=self.device)
+
+        # Create a mapping from action indices to action values
+        self.action_key_to_values = {}
+    
+        for action_idx, (accel, steer, head) in  enumerate(product(self.accel_actions, self.steer_actions, self.head_actions)):  
+            self.action_key_to_values[action_idx] = [int(accel), int(steer), int(head)]   
+    
+        return Discrete(n=int(len(self.action_key_to_values)))
+    
+    def _set_observation_space(self) -> None:
+        """Configure the observation space."""
         return Box(low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],))
     
     def get_obs(self):
-        # TODO(ev) remove magiv numbers
-        self_obs_tensor = self.sim.self_observation_tensor().to_torch()[:, :, 2:]
-        partner_obs_tensor = self.sim.partner_observations_tensor().to_torch().flatten(start_dim=2)
-        map_obs_tensor = self.sim.map_observation_tensor().to_torch().flatten(start_dim=1).unsqueeze(1).repeat((1, self_obs_tensor.shape[1], 1))
-        return torch.cat([self_obs_tensor, partner_obs_tensor, map_obs_tensor], dim=-1)
-
-    def reset(self):
-        for i in range(self.num_sims):
-            self.sim.reset(i)
-        return self.get_obs()
-    
-    def step(self, action):
-        gather_action = torch.gather(self.actions, 1, action.long().unsqueeze(-1).expand(-1, 2).unsqueeze(1)).reshape(
-            (self.num_sims, self.num_agents, -1)
-        )
-        self.sim.action_tensor().to_torch().copy_(torch.cat((gather_action, self.head_action), dim=-1))
-        self.sim.step()
-        state = self.get_obs()
-        reward = self.sim.reward_tensor().to_torch()
-        done = self.sim.done_tensor().to_torch()
-        valids = torch.logical_not(self.sim.collision_tensor().to_torch())
-        import ipdb; ipdb.set_trace()
-        # TODO(ev) find all the rows where valids is False in every column
-        episode_over = valids.sum(dim=1) == 0
-        for world_index in torch.where(episode_over)[0]:
-            self.sim.reset(world_index)
+        """Get observation: Combine different types of environment information into a single tensor.
         
-        self.metrics.step(StepReturn(state, reward.squeeze(dim=-1), done.squeeze(dim=-1), valids.squeeze(dim=-1)))
-        return state, reward, done, valids
+        Returns:
+            torch.Tensor: (num_worlds, max_cont_agents, num_features)
+        """       
+        # Get the ego states
+        # Ego state: (num_worlds, max_cont_agents, features)
+        ego_state = self.sim.self_observation_tensor().to_torch()
+        
+        # Get view of other agents
+        # Partner obs: (num_worlds, max_cont_agents, max_cont_agents-1, num_features)
+        # Flatten over the last two dimensions to get (num_worlds, max_cont_agents, (max_cont_agents-1) * num_features)
+        partner_obs_tensor = self.sim.partner_observations_tensor().to_torch().flatten(start_dim=2)
+        
+        # Get view of road graphs
+        # Roadmap obs: (num_worlds, max_cont_agents, max_road_points, num_features)
+        # Flatten over the last two dimensions to get (num_worlds, max_cont_agents, max_road_points * num_features)
+        map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
+        
+        return torch.cat([ego_state, partner_obs_tensor, map_obs_tensor], dim=-1)
     
-if __name__ == '__main__':
-    env = Env()
-    env.reset()
-    env.step(torch.Tensor([1,2,3]))
+
+if __name__ == "__main__":
+    
+    # Using a single world with 13 agents, controlling only a single one
+    env = Env(num_worlds=1, max_cont_agents=2, device='cuda')
+    obs = env.reset()
+    
+    # actions.shape: (num_worlds, max_cont_agents)
+    
+    rand_actions = torch.ones((env.num_sims, env.max_cont_agents))
+    obs, reward, done, info = env.step(rand_actions)
+    
+    # obs.shape: (num_worlds, max_cont_agents, 20699)
+    # reward.shape: (num_worlds, max_cont_agents, 1)
+    # done.shape: (num_worlds, max_cont_agents, 1)
