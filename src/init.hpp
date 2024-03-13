@@ -20,7 +20,7 @@ namespace gpudrive
     enum class CollisionBehaviour: uint32_t
     {
         AgentStop,
-        AgentRemoved, // Unimplemented
+        AgentRemoved,
         Ignore
     };
 
