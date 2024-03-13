@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
-    auto collisionPrinter = mgr.collisionTensor().makePrinter();
+    auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
 
     auto printObs = [&]() {
         // printf("Self\n");
