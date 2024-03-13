@@ -36,7 +36,9 @@ namespace gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
-            .def_rw("rewardParams", &Parameters::rewardParams);
+            .def_rw("rewardParams", &Parameters::rewardParams)
+            .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
+            .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
