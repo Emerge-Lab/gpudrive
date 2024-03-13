@@ -76,7 +76,7 @@ struct SelfObservation {
     float collisionState;
 };
 
-const int SelfObservationExportSize = 5;
+const int SelfObservationExportSize = 6;
 
 // SelfObservation is exported as a
 // [N, A, 5] float tensor to pytorch
