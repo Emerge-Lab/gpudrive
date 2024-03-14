@@ -266,11 +266,6 @@ Manager::Impl * Manager::Impl::init(
         0 // kMaxRoadEntityCount
     };
 
-    if(mgr_cfg.params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
-    {
-        FATAL("AgentRemoved collision behaviour is not implemented yet.");
-    }
-
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
