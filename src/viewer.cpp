@@ -199,7 +199,6 @@ int main(int argc, char *argv[])
     auto lidar_printer = mgr.lidarTensor().makePrinter();
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
-    auto collisionPrinter = mgr.collisionTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -216,9 +215,6 @@ int main(int argc, char *argv[])
 
         printf("Reward\n");
         reward_printer.print();
-
-        printf("Collision\n");
-        collisionPrinter.print();
 
         printf("\n");
     };

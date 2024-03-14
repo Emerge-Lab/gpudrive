@@ -493,7 +493,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   8
+                                   6
                                });
 }
 
@@ -562,7 +562,7 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds,consts::kMaxAgentCount, 1});
+                               {impl_->cfg.numWorlds,impl_->agentRoadCounts.first, 1});
 }
 
 void Manager::triggerReset(int32_t world_idx)
@@ -591,7 +591,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                   .headAngle = headAngle};
 
     auto *action_ptr =
-        impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
+        impl_->agentActionsBuffer + world_idx * impl_->agentRoadCounts.first + agent_idx;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -600,12 +600,6 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     } else {
         *action_ptr = action;
     }
-}
-
-Tensor Manager::collisionTensor() const {
-    return impl_->exportTensor(
-        ExportID::Collision, Tensor::ElementType::Int32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
 std::vector<Shape>

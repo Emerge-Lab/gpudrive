@@ -36,7 +36,8 @@ namespace gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
-            .def_rw("rewardParams", &Parameters::rewardParams);
+            .def_rw("rewardParams", &Parameters::rewardParams)
+            .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles);
 
 
         // Bindings for Manager class
@@ -69,7 +70,8 @@ namespace gpudrive
             .def("lidar_tensor", &Manager::lidarTensor)
             .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
             .def("shape_tensor", &Manager::shapeTensor)
-            .def("collision_tensor", &Manager::collisionTensor);
+            .def("controlled_state_tensor", &Manager::controlledStateTensor)
+            .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor);
     }
 
 }

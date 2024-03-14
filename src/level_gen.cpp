@@ -29,10 +29,9 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
 
-    Position center{{.x = xCoord + ctx.get<Scale>(agent).d0, .y = yCoord + ctx.get<Scale>(agent).d1, .z = ctx.get<Scale>(agent).d2/2}};
     ctx.get<BicycleModel>(agent) = {
-        .position = {.x = center.x, .y = center.y}, .heading = heading, .speed = speed};
-    ctx.get<Position>(agent) = center;
+        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
+    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
@@ -86,9 +85,11 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     auto &trajectory = ctx.get<Trajectory>(agent);
+    auto length = agentInit.length/2;
+    auto width = agentInit.width/2;
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];
@@ -306,6 +307,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
+    ctx.data().numControlledVehicles = 0;
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {

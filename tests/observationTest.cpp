@@ -93,7 +93,7 @@ TEST_F(ObservationsTest, TestObservations) {
     auto obs = mgr.mapObservationTensor();
     auto flat_obs = test_utils::flatten_obs(obs);
 
-    int64_t idx = 4; // Skip the first 4 points which are garbage for some reason.
+    int64_t idx = 0;
     for(int64_t i = 0; i < roadGeoms.size(); i++)
     {
         std::vector<std::pair<float, float>> roadGeom = roadGeoms[i];
