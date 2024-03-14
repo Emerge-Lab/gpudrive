@@ -38,6 +38,7 @@ protected:
     std::pair<float, float> mean = {0, 0};
 
     std::unordered_map<int64_t, float> agent_length_map;
+    std::unordered_map<int64_t, float> agent_width_map;
     std::ifstream data = std::ifstream("testJsons/test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
@@ -57,15 +58,24 @@ protected:
             if (obj["type"] != "vehicle") {
                 continue;
             }
-            initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
-            initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
+            agent_length_map[n_agents] = (float)obj["length"];
+            agent_width_map[n_agents] = (float)obj["width"];
+            auto length = agent_length_map[n_agents] / 2;
+            auto width = agent_width_map[n_agents] / 2;
+            auto x = float(obj["position"][0]["x"]);
+            initialState.push_back(float(obj["position"][0]["x"]) - mean.first + length);
+            initialState.push_back(float(obj["position"][0]["y"]) - mean.second + width);
             initialState.push_back(test_utils::degreesToRadians(obj["heading"][0]));
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
-            agent_length_map[n_agents++] = obj["length"];
+            n_agents++;
         }
         acc_distribution = std::uniform_real_distribution<float>(-3.0, 2.0);
         steering_distribution = std::uniform_real_distribution<float>(-0.7, 0.7); 
         generator = std::default_random_engine(42);
+
+        auto shape_tensor = mgr.shapeTensor();
+        int32_t *ptr = static_cast<int32_t *>(shape_tensor.devicePtr());
+        num_agents = ptr[0];
     }
 };
 
