@@ -8,6 +8,8 @@
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <array>
 #include <charconv>
 #include <iostream>
@@ -16,6 +18,8 @@
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <random>
+
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -255,6 +259,59 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
+static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
+{
+    std::filesystem::path path(cfg.jsonPath);
+    auto validFilesJsonPath = path / "valid_files.json";
+    assert(std::filesystem::exists(validFilesJsonPath));
+    // check if validFiles.json exists
+
+    std::ifstream validFilesJson(validFilesJsonPath);
+    assert(validFilesJson.good());
+
+    nlohmann::json validFiles;
+    validFilesJson >> validFiles;
+
+    std::vector<std::string> mapFiles;
+    for (auto& [key, value] : validFiles.items()) {
+        std::filesystem::path fullPath = path / key;
+        mapFiles.emplace_back(fullPath.string());
+    }
+    assert(mapFiles.size() != 0);
+    
+    if(cfg.params.datasetInitOptions == DatasetInitOptions::FirstN)
+    {
+        assert(cfg.numWorlds <= mapFiles.size());
+        mapFiles.resize(cfg.numWorlds);
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::RandomN)
+    {
+        assert(cfg.numWorlds <= mapFiles.size());
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(mapFiles.begin(), mapFiles.end(), g);
+        mapFiles.resize(cfg.numWorlds);
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
+    {
+        assert(cfg.numWorlds >= mapFiles.size());
+        for(int i = 0; i < cfg.numWorlds; i++)
+        {
+            mapFiles.push_back(mapFiles[0]);
+        }
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
+    {
+        // Do nothing
+    }
+    else
+    {
+        FATAL("Invalid datasetInitOptions");
+    }
+
+    return mapFiles;
+}
+
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg,
     const viz::VizECSBridge *viz_bridge)
@@ -265,6 +322,8 @@ Manager::Impl * Manager::Impl::init(
         0, // kMaxAgentCount
         0 // kMaxRoadEntityCount
     };
+
+    std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -280,21 +339,21 @@ Manager::Impl * Manager::Impl::init(
 
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
-
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
         
         int64_t worldIdx{0};
     
-        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        for (auto const &mapFile : mapFiles)
         {
-            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
+            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
                                                 viz_bridge, map_, mgr_cfg.execMode, paramsDevicePtr};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
 
+        
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
         // Bounds on the maxagent and maxroadentity counts.
         assert(sim_cfg.kMaxAgentCount <= consts::kMaxAgentCount);
@@ -356,9 +415,9 @@ Manager::Impl * Manager::Impl::init(
 
         int64_t worldIdx{0};
     
-        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+        for (auto const &mapFile : mapFiles)
         {
-            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
+            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
                                                 viz_bridge, map_, mgr_cfg.execMode, &(mgr_cfg.params)};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);

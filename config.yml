@@ -1,0 +1,17 @@
+reward_params:
+  rewardType: DistanceBased  
+  distanceToGoalThreshold: 1.0
+  distanceToExpertThreshold: 1.0
+
+parameters:
+  polylineReductionThreshold: 0.5
+  observationRadius: 10.0
+  datasetInitOptions: FirstN  
+  rewardParams: reward_params  
+
+sim_manager:
+  exec_mode: CPU 
+  gpu_id: 0
+  num_worlds: 1
+  auto_reset: true
+  json_path: /home/aarav/gpudrive/valid_nocturne

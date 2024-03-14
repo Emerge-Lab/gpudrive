@@ -18,6 +18,12 @@ namespace gpudrive
         // like madrona::py::Tensor and madrona::py::PyExecMode.
         madrona::py::setupMadronaSubmodule(m);
 
+        nb::enum_<DatasetInitOptions>(m, "DatasetInitOptions")
+            .value("FirstN", DatasetInitOptions::FirstN)
+            .value("RandomN", DatasetInitOptions::RandomN)
+            .value("PadN", DatasetInitOptions::PadN)
+            .value("ExactN", DatasetInitOptions::ExactN);
+
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
             .value("DistanceBased", RewardType::DistanceBased)
@@ -36,6 +42,7 @@ namespace gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
+            .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams);
 
 
@@ -68,7 +75,8 @@ namespace gpudrive
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
             .def("lidar_tensor", &Manager::lidarTensor)
             .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
-            .def("shape_tensor", &Manager::shapeTensor);
+            .def("shape_tensor", &Manager::shapeTensor)
+            .def("controlled_state_tensor", &Manager::controlledStateTensor);
     }
 
 }

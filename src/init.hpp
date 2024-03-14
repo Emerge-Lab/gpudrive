@@ -91,6 +91,14 @@ namespace gpudrive
         madrona::AtomicU32 curEpisode;
     };
 
+    enum class DatasetInitOptions : uint32_t
+    {
+        FirstN,
+        RandomN,
+        PadN, // Pad the worlds by repeating the first world.
+        ExactN, // Will fail if N != NumWorlds
+    };
+
     enum class RewardType : uint32_t
     {
         DistanceBased, // negative distance to goal
@@ -110,6 +118,7 @@ namespace gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
+        DatasetInitOptions datasetInitOptions;
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
     };
 
