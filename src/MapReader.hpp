@@ -4,7 +4,7 @@
 #include <madrona/exec_mode.hpp>
 #include <tuple>
 
-#include "init.hpp"
+#include "types.hpp"
 
 namespace gpudrive {
 

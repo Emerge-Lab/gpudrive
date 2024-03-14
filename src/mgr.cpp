@@ -348,7 +348,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, paramsDevicePtr};
+                                                viz_bridge, map_, paramsDevicePtr};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
@@ -419,7 +419,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, &(mgr_cfg.params)};
+                                                viz_bridge, map_, &(mgr_cfg.params)};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
@@ -520,7 +520,7 @@ Tensor Manager::bicycleModelTensor() const
         {
             impl_->cfg.numWorlds,
             impl_->agentRoadCounts.first,
-            4, // Number of states for the bicycle model
+            BicycleModelExportSize, // Number of states for the bicycle model
         });
 }
 
@@ -552,7 +552,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   6
+                                   SelfObservationExportSize 
                                });
 }
 
@@ -563,7 +563,7 @@ Tensor Manager::mapObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.second,
-                                   4
+                                   MapObservationExportSize
                                });
 }
 
@@ -575,7 +575,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
                                    consts::kMaxAgentCount-1,
-                                   7,
+                                   PartnerObservationExportSize,
                                });
 }
 
@@ -587,7 +587,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
                                    consts::kMaxRoadEntityCount,
-                                   4,
+                                   AgentMapObservationExportSize,
                                });
 
 }
@@ -621,7 +621,7 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds,consts::kMaxAgentCount, 1});
+                               {impl_->cfg.numWorlds,impl_->agentRoadCounts.first, 1});
 }
 
 void Manager::triggerReset(int32_t world_idx)
@@ -650,7 +650,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                   .headAngle = headAngle};
 
     auto *action_ptr =
-        impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
+        impl_->agentActionsBuffer + world_idx * impl_->agentRoadCounts.first + agent_idx;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT

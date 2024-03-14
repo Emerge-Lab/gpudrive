@@ -59,31 +59,31 @@ protected:
 
             if(obj["type"] == "road_edge")
             {
-                roadTypes.push_back(0);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadEdge);
             }
             else if(obj["type"] == "road_line")
             {
-                roadTypes.push_back(1);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadLine);
             }
             else if(obj["type"] == "lane")
             {
-                roadTypes.push_back(2);
+                roadTypes.push_back((float)gpudrive::EntityType::RoadLane);
             }
             else if(obj["type"] == "crosswalk")
             {
-                roadTypes.push_back(3);
+                roadTypes.push_back((float)gpudrive::EntityType::CrossWalk);
             }
             else if(obj["type"] == "speed_bump")
             {
-                roadTypes.push_back(4);
+                roadTypes.push_back((float)gpudrive::EntityType::SpeedBump);
             }
             else if(obj["type"] == "stop_sign")
             {
-                roadTypes.push_back(5);
+                roadTypes.push_back((float)gpudrive::EntityType::StopSign);
             }
             else if(obj["type"] == "invalid")
             {
-                roadTypes.push_back(6);
+                roadTypes.push_back(0);
             }
         }
     }
@@ -93,21 +93,32 @@ TEST_F(ObservationsTest, TestObservations) {
     auto obs = mgr.mapObservationTensor();
     auto flat_obs = test_utils::flatten_obs(obs);
 
-    int64_t idx = 4; // Skip the first 4 points which are garbage for some reason.
+    int64_t idx = 0;
     for(int64_t i = 0; i < roadGeoms.size(); i++)
     {
         std::vector<std::pair<float, float>> roadGeom = roadGeoms[i];
         float roadType = roadTypes[i];
         for(int64_t j = 0; j < roadGeom.size() - 1; j++)
         {
-            if(roadType > 2)
+            if(roadType > (float)gpudrive::EntityType::RoadLane && roadType < (float)gpudrive::EntityType::StopSign)
             {
                 float x = (roadGeom[j].first + roadGeom[j+1].first + roadGeom[j+2].first + roadGeom[j+3].first)/4 - mean.first;
                 float y = (roadGeom[j].second + roadGeom[j+1].second + roadGeom[j+2].second + roadGeom[j+3].second)/4 - mean.second;
 
                 ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
                 ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
+                ASSERT_EQ(flat_obs[idx+3], roadType);
+                idx += 4;
+                break;
+            }
+            else if(roadType == (float)gpudrive::EntityType::StopSign)
+            {
+                float x = roadGeom[j].first - mean.first;
+                float y = roadGeom[j].second - mean.second;
 
+                ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
+                ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
+                ASSERT_EQ(flat_obs[idx+3], roadType);
                 idx += 4;
                 break;
             }

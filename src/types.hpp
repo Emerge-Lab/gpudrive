@@ -20,11 +20,88 @@ using madrona::phys::ResponseType;
 using madrona::phys::ExternalForce;
 using madrona::phys::ExternalTorque;
 
+// This enum is used to track the type of each entity
+// The order of the enum is important and should not be changed
+// The order is {Road types that can be reduced, Road types that cannot be reduced, agent types, other types}
+enum class EntityType : uint32_t {
+    None,
+    RoadEdge,
+    RoadLine,
+    RoadLane,
+    CrossWalk,
+    SpeedBump,
+    StopSign,
+    Vehicle,
+    Pedestrian,
+    Cyclist,
+    Padding,
+    NumTypes,
+};
+
+// Constants computed from train files.
+constexpr size_t MAX_OBJECTS = 515;
+constexpr size_t MAX_ROADS = 956;
+constexpr size_t MAX_POSITIONS = 91;
+constexpr size_t MAX_GEOMETRY = 1746;
+
+// Cannot use Madrona::math::Vector2 because it is not a POD type.
+// Getting all zeros if using any madrona types.
+struct MapVector2
+{
+    float x;
+    float y;
+};
+
+struct MapObject
+{
+    MapVector2 position[MAX_POSITIONS];
+    float width;
+    float length;
+    float heading[MAX_POSITIONS];
+    MapVector2 velocity[MAX_POSITIONS];
+    bool valid[MAX_POSITIONS];
+    MapVector2 goalPosition;
+    EntityType type;
+
+    uint32_t numPositions;
+    uint32_t numHeadings;
+    uint32_t numVelocities;
+    uint32_t numValid;
+    MapVector2 mean;
+};
+
+struct MapRoad
+{
+    // std::array<MapPosition, MAX_POSITIONS> geometry;
+    MapVector2 geometry[MAX_GEOMETRY];
+    EntityType type;
+    uint32_t numPoints;
+    MapVector2 mean;
+};
+
+struct Map
+{
+    MapObject objects[MAX_OBJECTS];
+    MapRoad roads[MAX_ROADS];
+
+    uint32_t numObjects;
+    uint32_t numRoads;
+    uint32_t numRoadSegments;
+    MapVector2 mean;
+
+    // Constructor
+    Map() = default;
+};
+
 struct BicycleModel {
     madrona::math::Vector2 position;
     float heading;
     float speed;
 };
+
+const int BicycleModelExportSize = 4;
+
+static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
 
 struct VehicleSize {
   float length;
@@ -72,11 +149,23 @@ struct SelfObservation {
     float collisionState;
 };
 
+const int SelfObservationExportSize = 6;
+
+// SelfObservation is exported as a
+// [N, A, 5] float tensor to pytorch
+static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
+
 struct MapObservation {
     madrona::math::Vector2 position;
     float heading;
     float type;
 };
+
+const int MapObservationExportSize = 4;
+
+// MapObservation is exported as a
+// [N, numRoadEntities, 4] float tensor to pytorch
+static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
 struct PartnerObservation {
     float speed;
@@ -91,15 +180,24 @@ struct PartnerObservations {
     PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
+const int PartnerObservationExportSize = 7;
+
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 7);
+    (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
+const int AgentMapObservationExportSize = 4;
+
+// AgentMapObservations is exported as a
+// [N, A, numRoadEntities, 4] float tensor to pytorch
+
+static_assert(sizeof(AgentMapObservations) == sizeof(float) *
+    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
 
 
 struct LidarSample {
@@ -127,19 +225,6 @@ struct Progress {
 // build the egocentric observations of their state.
 struct OtherAgents {
     madrona::Entity e[consts::kMaxAgentCount - 1];
-};
-
-// This enum is used to track the type of each entity for the purposes of
-// classifying the objects hit by each lidar sample.
-enum class EntityType : uint32_t {
-    None,
-    Button,
-    Cube,
-    Vehicle,
-    Pedestrian,
-    Cyclist,
-    Padding,
-    NumTypes,
 };
 
 struct Trajectory {
