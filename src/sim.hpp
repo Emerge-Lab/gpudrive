@@ -68,7 +68,7 @@ struct Sim : public madrona::WorldBase {
     // Sim::setupTasks is called during initialization to build
     // the system task graph that will be invoked by the 
     // Manager class (src/mgr.hpp) for each step.
-    static void setupTasks(madrona::TaskGraphBuilder &builder,
+    static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
 
     // The constructor is called for each world during initialization.

@@ -11,25 +11,6 @@
 using namespace madrona;
 using namespace madrona::viz;
 
-static inline float srgbToLinear(float srgb)
-{
-    if (srgb <= 0.04045f) {
-        return srgb / 12.92f;
-    }
-
-    return powf((srgb + 0.055f) / 1.055f, 2.4f);
-}
-
-static inline math::Vector4 rgb8ToFloat(uint8_t r, uint8_t g, uint8_t b)
-{
-    return {
-        srgbToLinear((float)r / 255.f),
-        srgbToLinear((float)g / 255.f),
-        srgbToLinear((float)b / 255.f),
-        1.f,
-    };
-}
-
 static HeapArray<float> readReplayLog(const char *path) {
     std::ifstream replay_log(path, std::ios::binary);
     replay_log.seekg(0, std::ios::end);
@@ -76,82 +57,16 @@ int main(int argc, char *argv[])
         num_replay_steps = replay_log->size() / (num_worlds * num_views * 4);
     }
 
-    std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
-    render_asset_paths[(size_t)SimObject::Cube] =
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
-    render_asset_paths[(size_t)SimObject::Agent] =
-        (std::filesystem::path(DATA_DIR) / "agent_render.obj").string();
-    render_asset_paths[(size_t)SimObject::Plane] =
-        (std::filesystem::path(DATA_DIR) / "plane.obj").string();
-    render_asset_paths[(size_t)SimObject::StopSign] =
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
-    render_asset_paths[(size_t)SimObject::SpeedBump] =
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    bool enable_batch_renderer =
+#ifdef MADRONA_MACOS
+        false;
+#else
+        true;
+#endif
 
-    std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
-    for (size_t i = 0; i < render_asset_paths.size(); i++) {
-        render_asset_cstrs[i] = render_asset_paths[i].c_str();
-    }
-
-    std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk(
-        render_asset_cstrs, Span<char>(import_err.data(), import_err.size()));
-
-    if (!render_assets.has_value()) {
-        FATAL("Failed to load render assets: %s", import_err);
-    }
-
-    auto materials = std::to_array<imp::SourceMaterial>({
-        { rgb8ToFloat(191, 108, 10), -1, 0.8f, 1.0f },
-        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
-        { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
-        { rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
-        { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
-        { rgb8ToFloat(230, 20, 20),   -1, 0.8f, 1.0f },
-        { rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
-        { rgb8ToFloat(255,0,0), -1, 0.8f, 1.0f},
-        { rgb8ToFloat(0,0,0), -1, 0.8f, 0.2f}
-    });
-
-    // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
-    math::Quat initial_camera_rotation =
-            (math::Quat::angleAxis(0, math::up) *
-            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
-
-    Viewer viewer({
-        .gpuID = 0,
-        .renderWidth = 2730,
-        .renderHeight = 1536,
-        .numWorlds = num_worlds,
-        .maxViewsPerWorld = num_views,
-        .maxInstancesPerWorld = 450,
-        .defaultSimTickRate = 20,
-        .cameraMoveSpeed = 20.f,
-        .cameraPosition = 20.f * math::up,
-        .cameraRotation = initial_camera_rotation,
-        .execMode = exec_mode,
-    });
-
-    // Override materials
-    render_assets->objects[(CountT)SimObject::Cube].meshes[0].materialIDX = 0;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[0].materialIDX = 2;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[1].materialIDX = 3;
-    render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
-    render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
-    render_assets->objects[(CountT)SimObject::StopSign].meshes[0].materialIDX = 7;
-    render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
-    // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
-
-    viewer.loadObjects(render_assets->objects, materials, {
-        { (std::filesystem::path(DATA_DIR) /
-           "green_grid.png").string().c_str() },
-        { (std::filesystem::path(DATA_DIR) /
-           "smile.png").string().c_str() },
-    });
-
-    viewer.configureLighting({
-        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
-    });
+    WindowManager wm {};
+    WindowHandle window = wm.makeWindow("Escape Room", 2730, 1536);
+    render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
         .execMode = exec_mode,
@@ -162,8 +77,24 @@ int main(int argc, char *argv[])
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
-        }
-    }, viewer.rendererBridge());
+        },
+        .enableBatchRenderer = enable_batch_renderer,
+        .extRenderAPI = wm.gpuAPIManager().backend(),
+        .extRenderDev = render_gpu.device(),
+    });
+
+    // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
+    math::Quat initial_camera_rotation =
+            (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+
+    Viewer viewer(mgr.getRenderManager(), window.get(), {
+        .numWorlds = num_worlds,
+        .simTickRate = 20,
+        .cameraMoveSpeed = 20.f,
+        .cameraPosition = 20.f * math::up,
+        .cameraRotation = initial_camera_rotation,
+    });
 
     auto replayStep = [&]() {
         if (cur_replay_step == num_replay_steps - 1) {
@@ -219,8 +150,12 @@ int main(int argc, char *argv[])
         printf("\n");
     };
 
-    viewer.loop([&mgr](CountT world_idx, CountT agent_idx,
-                       const Viewer::UserInput &input) {
+    viewer.loop(
+    [](CountT world_idx, const Viewer::UserInput &input) {
+        (void)world_idx;
+    },
+    [&mgr](CountT world_idx, CountT agent_idx,
+            const Viewer::UserInput &input) {
         using Key = Viewer::KeyboardKey;
 
         float steering{0};

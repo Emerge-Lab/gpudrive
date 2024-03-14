@@ -41,7 +41,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
-    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+    ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
 }
 
@@ -273,7 +273,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<ExternalForce>(agent) = Vector3::zero();
     ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
-    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+    ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 
     return agent;
 }

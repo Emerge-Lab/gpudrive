@@ -79,8 +79,8 @@ static inline Optional<render::RenderManager> initRenderManager(
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = mgr_cfg.numWorlds,
-        .maxViewsPerWorld = consts::kMaxAgentCount,
-        .maxInstancesPerWorld = 1000,
+        .maxViewsPerWorld = 2, // FIXME?
+        .maxInstancesPerWorld = 450,
         .execMode = mgr_cfg.execMode,
         .voxelCfg = {},
     });
@@ -92,17 +92,23 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
+    Optional<RenderGPUState> renderGPUState;
+    Optional<render::RenderManager> renderMgr;
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
-                Action *action_buffer)
+                Action *action_buffer,
+                Optional<RenderGPUState> &&render_gpu_state,
+                Optional<render::RenderManager> &&render_mgr)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
           agentActionsBuffer(action_buffer)
+          renderGPUState(std::move(render_gpu_state)),
+          renderMgr(std::move(render_mgr))
     {}
 
     inline virtual ~Impl() {}
@@ -127,9 +133,12 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   TaskGraphT &&cpu_exec)
+                   TaskGraphT &&cpu_exec,
+                   Optional<RenderGPUState> &&render_gpu_state,
+                   Optional<render::RenderManager> &&render_mgr)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer),
+               ep_mgr, reset_buffer, action_buffer,
+               std::move(render_gpu_state), std::move(render_mgr)),
           cpuExec(std::move(cpu_exec))
     {}
 
@@ -162,9 +171,12 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   MWCudaExecutor &&gpu_exec)
+                   MWCudaExecutor &&gpu_exec,
+                   Optional<RenderGPUState> &&render_gpu_state,
+                   Optional<render::RenderManager> &&render_mgr)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer),
+               ep_mgr, reset_buffer, action_buffer,
+               std::move(render_gpu_state), std::move(render_mgr)),
           gpuExec(std::move(gpu_exec)),
           stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step))
     {}
@@ -188,6 +200,67 @@ struct Manager::CUDAImpl final : Manager::Impl {
     }
 };
 #endif
+
+static void loadRenderObjects(render::RenderManager &render_mgr)
+{
+    std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
+    render_asset_paths[(size_t)SimObject::Cube] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Agent] =
+        (std::filesystem::path(DATA_DIR) / "agent_render.obj").string();
+    render_asset_paths[(size_t)SimObject::Plane] =
+        (std::filesystem::path(DATA_DIR) / "plane.obj").string();
+    render_asset_paths[(size_t)SimObject::StopSign] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+    render_asset_paths[(size_t)SimObject::SpeedBump] =
+        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
+
+    std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
+    for (size_t i = 0; i < render_asset_paths.size(); i++) {
+        render_asset_cstrs[i] = render_asset_paths[i].c_str();
+    }
+
+    std::array<char, 1024> import_err;
+    auto render_assets = imp::ImportedAssets::importFromDisk(
+        render_asset_cstrs, Span<char>(import_err.data(), import_err.size()));
+
+    if (!render_assets.has_value()) {
+        FATAL("Failed to load render assets: %s", import_err);
+    }
+
+    auto materials = std::to_array<imp::SourceMaterial>({
+        { render::rgb8ToFloat(191, 108, 10), -1, 0.8f, 1.0f },
+        { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
+        { math::Vector4{1.f, 1.f, 1.f, 0.0f}, 1, 0.5f, 1.0f,},
+        { render::rgb8ToFloat(230, 230, 230),   -1, 0.8f, 1.0f },
+        { math::Vector4{0.5f, 0.3f, 0.3f, 0.0f},  0, 0.8f, 0.2f,},
+        { render::rgb8ToFloat(230, 20, 20),   -1, 0.8f, 1.0f },
+        { render::rgb8ToFloat(230, 230, 20),   -1, 0.8f, 1.0f },
+        { render::rgb8ToFloat(255,0,0), -1, 0.8f, 1.0f},
+        { render::rgb8ToFloat(0,0,0), -1, 0.8f, 0.2f}
+    });
+
+    // Override materials
+    render_assets->objects[(CountT)SimObject::Cube].meshes[0].materialIDX = 0;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[0].materialIDX = 2;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[1].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::Agent].meshes[2].materialIDX = 3;
+    render_assets->objects[(CountT)SimObject::Plane].meshes[0].materialIDX = 4;
+    render_assets->objects[(CountT)SimObject::StopSign].meshes[0].materialIDX = 7;
+    render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
+    // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
+
+    render_mgr.loadObjects(render_assets->objects, materials, {
+        { (std::filesystem::path(DATA_DIR) /
+           "green_grid.png").string().c_str() },
+        { (std::filesystem::path(DATA_DIR) /
+           "smile.png").string().c_str() },
+    });
+
+    render_mgr.configureLighting({
+        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
+    });
+}
 
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
@@ -311,14 +384,14 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
-    Sim::Config sim_cfg {
-        viz_bridge != nullptr,
-        mgr_cfg.autoReset,
-    };
+    Sim::Config sim_cfg;
+    sim_cfg.autoReset = mgr_cfg.autoReset;
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
+        CUcontext cu_ctx = MWCudaExecutor::initCUDA(mgr_cfg.gpuID);
+
         EpisodeManager *episode_mgr = 
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
@@ -341,9 +414,28 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
+<<<<<<< HEAD
                                                 viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
+=======
+                                                map_, mgr_cfg.execMode, paramsDevicePtr};
+            sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
+            sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
+>>>>>>> 1d68c91 (Compiling on latest madrona)
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+
+        Optional<RenderGPUState> render_gpu_state =
+            initRenderGPUState(mgr_cfg);
+
+        Optional<render::RenderManager> render_mgr =
+            initRenderManager(mgr_cfg, render_gpu_state);
+
+        if (render_mgr.has_value()) {
+            loadRenderObjects(*render_mgr);
+            sim_cfg.renderBridge = render_mgr->bridge();
+        } else {
+            sim_cfg.renderBridge = nullptr;
+        }
 
         MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
@@ -355,12 +447,11 @@ Manager::Impl * Manager::Impl::init(
             .numWorlds = mgr_cfg.numWorlds,
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
             .numExportedBuffers = (uint32_t)ExportID::NumExports, 
-            .gpuID = (uint32_t)mgr_cfg.gpuID,
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
-        });
+        }, cu_ctx);
 
         WorldReset *world_reset_buffer = 
             (WorldReset *)gpu_exec.getExported((uint32_t)ExportID::Reset);
@@ -381,6 +472,8 @@ Manager::Impl * Manager::Impl::init(
             world_reset_buffer,
             agent_actions_buffer,
             std::move(gpu_exec),
+            std::move(render_gpu_state),
+            std::move(render_mgr)
         };
 
 #else
@@ -403,10 +496,24 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, ExecMode::CPU,  &(mgr_cfg.params)};
+                                                map_, ExecMode::CPU,  &(mgr_cfg.params)};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
+
+
+        Optional<RenderGPUState> render_gpu_state =
+            initRenderGPUState(mgr_cfg);
+
+        Optional<render::RenderManager> render_mgr =
+            initRenderManager(mgr_cfg, render_gpu_state);
+
+        if (render_mgr.has_value()) {
+            loadRenderObjects(*render_mgr);
+            sim_cfg.renderBridge = render_mgr->bridge();
+        } else {
+            sim_cfg.renderBridge = nullptr;
+        }
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
@@ -431,6 +538,8 @@ Manager::Impl * Manager::Impl::init(
             world_reset_buffer,
             agent_actions_buffer,
             std::move(cpu_exec),
+            std::move(render_gpu_state),
+            std::move(render_mgr)
         };
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
@@ -558,7 +667,7 @@ Tensor Manager::partnerObservationsTensor() const
 Tensor Manager::agentMapObservationsTensor() const
 {
     return impl_->exportTensor(ExportID::AgentMapObservations,
-                               Tensor::ElementType::Float32,
+                               TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
 				   consts::kMaxAgentCount,
@@ -662,4 +771,10 @@ Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
 
     return worldToShape;
 }
+
+render::RenderManager & Manager::getRenderManager()
+{
+    return *impl_->renderMgr;
+}
+
 }
