@@ -547,8 +547,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   8
-
+                                   6
                                });
 }
 
@@ -570,9 +569,22 @@ Tensor Manager::partnerObservationsTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   impl_->agentRoadCounts.first - 1,
+                                   consts::kMaxAgentCount-1,
+                                   7,
+                               });
+}
+
+Tensor Manager::agentMapObservationsTensor() const
+{
+    return impl_->exportTensor(ExportID::AgentMapObservations,
+                               Tensor::ElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   impl_->agentRoadCounts.first,
+                                   consts::kMaxRoadEntityCount,
                                    4,
                                });
+
 }
 
 Tensor Manager::lidarTensor() const
@@ -600,6 +612,11 @@ Tensor Manager::stepsRemainingTensor() const
 Tensor Manager::shapeTensor() const {
     return impl_->exportTensor(ExportID::Shape, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, 2});
+}
+
+Tensor Manager::controlledStateTensor() const {
+    return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
+                               {impl_->cfg.numWorlds,consts::kMaxAgentCount, 1});
 }
 
 void Manager::triggerReset(int32_t world_idx)

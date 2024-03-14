@@ -66,9 +66,10 @@ struct Done {
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
-    BicycleModel bicycle_model;
+    float speed;
     VehicleSize vehicle_size;
     Goal goal;
+    float collisionState;
 };
 
 struct MapObservation {
@@ -81,6 +82,8 @@ struct PartnerObservation {
     float speed;
     madrona::math::Vector2 position;
     float heading;
+    VehicleSize vehicle_size;
+    float type;
 };
 
 // Egocentric observations of other agents
@@ -91,7 +94,13 @@ struct PartnerObservations {
 // PartnerObservations is exported as a
 // [N, A, consts::numAgents - 1, 3] // tensor to pytorch
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 4);
+    (consts::kMaxAgentCount - 1) * 7);
+
+struct AgentMapObservations {
+    MapObservation obs[consts::kMaxRoadEntityCount];
+};
+
+
 
 struct LidarSample {
     float depth;
@@ -126,7 +135,9 @@ enum class EntityType : uint32_t {
     None,
     Button,
     Cube,
-    Agent,
+    Vehicle,
+    Pedestrian,
+    Cyclist,
     Padding,
     NumTypes,
 };
@@ -134,12 +145,22 @@ enum class EntityType : uint32_t {
 struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
-    float initialHeading;
+    float headings[consts::kTrajectoryLength];
+    int32_t valids[consts::kTrajectoryLength];
 };
 
 struct Shape {
     int32_t agentEntityCount;
     int32_t roadEntityCount;
+};
+
+enum class ControlMode {
+   EXPERT,
+   BICYCLE
+};
+
+struct ControlledState {
+   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
 
 /* ECS Archetypes for the game */
@@ -173,13 +194,14 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
-
+    ControlledState,
     // Input
     Action,
 
     // Observations
     SelfObservation,
     PartnerObservations,
+    AgentMapObservations,
     Lidar,
     StepsRemaining,
 
