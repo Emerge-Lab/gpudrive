@@ -100,14 +100,25 @@ TEST_F(ObservationsTest, TestObservations) {
         float roadType = roadTypes[i];
         for(int64_t j = 0; j < roadGeom.size() - 1; j++)
         {
-            if(roadType > 2)
+            if(roadType > (float)gpudrive::EntityType::RoadLane && roadType < (float)gpudrive::EntityType::StopSign)
             {
                 float x = (roadGeom[j].first + roadGeom[j+1].first + roadGeom[j+2].first + roadGeom[j+3].first)/4 - mean.first;
                 float y = (roadGeom[j].second + roadGeom[j+1].second + roadGeom[j+2].second + roadGeom[j+3].second)/4 - mean.second;
 
                 ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
                 ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
+                ASSERT_EQ(flat_obs[idx+3], roadType);
+                idx += 4;
+                break;
+            }
+            else if(roadType == (float)gpudrive::EntityType::StopSign)
+            {
+                float x = roadGeom[j].first - mean.first;
+                float y = roadGeom[j].second - mean.second;
 
+                ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
+                ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
+                ASSERT_EQ(flat_obs[idx+3], roadType);
                 idx += 4;
                 break;
             }
