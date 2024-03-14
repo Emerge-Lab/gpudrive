@@ -4,7 +4,7 @@ reward_params:
   distanceToExpertThreshold: 1.0
 
 parameters:
-  polylineReductionThreshold: 0.5
+  polylineReductionThreshold: 1.0
   observationRadius: 10.0
   datasetInitOptions: FirstN  
   rewardParams: reward_params  
