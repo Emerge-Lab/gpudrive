@@ -42,6 +42,11 @@ enum class SimObject : uint32_t {
     NumObjects,
 };
 
+enum class TaskGraphID : uint32_t {
+    Step,
+    NumTaskGraphs,
+};
+
 // The Sim class encapsulates the per-world state of the simulation.
 // Sim is always available by calling ctx.data() given a reference
 // to the Engine / Context object that is passed to each ECS system.

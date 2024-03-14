@@ -140,7 +140,7 @@ struct Manager::CPUImpl final : Manager::Impl {
 
     inline virtual void run()
     {
-        cpuExec.run();
+        cpuExec.runTaskGraph(TaskGraphID::Step);
     }
 
     virtual inline Tensor exportTensor(ExportID slot,
@@ -155,6 +155,7 @@ struct Manager::CPUImpl final : Manager::Impl {
 #ifdef MADRONA_CUDA_SUPPORT
 struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
+    MWCudaLaunchGraph stepGraph;
 
     inline CUDAImpl(const Manager::Config &mgr_cfg,
                    PhysicsLoader &&phys_loader,
@@ -164,7 +165,8 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    MWCudaExecutor &&gpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
                ep_mgr, reset_buffer, action_buffer),
-          gpuExec(std::move(gpu_exec))
+          gpuExec(std::move(gpu_exec)),
+          stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step))
     {}
 
     inline virtual ~CUDAImpl() final
@@ -174,7 +176,7 @@ struct Manager::CUDAImpl final : Manager::Impl {
 
     inline virtual void run()
     {
-        gpuExec.run();
+        gpuExec.run(stepGraph);
     }
 
     virtual inline Tensor exportTensor(ExportID slot,
@@ -351,6 +353,7 @@ Manager::Impl * Manager::Impl::init(
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
             .numWorlds = mgr_cfg.numWorlds,
+            .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
             .numExportedBuffers = (uint32_t)ExportID::NumExports, 
             .gpuID = (uint32_t)mgr_cfg.gpuID,
         }, {
@@ -412,6 +415,7 @@ Manager::Impl * Manager::Impl::init(
             },
             sim_cfg,
             world_inits.data(),
+            (uint32_t)TaskGraphID::NumTaskGraphs,
         };
 
         WorldReset *world_reset_buffer = 

@@ -20,7 +20,7 @@ target_link_libraries(gpudrive_cpu_impl
         madrona_viz_system
 )
 
-add_library(gpudrive_mgr SHARED
+add_library(gpudrive_mgr STATIC
     mgr.hpp mgr.cpp
     MapReader.hpp MapReader.cpp
 )
