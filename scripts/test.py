@@ -19,7 +19,7 @@ sim = gpudrive.SimManager(
     gpu_id=0,
     num_worlds=1,
     auto_reset=True,
-    json_path="tests/test.json",
+    json_path="waymo_data",
     params=params
 )
 
