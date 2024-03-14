@@ -113,8 +113,8 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
-                            const MapVector2 &p4) {
+static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
+                            const MapVector2 &p4, const EntityType &type) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -171,11 +171,11 @@ static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 
     ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
-    ctx.get<EntityType>(speed_bump) = EntityType::SpeedBump;
+    ctx.get<EntityType>(speed_bump) = type;
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)EntityType::SpeedBump};
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)type};
     return speed_bump;
 }
 
@@ -205,12 +205,12 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
                  return;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
-    } else if (roadInit.type == EntityType::SpeedBump) {
+    } else if (roadInit.type == EntityType::SpeedBump || roadInit.type == EntityType::CrossWalk) {
       assert(roadInit.numPoints >= 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
       if(idx >= ctx.data().MaxRoadEntityCount)
         return;
-      ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
+      ctx.data().roads[idx++] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
     } else if (roadInit.type == EntityType::StopSign) {
       assert(roadInit.numPoints >= 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
