@@ -42,6 +42,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
+    registry.registerComponent<CollisionDetectionEvent>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -136,8 +137,9 @@ inline void collectObservationsSystem(Engine &ctx,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
                                       AgentMapObservations &map_obs,
-				      const EntityType& entityType,
-				      const CollisionEvent& collisionEvent) {
+				                      const EntityType& entityType,
+				                      const CollisionDetectionEvent& collisionEvent)
+{
      if (entityType == EntityType::Padding) {
        return;
      }
@@ -218,7 +220,7 @@ inline void movementSystem(Engine &e,
                            const Trajectory &trajectory,
                            ExternalForce &external_force,
                            ExternalTorque &external_torque,
-                           const CollisionEvent &collisionEvent)
+                           const CollisionDetectionEvent &collisionEvent)
 {
     if (type == EntityType::Padding) {
         return;
@@ -495,16 +497,16 @@ void collisionDetectionSystem(Engine &ctx,
         return;
     }
 
-    auto maybeCollisionEventA =
-        ctx.getSafe<CollisionEvent>(candidateCollision.aEntity);
-    if (maybeCollisionEventA.valid()) {
-        maybeCollisionEventA.value().hasCollided.store_relaxed(1);
+    auto maybeCollisionDetectionEventA =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
+    if (maybeCollisionDetectionEventA.valid()) {
+        maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
     }
 
-    auto maybeCollisionEventB =
-        ctx.getSafe<CollisionEvent>(candidateCollision.bEntity);
-    if (maybeCollisionEventB.valid()) {
-        maybeCollisionEventB.value().hasCollided.store_relaxed(1);
+    auto maybeCollisionDetectionEventB =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
+    if (maybeCollisionDetectionEventB.valid()) {
+        maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
     }
 }
 
@@ -548,7 +550,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Trajectory,
             ExternalForce,
             ExternalTorque,
-            CollisionEvent
+            CollisionDetectionEvent
         >>({});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
@@ -560,7 +562,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
                                                            {moveSystem});
 
     auto findOverlappingEntities =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseFindOverlappingTask(
+        phys::RigidBodyPhysicsSystem::setupBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -628,10 +630,10 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Progress,
             OtherAgents,
             SelfObservation,
-	    PartnerObservations,
+	        PartnerObservations,
             AgentMapObservations,
             EntityType,
-            madrona::phys::CollisionEvent
+            CollisionDetectionEvent
         >>({post_reset_broadphase});
 
 

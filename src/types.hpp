@@ -163,6 +163,10 @@ struct ControlledState {
    ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
 
+struct CollisionDetectionEvent {
+    madrona::AtomicI32 hasCollided{false};
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -176,13 +180,10 @@ struct Agent : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
-    madrona::phys::CollisionEvent,
+    CollisionDetectionEvent,
   
     // Internal logic state.
     Progress,
@@ -227,9 +228,6 @@ struct PhysicsEntity : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
     ExternalForce,
     ExternalTorque,
     madrona::phys::broadphase::LeafID,
