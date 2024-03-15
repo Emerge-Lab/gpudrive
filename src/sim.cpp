@@ -39,7 +39,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
-    registry.registerComponent<CollisionEvent>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -73,8 +72,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
-    registry.exportColumn<Agent, CollisionEvent>(
-        static_cast<uint32_t>(ExportID::Collision));
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -144,7 +141,8 @@ inline void collectObservationsSystem(Engine &ctx,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
                                       AgentMapObservations &map_obs,
-				      const EntityType& entityType) {
+				      const EntityType& entityType,
+				      const CollisionEvent& collisionEvent) {
      if (entityType == EntityType::Padding) {
        return;
      }
@@ -152,6 +150,10 @@ inline void collectObservationsSystem(Engine &ctx,
     self_obs.speed = model.speed;
     self_obs.vehicle_size = size; 
     self_obs.goal.position = goal.position - model.position;
+
+    auto hasCollided = collisionEvent.hasCollided.load_relaxed();
+    self_obs.collisionState = hasCollided ? 1.f : 0.f;
+
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
@@ -548,7 +550,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             EntityType,
             StepsRemaining,
             Trajectory,
-             ExternalForce,
+            ExternalForce,
             ExternalTorque,
             CollisionEvent
         >>({});
@@ -631,8 +633,9 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             OtherAgents,
             SelfObservation,
 	    PartnerObservations,
-        AgentMapObservations,
-            EntityType
+            AgentMapObservations,
+            EntityType,
+            madrona::phys::CollisionEvent
         >>({post_reset_broadphase});
 
 
