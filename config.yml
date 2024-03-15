@@ -5,13 +5,13 @@ reward_params:
 
 parameters:
   polylineReductionThreshold: 1.0
-  observationRadius: 10.0
+  observationRadius: 1000.0
   datasetInitOptions: FirstN  
-  rewardParams: reward_params  
+  rewardParams: reward_params
 
 sim_manager:
-  exec_mode: CPU 
+  exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 1
+  num_worlds: 5
   auto_reset: true
-  json_path: /home/aarav/gpudrive/valid_nocturne
+  json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid

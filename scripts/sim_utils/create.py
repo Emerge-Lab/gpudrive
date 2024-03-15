@@ -1,11 +1,7 @@
 import yaml
 import gpudrive
 
-def SimCreator(config_path: str) -> gpudrive.SimManager:
-    # Load the YAML config file
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-
+def SimCreator(config: dict) -> gpudrive.SimManager:
     # Initialize RewardParams
     reward_params_config = config['reward_params']
     reward_params = gpudrive.RewardParams()
@@ -34,5 +30,6 @@ def SimCreator(config_path: str) -> gpudrive.SimManager:
     return sim
 
 if __name__ == "__main__":
-    sim = SimCreator("/home/aarav/gpudrive/config.yml")
-    print(sim.controlled_state_tensor().to_torch().shape)
+    with open("/home/aarav/gpudrive/config.yml", 'r') as file:
+       config = yaml.safe_load(file)
+    sim = SimCreator(config)

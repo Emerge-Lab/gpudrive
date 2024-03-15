@@ -8,7 +8,7 @@ import build
 def get_constants():
     fullpath = os.path.join(os.path.dirname(__file__), "config.yml")
     sim = SimCreator(fullpath)
-    consts = sim.shape_tensor().to_torch().flatten().tolist()
+    consts = sim.shape_tensor().to_torch()[0].flatten().tolist()
     print(consts)
     return consts
 
