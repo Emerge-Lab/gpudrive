@@ -1,36 +1,45 @@
-Madrona Escape Room
+GPUDrive
 ============================
 
-This is an example RL environment simulator built on the [Madrona Engine](https://madrona-engine.github.io). 
-The goal of this repository is to provide a simple reference that demonstrates how to use Madrona's ECS APIs and 
-how to interface with the engine's rigid body physics and rendering functionality.
-This example also demonstrates how to integrate the simulator with python code for evaluating agent polices and/or policy learning. Specifically, this codebase includes a simple PyTorch PPO training loop integrated with the simulator that can train agents in under an hour on a high end GPU.
-
-If you're interested in using Madrona to implement a high-performance batch simulator for a new environment or RL training task, we highly recommend forking this repo and adding/removing code as needed, rather than starting from scratch. This will ensure the build system and backends are setup correctly.
+This is an Batch RL environment simulator of Nocturne built on the [Madrona Engine](https://madrona-engine.github.io). It supports loading multiple worlds with multi agent support. Python bindings are exposed for easy integration with RL algorithms.
 
 The Environment and Learning Task
 --------------
 
-https://github.com/shacklettbp/madrona_escape_room/assets/1111429/ec6231c8-a74b-4f0a-8a1a-b1bcdc7111cd
-
-As shown above, the simulator implements a 3D environment consisting of two agents and a row of three rooms. All agents start in the first room, and must navigate to as many new rooms as possible. The agents must step on buttons or push movable blocks over buttons to trigger the opening of doors that lead to new rooms. Agents are rewarded based on their progress along the length of the level.
-
 The codebase trains a shared policy that controls agents individually with direct engine inputs rather than pixel observations. Agents interact with the simulator as follows:
 
-**Action Space:**
- * Movement amount: Egocentric polar coordinates for the direction and amount to move, translated to XY forces in the physics engine.
- * Rotation amount: Torque applied to the agent to turn.
- * Grab: Boolean, true to grab if possible or release if already holding an object.
+### Action Space:
+ * Acceleration: Continuous float values for acceleration applied to the agents.
+ * Steering angle: Continuous float values for steering angle applied according to the bicycle kinematic model.
+ * Heading angle (currently unused): Continuous float values for heading angle. This controls where the agent is looking.
 
-**Observation Space:**
- * Global position.
- * Position within the current room.
- * Distance and direction to all the buttons and cubes in the current room (egocentric polar coordinates).
- * 30 Lidar samples arrayed in a circle around the agent, giving distance to the nearest object along a direction.
- * Whether the current room's door is open (boolean).
- * Whether an object is currently grabbed (boolean).
- * The max distance achieved so far in the level.
- * The number of steps remaining in the episode.
+### Observation Space:
+
+**SelfObservation**
+
+The `SelfObservation` tensor of shape `(5,)` for each agent provides information about the agent's own state. The respective values are 
+
+- `SelfObservation[0]`: Represents the current *speed* of the agent.
+- `SelfObservation[1:3]` : *length* and *width* of the agent.
+- `SelfObservation[3:5]`: *Coordinates (x,y)* of the goal relative to the agent. 
+
+**PartnerObservation**
+
+The `PartnerObservation` tensor of shape `(num_agents-1,7)` for each agent provides information about other agents in the range `params.observationRadius`. All the values in this tensor are *relative to the ego agent*. The respective values for each `PartnerObservation` are
+
+- `PartnerObservation[0]`: The *speed* of the observed neighboring agent.
+- `PartnerObservation[1:3]`: The *position (x,y)* of the observed neighbouring agent.
+- `PartnerObservation[3]`: The *orientation* of the neighboring agent.
+- `PartnerObservation[4:6]`: The *length* and *width* of the neighbouring agent.
+- `PartnerObservation[6]`: The type of agent. 
+
+**AgentMapObservations**
+
+The `AgentMapObservations` tensor of shape (num_road_objs, 4) for each agent provides information about the road objects in the range `params.observationRadius`. All the values in this tensor are *relative to the ego agent*. The respective values for each `AgentMapObservations` are
+
+- `AgentMapObservations[0:2]`: The position coordinates for the road object.
+- `AgentMapObservations[2]`: The relative orientation of the road object.
+- `AgentMapObservations[3]`: The road object type.
 
 **Rewards:**
   Agents are rewarded for the max distance achieved along the Y axis (the length of the level). Each step, new reward is assigned if the agents have progressed further in the level, or a small penalty reward is assigned if not.
@@ -57,9 +66,11 @@ The built-in training functionality requires [PyTorch 2.0](https://pytorch.org/g
 
 Now that you have the required dependencies, fetch the repo (don't forget `--recursive`!):
 ```bash
-git clone --recursive https://github.com/shacklettbp/madrona_escape_room.git
-cd madrona_escape_room
+git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+cd gpudrive
 ```
+
+# Manual Install
 
 Next, for Linux and MacOS: Run `cmake` and then `make` to build the simulator:
 ```bash
@@ -88,6 +99,19 @@ Or test the PyTorch training integration:
 ```bash
 python scripts/train.py --num-worlds 1024 --num-updates 100 --ckpt-dir build/ckpts
 ```
+
+# Poetry install
+
+### Conda 
+
+Create a conda environment using `environment.yml` and then run `poetry install`
+
+```bash
+conda env create -f environment.yml`
+poetry install
+```
+
+
 
 Simulator Code Walkthrough (Learning the Madrona ECS APIs)
 -----------------------------------------------------------
