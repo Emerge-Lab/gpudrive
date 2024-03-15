@@ -69,8 +69,9 @@ int main(int argc, char *argv[])
             .rewardParams = {
                 .rewardType = RewardType::DistanceBased,
                 .distanceToGoalThreshold = 0.5,
-                .distanceToExpertThreshold = 0.5,
-            }
+                .distanceToExpertThreshold = 0.5
+            },
+            .datasetInitOptions = DatasetInitOptions::FirstN
         }
     });
 

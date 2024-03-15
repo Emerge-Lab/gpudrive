@@ -18,6 +18,9 @@ path = "train_src/gpudrive_learn"
 [tool.poetry.build]
 script = "build.py"
 
+[tool.poetry.scripts]
+config = "config:main"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 torch = "^2.2.1"
@@ -27,6 +30,7 @@ stable-baselines3 = "^2.2.1"
 pufferlib = "^0.7.2"
 tqdm = "^4.66.2"
 wandb = "^0.16.4"
+pyyaml = "^6.0.1"
 
 [tool.poetry]
 name = "gpudrive"
@@ -35,5 +39,6 @@ description = ""
 authors = ["Sébastien Eustace <sebastien@eustace.io>"]
 readme = "README.md"
 packages = [
-    {include = "gpudrive.cpython-311-x86_64-linux-gnu.so", from = "build", to = "gpudrive"}
+    {include = "gpudrive.cpython-311-x86_64-linux-gnu.so", from = "build", to = "gpudrive"},
+    {include = "gpudrive_learn", from = "train_src", to = "gpudrive_learn"},
 ]

@@ -6,7 +6,7 @@ import shutil
 
 logging.basicConfig(level=logging.INFO)
 
-def main():
+def build():
     # Cloning the repository, although typically you would not do this in the build step
     # as the code should already be present. Including it just for completeness.
     subprocess.check_call(['git', 'submodule', 'update', '--init', '--recursive', '--force'])
@@ -25,4 +25,4 @@ def main():
 
 if __name__ == '__main__':
     logging.info("Building the C++ code and installing the Python package")
-    main()
+    build()
