@@ -39,7 +39,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
-
+    registry.registerComponent<AbsoluteSelfObservation>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
 
@@ -72,6 +72,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
+    registry.exportColumn<Agent, AbsoluteSelfObservation>(
+        (uint32_t) ExportID::AbsoluteSelfObservation);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}

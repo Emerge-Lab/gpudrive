@@ -71,7 +71,7 @@ namespace gpudrive
             .def("steps_remaining_tensor", &Manager::stepsRemainingTensor)
             .def("shape_tensor", &Manager::shapeTensor)
             .def("controlled_state_tensor", &Manager::controlledStateTensor)
-            .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor),
+            .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
             .def("absolute_self_observation_tensor", &Manager::absoluteSelfObservationTensor);
     }
 
