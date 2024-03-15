@@ -100,8 +100,6 @@ struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
-
-
 struct LidarSample {
     float depth;
     float encodedType;
@@ -163,6 +161,17 @@ struct ControlledState {
    ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
 
+struct AbsoluteRotation {
+    Rotation rotationAsQuat;
+    float rotationFromAxis;
+};
+
+struct AbsoluteSelfObservation {
+   Position position;
+   AbsoluteRotation rotation;
+   Goal goal;
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -200,10 +209,12 @@ struct Agent : public madrona::Archetype<
 
     // Observations
     SelfObservation,
+    AbsoluteSelfObservation,
     PartnerObservations,
     AgentMapObservations,
     Lidar,
     StepsRemaining,
+    
 
     // Reward, episode termination
     Reward,
