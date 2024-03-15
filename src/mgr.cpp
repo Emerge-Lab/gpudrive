@@ -309,7 +309,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, paramsDevicePtr};
+                                                viz_bridge, map_, paramsDevicePtr};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
@@ -379,7 +379,7 @@ Manager::Impl * Manager::Impl::init(
         {
             auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                viz_bridge, map_, mgr_cfg.execMode, &(mgr_cfg.params)};
+                                                viz_bridge, map_, &(mgr_cfg.params)};
             sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
             sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
@@ -480,7 +480,7 @@ Tensor Manager::bicycleModelTensor() const
         {
             impl_->cfg.numWorlds,
             impl_->agentRoadCounts.first,
-            4, // Number of states for the bicycle model
+            BicycleModelExportSize, // Number of states for the bicycle model
         });
 }
 
@@ -512,7 +512,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
-                                   6
+                                   SelfObservationExportSize 
                                });
 }
 
@@ -523,7 +523,7 @@ Tensor Manager::mapObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.second,
-                                   4
+                                   MapObservationExportSize
                                });
 }
 
@@ -535,7 +535,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
                                    consts::kMaxAgentCount-1,
-                                   7,
+                                   PartnerObservationExportSize,
                                });
 }
 
@@ -547,7 +547,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    impl_->agentRoadCounts.first,
                                    consts::kMaxRoadEntityCount,
-                                   4,
+                                   AgentMapObservationExportSize,
                                });
 
 }

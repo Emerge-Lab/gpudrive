@@ -1,6 +1,7 @@
 #pragma once
 
 #include "init.hpp"
+#include "types.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -85,13 +86,13 @@ namespace gpudrive
         from_json(j.at("goalPosition"), obj.goalPosition);
         std::string type = j.at("type");
         if(type == "vehicle")
-            obj.type = MapObjectType::Vehicle;
+            obj.type = EntityType::Vehicle;
         else if(type == "pedestrian")
-            obj.type = MapObjectType::Pedestrian;
+            obj.type = EntityType::Pedestrian;
         else if(type == "cyclist")
-            obj.type = MapObjectType::Cyclist;
+            obj.type = EntityType::Cyclist;
         else
-            obj.type = MapObjectType::Invalid;
+            obj.type = EntityType::None;
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
@@ -99,19 +100,19 @@ namespace gpudrive
         road.mean = {0,0};
         std::string type = j.at("type");
         if(type == "road_edge")
-            road.type = MapRoadType::RoadEdge;
+            road.type = EntityType::RoadEdge;
         else if(type == "road_line")
-            road.type = MapRoadType::RoadLine;
+            road.type = EntityType::RoadLine;
         else if(type == "lane")
-            road.type = MapRoadType::Lane;
+            road.type = EntityType::RoadLane;
         else if(type == "crosswalk")
-            road.type = MapRoadType::CrossWalk;
+            road.type = EntityType::CrossWalk;
         else if(type == "speed_bump")
-            road.type = MapRoadType::SpeedBump;
+            road.type = EntityType::SpeedBump;
         else if(type == "stop_sign")
-            road.type = MapRoadType::StopSign;
+            road.type = EntityType::StopSign;
         else
-            road.type = MapRoadType::Invalid;
+            road.type = EntityType::None;
         
         std::vector<MapVector2> geometry_points_;
         for(const auto &point: j.at("geometry"))
@@ -124,7 +125,7 @@ namespace gpudrive
         const int64_t num_segments = j["geometry"].size() - 1;
         const int64_t sample_every_n_ = 1;
         const int64_t num_sampled_points = (num_segments + sample_every_n_ - 1) / sample_every_n_ + 1;
-        if (num_segments >= 10 && (road.type == MapRoadType::Lane || road.type == MapRoadType::RoadEdge || road.type == MapRoadType::RoadLine))
+        if (num_segments >= 10 && (road.type == EntityType::RoadLane || road.type == EntityType::RoadEdge || road.type == EntityType::RoadLine))
         {
             std::vector<bool> skip(num_sampled_points, false); // This list tracks the points that are skipped
             int64_t k = 0;
@@ -240,9 +241,9 @@ namespace gpudrive
                 map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
                 map.mean.y = ((map.mean.y * totalPoints) + (map.roads[i].mean.y * roadPoints)) / (totalPoints + roadPoints);
                 totalPoints += roadPoints;
-                if(map.roads[i].type <= MapRoadType::Lane)
+                if(map.roads[i].type <= EntityType::RoadLane)
                     count_road_points += roadPoints - 1;
-                else if(map.roads[i].type > MapRoadType::Lane)
+                else if(map.roads[i].type > EntityType::RoadLane)
                     count_road_points += 1;
                 ++i;
             }

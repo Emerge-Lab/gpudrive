@@ -231,7 +231,22 @@ inline void movementSystem(Engine &e,
 
     if (collisionEvent.hasCollided.load_relaxed())
     {
-        return;
+        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop)
+            return;
+        else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
+        {
+            position = consts::kPaddingPosition;
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.angular = Vector3::zero();
+            external_force = Vector3::zero();
+            external_torque = Vector3::zero();
+        }
+        else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
+        {
+            // Do nothing. 
+        }
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
@@ -500,6 +515,24 @@ void collisionDetectionSystem(Engine &ctx,
     if (not hasCollided) {
         return;
     }
+    
+    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.aEntity);
+    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.bEntity);
+
+    // Ignore collisions between certain entity types
+    if(aEntitytype == EntityType::Padding || bEntitytype == EntityType::Padding)
+    {
+        return;
+    }
+
+    for(auto &pair : ctx.data().collisionPairs)
+    {
+        if((pair.first == aEntitytype && pair.second == bEntitytype) ||
+           (pair.first == bEntitytype && pair.second == aEntitytype))
+        {
+            return;
+        }
+    }
 
     auto maybeCollisionEventA =
         ctx.getSafe<CollisionEvent>(candidateCollision.aEntity);
@@ -681,7 +714,8 @@ Sim::Sim(Engine &ctx,
       episodeMgr(init.episodeMgr),
       params(*init.params),
       MaxAgentCount(cfg.kMaxAgentCount),
-      MaxRoadEntityCount(cfg.kMaxRoadEntityCount)
+      MaxRoadEntityCount(cfg.kMaxRoadEntityCount),
+      collisionPairs(initializeCollisionPairs())
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
