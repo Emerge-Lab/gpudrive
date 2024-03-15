@@ -14,7 +14,7 @@ params.observationRadius = 10.0  # Set appropriate value
 params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
 
 sim = gpudrive.SimManager(
-    exec_mode=gpudrive.madrona.ExecMode.CPU,
+    exec_mode=gpudrive.madrona.ExecMode.CUDA,
     gpu_id=0,
     num_worlds=1,
     auto_reset=True,
