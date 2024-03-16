@@ -18,6 +18,13 @@ import logging
 
 logging.getLogger(__name__)
 
+VIDEO_W = 4000
+VIDEO_H = 4000
+WINDOW_W = 1000
+WINDOW_H = 800
+ZOOM = 2.7  # Camera zoom
+SCALE = 30
+
 class Env(gym.Env):  
     """
     GPU Drive Gym Environment.
@@ -54,7 +61,7 @@ class Env(gym.Env):
         # Rendering
         self.render_mode = render_mode
         self.world_render_idx = 0 # Render only the 0th world
-        self.screen_dim = 800
+        self.screen_dim = 1000
         self.screen = None
         self.clock = None
         
@@ -196,111 +203,99 @@ class Env(gym.Env):
                 "pygame is not installed, run `pip install gymnasium[classic-control]`"
             ) from e
 
-        if self.screen is None:
-            pygame.init()
-            if self.render_mode == "human":
-                pygame.display.init()
-                self.screen = pygame.display.set_mode(
-                    (self.screen_dim, self.screen_dim)
-                )
-            else: # mode in "rgb_array"
-                #self.screen = pygame.Surface((self.screen_dim, self.screen_dim))
-                self.screen = pygame.Surface((400, 300))
-                self.screen.blit(self.surf, (0, 0))
-                
+        pygame.init()
+        pygame.font.init()
+        
+        if self.screen is None and self.render_mode == "human":
+            pygame.display.init()
+            self.screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
         if self.clock is None:
             self.clock = pygame.time.Clock()
-       
-        # Create a background surface
-        self.surf = pygame.Surface((self.screen_dim, self.screen_dim))
-        self.surf.fill((0, 255, 255)) # Fill the surface with white
-        
-        # Draw a circle
-        pygame.draw.circle(self.surf, "blue", [60, 250], 40)
-       
-        #TODO: Draw the road graph
-        #obj = obj.cpu().numpy()
-        # pygame.draw.rect(
-        #     surface=self.surf,
-        #     color=(255, 0, 0),
-        #     rect=pygame.Rect(0, 5, 100, 50),  # x, y, width, height
-        #     width=2,
-        # )
-        
-        # # Draw the agents
-        # # We only render agents from the chosen world index
-        # # Access the positions of the agents
-        # agent_info = self.sim.absolute_self_observation_tensor().to_torch()[
-        #     self.world_render_idx, :, :].cpu().detach().numpy()
-        # agent_positions = agent_info[:, :3] # x, y, z
-        # agent_rot_quaternions = agent_info[:, 3:7] # rotation as quaternion
-        # agent_rot_rad = agent_info[:, 7:8] # rotation from x-axis in radians
-        # agent_goal_positions = agent_info[:, 8:]
-        
-        # # Draw the agent positions and goal positions
-        # for agent_idx in range(agent_info.shape[0]):
             
-        #     current_pos = agent_positions[agent_idx]
-        #     goal_pos = agent_goal_positions[agent_idx]
-            
-        #     print(f'agent_idx: {agent_idx}, current_pos: {current_pos}, goal_pos: {goal_pos}')
-            
-        #     # Draw the agent
-        #     pygame.draw.rect(
-        #         surface=self.screen,
-        #         color=(255, 0, 0),
-        #         rect=pygame.Rect(int(current_pos[0]), int(current_pos[0]), 100, 50), # x, y, width, height
-        #         width=2,
-        #     )
-            
-        #     # Draw the goal position
-        #     pygame.draw.circle(
-        #         surface=self.screen,
-        #         color=(255, 0, 0),
-        #         center=(
-        #             int(goal_pos[0]),
-        #             int(goal_pos[1]),
-        #         ),
-        #         radius=200,
-        #     )
+        # Create a new canvas to draw on    
+        self.surf = pygame.Surface((WINDOW_W, WINDOW_H))  
+        self.surf.fill((255, 255, 0)) # Yellow background test
         
-        # # Draw the agent goals
-        # for i, goal in enumerate(self.goals[0]):
-        #     goal = goal.cpu().numpy()
-        #     x = int(goal[0] + self.cfg.warehouse_width)
-        #     y = int(goal[1] + self.cfg.warehouse_width)
-        #     pygame.draw.circle(
-        #         self.screen,
-        #         (0, 0, 255),
-        #         (int(goal[0] + self.cfg.warehouse_width), int(goal[1] + self.cfg.warehouse_width)),
-        #         self.cfg.goal_radius,
-        #     )
+        # Draw the agents
+        # We only render agents from the chosen world index
+        # Access the positions of the agents
+        agent_info = self.sim.absolute_self_observation_tensor().to_torch()[
+            self.world_render_idx, :, :].cpu().detach().numpy()
+        agent_positions = agent_info[:, :3] # x, y, z
+        agent_rot_quaternions = agent_info[:, 3:7] # rotation as quaternion
+        agent_rot_rad = agent_info[:, 7:8] # rotation from x-axis in radians
+        agent_goal_positions = agent_info[:, 8:]
+        
+         # New scale factors for drawing, assuming the simulation coordinates can range widely
+        scale_factor_x = WINDOW_W / (VIDEO_W * 2)  # Adjust based on your simulation's coordinate range
+        scale_factor_y = WINDOW_H / (VIDEO_H * 2)  # Adjust similarly
 
-        #     # Render the number in red. True stands for anti-aliasing.
-        #     text_surface = font.render(str(i), True, (255, 0, 0))
+        # Draw the agent positions and goal positions with adjustments
+        for agent_idx in range(agent_info.shape[0]):
+            current_pos = agent_positions[agent_idx]
+            goal_pos = agent_goal_positions[agent_idx]
 
-        #     # The x, y position where you want to draw the number
-        #     # Draw the text surface at the x, y position
-        #     self.screen.blit(text_surface, (x, y))
+            # Scale and translate positions to fit within window
+            current_pos_screen = (int((current_pos[0] - VIDEO_W / 2) * scale_factor_x + WINDOW_W / 2),
+                                int((current_pos[1] - VIDEO_H / 2) * scale_factor_y + WINDOW_H / 2))
+            goal_pos_screen = (int((goal_pos[0] - VIDEO_W / 2) * scale_factor_x + WINDOW_W / 2),
+                            int((goal_pos[1] - VIDEO_H / 2) * scale_factor_y + WINDOW_H / 2))
+
+            # Adjust rectangle size for visibility
+            agent_rect_size = (10, 10)  # Adjust as needed for visibility
+
+            # Draw the agent
+            pygame.draw.rect(
+                self.surf,
+                (255, 0, 0),  # Red color for the agent
+                pygame.Rect(
+                    current_pos_screen[0] - agent_rect_size[0] / 2,
+                    current_pos_screen[1] - agent_rect_size[1] / 2,
+                    agent_rect_size[0],
+                    agent_rect_size[1],
+                ),
+            )
+
+        # Draw the goal position with a smaller, visible circle
+        pygame.draw.circle(
+            surface=self.surf,
+            color=(0, 255, 0),  # Green color for the goal
+            center=goal_pos_screen,
+            radius=5,  # Smaller radius for visibility
+        )
+
+        # TODO: Draw the road graph       
+        #self._render_roadmap(zoom)
+        # pygame.draw.line(self.screen, (60, 179, 113), [0, 0], [50, 30], 5)
+    
+        # # Draw a circle
+        # pygame.draw.circle(self.screen, "blue", [60, 250], 40)
         
         if self.render_mode == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
+            assert self.screen is not None
+            self.screen.fill(0)
+            self.screen.blit(self.surf, (0, 0))
             pygame.display.flip()
-
-        else:  # mode == "rgb_array": return the rendered image
-            return np.transpose(
-                np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
-            )
+        elif self.render_mode == "rgb_array":
+            return self._create_image_array(self.surf, (VIDEO_W, VIDEO_H))
+        else:
+            return self.isopen
             
     def close(self):
         """Close pygame application if open."""
         if self.screen is not None:
             import pygame
-
             pygame.display.quit()
             pygame.quit()
             self.isopen = False
+            
+    def _create_image_array(self, screen, size):
+        scaled_screen = pygame.transform.scale(screen, size)
+        return np.transpose(
+            np.array(pygame.surfarray.pixels3d(scaled_screen)), axes=(1, 0, 2)
+        )
 
 if __name__ == "__main__":
     
@@ -312,7 +307,6 @@ if __name__ == "__main__":
     env = Env(
         num_worlds=1, 
         max_cont_agents=1, 
-        render_mode='rgb_array', 
         data_dir='waymo_data', 
         device='cuda'
     )
