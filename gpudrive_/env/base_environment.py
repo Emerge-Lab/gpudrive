@@ -12,7 +12,7 @@ from gymnasium.error import DependencyNotInstalled
 import pygame
 from pygame import gfxdraw
 
-# Simulator
+# Import the simulator
 import gpudrive
 import logging
 
@@ -35,10 +35,10 @@ class Env(gym.Env):
         "render_fps": 5,
     }
 
-    def __init__(self, num_worlds, max_cont_agents, data_dir, render_mode="rgb_array", device="cuda", auto_reset=True):
+    def __init__(self, num_worlds, max_cont_agents, data_dir, device="cuda", auto_reset=True, render_mode="rgb_array",):
         
         # Configure rewards 
-        #TODO: Make this configurable through dataclasses on the Python side and add docs
+        #TODO: Make this configurable on the Python side and add docs
         reward_params = gpudrive.RewardParams()
         reward_params.rewardType = gpudrive.RewardType.DistanceBased  # Or any other value from the enum
         reward_params.distanceToGoalThreshold = 2.0  # Set appropriate values
