@@ -328,7 +328,7 @@ if __name__ == "__main__":
         obs, reward, done, info = env.step(rand_actions)
         frame = env.render()
         
-        frames.append(frame)
+        frames.append(frame.T)
 
     # Log video
     wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
