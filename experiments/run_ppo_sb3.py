@@ -1,14 +1,10 @@
 import torch
 import wandb
 
-import sys
-#TODO: Fix
-sys.path.append('/home/emerge/gpudrive')
-
 # Import env wrapper that makes the GPU gym env compatible with stable-baselines3
-from env.sb3_wrapper import SB3MultiAgentEnv
+from gpudrive_.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
-from callbacks import MultiAgentCallback
+from algorithms.ppo.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
 from algorithms.ppo.sb3.mappo import MAPPO

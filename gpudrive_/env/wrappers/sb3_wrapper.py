@@ -9,7 +9,9 @@ from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnvObs,
     VecEnvStepReturn,
 )
-from base_environment import Env
+
+# Import base gumenvironment
+from gpudrive_.env.base_environment import Env
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,7 +24,7 @@ class SB3MultiAgentEnv(VecEnv):
         VecEnv (SB3 VecEnv): SB3 VecEnv base class.
     """
     def __init__(self, num_worlds, max_cont_agents, data_dir, device, auto_reset=True):
-        self.env = Env(num_worlds, max_cont_agents, data_dir, device, auto_reset)
+        self.env = Env(num_worlds=num_worlds, max_cont_agents=max_cont_agents, data_dir=data_dir, device=device, auto_reset=auto_reset)
         self.num_worlds = num_worlds
         self.max_cont_agents = max_cont_agents
         self.device = device
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         max_cont_agents=1, 
         data_dir='waymo_data', 
         device='cuda', 
-        auto_reset=True
+        auto_reset=True,
     )
 
     obs = env.reset()
