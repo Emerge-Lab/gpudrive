@@ -30,18 +30,25 @@ def run_bench(total_num_envs: int, args):
             subprocess.run(command, shell=True, check=True)
 
 
-def modifyConfigToRandomize(config_path: str):
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    config['parameters']['datasetInitOptions'] = "RandomN"
-    with open(config_path, 'w') as file:
-        yaml.dump(config, file)
+def modifyConfigToRandomize(randomize: bool):
+    if(randomize):
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+        config['parameters']['datasetInitOptions'] = "RandomN"
+        with open(config_path, 'w') as file:
+            yaml.dump(config, file)
+    else:
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+        config['parameters']['datasetInitOptions'] = "FirstN"
+        with open(config_path, 'w') as file:
+            yaml.dump(config, file)
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='GPUDrive Benchmarking Tool')
     parser.add_argument('--totalNumEnvs', type=int, help='Number of environments', default=150, required=False)
     parser.add_argument('--randomized', help='Randomize the dataset', action='store_true', required=False)
     args = parser.parse_args()
-    if(args.randomized):
-        modifyConfigToRandomize('config.yml')
+    modifyConfigToRandomize(args.randomized)
     run_bench(args.totalNumEnvs, args)
