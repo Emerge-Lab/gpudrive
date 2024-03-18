@@ -10,7 +10,8 @@ import wandb
 import gymnasium as gym
 from gymnasium.error import DependencyNotInstalled
 import pygame
-from pygame import gfxdraw
+import random
+
 
 # Import the simulator
 import gpudrive
@@ -18,12 +19,18 @@ import logging
 
 logging.getLogger(__name__)
 
-VIDEO_W = 4000
-VIDEO_H = 4000
-WINDOW_W = 1000
-WINDOW_H = 800
-ZOOM = 2.7  # Camera zoom
-SCALE = 30
+WINDOW_W = 500
+WINDOW_H = 500
+VEH_WIDTH = 25
+VEH_HEIGHT = 50
+GOAL_RADIUS = 10
+COLOR_LIST = [
+    (255, 0, 0),   # Red
+    (0, 255, 0),   # Green
+    (0, 0, 255),   # Blue
+    (255, 255, 0), # Yellow
+    (255, 165, 0), # Orange
+]
 
 class Env(gym.Env):  
     """
@@ -184,7 +191,7 @@ class Env(gym.Env):
         return torch.cat([ego_state, partner_obs_tensor, map_obs_tensor], dim=-1)
     
     
-    def render(self):
+    def render(self, t=None):
         """Render the environment."""
         
         if self.render_mode is None:
@@ -214,7 +221,14 @@ class Env(gym.Env):
             
         # Create a new canvas to draw on    
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))  
-        self.surf.fill((255, 255, 0)) # Yellow background test
+        self.surf.fill((255, 255, 255)) # White background
+        
+        # # # Draw the road map # # # 
+        roadmap_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx, :, :].cpu().detach().numpy()
+        roadmap_pos = roadmap_info[:, :2]
+        roadmap_heading = roadmap_info[:, 2:]
+        scaled_rm_positions = [self.scale_coord(pos, roadmap_pos) for pos in roadmap_pos]
+        pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
         
         # Draw the agents
         # We only render agents from the chosen world index
@@ -226,50 +240,42 @@ class Env(gym.Env):
         agent_rot_rad = agent_info[:, 7:8] # rotation from x-axis in radians
         agent_goal_positions = agent_info[:, 8:]
         
-         # New scale factors for drawing, assuming the simulation coordinates can range widely
-        scale_factor_x = WINDOW_W / (VIDEO_W * 2)  # Adjust based on your simulation's coordinate range
-        scale_factor_y = WINDOW_H / (VIDEO_H * 2)  # Adjust similarly
-
+        # Dynamically adjust the lower and upper bounds of the frame
+        frame_xy_coords = np.concatenate([agent_goal_positions, agent_positions[:, :2]])
+    
         # Draw the agent positions and goal positions with adjustments
         for agent_idx in range(agent_info.shape[0]):
-            current_pos = agent_positions[agent_idx]
-            goal_pos = agent_goal_positions[agent_idx]
 
-            # Scale and translate positions to fit within window
-            current_pos_screen = (int((current_pos[0] - VIDEO_W / 2) * scale_factor_x + WINDOW_W / 2),
-                                int((current_pos[1] - VIDEO_H / 2) * scale_factor_y + WINDOW_H / 2))
-            goal_pos_screen = (int((goal_pos[0] - VIDEO_W / 2) * scale_factor_x + WINDOW_W / 2),
-                            int((goal_pos[1] - VIDEO_H / 2) * scale_factor_y + WINDOW_H / 2))
-
-            # Adjust rectangle size for visibility
-            agent_rect_size = (10, 10)  # Adjust as needed for visibility
-
-            # Draw the agent
+            # Scale positions to fit within window
+            current_pos_screen = self.scale_coord(agent_positions[agent_idx], frame_xy_coords)
+            goal_pos_screen = self.scale_coord(agent_goal_positions[agent_idx], frame_xy_coords)
+            
+            # Randomly sample a color from the color list for the agent
+            agent_color = random.choice(COLOR_LIST)
+            
+            # Draw the current agent position with the randomly chosen color
             pygame.draw.rect(
-                self.surf,
-                (255, 0, 0),  # Red color for the agent
-                pygame.Rect(
-                    current_pos_screen[0] - agent_rect_size[0] / 2,
-                    current_pos_screen[1] - agent_rect_size[1] / 2,
-                    agent_rect_size[0],
-                    agent_rect_size[1],
+                surface=self.surf,
+                color=agent_color,  # Use the randomly sampled color
+                rect=pygame.Rect(
+                    int(current_pos_screen[0]),
+                    int(current_pos_screen[1]),
+                    VEH_WIDTH,
+                    VEH_HEIGHT,
                 ),
             )
 
-        # Draw the goal position with a smaller, visible circle
-        pygame.draw.circle(
-            surface=self.surf,
-            color=(0, 255, 0),  # Green color for the goal
-            center=goal_pos_screen,
-            radius=5,  # Smaller radius for visibility
-        )
+            # Draw the goal position
+            pygame.draw.circle(
+                surface=self.surf,
+                color=(0, 255, 0), # Green 
+                center=(int(goal_pos_screen[0]), int(goal_pos_screen[1])),
+                radius=GOAL_RADIUS,  
+            )
 
-        # TODO: Draw the road graph       
-        #self._render_roadmap(zoom)
-        # pygame.draw.line(self.screen, (60, 179, 113), [0, 0], [50, 30], 5)
-    
-        # # Draw a circle
-        # pygame.draw.circle(self.screen, "blue", [60, 250], 40)
+        # # You can use this moving box example for testing
+        # x_pos = 50 + t*10
+        # pygame.draw.rect(self.surf, (255, 0, 0), pygame.Rect(x_pos, 50, 100, 50)) 
         
         if self.render_mode == "human":
             pygame.event.pump()
@@ -279,10 +285,22 @@ class Env(gym.Env):
             self.screen.blit(self.surf, (0, 0))
             pygame.display.flip()
         elif self.render_mode == "rgb_array":
-            return self._create_image_array(self.surf, (VIDEO_W, VIDEO_H))
+            return self._create_image_array(self.surf)
         else:
             return self.isopen
             
+    def scale_coord(self, pos, frame_xy_coords):
+        """Scale the coordinates to fit within the pygame surface window."""
+        
+        # Extract the lower and upper bounds of the frame
+        x_min, x_max = frame_xy_coords[:, 0].min(), frame_xy_coords[:, 0].max()
+        y_min, y_max = frame_xy_coords[:, 1].min(), frame_xy_coords[:, 1].max()
+        
+        # Scale coordinates 
+        x_scaled = ((pos[0] - x_min) / (x_max - x_min)) * WINDOW_W
+        y_scaled = ((pos[1] - y_min) / (y_max - y_min)) * WINDOW_H
+        return [x_scaled, y_scaled]
+    
     def close(self):
         """Close pygame application if open."""
         if self.screen is not None:
@@ -291,16 +309,15 @@ class Env(gym.Env):
             pygame.quit()
             self.isopen = False
             
-    def _create_image_array(self, screen, size):
-        scaled_screen = pygame.transform.scale(screen, size)
+    def _create_image_array(self, surf):
         return np.transpose(
-            np.array(pygame.surfarray.pixels3d(scaled_screen)), axes=(1, 0, 2)
+            np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
         )
 
 if __name__ == "__main__":
     
     run = wandb.init(
-        project="gpu_drive", 
+        project="gpudrive", 
         group='test_rendering',
     )
 
@@ -323,10 +340,10 @@ if __name__ == "__main__":
     
     frames = []
     
-    for i in range(5):
+    for i in range(20):
         print(f"Step {i}")
         obs, reward, done, info = env.step(rand_actions)
-        frame = env.render()
+        frame = env.render(i)
         
         frames.append(frame.T)
 
