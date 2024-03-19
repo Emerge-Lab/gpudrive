@@ -7,11 +7,12 @@ import torch
 from itertools import islice, product
 import wandb
 
+import glob
 import gymnasium as gym
 from gymnasium.error import DependencyNotInstalled
 import pygame
 import random
-
+import os
 
 # Import the simulator
 import gpudrive
@@ -72,6 +73,12 @@ class Env(gym.Env):
         self.screen = None
         self.clock = None
         
+        # TODO: @Aarav / @Sam: Allow for num_worlds < num_files
+        #assert num_worlds == len(glob.glob(f"{data_dir}/*.json")), "Number of worlds exceeds the number of files in the data directory."
+        
+        if not os.path.exists(data_dir) or not os.listdir(data_dir):
+            assert False, "The data directory does not exist or is empty."
+        
         # Initialize the simulator
         self.sim = gpudrive.SimManager(
             exec_mode=gpudrive.madrona.ExecMode.CPU if device == 'cpu' else gpudrive.madrona.ExecMode.CUDA,
@@ -87,7 +94,10 @@ class Env(gym.Env):
         # We construct a mask to filter out the information from the expert controlled vehicles (0)
         #TODO: Get this to work for multiple worlds
         self.all_agents = self.sim.controlled_state_tensor().to_torch().shape[1]
-        self.cont_agent_idx = torch.where(self.sim.controlled_state_tensor().to_torch()[0, :, 0] == 1)[0]
+        
+        # NOTE: currently assuming we control the same agent indices in all worlds
+        # TODO: Decide how to select vehicles in different worlds
+        self.cont_agent_idx = torch.where((self.sim.controlled_state_tensor().to_torch()[:, :, 0] == 1))[0]
         self.max_cont_agents = max_cont_agents
         
         # Set up action space (TODO: Make this work for multiple worlds)
@@ -95,6 +105,9 @@ class Env(gym.Env):
         
         # Set observation space        
         self.observation_space = self._set_observation_space()
+        self.obs_dim = self.observation_space.shape[0]
+        
+        self._print_info(verbose=True)
                 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -102,9 +115,12 @@ class Env(gym.Env):
             self.sim.reset(sim_idx)
             
         obs = self.get_obs()
-        # Filter out the observations for the expert controlled vehicles, 
-        # Make sure shape is consistent: (num_worlds, max_cont_agents, num_features)
-        obs = torch.index_select(obs, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        
+        # Filter out the observations for the expert controlled vehicles
+        # Assuming each batch should select a single row based on the index in self.cont_agent_idx:
+        idx_full = self.cont_agent_idx.unsqueeze(-1).expand(-1, self.observation_space.shape[0])
+        obs = torch.gather(obs, 1, idx_full.unsqueeze(1))
+        
         return obs
 
     def step(self, actions):
@@ -119,9 +135,10 @@ class Env(gym.Env):
         
         # GPU Drive expects a tensor of shape (num_worlds, all_agents)
         # We insert the actions for the controlled vehicles, the others will be ignored
-        for agent_idx in range(self.cont_agent_idx.shape[0]):
-            action_idx = actions[:, agent_idx].item()
-            action_values[:, agent_idx, :] = torch.Tensor(self.action_key_to_values[action_idx])
+        for world_idx in range(self.num_sims):
+            for agent_idx in range(self.max_cont_agents):
+                action_idx = actions[world_idx, agent_idx].item()
+                action_values[world_idx, agent_idx, :] = torch.Tensor(self.action_key_to_values[action_idx])
 
         # Feed the actual action values to GPU Drive 
         self.sim.action_tensor().to_torch().copy_(action_values)
@@ -135,9 +152,12 @@ class Env(gym.Env):
         done = self.sim.done_tensor().to_torch()
         
         # Filter out the expert controlled vehicle information
-        obs = torch.index_select(obs, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
-        reward = torch.index_select(reward, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
-        done = torch.index_select(done, dim=1, index=self.cont_agent_idx).reshape(self.num_sims, self.max_cont_agents, -1)
+        idx_observations = self.cont_agent_idx.unsqueeze(-1).expand(-1, self.observation_space.shape[0])
+        idx_rest = self.cont_agent_idx.unsqueeze(-1)
+        obs = torch.gather(obs, 1, idx_observations.unsqueeze(1))
+        reward = torch.gather(reward, 1, idx_rest.unsqueeze(1))
+        done = torch.gather(done, 1, idx_rest.unsqueeze(1))
+       
         # TODO: add info
         info = torch.zeros_like(done)
         
@@ -313,19 +333,31 @@ class Env(gym.Env):
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
         )
+        
+    def _print_info(self, verbose=True):
+        """Print initialization information."""
+        if verbose:
+            logging.info("----------------------")
+            logging.info(f"Device: {self.device}")
+            logging.info(f"Number of worlds: {self.num_sims}")
+            logging.info(f"Number of maps in data directory: {len(glob.glob(f'{self.data_dir}/*.json'))}")
+            logging.info(f"Number of controlled agents: {self.max_cont_agents}")
+            logging.info("----------------------\n")
 
 if __name__ == "__main__":
     
-    run = wandb.init(
-        project="gpudrive", 
-        group='test_rendering',
-    )
+    logging.basicConfig(level=logging.INFO)    
+    
+    # run = wandb.init(
+    #     project="gpudrive", 
+    #     group="test_rendering",
+    # )
 
     env = Env(
-        num_worlds=1, 
+        num_worlds=5, 
         max_cont_agents=1, 
-        data_dir='waymo_data', 
-        device='cuda'
+        data_dir="formatted_json_v2_no_tl_train", 
+        device="cuda",
     )
     
     obs = env.reset()
@@ -340,14 +372,13 @@ if __name__ == "__main__":
     
     frames = []
     
-    for i in range(20):
+    for i in range(5):
         print(f"Step {i}")
         obs, reward, done, info = env.step(rand_actions)
-        frame = env.render(i)
-        
-        frames.append(frame.T)
+        #frame = env.render(i)
+        #frames.append(frame.T)
 
-    # Log video
-    wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
+    # # Log video
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
     
     env.close()

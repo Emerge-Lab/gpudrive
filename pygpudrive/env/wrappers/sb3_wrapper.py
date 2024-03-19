@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 )
 
 # Import base gumenvironment
-from gpudrive_.env.base_environment import Env
+from pygpudrive.env.base_environment import Env
 
 logging.basicConfig(level=logging.INFO)
 
@@ -75,7 +75,7 @@ class SB3MultiAgentEnv(VecEnv):
         # Create buffer for rewards, dones, and infos
         self.buf_rews = reward.reshape(self.num_envs)
         self.buf_dones = done.reshape(self.num_envs)
-        self.buf_infos = info.reshape(self.num_envs) # TODO: Implement info
+        self.buf_infos = info.reshape(self.num_envs) # TODO: Implement info variable
         
         # Flatten over num_worlds and max_cont_agents and store
         obs = obs.reshape(self.num_envs, self.obs_dim)
@@ -138,9 +138,9 @@ if __name__ == "__main__":
  
     # Make environment
     env = SB3MultiAgentEnv(
-        num_worlds=1, 
+        num_worlds=5, 
         max_cont_agents=1, 
-        data_dir='waymo_data', 
+        data_dir='formatted_json_v2_no_tl_train', 
         device='cuda', 
         auto_reset=True,
     )
