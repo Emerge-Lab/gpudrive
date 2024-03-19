@@ -18,6 +18,9 @@
 
 # Data
 /formatted_json_v2_no_tl_train
+#/data_10
+/data_100
+/data_1000
 
 # Logging
 /wandb
