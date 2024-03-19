@@ -12,7 +12,7 @@ if __name__ == "__main__":
     
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
-        num_worlds=3, 
+        num_worlds=1, 
         max_cont_agents=1, 
         data_dir='waymo_data', 
         device='cuda', 
