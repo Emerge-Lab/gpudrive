@@ -3,14 +3,19 @@ import os
 import yaml
 from scripts.sim_utils.create import SimCreator
 import build
-
+import torch
 
 def get_constants():
     fullpath = os.path.join(os.path.dirname(__file__), "config.yml")
-    sim = SimCreator(fullpath)
-    consts = sim.shape_tensor().to_torch()[0].flatten().tolist()
+    with open(fullpath, 'r') as file:
+        config = yaml.safe_load(file)
+    sim = SimCreator(config)
+    consts = sim.shape_tensor().to_torch()
+    max_agents = torch.max(consts[:, 0], 0).values.item()
+    max_roads = torch.max(consts[:, 1], 0).values.item()
     print(consts)
-    return consts
+    print(max_agents, max_roads)
+    return max_agents, max_roads
 
 def update_constants(filepath, new_max_agent_count, new_max_road_entity_count):
     with open(filepath, 'r') as file:

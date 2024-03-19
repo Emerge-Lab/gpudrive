@@ -1,5 +1,5 @@
 parameters:
-  datasetInitOptions: RandomN
+  datasetInitOptions: FirstN
   observationRadius: 1000.0
   polylineReductionThreshold: 1.0
   rewardParams: reward_params
@@ -11,5 +11,5 @@ sim_manager:
   auto_reset: true
   exec_mode: CUDA
   gpu_id: 0
-  json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid
-  num_worlds: 5
+  json_path: /home/aarav/nocturne_data/binned_jsons/bin_0
+  num_worlds: 100
