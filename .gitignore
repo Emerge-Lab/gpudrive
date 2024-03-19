@@ -16,6 +16,9 @@
 /zipp*
 .python-version
 
+# Data
+/formatted_json_v2_no_tl_train
+
 # Logging
 /wandb
 events.out.tfevents.*
