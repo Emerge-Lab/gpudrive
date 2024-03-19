@@ -138,9 +138,9 @@ if __name__ == "__main__":
  
     # Make environment
     env = SB3MultiAgentEnv(
-        num_worlds=5, 
+        num_worlds=1, 
         max_cont_agents=1, 
-        data_dir='formatted_json_v2_no_tl_train', 
+        data_dir='waymo_data', 
         device='cuda', 
         auto_reset=True,
     )
