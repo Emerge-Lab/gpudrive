@@ -74,7 +74,7 @@ class Env(gym.Env):
         self.clock = None
         
         # TODO: @Aarav / @Sam: Allow for num_worlds < num_files
-        #assert num_worlds == len(glob.glob(f"{data_dir}/*.json")), "Number of worlds exceeds the number of files in the data directory."
+        assert num_worlds == len(glob.glob(f"{data_dir}/*.json")), "Number of worlds exceeds the number of files in the data directory."
         
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
@@ -192,7 +192,7 @@ class Env(gym.Env):
         """Get observation: Combine different types of environment information into a single tensor.
         
         Returns:
-            torch.Tensor: (num_worlds, max_cont_agents, num_features)
+            torch.Tensor: (num_worlds, max_cont_agents, num_features) 
         """       
         # Get the ego states
         # Ego state: (num_worlds, max_cont_agents, features)
@@ -354,9 +354,9 @@ if __name__ == "__main__":
     # )
 
     env = Env(
-        num_worlds=5, 
+        num_worlds=10, 
         max_cont_agents=1, 
-        data_dir="formatted_json_v2_no_tl_train", 
+        data_dir="data_10",#"waymo_data", 
         device="cuda",
     )
     
