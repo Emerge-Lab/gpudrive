@@ -25,7 +25,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Action>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
-    registry.registerComponent<AgentMapObservations>();
+    // registry.registerComponent<AgentMapObservations>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
     registry.registerComponent<Progress>();
@@ -53,8 +53,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
-    registry.exportColumn<Agent, AgentMapObservations>(
-        (uint32_t)ExportID::AgentMapObservations);
+    // registry.exportColumn<Agent, AgentMapObservations>(
+    //     (uint32_t)ExportID::AgentMapObservations);
     registry.exportColumn<PhysicsEntity, MapObservation>(
         (uint32_t)ExportID::MapObservation);
 
@@ -140,7 +140,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
-                                      AgentMapObservations &map_obs,
+                                    //   AgentMapObservations &map_obs,
 				      const EntityType& entityType,
 				      const CollisionEvent& collisionEvent) {
      if (entityType == EntityType::Padding) {
@@ -189,25 +189,25 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
-        Entity road = ctx.data().roads[roadIdx++];
-        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
-        if(relative_pos.length() > ctx.data().params.observationRadius)
-        {
-            continue;
-        }
-        map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
-        arrIndex++;
-    }
-    while (arrIndex < consts::kMaxRoadEntityCount)
-    {
-        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
-        map_obs.obs[arrIndex].heading = 0.f;
-        map_obs.obs[arrIndex].type = (float)EntityType::None;
-        arrIndex++;
-    }
+    // arrIndex = 0; CountT roadIdx = 0;
+    // while(roadIdx < ctx.data().numRoads) {
+    //     Entity road = ctx.data().roads[roadIdx++];
+    //     Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+    //     if(relative_pos.length() > ctx.data().params.observationRadius)
+    //     {
+    //         continue;
+    //     }
+    //     map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
+    //     map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
+    //     arrIndex++;
+    // }
+    // while (arrIndex < consts::kMaxRoadEntityCount)
+    // {
+    //     map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
+    //     map_obs.obs[arrIndex].heading = 0.f;
+    //     map_obs.obs[arrIndex].type = (float)EntityType::None;
+    //     arrIndex++;
+    // }
 }
 
 inline void movementSystem(Engine &e,
@@ -665,7 +665,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             OtherAgents,
             SelfObservation,
 	    PartnerObservations,
-            AgentMapObservations,
+            // AgentMapObservations,
             EntityType,
             madrona::phys::CollisionEvent
         >>({post_reset_broadphase});

@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "/home/aarav/gpudrive/valid_nocturne",
+        .jsonPath = "/home/aarav/nocturne_data/formatted_json_v2_no_tl_valid",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
-    auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
+    // auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -121,8 +121,8 @@ int main(int argc, char *argv[])
         printf("Controlled State\n");
         controlledStatePrinter.print();
         
-        printf("Agent Map Obs\n");
-        agent_map_obs_printer.print();
+        // printf("Agent Map Obs\n");
+        // agent_map_obs_printer.print();
     };
     // printObs();
 

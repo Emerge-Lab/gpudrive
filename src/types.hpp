@@ -187,17 +187,17 @@ const int PartnerObservationExportSize = 7;
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
-struct AgentMapObservations {
-    MapObservation obs[consts::kMaxRoadEntityCount];
-};
+// struct AgentMapObservations {
+//     MapObservation obs[consts::kMaxRoadEntityCount];
+// };
 
-const int AgentMapObservationExportSize = 4;
+// const int AgentMapObservationExportSize = 4;
 
 // AgentMapObservations is exported as a
 // [N, A, numRoadEntities, 4] float tensor to pytorch
 
-static_assert(sizeof(AgentMapObservations) == sizeof(float) *
-    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
+// static_assert(sizeof(AgentMapObservations) == sizeof(float) *
+//     consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
 
 
 struct LidarSample {
@@ -286,7 +286,7 @@ struct Agent : public madrona::Archetype<
     // Observations
     SelfObservation,
     PartnerObservations,
-    AgentMapObservations,
+    // AgentMapObservations,
     Lidar,
     StepsRemaining,
 
