@@ -1,8 +1,7 @@
-import torch
 import wandb
 
 # Import env wrapper that makes the GPU gym env compatible with stable-baselines3
-from gpudrive_.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
+from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
 from algorithms.ppo.sb3.callbacks import MultiAgentCallback
 
@@ -13,7 +12,7 @@ if __name__ == "__main__":
     
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
-        num_worlds=1, 
+        num_worlds=3, 
         max_cont_agents=1, 
         data_dir='waymo_data', 
         device='cuda', 
