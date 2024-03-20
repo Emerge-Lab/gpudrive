@@ -599,18 +599,18 @@ Tensor Manager::partnerObservationsTensor() const
                                });
 }
 
-Tensor Manager::agentMapObservationsTensor() const
-{
-    return impl_->exportTensor(ExportID::AgentMapObservations,
-                               Tensor::ElementType::Float32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
-                                   consts::kMaxRoadEntityCount,
-                                   AgentMapObservationExportSize,
-                               });
+// Tensor Manager::agentMapObservationsTensor() const
+// {
+//     return impl_->exportTensor(ExportID::AgentMapObservations,
+//                                Tensor::ElementType::Float32,
+//                                {
+//                                    impl_->cfg.numWorlds,
+//                                    impl_->agentRoadCounts.first,
+//                                    consts::kMaxRoadEntityCount,
+//                                    AgentMapObservationExportSize,
+//                                });
 
-}
+// }
 
 Tensor Manager::lidarTensor() const
 {

@@ -8,8 +8,8 @@ namespace gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 200;
-inline constexpr madrona::CountT kMaxRoadEntityCount = 2000;
+inline constexpr madrona::CountT kMaxAgentCount = 400;
+inline constexpr madrona::CountT kMaxRoadEntityCount = 20000;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
