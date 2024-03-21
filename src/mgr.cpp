@@ -414,13 +414,7 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-<<<<<<< HEAD
-                                                viz_bridge, map_, ExecMode::CUDA, paramsDevicePtr};
-=======
-                                                map_, mgr_cfg.execMode, paramsDevicePtr};
-            sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
-            sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
->>>>>>> 1d68c91 (Compiling on latest madrona)
+                                                map_, ExecMode::CUDA, paramsDevicePtr};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -705,7 +699,7 @@ Tensor Manager::shapeTensor() const {
 }
 
 Tensor Manager::controlledStateTensor() const {
-    return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
+    return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
