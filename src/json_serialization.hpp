@@ -240,10 +240,7 @@ namespace gpudrive
                 map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
                 map.mean.y = ((map.mean.y * totalPoints) + (map.roads[i].mean.y * roadPoints)) / (totalPoints + roadPoints);
                 totalPoints += roadPoints;
-                if(map.roads[i].type <= MapRoadType::Lane)
-                    count_road_points += roadPoints - 1;
-                else if(map.roads[i].type > MapRoadType::Lane)
-                    count_road_points += 1;
+                count_road_points += roadPoints;
                 ++i;
             }
             else
