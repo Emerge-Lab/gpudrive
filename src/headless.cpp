@@ -119,8 +119,9 @@ int main(int argc, char *argv[])
 
         printf("Controlled State\n");
         controlledStatePrinter.print();
-        printf("Collision\n");
-        collisionPrinter.print();
+
+        printf("Agent Map Obs\n");
+        agent_map_obs_printer.print();
     };
     // printObs();
 
