@@ -31,11 +31,18 @@ namespace gpudrive
             .def_rw("distanceToGoalThreshold", &RewardParams::distanceToGoalThreshold)
             .def_rw("distanceToExpertThreshold", &RewardParams::distanceToExpertThreshold);
 
+        nb::enum_<DatasetInitOptions>(m, "DatasetInitOptions")
+            .value("FirstN", DatasetInitOptions::FirstN)
+            .value("RandomN", DatasetInitOptions::RandomN)
+            .value("PadN", DatasetInitOptions::PadN)
+            .value("ExactN", DatasetInitOptions::ExactN);
+
         // Define Parameters class
         nb::class_<Parameters>(m, "Parameters")
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
+            .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles);
 
