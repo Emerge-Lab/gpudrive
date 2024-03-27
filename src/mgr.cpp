@@ -495,7 +495,7 @@ Tensor Manager::bicycleModelTensor() const
         {
             impl_->cfg.numWorlds,
             consts::kMaxAgentCount,
-            4, // Number of states for the bicycle model
+            BicycleModelExportSize, // Number of states for the bicycle model
         });
 }
 
@@ -527,8 +527,8 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
-                                   8
-			       });
+                                   SelfObservationExportSize
+                               });
 }
 
 Tensor Manager::mapObservationTensor() const
@@ -538,7 +538,7 @@ Tensor Manager::mapObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxRoadEntityCount,
-                                   4
+                                   MapObservationExportSize
                                });
 }
 
@@ -549,8 +549,8 @@ Tensor Manager::partnerObservationsTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
-                                   consts::kMaxAgentCount - 1,
-                                   7,
+                                   consts::kMaxAgentCount-1,
+                                   PartnerObservationExportSize,
                                });
 }
 
@@ -562,7 +562,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                    impl_->cfg.numWorlds,
 				   consts::kMaxAgentCount,
                                    consts::kMaxRoadEntityCount,
-                                   4,
+                                   AgentMapObservationExportSize,
                                });
 
 }
