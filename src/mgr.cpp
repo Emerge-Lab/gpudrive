@@ -106,7 +106,7 @@ struct Manager::Impl {
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
-          agentActionsBuffer(action_buffer)
+          agentActionsBuffer(action_buffer),
           renderGPUState(std::move(render_gpu_state)),
           renderMgr(std::move(render_mgr))
     {}
