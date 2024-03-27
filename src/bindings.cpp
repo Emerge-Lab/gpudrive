@@ -44,7 +44,14 @@ namespace gpudrive
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams)
+            .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles);
+
+        // Define CollisionBehaviour enum
+        nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
+            .value("AgentStop", CollisionBehaviour::AgentStop)
+            .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
+            .value("Ignore", CollisionBehaviour::Ignore);
 
 
         // Bindings for Manager class
