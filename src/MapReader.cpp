@@ -52,11 +52,12 @@ void MapReader::doParse(float polylineReductionThreshold) {
   from_json(rawJson, *map_, polylineReductionThreshold);
 }
 
-std::tuple<gpudrive::Map*, std::pair<uint32_t, uint32_t>> MapReader::parseAndWriteOut(const std::string &path,
+gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
                             madrona::ExecMode executionMode, float polylineReductionThreshold) {
   MapReader reader(path);
   reader.doParse(polylineReductionThreshold);
-  std::pair<uint32_t, uint32_t> agentRoadCounts(reader.map_->numObjects, reader.map_->numRoadSegments);
-  return std::make_tuple(copyToArrayOnHostOrDevice(reader.map_, executionMode), agentRoadCounts);
+
+  return copyToArrayOnHostOrDevice(reader.map_, executionMode);
+
 } 
 } // namespace gpudrive
