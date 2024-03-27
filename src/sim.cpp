@@ -218,8 +218,6 @@ inline void movementSystem(Engine &e,
                            const EntityType &type,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
-                           ExternalForce &external_force,
-                           ExternalTorque &external_torque,
                            const CollisionDetectionEvent &collisionEvent)
 {
     if (type == EntityType::Padding) {
@@ -280,8 +278,6 @@ inline void movementSystem(Engine &e,
         velocity.linear.z = 0;
         velocity.angular = Vector3::zero();
         velocity.angular.z = w;
-        external_force = Vector3::zero();
-        external_torque = Vector3::zero();
     }
     else
     {
@@ -295,8 +291,6 @@ inline void movementSystem(Engine &e,
         velocity.linear.x = trajectory.velocities[curStepIdx].x;
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
-        external_force = Vector3::zero();
-        external_torque = Vector3::zero();
     }
 }
 
@@ -548,8 +542,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             EntityType,
             StepsRemaining,
             Trajectory,
-            ExternalForce,
-            ExternalTorque,
             CollisionDetectionEvent
         >>({});
 

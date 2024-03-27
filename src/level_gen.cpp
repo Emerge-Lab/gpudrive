@@ -35,8 +35,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    ctx.get<ExternalForce>(agent) = Vector3::zero();
-    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
@@ -254,8 +252,6 @@ static void createFloorPlane(Engine &ctx)
     ctx.get<Scale>(ctx.data().floorPlane) = Diag3x3{1, 1, 1};
     ctx.get<ObjectID>(ctx.data().floorPlane) = ObjectID{(int32_t)SimObject::Plane};
     ctx.get<Velocity>(ctx.data().floorPlane) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
@@ -270,8 +266,6 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Static;
-    ctx.get<ExternalForce>(agent) = Vector3::zero();
-    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 
@@ -287,8 +281,6 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<ExternalForce>(physicsEntity) = Vector3::zero();
-    ctx.get<ExternalTorque>(physicsEntity) = Vector3::zero();
     ctx.get<MapObservation>(physicsEntity) = MapObservation{
         .position = Vector2{.x = 0, .y = 0}, .heading = 0, .type = 0};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;

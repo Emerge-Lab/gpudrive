@@ -17,8 +17,6 @@ using madrona::base::Scale;
 using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 using madrona::phys::ResponseType;
-using madrona::phys::ExternalForce;
-using madrona::phys::ExternalTorque;
 
 struct BicycleModel {
     madrona::math::Vector2 position;
@@ -180,8 +178,6 @@ struct Agent : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
-    ExternalForce,
-    ExternalTorque,
     madrona::phys::broadphase::LeafID,
     CollisionDetectionEvent,
   
@@ -228,8 +224,6 @@ struct PhysicsEntity : public madrona::Archetype<
     Velocity,
     ObjectID,
     ResponseType,
-    ExternalForce,
-    ExternalTorque,
     madrona::phys::broadphase::LeafID,
     MapObservation,
     EntityType,
