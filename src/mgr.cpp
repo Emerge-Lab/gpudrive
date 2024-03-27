@@ -35,20 +35,17 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
-    std::pair<uint32_t, uint32_t> agentRoadCounts;
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
-                Action *action_buffer,
-                std::pair<uint32_t, uint32_t> agentRoadCounts)
+                Action *action_buffer)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
-          agentActionsBuffer(action_buffer),
-          agentRoadCounts(agentRoadCounts)
+          agentActionsBuffer(action_buffer)
     {}
 
     inline virtual ~Impl() {}
@@ -74,10 +71,9 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   TaskGraphT &&cpu_exec,
-                   std::pair<uint32_t, uint32_t> agentRoadCounts)
+                   TaskGraphT &&cpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, agentRoadCounts),
+               ep_mgr, reset_buffer, action_buffer),
           cpuExec(std::move(cpu_exec))
     {}
 
@@ -109,10 +105,9 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
-                   MWCudaExecutor &&gpu_exec,
-                   std::pair<uint32_t, uint32_t> agentRoadCounts)
+                   MWCudaExecutor &&gpu_exec)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer, agentRoadCounts),
+               ep_mgr, reset_buffer, action_buffer),
           gpuExec(std::move(gpu_exec))
     {}
 
@@ -262,8 +257,6 @@ Manager::Impl * Manager::Impl::init(
     Sim::Config sim_cfg {
         viz_bridge != nullptr,
         mgr_cfg.autoReset,
-        0, // kMaxAgentCount
-        0 // kMaxRoadEntityCount
     };
 
     switch (mgr_cfg.execMode) {
@@ -285,22 +278,15 @@ Manager::Impl * Manager::Impl::init(
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
         
         int64_t worldIdx{0};
-    
+
         for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
-            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
                                                 viz_bridge, map_, paramsDevicePtr};
-            sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
-            sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
-
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
-        // Bounds on the maxagent and maxroadentity counts.
-        assert(sim_cfg.kMaxAgentCount <= consts::kMaxAgentCount);
-        assert(sim_cfg.kMaxRoadEntityCount <= consts::kMaxRoadEntityCount);
-        assert(sim_cfg.kMaxAgentCount > 0);
-        assert(sim_cfg.kMaxRoadEntityCount > 0);
 
         MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
@@ -337,7 +323,6 @@ Manager::Impl * Manager::Impl::init(
             world_reset_buffer,
             agent_actions_buffer,
             std::move(gpu_exec),
-            std::make_pair(sim_cfg.kMaxAgentCount, sim_cfg.kMaxRoadEntityCount)
         };
 
 #else
@@ -355,22 +340,15 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         int64_t worldIdx{0};
-    
         for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
         {
-            auto [map_, mapCounts] = MapReader::parseAndWriteOut(mapFile.path(), mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
                                                 viz_bridge, map_, &(mgr_cfg.params)};
-            sim_cfg.kMaxAgentCount = std::max(mapCounts.first, sim_cfg.kMaxAgentCount);
-            sim_cfg.kMaxRoadEntityCount = std::max(mapCounts.second, sim_cfg.kMaxRoadEntityCount);
         }
-
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
-        // Bounds on the maxagent and maxroadentity counts.
-        assert(sim_cfg.kMaxAgentCount <= consts::kMaxAgentCount);
-        assert(sim_cfg.kMaxRoadEntityCount <= consts::kMaxRoadEntityCount);
-        assert(sim_cfg.kMaxAgentCount > 0);
-        assert(sim_cfg.kMaxRoadEntityCount > 0);
+
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
@@ -394,7 +372,6 @@ Manager::Impl * Manager::Impl::init(
             world_reset_buffer,
             agent_actions_buffer,
             std::move(cpu_exec),
-            std::make_pair(sim_cfg.kMaxAgentCount, sim_cfg.kMaxRoadEntityCount)
         };
 
         for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
@@ -450,7 +427,7 @@ Tensor Manager::actionTensor() const
     return impl_->exportTensor(ExportID::Action, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
-            impl_->agentRoadCounts.first,
+            consts::kMaxAgentCount,
             3, // Num_actions
         });
 }
@@ -460,7 +437,7 @@ Tensor Manager::bicycleModelTensor() const
     return impl_->exportTensor(ExportID::BicycleModel, Tensor::ElementType::Float32,
         {
             impl_->cfg.numWorlds,
-            impl_->agentRoadCounts.first,
+            consts::kMaxAgentCount,
             4, // Number of states for the bicycle model
         });
 }
@@ -471,7 +448,7 @@ Tensor Manager::rewardTensor() const
     return impl_->exportTensor(ExportID::Reward, Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -481,7 +458,7 @@ Tensor Manager::doneTensor() const
     return impl_->exportTensor(ExportID::Done, Tensor::ElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -492,9 +469,9 @@ Tensor Manager::selfObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
-                                   6
-                               });
+                                   consts::kMaxAgentCount,
+                                   8
+			       });
 }
 
 Tensor Manager::mapObservationTensor() const
@@ -503,7 +480,7 @@ Tensor Manager::mapObservationTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.second,
+                                   consts::kMaxRoadEntityCount,
                                    4
                                });
 }
@@ -514,8 +491,8 @@ Tensor Manager::partnerObservationsTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
-                                   consts::kMaxAgentCount-1,
+                                   consts::kMaxAgentCount,
+                                   consts::kMaxAgentCount - 1,
                                    7,
                                });
 }
@@ -526,7 +503,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
+				   consts::kMaxAgentCount,
                                    consts::kMaxRoadEntityCount,
                                    4,
                                });
@@ -538,7 +515,7 @@ Tensor Manager::lidarTensor() const
     return impl_->exportTensor(ExportID::Lidar, Tensor::ElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
+                                   consts::kMaxAgentCount,
                                    consts::numLidarSamples,
                                    2,
                                });
@@ -550,7 +527,7 @@ Tensor Manager::stepsRemainingTensor() const
                                Tensor::ElementType::Int32,
                                {
                                    impl_->cfg.numWorlds,
-                                   impl_->agentRoadCounts.first,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -562,7 +539,7 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, Tensor::ElementType::Int32,
-                               {impl_->cfg.numWorlds,impl_->agentRoadCounts.first, 1});
+                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
 void Manager::triggerReset(int32_t world_idx)
@@ -590,8 +567,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                   .steering = steering,
                   .headAngle = headAngle};
 
-    auto *action_ptr =
-        impl_->agentActionsBuffer + world_idx * impl_->agentRoadCounts.first + agent_idx;
+    auto *action_ptr = impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
