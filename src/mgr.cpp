@@ -289,7 +289,7 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
     {
         assert(cfg.numWorlds >= mapFiles.size());
-        for(int i = 0; i < cfg.numWorlds; i++)
+        for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
         {
             mapFiles.push_back(mapFiles[0]);
         }
