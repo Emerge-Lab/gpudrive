@@ -66,6 +66,36 @@ struct Sim : public madrona::WorldBase {
     static void setupTasks(madrona::TaskGraphBuilder &builder,
                            const Config &cfg);
 
+    // Function to initialize your collision pairs array
+    static madrona::InlineArray<std::pair<EntityType, EntityType>, 64> initializeCollisionPairs() {
+        madrona::InlineArray<std::pair<EntityType, EntityType>, 64> collisionPairs;
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::Pedestrian});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadEdge});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::Cyclist});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadLine});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadLane});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::CrossWalk});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::SpeedBump});
+        collisionPairs.push_back({EntityType::Pedestrian, EntityType::StopSign});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::Pedestrian});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadEdge});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::Cyclist});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadLine});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadLane});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::CrossWalk});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::SpeedBump});
+        collisionPairs.push_back({EntityType::Cyclist, EntityType::StopSign});
+        collisionPairs.push_back({EntityType::Vehicle, EntityType::CrossWalk});
+        collisionPairs.push_back({EntityType::Vehicle, EntityType::SpeedBump});
+        collisionPairs.push_back({EntityType::Vehicle, EntityType::RoadLine});
+        collisionPairs.push_back({EntityType::Vehicle, EntityType::RoadLane});
+        // TODO: Break Cube into road types for better control over collisions
+        return collisionPairs;
+    }
+
+
+    const madrona::InlineArray<std::pair<EntityType,EntityType>, 64> collisionPairs;                        
+
     // The constructor is called for each world during initialization.
     // Config is global across all worlds, while WorldInit (src/init.hpp)
     // can contain per-world initialization data, created in (src/mgr.cpp)

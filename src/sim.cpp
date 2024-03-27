@@ -500,6 +500,24 @@ void collisionDetectionSystem(Engine &ctx,
         return;
     }
 
+    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.aEntity);
+    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.bEntity);
+
+    // Ignore collisions between certain entity types
+    if(aEntitytype == EntityType::Padding || bEntitytype == EntityType::Padding)
+    {
+        return;
+    }
+
+    for(auto &pair : ctx.data().collisionPairs)
+    {
+        if((pair.first == aEntitytype && pair.second == bEntitytype) ||
+           (pair.first == bEntitytype && pair.second == aEntitytype))
+        {
+            return;
+        }
+    }
+
     auto maybeCollisionEventA =
         ctx.getSafe<CollisionEvent>(candidateCollision.aEntity);
     if (maybeCollisionEventA.valid()) {
@@ -678,7 +696,8 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr),
-      params(*init.params)
+      params(*init.params),
+      collisionPairs(initializeCollisionPairs())
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
