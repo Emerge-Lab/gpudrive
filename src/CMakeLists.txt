@@ -17,10 +17,10 @@ target_link_libraries(gpudrive_cpu_impl
     PRIVATE
         madrona_common
         madrona_mw_physics
-        madrona_viz_system
+        madrona_rendering_system
 )
 
-add_library(gpudrive_mgr SHARED
+add_library(gpudrive_mgr STATIC
     mgr.hpp mgr.cpp
     MapReader.hpp MapReader.cpp
 )
@@ -35,6 +35,7 @@ target_link_libraries(gpudrive_mgr
         madrona_common
         madrona_importer
         madrona_physics_loader
+        madrona_render
 )
 
 if (TARGET madrona_mw_gpu)
@@ -66,15 +67,21 @@ target_link_libraries(gpudrive PRIVATE
     gpudrive_mgr
 )
 
-if (TARGET madrona_viewer)
+if (TARGET madrona_viz)
     add_executable(viewer viewer.cpp)
-    target_link_libraries(viewer madrona_viewer
-        madrona_mw_core gpudrive_mgr)
+    target_link_libraries(viewer PRIVATE
+        madrona_mw_core gpudrive_mgr madrona_viz)
 
     target_compile_definitions(viewer PRIVATE
         -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
     )
+
+    if (TARGET madrona_cuda)
+        target_link_libraries(viewer PRIVATE
+            madrona_cuda
+        )
+    endif()
 endif()
 
 add_executable(headless headless.cpp)
-target_link_libraries(headless gpudrive_mgr)
+target_link_libraries(headless madrona_mw_core gpudrive_mgr)

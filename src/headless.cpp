@@ -12,7 +12,6 @@
 #include <vector>
 
 using namespace madrona;
-using namespace madrona::viz;
 
 [[maybe_unused]] static void
 saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,

@@ -27,14 +27,14 @@ namespace test_utils
 
         if constexpr (std::is_same<T, int64_t>::value)
         {
-            if (tensor.type() != py::Tensor::ElementType::Int64)
+            if (tensor.type() != py::TensorElementType::Int64)
             {
                 return {false, "Type mismatch: Expected Int64."};
             }
         }
         else if constexpr (std::is_same<T, float>::value)
         {
-            if (tensor.type() != py::Tensor::ElementType::Float32)
+            if (tensor.type() != py::TensorElementType::Float32)
             {
                 return {false, "Type mismatch: Expected Float32."};
             }
@@ -42,7 +42,7 @@ namespace test_utils
 
         switch (tensor.type())
         {
-        case py::Tensor::ElementType::Int64:
+        case py::TensorElementType::Int64:
         {
             int64_t *ptr = static_cast<int64_t *>(tensor.devicePtr());
             for (int64_t i = 0; i < num_elems; ++i)
@@ -54,7 +54,7 @@ namespace test_utils
             }
             break;
         }
-        case py::Tensor::ElementType::Float32:
+        case py::TensorElementType::Float32:
         {
             float *ptr = static_cast<float *>(tensor.devicePtr());
             for (int64_t i = 0; i < num_elems; ++i)
