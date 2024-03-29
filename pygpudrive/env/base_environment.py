@@ -71,7 +71,7 @@ class Env(gym.Env):
         self.screen = None
         self.clock = None
         
-        # TODO: @Aarav / @Sam: Allow for num_worlds < num_files
+        # TODO: @AP / @SK: Allow for num_worlds < num_files
         assert num_worlds == len(glob.glob(f"{data_dir}/*.json")), "Number of worlds exceeds the number of files in the data directory."
         
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
@@ -90,15 +90,11 @@ class Env(gym.Env):
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene 
         # We construct a mask to filter out the information from the expert controlled vehicles (0)
-        #TODO: Get this to work for multiple worlds
-        self.all_agents = self.sim.controlled_state_tensor().to_torch().shape[1]
-        
-        # NOTE: currently assuming we control the same agent indices in all worlds
-        # TODO: Decide how to select vehicles in different worlds
-        self.cont_agent_idx = torch.where((self.sim.controlled_state_tensor().to_torch()[:, :, 0] == 1))[0]
+        # Mask size: (num_worlds, kMaxAgentCount)
+        self.cont_agent_mask = (self.sim.controlled_state_tensor().to_torch() == 1).squeeze()
         self.max_cont_agents = max_cont_agents
         
-        # Set up action space (TODO: Make this work for multiple worlds)
+        # Set up action space
         self.action_space = self._set_discrete_action_space()
         
         # Set observation space        
@@ -112,14 +108,7 @@ class Env(gym.Env):
         for sim_idx in range(self.num_sims):
             self.sim.reset(sim_idx)
             
-        obs = self.get_obs()
-        
-        # Filter out the observations for the expert controlled vehicles
-        # Assuming each batch should select a single row based on the index in self.cont_agent_idx:
-        idx_full = self.cont_agent_idx.unsqueeze(-1).expand(-1, self.observation_space.shape[0])
-        obs = torch.gather(obs, 1, idx_full.unsqueeze(1))
-        
-        return obs
+        return self.get_obs()
 
     def step(self, actions):
         """Take simultaneous actions for each agent in all `num_worlds` environments.
@@ -129,40 +118,34 @@ class Env(gym.Env):
         """
         # Convert action indices to action values
         actions_shape = self.sim.action_tensor().to_torch().shape[1]
-        action_values = torch.zeros((self.num_sims, actions_shape, self.action_types))
+        action_value_tensor = torch.zeros((self.num_sims, actions_shape, self.action_types))
         
-        # GPU Drive expects a tensor of shape (num_worlds, all_agents)
+        # GPU Drive expects a tensor of shape (num_worlds, kMaxAgentCount, 3)
         # We insert the actions for the controlled vehicles, the others will be ignored
         for world_idx in range(self.num_sims):
             for agent_idx in range(self.max_cont_agents):
                 action_idx = actions[world_idx, agent_idx].item()
-                action_values[world_idx, agent_idx, :] = torch.Tensor(self.action_key_to_values[action_idx])
+                action_value_tensor[world_idx, agent_idx, :] = torch.Tensor(
+                    self.action_key_to_values[action_idx]
+                )
 
         # Feed the actual action values to GPU Drive 
-        self.sim.action_tensor().to_torch().copy_(action_values)
+        self.sim.action_tensor().to_torch().copy_(action_value_tensor)
         
         # Step the simulator
         self.sim.step()
         
         # Obtain the next observations, rewards, and done flags
         obs = self.get_obs()
-        reward = self.sim.reward_tensor().to_torch()
-        done = self.sim.done_tensor().to_torch()
+        reward = (self.sim.reward_tensor().to_torch()[self.cont_agent_mask]).reshape(self.num_sims, self.max_cont_agents)
+        done = (self.sim.done_tensor().to_torch()[self.cont_agent_mask]).reshape(self.num_sims, self.max_cont_agents)
         
-        # Filter out the expert controlled vehicle information
-        idx_observations = self.cont_agent_idx.unsqueeze(-1).expand(-1, self.observation_space.shape[0])
-        idx_rest = self.cont_agent_idx.unsqueeze(-1)
-        obs = torch.gather(obs, 1, idx_observations.unsqueeze(1))
-        reward = torch.gather(reward, 1, idx_rest.unsqueeze(1))
-        done = torch.gather(done, 1, idx_rest.unsqueeze(1))
-       
         # TODO: add info
         info = torch.zeros_like(done)
         
         # The episode is reset automatically if all agents reach their goal
         # or the episode is over 
         #TODO: also reset when all agents have collided
-        is_collided = torch.index_select(self.sim.self_observation_tensor().to_torch()[:, :, 5], dim=1, index=self.cont_agent_idx)
         
         return obs, reward, done, info
     
@@ -204,7 +187,13 @@ class Env(gym.Env):
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
         
-        return torch.cat([ego_state, partner_obs_tensor, map_obs_tensor], dim=-1)
+        # Combine the observations
+        obs_all = torch.cat([ego_state, partner_obs_tensor, map_obs_tensor], dim=-1)
+        
+        # Only select the observations for the controlled agents
+        obs_filtered = obs_all[self.cont_agent_mask].reshape(self.num_sims, self.max_cont_agents, -1)
+        
+        return obs_filtered
     
     def render(self, t=None):
         """Render the environment."""
@@ -287,11 +276,7 @@ class Env(gym.Env):
                 center=(int(goal_pos_screen[0]), int(goal_pos_screen[1])),
                 radius=GOAL_RADIUS,  
             )
-
-        # # You can use this moving box example for testing
-        # x_pos = 50 + t*10
-        # pygame.draw.rect(self.surf, (255, 0, 0), pygame.Rect(x_pos, 50, 100, 50)) 
-        
+    
         if self.render_mode == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
@@ -344,8 +329,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)    
 
     env = Env(
-        num_worlds=1, 
-        max_cont_agents=1, 
+        num_worlds=2, 
+        max_cont_agents=2, # Number of agents to control
         data_dir="waymo_data",
         device="cuda",
     )
@@ -357,17 +342,11 @@ if __name__ == "__main__":
     #     group="test_rendering",
     # )
 
-    # actions.shape: (num_worlds, max_cont_agents)
-    rand_actions = torch.ones((env.num_sims, env.max_cont_agents))
-    obs, reward, done, info = env.step(rand_actions)
-                
-    # obs.shape: (num_worlds, max_cont_agents, 20699)
-    # reward.shape: (num_worlds, max_cont_agents, 1)
-    # done.shape: (num_worlds, max_cont_agents, 1)
-    
     #frames = []
     
     for i in range(20):
+        
+        rand_actions = torch.ones((env.num_sims, env.max_cont_agents))
         print(f"Step {i}")
         obs, reward, done, info = env.step(rand_actions)
         # frame = env.render(i)
