@@ -1,4 +1,4 @@
-import pandas as pd
+#import pandas as pd
 import logging
 
 from time import perf_counter
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     DATA_DIR = ['waymo_data', 'data_10', 'data_100']    
     
     # Storage 
-    df = pd.DataFrame(columns=['num_worlds', 'num_frames', 'training time (s)', 'fps'])
+    #df = pd.DataFrame(columns=['num_worlds', 'num_frames', 'training time (s)', 'fps'])
     idx = 0
     
     for data_dir, num_worlds in zip(DATA_DIR, NUM_BENCH_WORLDS):
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         
         model = MAPPO(      
             policy="MlpPolicy", # Policy type
-            n_steps=2048, # Number of steps per rollout
+            n_steps=100, # Number of steps per rollout
             batch_size=256, # Minibatch size
             env=env, # Our wrapped environment
             seed=42, # Always seed for reproducibility
@@ -52,20 +52,20 @@ if __name__ == "__main__":
         
         ppo_end = perf_counter()
         
-        # Add results to dataframe
-        res = {
-            'num_worlds': num_worlds,
-            'num_frames': model.num_timesteps,
-            'time': ppo_end - ppo_start,
-            'fps': model.num_timesteps / (ppo_end - ppo_start),
-            'num_cont_agents': MAX_CONT_AGENTS,
-        }
+        # # Add results to dataframe
+        # res = {
+        #     'num_worlds': num_worlds,
+        #     'num_frames': model.num_timesteps,
+        #     'time': ppo_end - ppo_start,
+        #     'fps': model.num_timesteps / (ppo_end - ppo_start),
+        #     'num_cont_agents': MAX_CONT_AGENTS,
+        # }
         
-        df.loc[idx] = res
+        # df.loc[idx] = res
         
-        idx += 1
-        # Checkpointing
-        df.to_csv('ppo_sim_benchmark.csv')
+        # idx += 1
+        # # Checkpointing
+        # df.to_csv('ppo_sim_benchmark.csv')
         
         
         env.close()
