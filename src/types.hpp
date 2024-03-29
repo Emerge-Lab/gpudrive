@@ -175,10 +175,10 @@ struct Agent : public madrona::Archetype<
     Position,
     Rotation,
     Scale,
-    Velocity,
     ObjectID,
     ResponseType,
     madrona::phys::broadphase::LeafID,
+    Velocity,
     CollisionDetectionEvent,
   
     // Internal logic state.
@@ -221,10 +221,10 @@ struct PhysicsEntity : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
-    Velocity,
     ObjectID,
     ResponseType,
     madrona::phys::broadphase::LeafID,
+    Velocity,
     MapObservation,
     EntityType,
     madrona::render::Renderable
