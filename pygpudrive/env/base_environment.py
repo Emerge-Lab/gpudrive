@@ -1,11 +1,9 @@
 """Base Gym Environment that interfaces with the GPU Drive simulator."""
 
-from dataclasses import dataclass
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
-from itertools import islice, product
-import wandb
+from itertools import product
 
 import glob
 import gymnasium as gym
@@ -183,7 +181,6 @@ class Env(gym.Env):
     
         return Discrete(n=int(len(self.action_key_to_values)))
     
-    
     def _set_observation_space(self) -> None:
         """Configure the observation space."""
         return Box(low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],))
@@ -195,21 +192,19 @@ class Env(gym.Env):
             torch.Tensor: (num_worlds, max_cont_agents, num_features) 
         """       
         # Get the ego states
-        # Ego state: (num_worlds, max_cont_agents, features)
+        # Ego state: (num_worlds, kMaxAgentCount, features)
         ego_state = self.sim.self_observation_tensor().to_torch()
         
-        # Get view of other agents
-        # Partner obs: (num_worlds, max_cont_agents, max_cont_agents-1, num_features)
-        # Flatten over the last two dimensions to get (num_worlds, max_cont_agents, (max_cont_agents-1) * num_features)
+        # Get patner obs view
+        # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         partner_obs_tensor = self.sim.partner_observations_tensor().to_torch().flatten(start_dim=2)
         
-        # Get view of road graphs
-        # Roadmap obs: (num_worlds, max_cont_agents, max_road_points, num_features)
-        # Flatten over the last two dimensions to get (num_worlds, max_cont_agents, max_road_points * num_features)
+        # Get road map
+        # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
+        # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
         
         return torch.cat([ego_state, partner_obs_tensor, map_obs_tensor], dim=-1)
-    
     
     def render(self, t=None):
         """Render the environment."""
@@ -347,21 +342,21 @@ class Env(gym.Env):
 if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO)    
+
+    env = Env(
+        num_worlds=1, 
+        max_cont_agents=1, 
+        data_dir="waymo_data",
+        device="cuda",
+    )
+    
+    obs = env.reset()
     
     # run = wandb.init(
     #     project="gpudrive", 
     #     group="test_rendering",
     # )
 
-    env = Env(
-        num_worlds=10, 
-        max_cont_agents=1, 
-        data_dir="data_10",#"waymo_data", 
-        device="cuda",
-    )
-    
-    obs = env.reset()
-    
     # actions.shape: (num_worlds, max_cont_agents)
     rand_actions = torch.ones((env.num_sims, env.max_cont_agents))
     obs, reward, done, info = env.step(rand_actions)
@@ -370,15 +365,15 @@ if __name__ == "__main__":
     # reward.shape: (num_worlds, max_cont_agents, 1)
     # done.shape: (num_worlds, max_cont_agents, 1)
     
-    frames = []
+    #frames = []
     
-    for i in range(5):
+    for i in range(20):
         print(f"Step {i}")
         obs, reward, done, info = env.step(rand_actions)
-        #frame = env.render(i)
-        #frames.append(frame.T)
+        # frame = env.render(i)
+        # frames.append(frame.T)
 
-    # # Log video
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
+    # Log video
+    #wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
     
     env.close()
