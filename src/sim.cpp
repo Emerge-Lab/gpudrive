@@ -21,7 +21,7 @@ namespace gpudrive {
 void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 {
     base::registerTypes(registry);
-    phys::RigidBodyPhysicsSystem::registerTypes(registry);
+    phys::PhysicsSystem::registerTypes(registry);
 
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
@@ -82,7 +82,7 @@ static inline void cleanupWorld(Engine &ctx) {}
 
 static inline void initWorld(Engine &ctx)
 {
-    phys::RigidBodyPhysicsSystem::reset(ctx);
+    phys::PhysicsSystem::reset(ctx);
 
     // Assign a new episode ID
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
@@ -469,19 +469,23 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+    const CountT PositionColumn{2};
+    const CountT RotationColumn{3};
+    const CountT ScaleColumn{4};
+
     const Loc locationA{candidateCollision.a};
     const Position positionA{
-        ctx.getDirect<Position>(Cols::Position, locationA)};
+        ctx.getDirect<Position>(PositionColumn, locationA)};
     const Rotation rotationA{
-        ctx.getDirect<Rotation>(Cols::Rotation, locationA)};
-    const Scale scaleA{ctx.getDirect<Scale>(Cols::Scale, locationA)};
+        ctx.getDirect<Rotation>(RotationColumn, locationA)};
+    const Scale scaleA{ctx.getDirect<Scale>(ScaleColumn, locationA)};
 
     const Loc locationB{candidateCollision.b};
     const Position positionB{
-        ctx.getDirect<Position>(Cols::Position, locationB)};
+        ctx.getDirect<Position>(PositionColumn, locationB)};
     const Rotation rotationB{
-        ctx.getDirect<Rotation>(Cols::Rotation, locationB)};
-    const Scale scaleB{ctx.getDirect<Scale>(Cols::Scale, locationB)};
+        ctx.getDirect<Rotation>(RotationColumn, locationB)};
+    const Scale scaleB{ctx.getDirect<Scale>(ScaleColumn, locationB)};
 
     auto obbA = OrientedBoundingBox2D::from(positionA, rotationA, scaleA);
     auto obbB = OrientedBoundingBox2D::from(positionB, rotationB, scaleB);
@@ -550,11 +554,11 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        phys::PhysicsSystem::setupBroadphaseTasks(builder,
                                                            {moveSystem});
 
     auto findOverlappingEntities =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseOverlapTasks(
+        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -568,7 +572,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {detectCollisions});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -607,7 +611,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     // It's only necessary if the world was reset, but we don't have a way
     // to conditionally queue taskgraph nodes yet.
     auto post_reset_broadphase =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        phys::PhysicsSystem::setupBroadphaseTasks(builder,
                                                            {reset_sys});
 
     // Finally, collect observations for the next step.
@@ -681,7 +685,7 @@ Sim::Sim(Engine &ctx,
     // a future release.
     auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
-    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
+    phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
         max_total_entities);
 
