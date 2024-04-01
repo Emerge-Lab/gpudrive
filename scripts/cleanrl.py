@@ -21,7 +21,6 @@ import pufferlib.vectorization
 import pufferlib.frameworks.cleanrl
 import pufferlib.policy_pool
 
-
 @pufferlib.dataclass
 class Performance:
     total_uptime = 0
@@ -73,7 +72,6 @@ def create(
         # Environment
         env_creator: callable = None,
         env_creator_kwargs: dict = None,
-        vectorization: ... = pufferlib.vectorization.Serial,
 
         # Policy Pool options
         policy_selector: callable = pufferlib.policy_pool.random_selector,
@@ -97,20 +95,12 @@ def create(
     # Create environments, agent, and optimizer
     init_profiler = pufferlib.utils.Profiler(memory=True)
     with init_profiler:
-        pool = vectorization(
-            env_creator,
-            env_kwargs=env_creator_kwargs,
-            num_envs=config.num_envs,
-            envs_per_worker=config.envs_per_worker,
-            envs_per_batch=config.envs_per_batch,
-            env_pool=config.env_pool,
-            mask_agents=True,
-        )
+        pool = env_creator()
 
     obs_shape = pool.single_observation_space.shape
     atn_shape = pool.single_action_space.shape
     num_agents = pool.agents_per_env
-    total_agents = num_agents * config.num_envs
+    total_agents = num_agents * pool.num_envs
 
     # If data_dir is provided, load the resume state
     resume_state = {}
@@ -352,19 +342,6 @@ def evaluate(data):
 
     data.stats = {}
     infos = infos['learner']
-
-    if 'pokemon_exploration_map' in infos:
-        for idx, pmap in zip(infos['env_id'], infos['pokemon_exploration_map']):
-            if not hasattr(data, 'pokemon'):
-                import pokemon_red_eval
-                data.map_updater = pokemon_red_eval.map_updater()
-                data.map_buffer = np.zeros((data.config.num_envs, *pmap.shape))
-
-            data.map_buffer[idx] = pmap
-
-        pokemon_map = np.sum(data.map_buffer, axis=0)
-        rendered = data.map_updater(pokemon_map)
-        data.stats['Media/exploration_map'] = data.wandb.Image(rendered)
 
     for k, v in infos.items():
         if 'Task_eval_fn' in k:

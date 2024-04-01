@@ -33,7 +33,6 @@ wandb = "^0.16.4"
 pyyaml = "^6.0.1"
 matplotlib = "^3.8.3"
 seaborn = "^0.13.2"
-pandas = "^2.2.1"
 
 [tool.poetry]
 name = "gpudrive"
