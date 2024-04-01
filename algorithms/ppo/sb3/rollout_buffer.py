@@ -10,6 +10,7 @@ from stable_baselines3.common.buffers import BaseBuffer
 
 logging.getLogger(__name__)
 
+
 class RolloutBufferSamples(NamedTuple):
     observations: torch.Tensor
     actions: torch.Tensor
@@ -17,6 +18,7 @@ class RolloutBufferSamples(NamedTuple):
     old_log_prob: torch.Tensor
     advantages: torch.Tensor
     returns: torch.Tensor
+
 
 class MaskedRolloutBuffer(BaseBuffer):
     """Custom SB3 RolloutBuffer class that filters out invalid samples."""
@@ -31,7 +33,9 @@ class MaskedRolloutBuffer(BaseBuffer):
         gamma: float = 0.99,
         n_envs: int = 1,
     ):
-        super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
+        super().__init__(
+            buffer_size, observation_space, action_space, device, n_envs=n_envs
+        )
         self.gae_lambda = gae_lambda
         self.gamma = gamma
         self.generator_ready = False
@@ -39,17 +43,49 @@ class MaskedRolloutBuffer(BaseBuffer):
 
     def reset(self) -> None:
         """Reset the buffer."""
-        self.observations = torch.zeros((self.buffer_size, self.n_envs, *self.obs_shape), device=self.device, dtype=torch.float32)
-        self.actions = torch.zeros((self.buffer_size, self.n_envs, self.action_dim),  device=self.device, dtype=torch.float32)
-        self.rewards = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
-        self.returns = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
-        self.episode_starts = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
-        self.values = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
-        self.log_probs = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
-        self.advantages = torch.zeros((self.buffer_size, self.n_envs), device=self.device, dtype=torch.float32)
+        self.observations = torch.zeros(
+            (self.buffer_size, self.n_envs, *self.obs_shape),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.actions = torch.zeros(
+            (self.buffer_size, self.n_envs, self.action_dim),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.rewards = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.returns = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.episode_starts = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.values = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.log_probs = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.advantages = torch.zeros(
+            (self.buffer_size, self.n_envs),
+            device=self.device,
+            dtype=torch.float32,
+        )
         self.generator_ready = False
-        super().reset() 
-        
+        super().reset()
+
     def add(
         self,
         obs: torch.Tensor,
@@ -84,7 +120,9 @@ class MaskedRolloutBuffer(BaseBuffer):
         if self.pos == self.buffer_size:
             self.full = True
 
-    def compute_returns_and_advantage(self, last_values: torch.Tensor, dones: torch.Tensor) -> None:
+    def compute_returns_and_advantage(
+        self, last_values: torch.Tensor, dones: torch.Tensor
+    ) -> None:
         """GAE (General Advantage Estimation) to compute advantages and returns."""
         # Convert to numpy
         last_values = last_values.clone().flatten()
@@ -100,28 +138,44 @@ class MaskedRolloutBuffer(BaseBuffer):
 
             else:
                 # EDIT_1: Map NaNs to 1
-                episode_starts = torch.nan_to_num(self.episode_starts[step + 1], nan=1.0)
+                episode_starts = torch.nan_to_num(
+                    self.episode_starts[step + 1], nan=1.0
+                )
 
                 next_non_terminal = 1.0 - episode_starts
                 next_values = self.values[step + 1]
 
             delta = (
-                torch.nan_to_num(self.rewards[step], nan=0)  # EDIT_2: Set invalid rewards to zero
+                torch.nan_to_num(
+                    self.rewards[step], nan=0
+                )  # EDIT_2: Set invalid rewards to zero
                 + torch.nan_to_num(
                     self.gamma * next_values * next_non_terminal, nan=0
                 )  # EDIT_3: Set invalid rewards to zero
-                - torch.nan_to_num(self.values[step], nan=0)  # EDIT_4: Set invalid values to zero
+                - torch.nan_to_num(
+                    self.values[step], nan=0
+                )  # EDIT_4: Set invalid values to zero
             )
 
-            last_gae_lam = delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
+            last_gae_lam = (
+                delta
+                + self.gamma
+                * self.gae_lambda
+                * next_non_terminal
+                * last_gae_lam
+            )
             self.advantages[step] = last_gae_lam
         # TD(lambda) estimator, see Github PR #375 or "Telescoping in TD(lambda)"
         # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
         self.returns = self.advantages + self.values
 
-        assert not torch.isnan(self.advantages).any(), "Advantages arr contains NaN values; check GAE computation"
-    
-    def get(self, batch_size: Optional[int] = None) -> Generator[RolloutBufferSamples, None, None]:
+        assert not torch.isnan(
+            self.advantages
+        ).any(), "Advantages arr contains NaN values: Check GAE computation"
+
+    def get(
+        self, batch_size: Optional[int] = None
+    ) -> Generator[RolloutBufferSamples, None, None]:
         assert self.full, ""
 
         # Prepare the data
@@ -135,17 +189,21 @@ class MaskedRolloutBuffer(BaseBuffer):
                 "returns",
             ]
             # Create mask
-            self.valid_samples_mask = ~torch.isnan(self.swap_and_flatten(self.__dict__["rewards"]))
+            self.valid_samples_mask = ~torch.isnan(
+                self.swap_and_flatten(self.__dict__["rewards"])
+            )
 
             # Flatten data
             # EDIT_5: And mask out invalid samples
             for tensor in _tensor_names:
                 if tensor == "observations":
-                    self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])[
-                        self.valid_samples_mask.flatten(), :
-                    ]
+                    self.__dict__[tensor] = self.swap_and_flatten(
+                        self.__dict__[tensor]
+                    )[self.valid_samples_mask.flatten(), :]
                 else:
-                    self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])[self.valid_samples_mask]
+                    self.__dict__[tensor] = self.swap_and_flatten(
+                        self.__dict__[tensor]
+                    )[self.valid_samples_mask]
 
                 assert not torch.isnan(
                     self.__dict__[tensor]
@@ -155,7 +213,7 @@ class MaskedRolloutBuffer(BaseBuffer):
 
         # EDIT_6: Compute total number of samples and create indices
         total_num_samples = self.valid_samples_mask.sum()
-        indices =  torch.randperm(total_num_samples)
+        indices = torch.randperm(total_num_samples)
 
         # Return everything, don't create minibatches
         if batch_size is None:
@@ -163,10 +221,11 @@ class MaskedRolloutBuffer(BaseBuffer):
 
         start_idx = 0
         while start_idx < total_num_samples:
-            yield self._get_samples(indices[start_idx : start_idx + batch_size])
+            yield self._get_samples(
+                indices[start_idx : start_idx + batch_size]
+            )
             start_idx += batch_size
-            
-            
+
     def _get_samples(
         self,
         batch_inds: np.ndarray,

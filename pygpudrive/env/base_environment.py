@@ -143,6 +143,11 @@ class Env(gym.Env):
         Args:
             actions (torch.Tensor): The action indices for all agents in all worlds.
         """
+        assert actions.shape == (
+            self.num_sims,
+            self.max_cont_agents,
+        ), """Action tensor must match the shape (num_worlds, max_cont_agents)"""
+
         # Convert action indices to action values
         actions_shape = self.sim.action_tensor().to_torch().shape[1]
         action_value_tensor = torch.zeros(
@@ -406,6 +411,10 @@ class Env(gym.Env):
             )
             logging.info("----------------------\n")
 
+    @property
+    def steps_remaining(self):
+        return self.sim.steps_remaining_tensor().to_torch()
+
 
 if __name__ == "__main__":
 
@@ -423,7 +432,11 @@ if __name__ == "__main__":
 
     obs = env.reset()
 
-    for _ in range(10):
+    for _ in range(200):
+
+        print(
+            f"Remaining steps in episode: {env.steps_remaining[0, 0, 0].item()}"
+        )
 
         # Take a random action
         rand_action = torch.Tensor([[env.action_space.sample()]])
@@ -432,13 +445,21 @@ if __name__ == "__main__":
         obs, reward, done, info = env.step(rand_action)
 
         print(
-            f"action: {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f} | done: {done.item()}"
+            f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
         )
         print(
             f"veh_x_pos: {obs[:, :, 3].item():.3f} | veh_y_pos: {obs[:, :, 4].item():.3f}"
         )
-        print(f"veh_speed: {obs[:, :, 0].item():.3f} \n")
+        print(f"veh_speed: {obs[:, :, 0].item():.3f}")
+        print(f"done: {done}")
+
+        print(f"veh_collided: {obs[:, :, 5]}")
+
+        print(f"--- \n")
         # frame = env.render(i)
         # frames.append(frame.T)
+
+        if done.all():
+            obs = env.reset()
 
     env.close()
