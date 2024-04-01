@@ -21,7 +21,8 @@ script = "build.py"
 [tool.poetry.dependencies]
 python = "^3.11"
 torch = "^2.2.1"
-numpy = "^1.26.4"
+numpy = "1.23.3"
+pufferlib = "^0.7.3"
 
 [tool.poetry]
 name = "gpudrive"

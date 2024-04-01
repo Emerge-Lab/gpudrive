@@ -15,11 +15,11 @@ params.rewardParams = reward_params  # Set the rewardParams attribute to the ins
 
 # Now use the 'params' instance when creating SimManager
 sim = gpudrive.SimManager(
-    exec_mode=gpudrive.madrona.ExecMode.CUDA,
+    exec_mode=gpudrive.madrona.ExecMode.CPU,
     gpu_id=0,
     num_worlds=1,
     auto_reset=True,
-    json_path="waymo_data",
+    json_path="nocturne_data",
     params=params
 )
 

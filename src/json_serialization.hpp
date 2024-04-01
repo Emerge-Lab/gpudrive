@@ -229,7 +229,6 @@ namespace gpudrive
             }
         }
         map.numObjects = i;
-
         i = 0;
         size_t count_road_points = 0;
         for (const auto &road : j.at("roads"))
