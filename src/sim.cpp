@@ -235,8 +235,6 @@ inline void movementSystem(Engine &e,
             velocity.linear.y = 0;
             velocity.linear.z = fminf(velocity.linear.z, 0);
             velocity.angular = Vector3::zero();
-            external_force = Vector3::zero();
-            external_torque = Vector3::zero();
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
