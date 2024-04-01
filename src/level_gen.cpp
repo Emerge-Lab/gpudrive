@@ -17,8 +17,7 @@ static void registerRigidBodyEntity(
     SimObject sim_obj)
 {
     ObjectID obj_id { (int32_t)sim_obj };
-    ctx.get<broadphase::LeafID>(e) =
-        RigidBodyPhysicsSystem::registerEntity(ctx, e, obj_id);
+    ctx.get<broadphase::LeafID>(e) = PhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
@@ -35,18 +34,17 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    ctx.get<ExternalForce>(agent) = Vector3::zero();
-    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
-    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+    ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
 }
 
+
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
-    auto agent = ctx.makeEntity<Agent>();
+    auto agent = ctx.makeRenderableEntity<Agent>();
     
     // The following components do not vary within an episode and so need only
     // be set once
@@ -85,6 +83,13 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
 
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
@@ -98,7 +103,7 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 1};
     Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = 1};
     float distance = end.distance(start);
-    auto road_edge = ctx.makeEntity<PhysicsEntity>();
+    auto road_edge = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 1};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
@@ -168,7 +173,7 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     // Calculate rotation angle (assuming longer side is used to calculate angle)
     float angle = atan2(coords[3] - coords[1], coords[2] - coords[0]);
 
-    auto speed_bump = ctx.makeEntity<PhysicsEntity>();
+    auto speed_bump = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
@@ -184,7 +189,7 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     float x1 = p1.x;
     float y1 = p1.y;
 
-    auto stop_sign = ctx.makeEntity<PhysicsEntity>();
+    auto stop_sign = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
@@ -227,21 +232,19 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
 
 static void createFloorPlane(Engine &ctx)
 {
-    ctx.data().floorPlane = ctx.makeEntity<PhysicsEntity>();
+    ctx.data().floorPlane = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<Position>(ctx.data().floorPlane) = Vector3{.x = 0, .y = 0, .z = 0};
     ctx.get<Rotation>(ctx.data().floorPlane) = Quat { 1, 0, 0, 0 };
     ctx.get<Scale>(ctx.data().floorPlane) = Diag3x3{1, 1, 1};
     ctx.get<ObjectID>(ctx.data().floorPlane) = ObjectID{(int32_t)SimObject::Plane};
     ctx.get<Velocity>(ctx.data().floorPlane) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ExternalForce>(ctx.data().floorPlane) = Vector3::zero();
-    ctx.get<ExternalTorque>(ctx.data().floorPlane) = Vector3::zero();
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 }
 
 static inline Entity createAgentPadding(Engine &ctx) {
-    auto agent = ctx.makeEntity<Agent>();
+    auto agent = ctx.makeRenderableEntity<Agent>();
 
     ctx.get<Position>(agent) = consts::kPaddingPosition;
     ctx.get<Rotation>(agent) = Quat::angleAxis(0, madrona::math::up);
@@ -249,16 +252,14 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Static;
-    ctx.get<ExternalForce>(agent) = Vector3::zero();
-    ctx.get<ExternalTorque>(agent) = Vector3::zero();
     ctx.get<EntityType>(agent) = EntityType::Padding;
-    ctx.get<CollisionEvent>(agent).hasCollided.store_release(0);
+    ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 
     return agent;
 }
 
 static inline Entity createPhysicsEntityPadding(Engine &ctx) {
-    auto physicsEntity = ctx.makeEntity<PhysicsEntity>();
+    auto physicsEntity = ctx.makeRenderableEntity<PhysicsEntity>();
 
     ctx.get<Position>(physicsEntity) = consts::kPaddingPosition;
     ctx.get<Rotation>(physicsEntity) = Quat::angleAxis(0, madrona::math::up);
@@ -266,8 +267,6 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<ExternalForce>(physicsEntity) = Vector3::zero();
-    ctx.get<ExternalTorque>(physicsEntity) = Vector3::zero();
     ctx.get<MapObservation>(physicsEntity) = MapObservation{
         .position = Vector2{.x = 0, .y = 0}, .heading = 0, .type = 0};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
@@ -347,10 +346,6 @@ static void resetPersistentEntities(Engine &ctx)
         resetAgent(ctx, agent);
 
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
-
-
-        ctx.get<viz::VizCamera>(agent) = viz::VizRenderingSystem::setupView(
-            ctx, 90.f, 0.001f, 1.5f * math::up, (int32_t)idx);
     }
 
     for (CountT idx = 0; idx < ctx.data().numRoads; idx++)
