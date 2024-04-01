@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict
 from datetime import timedelta
 
-import torch
+import scripts.torch as torch
 import torch.nn as nn
 import torch.optim as optim
 
@@ -114,7 +114,7 @@ def create(
               f'with policy {resume_state["model_name"]}')
     else:
         agent = pufferlib.emulation.make_object(
-            agent, agent_creator, [pool.driver_env], agent_kwargs)
+            agent, agent_creator, [pool], agent_kwargs)
 
     global_step = resume_state.get("global_step", 0)
     agent_step = resume_state.get("agent_step", 0)

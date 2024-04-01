@@ -1,13 +1,17 @@
 import gpudrive
 import gymnasium as gym
 import torch
+import torch.nn as nn
 import math
 import numpy as np
 from gymnasium.wrappers import FlattenObservation, NormalizeObservation
 from stable_baselines3.common.env_checker import check_env
 from sim_utils.creator import SimCreator
+import pufferlib.models
 
 class GPUDriveEnv(gym.Env):
+    Recurrent = None
+
     def __init__(self, params: gpudrive.Parameters = None):
         self.sim = SimCreator()
         self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
@@ -19,6 +23,7 @@ class GPUDriveEnv(gym.Env):
         self.agents_per_env = self.self_obs_tensor.shape[1]
         self.total_num_agents = self.num_envs * self.agents_per_env
 
+        self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float64)
         # self.observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.num_obs_features,), dtype=torch.float32)
         self.observation_space = gym.spaces.Dict({
             "self_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[0].shape, dtype=np.float64),
@@ -29,7 +34,9 @@ class GPUDriveEnv(gym.Env):
         })
 
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions(), dtype=np.float64)
+        self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions()[2:], dtype=np.float64)
 
+        self.Recurrent = None
 
     def setup_obs(self):
         self_obs_tensor = self.sim.self_observation_tensor().to_torch()
@@ -113,6 +120,68 @@ class GPUDriveEnv(gym.Env):
         params.observationRadius = observationRadius
         params.rewardParams = reward_params  
         return params
+    
+    @staticmethod
+    def Policy(env: gym.Env):
+        return torch.rand(1)
+
+
+class Convolutional1D(pufferlib.models.Policy):
+    def __init__(self, env, *args, framestack, flat_size,
+            input_size=512, hidden_size=512, output_size=512,
+            channels_last=False, downsample=1, **kwargs):
+        '''The CleanRL default Atari policy: a stack of three convolutions followed by a linear layer
+        
+        Takes framestack as a mandatory keyword arguments. Suggested default is 1 frame
+        with LSTM or 4 frames without.'''
+        super().__init__(env)
+        self.num_actions = self.action_space.n
+        self.channels_last = channels_last
+        self.downsample = downsample
+        
+        self.network = nn.Sequential(
+            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 32, 128, stride=32)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 4, stride=2)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 3, stride=1)),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool1d(1024),
+            nn.Flatten(),
+            pufferlib.pytorch.layer_init(nn.Linear(64*1024, hidden_size)),
+            nn.ReLU(),
+        )
+
+        self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
+        self.value_fn = pufferlib.pytorch.layer_init(nn.Linear(output_size, 1), std=1)
+
+    def encode_observations(self, observations):
+        if self.channels_last:
+            observations = observations.permute(0, 3, 1, 2)
+        if self.downsample > 1:
+            observations = observations[:, :, ::self.downsample, ::self.downsample]
+        return self.network(observations.float()), None
+
+    def decode_actions(self, flat_hidden, lookup, concat=None):
+        action = self.actor(flat_hidden)
+        value = self.value_fn(flat_hidden)
+        return action, value
+
+class Policy(pufferlib.models.Policy):
+    def __init__(self, env):
+        input_size=512
+        hidden_size=512
+        output_size=512
+        framestack=1
+        flat_size=64*7*7
+        super().__init__(
+            env=env,
+            input_size=input_size,
+            hidden_size=hidden_size,
+            output_size=output_size,
+            framestack=framestack,
+            flat_size=flat_size,
+        )
 
 def make_gpudrive():
     return GPUDriveEnv()

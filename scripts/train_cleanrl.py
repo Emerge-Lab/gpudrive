@@ -16,11 +16,9 @@ from cleanrl import rollout
 
 from gpudrive_gym import GPUDriveEnv, make_gpudrive
 from sim_utils.creator import SimCreator
-
-
    
 def make_policy(env, env_module, args):
-    policy = env_module.Policy(env, **args.policy)
+    policy = env_module.Policy(env)
     if args.force_recurrence or env_module.Recurrent is not None:
         policy = env_module.Recurrent(env, policy, **args.recurrent)
         policy = pufferlib.frameworks.cleanrl.RecurrentPolicy(policy)
@@ -99,7 +97,7 @@ def train(args, env_module, make_env):
     if args.backend == 'clean_pufferl':
         data = cleanrl.create(
             config=args.train,
-            agent_creator=env_module,
+            agent_creator=make_policy,
             agent_kwargs={'env_module': env_module, 'args': args},
             env_creator=make_env,
             env_creator_kwargs=None,

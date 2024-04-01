@@ -11,7 +11,7 @@ from gpudrive_learn.models import (
 from gpudrive_learn.rnn import LSTM
 
 import math
-import torch
+import scripts.torch as torch
 
 def setup_obs(sim):
     self_obs_tensor = sim.self_observation_tensor().to_torch()
