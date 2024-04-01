@@ -42,6 +42,11 @@ enum class SimObject : uint32_t {
     NumObjects,
 };
 
+enum class TaskGraphID : uint32_t {
+    Step,
+    NumTaskGraphs,
+};
+
 // The Sim class encapsulates the per-world state of the simulation.
 // Sim is always available by calling ctx.data() given a reference
 // to the Engine / Context object that is passed to each ECS system.
@@ -51,8 +56,8 @@ enum class SimObject : uint32_t {
 // in this class in order to ensure efficient access patterns.
 struct Sim : public madrona::WorldBase {
     struct Config {
-        bool enableViewer;
         bool autoReset;
+        const madrona::render::RenderECSBridge *renderBridge;
     };
 
     // Sim::registerTypes is called during initialization
@@ -63,7 +68,7 @@ struct Sim : public madrona::WorldBase {
     // Sim::setupTasks is called during initialization to build
     // the system task graph that will be invoked by the 
     // Manager class (src/mgr.hpp) for each step.
-    static void setupTasks(madrona::TaskGraphBuilder &builder,
+    static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
 
     // The constructor is called for each world during initialization.
@@ -108,11 +113,20 @@ struct Sim : public madrona::WorldBase {
     bool autoReset;
 
     // Are we visualizing the simulation in the viewer?
-    bool enableVizRender;
+    bool enableRender;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {
+public:
     using CustomContext::CustomContext;
+
+    // These are convenience helpers for creating renderable
+    // entities when rendering isn't necessarily enabled
+    template <typename ArchetypeT>
+    inline madrona::Entity makeRenderableEntity();
+    inline void destroyRenderableEntity(Entity e);
 };
 
 }
+
+#include "sim.inl"

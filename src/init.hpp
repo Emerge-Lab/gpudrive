@@ -6,10 +6,6 @@
 #include <madrona/physics.hpp>
 #include <madrona/types.hpp>
 
-namespace madrona::viz {
-struct VizECSBridge;
-}
-
 namespace gpudrive
 {
     // Constants computed from train files.
@@ -125,7 +121,6 @@ namespace gpudrive
     {
         EpisodeManager *episodeMgr;
         madrona::phys::ObjectManager *rigidBodyObjMgr;
-        const madrona::viz::VizECSBridge *vizBridge;
         Map *map;
         const Parameters *params;
     };
