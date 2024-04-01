@@ -12,6 +12,10 @@ import pygame
 import random
 import os
 
+# Import the EnvConfig dataclass
+from pygpudrive.env.config import EnvConfig
+
+
 # Import the simulator
 import gpudrive
 import logging
@@ -47,13 +51,16 @@ class Env(gym.Env):
 
     def __init__(
         self,
+        config,
         num_worlds,
         max_cont_agents,
         data_dir,
         device="cuda",
         auto_reset=True,
         render_mode="rgb_array",
+        verbose=True,
     ):
+        self.config = config
 
         # Configure rewards
         # TODO: Make this configurable on the Python side and add docs
@@ -121,7 +128,7 @@ class Env(gym.Env):
         self.observation_space = self._set_observation_space()
         self.obs_dim = self.observation_space.shape[0]
 
-        self._print_info(verbose=True)
+        self._print_info(verbose)
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -189,9 +196,9 @@ class Env(gym.Env):
             product(self.accel_actions, self.steer_actions, self.head_actions)
         ):
             self.action_key_to_values[action_idx] = [
-                int(accel),
-                int(steer),
-                int(head),
+                accel.item(),
+                steer.item(),
+                head.item(),
             ]
 
         return Discrete(n=int(len(self.action_key_to_values)))
@@ -208,26 +215,35 @@ class Env(gym.Env):
         """
         # Get the ego states
         # Ego state: (num_worlds, kMaxAgentCount, features)
-        ego_state = self.sim.self_observation_tensor().to_torch()
+        if self.config.ego_state:
+            ego_state = self.sim.self_observation_tensor().to_torch()
+        else:
+            ego_state = torch.Tensor().to(self.device)
 
         # Get patner obs view
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
-        partner_obs_tensor = (
-            self.sim.partner_observations_tensor()
-            .to_torch()
-            .flatten(start_dim=2)
-        )
+        if self.config.partner_obs:
+            partner_obs_tensor = (
+                self.sim.partner_observations_tensor()
+                .to_torch()
+                .flatten(start_dim=2)
+            )
+        else:
+            partner_obs_tensor = torch.Tensor().to(self.device)
 
         # Get road map
         # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
-        map_obs_tensor = (
-            self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
-        )
+        if self.config.road_map_obs:
+            map_obs_tensor = (
+                self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
+            )
+        else:
+            map_obs_tensor = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_all = torch.cat(
-            [ego_state, partner_obs_tensor, map_obs_tensor], dim=-1
+            (ego_state, partner_obs_tensor, map_obs_tensor), dim=-1
         )
 
         # Only select the observations for the controlled agents
@@ -395,7 +411,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
+    config = EnvConfig()
+
     env = Env(
+        config=config,
         num_worlds=1,
         max_cont_agents=1,  # Number of agents to control
         data_dir="waymo_data",
@@ -404,22 +423,22 @@ if __name__ == "__main__":
 
     obs = env.reset()
 
-    # run = wandb.init(
-    #     project="gpudrive",
-    #     group="test_rendering",
-    # )
+    for _ in range(10):
 
-    # frames = []
+        # Take a random action
+        rand_action = torch.Tensor([[env.action_space.sample()]])
 
-    for i in range(20):
+        # Step the environment
+        obs, reward, done, info = env.step(rand_action)
 
-        rand_actions = torch.ones((env.num_sims, env.max_cont_agents))
-        print(f"Step {i}")
-        obs, reward, done, info = env.step(rand_actions)
+        print(
+            f"action: {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f} | done: {done.item()}"
+        )
+        print(
+            f"veh_x_pos: {obs[:, :, 3].item():.3f} | veh_y_pos: {obs[:, :, 4].item():.3f}"
+        )
+        print(f"veh_speed: {obs[:, :, 0].item():.3f} \n")
         # frame = env.render(i)
         # frames.append(frame.T)
-
-    # Log video
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=4, format="gif")})
 
     env.close()
