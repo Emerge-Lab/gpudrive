@@ -22,6 +22,8 @@ import logging
 
 logging.getLogger(__name__)
 
+GLOBAL_MAX = 11_000
+GLOBAL_MIN = -11_000
 WINDOW_W = 500
 WINDOW_H = 500
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
@@ -308,11 +310,6 @@ class Env(gym.Env):
         # ]
         # pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
 
-        # Scale and center the surface
-        frame_xy_coords = self.sim.bicycle_model_tensor().to_torch()[
-            self.world_render_idx, :, :2
-        ]
-
         # Get the agent xy positions
         agent_pos = (
             self.sim.self_observation_tensor()
@@ -321,13 +318,15 @@ class Env(gym.Env):
             .detach()
             .numpy()
         )
-
+        
         # Draw the agent positions
         for agent_idx in range(agent_pos.shape[0]):
 
-            current_pos_screen = self.scale_coord(
-                agent_pos[agent_idx], frame_xy_coords
+            # Use the updated scale_coord function to get centered and scaled coordinates
+            current_pos_screen = self.scale_and_center(
+                agent_pos[agent_idx], WINDOW_W
             )
+            
             mod_idx = agent_idx % len(COLOR_LIST)
 
             pygame.draw.rect(
@@ -353,17 +352,10 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coord(self, pos, frame_xy_coords):
-        """Scale the coordinates to fit within the pygame surface window."""
-
-        # Extract the lower and upper bounds of the frame
-        x_min, x_max = frame_xy_coords[:, 0].min(), frame_xy_coords[:, 0].max()
-        y_min, y_max = frame_xy_coords[:, 1].min(), frame_xy_coords[:, 1].max()
-
-        # Scale coordinates
-        x_scaled = ((pos[0] - x_min) / (x_max - x_min)) * WINDOW_W
-        y_scaled = ((pos[1] - y_min) / (y_max - y_min)) * WINDOW_H
-        return [x_scaled, y_scaled]
+    def scale_and_center(self, coords, scale):
+        """Scale the coordinates to fit within the pygame surface window and center them."""
+        centered_coords = ((coords - GLOBAL_MIN) / (GLOBAL_MAX - GLOBAL_MIN)) * scale
+        return centered_coords
 
     def close(self):
         """Close pygame application if open."""
@@ -423,6 +415,8 @@ if __name__ == "__main__":
     frames = []
 
     for _ in range(50):
+        
+        print()
 
         # print(
         #     f"Remaining steps in episode: {env.steps_remaining[0, 0, 0].item()}"
@@ -453,7 +447,7 @@ if __name__ == "__main__":
         frames.append(frame.T)
 
     # Log video
-    wandb.log({"scene": wandb.Video(np.array(frames), fps=2, format="gif")})
+    wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
     env.close()
     run.finish()
