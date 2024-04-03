@@ -318,7 +318,7 @@ class Env(gym.Env):
             .detach()
             .numpy()
         )
-        
+
         # Draw the agent positions
         for agent_idx in range(agent_pos.shape[0]):
 
@@ -326,7 +326,7 @@ class Env(gym.Env):
             current_pos_screen = self.scale_and_center(
                 agent_pos[agent_idx], WINDOW_W
             )
-            
+
             mod_idx = agent_idx % len(COLOR_LIST)
 
             pygame.draw.rect(
@@ -354,7 +354,9 @@ class Env(gym.Env):
 
     def scale_and_center(self, coords, scale):
         """Scale the coordinates to fit within the pygame surface window and center them."""
-        centered_coords = ((coords - GLOBAL_MIN) / (GLOBAL_MAX - GLOBAL_MIN)) * scale
+        centered_coords = (
+            (coords - GLOBAL_MIN) / (GLOBAL_MAX - GLOBAL_MIN)
+        ) * scale
         return centered_coords
 
     def close(self):
@@ -415,7 +417,7 @@ if __name__ == "__main__":
     frames = []
 
     for _ in range(50):
-        
+
         print()
 
         # print(
