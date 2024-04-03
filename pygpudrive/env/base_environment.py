@@ -4,7 +4,7 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
 from itertools import product
-
+import wandb
 import glob
 import gymnasium as gym
 from gymnasium.error import DependencyNotInstalled
@@ -24,9 +24,12 @@ logging.getLogger(__name__)
 
 WINDOW_W = 500
 WINDOW_H = 500
-VEH_WIDTH = 25
-VEH_HEIGHT = 50
-GOAL_RADIUS = 10
+WINDOW_SIZE = (WINDOW_W, WINDOW_H)
+# Vehicles are pretty big atm since they are far apart,
+# can have a better way of sizing the vehicles relative to the window
+VEH_WIDTH = 1 * 30
+VEH_HEIGHT = 2 * 30
+GOAL_RADIUS = 10 * 50
 COLOR_LIST = [
     (255, 0, 0),  # Red
     (0, 255, 0),  # Green
@@ -190,8 +193,8 @@ class Env(gym.Env):
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([-0.6, 0, 0.6], device=self.device)
-        self.accel_actions = torch.tensor([-3, 0, 3], device=self.device)
+        self.steer_actions = torch.tensor([0], device=self.device)
+        self.accel_actions = torch.tensor([3], device=self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
         # Create a mapping from action indices to action values
@@ -291,72 +294,53 @@ class Env(gym.Env):
         self.surf.fill((255, 255, 255))  # White background
 
         # # # Draw the road map # # #
-        roadmap_info = (
-            self.sim.map_observation_tensor()
-            .to_torch()[self.world_render_idx, :, :]
-            .cpu()
-            .detach()
-            .numpy()
-        )
-        roadmap_pos = roadmap_info[:, :2]
-        roadmap_heading = roadmap_info[:, 2:]
-        scaled_rm_positions = [
-            self.scale_coord(pos, roadmap_pos) for pos in roadmap_pos
+        # roadmap_info = (
+        #     self.sim.map_observation_tensor()
+        #     .to_torch()[self.world_render_idx, :, :]
+        #     .cpu()
+        #     .detach()
+        #     .numpy()
+        # )
+        # roadmap_pos = roadmap_info[:, :2]
+        # roadmap_heading = roadmap_info[:, 2:]
+        # scaled_rm_positions = [
+        #     self.scale_coord(pos, roadmap_pos) for pos in roadmap_pos
+        # ]
+        # pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
+
+        # Scale and center the surface
+        frame_xy = self.sim.bicycle_model_tensor().to_torch()[
+            self.world_render_idx, :, :2
         ]
-        pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
+        scale, center = self.find_scale_and_center(frame_xy)
 
-        # Draw the agents
-        # We only render agents from the chosen world index
-        # Access the positions of the agents
-        agent_info = (
-            self.sim.absolute_self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, :]
+        # Get the agent xy positions
+        agent_pos = (
+            self.sim.self_observation_tensor()
+            .to_torch()[self.world_render_idx, :, 3:5]
             .cpu()
             .detach()
             .numpy()
         )
-        agent_positions = agent_info[:, :3]  # x, y, z
-        agent_rot_quaternions = agent_info[:, 3:7]  # rotation as quaternion
-        agent_rot_rad = agent_info[:, 7:8]  # rotation from x-axis in radians
-        agent_goal_positions = agent_info[:, 8:]
 
-        # Dynamically adjust the lower and upper bounds of the frame
-        frame_xy_coords = np.concatenate(
-            [agent_goal_positions, agent_positions[:, :2]]
-        )
+        # Draw the agent positions
+        for agent_idx in range(agent_pos.shape[0]):
 
-        # Draw the agent positions and goal positions with adjustments
-        for agent_idx in range(agent_info.shape[0]):
-
-            # Scale positions to fit within window
-            current_pos_screen = self.scale_coord(
-                agent_positions[agent_idx], frame_xy_coords
-            )
-            goal_pos_screen = self.scale_coord(
-                agent_goal_positions[agent_idx], frame_xy_coords
+            current_pos_screen = self.translate(
+                agent_pos[agent_idx], center, scale
             )
 
-            # Randomly sample a color from the color list for the agent
-            agent_color = random.choice(COLOR_LIST)
+            mod_idx = agent_idx % len(COLOR_LIST)
 
-            # Draw the current agent position with the randomly chosen color
             pygame.draw.rect(
                 surface=self.surf,
-                color=agent_color,  # Use the randomly sampled color
+                color=COLOR_LIST[mod_idx],  # Use the randomly sampled color
                 rect=pygame.Rect(
                     int(current_pos_screen[0]),
                     int(current_pos_screen[1]),
-                    VEH_WIDTH,
-                    VEH_HEIGHT,
+                    VEH_WIDTH * scale,
+                    VEH_HEIGHT * scale,
                 ),
-            )
-
-            # Draw the goal position
-            pygame.draw.circle(
-                surface=self.surf,
-                color=(0, 255, 0),  # Green
-                center=(int(goal_pos_screen[0]), int(goal_pos_screen[1])),
-                radius=GOAL_RADIUS,
             )
 
         if self.render_mode == "human":
@@ -371,17 +355,28 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coord(self, pos, frame_xy_coords):
-        """Scale the coordinates to fit within the pygame surface window."""
-
-        # Extract the lower and upper bounds of the frame
+    def find_scale_and_center(self, frame_xy_coords):
         x_min, x_max = frame_xy_coords[:, 0].min(), frame_xy_coords[:, 0].max()
         y_min, y_max = frame_xy_coords[:, 1].min(), frame_xy_coords[:, 1].max()
 
-        # Scale coordinates
-        x_scaled = ((pos[0] - x_min) / (x_max - x_min)) * WINDOW_W
-        y_scaled = ((pos[1] - y_min) / (y_max - y_min)) * WINDOW_H
-        return [x_scaled, y_scaled]
+        x_center = (x_max + x_min) / 2
+        y_center = (y_max + y_min) / 2
+
+        content_W = x_max - x_min
+        content_H = y_max - y_min
+
+        scale_x = (WINDOW_W - 50) / content_W
+        scale_y = (WINDOW_H - 50) / content_H
+
+        return max(min(scale_x, scale_y), 0.25), (x_center, y_center)
+
+    def scale_tuple(self, tup, scale):
+        return tup(i * scale for i in tup)
+
+    def translate(self, pos, center, scale):
+        x = (pos[0] - center[0]) * scale + (WINDOW_W / 2)
+        y = (pos[1] - center[1]) * scale + (WINDOW_H / 2)
+        return (x, y)
 
     def close(self):
         """Close pygame application if open."""
@@ -420,46 +415,58 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
+    run = wandb.init(
+        project="gpudrive",
+        group="test_rendering",
+    )
+
     config = EnvConfig()
+
+    NUM_CONT_AGENTS = 5
 
     env = Env(
         config=config,
         num_worlds=1,
-        max_cont_agents=1,  # Number of agents to control
+        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="waymo_data",
         device="cuda",
     )
 
     obs = env.reset()
+    frames = []
 
-    for _ in range(200):
+    for _ in range(50):
 
-        print(
-            f"Remaining steps in episode: {env.steps_remaining[0, 0, 0].item()}"
-        )
+        # print(
+        #     f"Remaining steps in episode: {env.steps_remaining[0, 0, 0].item()}"
+        # )
+
+        # print(
+        #     f"veh_x_pos: {obs[:, :, 3].item():.3f} | veh_y_pos: {obs[:, :, 4].item():.3f}"
+        # )
+        # print(f"veh_speed: {obs[:, :, 0].item():.3f}")
+
+        # print(f"veh_collided: {obs[:, :, 5]}")
 
         # Take a random action
-        rand_action = torch.Tensor([[env.action_space.sample()]])
+        rand_action = torch.Tensor(
+            [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
+        )
 
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        print(
-            f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
-        )
-        print(
-            f"veh_x_pos: {obs[:, :, 3].item():.3f} | veh_y_pos: {obs[:, :, 4].item():.3f}"
-        )
-        print(f"veh_speed: {obs[:, :, 0].item():.3f}")
+        # print(
+        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
+        # )
+
         print(f"done: {done}")
 
-        print(f"veh_collided: {obs[:, :, 5]}")
+        frame = env.render()
+        frames.append(frame.T)
 
-        print(f"--- \n")
-        # frame = env.render(i)
-        # frames.append(frame.T)
-
-        if done.all():
-            obs = env.reset()
+    # Log video
+    wandb.log({"scene": wandb.Video(np.array(frames), fps=2, format="gif")})
 
     env.close()
+    run.finish()
