@@ -22,6 +22,8 @@ import logging
 
 logging.getLogger(__name__)
 
+GLOBAL_MAX = 11_000
+GLOBAL_MIN = -11_000
 WINDOW_W = 500
 WINDOW_H = 500
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
