@@ -43,7 +43,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
     registry.registerComponent<CollisionDetectionEvent>();
-
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
 
@@ -123,7 +122,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
-// This system packages all the egocentric observations together 
+// This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
                                       const BicycleModel &model,
@@ -143,9 +142,9 @@ inline void collectObservationsSystem(Engine &ctx,
      if (entityType == EntityType::Padding) {
        return;
      }
-  
+
     self_obs.speed = model.speed;
-    self_obs.vehicle_size = size; 
+    self_obs.vehicle_size = size;
     self_obs.goal.position = goal.position - model.position;
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
@@ -195,7 +194,7 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
         map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
+        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;
         arrIndex++;
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
@@ -230,7 +229,7 @@ inline void movementSystem(Engine &e,
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
-    { 
+    {
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
         // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
@@ -366,7 +365,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 
     // MADRONA_GPU_MODE guards GPU specific logic
 #ifdef MADRONA_GPU_MODE
-    // Can use standard cuda variables like threadIdx for 
+    // Can use standard cuda variables like threadIdx for
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 

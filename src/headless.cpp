@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "/home/samk/gpudrive/maps.small",
+        .jsonPath = "/home/emerge/gpudrive/data_10",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
