@@ -309,10 +309,9 @@ class Env(gym.Env):
         # pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
 
         # Scale and center the surface
-        frame_xy = self.sim.bicycle_model_tensor().to_torch()[
+        frame_xy_coords = self.sim.bicycle_model_tensor().to_torch()[
             self.world_render_idx, :, :2
         ]
-        scale, center = self.find_scale_and_center(frame_xy)
 
         # Get the agent xy positions
         agent_pos = (
@@ -326,10 +325,9 @@ class Env(gym.Env):
         # Draw the agent positions
         for agent_idx in range(agent_pos.shape[0]):
 
-            current_pos_screen = self.translate(
-                agent_pos[agent_idx], center, scale
+            current_pos_screen = self.scale_coord(
+                agent_pos[agent_idx], frame_xy_coords
             )
-
             mod_idx = agent_idx % len(COLOR_LIST)
 
             pygame.draw.rect(
@@ -338,8 +336,8 @@ class Env(gym.Env):
                 rect=pygame.Rect(
                     int(current_pos_screen[0]),
                     int(current_pos_screen[1]),
-                    VEH_WIDTH * scale,
-                    VEH_HEIGHT * scale,
+                    VEH_WIDTH,
+                    VEH_HEIGHT,
                 ),
             )
 
@@ -355,28 +353,17 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def find_scale_and_center(self, frame_xy_coords):
+    def scale_coord(self, pos, frame_xy_coords):
+        """Scale the coordinates to fit within the pygame surface window."""
+
+        # Extract the lower and upper bounds of the frame
         x_min, x_max = frame_xy_coords[:, 0].min(), frame_xy_coords[:, 0].max()
         y_min, y_max = frame_xy_coords[:, 1].min(), frame_xy_coords[:, 1].max()
 
-        x_center = (x_max + x_min) / 2
-        y_center = (y_max + y_min) / 2
-
-        content_W = x_max - x_min
-        content_H = y_max - y_min
-
-        scale_x = (WINDOW_W - 50) / content_W
-        scale_y = (WINDOW_H - 50) / content_H
-
-        return max(min(scale_x, scale_y), 0.25), (x_center, y_center)
-
-    def scale_tuple(self, tup, scale):
-        return tup(i * scale for i in tup)
-
-    def translate(self, pos, center, scale):
-        x = (pos[0] - center[0]) * scale + (WINDOW_W / 2)
-        y = (pos[1] - center[1]) * scale + (WINDOW_H / 2)
-        return (x, y)
+        # Scale coordinates
+        x_scaled = ((pos[0] - x_min) / (x_max - x_min)) * WINDOW_W
+        y_scaled = ((pos[1] - y_min) / (y_max - y_min)) * WINDOW_H
+        return [x_scaled, y_scaled]
 
     def close(self):
         """Close pygame application if open."""
