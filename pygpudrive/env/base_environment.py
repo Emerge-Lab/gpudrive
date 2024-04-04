@@ -22,13 +22,9 @@ import logging
 
 logging.getLogger(__name__)
 
-GLOBAL_MAX = 11_000
-GLOBAL_MIN = -11_000
 WINDOW_W = 500
 WINDOW_H = 500
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
-# Vehicles are pretty big atm since they are far apart,
-# can have a better way of sizing the vehicles relative to the window
 VEH_WIDTH = 1 * 10
 VEH_HEIGHT = 1.5 * 20
 GOAL_RADIUS = 5
@@ -263,7 +259,7 @@ class Env(gym.Env):
 
         return obs_filtered
 
-    def render(self, t=None):
+    def render(self):
         """Render the environment."""
 
         if self.render_mode is None:
@@ -295,44 +291,34 @@ class Env(gym.Env):
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
         self.surf.fill((255, 255, 255))  # White background
 
-        # Get the agent goal positions
-        goal_pos = (
+        # Get agent info
+        agent_info = (
             self.sim.absolute_self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, 8:]
+            .to_torch()[self.world_render_idx, :, :]
             .cpu()
             .detach()
             .numpy()
         )
 
-        # Get the agent xy positions
-        agent_pos = (
-            self.sim.self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, 3:5]
-            .cpu()
-            .detach()
-            .numpy()
-        )
+        # Get the agent goal positions and current positions
+        goal_pos = agent_info[:, 8:]
+        agent_pos = agent_info[:, :2]  # x, y
+
+        # Get minimum and maximum values for scaling
+        x_min, y_min, x_max, y_max = self.get_coord_min_max(agent_info)
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
         # Draw the agent positions
         for agent_idx in range(num_agents_in_scene):
 
-            print(f"agent_idx: {agent_idx}")
-            print(
-                f"current pos x: {agent_pos[agent_idx, 0]:.3f} | current pos y: {agent_pos[agent_idx, 1]:.3f}"
-            )
-            print(
-                f"goal_pos_x: {goal_pos[agent_idx, 0]:.3f} | goal_pos_y: {goal_pos[agent_idx, 1]:.3f}\n"
-            )
-
             # Use the updated scale_coord function to get centered and scaled coordinates
-            current_pos_screen = self.scale_and_center(
-                agent_pos[agent_idx], WINDOW_W
+            current_pos_scaled = self.scale_coords(
+                agent_pos[agent_idx], x_min, y_min, x_max, y_max
             )
 
-            current_goal_screen = self.scale_and_center(
-                goal_pos[agent_idx], WINDOW_W
+            current_goal_scaled = self.scale_coords(
+                goal_pos[agent_idx], x_min, y_min, x_max, y_max
             )
 
             mod_idx = agent_idx % len(COLOR_LIST)
@@ -341,8 +327,8 @@ class Env(gym.Env):
                 surface=self.surf,
                 color=COLOR_LIST[mod_idx],
                 rect=pygame.Rect(
-                    int(current_pos_screen[0]),
-                    int(current_pos_screen[1]),
+                    int(current_pos_scaled[0]),
+                    int(current_pos_scaled[1]),
                     VEH_WIDTH,
                     VEH_HEIGHT,
                 ),
@@ -352,8 +338,8 @@ class Env(gym.Env):
                 surface=self.surf,
                 color=COLOR_LIST[mod_idx],
                 center=(
-                    int(current_goal_screen[0]),
-                    int(current_goal_screen[1]),
+                    int(current_goal_scaled[0]),
+                    int(current_goal_scaled[1]),
                 ),
                 radius=GOAL_RADIUS,
             )
@@ -385,11 +371,17 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_and_center(self, coords, scale):
-        """Scale the coordinates to fit within the pygame surface window and center them."""
-        # (x - (L + R) / 2)
-        centered_coords = ((coords - (GLOBAL_MIN + GLOBAL_MAX) / 2)) * scale
-        return centered_coords
+    def scale_coords(self, coords, x_min, y_min, x_max, y_max):
+        """Scale the coordinates to fit within the pygame surface window and center them.
+        Args:
+            coords: x, y coordinates
+        """
+        x, y = coords
+
+        x_scaled = (x / (x_max - x_min)) * WINDOW_W
+        y_scaled = (y / (y_max - y_min)) * WINDOW_H
+
+        return (x_scaled, y_scaled)
 
     def close(self):
         """Close pygame application if open."""
@@ -404,6 +396,14 @@ class Env(gym.Env):
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
         )
+
+    def get_coord_min_max(self, coords):
+        """Get the minimum and maximum values of the coordinates."""
+        x_min = np.min(coords[:, 0])
+        y_min = np.min(coords[:, 1])
+        x_max = np.max(coords[:, 0])
+        y_max = np.max(coords[:, 1])
+        return x_min, y_min, x_max, y_max
 
     def _print_info(self, verbose=True):
         """Print initialization information."""
