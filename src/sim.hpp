@@ -28,6 +28,7 @@ enum class ExportID : uint32_t {
     MapObservation,
     Shape,
     ControlledState,
+    AbsoluteSelfObservation,
     NumExports
 };
 

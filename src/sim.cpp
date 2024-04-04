@@ -43,6 +43,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
     registry.registerComponent<CollisionDetectionEvent>();
+    registry.registerComponent<AbsoluteSelfObservation>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
 
@@ -75,6 +76,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
+    registry.exportColumn<Agent, AbsoluteSelfObservation>(
+        (uint32_t)ExportID::AbsoluteSelfObservation);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -527,6 +530,22 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
+inline void collectAbsoluteObservationsSystem(Engine &ctx,
+                                              const Position &position,
+                                              const Rotation &rotation,
+                                              const Goal &goal,
+                                              const EntityType &entityType,
+                                              AbsoluteSelfObservation &out) {
+    if (entityType == EntityType::Padding) {
+        return;
+    }
+
+    out.position = position;
+    out.rotation.rotationAsQuat = rotation;
+    out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
+    out.goal = goal;
+}
+
 // Build the task graph
 void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 {
@@ -631,8 +650,12 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             CollisionDetectionEvent
         >>({post_reset_broadphase});
 
+    auto collectAbsoluteSelfObservations = builder.addToGraph<
+        ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
+                        Rotation, Goal, EntityType, AbsoluteSelfObservation>>(
+        {collect_obs});
 
-    // The lidar system
+        // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
     // that launches a warp of threads (32) for each invocation (1).
@@ -647,7 +670,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Entity,
             Lidar,
             EntityType
-        >>({post_reset_broadphase});
+        >>({collectAbsoluteSelfObservations});
 
     if (cfg.renderBridge) {
         RenderingSystem::setupTasks(builder, {reset_sys});
