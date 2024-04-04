@@ -47,6 +47,6 @@ parameters:
 sim_manager:
   exec_mode: CPU
   gpu_id: 0
-  num_worlds: 1
+  num_worlds: 2
   auto_reset: true
   json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid

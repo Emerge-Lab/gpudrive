@@ -14,17 +14,17 @@ import pufferlib.utils
 import cleanrl
 from cleanrl import rollout
 
-from gpudrive_gym import GPUDriveEnv, make_gpudrive
+from gpudrive_gym import GPUDriveEnv, make_gpudrive, Convolutional1D
 from sim_utils.creator import SimCreator
    
 def make_policy(env, env_module, args):
-    policy = env_module.Policy(env)
-    if args.force_recurrence or env_module.Recurrent is not None:
+    policy = Convolutional1D(env, framestack=1, flat_size=1024)
+    if args.force_recurrence:
         policy = env_module.Recurrent(env, policy, **args.recurrent)
         policy = pufferlib.frameworks.cleanrl.RecurrentPolicy(policy)
     else:
-        policy = pufferlib.frameworks.cleanrl.Policy(policy)
-
+        policy = cleanrl.Policy(policy)
+    print(policy)
     return policy.to(args.train.device)
 
 def init_wandb(args, name=None, resume=True):

@@ -2,6 +2,7 @@ from pdb import set_trace as T
 import numpy as np
 import cv2
 
+from typing import List, Union
 import os
 import random
 import time
@@ -10,9 +11,10 @@ import uuid
 from collections import defaultdict
 from datetime import timedelta
 
-import scripts.torch as torch
+import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributions.utils import logits_to_probs
 
 import pufferlib
 import pufferlib.utils
@@ -100,7 +102,7 @@ def create(
     obs_shape = pool.single_observation_space.shape
     atn_shape = pool.single_action_space.shape
     num_agents = pool.agents_per_env
-    total_agents = num_agents * pool.num_envs
+    total_agents = pool.total_num_agents
 
     # If data_dir is provided, load the resume state
     resume_state = {}
@@ -136,7 +138,7 @@ def create(
         optimizer.load_state_dict(resume_state["optimizer_state_dict"])
 
     # Create policy pool
-    pool_agents = num_agents * pool.envs_per_batch
+    pool_agents = total_agents
     policy_pool = pufferlib.policy_pool.PolicyPool(
         agent, pool_agents, atn_shape, device, path,
         config.pool_kernel, policy_selector,
@@ -291,7 +293,7 @@ def evaluate(data):
 
        
         with misc_profiler:
-            actions = actions.cpu().numpy()
+            actions_cpu = actions.cpu().numpy()
      
             # Index alive mask with policy pool idxs...
             # TODO: Find a way to avoid having to do this
@@ -304,7 +306,7 @@ def evaluate(data):
             # Batch indexing
             data.obs_ary[ptr:end] = o.cpu().numpy()[indices]
             data.values_ary[ptr:end] = value.cpu().numpy()[indices]
-            data.actions_ary[ptr:end] = actions[indices]
+            data.actions_ary[ptr:end] = actions_cpu[indices]
             data.logprobs_ary[ptr:end] = logprob.cpu().numpy()[indices]
             data.rewards_ary[ptr:end] = r.cpu().numpy()[indices]
             data.dones_ary[ptr:end] = d.cpu().numpy()[indices]
@@ -661,3 +663,79 @@ def print_dashboard(stats, init_performance, performance):
     print("\033c", end="")
     print('\n'.join(output))
     time.sleep(1/20)
+
+
+# taken from torch.distributions.Categorical
+def log_prob(logits, value):
+    value = value.long().unsqueeze(-1)
+    value, log_pmf = torch.broadcast_tensors(value, logits)
+    value = value[..., :1]
+    return log_pmf.gather(-1, value).squeeze(-1)
+
+def sample_logits(logits: Union[torch.Tensor, List[torch.Tensor]], action=None):
+    is_discrete = isinstance(logits, torch.Tensor)
+    if is_discrete:
+        normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
+        logits = [logits]
+    else: # not sure what else it could be
+        normalized_logits = [l - l.logsumexp(dim=-1, keepdim=True) for l in logits]
+
+
+    if action is None:
+        action = torch.stack([torch.multinomial(logits_to_probs(l), 1).squeeze() for l in logits])
+    else:
+        batch = logits[0].shape[0]
+        action = action.view(batch, -1).T
+
+    assert len(logits) == len(action)
+    logprob = torch.stack([log_prob(l, a) for l, a in zip(normalized_logits, action)]).T.sum(1)
+    logits_entropy = torch.stack([entropy(l) for l in normalized_logits]).T.sum(1)
+
+    if is_discrete:
+        return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
+
+    return action.T, logprob, logits_entropy
+
+
+def sample_continuous_actions(params: List[torch.Tensor], action=None):
+    # Unpack the mean and std deviation from the input list
+    mean, std = params[0].float(), params[1].float()
+    
+    # Define the Gaussian distribution with the given mean and std deviation
+    normal_dist = torch.distributions.Normal(mean, std)
+    
+    if action is None:
+        # Sample actions from the distribution using the reparameterization trick
+        action = normal_dist.rsample()  # This allows backpropagation through the sampling process
+    else:
+        batch_size = mean.shape[0]
+        # If an action is given, ensure it's used directly (useful for evaluating specific actions' log probs)
+        action = action.view(batch_size, -1)
+
+    assert(mean.shape == action.shape)
+    # Calculate the log probabilities of the actions
+    logprob = normal_dist.log_prob(action).sum(axis=-1)  # Sum needed if action space is multidimensional
+    entropy = normal_dist.entropy().sum(axis=-1)
+    return action, logprob, entropy
+
+class Policy(torch.nn.Module):
+    '''Wrap a non-recurrent PyTorch model for use with CleanRL'''
+    def __init__(self, policy):
+        super().__init__()
+        self.policy = policy
+
+    def get_value(self, x, state=None):
+        _, value = self.policy(x)
+        return value
+
+    def get_action_and_value(self, x, action=None):
+        logits, value = self.policy(x)
+        if(isinstance(logits, list)):
+            action, logprob, entropy = sample_continuous_actions(logits, action)
+            return action, logprob, entropy, value
+        else:
+            action, logprob, entropy = sample_logits(logits, action)
+            return action, logprob, entropy, value
+
+    def forward(self, x, action=None):
+        return self.get_action_and_value(x, action)
