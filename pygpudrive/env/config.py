@@ -12,3 +12,5 @@ class EnvConfig:
     vis_obs: bool = False
     partner_obs: bool = False
     road_map_obs: bool = False
+
+    # Action space
