@@ -37,6 +37,9 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+    ctx.get<Done>(agent).v = 0;
+    ctx.get<Reward>(agent).v = 0;
+
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
