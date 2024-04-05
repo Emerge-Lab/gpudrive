@@ -305,8 +305,9 @@ void createPaddingEntities(Engine &ctx) {
 void createPersistentEntities(Engine &ctx, Map *map) {
 
     ctx.data().mean = {0, 0};
-    ctx.data().mean.x = map->mean.x;
-    ctx.data().mean.y = map->mean.y;
+    ctx.data().mean.x = 0;
+    ctx.data().mean.y = 0;
+    printf("de-mean=(%f,%f)\n", map->mean.x, map->mean.y);
     ctx.data().numControlledVehicles = 0;
 
     CountT agentIdx;

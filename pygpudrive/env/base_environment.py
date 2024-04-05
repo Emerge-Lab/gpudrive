@@ -4,13 +4,14 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
 from itertools import product
-import wandb
+# import wandb
 import glob
 import gymnasium as gym
 from gymnasium.error import DependencyNotInstalled
 import pygame
 import random
 import os
+import math
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -35,6 +36,43 @@ COLOR_LIST = [
     (255, 165, 0),  # Orange
 ]
 
+# https://stackoverflow.com/a/73855696
+def compute_agent_corners(center, width, height, rotation):
+    """Draw a rectangle, centered at x, y.
+
+    Arguments:
+      x (int/float):
+        The x coordinate of the center of the shape.
+      y (int/float):
+        The y coordinate of the center of the shape.
+      width (int/float):
+        The width of the rectangle.
+      height (int/float):
+        The height of the rectangle.
+    """
+    x, y = center
+    
+    points = []
+
+    # The distance from the center of the rectangle to
+    # one of the corners is the same for each corner.
+    radius = math.sqrt((height / 2)**2 + (width / 2)**2)
+
+    # Get the angle to one of the corners with respect
+    # to the x-axis.
+    angle = math.atan2(height / 2, width / 2)
+
+    # Transform that angle to reach each corner of the rectangle.
+    angles = [angle, -angle + math.pi, angle + math.pi, -angle]
+
+    # Calculate the coordinates of each point.
+    for angle in angles:
+        y_offset = -1 * radius * math.sin(angle + rotation)
+        x_offset = radius * math.cos(angle + rotation)
+        points.append((x + x_offset, y + y_offset))
+
+    return points
+
 
 class Env(gym.Env):
     """
@@ -57,7 +95,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_mode="rgb_array",
+        render_mode="human",
         verbose=True,
     ):
         self.config = config
@@ -342,13 +380,11 @@ class Env(gym.Env):
         )
 
         # Get the agent goal positions and current positions
-        goal_pos = agent_info[:, 8:]
         agent_pos = agent_info[:, :2]  # x, y
+        agent_rot = agent_info[:, 7]
+        goal_pos = agent_info[:, 8:]
 
-        # Get minimum and maximum values for scaling
-        x_min, y_min, x_max, y_max = self.get_coord_min_max(agent_info)
-
-        # print(f"x_min: {x_min}, y_min: {y_min}, x_max: {x_max}, y_max: {y_max}")
+        agent_pos_mean = np.mean(agent_pos, axis=0, where=(agent_pos!=0))
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
@@ -357,25 +393,23 @@ class Env(gym.Env):
 
             # Use the updated scale_coord function to get centered and scaled coordinates
             current_pos_scaled = self.scale_coords(
-                agent_pos[agent_idx],  # x_min, y_min, x_max, y_max
+                agent_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
             )
 
             current_goal_scaled = self.scale_coords(
-                goal_pos[agent_idx],  # x_min, y_min, x_max, y_max
+                goal_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
             )
 
             mod_idx = agent_idx % len(COLOR_LIST)
-            # if agent_idx == 0:
-            pygame.draw.rect(
-                surface=self.surf,
-                color=COLOR_LIST[mod_idx],
-                rect=pygame.Rect(
-                    int(current_pos_scaled[0]),
-                    int(current_pos_scaled[1]),
-                    VEH_WIDTH,
-                    VEH_HEIGHT,
-                ),
-            )
+
+            agent_corners = compute_agent_corners(current_pos_scaled, 
+                                                  VEH_WIDTH, 
+                                                  VEH_HEIGHT, 
+                                                  agent_rot[agent_idx])
+
+            pygame.draw.polygon(surface=self.surf,
+                                color=COLOR_LIST[mod_idx],
+                                points=agent_corners)
 
             pygame.draw.circle(
                 surface=self.surf,
@@ -406,7 +440,7 @@ class Env(gym.Env):
                 ),
             }
 
-            wandb.log(agent_log_dict)
+            # wandb.log(agent_log_dict)
 
         if self.render_mode == "human":
             pygame.event.pump()
@@ -421,7 +455,7 @@ class Env(gym.Env):
             return self.isopen
 
     def scale_coords(
-        self, coords, x_min=-6000, y_min=-12_000, x_max=4500, y_max=9200
+            self, coords, x_avg, y_avg
     ):
         """Scale the coordinates to fit within the pygame surface window and center them.
         Args:
@@ -429,13 +463,8 @@ class Env(gym.Env):
         """
         x, y = coords
 
-        # Transformationn 1
-        x_scaled = (x / (x_max - x_min)) * WINDOW_W
-        y_scaled = (y / (y_max - y_min)) * WINDOW_H
-
-        # Transformation 2
-        # x_scaled = (x - (x_min + x_max) / 2) #* WINDOW_W
-        # y_scaled = (y - (y_min + y_max) / 2) #* WINDOW_H
+        x_scaled = x - x_avg
+        y_scaled = y - y_avg
 
         return (x_scaled, y_scaled)
 
@@ -464,14 +493,6 @@ class Env(gym.Env):
             np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
         )
 
-    def get_coord_min_max(self, coords):
-        """Get the minimum and maximum values of the coordinates."""
-        x_min = np.min(coords[:, 0])
-        y_min = np.min(coords[:, 1])
-        x_max = np.max(coords[:, 0])
-        y_max = np.max(coords[:, 1])
-        return x_min, y_min, x_max, y_max
-
     def _print_info(self, verbose=True):
         """Print initialization information."""
         if verbose:
@@ -496,14 +517,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     config = EnvConfig()
-    run = wandb.init(
-        project="gpudrive",
-        group="test_rendering",
-    )
+    # run = wandb.init(
+    #     project="gpudrive",
+    #     group="test_rendering",
+    # )
 
-    wandb.define_metric("episode_step")
+    # wandb.define_metric("episode_step")
     # set all other agent pos logs to use this step
-    wandb.define_metric("agent_*", step_metric="episode_step")
+    # wandb.define_metric("agent_*", step_metric="episode_step")
 
     NUM_CONT_AGENTS = 1
 
@@ -511,7 +532,7 @@ if __name__ == "__main__":
         config=config,
         num_worlds=1,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data",
+        data_dir="/home/samk/gpudrive/waymo_data",
         device="cuda",
     )
 
@@ -542,12 +563,12 @@ if __name__ == "__main__":
             obs = env.reset()
             print(f"RESETTING ENVIRONMENT\n")
 
-        # frame = env.render()
+        frame = env.render()
         # frames.append(frame.T)
 
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
-    run.finish()
+    # run.finish()
     env.close()

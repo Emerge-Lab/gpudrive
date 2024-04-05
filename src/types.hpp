@@ -164,14 +164,14 @@ struct CollisionDetectionEvent {
 };
 
 struct AbsoluteRotation {
-    Rotation rotationAsQuat;
+    Rotation rotationAsQuat; 
     float rotationFromAxis;
 };
 
 struct AbsoluteSelfObservation {
-    Position position;
-    AbsoluteRotation rotation;
-    Goal goal;
+    Position position; // 0 1 2
+    AbsoluteRotation rotation; // 3 4 5 6 7
+    Goal goal; // 8 9 
 };
 
 /* ECS Archetypes for the game */
