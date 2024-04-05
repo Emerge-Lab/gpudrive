@@ -169,6 +169,12 @@ Citation
 If you use Madrona in a research project, please cite our SIGGRAPH paper.
 
 ```
-@article{...,
+@article{shacklett23madrona,
+    title   = {An Extensible, Data-Oriented Architecture for High-Performance, Many-World Simulation},
+    author  = {Brennan Shacklett and Luc Guy Rosenzweig and Zhiqiang Xie and Bidipta Sarkar and Andrew Szot and Erik Wijmans and Vladlen Koltun and Dhruv Batra and Kayvon Fatahalian},
+    journal = {ACM Trans. Graph.},
+    volume  = {42},
+    number  = {4},
+    year    = {2023}
 }
 ```

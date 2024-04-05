@@ -98,6 +98,8 @@ struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
+
+
 struct LidarSample {
     float depth;
     float encodedType;
@@ -162,16 +164,6 @@ struct ControlledState {
 struct CollisionDetectionEvent {
     madrona::AtomicI32 hasCollided{false};
 };
-struct AbsoluteRotation {
-    Rotation rotationAsQuat;
-    float rotationFromAxis;
-};
-
-struct AbsoluteSelfObservation {
-   Position position;
-   AbsoluteRotation rotation;
-   Goal goal;
-};
 
 /* ECS Archetypes for the game */
 
@@ -205,12 +197,10 @@ struct Agent : public madrona::Archetype<
 
     // Observations
     SelfObservation,
-    AbsoluteSelfObservation,
     PartnerObservations,
     AgentMapObservations,
     Lidar,
     StepsRemaining,
-    
 
     // Reward, episode termination
     Reward,

@@ -703,11 +703,6 @@ Tensor Manager::controlledStateTensor() const {
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
-Tensor Manager::absoluteSelfObservationTensor() const {
-    return impl_->exportTensor(ExportID::AbsoluteSelfObservation, Tensor::ElementType::Float32,
-			       {impl_->cfg.numWorlds, impl_->agentRoadCounts.first, 3 + 4 + 1 + 2});
-}
-
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
