@@ -183,6 +183,10 @@ inline void collectObservationsSystem(Engine &ctx,
     while(arrIndex < consts::kMaxAgentCount - 1)
     {
         partner_obs.obs[arrIndex].type = (float)EntityType::None;
+        partner_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
+        partner_obs.obs[arrIndex].heading = 0.f;
+        partner_obs.obs[arrIndex].speed = 0.f;
+        partner_obs.obs[arrIndex].vehicle_size = VehicleSize{0.f, 0.f};
         arrIndex++;
     }
 

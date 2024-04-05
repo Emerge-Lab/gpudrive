@@ -173,6 +173,7 @@ class GPUDriveEnv(gym.Env):
         env_ids = torch.arange(self.total_num_agents).to(dones.device)
         env_ids = env_ids//self.total_num_agents
 
+        assert(torch.isnan(env_obs).any() == False)
         if self.mask_agents:
             return env_obs, rews, dones, truncateds, infos, env_ids, mask
 
@@ -267,6 +268,7 @@ class Convolutional1D(nn.Module):
     
     def forward(self, env_outputs):
         '''Forward pass for PufferLib compatibility'''
+        assert(torch.isnan(env_outputs).any() == False)
         hidden, lookup = self.encode_observations(env_outputs)
         # Discrete
         # actions, value = self.decode_actions(hidden, lookup)

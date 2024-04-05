@@ -36,12 +36,6 @@ def init_wandb(args, name=None, resume=True):
         project=args.wandb_project,
         entity=args.wandb_entity,
         group=args.wandb_group,
-        config={
-            'cleanrl': args.train,
-            'env': args.env,
-            'policy': args.policy,
-            'recurrent': args.recurrent,
-        },
         name=name or args.config,
         monitor_gym=True,
         save_code=True,
@@ -138,10 +132,10 @@ if __name__ == '__main__':
     parser.add_argument('--baseline', action='store_true', help='Baseline run')
     parser.add_argument('--no-render', action='store_true', help='Disable render during evaluate')
     parser.add_argument('--exp-name', type=str, default=None, help="Resume from experiment")
-    parser.add_argument('--wandb-entity', type=str, default='jsuarez', help='WandB entity')
-    parser.add_argument('--wandb-project', type=str, default='pufferlib', help='WandB project')
+    parser.add_argument('--wandb-entity', type=str, default='pandya-aarav-97', help='WandB entity')
+    parser.add_argument('--wandb-project', type=str, default='GPUDrive', help='WandB project')
     parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
-    parser.add_argument('--track', action='store_true', help='Track on WandB')
+    parser.add_argument('--track', action='store_true', default=True, help='Track on WandB')
     parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
 
     clean_parser = argparse.ArgumentParser(parents=[parser])

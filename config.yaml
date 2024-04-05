@@ -4,7 +4,7 @@ train:
   device: cuda
   total_timesteps: 10_000_000
   learning_rate: 2.5e-4
-  num_steps: 128
+  num_steps: 90
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
@@ -34,7 +34,7 @@ train:
   compile_mode: reduce-overhead
   
 reward_params:
-  rewardType: DistanceBased  
+  rewardType: OnGoalAchieved  
   distanceToGoalThreshold: 1.0
   distanceToExpertThreshold: 1.0
 
