@@ -11,8 +11,7 @@
 #include <madrona/py/utils.hpp>
 #include <madrona/exec_mode.hpp>
 
-#include <madrona/render/mw.hpp>
-#include <madrona/viz/system.hpp>
+#include <madrona/render/render_mgr.hpp>
 
 #include "init.hpp"
 #include "types.hpp"
@@ -34,11 +33,16 @@ public:
         bool autoReset; // Immediately generate new world on episode end
         std::string jsonPath; // Directory path to jsons. Should contain exactly numWorlds files.
         Parameters params;
+
+        // Rendering settings
+        bool enableBatchRenderer = false;
+        uint32_t batchRenderViewWidth = 64;
+        uint32_t batchRenderViewHeight = 64;
+        madrona::render::APIBackend *extRenderAPI = nullptr;
+        madrona::render::GPUDevice *extRenderDev = nullptr;
     };
 
-    MGR_EXPORT Manager(
-        const Config &cfg,
-        const madrona::viz::VizECSBridge *viz_bridge = nullptr);
+    MGR_EXPORT Manager(const Config &cfg);
     MGR_EXPORT ~Manager();
 
     MGR_EXPORT void step();
@@ -58,6 +62,7 @@ public:
     MGR_EXPORT madrona::py::Tensor bicycleModelTensor() const;
     MGR_EXPORT madrona::py::Tensor shapeTensor() const;
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
+    MGR_EXPORT madrona::py::Tensor absoluteSelfObservationTensor() const;
     // These functions are used by the viewer to control the simulation
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);
@@ -68,6 +73,8 @@ public:
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory(madrona::ExecMode mode, uint32_t numWorlds);
+
+    madrona::render::RenderManager & getRenderManager();
 
   private:
     struct Impl;

@@ -36,7 +36,6 @@ namespace gpudrive
     {
         EpisodeManager *episodeMgr;
         madrona::phys::ObjectManager *rigidBodyObjMgr;
-        const madrona::viz::VizECSBridge *vizBridge;
         gpudrive::Map *map;
         const Parameters *params;
     };

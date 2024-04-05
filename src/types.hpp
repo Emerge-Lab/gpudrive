@@ -3,7 +3,7 @@
 #include <madrona/components.hpp>
 #include <madrona/math.hpp>
 #include <madrona/physics.hpp>
-#include <madrona/viz/system.hpp>
+#include <madrona/render/ecs.hpp>
 
 #include "consts.hpp"
 
@@ -17,8 +17,6 @@ using madrona::base::Scale;
 using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 using madrona::phys::ResponseType;
-using madrona::phys::ExternalForce;
-using madrona::phys::ExternalTorque;
 
 // This enum is used to track the type of each entity
 // The order of the enum is important and should not be changed
@@ -173,8 +171,6 @@ struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
-
-
 struct LidarSample {
     float depth;
     float encodedType;
@@ -223,6 +219,21 @@ struct ControlledState {
    ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
 };
 
+struct CollisionDetectionEvent {
+    madrona::AtomicI32 hasCollided{false};
+};
+
+struct AbsoluteRotation {
+    Rotation rotationAsQuat;
+    float rotationFromAxis;
+};
+
+struct AbsoluteSelfObservation {
+    Position position;
+    AbsoluteRotation rotation;
+    Goal goal;
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -233,16 +244,11 @@ struct Agent : public madrona::Archetype<
     Position,
     Rotation,
     Scale,
-    Velocity,
     ObjectID,
     ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
     madrona::phys::broadphase::LeafID,
-    madrona::phys::CollisionEvent,
+    Velocity,
+    CollisionDetectionEvent,
   
     // Internal logic state.
     Progress,
@@ -260,10 +266,12 @@ struct Agent : public madrona::Archetype<
 
     // Observations
     SelfObservation,
+    AbsoluteSelfObservation,
     PartnerObservations,
     AgentMapObservations,
     Lidar,
     StepsRemaining,
+    
 
     // Reward, episode termination
     Reward,
@@ -271,7 +279,11 @@ struct Agent : public madrona::Archetype<
 
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
-    madrona::viz::VizCamera
+    madrona::render::RenderCamera,
+    // All entities with the Renderable component will be drawn by the
+    // viewer and batch renderer
+    madrona::render::Renderable
+
 > {};
 
 // Generic archetype for entities that need physics but don't have custom
@@ -280,17 +292,13 @@ struct PhysicsEntity : public madrona::Archetype<
     Position, 
     Rotation,
     Scale,
-    Velocity,
     ObjectID,
     ResponseType,
-    madrona::phys::solver::SubstepPrevState,
-    madrona::phys::solver::PreSolvePositional,
-    madrona::phys::solver::PreSolveVelocity,
-    ExternalForce,
-    ExternalTorque,
     madrona::phys::broadphase::LeafID,
+    Velocity,
     MapObservation,
-    EntityType
+    EntityType,
+    madrona::render::Renderable
 > {};
 
 }

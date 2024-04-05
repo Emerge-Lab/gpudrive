@@ -12,15 +12,18 @@ using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
 
+namespace RenderingSystem = madrona::render::RenderingSystem;
+
 namespace gpudrive {
 
 // Register all the ECS components and archetypes that will be
 // used in the simulation
-void Sim::registerTypes(ECSRegistry &registry, const Config &)
+void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 {
     base::registerTypes(registry);
-    phys::RigidBodyPhysicsSystem::registerTypes(registry);
-    viz::VizRenderingSystem::registerTypes(registry);
+    phys::PhysicsSystem::registerTypes(registry);
+
+    RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerComponent<Action>();
     registry.registerComponent<SelfObservation>();
@@ -39,7 +42,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
     registry.registerComponent<ControlledState>();
-
+    registry.registerComponent<CollisionDetectionEvent>();
+    registry.registerComponent<AbsoluteSelfObservation>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
 
@@ -72,17 +76,15 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &)
         (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
+    registry.exportColumn<Agent, AbsoluteSelfObservation>(
+        (uint32_t)ExportID::AbsoluteSelfObservation);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
 
 static inline void initWorld(Engine &ctx)
 {
-    if (ctx.data().enableVizRender) {
-        viz::VizRenderingSystem::reset(ctx);
-    }
-
-    phys::RigidBodyPhysicsSystem::reset(ctx);
+    phys::PhysicsSystem::reset(ctx);
 
     // Assign a new episode ID
     EpisodeManager &episode_mgr = *ctx.data().episodeMgr;
@@ -120,14 +122,10 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 
         cleanupWorld(ctx);
         initWorld(ctx);
-
-        if (ctx.data().enableVizRender) {
-            viz::VizRenderingSystem::markEpisode(ctx);
-        }
     }
 }
 
-// This system packages all the egocentric observations together 
+// This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
                                       const BicycleModel &model,
@@ -141,14 +139,15 @@ inline void collectObservationsSystem(Engine &ctx,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
                                       AgentMapObservations &map_obs,
-				      const EntityType& entityType,
-				      const CollisionEvent& collisionEvent) {
+				                      const EntityType& entityType,
+				                      const CollisionDetectionEvent& collisionEvent)
+{
      if (entityType == EntityType::Padding) {
        return;
      }
-  
+
     self_obs.speed = model.speed;
-    self_obs.vehicle_size = size; 
+    self_obs.vehicle_size = size;
     self_obs.goal.position = goal.position - model.position;
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
@@ -198,7 +197,7 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
         map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;   
+        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;
         arrIndex++;
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
@@ -221,9 +220,7 @@ inline void movementSystem(Engine &e,
                            const EntityType &type,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
-                           ExternalForce &external_force,
-                           ExternalTorque &external_torque,
-                           const CollisionEvent &collisionEvent)
+                           const CollisionDetectionEvent &collisionEvent)
 {
     if (type == EntityType::Padding) {
         return;
@@ -235,7 +232,7 @@ inline void movementSystem(Engine &e,
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
-    { 
+    {
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
         // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
@@ -283,8 +280,6 @@ inline void movementSystem(Engine &e,
         velocity.linear.z = 0;
         velocity.angular = Vector3::zero();
         velocity.angular.z = w;
-        external_force = Vector3::zero();
-        external_torque = Vector3::zero();
     }
     else
     {
@@ -298,8 +293,6 @@ inline void movementSystem(Engine &e,
         velocity.linear.x = trajectory.velocities[curStepIdx].x;
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
-        external_force = Vector3::zero();
-        external_torque = Vector3::zero();
     }
 }
 
@@ -375,7 +368,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 
     // MADRONA_GPU_MODE guards GPU specific logic
 #ifdef MADRONA_GPU_MODE
-    // Can use standard cuda variables like threadIdx for 
+    // Can use standard cuda variables like threadIdx for
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 
@@ -478,19 +471,23 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+    const CountT PositionColumn{2};
+    const CountT RotationColumn{3};
+    const CountT ScaleColumn{4};
+
     const Loc locationA{candidateCollision.a};
     const Position positionA{
-        ctx.getDirect<Position>(Cols::Position, locationA)};
+        ctx.getDirect<Position>(PositionColumn, locationA)};
     const Rotation rotationA{
-        ctx.getDirect<Rotation>(Cols::Rotation, locationA)};
-    const Scale scaleA{ctx.getDirect<Scale>(Cols::Scale, locationA)};
+        ctx.getDirect<Rotation>(RotationColumn, locationA)};
+    const Scale scaleA{ctx.getDirect<Scale>(ScaleColumn, locationA)};
 
     const Loc locationB{candidateCollision.b};
     const Position positionB{
-        ctx.getDirect<Position>(Cols::Position, locationB)};
+        ctx.getDirect<Position>(PositionColumn, locationB)};
     const Rotation rotationB{
-        ctx.getDirect<Rotation>(Cols::Rotation, locationB)};
-    const Scale scaleB{ctx.getDirect<Scale>(Cols::Scale, locationB)};
+        ctx.getDirect<Rotation>(RotationColumn, locationB)};
+    const Scale scaleB{ctx.getDirect<Scale>(ScaleColumn, locationB)};
 
     auto obbA = OrientedBoundingBox2D::from(positionA, rotationA, scaleA);
     auto obbB = OrientedBoundingBox2D::from(positionB, rotationB, scaleB);
@@ -500,8 +497,8 @@ void collisionDetectionSystem(Engine &ctx,
         return;
     }
 
-    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.aEntity);
-    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.bEntity);
+    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.a);
+    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.b);
 
     // Ignore collisions between certain entity types
     if(aEntitytype == EntityType::Padding || bEntitytype == EntityType::Padding)
@@ -518,16 +515,16 @@ void collisionDetectionSystem(Engine &ctx,
         }
     }
 
-    auto maybeCollisionEventA =
-        ctx.getSafe<CollisionEvent>(candidateCollision.aEntity);
-    if (maybeCollisionEventA.valid()) {
-        maybeCollisionEventA.value().hasCollided.store_relaxed(1);
+    auto maybeCollisionDetectionEventA =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
+    if (maybeCollisionDetectionEventA.valid()) {
+        maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
     }
 
-    auto maybeCollisionEventB =
-        ctx.getSafe<CollisionEvent>(candidateCollision.bEntity);
-    if (maybeCollisionEventB.valid()) {
-        maybeCollisionEventB.value().hasCollided.store_relaxed(1);
+    auto maybeCollisionDetectionEventB =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
+    if (maybeCollisionDetectionEventB.valid()) {
+        maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
     }
 }
 
@@ -551,9 +548,27 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
+inline void collectAbsoluteObservationsSystem(Engine &ctx,
+                                              const Position &position,
+                                              const Rotation &rotation,
+                                              const Goal &goal,
+                                              const EntityType &entityType,
+                                              AbsoluteSelfObservation &out) {
+    if (entityType == EntityType::Padding) {
+        return;
+    }
+
+    out.position = position;
+    out.rotation.rotationAsQuat = rotation;
+    out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
+    out.goal = goal;
+}
+
 // Build the task graph
-void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
+void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 {
+    TaskGraphBuilder &builder = taskgraph_mgr.init(TaskGraphID::Step);
+
     // Turn policy actions into movement
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
@@ -567,9 +582,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             EntityType,
             StepsRemaining,
             Trajectory,
-            ExternalForce,
-            ExternalTorque,
-            CollisionEvent
+            CollisionDetectionEvent
         >>({});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
@@ -577,11 +590,11 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        phys::PhysicsSystem::setupBroadphaseTasks(builder,
                                                            {moveSystem});
 
     auto findOverlappingEntities =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseFindOverlappingTask(
+        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -595,7 +608,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
         {detectCollisions});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::RigidBodyPhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -634,7 +647,7 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
     // It's only necessary if the world was reset, but we don't have a way
     // to conditionally queue taskgraph nodes yet.
     auto post_reset_broadphase =
-        phys::RigidBodyPhysicsSystem::setupBroadphaseTasks(builder,
+        phys::PhysicsSystem::setupBroadphaseTasks(builder,
                                                            {reset_sys});
 
     // Finally, collect observations for the next step.
@@ -649,14 +662,18 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Progress,
             OtherAgents,
             SelfObservation,
-	    PartnerObservations,
+	        PartnerObservations,
             AgentMapObservations,
             EntityType,
-            madrona::phys::CollisionEvent
+            CollisionDetectionEvent
         >>({post_reset_broadphase});
 
+    auto collectAbsoluteSelfObservations = builder.addToGraph<
+        ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
+                        Rotation, Goal, EntityType, AbsoluteSelfObservation>>(
+        {collect_obs});
 
-    // The lidar system
+        // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
     // that launches a warp of threads (32) for each invocation (1).
@@ -671,10 +688,10 @@ void Sim::setupTasks(TaskGraphBuilder &builder, const Config &cfg)
             Entity,
             Lidar,
             EntityType
-        >>({post_reset_broadphase});
+        >>({collectAbsoluteSelfObservations});
 
-    if (cfg.enableViewer) {
-        viz::VizRenderingSystem::setupTasks(builder, {reset_sys});
+    if (cfg.renderBridge) {
+        RenderingSystem::setupTasks(builder, {reset_sys});
     }
 
 #ifdef MADRONA_GPU_MODE
@@ -709,15 +726,14 @@ Sim::Sim(Engine &ctx,
     // a future release.
     auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
-    phys::RigidBodyPhysicsSystem::init(ctx, init.rigidBodyObjMgr,
+    phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
-        max_total_entities, max_total_entities * max_total_entities / 2,
-        consts::kMaxAgentCount);
+        max_total_entities);
 
-    enableVizRender = cfg.enableViewer;
+    enableRender = cfg.renderBridge != nullptr;
 
-    if (enableVizRender) {
-        viz::VizRenderingSystem::init(ctx, init.vizBridge);
+    if (enableRender) {
+        RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
     autoReset = cfg.autoReset;
