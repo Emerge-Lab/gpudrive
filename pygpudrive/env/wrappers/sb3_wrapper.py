@@ -25,9 +25,10 @@ class SB3MultiAgentEnv(VecEnv):
     """
 
     def __init__(
-        self, num_worlds, max_cont_agents, data_dir, device, auto_reset=True
+        self, config, num_worlds, max_cont_agents, data_dir, device, auto_reset=True
     ):
         self.env = Env(
+            config=config,
             num_worlds=num_worlds,
             max_cont_agents=max_cont_agents,
             data_dir=data_dir,

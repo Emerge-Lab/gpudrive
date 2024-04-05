@@ -36,7 +36,14 @@ class MultiAgentCallback(BaseCallback):
         """
         This method will be called by the model after each call to `env.step()`.
         """
-        pass
+        ep_step = 90 - self.locals["env"].env.steps_remaining[0][0].item()
+        wandb.define_metric("episode_step", step=ep_step)
+        wandb.define_metric("episode/*", step_metric="episode_step")
+        self.logger.record("episode/action", self.locals["clipped_actions"].item())
+        self.logger.record("episode/reward", self.locals["rewards"].item())
+        self.logger.record("episode/dist_to_goal", self.locals["new_obs"][0][-1].item())
+        self.logger.record("episode/done", self.locals["dones"].item())
+        
     
     def _on_rollout_end(self) -> None:
         """
@@ -44,10 +51,14 @@ class MultiAgentCallback(BaseCallback):
         """
         
         rewards = self.locals["rollout_buffer"].rewards.cpu().detach().numpy().flatten()
+        observations = self.locals["rollout_buffer"].observations.cpu().detach().numpy()
+        num_cont_agents = observations.shape[1]
         
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record("rollout/avg_reward", np.mean(rewards))
         self.logger.record("rollout/std_reward", np.std(rewards))
+        self.logger.record("rollout/avg_dist_to_goal", np.mean(observations[:, :, -1]))
+        
     
     
     

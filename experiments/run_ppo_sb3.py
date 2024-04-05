@@ -1,5 +1,8 @@
 import wandb
 
+# Import the EnvConfig dataclass
+from pygpudrive.env.config import EnvConfig
+
 # Import env wrapper that makes the GPU gym env compatible with stable-baselines3
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
@@ -10,10 +13,13 @@ from algorithms.ppo.sb3.mappo import MAPPO
 
 if __name__ == "__main__":
 
+    config = EnvConfig()
+    
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
-        num_worlds=2,
-        max_cont_agents=2,
+        config=config,
+        num_worlds=1,
+        max_cont_agents=1,
         data_dir="waymo_data",
         device="cuda",
         auto_reset=True,
