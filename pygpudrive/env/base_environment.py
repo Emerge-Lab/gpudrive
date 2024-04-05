@@ -222,8 +222,8 @@ class Env(gym.Env):
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
             ego_state = self.sim.self_observation_tensor().to_torch()
-            
-            if self.config.normalize_obs: # Normalize to values between 0 - 1
+
+            if self.config.normalize_obs:  # Normalize to values between 0 - 1
                 ego_state = self.normalize_ego_state(ego_state)
         else:
             ego_state = torch.Tensor().to(self.device)
@@ -236,8 +236,8 @@ class Env(gym.Env):
                 .to_torch()
                 .flatten(start_dim=2)
             )
-            #TODO: Normalize
-                
+            # TODO: Normalize
+
         else:
             partner_obs_tensor = torch.Tensor().to(self.device)
 
@@ -248,10 +248,10 @@ class Env(gym.Env):
             map_obs_tensor = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
             )
-            #TODO: Normalize
+            # TODO: Normalize
         else:
             map_obs_tensor = torch.Tensor().to(self.device)
-            
+
         if self.config.goal_dist:
             # Get agent info
             agent_info = self.sim.absolute_self_observation_tensor().to_torch()
@@ -259,15 +259,18 @@ class Env(gym.Env):
             # Get the agent goal positions and current positions
             goal_pos = agent_info[:, :, 8:]
             agent_pos = agent_info[:, :, :2]  # x, y
-            
-            goal_dist_tensor = torch.linalg.norm(agent_pos - goal_pos, dim=-1).unsqueeze(-1)
-            
+
+            goal_dist_tensor = torch.linalg.norm(
+                agent_pos - goal_pos, dim=-1
+            ).unsqueeze(-1)
+
         else:
             goal_dist_tensor = torch.Tensor().to(self.device)
-            
+
         # Combine the observations
         obs_all = torch.cat(
-            (ego_state, partner_obs_tensor, map_obs_tensor, goal_dist_tensor), dim=-1
+            (ego_state, partner_obs_tensor, map_obs_tensor, goal_dist_tensor),
+            dim=-1,
         )
 
         # Only select the observations for the controlled agents
@@ -324,8 +327,8 @@ class Env(gym.Env):
 
         # Get minimum and maximum values for scaling
         x_min, y_min, x_max, y_max = self.get_coord_min_max(agent_info)
-        
-        #print(f"x_min: {x_min}, y_min: {y_min}, x_max: {x_max}, y_max: {y_max}")
+
+        # print(f"x_min: {x_min}, y_min: {y_min}, x_max: {x_max}, y_max: {y_max}")
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
@@ -334,13 +337,13 @@ class Env(gym.Env):
 
             # Use the updated scale_coord function to get centered and scaled coordinates
             current_pos_scaled = self.scale_coords(
-                agent_pos[agent_idx], #x_min, y_min, x_max, y_max
+                agent_pos[agent_idx],  # x_min, y_min, x_max, y_max
             )
 
             current_goal_scaled = self.scale_coords(
-                goal_pos[agent_idx], #x_min, y_min, x_max, y_max
+                goal_pos[agent_idx],  # x_min, y_min, x_max, y_max
             )
-            
+
             mod_idx = agent_idx % len(COLOR_LIST)
             # if agent_idx == 0:
             pygame.draw.rect(
@@ -378,7 +381,8 @@ class Env(gym.Env):
                 f"pos_scaled/agent_{agent_idx}_x": current_pos_scaled[0],
                 f"pos_scaled/agent_{agent_idx}_y": current_pos_scaled[1],
                 f"dist_scaled/agent_{agent_idx}_goal_dist": np.linalg.norm(
-                    np.array(current_pos_scaled) - np.array(current_goal_scaled)
+                    np.array(current_pos_scaled)
+                    - np.array(current_goal_scaled)
                 ),
             }
 
@@ -396,7 +400,9 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coords(self, coords, x_min=-6000, y_min=-12_000, x_max=4500, y_max=9200):
+    def scale_coords(
+        self, coords, x_min=-6000, y_min=-12_000, x_max=4500, y_max=9200
+    ):
         """Scale the coordinates to fit within the pygame surface window and center them.
         Args:
             coords: x, y coordinates
@@ -406,22 +412,22 @@ class Env(gym.Env):
         # Transformationn 1
         x_scaled = (x / (x_max - x_min)) * WINDOW_W
         y_scaled = (y / (y_max - y_min)) * WINDOW_H
-        
+
         # Transformation 2
-        #x_scaled = (x - (x_min + x_max) / 2) #* WINDOW_W
-        #y_scaled = (y - (y_min + y_max) / 2) #* WINDOW_H
+        # x_scaled = (x - (x_min + x_max) / 2) #* WINDOW_W
+        # y_scaled = (y - (y_min + y_max) / 2) #* WINDOW_H
 
         return (x_scaled, y_scaled)
-    
+
     def normalize_ego_state(self, obs):
         """Normalize the ego state by the maximum value for each respective category."""
-        #TODO DC: Normalize the ego state
+        # TODO DC: Normalize the ego state
         max_speed = 30.0
         max_x = 4500
         max_y = 9200
         max_len = 10.0
         max_width = 5.0
-        
+
         return obs - obs.min() / (obs.max() - obs.min())
 
     def close(self):
@@ -495,9 +501,7 @@ if __name__ == "__main__":
 
     for _ in range(200):
 
-        print(
-            f"Step: {90 - env.steps_remaining[0, 0, 0].item()}"
-        )
+        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
         # Take a random action (we're only going straight)
         rand_action = torch.Tensor(
@@ -511,10 +515,10 @@ if __name__ == "__main__":
         #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
         # )
 
-        #print(f"goal_dist: {obs[:, :, -1].item()}")
-        #print(f"done: {done[0].item()}")
+        # print(f"goal_dist: {obs[:, :, -1].item()}")
+        # print(f"done: {done[0].item()}")
         print(done)
-        
+
         if done.all():
             obs = env.reset()
 
