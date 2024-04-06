@@ -404,7 +404,7 @@ inline void rewardSystem(Engine &ctx,
                          const BicycleModel &model,
                          const Trajectory &trajectory,
                          const Goal &goal,
-                         Progress &progress,
+                         const StepsRemaining &stepsRemaining,
                          Reward &out_reward)
 {
 
@@ -423,8 +423,19 @@ inline void rewardSystem(Engine &ctx,
     }
     else if(rewardType == RewardType::Dense)
     {
-        // TODO: Implement full trajectory reward
-        assert(false);
+        auto idx = consts::episodeLen - stepsRemaining.t;
+        if (trajectory.valids[idx])
+        {
+            auto traj_pos = trajectory.positions[idx];
+            float dist = (model.position - traj_pos).length();
+            out_reward.v = (dist < ctx.data().params.rewardParams.distanceToExpertThreshold) ? 0.1 : 0.f;
+        }
+
+        auto goal_dist = (model.position - goal.position).length();
+        if(goal_dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+        {
+            out_reward.v = 1.f;
+        }
     }
 
     // Just in case agents do something crazy, clamp total reward
@@ -466,7 +477,8 @@ inline void stepTrackerSystem(Engine &ctx,
 {
     // Absolute done is 90 steps.
     int32_t num_remaining = --steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
+    assert(num_remaining <= consts::episodeLen);
+    if (num_remaining > 0 && done.v != 1) { // Make sure to not reset an agent's done flag
         done.v = 0;
     } else if (num_remaining == 0) {
         done.v = 1;
@@ -615,7 +627,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             BicycleModel,
             Trajectory,
             Goal,
-            Progress,
+            StepsRemaining,
             Reward
         >>({phys_done});
 

@@ -329,6 +329,8 @@ static void resetPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
+        ctx.get<Done>(agent).v = 0;
+        ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 

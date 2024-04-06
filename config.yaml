@@ -34,7 +34,7 @@ train:
   compile_mode: reduce-overhead
   
 reward_params:
-  rewardType: OnGoalAchieved  
+  rewardType: Dense  
   distanceToGoalThreshold: 1.0
   distanceToExpertThreshold: 1.0
 

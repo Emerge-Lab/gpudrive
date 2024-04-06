@@ -233,6 +233,7 @@ def evaluate(data):
             'SPS': data.SPS,
             'global_step': data.global_step,
             'learning_rate': data.optimizer.param_groups[0]["lr"],
+            'reward': data.reward,
             **{f'losses/{k}': v for k, v in data.losses.items()},
             **{f'performance/{k}': v
                 for k, v in data.performance.items()},
