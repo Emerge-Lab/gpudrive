@@ -66,9 +66,9 @@ class Env(gym.Env):
         # TODO: Make this configurable on the Python side and add docs
         reward_params = gpudrive.RewardParams()
         reward_params.rewardType = (
-            gpudrive.RewardType.DistanceBased
+            gpudrive.RewardType.OnGoalAchieved
         )  # Or any other value from the enum
-        reward_params.distanceToGoalThreshold = 2.0  # Set appropriate values
+        reward_params.distanceToGoalThreshold = 3.0  # Set appropriate values
         reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
 
         # Configure the environment
@@ -190,8 +190,8 @@ class Env(gym.Env):
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([-10, 0, 10], device=self.device)
-        self.accel_actions = torch.tensor([0, 10], device=self.device)
+        self.steer_actions = self.config.steer_actions.to(self.device)
+        self.accel_actions = self.config.accel_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
         # Create a mapping from action indices to action values
@@ -223,6 +223,11 @@ class Env(gym.Env):
         if self.config.ego_state:
             ego_state = self.sim.self_observation_tensor().to_torch()
 
+            # Filter out the information for the controlled agents
+            ego_state = ego_state[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+
             if self.config.normalize_obs:  # Normalize to values between 0 - 1
                 ego_state = self.normalize_ego_state(ego_state)
         else:
@@ -252,31 +257,56 @@ class Env(gym.Env):
         else:
             map_obs_tensor = torch.Tensor().to(self.device)
 
+        # Get agent info
+        agent_info = self.sim.absolute_self_observation_tensor().to_torch()
+        # Get the agent goal positions and current positions
+        goal_pos = agent_info[:, :, 8:]
+        agent_pos = agent_info[:, :, :2]  # x, y
+
+        # L2 norm to goal position
         if self.config.goal_dist:
-            # Get agent info
-            agent_info = self.sim.absolute_self_observation_tensor().to_torch()
-
-            # Get the agent goal positions and current positions
-            goal_pos = agent_info[:, :, 8:]
-            agent_pos = agent_info[:, :, :2]  # x, y
-
             goal_dist_tensor = torch.linalg.norm(
                 agent_pos - goal_pos, dim=-1
             ).unsqueeze(-1)
 
+            goal_dist_tensor = goal_dist_tensor[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+            if self.config.normalize_obs:
+                goal_dist_tensor = goal_dist_tensor / self.config.max_norm_by
         else:
             goal_dist_tensor = torch.Tensor().to(self.device)
 
+        # Absolute coordinates
+        if self.config.abs_agent_pos:
+            agent_pos_tensor = agent_pos[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+
+            if self.config.normalize_obs:
+                agent_pos_tensor = (
+                    agent_pos_tensor - self.config.min_abs_coord
+                ) / (self.config.max_abs_coord - self.config.min_abs_coord)
+        else:
+            agent_pos_tensor = torch.Tensor().to(self.device)
+
         # Combine the observations
         obs_all = torch.cat(
-            (ego_state, partner_obs_tensor, map_obs_tensor, goal_dist_tensor),
+            (
+                ego_state,
+                partner_obs_tensor,
+                map_obs_tensor,
+                goal_dist_tensor,
+                agent_pos_tensor,
+            ),
             dim=-1,
         )
 
         # Only select the observations for the controlled agents
-        obs_filtered = obs_all[self.cont_agent_mask].reshape(
-            self.num_sims, self.max_cont_agents, -1
-        )
+        obs_filtered = obs_all
+        # obs_filtered = obs_all[self.cont_agent_mask].reshape(
+        #     self.num_sims, self.max_cont_agents, -1
+        # )
 
         return obs_filtered
 
@@ -420,15 +450,12 @@ class Env(gym.Env):
         return (x_scaled, y_scaled)
 
     def normalize_ego_state(self, obs):
-        """Normalize the ego state by the maximum value for each respective category."""
-        # TODO DC: Normalize the ego state
-        max_speed = 30.0
-        max_x = 4500
-        max_y = 9200
-        max_len = 10.0
-        max_width = 5.0
-
-        return obs - obs.min() / (obs.max() - obs.min())
+        """Directly normalize the ego state to be between -1 and 1."""
+        return (
+            2
+            * (obs - self.config.min_norm_by)
+            / (self.config.max_norm_by - self.config.min_norm_by)
+        ) - 1
 
     def close(self):
         """Close pygame application if open."""
@@ -475,6 +502,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
+    config = EnvConfig()
     run = wandb.init(
         project="gpudrive",
         group="test_rendering",
@@ -483,8 +511,6 @@ if __name__ == "__main__":
     wandb.define_metric("episode_step")
     # set all other agent pos logs to use this step
     wandb.define_metric("agent_*", step_metric="episode_step")
-
-    config = EnvConfig()
 
     NUM_CONT_AGENTS = 1
 
@@ -499,7 +525,7 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for _ in range(200):
+    for _ in range(100):
 
         print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
@@ -508,19 +534,20 @@ if __name__ == "__main__":
             [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
         )
 
+        # print(
+        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]}"
+        # )
+
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        # print(
-        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
-        # )
+        print(
+            f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
+        )
 
-        # print(f"goal_dist: {obs[:, :, -1].item()}")
-        # print(f"done: {done[0].item()}")
-        print(done)
-
-        if done.all():
+        if done.sum() == NUM_CONT_AGENTS:
             obs = env.reset()
+            print(f"RESETTING ENVIRONMENT\n")
 
         # frame = env.render()
         # frames.append(frame.T)

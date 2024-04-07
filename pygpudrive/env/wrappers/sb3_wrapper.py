@@ -13,6 +13,9 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 # Import base gumenvironment
 from pygpudrive.env.base_environment import Env
 
+# Import the EnvConfig dataclass
+from pygpudrive.env.config import EnvConfig
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -25,9 +28,15 @@ class SB3MultiAgentEnv(VecEnv):
     """
 
     def __init__(
-        self, config, num_worlds, max_cont_agents, data_dir, device, auto_reset=True
+        self,
+        config,
+        num_worlds,
+        max_cont_agents,
+        data_dir,
+        device,
+        auto_reset=False,
     ):
-        self.env = Env(
+        self._env = Env(
             config=config,
             num_worlds=num_worlds,
             max_cont_agents=max_cont_agents,
@@ -39,11 +48,11 @@ class SB3MultiAgentEnv(VecEnv):
         self.max_cont_agents = max_cont_agents
         self.num_envs = self.num_worlds * self.max_cont_agents
         self.device = device
-        self.action_space = gym.spaces.Discrete(self.env.action_space.n)
+        self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
-            -np.inf, np.inf, self.env.observation_space.shape, np.float32
+            -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
-        self.obs_dim = self.env.observation_space.shape[0]
+        self.obs_dim = self._env.observation_space.shape[0]
 
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
@@ -54,11 +63,11 @@ class SB3MultiAgentEnv(VecEnv):
 
         Returns:
         --------
-            torch.Tensor (max_cont_agents * num_worlds, obs_dim): Initial observations.
+            torch.Tensor (max_cont_agents * num_worlds, obs_dim): Initial observation.
         """
 
         # Has shape (num_worlds, max_cont_agents, obs_dim)
-        obs = self.env.reset()
+        obs = self._env.reset()
 
         # Flatten over num_worlds and max_cont_agents
         obs = obs.reshape(self.num_envs, self.obs_dim)
@@ -66,7 +75,7 @@ class SB3MultiAgentEnv(VecEnv):
         # Save observation to buffer
         self._save_obs(obs)
 
-        # Get alive agent mask
+        # Get dead agent mask (initialize to False)
         self.dead_agent_mask = torch.full(
             (self.num_worlds, self.max_cont_agents), fill_value=False
         ).to(self.device)
@@ -83,58 +92,74 @@ class SB3MultiAgentEnv(VecEnv):
             dict: Additional information.
         """
 
-        # Unsqueeze action tensor to a shape gpu drive expects
+        # Unsqueeze action tensor to a shape the gpudrive env expects
         actions = actions.reshape((self.num_worlds, self.max_cont_agents))
 
         # Step the environment
-        obs, reward, done, info = self.env.step(actions)
-
-        print(f"done: {done}\n")
-        print(f"dead_agent_mask: {self.dead_agent_mask}\n")
+        obs, reward, done, info = self._env.step(actions)
 
         # Update dead agent mask (Set to True if agent is done before end of episode)
-        self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
+        # self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
 
         # Storage: Fill buffer with nan values
-        self.buf_rews = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        ).to(self.device)
-        self.buf_dones = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        ).to(self.device)
-        self.buf_infos = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        ).to(self.device)
-        buf_obs = torch.full(
-            (self.num_worlds, self.max_cont_agents, self.obs_dim),
-            fill_value=float("nan"),
-        ).to(self.device)
+        # self.buf_rews = torch.full(
+        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        # ).to(self.device)
+        # self.buf_dones = torch.full(
+        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        # ).to(self.device)
+        # self.buf_infos = torch.full(
+        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        # ).to(self.device)
+        # buf_obs = torch.full(
+        #     (self.num_worlds, self.max_cont_agents, self.obs_dim),
+        #     fill_value=float("nan"),
+        # ).to(self.device)
 
         # Override nan placeholders for alive agents
-        self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
-        self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
-            torch.float32
-        )
-        self.buf_infos[~self.dead_agent_mask] = info[~self.dead_agent_mask].to(
-            torch.float32
-        )
-        buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
+        # self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
+        # self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
+        #     torch.float32
+        # )
+        # self.buf_infos[~self.dead_agent_mask] = info[~self.dead_agent_mask].to(
+        #     torch.float32
+        # )
+        # buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
+
+        # Flatten over num_worlds and max_cont_agents and store
+        # obs = obs.reshape(self.num_envs, self.obs_dim)
+        # self._save_obs(obs)
+
+        # # Reset episode if all agents in all worlds are done
+        # if torch.all(self.dead_agent_mask):
+        #     obs = self.reset()
+
+        # Create buffer for rewards, dones, and infos
+        self.buf_rews = reward.reshape(self.num_envs)
+        self.buf_dones = done.reshape(self.num_envs)
+        self.buf_infos = info.reshape(self.num_envs)  # TODO: Implement info
 
         # Flatten over num_worlds and max_cont_agents and store
         obs = obs.reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
-        # Reset episode if all agents in all worlds are done
-        if torch.all(self.dead_agent_mask):
-            print(f"Resetting environment\n")
+        # Reset if all agents are done
+        if done.sum() == self.num_envs:
             obs = self.reset()
 
         return (
             self._obs_from_buf(),
-            torch.clone(self.buf_rews).reshape(self.num_envs),
-            torch.clone(self.buf_dones).reshape(self.num_envs),
-            deepcopy(self.buf_infos).reshape(self.num_envs),
+            torch.clone(self.buf_rews),
+            torch.clone(self.buf_dones),
+            deepcopy(self.buf_infos),
         )
+
+        # return (
+        #     self._obs_from_buf(),
+        #     torch.clone(self.buf_rews).reshape(self.num_envs),
+        #     torch.clone(self.buf_dones).reshape(self.num_envs),
+        #     deepcopy(self.buf_infos).reshape(self.num_envs),
+        # )
 
     def close(self) -> None:
         """Close the environment."""
@@ -183,20 +208,28 @@ class SB3MultiAgentEnv(VecEnv):
 
 if __name__ == "__main__":
 
+    config = EnvConfig()
+
     # Make environment
     env = SB3MultiAgentEnv(
+        config=config,
         num_worlds=1,
-        max_cont_agents=2,
+        max_cont_agents=1,
         data_dir="waymo_data",
         device="cuda",
-        auto_reset=True,
     )
 
     obs = env.reset()
     for global_step in range(100):
+
+        print(f"Step: {90 - env._env.steps_remaining[0, 0, 0].item()}")
 
         # Random actions
         actions = torch.randint(0, env.action_space.n, (env.num_envs,))
 
         # Step
         obs, rew, done, info = env.step(actions)
+
+        print(
+            f"speed: {obs[0, 0].item():.2f} | x_pos: {obs[0, 3].item():.2f} | y_pos: {obs[0, 4].item():.2f} | reward:{rew.item():.2f} | done: {done.item()}\n"
+        )
