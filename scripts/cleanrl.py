@@ -298,10 +298,10 @@ def evaluate(data):
      
             # Index alive mask with policy pool idxs...
             # TODO: Find a way to avoid having to do this
-            learner_mask = torch.Tensor(mask * data.policy_pool.mask)
+            learner_mask = torch.Tensor(mask * torch.Tensor(data.policy_pool.mask).to(mask.device))
 
             # Ensure indices do not exceed batch size
-            indices = torch.where(learner_mask)[0][:config.batch_size - ptr + 1].numpy()
+            indices = torch.where(learner_mask)[0][:config.batch_size - ptr + 1].cpu().numpy()
             end = ptr + len(indices)
 
             # Batch indexing

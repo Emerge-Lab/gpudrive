@@ -41,11 +41,12 @@ reward_params:
 parameters:
   polylineReductionThreshold: 1.0
   observationRadius: 1000.0
-  datasetInitOptions: FirstN  
+  datasetInitOptions: FirstN
+  collisionBehaviour: Ignore
   rewardParams: reward_params
 
 sim_manager:
-  exec_mode: CPU
+  exec_mode: CUDA
   gpu_id: 0
   num_worlds: 2
   auto_reset: true

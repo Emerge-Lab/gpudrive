@@ -1,5 +1,6 @@
 import gpudrive
 import gymnasium as gym
+import pufferlib.pytorch
 import torch
 import torch.nn as nn
 import math
@@ -49,7 +50,7 @@ class GPUDriveEnv(gym.Env):
         
         # Generate a mask for valid agents across all environments
         valid_counts = self.shape_tensor[:, 0]  # Shape: (N,)
-        cumulative_counts = torch.arange(A).expand(N, A)  # Matrix of shape (N, A) with repeated range(A)
+        cumulative_counts = torch.arange(A).expand(N, A).to(obs_tensors[0].device)  # Matrix of shape (N, A) with repeated range(A)
         valid_mask = cumulative_counts < valid_counts.unsqueeze(1)  # Expanding valid_counts to match dimensions
 
         # Flatten the mask to match the batched observation shape
@@ -71,7 +72,7 @@ class GPUDriveEnv(gym.Env):
         
         # Generate the mask for valid agents, similar to the filtering process
         valid_counts = self.shape_tensor[:, 0]  # Valid agent counts per environment
-        cumulative_counts = torch.arange(A).expand(N, A)  # Matrix of shape (N, A) with repeated range(A)
+        cumulative_counts = torch.arange(A).expand(N, A).to(self.self_obs_tensor.device)  # Matrix of shape (N, A) with repeated range(A)
         valid_mask = cumulative_counts < valid_counts.unsqueeze(1)  # Mask for valid agents
         
         # Flatten the mask to match the batched action shape
@@ -168,7 +169,7 @@ class GPUDriveEnv(gym.Env):
 
         infos = [i for ii in infos for i in ii]
         
-        mask = torch.logical_not(torch.logical_or(dones.bool(), controlled.bool()))
+        mask = controlled.bool()
 
         env_ids = torch.arange(self.total_num_agents).to(dones.device)
         env_ids = env_ids//self.total_num_agents
@@ -189,14 +190,14 @@ class GPUDriveEnv(gym.Env):
         self.sim.reset(0)
         obs, _ = self.setup_obs()
         obs = {
-            "self_obs": obs[0].numpy(),
-            "partner_obs": obs[1].numpy(),
-            "map_obs": obs[2].numpy(),
-            "steps_remaining": obs[3].numpy(),
-            "id": obs[4].numpy(),
+            "self_obs": obs[0],
+            "partner_obs": obs[1],
+            "map_obs": obs[2],
+            "steps_remaining": obs[3],
+            "id": obs[4],
         }
-        for key in obs:
-            print(key, obs[key].shape)
+        # for key in obs:
+        #     print(key, obs[key].shape)
         return obs, {}
 
     @staticmethod
@@ -230,27 +231,39 @@ class Convolutional1D(nn.Module):
         self.channels_last = channels_last
         self.downsample = downsample
         
+        self.initial_norm = nn.BatchNorm1d(framestack)
         self.network = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 32, 128, stride=32)),
+            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 32, 1024, stride=4)),
             nn.ReLU(),
-            pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 4, stride=2)),
+            nn.BatchNorm1d(32),  # Normalization layer after the first convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(32, 32, 512, stride=4)),
             nn.ReLU(),
-            pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 3, stride=1)),
+            nn.BatchNorm1d(32),  # Normalization layer after the second convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(32, 32, 256, stride=2)),
             nn.ReLU(),
+            nn.BatchNorm1d(32),  # Normalization layer after the third convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=2)),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),  # Normalization layer after the fifth convolution
             nn.AdaptiveAvgPool1d(1024),
             nn.Flatten(),
-            pufferlib.pytorch.layer_init(nn.Linear(64*1024, hidden_size)),
+            pufferlib.pytorch.layer_init(nn.Linear(64*1024, 16*1024)),
             nn.ReLU(),
+            pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(nn.Linear(4*1024, hidden_size)),
+            nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
         )
         # Discrete
         # self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
         self.value_fn = pufferlib.pytorch.layer_init(nn.Linear(output_size, 1), std=1)
 
         # continuous
-        # Output layers for the mean and log_std of the actions
         self.mean = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
-        # It's common to initialize the log_std as a learnable parameter rather than an output of the network
-        # This can help with stability and is often sufficient for many environments
+
         self.log_std = nn.Parameter(torch.zeros(self.num_actions))
 
     def encode_observations(self, observations):
@@ -258,7 +271,9 @@ class Convolutional1D(nn.Module):
             observations = observations.permute(0, 3, 1, 2)
         if self.downsample > 1:
             observations = observations[:, :, ::self.downsample, ::self.downsample]
+        
         observations = observations.unsqueeze(1)  # This adds a channel dimension, resulting in [batch_size, 1, length]
+        observations = self.initial_norm(observations.float())
         return self.network(observations.float()), None
 
     def decode_actions(self, flat_hidden, lookup, concat=None):

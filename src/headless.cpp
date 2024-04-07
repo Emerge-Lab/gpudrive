@@ -61,12 +61,12 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "/home/samk/gpudrive/maps.small",
+        .jsonPath = "/home/aarav/nocturne_data/formatted_json_v2_no_tl_valid",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
             .rewardParams = {
-                .rewardType = RewardType::DistanceBased,
+                .rewardType = RewardType::Dense,
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             }
@@ -91,21 +91,21 @@ int main(int argc, char *argv[])
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
-        printf("Model \n");
-        model_printer.print();
+        // printf("Model \n");
+        // model_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
-        printf("\n");
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
 
         printf("Shape\n");
         shapePrinter.print();
@@ -119,8 +119,8 @@ int main(int argc, char *argv[])
         printf("Controlled State\n");
         controlledStatePrinter.print();
         
-        printf("Agent Map Obs\n");
-        agent_map_obs_printer.print();
+        // printf("Agent Map Obs\n");
+        // agent_map_obs_printer.print();
     };
     // printObs();
 

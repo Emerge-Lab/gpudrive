@@ -18,6 +18,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params.polylineReductionThreshold = 1.0
     params.observationRadius = params_config['observationRadius']
     params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
+    params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])
     params.rewardParams = reward_params
 
     # Initialize SimManager with parameters from the config
