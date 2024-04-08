@@ -63,7 +63,8 @@ class SB3MultiAgentEnv(VecEnv):
 
         Returns:
         --------
-            torch.Tensor (max_cont_agents * num_worlds, obs_dim): Initial observation.
+            torch.Tensor (max_cont_agents * num_worlds, obs_dim):
+                Initial observation.
         """
 
         # Has shape (num_worlds, max_cont_agents, obs_dim)
@@ -75,7 +76,7 @@ class SB3MultiAgentEnv(VecEnv):
         # Save observation to buffer
         self._save_obs(obs)
 
-        # Get dead agent mask (initialize to False)
+        # Make dead agent mask (initialize to False)
         self.dead_agent_mask = torch.full(
             (self.num_worlds, self.max_cont_agents), fill_value=False
         ).to(self.device)
@@ -90,6 +91,13 @@ class SB3MultiAgentEnv(VecEnv):
             torch.Tensor (max_cont_agents * num_worlds): Rewards.
             torch.Tensor (max_cont_agents * num_worlds): Dones.
             dict: Additional information.
+
+        Note:
+        -------
+            In multi-agent settings some agents may be done before others.
+            To handle this, we return done is 1 at the first time step the
+            agent is done. After that, we return nan for the rewards, infos
+            and done for that agent until the end of the episode.
         """
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
@@ -98,54 +106,50 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         obs, reward, done, info = self._env.step(actions)
 
-        # Update dead agent mask (Set to True if agent is done before end of episode)
-        # self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
+        # print(f"(in step): {done}")
+        # if done.sum() == 1:
+        #     print('stop')
 
         # Storage: Fill buffer with nan values
-        # self.buf_rews = torch.full(
-        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        # ).to(self.device)
-        # self.buf_dones = torch.full(
-        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        # ).to(self.device)
-        # self.buf_infos = torch.full(
-        #     (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
-        # ).to(self.device)
-        # buf_obs = torch.full(
-        #     (self.num_worlds, self.max_cont_agents, self.obs_dim),
-        #     fill_value=float("nan"),
-        # ).to(self.device)
+        self.buf_rews = torch.full(
+            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        ).to(self.device)
+        self.buf_dones = torch.full(
+            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        ).to(self.device)
+        self.buf_infos = torch.full(
+            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+        ).to(self.device)
+        buf_obs = torch.full(
+            (self.num_worlds, self.max_cont_agents, self.obs_dim),
+            fill_value=float("nan"),
+        ).to(self.device)
 
         # Override nan placeholders for alive agents
-        # self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
-        # self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
-        #     torch.float32
-        # )
-        # self.buf_infos[~self.dead_agent_mask] = info[~self.dead_agent_mask].to(
-        #     torch.float32
-        # )
-        # buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
-
-        # Flatten over num_worlds and max_cont_agents and store
-        # obs = obs.reshape(self.num_envs, self.obs_dim)
-        # self._save_obs(obs)
-
-        # # Reset episode if all agents in all worlds are done
-        # if torch.all(self.dead_agent_mask):
-        #     obs = self.reset()
-
-        # Create buffer for rewards, dones, and infos
-        self.buf_rews = reward.reshape(self.num_envs)
-        self.buf_dones = done.reshape(self.num_envs)
-        self.buf_infos = info.reshape(self.num_envs)  # TODO: Implement info
+        self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
+        self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
+            torch.float32
+        )
+        self.buf_infos[~self.dead_agent_mask] = info[~self.dead_agent_mask].to(
+            torch.float32
+        )
+        buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
 
         # Flatten over num_worlds and max_cont_agents and store
         obs = obs.reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
-        # Reset if all agents are done
+        # Reset episode if all agents in all worlds are done
         if done.sum() == self.num_envs:
             obs = self.reset()
+        else:
+            # Update dead agent mask: Set to True if agent is done before
+            # the end of the episode
+            self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
+
+        # Flatten over num_worlds and max_cont_agents and store
+        obs = obs.reshape(self.num_envs, self.obs_dim)
+        self._save_obs(obs)
 
         return (
             self._obs_from_buf(),
@@ -153,13 +157,6 @@ class SB3MultiAgentEnv(VecEnv):
             torch.clone(self.buf_dones),
             deepcopy(self.buf_infos),
         )
-
-        # return (
-        #     self._obs_from_buf(),
-        #     torch.clone(self.buf_rews).reshape(self.num_envs),
-        #     torch.clone(self.buf_dones).reshape(self.num_envs),
-        #     deepcopy(self.buf_infos).reshape(self.num_envs),
-        # )
 
     def close(self) -> None:
         """Close the environment."""
@@ -214,13 +211,13 @@ if __name__ == "__main__":
     env = SB3MultiAgentEnv(
         config=config,
         num_worlds=1,
-        max_cont_agents=1,
+        max_cont_agents=2,
         data_dir="waymo_data",
         device="cuda",
     )
 
     obs = env.reset()
-    for global_step in range(100):
+    for global_step in range(500):
 
         print(f"Step: {90 - env._env.steps_remaining[0, 0, 0].item()}")
 
@@ -230,6 +227,4 @@ if __name__ == "__main__":
         # Step
         obs, rew, done, info = env.step(actions)
 
-        print(
-            f"speed: {obs[0, 0].item():.2f} | x_pos: {obs[0, 3].item():.2f} | y_pos: {obs[0, 4].item():.2f} | reward:{rew.item():.2f} | done: {done.item()}\n"
-        )
+        print(f"(out step) done: {done} \n")

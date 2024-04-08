@@ -1,11 +1,5 @@
-import logging
-import os
-import wandb
 import numpy as np
-import torch
-import torch.nn as nn
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.policies import ActorCriticPolicy
 
 
 class MultiAgentCallback(BaseCallback):
@@ -35,33 +29,61 @@ class MultiAgentCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         """
-        This method will be called by the model after each call to `env.step()`.
+        Will be called by the model after each call to `env.step()`.
         """
         pass
 
     def _on_rollout_end(self) -> None:
         """
-        This event is triggered before updating the policy.
+        Triggered before updating the policy.
         """
 
+        # Filter out all nans
         rewards = np.nan_to_num(
-            (
-                self.locals["rollout_buffer"]
-                .rewards.cpu()
-                .detach()
-                .numpy()
-                .flatten()
-            ),
+            (self.locals["rollout_buffer"].rewards.cpu().detach().numpy()),
             nan=0,
         )
+
+        # TODO: note that this only works when we have a fixed number of agents
+        num_controlled_agents = rewards.shape[1]
+
+        # Number of episodes in the rollout
+        num_episodes_in_rollout = (
+            np.nan_to_num(
+                (
+                    self.locals["rollout_buffer"]
+                    .episode_starts.cpu()
+                    .detach()
+                    .numpy()
+                ),
+                nan=0,
+            ).sum()
+            / num_controlled_agents
+        )
+
+        # Rewards for each agent
+        for agent_idx in range(num_controlled_agents):
+            self.logger.record(
+                f"rollout/avg_agent_rew{agent_idx}",
+                rewards[:, agent_idx].sum() / num_episodes_in_rollout,
+            )
 
         observations = (
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
         )
 
-        num_episodes_in_rollout = self.locals[
-            "rollout_buffer"
-        ].episode_starts.sum()
+        num_episodes_in_rollout = (
+            np.nan_to_num(
+                (
+                    self.locals["rollout_buffer"]
+                    .episode_starts.cpu()
+                    .detach()
+                    .numpy()
+                ),
+                nan=0,
+            ).sum()
+            / num_controlled_agents
+        )
 
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
