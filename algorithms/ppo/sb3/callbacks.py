@@ -90,7 +90,7 @@ class MultiAgentCallback(BaseCallback):
         self.logger.record("rollout/sum_reward", rewards.sum())
         self.logger.record(
             "rollout/avg_reward",
-            (rewards.sum() / (num_episodes_in_rollout).item(),),
+            (rewards.sum() / (num_episodes_in_rollout)).item(),
         )
 
         self.logger.record("rollout/obs_max", observations.max())
