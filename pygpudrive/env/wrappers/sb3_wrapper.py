@@ -106,10 +106,6 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         obs, reward, done, info = self._env.step(actions)
 
-        # print(f"(in step): {done}")
-        # if done.sum() == 1:
-        #     print('stop')
-
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
             (self.num_worlds, self.max_cont_agents), fill_value=float("nan")

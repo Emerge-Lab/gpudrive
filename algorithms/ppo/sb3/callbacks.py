@@ -72,27 +72,25 @@ class MultiAgentCallback(BaseCallback):
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
         )
 
-        num_episodes_in_rollout = (
-            np.nan_to_num(
-                (
-                    self.locals["rollout_buffer"]
-                    .episode_starts.cpu()
-                    .detach()
-                    .numpy()
-                ),
-                nan=0,
-            ).sum()
-            / num_controlled_agents
-        )
+        num_episodes_in_rollout = np.nan_to_num(
+            (
+                self.locals["rollout_buffer"]
+                .episode_starts.cpu()
+                .detach()
+                .numpy()
+            ),
+            nan=0,
+        ).sum()
 
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
-            "rollout/num_episodes_in_rollout", num_episodes_in_rollout.item()
+            "rollout/num_episodes_in_rollout",
+            num_episodes_in_rollout.item() / num_controlled_agents,
         )
         self.logger.record("rollout/sum_reward", rewards.sum())
         self.logger.record(
             "rollout/avg_reward",
-            (rewards.sum() / num_episodes_in_rollout).item(),
+            (rewards.sum() / (num_episodes_in_rollout).item(),),
         )
 
         self.logger.record("rollout/obs_max", observations.max())
