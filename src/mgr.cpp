@@ -721,7 +721,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-				   consts::kMaxAgentCount,
+				                   consts::kMaxAgentCount,
                                    consts::kMaxRoadEntityCount,
                                    AgentMapObservationExportSize,
                                });

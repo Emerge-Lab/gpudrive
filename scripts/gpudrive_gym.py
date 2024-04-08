@@ -113,6 +113,7 @@ class GPUDriveEnv(gym.Env):
         # Flatten map obs tensor of shape (N, R, 4) to (N, 4 * R)
         # map_obs_tensor = map_obs_tensor.view(N, map_obs_tensor.shape[1]*map_obs_tensor.shape[2])
         map_obs_tensor = agent_map_obs_tensor.view(N, A, -1)
+        # print("map_obs_tensor", map_obs_tensor.shape)
         partner_obs_tensor = partner_obs_tensor.view(N, A, -1)
         # map_obs_tensor = map_obs_tensor.repeat(N*A//N, 1)
 
@@ -129,8 +130,10 @@ class GPUDriveEnv(gym.Env):
         obs_tensors = self.filter_padding_agents(obs_tensors, N, A)
 
         num_obs_features = 0
-        for tensor in obs_tensors[:3]:
+        for tensor in obs_tensors[:2]:
             num_obs_features += math.prod(tensor.shape[1:])
+
+        # print("num_obs_features", num_obs_features)
 
         return obs_tensors, num_obs_features
 
@@ -162,7 +165,7 @@ class GPUDriveEnv(gym.Env):
         recvs = []
         next_env_id = []
         obs, _ = self.setup_obs()
-        env_obs = torch.cat(obs[:3], dim=-1)
+        env_obs = torch.cat(obs[:2], dim=-1)
         controlled, dones, rews= obs[3], obs[4], obs[5]
         truncateds = torch.Tensor([False] * self.total_num_agents).to(dones.device)
         infos = [{} for _ in range(self.total_num_agents)]
@@ -233,28 +236,28 @@ class Convolutional1D(nn.Module):
         
         self.initial_norm = nn.BatchNorm1d(framestack)
         self.network = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 32, 1024, stride=4)),
+            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 2, 32, stride=1)),
             nn.ReLU(),
-            nn.BatchNorm1d(32),  # Normalization layer after the first convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(32, 32, 512, stride=4)),
+            nn.BatchNorm1d(2),  # Normalization layer after the first convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
             nn.ReLU(),
-            nn.BatchNorm1d(32),  # Normalization layer after the second convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(32, 32, 256, stride=2)),
+            nn.BatchNorm1d(4),  # Normalization layer after the second convolution
+            pufferlib.pytorch.layer_init(nn.Conv1d(4, 4, 8, stride=1)),
+            # nn.ReLU(),
+            # nn.BatchNorm1d(32),  # Normalization layer after the third convolution
+            # pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=1)),
+            # nn.ReLU(),
+            # nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
+            # pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
             nn.ReLU(),
-            nn.BatchNorm1d(32),  # Normalization layer after the third convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=2)),
-            nn.ReLU(),
-            nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
-            nn.ReLU(),
-            nn.BatchNorm1d(64),  # Normalization layer after the fifth convolution
-            nn.AdaptiveAvgPool1d(1024),
+            nn.BatchNorm1d(4),  # Normalization layer after the fifth convolution
+            nn.AdaptiveAvgPool1d(32),
             nn.Flatten(),
-            pufferlib.pytorch.layer_init(nn.Linear(64*1024, 16*1024)),
+            pufferlib.pytorch.layer_init(nn.Linear(4*32, 64)),
+            # nn.ReLU(),
+            # pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
             nn.ReLU(),
-            pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
-            nn.ReLU(),
-            pufferlib.pytorch.layer_init(nn.Linear(4*1024, hidden_size)),
+            pufferlib.pytorch.layer_init(nn.Linear(64, hidden_size)),
             nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
         )
         # Discrete

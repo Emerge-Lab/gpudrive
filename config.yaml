@@ -36,7 +36,7 @@ train:
 reward_params:
   rewardType: Dense  
   distanceToGoalThreshold: 1.0
-  distanceToExpertThreshold: 1.0
+  distanceToExpertThreshold: 50.0
 
 parameters:
   polylineReductionThreshold: 1.0
