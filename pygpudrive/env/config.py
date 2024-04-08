@@ -13,15 +13,16 @@ class EnvConfig:
     vis_obs: bool = False
     partner_obs: bool = False
     road_map_obs: bool = False
+    collision_state: bool = False
     goal_dist: bool = True
-    abs_agent_pos: bool = False
 
     # Normalize
     normalize_obs: bool = False
-    max_norm_by: int = 90  # Hardcoded normalization value
-    min_norm_by: int = -90
-    max_abs_coord: int = 9100  # Hardcoded normalization value
-    min_abs_coord: int = -9100
+    max_speed: int = 20  # Speed is a positive value < 20
+    max_veh_len: int = 25
+    max_veh_width: int = 5
+    max_rel_goal_coords: int = 200
+    max_dist_to_goal: int = 200  # L2 norm to goal
 
     # Action space
     steer_actions: torch.Tensor = torch.tensor([-0.6, 0, 0.6])

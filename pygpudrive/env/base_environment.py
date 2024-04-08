@@ -228,7 +228,11 @@ class Env(gym.Env):
                 self.num_sims, self.max_cont_agents, -1
             )
 
-            if self.config.normalize_obs:  # Normalize to values between 0 - 1
+            if not self.config.collision_state:
+                # Remove collision state from SelfObservation
+                ego_state = ego_state[:, :, :-3]
+
+            if self.config.normalize_obs:  # Normalize
                 ego_state = self.normalize_ego_state(ego_state)
         else:
             ego_state = torch.Tensor().to(self.device)
@@ -273,22 +277,9 @@ class Env(gym.Env):
                 self.num_sims, self.max_cont_agents, -1
             )
             if self.config.normalize_obs:
-                goal_dist_tensor = goal_dist_tensor / self.config.max_norm_by
+                goal_dist_tensor /= self.config.max_dist_to_goal
         else:
             goal_dist_tensor = torch.Tensor().to(self.device)
-
-        # Absolute coordinates
-        if self.config.abs_agent_pos:
-            agent_pos_tensor = agent_pos[self.cont_agent_mask].reshape(
-                self.num_sims, self.max_cont_agents, -1
-            )
-
-            if self.config.normalize_obs:
-                agent_pos_tensor = (
-                    agent_pos_tensor - self.config.min_abs_coord
-                ) / (self.config.max_abs_coord - self.config.min_abs_coord)
-        else:
-            agent_pos_tensor = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_all = torch.cat(
@@ -297,7 +288,6 @@ class Env(gym.Env):
                 partner_obs_tensor,
                 map_obs_tensor,
                 goal_dist_tensor,
-                agent_pos_tensor,
             ),
             dim=-1,
         )
@@ -449,13 +439,16 @@ class Env(gym.Env):
 
         return (x_scaled, y_scaled)
 
-    def normalize_ego_state(self, obs):
-        """Directly normalize the ego state to be between -1 and 1."""
-        return (
-            2
-            * (obs - self.config.min_norm_by)
-            / (self.config.max_norm_by - self.config.min_norm_by)
-        ) - 1
+    def normalize_ego_state(self, state):
+        """Normalize ego state features."""
+
+        state[:, :, 0] /= self.config.max_speed
+        state[:, :, 1] /= self.config.max_veh_len
+        state[:, :, 2] /= self.config.max_veh_width
+        state[:, :, 3] /= self.config.max_rel_goal_coords
+        state[:, :, 4] /= self.config.max_rel_goal_coords
+
+        return state
 
     def close(self):
         """Close pygame application if open."""

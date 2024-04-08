@@ -95,3 +95,11 @@ class MultiAgentCallback(BaseCallback):
 
         self.logger.record("rollout/obs_max", observations.max())
         self.logger.record("rollout/obs_min", observations.min())
+
+        # Get categorical max values
+        self.logger.record("norm/speed_max", observations[:, :, 0].max())
+        self.logger.record("norm/veh_len_max", observations[:, :, 1].max())
+        self.logger.record("norm/veh_width_max", observations[:, :, 2].max())
+        self.logger.record("norm/goal_coord_x", observations[:, :, 3].max())
+        self.logger.record("norm/goal_coord_y", observations[:, :, 4].max())
+        self.logger.record("norm/L2_norm_to_goal", observations[:, :, 5].max())

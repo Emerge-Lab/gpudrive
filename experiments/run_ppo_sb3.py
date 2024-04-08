@@ -19,7 +19,7 @@ if __name__ == "__main__":
     env = SB3MultiAgentEnv(
         config=config,
         num_worlds=2,
-        max_cont_agents=1,
+        max_cont_agents=3,
         data_dir="waymo_data",
         device="cuda",
     )
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     # Learn
     model.learn(
-        total_timesteps=1_500_000,
+        total_timesteps=3_000_000,
         callback=custom_callback,
     )
 

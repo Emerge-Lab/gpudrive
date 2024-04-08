@@ -106,11 +106,6 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         obs, reward, done, info = self._env.step(actions)
 
-        # print(f"( in_step ) done: {done} \n")
-
-        # if done.sum() > 0:
-        #     print("stop")
-
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
             (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
@@ -147,10 +142,6 @@ class SB3MultiAgentEnv(VecEnv):
             # Update dead agent mask: Set to True if agent is done before
             # the end of the episode
             self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
-
-        # Flatten over num_worlds and max_cont_agents and store
-        obs = obs.reshape(self.num_envs, self.obs_dim)
-        self._save_obs(obs)
 
         return (
             self._obs_from_buf(),
@@ -211,8 +202,8 @@ if __name__ == "__main__":
     # Make environment
     env = SB3MultiAgentEnv(
         config=config,
-        num_worlds=2,
-        max_cont_agents=1,
+        num_worlds=1,
+        max_cont_agents=3,
         data_dir="waymo_data",
         device="cuda",
     )
@@ -228,7 +219,7 @@ if __name__ == "__main__":
         # Step
         obs, rew, done, info = env.step(actions)
 
-        # print(f"(out step) done: {done} \n")
+        print(f"(out step) done: {done} \n")
 
         print(
             f"obs: {obs.shape} | rew: {rew.shape} | done: {done.shape} | info: {info.shape} \n"
