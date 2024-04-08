@@ -143,6 +143,8 @@ def create(
         agent, pool_agents, atn_shape, device, path,
         config.pool_kernel, policy_selector,
     )
+    policy_pool.actions = torch.zeros(
+            total_agents, *atn_shape, dtype=torch.float32).to(device)
 
     # Allocate Storage
     storage_profiler = pufferlib.utils.Profiler(memory=True, pytorch_memory=True).start()
