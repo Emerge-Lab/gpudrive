@@ -95,7 +95,7 @@ class Env(gym.Env):
         # TODO: @AP / @SK: Allow for num_worlds < num_files
         assert num_worlds == len(
             glob.glob(f"{data_dir}/*.json")
-        ), "Number of worlds exceeds the number of files in the data directory."
+        ), "Number of worlds is not equal to the number of files in the data directory."
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."

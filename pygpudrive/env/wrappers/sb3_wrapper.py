@@ -106,6 +106,11 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         obs, reward, done, info = self._env.step(actions)
 
+        # print(f"( in_step ) done: {done} \n")
+
+        # if done.sum() > 0:
+        #     print("stop")
+
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
             (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
@@ -149,9 +154,9 @@ class SB3MultiAgentEnv(VecEnv):
 
         return (
             self._obs_from_buf(),
-            torch.clone(self.buf_rews),
-            torch.clone(self.buf_dones),
-            deepcopy(self.buf_infos),
+            torch.clone(self.buf_rews).reshape(self.num_envs),
+            torch.clone(self.buf_dones).reshape(self.num_envs),
+            deepcopy(self.buf_infos).reshape(self.num_envs),
         )
 
     def close(self) -> None:
@@ -206,14 +211,14 @@ if __name__ == "__main__":
     # Make environment
     env = SB3MultiAgentEnv(
         config=config,
-        num_worlds=1,
-        max_cont_agents=2,
+        num_worlds=2,
+        max_cont_agents=1,
         data_dir="waymo_data",
         device="cuda",
     )
 
     obs = env.reset()
-    for global_step in range(500):
+    for global_step in range(20):
 
         print(f"Step: {90 - env._env.steps_remaining[0, 0, 0].item()}")
 
@@ -223,4 +228,8 @@ if __name__ == "__main__":
         # Step
         obs, rew, done, info = env.step(actions)
 
-        print(f"(out step) done: {done} \n")
+        # print(f"(out step) done: {done} \n")
+
+        print(
+            f"obs: {obs.shape} | rew: {rew.shape} | done: {done.shape} | info: {info.shape} \n"
+        )
