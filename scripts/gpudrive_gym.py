@@ -3,6 +3,7 @@ import gymnasium as gym
 import pufferlib.pytorch
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 import numpy as np
 from gymnasium.wrappers import FlattenObservation, NormalizeObservation
@@ -233,32 +234,42 @@ class Convolutional1D(nn.Module):
         self.num_actions = env.single_action_space.shape[0]
         self.channels_last = channels_last
         self.downsample = downsample
-        
-        self.initial_norm = nn.BatchNorm1d(framestack)
+
+        self.num_features = env.num_obs_features
+
+
+        # self.initial_norm = nn.BatchNorm1d(framestack)
         self.network = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Conv1d(framestack, 2, 32, stride=1)),
-            nn.ReLU(),
-            nn.BatchNorm1d(2),  # Normalization layer after the first convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
-            nn.ReLU(),
-            nn.BatchNorm1d(4),  # Normalization layer after the second convolution
-            pufferlib.pytorch.layer_init(nn.Conv1d(4, 4, 8, stride=1)),
-            # nn.ReLU(),
-            # nn.BatchNorm1d(32),  # Normalization layer after the third convolution
-            # pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=1)),
-            # nn.ReLU(),
-            # nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
-            # pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
-            nn.ReLU(),
-            nn.BatchNorm1d(4),  # Normalization layer after the fifth convolution
-            nn.AdaptiveAvgPool1d(32),
-            nn.Flatten(),
-            pufferlib.pytorch.layer_init(nn.Linear(4*32, 64)),
-            # nn.ReLU(),
-            # pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
-            nn.ReLU(),
-            pufferlib.pytorch.layer_init(nn.Linear(64, hidden_size)),
-            nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
+            pufferlib.pytorch.layer_init(nn.Linear(self.num_features, hidden_size)),
+            nn.Tanh(),
+            nn.BatchNorm1d(hidden_size),
+            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
+            nn.Tanh(),
+            nn.BatchNorm1d(hidden_size),
+            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, output_size)),
+            nn.Tanh()
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(2),  # Normalization layer after the first convolution
+        #     pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(4),  # Normalization layer after the second convolution
+        #     pufferlib.pytorch.layer_init(nn.Conv1d(4, 4, 8, stride=1)),
+        #     # nn.ReLU(),
+        #     # nn.BatchNorm1d(32),  # Normalization layer after the third convolution
+        #     # pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=1)),
+        #     # nn.ReLU(),
+        #     # nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
+        #     # pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(4),  # Normalization layer after the fifth convolution
+        #     nn.AdaptiveAvgPool1d(32),
+        #     nn.Flatten(),
+        #     pufferlib.pytorch.layer_init(nn.Linear(4*32, 64)),
+        #     # nn.ReLU(),
+        #     # pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
+        #     nn.ReLU(),
+        #     pufferlib.pytorch.layer_init(nn.Linear(64, hidden_size)),
+        #     nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
         )
         # Discrete
         # self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
@@ -274,9 +285,9 @@ class Convolutional1D(nn.Module):
             observations = observations.permute(0, 3, 1, 2)
         if self.downsample > 1:
             observations = observations[:, :, ::self.downsample, ::self.downsample]
-        
-        observations = observations.unsqueeze(1)  # This adds a channel dimension, resulting in [batch_size, 1, length]
-        observations = self.initial_norm(observations.float())
+        F.normalize(observations, p=2, dim=1)
+        # observations = observations.unsqueeze(1)  # This adds a channel dimension, resulting in [batch_size, 1, length]
+        # observations = self.initial_norm(observations.float())
         return self.network(observations.float()), None
 
     def decode_actions(self, flat_hidden, lookup, concat=None):
