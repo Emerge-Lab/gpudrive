@@ -15,7 +15,6 @@ import os
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
 
-
 # Import the simulator
 import gpudrive
 import logging
@@ -25,11 +24,9 @@ logging.getLogger(__name__)
 WINDOW_W = 500
 WINDOW_H = 500
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
-# Vehicles are pretty big atm since they are far apart,
-# can have a better way of sizing the vehicles relative to the window
-VEH_WIDTH = 1 * 30
-VEH_HEIGHT = 2 * 30
-GOAL_RADIUS = 10 * 50
+VEH_WIDTH = 5
+VEH_HEIGHT = 10
+GOAL_RADIUS = 2
 COLOR_LIST = [
     (255, 0, 0),  # Red
     (0, 255, 0),  # Green
@@ -59,7 +56,7 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        auto_reset=True,
+        auto_reset=False,
         render_mode="rgb_array",
         verbose=True,
     ):
@@ -69,9 +66,9 @@ class Env(gym.Env):
         # TODO: Make this configurable on the Python side and add docs
         reward_params = gpudrive.RewardParams()
         reward_params.rewardType = (
-            gpudrive.RewardType.DistanceBased
+            gpudrive.RewardType.OnGoalAchieved
         )  # Or any other value from the enum
-        reward_params.distanceToGoalThreshold = 2.0  # Set appropriate values
+        reward_params.distanceToGoalThreshold = 3.0  # Set appropriate values
         reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
 
         # Configure the environment
@@ -98,7 +95,7 @@ class Env(gym.Env):
         # TODO: @AP / @SK: Allow for num_worlds < num_files
         assert num_worlds == len(
             glob.glob(f"{data_dir}/*.json")
-        ), "Number of worlds exceeds the number of files in the data directory."
+        ), "Number of worlds is not equal to the number of files in the data directory."
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
@@ -193,8 +190,8 @@ class Env(gym.Env):
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([0], device=self.device)
-        self.accel_actions = torch.tensor([3], device=self.device)
+        self.steer_actions = self.config.steer_actions.to(self.device)
+        self.accel_actions = self.config.accel_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
         # Create a mapping from action indices to action values
@@ -225,6 +222,18 @@ class Env(gym.Env):
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
             ego_state = self.sim.self_observation_tensor().to_torch()
+
+            # Filter out the information for the controlled agents
+            ego_state = ego_state[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+
+            if not self.config.collision_state:
+                # Remove collision state from SelfObservation
+                ego_state = ego_state[:, :, :-3]
+
+            if self.config.normalize_obs:  # Normalize
+                ego_state = self.normalize_ego_state(ego_state)
         else:
             ego_state = torch.Tensor().to(self.device)
 
@@ -236,6 +245,8 @@ class Env(gym.Env):
                 .to_torch()
                 .flatten(start_dim=2)
             )
+            # TODO: Normalize
+
         else:
             partner_obs_tensor = torch.Tensor().to(self.device)
 
@@ -246,22 +257,50 @@ class Env(gym.Env):
             map_obs_tensor = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
             )
+            # TODO: Normalize
         else:
             map_obs_tensor = torch.Tensor().to(self.device)
 
+        # Get agent info
+        agent_info = self.sim.absolute_self_observation_tensor().to_torch()
+        # Get the agent goal positions and current positions
+        goal_pos = agent_info[:, :, 8:]
+        agent_pos = agent_info[:, :, :2]  # x, y
+
+        # L2 norm to goal position
+        if self.config.goal_dist:
+            goal_dist_tensor = torch.linalg.norm(
+                agent_pos - goal_pos, dim=-1
+            ).unsqueeze(-1)
+
+            goal_dist_tensor = goal_dist_tensor[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+            if self.config.normalize_obs:
+                goal_dist_tensor /= self.config.max_dist_to_goal
+        else:
+            goal_dist_tensor = torch.Tensor().to(self.device)
+
         # Combine the observations
         obs_all = torch.cat(
-            (ego_state, partner_obs_tensor, map_obs_tensor), dim=-1
+            (
+                ego_state,
+                partner_obs_tensor,
+                map_obs_tensor,
+                goal_dist_tensor,
+            ),
+            dim=-1,
         )
 
         # Only select the observations for the controlled agents
-        obs_filtered = obs_all[self.cont_agent_mask].reshape(
-            self.num_sims, self.max_cont_agents, -1
-        )
+        obs_filtered = obs_all
+        # obs_filtered = obs_all[self.cont_agent_mask].reshape(
+        #     self.num_sims, self.max_cont_agents, -1
+        # )
 
         return obs_filtered
 
-    def render(self, t=None):
+    def render(self):
         """Render the environment."""
 
         if self.render_mode is None:
@@ -293,53 +332,81 @@ class Env(gym.Env):
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
         self.surf.fill((255, 255, 255))  # White background
 
-        # # # Draw the road map # # #
-        # roadmap_info = (
-        #     self.sim.map_observation_tensor()
-        #     .to_torch()[self.world_render_idx, :, :]
-        #     .cpu()
-        #     .detach()
-        #     .numpy()
-        # )
-        # roadmap_pos = roadmap_info[:, :2]
-        # roadmap_heading = roadmap_info[:, 2:]
-        # scaled_rm_positions = [
-        #     self.scale_coord(pos, roadmap_pos) for pos in roadmap_pos
-        # ]
-        # pygame.draw.lines(self.surf, (0, 0, 0), False, scaled_rm_positions)
-
-        # Scale and center the surface
-        frame_xy_coords = self.sim.bicycle_model_tensor().to_torch()[
-            self.world_render_idx, :, :2
-        ]
-
-        # Get the agent xy positions
-        agent_pos = (
-            self.sim.self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, 3:5]
+        # Get agent info
+        agent_info = (
+            self.sim.absolute_self_observation_tensor()
+            .to_torch()[self.world_render_idx, :, :]
             .cpu()
             .detach()
             .numpy()
         )
 
+        # Get the agent goal positions and current positions
+        goal_pos = agent_info[:, 8:]
+        agent_pos = agent_info[:, :2]  # x, y
+
+        # Get minimum and maximum values for scaling
+        x_min, y_min, x_max, y_max = self.get_coord_min_max(agent_info)
+
+        # print(f"x_min: {x_min}, y_min: {y_min}, x_max: {x_max}, y_max: {y_max}")
+
+        num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
+
         # Draw the agent positions
-        for agent_idx in range(agent_pos.shape[0]):
+        for agent_idx in range(num_agents_in_scene):
 
-            current_pos_screen = self.scale_coord(
-                agent_pos[agent_idx], frame_xy_coords
+            # Use the updated scale_coord function to get centered and scaled coordinates
+            current_pos_scaled = self.scale_coords(
+                agent_pos[agent_idx],  # x_min, y_min, x_max, y_max
             )
-            mod_idx = agent_idx % len(COLOR_LIST)
 
+            current_goal_scaled = self.scale_coords(
+                goal_pos[agent_idx],  # x_min, y_min, x_max, y_max
+            )
+
+            mod_idx = agent_idx % len(COLOR_LIST)
+            # if agent_idx == 0:
             pygame.draw.rect(
                 surface=self.surf,
-                color=COLOR_LIST[mod_idx],  # Use the randomly sampled color
+                color=COLOR_LIST[mod_idx],
                 rect=pygame.Rect(
-                    int(current_pos_screen[0]),
-                    int(current_pos_screen[1]),
+                    int(current_pos_scaled[0]),
+                    int(current_pos_scaled[1]),
                     VEH_WIDTH,
                     VEH_HEIGHT,
                 ),
             )
+
+            pygame.draw.circle(
+                surface=self.surf,
+                color=COLOR_LIST[mod_idx],
+                center=(
+                    int(current_goal_scaled[0]),
+                    int(current_goal_scaled[1]),
+                ),
+                radius=GOAL_RADIUS,
+            )
+
+            # Log
+            agent_log_dict = {
+                "episode_step": 90
+                - self.steps_remaining[self.world_render_idx, 0, 0].item(),
+                f"goal_pos/agent_{agent_idx}_goal_x": goal_pos[agent_idx, 0],
+                f"goal_pos/agent_{agent_idx}_goal_y": goal_pos[agent_idx, 1],
+                f"pos/agent_{agent_idx}_x": agent_pos[agent_idx, 0],
+                f"pos/agent_{agent_idx}_y": agent_pos[agent_idx, 1],
+                f"dist/agent_{agent_idx}_goal_dist": np.linalg.norm(
+                    agent_pos[agent_idx] - goal_pos[agent_idx]
+                ),
+                f"pos_scaled/agent_{agent_idx}_x": current_pos_scaled[0],
+                f"pos_scaled/agent_{agent_idx}_y": current_pos_scaled[1],
+                f"dist_scaled/agent_{agent_idx}_goal_dist": np.linalg.norm(
+                    np.array(current_pos_scaled)
+                    - np.array(current_goal_scaled)
+                ),
+            }
+
+            wandb.log(agent_log_dict)
 
         if self.render_mode == "human":
             pygame.event.pump()
@@ -353,17 +420,35 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coord(self, pos, frame_xy_coords):
-        """Scale the coordinates to fit within the pygame surface window."""
+    def scale_coords(
+        self, coords, x_min=-6000, y_min=-12_000, x_max=4500, y_max=9200
+    ):
+        """Scale the coordinates to fit within the pygame surface window and center them.
+        Args:
+            coords: x, y coordinates
+        """
+        x, y = coords
 
-        # Extract the lower and upper bounds of the frame
-        x_min, x_max = frame_xy_coords[:, 0].min(), frame_xy_coords[:, 0].max()
-        y_min, y_max = frame_xy_coords[:, 1].min(), frame_xy_coords[:, 1].max()
+        # Transformationn 1
+        x_scaled = (x / (x_max - x_min)) * WINDOW_W
+        y_scaled = (y / (y_max - y_min)) * WINDOW_H
 
-        # Scale coordinates
-        x_scaled = ((pos[0] - x_min) / (x_max - x_min)) * WINDOW_W
-        y_scaled = ((pos[1] - y_min) / (y_max - y_min)) * WINDOW_H
-        return [x_scaled, y_scaled]
+        # Transformation 2
+        # x_scaled = (x - (x_min + x_max) / 2) #* WINDOW_W
+        # y_scaled = (y - (y_min + y_max) / 2) #* WINDOW_H
+
+        return (x_scaled, y_scaled)
+
+    def normalize_ego_state(self, state):
+        """Normalize ego state features."""
+
+        state[:, :, 0] /= self.config.max_speed
+        state[:, :, 1] /= self.config.max_veh_len
+        state[:, :, 2] /= self.config.max_veh_width
+        state[:, :, 3] /= self.config.max_rel_goal_coords
+        state[:, :, 4] /= self.config.max_rel_goal_coords
+
+        return state
 
     def close(self):
         """Close pygame application if open."""
@@ -378,6 +463,14 @@ class Env(gym.Env):
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
         )
+
+    def get_coord_min_max(self, coords):
+        """Get the minimum and maximum values of the coordinates."""
+        x_min = np.min(coords[:, 0])
+        y_min = np.min(coords[:, 1])
+        x_max = np.max(coords[:, 0])
+        y_max = np.max(coords[:, 1])
+        return x_min, y_min, x_max, y_max
 
     def _print_info(self, verbose=True):
         """Print initialization information."""
@@ -402,14 +495,17 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
+    config = EnvConfig()
     run = wandb.init(
         project="gpudrive",
         group="test_rendering",
     )
 
-    config = EnvConfig()
+    wandb.define_metric("episode_step")
+    # set all other agent pos logs to use this step
+    wandb.define_metric("agent_*", step_metric="episode_step")
 
-    NUM_CONT_AGENTS = 5
+    NUM_CONT_AGENTS = 1
 
     env = Env(
         config=config,
@@ -422,38 +518,36 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for _ in range(50):
+    for _ in range(100):
 
-        # print(
-        #     f"Remaining steps in episode: {env.steps_remaining[0, 0, 0].item()}"
-        # )
+        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
-        # print(
-        #     f"veh_x_pos: {obs[:, :, 3].item():.3f} | veh_y_pos: {obs[:, :, 4].item():.3f}"
-        # )
-        # print(f"veh_speed: {obs[:, :, 0].item():.3f}")
-
-        # print(f"veh_collided: {obs[:, :, 5]}")
-
-        # Take a random action
+        # Take a random action (we're only going straight)
         rand_action = torch.Tensor(
             [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
         )
 
+        # print(
+        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]}"
+        # )
+
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        # print(
-        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]} | reward: {reward.item():.3f}"
-        # )
+        print(
+            f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
+        )
 
-        print(f"done: {done}")
+        if done.sum() == NUM_CONT_AGENTS:
+            obs = env.reset()
+            print(f"RESETTING ENVIRONMENT\n")
 
-        frame = env.render()
-        frames.append(frame.T)
+        # frame = env.render()
+        # frames.append(frame.T)
 
     # Log video
-    wandb.log({"scene": wandb.Video(np.array(frames), fps=2, format="gif")})
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
-    env.close()
     run.finish()
+    env.close()

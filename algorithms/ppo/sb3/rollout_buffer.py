@@ -230,7 +230,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         self,
         batch_inds: np.ndarray,
         env: Optional[VecNormalize] = None,
-    ) -> RolloutBufferSamples:  # type: ignore[signature-mismatch] #FIXME
+    ) -> RolloutBufferSamples:  # type: ignore[signature-mismatch]
         data = (
             self.observations[batch_inds],
             self.actions[batch_inds],

@@ -14,10 +14,10 @@ from torch import nn
 # Import masked rollout buffer class
 from algorithms.ppo.sb3.rollout_buffer import MaskedRolloutBuffer
 
-logging.getLogger(__name__)
-
 # From stable baselines
-def explained_variance(y_pred: torch.tensor, y_true: torch.tensor) -> torch.tensor:
+def explained_variance(
+    y_pred: torch.tensor, y_true: torch.tensor
+) -> torch.tensor:
     """
     Computes fraction of variance that ypred explains about y.
     Returns 1 - Var[y-ypred] / Var[y]
@@ -55,7 +55,9 @@ class MAPPO(PPO):
     ) -> bool:
         """Adapted collect_rollouts function."""
 
-        assert self._last_obs is not None, "No previous observation was provided"
+        assert (
+            self._last_obs is not None
+        ), "No previous observation was provided"
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
 
@@ -68,7 +70,11 @@ class MAPPO(PPO):
         callback.on_rollout_start()
 
         while n_steps < n_rollout_steps:
-            if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
+            if (
+                self.use_sde
+                and self.sde_sample_freq > 0
+                and n_steps % self.sde_sample_freq == 0
+            ):
                 # Sample a new noise matrix
                 self.policy.reset_noise(env.num_envs)
 
@@ -86,7 +92,7 @@ class MAPPO(PPO):
                 # )
 
                 # Predict actions, vals and log_probs given obs
-                actions, values, log_probs = self.policy(obs_tensor)        
+                actions, values, log_probs = self.policy(obs_tensor)
 
             # Rescale and perform action
             clipped_actions = actions
@@ -95,17 +101,20 @@ class MAPPO(PPO):
                 if self.policy.squash_output:
                     # Unscale the actions to match env bounds
                     # if they were previously squashed (scaled in [-1, 1])
-                    clipped_actions = self.policy.unscale_action(clipped_actions)
+                    clipped_actions = self.policy.unscale_action(
+                        clipped_actions
+                    )
                 else:
                     # Otherwise, clip the actions to avoid out of bound error
                     # as we are sampling from an unbounded Gaussian distribution
-                    clipped_actions = torch.clamp(actions, self.action_space.low, self.action_space.high)
+                    clipped_actions = torch.clamp(
+                        actions, self.action_space.low, self.action_space.high
+                    )
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of valid samples in rollout step
-            samples_in_timestep = env.num_envs - torch.isnan(dones).sum()
-            self.num_timesteps += int(samples_in_timestep)
+            # EDIT_2: Increment the global step by the number of samples in rollout step
+            self.num_timesteps += int(env.num_envs)
 
             # Give access to local variables
             callback.update_locals(locals())
@@ -116,20 +125,6 @@ class MAPPO(PPO):
             if isinstance(self.action_space, spaces.Discrete):
                 # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
-
-            #TODO: Verify if removing this is harmful
-            # # Handle timeout by bootstraping with value function
-            # # see GitHub issue #633
-            # for idx, done in enumerate(dones):
-            #     if (
-            #         done
-            #         and infos[idx].get("terminal_observation") is not None
-            #         and infos[idx].get("TimeLimit.truncated", False)
-            #     ):
-            #         terminal_obs = self.policy.obs_to_tensor(infos[idx]["terminal_observation"])[0]
-            #         with torch.no_grad():
-            #             terminal_value = self.policy.predict_values(terminal_obs)[0]  # type: ignore[arg-type]
-            #         rewards[idx] += self.gamma * terminal_value
 
             rollout_buffer.add(
                 self._last_obs,  # type: ignore[arg-type]
@@ -146,12 +141,14 @@ class MAPPO(PPO):
             # Compute value for the last timestep
             values = self.policy.predict_values(new_obs)  # type: ignore[arg-type]
 
-        rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
+        rollout_buffer.compute_returns_and_advantage(
+            last_values=values, dones=dones
+        )
 
         callback.update_locals(locals())
 
         callback.on_rollout_end()
-            
+
         return True
 
     def _setup_model(self) -> None:
@@ -185,12 +182,12 @@ class MAPPO(PPO):
         if self.clip_range_vf is not None:
             if isinstance(self.clip_range_vf, (float, int)):
                 assert self.clip_range_vf > 0, (
-                    "`clip_range_vf` must be positive, " "pass `None` to deactivate vf clipping"
+                    "`clip_range_vf` must be positive, "
+                    "pass `None` to deactivate vf clipping"
                 )
 
             self.clip_range_vf = get_schedule_fn(self.clip_range_vf)
-            
-            
+
     def train(self) -> None:
         """
         Update policy using the currently gathered rollout buffer.
@@ -224,25 +221,33 @@ class MAPPO(PPO):
                 if self.use_sde:
                     self.policy.reset_noise(self.batch_size)
 
-                values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
+                values, log_prob, entropy = self.policy.evaluate_actions(
+                    rollout_data.observations, actions
+                )
                 values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.advantages
                 # Normalization does not make sense if mini batchsize == 1, see GH issue #325
                 if self.normalize_advantage and len(advantages) > 1:
-                    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+                    advantages = (advantages - advantages.mean()) / (
+                        advantages.std() + 1e-8
+                    )
 
                 # ratio between old and new policy, should be one at the first iteration
                 ratio = torch.exp(log_prob - rollout_data.old_log_prob)
 
                 # clipped surrogate loss
                 policy_loss_1 = advantages * ratio
-                policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
+                policy_loss_2 = advantages * torch.clamp(
+                    ratio, 1 - clip_range, 1 + clip_range
+                )
                 policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
 
                 # Logging
                 pg_losses.append(policy_loss.item())
-                clip_fraction = torch.mean((torch.abs(ratio - 1) > clip_range).float()).item()
+                clip_fraction = torch.mean(
+                    (torch.abs(ratio - 1) > clip_range).float()
+                ).item()
                 clip_fractions.append(clip_fraction)
 
                 if self.clip_range_vf is None:
@@ -252,7 +257,9 @@ class MAPPO(PPO):
                     # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
                     values_pred = rollout_data.old_values + torch.clamp(
-                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf
+                        values - rollout_data.old_values,
+                        -clip_range_vf,
+                        clip_range_vf,
                     )
                 # Value loss using the TD(gae_lambda) target
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
@@ -267,7 +274,11 @@ class MAPPO(PPO):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                loss = (
+                    policy_loss
+                    + self.ent_coef * entropy_loss
+                    + self.vf_coef * value_loss
+                )
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -275,40 +286,57 @@ class MAPPO(PPO):
                 # and Schulman blog: http://joschu.net/blog/kl-approx.html
                 with torch.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
-                    approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu()
+                    approx_kl_div = torch.mean(
+                        (torch.exp(log_ratio) - 1) - log_ratio
+                    ).cpu()
                     approx_kl_divs.append(approx_kl_div)
 
-                if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
+                if (
+                    self.target_kl is not None
+                    and approx_kl_div > 1.5 * self.target_kl
+                ):
                     continue_training = False
                     if self.verbose >= 1:
-                        print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+                        print(
+                            f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}"
+                        )
                     break
 
                 # Optimization step
                 self.policy.optimizer.zero_grad()
                 loss.backward()
                 # Clip grad norm
-                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(
+                    self.policy.parameters(), self.max_grad_norm
+                )
                 self.policy.optimizer.step()
 
             self._n_updates += 1
             if not continue_training:
                 break
 
-        explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
+        explained_var = explained_variance(
+            self.rollout_buffer.values.flatten(),
+            self.rollout_buffer.returns.flatten(),
+        )
 
         # Logs
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
+        self.logger.record("train/mean_advantages", advantages.mean().item())
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
-        #self.logger.record("train/explained_variance",explained_var)
+        # self.logger.record("train/explained_variance",explained_var)
         if hasattr(self.policy, "log_std"):
-            self.logger.record("train/std", torch.exp(self.policy.log_std).mean().item())
+            self.logger.record(
+                "train/std", torch.exp(self.policy.log_std).mean().item()
+            )
 
-        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        self.logger.record(
+            "train/n_updates", self._n_updates, exclude="tensorboard"
+        )
         self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
