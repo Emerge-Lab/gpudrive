@@ -29,10 +29,6 @@ namespace test_utils
         int64_t numEntities = 0;
         for (const auto &obj : rawJson["objects"])
         {
-            if (obj["type"] != "vehicle")
-            {
-                continue;
-            }
             for (const auto &pos : obj["position"])
             {
                 numEntities++;
