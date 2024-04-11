@@ -228,9 +228,9 @@ inline void movementSystem(Engine &e,
 
     if (collisionEvent.hasCollided.load_relaxed())
     {
-        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop)
+        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
             return;
-        else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
+       }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
         {
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
