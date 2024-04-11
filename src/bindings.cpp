@@ -73,7 +73,8 @@ namespace gpudrive
             .def("controlled_state_tensor", &Manager::controlledStateTensor)
             .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
             .def("absolute_self_observation_tensor",
-                 &Manager::absoluteSelfObservationTensor);
+                 &Manager::absoluteSelfObservationTensor)
+            .def("valid_state_tensor", &Manager::validStateTensor);
     }
 
 }
