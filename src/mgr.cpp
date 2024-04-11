@@ -414,7 +414,7 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                map_, ExecMode::CUDA, paramsDevicePtr};
+                                                map_, paramsDevicePtr};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -490,7 +490,7 @@ Manager::Impl * Manager::Impl::init(
             Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
                                                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                map_, ExecMode::CPU,  &(mgr_cfg.params)};
+                                                map_, &(mgr_cfg.params)};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
