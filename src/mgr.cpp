@@ -707,6 +707,12 @@ Tensor Manager::absoluteSelfObservationTensor() const {
         {impl_->cfg.numWorlds, consts::kMaxAgentCount, 3 + 4 + 1 + 2});
 }
 
+Tensor Manager::validStateTensor() const {
+    return impl_->exportTensor(
+        ExportID::ValidState, TensorElementType::Int32,
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
