@@ -571,6 +571,14 @@ Manager::~Manager() {}
 void Manager::step()
 {
     impl_->run();
+
+    if (impl_->renderMgr.has_value()) {
+        impl_->renderMgr->readECS();
+    }
+
+    if (impl_->cfg.enableBatchRenderer) {
+        impl_->renderMgr->batchRender();
+    }
 }
 
 Tensor Manager::resetTensor() const
