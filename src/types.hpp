@@ -179,6 +179,15 @@ struct AbsoluteSelfObservation {
     Goal goal;
 };
 
+enum class Validity : int32_t {
+    Invalid = 0,
+    Valid = 1
+};
+
+struct ValidState {
+    Validity valid[consts::kMaxAgentCount];
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -206,6 +215,7 @@ struct Agent : public madrona::Archetype<
     Goal,
     Trajectory,
     ControlledState,
+
     // Input
     Action,
 
@@ -217,7 +227,6 @@ struct Agent : public madrona::Archetype<
     Lidar,
     StepsRemaining,
     
-
     // Reward, episode termination
     Reward,
     Done,
