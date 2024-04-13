@@ -258,6 +258,13 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<EntityType>(agent) = EntityType::Padding;
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
