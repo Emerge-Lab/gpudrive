@@ -257,6 +257,9 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<ResponseType>(agent) = ResponseType::Static;
     ctx.get<EntityType>(agent) = EntityType::Padding;
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
+    ctx.get<Done>(agent).v = 0;
+    ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+    ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
 
     return agent;
 }
@@ -329,6 +332,8 @@ static void resetPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
+        ctx.get<Done>(agent).v = 0;
+        ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 
