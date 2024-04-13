@@ -72,6 +72,27 @@ struct Sim : public madrona::WorldBase {
     static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
 
+   const std::pair<EntityType,EntityType> collisionPairs[20] = {{EntityType::Pedestrian, EntityType::Pedestrian},                                                                                                             
+                                                              {EntityType::Pedestrian, EntityType::RoadEdge},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::Cyclist},                                                                                                                 
+                                                              {EntityType::Pedestrian, EntityType::RoadLine},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::RoadLane},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::CrossWalk},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::SpeedBump},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::StopSign},                                                                                                                
+                                                              {EntityType::Cyclist, EntityType::Pedestrian},                                                                                                                 
+                                                              {EntityType::Cyclist, EntityType::RoadEdge},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::Cyclist},                                                                                                                    
+                                                              {EntityType::Cyclist, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::RoadLane},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::StopSign},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::RoadLane}};                   
+
     // The constructor is called for each world during initialization.
     // Config is global across all worlds, while WorldInit (src/init.hpp)
     // can contain per-world initialization data, created in (src/mgr.cpp)

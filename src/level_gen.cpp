@@ -55,24 +55,11 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
-    if(agentInit.type == MapObjectType::Vehicle)
-    {
-        ctx.get<EntityType>(agent) = EntityType::Vehicle;
-    }
-    else if(agentInit.type == MapObjectType::Pedestrian)
-    {
-        ctx.get<EntityType>(agent) = EntityType::Pedestrian;
-    }
-    else if(agentInit.type == MapObjectType::Cyclist)
-    {
-        ctx.get<EntityType>(agent) = EntityType::Cyclist;
-    }
-    else
-    {
-        MADRONA_UNREACHABLE();
-    }
+    assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
+    ctx.get<EntityType>(agent) = agentInit.type;
+
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == MapObjectType::Vehicle && agentInit.valid[0])
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
@@ -110,7 +97,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 }
 
 static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
-                           const MapVector2 &p2, const MapRoadType &type) {
+                           const MapVector2 &p2, const EntityType &type) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -123,7 +110,7 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = 1};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
-    ctx.get<EntityType>(road_edge) = EntityType::Cube;
+    ctx.get<EntityType>(road_edge) = type;
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
@@ -135,8 +122,8 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
-                            const MapVector2 &p4) {
+static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
+                            const MapVector2 &p4, const EntityType &type) {
     float x1 = p1.x;
     float y1 = p1.y;
     float x2 = p2.x;
@@ -193,11 +180,11 @@ static Entity makeSpeedBump(Engine &ctx, const MapVector2 &p1, const MapVector2 
     ctx.get<Position>(speed_bump) = Vector3{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y = (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y, .z = 1};
     ctx.get<Rotation>(speed_bump) = Quat::angleAxis(angle, madrona::math::up);
     ctx.get<Scale>(speed_bump) = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
-    ctx.get<EntityType>(speed_bump) = EntityType::Cube;
+    ctx.get<EntityType>(speed_bump) = type;
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)MapRoadType::SpeedBump};
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)type};
     return speed_bump;
 }
 
@@ -209,16 +196,16 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     ctx.get<Position>(stop_sign) = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 0.5};
     ctx.get<Rotation>(stop_sign) = Quat::angleAxis(0, madrona::math::up);
     ctx.get<Scale>(stop_sign) = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 0.5};
-    ctx.get<EntityType>(stop_sign) = EntityType::Cube;
+    ctx.get<EntityType>(stop_sign) = EntityType::StopSign;
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
-    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = (float)MapRoadType::StopSign};
+    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = (float)EntityType::StopSign};
     return stop_sign;
 }
 
 static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, CountT &idx) {
-    if (roadInit.type == MapRoadType::RoadEdge || roadInit.type == MapRoadType::RoadLine || roadInit.type == MapRoadType::Lane)
+    if (roadInit.type == EntityType::RoadEdge || roadInit.type == EntityType::RoadLine || roadInit.type == EntityType::RoadLane)
     {
         size_t numPoints = roadInit.numPoints;
         for(size_t j = 1; j <= numPoints - 1; j++)
@@ -227,13 +214,13 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
                  return;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
-    } else if (roadInit.type == MapRoadType::SpeedBump) {
+    } else if (roadInit.type == EntityType::SpeedBump || roadInit.type == EntityType::CrossWalk) {
       assert(roadInit.numPoints >= 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
       if(idx >= consts::kMaxRoadEntityCount)
         return;
-      ctx.data().roads[idx++] = makeSpeedBump(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3]);
-    } else if (roadInit.type == MapRoadType::StopSign) {
+      ctx.data().roads[idx++] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
+    } else if (roadInit.type == EntityType::StopSign ) {
       assert(roadInit.numPoints >= 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
       if(idx >= consts::kMaxRoadEntityCount)
