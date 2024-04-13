@@ -713,8 +713,7 @@ Sim::Sim(Engine &ctx,
          const WorldInit &init)
     : WorldBase(ctx),
       episodeMgr(init.episodeMgr),
-      params(*init.params),
-      collisionPairs(initializeCollisionPairs())
+      params(*init.params)
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
