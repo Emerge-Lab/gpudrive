@@ -228,7 +228,20 @@ inline void movementSystem(Engine &e,
 
     if (collisionEvent.hasCollided.load_relaxed())
     {
-        return;
+        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
+            return;
+       }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
+        {
+            position = consts::kPaddingPosition;
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.angular = Vector3::zero();
+        }
+        else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
+        {
+            // Do nothing. 
+        }
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)

@@ -11,6 +11,7 @@ reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
 params = gpudrive_.Parameters()
 params.polylineReductionThreshold = 0.5  # Set appropriate value
 params.observationRadius = 10.0  # Set appropriate value
+params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore  # Set appropriate value
 params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
 
 # Now use the 'params' instance when creating SimManager
@@ -19,7 +20,7 @@ sim = gpudrive_.SimManager(
     gpu_id=0,
     num_worlds=1,
     auto_reset=True,
-    json_path="waymo_data",
+    json_path="build/tests/testJsons",
     params=params
 )
 

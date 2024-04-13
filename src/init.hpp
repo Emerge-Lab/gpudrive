@@ -80,19 +80,27 @@ namespace gpudrive
         float distanceToExpertThreshold;
     };
 
+    enum class CollisionBehaviour: uint32_t
+    {
+        AgentStop,
+        AgentRemoved,
+        Ignore
+    };
+
     struct Parameters
     {
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
-        uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles
+        CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
+        uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
     };
 
     struct WorldInit
     {
         EpisodeManager *episodeMgr;
         madrona::phys::ObjectManager *rigidBodyObjMgr;
-        gpudrive::Map *map;
+        Map *map;
         const Parameters *params;
     };
 
