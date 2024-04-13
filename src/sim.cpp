@@ -510,6 +510,24 @@ void collisionDetectionSystem(Engine &ctx,
         return;
     }
 
+    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.a);
+    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.b);
+
+    // Ignore collisions between certain entity types
+    if(aEntitytype == EntityType::Padding || bEntitytype == EntityType::Padding)
+    {
+        return;
+    }
+
+    for(auto &pair : ctx.data().collisionPairs)
+    {
+        if((pair.first == aEntitytype && pair.second == bEntitytype) ||
+           (pair.first == bEntitytype && pair.second == aEntitytype))
+        {
+            return;
+        }
+    }
+
     auto maybeCollisionDetectionEventA =
         ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
     if (maybeCollisionDetectionEventA.valid()) {
