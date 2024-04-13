@@ -766,6 +766,12 @@ Tensor Manager::controlledStateTensor() const {
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
+Tensor Manager::absoluteSelfObservationTensor() const {
+    return impl_->exportTensor(
+        ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 3 + 4 + 1 + 2});
+}
+
 Tensor Manager::rgbTensor() const
 {
     const uint8_t *rgb_ptr = impl_->renderMgr->batchRendererRGBOut();

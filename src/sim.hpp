@@ -28,6 +28,7 @@ enum class ExportID : uint32_t {
     MapObservation,
     Shape,
     ControlledState,
+    AbsoluteSelfObservation,
     NumExports
 };
 
@@ -71,35 +72,26 @@ struct Sim : public madrona::WorldBase {
     static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
 
-    // Function to initialize your collision pairs array
-    static madrona::InlineArray<std::pair<EntityType, EntityType>, 64> initializeCollisionPairs() {
-        madrona::InlineArray<std::pair<EntityType, EntityType>, 64> collisionPairs;
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::Pedestrian});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadEdge});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::Cyclist});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadLine});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::RoadLane});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::CrossWalk});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::SpeedBump});
-        collisionPairs.push_back({EntityType::Pedestrian, EntityType::StopSign});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::Pedestrian});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadEdge});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::Cyclist});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadLine});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::RoadLane});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::CrossWalk});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::SpeedBump});
-        collisionPairs.push_back({EntityType::Cyclist, EntityType::StopSign});
-        collisionPairs.push_back({EntityType::Vehicle, EntityType::CrossWalk});
-        collisionPairs.push_back({EntityType::Vehicle, EntityType::SpeedBump});
-        collisionPairs.push_back({EntityType::Vehicle, EntityType::RoadLine});
-        collisionPairs.push_back({EntityType::Vehicle, EntityType::RoadLane});
-        // TODO: Break Cube into road types for better control over collisions
-        return collisionPairs;
-    }
-
-
-    const madrona::InlineArray<std::pair<EntityType,EntityType>, 64> collisionPairs;                        
+   const std::pair<EntityType,EntityType> collisionPairs[20] = {{EntityType::Pedestrian, EntityType::Pedestrian},                                                                                                             
+                                                              {EntityType::Pedestrian, EntityType::RoadEdge},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::Cyclist},                                                                                                                 
+                                                              {EntityType::Pedestrian, EntityType::RoadLine},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::RoadLane},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::CrossWalk},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::SpeedBump},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::StopSign},                                                                                                                
+                                                              {EntityType::Cyclist, EntityType::Pedestrian},                                                                                                                 
+                                                              {EntityType::Cyclist, EntityType::RoadEdge},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::Cyclist},                                                                                                                    
+                                                              {EntityType::Cyclist, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::RoadLane},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::StopSign},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::RoadLane}};                   
 
     // The constructor is called for each world during initialization.
     // Config is global across all worlds, while WorldInit (src/init.hpp)
