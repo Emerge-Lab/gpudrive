@@ -412,8 +412,8 @@ inline void rewardSystem(Engine &ctx,
     if(rewardType == RewardType::DistanceBased)
     {
         float dist = (model.position - goal.position).length();
-        float reward = -dist;
-        out_reward.v = reward;
+        float reward = 1.0 - dist / ctx.data().maxDist;
+        out_reward.v = fmaxf(fminf(reward, 1.f), 0.f);
     }
     else if(rewardType == RewardType::OnGoalAchieved)
     {
@@ -741,6 +741,7 @@ Sim::Sim(Engine &ctx,
 
     if (enableRender) {
         RenderingSystem::init(ctx, cfg.renderBridge);
+        printf("Rendering enabled\n");
     }
 
     autoReset = cfg.autoReset;

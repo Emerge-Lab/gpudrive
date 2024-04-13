@@ -117,6 +117,7 @@ def create(
     else:
         agent = pufferlib.emulation.make_object(
             agent, agent_creator, [pool], agent_kwargs)
+        wandb.watch(agent, log="all", log_freq=100)
 
     global_step = resume_state.get("global_step", 0)
     agent_step = resume_state.get("agent_step", 0)
@@ -158,7 +159,7 @@ def create(
             torch.zeros(shape).to(device),
         )
     obs=torch.zeros(config.batch_size + 1, *obs_shape)
-    actions=torch.zeros(config.batch_size + 1, *atn_shape, dtype=int)
+    actions=torch.zeros(config.batch_size + 1, *atn_shape, dtype=float)
     logprobs=torch.zeros(config.batch_size + 1)
     rewards=torch.zeros(config.batch_size + 1)
     dones=torch.zeros(config.batch_size + 1)
@@ -422,7 +423,7 @@ def train(data):
 
     # Optimizing the policy and value network
     train_time = time.time()
-    pg_losses, entropy_losses, v_losses, clipfracs, old_kls, kls = [], [], [], [], [], []
+    pg_losses, entropy_losses, v_losses, clipfracs, old_kls, kls, total_losses = [], [], [], [], [], [], []
     mb_obs_buffer = torch.zeros_like(b_obs[0], pin_memory=(data.device=="cuda"))
 
     for epoch in range(config.update_epochs):
@@ -493,6 +494,7 @@ def train(data):
             entropy_losses.append(entropy_loss.item())
 
             loss = pg_loss - config.ent_coef * entropy_loss + v_loss * config.vf_coef
+            total_losses.append(loss.item())
             data.optimizer.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(data.agent.parameters(), config.max_grad_norm)
@@ -515,6 +517,7 @@ def train(data):
     losses.approx_kl = np.mean(kls)
     losses.clipfrac = np.mean(clipfracs)
     losses.explained_variance = explained_var
+    losses.total_loss = np.mean(total_losses)
 
     perf = data.performance
     perf.total_uptime = int(time.time() - data.start_time)
@@ -530,8 +533,8 @@ def train(data):
         print_dashboard(data.stats, data.init_performance, data.performance)
 
     data.update += 1
-    if data.update % config.checkpoint_interval == 0 or done_training(data):
-       save_checkpoint(data)
+    # if data.update % config.checkpoint_interval == 0 or done_training(data):
+    #    save_checkpoint(data)
 
 def close(data):
     data.pool.close()
@@ -637,6 +640,7 @@ def unroll_nested_dict(d):
             yield k, v
 
 def print_dashboard(stats, init_performance, performance):
+    return
     output = []
     data = {**stats, **init_performance, **performance}
     

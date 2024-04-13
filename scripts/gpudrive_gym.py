@@ -10,6 +10,7 @@ from gymnasium.wrappers import FlattenObservation, NormalizeObservation
 from stable_baselines3.common.env_checker import check_env
 from sim_utils.creator import SimCreator
 import pufferlib.models
+import imageio
 
 class GPUDriveEnv(gym.Env):
     Recurrent = None
@@ -24,9 +25,10 @@ class GPUDriveEnv(gym.Env):
 
 
 
-        self.num_envs = self.obs_tensors[0].shape[0]
+        self.num_envs = self.self_obs_tensor.shape[0]
         self.agents_per_env = self.shape_tensor[:,0]
         self.total_num_agents = torch.sum(self.agents_per_env)
+        self.env_ids = torch.repeat_interleave(torch.arange(self.num_envs).to(self.self_obs_tensor.device), self.agents_per_env)
 
         self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float64)
         # self.observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.num_obs_features,), dtype=torch.float32)
@@ -89,6 +91,14 @@ class GPUDriveEnv(gym.Env):
         # For example, if your environment expects a specific shape, you might need to adjust it accordingly
 
         return padded_actions
+    
+    def render(self):
+        rgb_image = self.sim.rgb_tensor().to_torch()
+        return rgb_image
+
+    def render_depth(self):
+        depth_image = self.sim.depth_tensor().to_torch()
+        return depth_image
 
     def setup_obs(self):
         self_obs_tensor = self.sim.self_observation_tensor().to_torch()
@@ -99,6 +109,15 @@ class GPUDriveEnv(gym.Env):
         done_tensor = self.sim.done_tensor().to_torch()
         reward_tensor = self.sim.reward_tensor().to_torch()
         steps_remaining_tensor = self.sim.steps_remaining_tensor().to_torch()
+
+        controlled_mask = controlled_state_tensor[:, :, 0] == 1
+        for i in range(done_tensor.shape[0]):
+            if(done_tensor[i].all()):
+                self.reset(i)
+            elif(done_tensor[i][controlled_mask[i]].all()):
+                self.reset(i)
+
+        # Add L2 Norm to obs_tensor for each agent at indexs [2,3]
 
         N, A, O = self_obs_tensor.shape[0:3] # N = num worlds, A = num agents, O = num obs features
         batch_size = N * A
@@ -131,7 +150,7 @@ class GPUDriveEnv(gym.Env):
         obs_tensors = self.filter_padding_agents(obs_tensors, N, A)
 
         num_obs_features = 0
-        for tensor in obs_tensors[:2]:
+        for tensor in obs_tensors[:1]:
             num_obs_features += math.prod(tensor.shape[1:])
 
         # print("num_obs_features", num_obs_features)
@@ -166,7 +185,7 @@ class GPUDriveEnv(gym.Env):
         recvs = []
         next_env_id = []
         obs, _ = self.setup_obs()
-        env_obs = torch.cat(obs[:2], dim=-1)
+        env_obs = torch.cat(obs[:1], dim=-1)
         controlled, dones, rews= obs[3], obs[4], obs[5]
         truncateds = torch.Tensor([False] * self.total_num_agents).to(dones.device)
         infos = [{} for _ in range(self.total_num_agents)]
@@ -180,6 +199,8 @@ class GPUDriveEnv(gym.Env):
 
         assert(torch.isnan(env_obs).any() == False)
         if self.mask_agents:
+            # iterate through environments and get all controlled agents
+                
             return env_obs, rews, dones, truncateds, infos, env_ids, mask
 
         return env_obs, rews, dones, truncateds, infos, env_ids
@@ -191,18 +212,8 @@ class GPUDriveEnv(gym.Env):
         self.sim.step()
 
     def reset(self, env_id, seed = None, options=None):
-        self.sim.reset(0)
-        obs, _ = self.setup_obs()
-        obs = {
-            "self_obs": obs[0],
-            "partner_obs": obs[1],
-            "map_obs": obs[2],
-            "steps_remaining": obs[3],
-            "id": obs[4],
-        }
-        # for key in obs:
-        #     print(key, obs[key].shape)
-        return obs, {}
+        self.sim.reset(env_id)
+        return
 
     @staticmethod
     def makeRewardParams(rewardType: gpudrive.RewardType = gpudrive.RewardType.DistanceBased, distanceToGoalThreshold: float = 1.0, distanceToExpertThreshold: float = 1.0, polylineReductionThreshold: float = 1.0, observationRadius: float = 100.0):
@@ -224,7 +235,7 @@ class GPUDriveEnv(gym.Env):
 
 class Convolutional1D(nn.Module):
     def __init__(self, env, *args, framestack, flat_size,
-            input_size=512, hidden_size=512, output_size=512,
+            input_size=512, hidden_size=16, output_size=16,
             channels_last=False, downsample=1, **kwargs):
         '''The CleanRL default Atari policy: a stack of three convolutions followed by a linear layer
         
@@ -303,7 +314,8 @@ class Convolutional1D(nn.Module):
         # actions, value = self.decode_actions(hidden, lookup)
 
         mean = self.mean(hidden)
-        log_std = torch.clamp(self.log_std, min=-20, max=2)
+        mean = torch.clamp(mean, min=-2, max=2)
+        log_std = torch.clamp(self.log_std, min=-5, max=5)
         std = torch.exp(log_std)
         value = self.value_fn(hidden)
         # return actions, value
@@ -330,11 +342,20 @@ def make_gpudrive():
 
 if __name__ == "__main__":
     env = GPUDriveEnv()
-    print(env.obs_tensors[0].shape)
-    print(env.num_obs_features)
-    env = NormalizeObservation(FlattenObservation(env))
-    print("-----------------------------")
-    print(env.observation_space)
-    print(env.observation_space.sample())
-    # model = A2C("CnnPolicy", env).learn(total_timesteps=1000)
-    check_env(env, warn=True)
+    # print(env.sim.self_observation_tensor().to_jax())
+    # return
+    frames = []
+    for i in range(91):
+        env_obs, rews, dones, truncateds, infos, env_ids, mask = env.recv()
+        env.sim.step()
+
+        # print(i, dones[0], env_obs[0])
+        frame = env.render()
+        frame_np = frame.cpu().numpy()[0][0]
+        print(frame_np.shape)
+        frames.append(frame_np.astype('uint8'))
+
+    with imageio.get_writer('video.mp4', fps=30) as video:
+        for frame in frames:
+            video.append_data(frame)
+    print("Video saved to video.mp4")

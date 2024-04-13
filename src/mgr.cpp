@@ -81,8 +81,8 @@ static inline Optional<render::RenderManager> initRenderManager(
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = mgr_cfg.numWorlds,
-        .maxViewsPerWorld = 2, // FIXME?
-        .maxInstancesPerWorld = 450,
+        .maxViewsPerWorld = consts::kMaxAgentCount, // FIXME?
+        .maxInstancesPerWorld = 1000,
         .execMode = mgr_cfg.execMode,
         .voxelCfg = {},
     });
@@ -255,12 +255,10 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     render_mgr.loadObjects(render_assets->objects, materials, {
         { (std::filesystem::path(DATA_DIR) /
            "green_grid.png").string().c_str() },
-        { (std::filesystem::path(DATA_DIR) /
-           "smile.png").string().c_str() },
     });
 
     render_mgr.configureLighting({
-        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{1.0f, 1.0f, 1.0f} }
+        { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{50.0f, 50.0f, 1.0f} }
     });
 }
 
@@ -628,6 +626,14 @@ Manager::~Manager() {}
 void Manager::step()
 {
     impl_->run();
+
+    if (impl_->renderMgr.has_value()) {
+        impl_->renderMgr->readECS();
+    }
+
+    if (impl_->cfg.enableBatchRenderer) {
+        impl_->renderMgr->batchRender();
+    }
 }
 
 Tensor Manager::resetTensor() const
@@ -759,6 +765,35 @@ Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
+
+Tensor Manager::rgbTensor() const
+{
+    const uint8_t *rgb_ptr = impl_->renderMgr->batchRendererRGBOut();
+
+    assert(rgb_ptr != nullptr);
+
+    return Tensor((void*)rgb_ptr, TensorElementType::UInt8, {
+        impl_->cfg.numWorlds,
+        consts::kMaxAgentCount,
+        impl_->cfg.batchRenderViewHeight,
+        impl_->cfg.batchRenderViewWidth,
+        4,
+    }, impl_->cfg.gpuID);
+}
+
+Tensor Manager::depthTensor() const
+{
+    const float *depth_ptr = impl_->renderMgr->batchRendererDepthOut();
+
+    return Tensor((void *)depth_ptr, TensorElementType::Float32, {
+        impl_->cfg.numWorlds,
+        consts::kMaxAgentCount,
+        impl_->cfg.batchRenderViewHeight,
+        impl_->cfg.batchRenderViewWidth,
+        1,
+    }, impl_->cfg.gpuID);
+}
+
 
 void Manager::triggerReset(int32_t world_idx)
 {

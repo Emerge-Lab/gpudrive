@@ -19,6 +19,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params.observationRadius = params_config['observationRadius']
     params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
     params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])
+    params.maxNumControlledVehicles = params_config['maxNumControlledVehicles']
     params.rewardParams = reward_params
 
     # Initialize SimManager with parameters from the config
@@ -29,7 +30,8 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
         num_worlds=sim_manager_config['num_worlds'],
         auto_reset=sim_manager_config['auto_reset'],
         json_path=sim_manager_config['json_path'],
-        params=params
+        params=params,
+        enable_batch_renderer = sim_manager_config['enable_batch_renderer'],
     )
     return sim
 

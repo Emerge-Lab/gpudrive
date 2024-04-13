@@ -23,6 +23,8 @@ python = "^3.11"
 torch = "^2.2.1"
 numpy = "1.23.3"
 pufferlib = "^0.7.3"
+imageio = "^2.34.0"
+imageio-ffmpeg = "^0.4.9"
 
 [tool.poetry]
 name = "gpudrive"

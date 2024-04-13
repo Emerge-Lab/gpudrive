@@ -1,6 +1,5 @@
 #include "level_gen.hpp"
 
-
 namespace gpudrive {
 
 using namespace madrona;
@@ -59,6 +58,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
+    
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
@@ -83,6 +83,10 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
+    if(ctx.get<ControlledState>(agent).controlledState == ControlMode::BICYCLE)
+    {
+        ctx.data().maxDist = fmaxf(ctx.data().maxDist, (ctx.get<Goal>(agent).position - trajectory.positions[0]).length());
+    }
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
 
@@ -90,7 +94,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         render::RenderingSystem::attachEntityToView(ctx,
                 agent,
                 90.f, 0.001f,
-                1.5f * math::up);
+                -50.0f * math::fwd + 20.0f * math::up);
     }
 
     return agent;
@@ -244,6 +248,12 @@ static void createFloorPlane(Engine &ctx)
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
+    // if (ctx.data().enableRender) {
+    //     render::RenderingSystem::attachEntityToView(ctx,
+    //             ctx.data().floorPlane,
+    //             90.f, 0.001f,
+    //             100.0f * math::up);
+    // }
 }
 
 static inline Entity createAgentPadding(Engine &ctx) {
@@ -260,6 +270,14 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<Done>(agent).v = 0;
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
@@ -292,11 +310,12 @@ void createPaddingEntities(Engine &ctx) {
 }
 
 void createPersistentEntities(Engine &ctx, Map *map) {
-
+    createFloorPlane(ctx);
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
+    ctx.data().maxDist = 1;
 
     CountT agentIdx;
     for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
@@ -325,6 +344,8 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     shape.roadEntityCount = ctx.data().numRoads;
 
     createPaddingEntities(ctx);
+
+    printf("maxDist: %f\n", ctx.data().maxDist);
 }
 
 static void resetPaddingEntities(Engine &ctx) {

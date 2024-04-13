@@ -10,6 +10,7 @@
 #include <fstream>
 #include <random>
 #include <vector>
+#include <iostream>
 
 using namespace madrona;
 
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "/home/aarav/nocturne_data/formatted_json_v2_no_tl_valid",
+        .jsonPath = "/home/aarav/gpudrive/nocturne_data",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -70,7 +71,8 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             }
-        }
+        },
+        .enableBatchRenderer = true
     });
 
     std::random_device rd;
@@ -89,6 +91,7 @@ int main(int argc, char *argv[])
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
+    auto rgb_printer = mgr.rgbTensor().makePrinter();
 
     auto printObs = [&]() {
         // printf("Self\n");
@@ -107,18 +110,20 @@ int main(int argc, char *argv[])
         // map_obs_printer.print();
         // printf("\n");
 
-        printf("Shape\n");
-        shapePrinter.print();
+        // printf("Shape\n");
+        // shapePrinter.print();
 
-        printf("Reward\n");
-        rewardPrinter.print();
+        // printf("Reward\n");
+        // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
-        printf("Controlled State\n");
-        controlledStatePrinter.print();
+        // printf("Controlled State\n");
+        // controlledStatePrinter.print();
         
+        printf("RGB\n");
+        std::cout<<mgr.rgbTensor().isOnGPU();
         // printf("Agent Map Obs\n");
         // agent_map_obs_printer.print();
     };

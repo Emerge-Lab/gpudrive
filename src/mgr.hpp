@@ -36,8 +36,8 @@ public:
 
         // Rendering settings
         bool enableBatchRenderer = false;
-        uint32_t batchRenderViewWidth = 64;
-        uint32_t batchRenderViewHeight = 64;
+        uint32_t batchRenderViewWidth = 1024;
+        uint32_t batchRenderViewHeight = 1024;
         madrona::render::APIBackend *extRenderAPI = nullptr;
         madrona::render::GPUDevice *extRenderDev = nullptr;
     };
@@ -62,6 +62,8 @@ public:
     MGR_EXPORT madrona::py::Tensor bicycleModelTensor() const;
     MGR_EXPORT madrona::py::Tensor shapeTensor() const;
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
+    madrona::py::Tensor rgbTensor() const;
+    madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);

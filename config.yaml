@@ -26,16 +26,16 @@ train:
   data_dir: experiments
   checkpoint_interval: 200
   pool_kernel: [0]
-  batch_size: 1024
-  batch_rows: 32
-  bptt_horizon: 16 #8
+  batch_size: 4096
+  batch_rows: 128
+  bptt_horizon: 1 #8
   vf_clip_coef: 0.1
   compile: False
   compile_mode: reduce-overhead
   
 reward_params:
-  rewardType: Dense  
-  distanceToGoalThreshold: 1.0
+  rewardType: DistanceBased  
+  distanceToGoalThreshold: 3.0
   distanceToExpertThreshold: 50.0
 
 parameters:
@@ -43,11 +43,13 @@ parameters:
   observationRadius: 1000.0
   datasetInitOptions: FirstN
   collisionBehaviour: Ignore
+  maxNumControlledVehicles: 1
   rewardParams: reward_params
 
 sim_manager:
-  exec_mode: CUDA
+  exec_mode: CPU
   gpu_id: 0
-  num_worlds: 2
-  auto_reset: true
-  json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid
+  num_worlds: 1
+  auto_reset: false
+  json_path: /home/aarav/gpudrive/nocturne_data/
+  enable_batch_renderer: true
