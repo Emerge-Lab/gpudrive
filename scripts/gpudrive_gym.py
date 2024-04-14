@@ -280,7 +280,7 @@ class GPUDriveEnv(gym.Env):
 
 class Convolutional1D(nn.Module):
     def __init__(self, env, *args, framestack, flat_size,
-            input_size=512, hidden_size=16, output_size=16,
+            input_size=512, hidden_size=32, output_size=32,
             channels_last=False, downsample=1, **kwargs):
         '''The CleanRL default Atari policy: a stack of three convolutions followed by a linear layer
         
@@ -298,10 +298,10 @@ class Convolutional1D(nn.Module):
         self.network = nn.Sequential(
             pufferlib.pytorch.layer_init(nn.Linear(self.num_features, hidden_size)),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_size),
+            # nn.BatchNorm1d(hidden_size),
             pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_size),
+            # nn.BatchNorm1d(hidden_size),
             pufferlib.pytorch.layer_init(nn.Linear(hidden_size, output_size)),
             nn.ReLU()
         #     nn.ReLU(),
@@ -340,11 +340,11 @@ class Convolutional1D(nn.Module):
         # continuous
 
     def encode_observations(self, observations):
-        if self.channels_last:
-            observations = observations.permute(0, 3, 1, 2)
-        if self.downsample > 1:
-            observations = observations[:, :, ::self.downsample, ::self.downsample]
-        F.normalize(observations, p=2, dim=1)
+        # if self.channels_last:
+        #     observations = observations.permute(0, 3, 1, 2)
+        # if self.downsample > 1:
+        #     observations = observations[:, :, ::self.downsample, ::self.downsample]
+        # F.normalize(observations, p=2, dim=1)
         # observations = observations.unsqueeze(1)  # This adds a channel dimension, resulting in [batch_size, 1, length]
         # observations = self.initial_norm(observations.float())
         return self.network(observations.float()), None

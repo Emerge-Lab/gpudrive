@@ -148,6 +148,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     self_obs.speed = model.speed;
     self_obs.vehicle_size = size;
+    self_obs.heading = utils::quatToYaw(rot);
     self_obs.goal.position = goal.position - model.position;
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();

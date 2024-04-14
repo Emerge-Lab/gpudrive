@@ -88,11 +88,12 @@ struct Done {
 struct SelfObservation {
     float speed;
     VehicleSize vehicle_size;
+    float heading;
     Goal goal;
     float collisionState;
 };
 
-const int SelfObservationExportSize = 6;
+const int SelfObservationExportSize = 7;
 
 static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 

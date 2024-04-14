@@ -705,8 +705,8 @@ def sample_logits(logits: Union[torch.Tensor, List[torch.Tensor]], action=None):
         batch = logits.shape[0]
         action = action.view(batch, -1)
     
-    logprob = categorical_dist.log_prob(action).sum(axis=-1)
-    entropy = categorical_dist.entropy().sum(axis=-1)
+    logprob = categorical_dist.log_prob(action).mean(axis=-1)
+    entropy = categorical_dist.entropy().mean(axis=-1)
 
     return action, logprob, entropy
     
