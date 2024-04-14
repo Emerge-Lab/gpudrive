@@ -97,7 +97,7 @@ def create(
     # Create environments, agent, and optimizer
     init_profiler = pufferlib.utils.Profiler(memory=True)
     with init_profiler:
-        pool = env_creator()
+        pool = env_creator(**env_creator_kwargs)
 
     obs_shape = pool.single_observation_space.shape
     atn_shape = pool.single_action_space.shape
@@ -144,8 +144,9 @@ def create(
         agent, pool_agents, atn_shape, device, path,
         config.pool_kernel, policy_selector,
     )
-    policy_pool.actions = torch.zeros(
-            total_agents, *atn_shape, dtype=torch.float32).to(device)
+    if config.action_space_type == 'Continuous':
+        policy_pool.actions = torch.zeros(
+                total_agents, *atn_shape, dtype=torch.float32).to(device)
 
     # Allocate Storage
     storage_profiler = pufferlib.utils.Profiler(memory=True, pytorch_memory=True).start()
@@ -159,7 +160,10 @@ def create(
             torch.zeros(shape).to(device),
         )
     obs=torch.zeros(config.batch_size + 1, *obs_shape)
-    actions=torch.zeros(config.batch_size + 1, *atn_shape, dtype=float)
+    if config.action_space_type == 'discrete':
+        actions=torch.zeros(config.batch_size + 1, *atn_shape, dtype=int)
+    elif config.action_space_type == 'continuous':
+        actions=torch.zeros(config.batch_size + 1, *atn_shape, dtype=float)
     logprobs=torch.zeros(config.batch_size + 1)
     rewards=torch.zeros(config.batch_size + 1)
     dones=torch.zeros(config.batch_size + 1)
@@ -408,8 +412,12 @@ def train(data):
 
     # Flatten the batch
     data.b_obs = b_obs = torch.Tensor(data.obs_ary[b_idxs])
-    b_actions = torch.Tensor(data.actions_ary[b_idxs]
-        ).to(data.device, non_blocking=True)
+    if config.action_space_type == 'discrete':
+        b_actions = torch.Tensor(data.actions_ary[b_idxs]
+            ).to(data.device, non_blocking=True, dtype=torch.int64)
+    elif config.action_space_type == 'continuous':
+        b_actions = torch.Tensor(data.actions_ary[b_idxs]
+            ).to(data.device, non_blocking=True, dtype=torch.float32)
     b_logprobs = torch.Tensor(data.logprobs_ary[b_idxs]
         ).to(data.device, non_blocking=True)
     b_dones = torch.Tensor(data.dones_ary[b_idxs]
@@ -674,34 +682,49 @@ def print_dashboard(stats, init_performance, performance):
 
 # taken from torch.distributions.Categorical
 def log_prob(logits, value):
-    value = value.long().unsqueeze(-1)
+    # value = value.long()
     value, log_pmf = torch.broadcast_tensors(value, logits)
     value = value[..., :1]
     return log_pmf.gather(-1, value).squeeze(-1)
 
+
+# taken from torch.distributions.Categorical
+def entropy(logits):
+    min_real = torch.finfo(logits.dtype).min
+    logits = torch.clamp(logits, min=min_real)
+    p_log_p = logits * logits_to_probs(logits)
+    return -p_log_p.sum(-1)
+
 def sample_logits(logits: Union[torch.Tensor, List[torch.Tensor]], action=None):
-    is_discrete = isinstance(logits, torch.Tensor)
-    if is_discrete:
-        normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
-        logits = [logits]
-    else: # not sure what else it could be
-        normalized_logits = [l - l.logsumexp(dim=-1, keepdim=True) for l in logits]
+    
+    categorical_dist = torch.distributions.Categorical(logits=logits)
 
-
-    if action is None:
-        action = torch.stack([torch.multinomial(logits_to_probs(l), 1).squeeze() for l in logits])
+    if(action is None):
+        action = categorical_dist.sample()
     else:
-        batch = logits[0].shape[0]
-        action = action.view(batch, -1).T
+        batch = logits.shape[0]
+        action = action.view(batch, -1)
+    
+    logprob = categorical_dist.log_prob(action).sum(axis=-1)
+    entropy = categorical_dist.entropy().sum(axis=-1)
 
-    assert len(logits) == len(action)
-    logprob = torch.stack([log_prob(l, a) for l, a in zip(normalized_logits, action)]).T.sum(1)
-    logits_entropy = torch.stack([entropy(l) for l in normalized_logits]).T.sum(1)
+    return action, logprob, entropy
+    
 
-    if is_discrete:
-        return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
+    # if action is None:
+    #     action = torch.stack([torchlogits_to_probs(l), 3).squeeze() for l in logits])
+    # else:
+    #     batch = logits[0].shape[0]
+    #     action = action.view(batch, -1).unsqueeze(0)
 
-    return action.T, logprob, logits_entropy
+    # assert len(logits) == len(action)
+    # logprob = torch.stack([log_prob(l, a) for l, a in zip(normalized_logits, action)]).T.sum(1)
+    # logits_entropy = torch.stack([entropy(l) for l in normalized_logits]).T.sum(1)
+
+    # if is_discrete:
+    #     return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
+
+    # return action.T, logprob, logits_entropy
 
 
 def sample_continuous_actions(params: List[torch.Tensor], action=None):
@@ -742,6 +765,7 @@ class Policy(torch.nn.Module):
             return action, logprob, entropy, value
         else:
             action, logprob, entropy = sample_logits(logits, action)
+            action = action.to(torch.int)
             return action, logprob, entropy, value
 
     def forward(self, x, action=None):

@@ -26,15 +26,17 @@ train:
   data_dir: experiments
   checkpoint_interval: 200
   pool_kernel: [0]
-  batch_size: 4096
-  batch_rows: 128
+  batch_size: 8192
+  batch_rows: 2048
   bptt_horizon: 1 #8
   vf_clip_coef: 0.1
   compile: False
   compile_mode: reduce-overhead
+
+  action_space_type: discrete
   
 reward_params:
-  rewardType: DistanceBased  
+  rewardType: OnGoalAchieved  
   distanceToGoalThreshold: 3.0
   distanceToExpertThreshold: 50.0
 
@@ -47,9 +49,9 @@ parameters:
   rewardParams: reward_params
 
 sim_manager:
-  exec_mode: CPU
+  exec_mode: CUDA
   gpu_id: 0
   num_worlds: 1
   auto_reset: false
   json_path: /home/aarav/gpudrive/nocturne_data/
-  enable_batch_renderer: true
+  enable_batch_renderer: false

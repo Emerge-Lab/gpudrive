@@ -94,7 +94,7 @@ def train(args, env_module, make_env):
             agent_creator=make_policy,
             agent_kwargs={'env_module': env_module, 'args': args},
             env_creator=make_env,
-            env_creator_kwargs=None,
+            env_creator_kwargs={'action_space_type': args.train.action_space_type},
             exp_name=args.exp_name,
             track=args.track,
         )
@@ -137,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
     parser.add_argument('--track', action='store_true', default=True, help='Track on WandB')
     parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
+    parser.add_argument('--action_space_type', type=str, default='discrete', choices=['discrete', 'continuous'], help='Action space')
 
     clean_parser = argparse.ArgumentParser(parents=[parser])
     args = parser.parse_known_args()[0].__dict__

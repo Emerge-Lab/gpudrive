@@ -1,5 +1,7 @@
 import gpudrive
 import gymnasium as gym
+
+from gymnasium.spaces import Box, Discrete
 import pufferlib.pytorch
 import torch
 import torch.nn as nn
@@ -11,11 +13,12 @@ from stable_baselines3.common.env_checker import check_env
 from sim_utils.creator import SimCreator
 import pufferlib.models
 import imageio
+from itertools import product
 
 class GPUDriveEnv(gym.Env):
     Recurrent = None
 
-    def __init__(self, params: gpudrive.Parameters = None):
+    def __init__(self, params: gpudrive.Parameters = None, action_space_type: str = "continuous"):
         self.sim = SimCreator()
         self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
         self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
@@ -23,7 +26,14 @@ class GPUDriveEnv(gym.Env):
         self.shape_tensor = self.sim.shape_tensor().to_torch()
         self.obs_tensors, self.num_obs_features = self.setup_obs()
 
+        self.action_space_type = action_space_type
 
+        if self.action_space_type == "discrete":
+            self.action_space = self.setup_discrete_actions()
+            self.single_action_space = self.action_space
+        elif self.action_space_type == "continuous":
+            self.action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions(), dtype=np.float64)
+            self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions()[2:], dtype=np.float64)
 
         self.num_envs = self.self_obs_tensor.shape[0]
         self.agents_per_env = self.shape_tensor[:,0]
@@ -40,12 +50,32 @@ class GPUDriveEnv(gym.Env):
             "id": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[4].shape, dtype=np.float64),
         })
 
-        self.action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions(), dtype=np.float64)
-        self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions()[2:], dtype=np.float64)
+
 
         self.Recurrent = None
         self.unflatten_context = None
         self.mask_agents = True
+
+    def setup_discrete_actions(self):
+        """Configure the discrete action space."""
+
+        self.steer_actions = torch.tensor([-0.6, 0, 0.6])
+        self.accel_actions = torch.tensor([-3, -1, 0.5, 0, 0.5, 1, 3])
+        self.head_actions = torch.tensor([0])
+
+        # Create a mapping from action indices to action values
+        self.action_key_to_values = {}
+
+        for action_idx, (accel, steer, head) in enumerate(
+            product(self.accel_actions, self.steer_actions, self.head_actions)
+        ):
+            self.action_key_to_values[action_idx] = [
+                accel.item(),
+                steer.item(),
+                head.item(),
+            ]
+
+        return Discrete(n=int(len(self.action_key_to_values)))
 
     def filter_padding_agents(self, obs_tensors, N, A):
         # Calculate the batch size assuming it's N*A for simplicity here
@@ -64,14 +94,31 @@ class GPUDriveEnv(gym.Env):
 
         return filtered_obs_tensors
     
+    def apply_discrete_action(self, actions):
+        # Convert the discrete action indices to action values
+        actions = actions.view(-1)
+        action_value_tensor = torch.zeros(actions.shape[0], 3)
+        for idx, action in enumerate(actions):
+            action_idx = action.item()
+            action_value_tensor[idx, :] = torch.Tensor(
+                    self.action_key_to_values[action_idx]
+                )
+        action_value_tensor.to(actions.device)
+        return action_value_tensor
+    
     def apply_action(self, actions):
+        if self.action_space_type == "discrete":
+            actions = self.apply_discrete_action(actions)
+
         N, A = self.self_obs_tensor.shape[0:2]
         batch_size = N * A
         action_dim = actions.shape[1]
         
         # Create a placeholder tensor for the actions, filled with zeros or an appropriate default value
         # You may need to adjust the default value based on the nature of your actions
+        
         padded_actions = torch.zeros(batch_size, action_dim, device=actions.device)
+
         
         # Generate the mask for valid agents, similar to the filtering process
         valid_counts = self.shape_tensor[:, 0]  # Valid agent counts per environment
@@ -113,8 +160,10 @@ class GPUDriveEnv(gym.Env):
         controlled_mask = controlled_state_tensor[:, :, 0] == 1
         for i in range(done_tensor.shape[0]):
             if(done_tensor[i].all()):
+                # print("done due to time")
                 self.reset(i)
             elif(done_tensor[i][controlled_mask[i]].all()):
+                # print("done due to agent")
                 self.reset(i)
 
         # Add L2 Norm to obs_tensor for each agent at indexs [2,3]
@@ -207,7 +256,7 @@ class GPUDriveEnv(gym.Env):
 
     def send(self, actions):
         actions = self.apply_action(actions)
-        actions = actions.view(self.self_obs_tensor.shape[0], -1, self.single_action_space.shape[0])
+        actions = actions.view(self.self_obs_tensor.shape[0], -1, 3)
         self.sim.action_tensor().to_torch().copy_(actions)
         self.sim.step()
 
@@ -227,10 +276,6 @@ class GPUDriveEnv(gym.Env):
         params.observationRadius = observationRadius
         params.rewardParams = reward_params  
         return params
-    
-    @staticmethod
-    def Policy(env: gym.Env):
-        return torch.rand(1)
 
 
 class Convolutional1D(nn.Module):
@@ -242,23 +287,23 @@ class Convolutional1D(nn.Module):
         Takes framestack as a mandatory keyword arguments. Suggested default is 1 frame
         with LSTM or 4 frames without.'''
         super().__init__()
-        self.num_actions = env.single_action_space.shape[0]
+        # self.num_actions = env.single_action_space.shape[0]
         self.channels_last = channels_last
         self.downsample = downsample
-
+        self.action_space_type = env.action_space_type
         self.num_features = env.num_obs_features
 
 
         # self.initial_norm = nn.BatchNorm1d(framestack)
         self.network = nn.Sequential(
             pufferlib.pytorch.layer_init(nn.Linear(self.num_features, hidden_size)),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.BatchNorm1d(hidden_size),
             pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.BatchNorm1d(hidden_size),
             pufferlib.pytorch.layer_init(nn.Linear(hidden_size, output_size)),
-            nn.Tanh()
+            nn.ReLU()
         #     nn.ReLU(),
         #     nn.BatchNorm1d(2),  # Normalization layer after the first convolution
         #     pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
@@ -283,13 +328,16 @@ class Convolutional1D(nn.Module):
         #     nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
         )
         # Discrete
-        # self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
+        if (self.action_space_type == "discrete"):
+            self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.action_space.n), std=0.01)
+        elif (self.action_space_type == "continuous"):
+            self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
+            self.log_std = nn.Parameter(torch.full((self.num_actions,), -2.0))
+
+        
         self.value_fn = pufferlib.pytorch.layer_init(nn.Linear(output_size, 1), std=1)
 
         # continuous
-        self.mean = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
-
-        self.log_std = nn.Parameter(torch.zeros(self.num_actions))
 
     def encode_observations(self, observations):
         if self.channels_last:
@@ -311,15 +359,16 @@ class Convolutional1D(nn.Module):
         assert(torch.isnan(env_outputs).any() == False)
         hidden, lookup = self.encode_observations(env_outputs)
         # Discrete
-        # actions, value = self.decode_actions(hidden, lookup)
-
-        mean = self.mean(hidden)
-        mean = torch.clamp(mean, min=-2, max=2)
-        log_std = torch.clamp(self.log_std, min=-5, max=5)
-        std = torch.exp(log_std)
-        value = self.value_fn(hidden)
-        # return actions, value
-        return [mean, std], value
+        if (self.action_space_type == "discrete"):
+            actions, value = self.decode_actions(hidden, lookup)
+            return actions, value
+        elif (self.action_space_type == "continuous"):
+            actions = self.mean(hidden)
+            actions = torch.clamp(actions, min=-1, max=1)
+            log_std = torch.clamp(self.log_std, min=-5, max=-2)
+            std = torch.exp(log_std)
+            value = self.value_fn(hidden)
+            return actions, value
 
 class Policy(pufferlib.models.Policy):
     def __init__(self, env):
@@ -337,8 +386,8 @@ class Policy(pufferlib.models.Policy):
             flat_size=flat_size,
         )
 
-def make_gpudrive():
-    return GPUDriveEnv()
+def make_gpudrive(action_space_type: str = "continuous"):
+    return GPUDriveEnv(action_space_type=action_space_type)
 
 if __name__ == "__main__":
     env = GPUDriveEnv()
@@ -349,13 +398,13 @@ if __name__ == "__main__":
         env_obs, rews, dones, truncateds, infos, env_ids, mask = env.recv()
         env.sim.step()
 
-        # print(i, dones[0], env_obs[0])
-        frame = env.render()
-        frame_np = frame.cpu().numpy()[0][0]
-        print(frame_np.shape)
-        frames.append(frame_np.astype('uint8'))
+        print(i, dones[0], env_obs[0])
+    #     frame = env.render()
+    #     frame_np = frame.cpu().numpy()[0][0]
+    #     print(frame_np.shape)
+    #     frames.append(frame_np.astype('uint8'))
 
-    with imageio.get_writer('video.mp4', fps=30) as video:
-        for frame in frames:
-            video.append_data(frame)
-    print("Video saved to video.mp4")
+    # with imageio.get_writer('video.mp4', fps=30) as video:
+    #     for frame in frames:
+    #         video.append_data(frame)
+    # print("Video saved to video.mp4")
