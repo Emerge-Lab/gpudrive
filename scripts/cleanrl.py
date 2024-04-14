@@ -144,7 +144,7 @@ def create(
         agent, pool_agents, atn_shape, device, path,
         config.pool_kernel, policy_selector,
     )
-    if config.action_space_type == 'Continuous':
+    if config.action_space_type == 'continuous':
         policy_pool.actions = torch.zeros(
                 total_agents, *atn_shape, dtype=torch.float32).to(device)
 
@@ -555,44 +555,21 @@ def close(data):
         data.wandb.run.log_artifact(artifact)
         data.wandb.finish()
 
-def rollout(env_creator, env_kwargs, agent_creator, agent_kwargs,
-        model_path=None, device='cuda', verbose=True):
-    env = env_creator(**env_kwargs)
-    if model_path is None:
-        agent = agent_creator(env, **agent_kwargs)
-    else:
+def rollout(env, agent, model_path=None, device='cuda', verbose=True):
+    if model_path is not None:
         agent = torch.load(model_path, map_location=device)
-
-    terminal = truncated = True
- 
+    step = 0
     while True:
-        if terminal or truncated:
-            if verbose:
-                print('---  Reset  ---')
-
-            ob, info = env.reset()
-            state = None
-            step = 0
-            return_val = 0
-
-        ob = torch.tensor(ob).unsqueeze(0).to(device)
+        ob, reward, terminal, truncated, i, env_id, mask = env.recv()
+        if torch.all(terminal[mask]):
+            return reward[mask].mean()
         with torch.no_grad():
             if hasattr(agent, 'lstm'):
                 action, _, _, _, state = agent(ob, state)
             else:
                 action, _, _, _ = agent(ob)
 
-        ob, reward, terminal, truncated, _ = env.step(action[0].item())
-        return_val += reward
-
-        chars = env.render()
-        print("\033c", end="")
-        print(chars)
-
-        if verbose:
-            print(f'Step: {step} Reward: {reward:.4f} Return: {return_val:.2f}')
-
-        time.sleep(0.5)
+        env.send(action)
         step += 1
 
 def done_training(data):

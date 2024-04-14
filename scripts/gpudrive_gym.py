@@ -59,8 +59,8 @@ class GPUDriveEnv(gym.Env):
     def setup_discrete_actions(self):
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([-0.6, 0, 0.6])
-        self.accel_actions = torch.tensor([-3, -1, 0.5, 0, 0.5, 1, 3])
+        self.steer_actions = torch.tensor([-0.6, -0.3, -0.1, 0, 0.1, 0.3, 0.6])
+        self.accel_actions = torch.tensor([-3, -1, 0.5, 0.1, 0, 0.1, 0.5, 1, 3])
         self.head_actions = torch.tensor([0])
 
         # Create a mapping from action indices to action values
@@ -331,8 +331,9 @@ class Convolutional1D(nn.Module):
         if (self.action_space_type == "discrete"):
             self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.action_space.n), std=0.01)
         elif (self.action_space_type == "continuous"):
-            self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, self.num_actions), std=0.01)
-            self.log_std = nn.Parameter(torch.full((self.num_actions,), -2.0))
+            self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.single_action_space.shape[0]), std=0.01)
+            # self.log_std = nn.Parameter(torch.full((env.single_action_space.shape[0],), -2.0))
+            self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[0]))
 
         
         self.value_fn = pufferlib.pytorch.layer_init(nn.Linear(output_size, 1), std=1)
@@ -363,12 +364,12 @@ class Convolutional1D(nn.Module):
             actions, value = self.decode_actions(hidden, lookup)
             return actions, value
         elif (self.action_space_type == "continuous"):
-            actions = self.mean(hidden)
-            actions = torch.clamp(actions, min=-1, max=1)
-            log_std = torch.clamp(self.log_std, min=-5, max=-2)
+            means = self.mean(hidden)
+            means = torch.clamp(means, min=-2, max=2)
+            log_std = torch.clamp(self.log_std, min=-10, max=1)
             std = torch.exp(log_std)
             value = self.value_fn(hidden)
-            return actions, value
+            return [means, std], value
 
 class Policy(pufferlib.models.Policy):
     def __init__(self, env):

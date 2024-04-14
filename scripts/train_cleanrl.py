@@ -102,7 +102,9 @@ def train(args, env_module, make_env):
         while not cleanrl.done_training(data):
             cleanrl.evaluate(data)
             cleanrl.train(data)
-
+            reward = cleanrl.rollout(data.pool, data.agent)
+            if args.track:
+                data.wandb.log({'ep_reward': reward})
         print('Done training. Saving data...')
         cleanrl.close(data)
         print('Run complete')
