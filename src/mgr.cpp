@@ -648,7 +648,7 @@ Tensor Manager::mapObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxRoadEntityCount,
-                                   4
+                                   7
                                });
 }
 

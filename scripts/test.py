@@ -26,4 +26,4 @@ sim = gpudrive.SimManager(
 )
 
 sim.step()
-print(sim.done_tensor().to_torch())
+print(sim.map_observation_tensor().to_torch().shape)
