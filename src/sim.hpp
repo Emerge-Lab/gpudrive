@@ -28,6 +28,7 @@ enum class ExportID : uint32_t {
     MapObservation,
     Shape,
     ControlledState,
+    AbsoluteSelfObservation,
     NumExports
 };
 
@@ -42,6 +43,11 @@ enum class SimObject : uint32_t {
     NumObjects,
 };
 
+enum class TaskGraphID : uint32_t {
+    Step,
+    NumTaskGraphs,
+};
+
 // The Sim class encapsulates the per-world state of the simulation.
 // Sim is always available by calling ctx.data() given a reference
 // to the Engine / Context object that is passed to each ECS system.
@@ -51,8 +57,8 @@ enum class SimObject : uint32_t {
 // in this class in order to ensure efficient access patterns.
 struct Sim : public madrona::WorldBase {
     struct Config {
-        bool enableViewer;
         bool autoReset;
+        const madrona::render::RenderECSBridge *renderBridge;
     };
 
     // Sim::registerTypes is called during initialization
@@ -63,8 +69,29 @@ struct Sim : public madrona::WorldBase {
     // Sim::setupTasks is called during initialization to build
     // the system task graph that will be invoked by the 
     // Manager class (src/mgr.hpp) for each step.
-    static void setupTasks(madrona::TaskGraphBuilder &builder,
+    static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
+
+   const std::pair<EntityType,EntityType> collisionPairs[20] = {{EntityType::Pedestrian, EntityType::Pedestrian},                                                                                                             
+                                                              {EntityType::Pedestrian, EntityType::RoadEdge},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::Cyclist},                                                                                                                 
+                                                              {EntityType::Pedestrian, EntityType::RoadLine},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::RoadLane},                                                                                                                
+                                                              {EntityType::Pedestrian, EntityType::CrossWalk},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::SpeedBump},                                                                                                               
+                                                              {EntityType::Pedestrian, EntityType::StopSign},                                                                                                                
+                                                              {EntityType::Cyclist, EntityType::Pedestrian},                                                                                                                 
+                                                              {EntityType::Cyclist, EntityType::RoadEdge},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::Cyclist},                                                                                                                    
+                                                              {EntityType::Cyclist, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::RoadLane},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Cyclist, EntityType::StopSign},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::CrossWalk},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::SpeedBump},                                                                                                                  
+                                                              {EntityType::Vehicle, EntityType::RoadLine},                                                                                                                   
+                                                              {EntityType::Vehicle, EntityType::RoadLane}};                   
 
     // The constructor is called for each world during initialization.
     // Config is global across all worlds, while WorldInit (src/init.hpp)
@@ -108,11 +135,20 @@ struct Sim : public madrona::WorldBase {
     bool autoReset;
 
     // Are we visualizing the simulation in the viewer?
-    bool enableVizRender;
+    bool enableRender;
 };
 
 class Engine : public ::madrona::CustomContext<Engine, Sim> {
+public:
     using CustomContext::CustomContext;
+
+    // These are convenience helpers for creating renderable
+    // entities when rendering isn't necessarily enabled
+    template <typename ArchetypeT>
+    inline madrona::Entity makeRenderableEntity();
+    inline void destroyRenderableEntity(Entity e);
 };
 
 }
+
+#include "sim.inl"
