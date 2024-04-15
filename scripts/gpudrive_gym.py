@@ -21,6 +21,7 @@ class GPUDriveEnv(gym.Env):
     def __init__(self, params: gpudrive.Parameters = None, action_space_type: str = "continuous"):
         self.sim = SimCreator()
         self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
+        self.device = self.self_obs_tensor.device
         self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
         self.map_obs_tensor = self.sim.map_observation_tensor().to_torch()
         self.shape_tensor = self.sim.shape_tensor().to_torch()
@@ -59,7 +60,7 @@ class GPUDriveEnv(gym.Env):
     def setup_discrete_actions(self):
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([-0.6, -0.3, -0.1, 0, 0.1, 0.3, 0.6])
+        self.steer_actions = torch.tensor([-0.6, 0, 0.6])
         self.accel_actions = torch.tensor([-3, -1, 0.5, 0.1, 0, 0.1, 0.5, 1, 3])
         self.head_actions = torch.tensor([0])
 
@@ -96,7 +97,9 @@ class GPUDriveEnv(gym.Env):
     
     def apply_discrete_action(self, actions):
         # Convert the discrete action indices to action values
-        actions = actions.view(-1)
+        # actions = actions.view(-1)
+        if(isinstance(actions, np.ndarray)):
+            actions = torch.from_numpy(actions)
         action_value_tensor = torch.zeros(actions.shape[0], 3)
         for idx, action in enumerate(actions):
             action_idx = action.item()
@@ -243,8 +246,7 @@ class GPUDriveEnv(gym.Env):
         
         mask = controlled.bool()
 
-        env_ids = torch.arange(self.total_num_agents).to(dones.device)
-        env_ids = env_ids//self.total_num_agents
+        env_ids = torch.arange(self.total_num_agents).to(env_obs.device)
 
         assert(torch.isnan(env_obs).any() == False)
         if self.mask_agents:
@@ -292,18 +294,24 @@ class Convolutional1D(nn.Module):
         self.downsample = downsample
         self.action_space_type = env.action_space_type
         self.num_features = env.num_obs_features
+        self.device = env.device
 
 
         # self.initial_norm = nn.BatchNorm1d(framestack)
-        self.network = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Linear(self.num_features, hidden_size)),
-            nn.ReLU(),
+        self.actor = nn.Sequential(
+            nn.Linear(self.num_features, hidden_size),
+            nn.Tanh(),
             # nn.BatchNorm1d(hidden_size),
-            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
-            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
             # nn.BatchNorm1d(hidden_size),
-            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, output_size)),
-            nn.ReLU()
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            # nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, output_size),
+            nn.Tanh(),
+            nn.Linear(output_size, env.action_space.n),
+            nn.Softmax(dim=-1)
         #     nn.ReLU(),
         #     nn.BatchNorm1d(2),  # Normalization layer after the first convolution
         #     pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
@@ -326,21 +334,37 @@ class Convolutional1D(nn.Module):
         #     nn.ReLU(),
         #     pufferlib.pytorch.layer_init(nn.Linear(64, hidden_size)),
         #     nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
-        )
+        ).to(self.device)
+
+        self.critic = nn.Sequential(
+            nn.Linear(self.num_features, hidden_size),
+            nn.Tanh(),
+            # nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            # nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            # nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, 1),
+            nn.Tanh()
+        ).to(self.device)
+
         # Discrete
-        if (self.action_space_type == "discrete"):
-            self.actor = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.action_space.n), std=0.01)
-        elif (self.action_space_type == "continuous"):
-            self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.single_action_space.shape[0]), std=0.01)
-            # self.log_std = nn.Parameter(torch.full((env.single_action_space.shape[0],), -2.0))
-            self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[0]))
+        # if (self.action_space_type == "discrete"):
+        #     self.actor = nn.Linear(output_size, env.action_space.n).to(self.device)
+        # elif (self.action_space_type == "continuous"):
+        #     self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.single_action_space.shape[0]), std=0.01).to(self.device)
+        #     self.log_std = nn.Parameter(torch.full((env.single_action_space.shape[0],), -2.0)).to(self.device)
+            # self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[0]))
 
         
-        self.value_fn = pufferlib.pytorch.layer_init(nn.Linear(output_size, 1), std=1)
+        # self.value_fn = nn.Linear(output_size, 1).to(self.device)
 
         # continuous
 
     def encode_observations(self, observations):
+        observations.to(self.device)
         # if self.channels_last:
         #     observations = observations.permute(0, 3, 1, 2)
         # if self.downsample > 1:
@@ -357,19 +381,22 @@ class Convolutional1D(nn.Module):
     
     def forward(self, env_outputs):
         '''Forward pass for PufferLib compatibility'''
-        assert(torch.isnan(env_outputs).any() == False)
-        hidden, lookup = self.encode_observations(env_outputs)
-        # Discrete
-        if (self.action_space_type == "discrete"):
-            actions, value = self.decode_actions(hidden, lookup)
-            return actions, value
-        elif (self.action_space_type == "continuous"):
-            means = self.mean(hidden)
-            means = torch.clamp(means, min=-2, max=2)
-            log_std = torch.clamp(self.log_std, min=-10, max=1)
-            std = torch.exp(log_std)
-            value = self.value_fn(hidden)
-            return [means, std], value
+        action = self.actor(env_outputs)
+        value = self.critic(env_outputs)
+        return action, value
+        # assert(torch.isnan(env_outputs).any() == False)
+        # hidden, lookup = self.encode_observations(env_outputs)
+        # # Discrete
+        # if (self.action_space_type == "discrete"):
+        #     actions, value = self.decode_actions(hidden, lookup)
+        #     return actions, value
+        # elif (self.action_space_type == "continuous"):
+        #     means = self.mean(hidden)
+        #     means = torch.clamp(means, min=-3, max=3)
+        #     log_std = torch.clamp(self.log_std, min=-10, max=-2)
+        #     std = torch.exp(log_std)
+        #     value = self.value_fn(hidden)
+        #     return [means, std], value
 
 class Policy(pufferlib.models.Policy):
     def __init__(self, env):

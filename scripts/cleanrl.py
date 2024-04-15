@@ -305,10 +305,12 @@ def evaluate(data):
      
             # Index alive mask with policy pool idxs...
             # TODO: Find a way to avoid having to do this
-            learner_mask = torch.Tensor(mask * torch.Tensor(data.policy_pool.mask).to(mask.device))
+            # learner_mask = torch.Tensor(mask * torch.Tensor(data.policy_pool.mask).to(mask.device))
 
             # Ensure indices do not exceed batch size
-            indices = torch.where(learner_mask)[0][:config.batch_size - ptr + 1].cpu().numpy()
+            indices = torch.where(mask)[0][:config.batch_size - ptr + 1].cpu().numpy()
+
+            # indices = mask.cpu().numpy().squeeze()
             end = ptr + len(indices)
 
             # Batch indexing
@@ -351,6 +353,12 @@ def evaluate(data):
     perf.misc_time = misc_profiler.elapsed
 
     data.stats = {}
+    actions_log = data.pool.apply_discrete_action(data.actions_ary).cpu().numpy()
+    data.stats['acc_mean'] = np.mean(actions_log[:, 0])
+    data.stats['acc_std'] = np.std(actions_log[:, 0])
+    data.stats['steer_mean'] = np.mean(actions_log[:, 1])
+    data.stats['steer_std'] = np.std(actions_log[:, 1])
+
     infos = infos['learner']
 
     for k, v in infos.items():
@@ -393,11 +401,20 @@ def train(data):
         .transpose(0, 1)
     )
 
+    advantage_idx_step = data.pool.total_num_agents
+
     # bootstrap value if not done
     with torch.no_grad():
         advantages = torch.zeros(config.batch_size, device=data.device)
         lastgaelam = 0
         for t in reversed(range(config.batch_size)):
+            # if(t + advantage_idx_step > len(idxs) - 1):
+            #     # This is the last step
+            #     nextnonterminal = 0.0
+            #     nextvalues = 0.0
+            #     delta = data.rewards[t] - data.values[t]
+            #     advantages[t] = lastgaelam = delta
+            # else:
             i, i_nxt = idxs[t], idxs[t + 1]
             nextnonterminal = 1.0 - data.dones[i_nxt]
             nextvalues = data.values[i_nxt]

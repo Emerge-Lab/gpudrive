@@ -2,19 +2,19 @@ train:
   seed: 1
   torch_deterministic: True
   device: cuda
-  total_timesteps: 10_000_000
-  learning_rate: 2.5e-4
+  total_timesteps: 100_000_000
+  learning_rate: 2.5e-3
   num_steps: 90
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
   num_minibatches: 4
-  update_epochs: 4
+  update_epochs: 24
   norm_adv: True
   clip_coef: 0.1
-  clip_vloss: True
+  clip_vloss: false
   ent_coef: 0.01
-  vf_coef: 0.5
+  vf_coef: 1.0
   max_grad_norm: 0.5
   target_kl: ~
 
@@ -26,10 +26,10 @@ train:
   data_dir: experiments
   checkpoint_interval: 200
   pool_kernel: [0]
-  batch_size: 8192
-  batch_rows: 2048
+  batch_size: 16000
+  batch_rows: 1000
   bptt_horizon: 1 #8
-  vf_clip_coef: 0.1
+  vf_clip_coef: 1.0
   compile: False
   compile_mode: reduce-overhead
 
@@ -43,15 +43,15 @@ reward_params:
 parameters:
   polylineReductionThreshold: 1.0
   observationRadius: 1000.0
-  datasetInitOptions: FirstN
+  datasetInitOptions: PadN
   collisionBehaviour: Ignore
-  maxNumControlledVehicles: 1
+  maxNumControlledVehicles: 100
   rewardParams: reward_params
 
 sim_manager:
   exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 1
+  num_worlds: 20
   auto_reset: false
   json_path: /home/aarav/gpudrive/nocturne_data/
   enable_batch_renderer: false
