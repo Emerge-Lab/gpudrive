@@ -18,6 +18,24 @@ using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 using madrona::phys::ResponseType;
 
+// This enum is used to track the type of each entity
+// The order of the enum is important and should not be changed
+// The order is {Road types that can be reduced, Road types that cannot be reduced, agent types, other types}
+enum class EntityType : uint32_t {
+    None,
+    RoadEdge,
+    RoadLine,
+    RoadLane,
+    CrossWalk,
+    SpeedBump,
+    StopSign,
+    Vehicle,
+    Pedestrian,
+    Cyclist,
+    Padding,
+    NumTypes,
+};
+
 struct BicycleModel {
     madrona::math::Vector2 position;
     float heading;
@@ -123,19 +141,6 @@ struct Progress {
 // build the egocentric observations of their state.
 struct OtherAgents {
     madrona::Entity e[consts::kMaxAgentCount - 1];
-};
-
-// This enum is used to track the type of each entity for the purposes of
-// classifying the objects hit by each lidar sample.
-enum class EntityType : uint32_t {
-    None,
-    Button,
-    Cube,
-    Vehicle,
-    Pedestrian,
-    Cyclist,
-    Padding,
-    NumTypes,
 };
 
 struct Trajectory {
