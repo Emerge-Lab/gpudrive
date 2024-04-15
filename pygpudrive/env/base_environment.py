@@ -73,7 +73,6 @@ def compute_agent_corners(center, width, height, rotation):
 
     return points
 
-
 class Env(gym.Env):
     """
     GPU Drive Gym Environment.
@@ -340,6 +339,15 @@ class Env(gym.Env):
 
     def render(self):
         """Render the environment."""
+        def create_render_mask():
+            agent_to_is_valid = (self.sim.valid_state_tensor()
+                .to_torch()[self.world_render_idx, :, :]
+                .cpu()
+                .detach()
+                .numpy()
+            )
+
+            return agent_to_is_valid
 
         if self.render_mode is None:
             assert self.spec is not None
@@ -384,13 +392,17 @@ class Env(gym.Env):
         agent_rot = agent_info[:, 7]
         goal_pos = agent_info[:, 8:]
 
-        agent_pos_mean = np.mean(agent_pos, axis=0, where=(agent_pos!=0))
+        render_mask = create_render_mask()
+
+        agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask==1)
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
         # Draw the agent positions
         for agent_idx in range(num_agents_in_scene):
-
+            if not render_mask[agent_idx]:
+                continue
+            
             # Use the updated scale_coord function to get centered and scaled coordinates
             current_pos_scaled = self.scale_coords(
                 agent_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
@@ -463,8 +475,8 @@ class Env(gym.Env):
         """
         x, y = coords
 
-        x_scaled = x - x_avg
-        y_scaled = y - y_avg
+        x_scaled = x - x_avg + (WINDOW_W / 2)
+        y_scaled = y - y_avg + (WINDOW_H / 2)
 
         return (x_scaled, y_scaled)
 
