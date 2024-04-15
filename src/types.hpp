@@ -90,9 +90,12 @@ struct SelfObservation {
 
 struct MapObservation {
     madrona::math::Vector2 position;
+    Scale scale;
     float heading;
     float type;
 };
+
+static_assert(sizeof(MapObservation) == sizeof(float) * 7);
 
 struct PartnerObservation {
     float speed;
