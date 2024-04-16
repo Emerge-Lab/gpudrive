@@ -3,7 +3,9 @@
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
+import wandb
 from itertools import product
+
 # import wandb
 import glob
 import gymnasium as gym
@@ -25,8 +27,8 @@ logging.getLogger(__name__)
 WINDOW_W = 500
 WINDOW_H = 500
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
-VEH_WIDTH = 5
-VEH_HEIGHT = 10
+VEH_WIDTH = 2.05
+VEH_HEIGHT = 4.6
 GOAL_RADIUS = 2
 COLOR_LIST = [
     (255, 0, 0),  # Red
@@ -51,12 +53,12 @@ def compute_agent_corners(center, width, height, rotation):
         The height of the rectangle.
     """
     x, y = center
-    
+
     points = []
 
     # The distance from the center of the rectangle to
     # one of the corners is the same for each corner.
-    radius = math.sqrt((height / 2)**2 + (width / 2)**2)
+    radius = math.sqrt((height / 2) ** 2 + (width / 2) ** 2)
 
     # Get the angle to one of the corners with respect
     # to the x-axis.
@@ -72,6 +74,7 @@ def compute_agent_corners(center, width, height, rotation):
         points.append((x + x_offset, y + y_offset))
 
     return points
+
 
 class Env(gym.Env):
     """
@@ -128,11 +131,12 @@ class Env(gym.Env):
         self.screen_dim = 1000
         self.screen = None
         self.clock = None
+        self.zoom_scale = None
 
         # TODO: @AP / @SK: Allow for num_worlds < num_files
-        assert num_worlds == len(
-            glob.glob(f"{data_dir}/*.json")
-        ), "Number of worlds is not equal to the number of files in the data directory."
+        # assert num_worlds == len(
+        #     glob.glob(f"{data_dir}/*.json")
+        # ), "Number of worlds is not equal to the number of files in the data directory."
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
@@ -165,12 +169,18 @@ class Env(gym.Env):
         self.observation_space = self._set_observation_space()
         self.obs_dim = self.observation_space.shape[0]
 
+        # Set a center for the rendering window
+        # This is the center for the 0-th world.
+        self.window_center = np.zeros(2)
+
         self._print_info(verbose)
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
         for sim_idx in range(self.num_sims):
             self.sim.reset(sim_idx)
+
+        self.compute_window_settings()
 
         return self.get_obs()
 
@@ -337,17 +347,45 @@ class Env(gym.Env):
 
         return obs_filtered
 
+    def compute_window_settings(self):
+        render_mask = self.create_render_mask()
+        # Get agent info
+        all_agent_pos = (
+            self.sim.absolute_self_observation_tensor()
+            .to_torch()[self.world_render_idx, :, :]
+            .cpu()
+            .detach()
+            .numpy()
+        )[:, :2]
+        # # Get the agent goal positions and current positions
+        # selected_agent_info = all_agent_info[render_mask.squeeze(1)]
+        agent_pos = all_agent_pos[render_mask.squeeze(1)]  # x, y
+        self.zoom_scale = (
+            WINDOW_H
+            / np.min(
+                (
+                    agent_pos[:, 0].max() - agent_pos[:, 0].min(),
+                    agent_pos[:, 1].max() - agent_pos[:, 1].min(),
+                )
+            )
+            / 2
+        )
+
+        self.window_center = np.mean(agent_pos, axis=0)
+
+    def create_render_mask(self):
+        agent_to_is_valid = (
+            self.sim.valid_state_tensor()
+            .to_torch()[self.world_render_idx, :, :]
+            .cpu()
+            .detach()
+            .numpy()
+        )
+        return agent_to_is_valid.astype(bool)
+
     def render(self):
         """Render the environment."""
-        def create_render_mask():
-            agent_to_is_valid = (self.sim.valid_state_tensor()
-                .to_torch()[self.world_render_idx, :, :]
-                .cpu()
-                .detach()
-                .numpy()
-            )
-
-            return agent_to_is_valid
+        render_mask = self.create_render_mask()
 
         if self.render_mode is None:
             assert self.spec is not None
@@ -389,12 +427,8 @@ class Env(gym.Env):
 
         # Get the agent goal positions and current positions
         agent_pos = agent_info[:, :2]  # x, y
-        agent_rot = agent_info[:, 7]
-        goal_pos = agent_info[:, 8:]
-
-        render_mask = create_render_mask()
-
-        agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask==1)
+        goal_pos = agent_info[:, 8:]  # x, y
+        agent_rot = agent_info[:, 7]  # heading
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
@@ -402,26 +436,37 @@ class Env(gym.Env):
         for agent_idx in range(num_agents_in_scene):
             if not render_mask[agent_idx]:
                 continue
-            
+
             # Use the updated scale_coord function to get centered and scaled coordinates
             current_pos_scaled = self.scale_coords(
-                agent_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
+                agent_pos[agent_idx],
+                self.window_center[0],
+                self.window_center[1],
             )
 
             current_goal_scaled = self.scale_coords(
-                goal_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
+                goal_pos[agent_idx],
+                self.window_center[0],
+                self.window_center[1],
             )
 
-            mod_idx = agent_idx % len(COLOR_LIST)
+            mod_idx = 2  # agent_idx % len(COLOR_LIST)
 
-            agent_corners = compute_agent_corners(current_pos_scaled, 
-                                                  VEH_WIDTH, 
-                                                  VEH_HEIGHT, 
-                                                  agent_rot[agent_idx])
+            if self.cont_agent_mask[self.world_render_idx, agent_idx]:
+                mod_idx = 0
 
-            pygame.draw.polygon(surface=self.surf,
-                                color=COLOR_LIST[mod_idx],
-                                points=agent_corners)
+            agent_corners = compute_agent_corners(
+                current_pos_scaled,
+                VEH_WIDTH * self.zoom_scale,
+                VEH_HEIGHT * self.zoom_scale,
+                agent_rot[agent_idx] + np.pi / 4,
+            )
+
+            pygame.draw.polygon(
+                surface=self.surf,
+                color=COLOR_LIST[mod_idx],
+                points=agent_corners,
+            )
 
             pygame.draw.circle(
                 surface=self.surf,
@@ -430,7 +475,7 @@ class Env(gym.Env):
                     int(current_goal_scaled[0]),
                     int(current_goal_scaled[1]),
                 ),
-                radius=GOAL_RADIUS,
+                radius=GOAL_RADIUS * self.zoom_scale,
             )
 
             # Log
@@ -466,17 +511,15 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coords(
-            self, coords, x_avg, y_avg
-    ):
+    def scale_coords(self, coords, x_avg, y_avg):
         """Scale the coordinates to fit within the pygame surface window and center them.
         Args:
             coords: x, y coordinates
         """
         x, y = coords
 
-        x_scaled = x - x_avg + (WINDOW_W / 2)
-        y_scaled = y - y_avg + (WINDOW_H / 2)
+        x_scaled = (x - x_avg) * self.zoom_scale + (WINDOW_W / 2)
+        y_scaled = (y - y_avg) * self.zoom_scale + (WINDOW_H / 2)
 
         return (x_scaled, y_scaled)
 
@@ -529,10 +572,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     config = EnvConfig()
-    # run = wandb.init(
-    #     project="gpudrive",
-    #     group="test_rendering",
-    # )
+    run = wandb.init(
+        project="gpudrive",
+        group="test_rendering",
+    )
 
     # wandb.define_metric("episode_step")
     # set all other agent pos logs to use this step
@@ -544,8 +587,9 @@ if __name__ == "__main__":
         config=config,
         num_worlds=1,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="/home/samk/gpudrive/waymo_data",
-        device="cuda",
+        data_dir="waymo_data",
+        device="cpu",
+        render_mode="rgb_array",
     )
 
     obs = env.reset()
@@ -560,10 +604,6 @@ if __name__ == "__main__":
             [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
         )
 
-        # print(
-        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]}"
-        # )
-
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
@@ -576,11 +616,10 @@ if __name__ == "__main__":
             print(f"RESETTING ENVIRONMENT\n")
 
         frame = env.render()
-        # frames.append(frame.T)
+        frames.append(frame.T)
 
     # Log video
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+    wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
     # run.finish()
     env.close()
