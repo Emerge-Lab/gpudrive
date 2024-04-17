@@ -24,8 +24,8 @@ import logging
 
 logging.getLogger(__name__)
 
-WINDOW_W = 500
-WINDOW_H = 500
+WINDOW_W = 1024
+WINDOW_H = 1024
 WINDOW_SIZE = (WINDOW_W, WINDOW_H)
 VEH_WIDTH = 2.05
 VEH_HEIGHT = 4.6
@@ -113,9 +113,10 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 0.5
+        params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
+        params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
 
         # Set number of controlled vehicles
         params.maxNumControlledVehicles = max_cont_agents
@@ -138,8 +139,8 @@ class Env(gym.Env):
         #     glob.glob(f"{data_dir}/*.json")
         # ), "Number of worlds is not equal to the number of files in the data directory."
 
-        if not os.path.exists(data_dir) or not os.listdir(data_dir):
-            assert False, "The data directory does not exist or is empty."
+        # if not os.path.exists(data_dir) or not os.listdir(data_dir):
+        #     assert False, "The data directory does not exist or is empty."
 
         # Initialize the simulator
         self.sim = gpudrive.SimManager(
@@ -166,8 +167,8 @@ class Env(gym.Env):
         self.action_space = self._set_discrete_action_space()
 
         # Set observation space
-        self.observation_space = self._set_observation_space()
-        self.obs_dim = self.observation_space.shape[0]
+        # self.observation_space = self._set_observation_space()
+        # self.obs_dim = self.observation_space.shape[0]
 
         # Set a center for the rendering window
         # This is the center for the 0-th world.
@@ -182,7 +183,7 @@ class Env(gym.Env):
 
         self.compute_window_settings()
 
-        return self.get_obs()
+        return
 
     def step(self, actions):
         """Take simultaneous actions for each agent in all `num_worlds` environments.
@@ -381,7 +382,17 @@ class Env(gym.Env):
             .detach()
             .numpy()
         )
+        print(agent_to_is_valid.shape)
         return agent_to_is_valid.astype(bool)
+    
+    def get_endpoints(self, center, map_obj):
+        center_pos = center
+        length = map_obj[2] # Already half the length
+        yaw = map_obj[5]
+
+        start = center_pos - np.array([length * np.cos(yaw), length * np.sin(yaw)])
+        end = center_pos + np.array([length * np.cos(yaw), length * np.sin(yaw)])
+        return start, end
 
     def render(self):
         """Render the environment."""
@@ -499,6 +510,30 @@ class Env(gym.Env):
 
             # wandb.log(agent_log_dict)
 
+        map_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx].cpu().numpy()
+        print(f'{map_info.shape=}')
+
+        color_dict = {
+            float(gpudrive.EntityType.RoadEdge): (0, 0, 0), # Black
+            float(gpudrive.EntityType.RoadLane): (255,0,0), # Grey
+            float(gpudrive.EntityType.RoadLine): (0,255,0), # Green
+        }
+
+        for idx, map_obj in enumerate(map_info):
+            if map_obj[-1] == float(gpudrive.EntityType._None):
+                continue
+            elif map_obj[-1] < float(gpudrive.EntityType.CrossWalk):
+                center = self.scale_coords(map_obj[:2], self.window_center[0], self.window_center[1])
+                start, end = self.get_endpoints(center, map_obj)
+                pygame.draw.line(
+                    self.surf,
+                    color_dict[map_obj[-1]],
+                    start,
+                    end,
+                    2
+                )
+            
+
         if self.render_mode == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
@@ -572,22 +607,23 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     config = EnvConfig()
-    run = wandb.init(
-        project="gpudrive",
-        group="test_rendering",
-    )
+    # run = wandb.init(
+    #     project="gpudrive",
+    #     group="test_rendering",
+    # )
 
     # wandb.define_metric("episode_step")
     # set all other agent pos logs to use this step
     # wandb.define_metric("agent_*", step_metric="episode_step")
 
-    NUM_CONT_AGENTS = 1
+    NUM_CONT_AGENTS = 0
 
     env = Env(
         config=config,
         num_worlds=1,
+        auto_reset=True,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data",
+        data_dir="/home/aarav/gpudrive/nocturne_data",
         device="cpu",
         render_mode="rgb_array",
     )
@@ -595,31 +631,57 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for _ in range(100):
+    for _ in range(1):
 
-        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
+        # print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
-        # Take a random action (we're only going straight)
-        rand_action = torch.Tensor(
-            [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
-        )
+        # # Take a random action (we're only going straight)
+        # rand_action = torch.Tensor(
+        #     [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
+        # )
 
         # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        # obs, reward, done, info = env.step(rand_action)
+        env.sim.step()
 
-        print(
-            f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
-        )
+        # print(
+        #     f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
+        # )
 
-        if done.sum() == NUM_CONT_AGENTS:
-            obs = env.reset()
-            print(f"RESETTING ENVIRONMENT\n")
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
 
         frame = env.render()
-        frames.append(frame.T)
+        print(frame.shape)
+        frames.append(frame)
 
-    # Log video
-    wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+    # import imageio
+    # with imageio.get_writer('out.mp4', fps=20) as video:
+    #     for frame in frames:
+    #         video.append_data(frame)
+    import cv2
+    cv2.imwrite('frame.png', frames[0]) 
+    # # # Example frame dimensions and frame rate
+    # height, width, channels = frames[0].shape  # Update with your actual dimensions
+    # # print(height, width, channels)
+    # fps = 10  # Update with your desired frames per second
+
+    # # # Create a VideoWriter object
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 'mp4v' is the codec for .mp4 files
+    # video = cv2.VideoWriter('output.mp4', fourcc, fps, (width, height))
+
+    # # # Assume `frames` is a list of numpy arrays in the shape (H, W, C)
+    # for frame in frames:
+    #     # If you were transposing frames, you might need to adjust this part
+    #     # frame = frame.T  # Only use if you actually need to transpose the frame
+    #     video.write(frame)
+
+    # # # Release the VideoWriter
+    # video.release()
+    # print(np.array(frames).shape)
+    # # Log video
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
     # run.finish()
     env.close()
