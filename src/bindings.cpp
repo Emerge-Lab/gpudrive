@@ -90,6 +90,7 @@ namespace gpudrive
             .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
             .def("absolute_self_observation_tensor",
                  &Manager::absoluteSelfObservationTensor)
+            .def("valid_state_tensor", &Manager::validStateTensor)
             .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor);

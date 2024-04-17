@@ -1,4 +1,5 @@
 #include "level_gen.hpp"
+#include "utils.hpp"
 
 namespace gpudrive {
 
@@ -117,7 +118,10 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
-    ctx.get<MapObservation>(road_edge) = MapObservation{.position = Vector2{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2}, .heading = atan2(end.y - start.y, end.x - start.x), .type = (float)type};
+    ctx.get<MapObservation>(road_edge) = MapObservation{.position = ctx.get<Position>(road_edge).xy(),
+                                                        .scale = ctx.get<Scale>(road_edge), 
+                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(road_edge)), 
+                                                        .type = (float)type};
     return road_edge;
 }
 
@@ -187,7 +191,10 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = Vector2{.x = (x1 + x2 + x3 + x4)/4 - ctx.data().mean.x, .y =  (y1 + y2 + y3 + y4)/4 - ctx.data().mean.y}, .heading = angle, .type = (float)type};
+    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = ctx.get<Position>(speed_bump).xy(),
+                                                         .scale = ctx.get<Scale>(speed_bump), 
+                                                         .heading = utils::quatToYaw(ctx.get<Rotation>(speed_bump)), 
+                                                         .type = (float)type};
     return speed_bump;
 }
 
@@ -203,7 +210,10 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
-    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = Vector2{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y}, .heading = 0, .type = (float)EntityType::StopSign};
+    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = ctx.get<Position>(stop_sign).xy(),
+                                                        .scale = ctx.get<Scale>(stop_sign), 
+                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(stop_sign)), 
+                                                        .type = (float)EntityType::StopSign};
     return stop_sign;
 }
 
@@ -289,8 +299,10 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<MapObservation>(physicsEntity) = MapObservation{
-        .position = Vector2{.x = 0, .y = 0}, .heading = 0, .type = 0};
+    ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
+                                                            .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
+                                                            .type = 0, 
+                                                            .scale = ctx.get<Scale>(physicsEntity)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
     return physicsEntity;

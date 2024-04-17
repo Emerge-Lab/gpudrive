@@ -99,11 +99,12 @@ static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSi
 
 struct MapObservation {
     madrona::math::Vector2 position;
+    Scale scale;
     float heading;
     float type;
 };
 
-const int MapObservationExportSize = 4;
+const int MapObservationExportSize = 7;
 
 static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -197,6 +198,15 @@ struct AbsoluteSelfObservation {
     Goal goal;
 };
 
+enum class Validity : int32_t {
+    Invalid = 0,
+    Valid = 1
+};
+
+struct ValidState {
+    Validity valid[consts::kMaxAgentCount];
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -224,6 +234,7 @@ struct Agent : public madrona::Archetype<
     Goal,
     Trajectory,
     ControlledState,
+
     // Input
     Action,
 
@@ -235,7 +246,6 @@ struct Agent : public madrona::Archetype<
     Lidar,
     StepsRemaining,
     
-
     // Reward, episode termination
     Reward,
     Done,
