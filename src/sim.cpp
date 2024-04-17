@@ -122,6 +122,19 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
         }
         should_reset = areAllControlledAgentsDone;
     }
+    else if (ctx.data().autoReset && ctx.data().numControlledVehicles == 0) {
+        should_reset = 1;
+        for(CountT i = 0; i < ctx.data().numAgents; i++) {
+            Entity agent = ctx.data().agents[i];
+            if(ctx.get<EntityType>(agent) == EntityType::Padding) {
+                continue;
+            }
+            if(ctx.get<Done>(agent).v == 0) {
+                should_reset = 0;
+                break;
+            }
+        }
+    }
 
     if (should_reset != 0) {
         reset.reset = 0;
