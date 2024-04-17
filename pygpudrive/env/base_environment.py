@@ -113,7 +113,7 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 1.0
+        params.polylineReductionThreshold = 0.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
         params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
@@ -511,8 +511,6 @@ class Env(gym.Env):
             # wandb.log(agent_log_dict)
 
         map_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx].cpu().numpy()
-        print(f'{map_info.shape=}')
-
         color_dict = {
             float(gpudrive.EntityType.RoadEdge): (0, 0, 0), # Black
             float(gpudrive.EntityType.RoadLane): (255,0,0), # Grey
@@ -624,14 +622,14 @@ if __name__ == "__main__":
         auto_reset=True,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="/home/aarav/gpudrive/nocturne_data",
-        device="cpu",
+        device="cuda",
         render_mode="rgb_array",
     )
 
     obs = env.reset()
     frames = []
 
-    for _ in range(1):
+    for _ in range(91):
 
         # print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
@@ -653,15 +651,14 @@ if __name__ == "__main__":
         #     print(f"RESETTING ENVIRONMENT\n")
 
         frame = env.render()
-        print(frame.shape)
         frames.append(frame)
 
-    # import imageio
-    # with imageio.get_writer('out.mp4', fps=20) as video:
-    #     for frame in frames:
-    #         video.append_data(frame)
-    import cv2
-    cv2.imwrite('frame.png', frames[0]) 
+    import imageio
+    with imageio.get_writer('out.mp4', fps=20) as video:
+        for frame in frames:
+            video.append_data(frame)
+    # import cv2
+    # cv2.imwrite('frame.png', frames[0]) 
     # # # Example frame dimensions and frame rate
     # height, width, channels = frames[0].shape  # Update with your actual dimensions
     # # print(height, width, channels)
