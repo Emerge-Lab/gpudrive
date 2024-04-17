@@ -80,7 +80,7 @@ static inline Optional<render::RenderManager> initRenderManager(
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = mgr_cfg.numWorlds,
         .maxViewsPerWorld = consts::kMaxAgentCount, // FIXME?
-        .maxInstancesPerWorld = 1000,
+        .maxInstancesPerWorld = 3000,
         .execMode = mgr_cfg.execMode,
         .voxelCfg = {},
     });

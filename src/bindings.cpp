@@ -50,7 +50,7 @@ namespace gpudrive
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, bool auto_reset, std::string jsonPath, Parameters params, bool enable_batch_renderer)
+                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, bool auto_reset, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
@@ -58,14 +58,18 @@ namespace gpudrive
                       .autoReset = auto_reset,
                       .jsonPath = jsonPath,
                       .params = params,
-                      .enableBatchRenderer = enable_batch_renderer}); },
+                      .enableBatchRenderer = enable_batch_renderer,
+                      .batchRenderViewWidth = batch_render_view_width,
+                      .batchRenderViewHeight = batch_render_view_height});},
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
                 nb::arg("num_worlds"),
                 nb::arg("auto_reset"),
                 nb::arg("json_path"),
                 nb::arg("params"),
-                nb::arg("enable_batch_renderer") = false)
+                nb::arg("enable_batch_renderer") = false,
+                nb::arg("batch_render_view_width") = 64,
+                nb::arg("batch_render_view_height") = 64)
             .def("step", &Manager::step)
             .def("reset", &Manager::triggerReset)
             .def("reset_tensor", &Manager::resetTensor)
