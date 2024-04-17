@@ -110,7 +110,7 @@ static inline void initWorld(Engine &ctx)
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
-    if (ctx.data().autoReset) {
+    if (ctx.data().autoReset && ctx.data().numControlledVehicles > 0) {
         int32_t areAllControlledAgentsDone = 1;
         for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
