@@ -117,8 +117,8 @@ def create(
     else:
         agent = pufferlib.emulation.make_object(
             agent, agent_creator, [pool], agent_kwargs)
-        if wandb is not None:
-            wandb.watch(agent, log="all", log_freq=100)
+        # if wandb is not None:
+        #     wandb.watch(agent, log="all", log_freq=100)
 
     global_step = resume_state.get("global_step", 0)
     agent_step = resume_state.get("agent_step", 0)
@@ -427,7 +427,7 @@ def train(data):
             nextnonterminal = 1.0 - data.dones[i_nxt]
             nextvalues = data.values[i_nxt]
             delta = (
-                data.rewards[i_nxt]
+                data.rewards[i]
                 + config.gamma * nextvalues * nextnonterminal
                 - data.values[i]
             )
