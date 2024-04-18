@@ -226,8 +226,8 @@ inline void movementSystem(Engine &e,
                            const EntityType &type,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
-                           const CollisionDetectionEvent &collisionEvent)
-{
+                           const CollisionDetectionEvent &collisionEvent,
+                           Done& done) {
     if (type == EntityType::Padding) {
         return;
     }
@@ -235,11 +235,11 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
-            ctx.get<Done>(e).v = 1;
+            done.v = 1;
             return;
        }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
         {
-            ctx.get<Done>(e).v = 1;
+            done.v = 1;
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
             velocity.linear.y = 0;
@@ -626,7 +626,8 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             EntityType,
             StepsRemaining,
             Trajectory,
-            CollisionDetectionEvent
+            CollisionDetectionEvent,
+            Done
         >>({});
 
     auto updateValidStateSystem =
