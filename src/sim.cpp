@@ -110,7 +110,7 @@ static inline void initWorld(Engine &ctx)
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     int32_t should_reset = reset.reset;
-    if (ctx.data().autoReset) {
+    if (ctx.data().autoReset && ctx.data().numControlledVehicles > 0) {
         int32_t areAllControlledAgentsDone = 1;
         for (CountT i = 0; i < ctx.data().numAgents; i++) {
             Entity agent = ctx.data().agents[i];
@@ -121,6 +121,19 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
             }
         }
         should_reset = areAllControlledAgentsDone;
+    }
+    else if (ctx.data().autoReset && ctx.data().numControlledVehicles == 0) {
+        should_reset = 1;
+        for(CountT i = 0; i < ctx.data().numAgents; i++) {
+            Entity agent = ctx.data().agents[i];
+            if(ctx.get<EntityType>(agent) == EntityType::Padding) {
+                continue;
+            }
+            if(ctx.get<Done>(agent).v == 0) {
+                should_reset = 0;
+                break;
+            }
+        }
     }
 
     if (should_reset != 0) {
