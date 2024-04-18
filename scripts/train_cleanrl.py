@@ -88,6 +88,7 @@ def load_from_config():
    
 
 def train(args, env_module, make_env):
+    print("Training with args", args)
     if args.backend == 'clean_pufferl':
         data = cleanrl.create(
             config=args.train,
@@ -137,7 +138,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb-entity', type=str, default='pandya-aarav-97', help='WandB entity')
     parser.add_argument('--wandb-project', type=str, default='GPUDrive', help='WandB project')
     parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
-    parser.add_argument('--track', action='store_true', default=True, help='Track on WandB')
+    parser.add_argument('--track', action='store_true', default=False, help='Track on WandB')
     parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
     parser.add_argument('--action_space_type', type=str, default='discrete', choices=['discrete', 'continuous'], help='Action space')
 

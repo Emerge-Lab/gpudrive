@@ -117,7 +117,8 @@ def create(
     else:
         agent = pufferlib.emulation.make_object(
             agent, agent_creator, [pool], agent_kwargs)
-        wandb.watch(agent, log="all", log_freq=100)
+        if wandb is not None:
+            wandb.watch(agent, log="all", log_freq=100)
 
     global_step = resume_state.get("global_step", 0)
     agent_step = resume_state.get("agent_step", 0)
@@ -416,6 +417,13 @@ def train(data):
             #     advantages[t] = lastgaelam = delta
             # else:
             i, i_nxt = idxs[t], idxs[t + 1]
+            if(data.dones[i]):
+                # This is the last step
+                nextnonterminal = 0.0
+                nextvalues = 0.0
+                delta = data.rewards[i] - data.values[i]
+                advantages[t] = lastgaelam = delta
+                continue
             nextnonterminal = 1.0 - data.dones[i_nxt]
             nextvalues = data.values[i_nxt]
             delta = (
@@ -699,8 +707,8 @@ def sample_logits(logits: Union[torch.Tensor, List[torch.Tensor]], action=None):
         batch = logits.shape[0]
         action = action.view(batch, -1)
     
-    logprob = categorical_dist.log_prob(action).mean(axis=-1)
-    entropy = categorical_dist.entropy().mean(axis=-1)
+    logprob = categorical_dist.log_prob(action)
+    entropy = categorical_dist.entropy()
 
     return action, logprob, entropy
     

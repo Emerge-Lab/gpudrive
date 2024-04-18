@@ -130,7 +130,7 @@ struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
-const int AgentMapObservationExportSize = 4;
+const int AgentMapObservationExportSize = 7;
 
 static_assert(sizeof(AgentMapObservations) == sizeof(float) *
     consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
