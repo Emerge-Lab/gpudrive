@@ -18,8 +18,8 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=config,
-        num_worlds=2,
-        max_cont_agents=3,
+        num_worlds=3,
+        max_cont_agents=4,
         data_dir="waymo_data",
         device="cuda",
     )
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     wandb.login()
     run = wandb.init(
         project="please_drive",
-        group="single_agent_sparse",
+        group="new_roadlines_test",
         sync_tensorboard=True,
     )
     run_id = run.id

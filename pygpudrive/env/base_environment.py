@@ -4,6 +4,7 @@ from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
 from itertools import product
+
 # import wandb
 import glob
 import gymnasium as gym
@@ -51,12 +52,12 @@ def compute_agent_corners(center, width, height, rotation):
         The height of the rectangle.
     """
     x, y = center
-    
+
     points = []
 
     # The distance from the center of the rectangle to
     # one of the corners is the same for each corner.
-    radius = math.sqrt((height / 2)**2 + (width / 2)**2)
+    radius = math.sqrt((height / 2) ** 2 + (width / 2) ** 2)
 
     # Get the angle to one of the corners with respect
     # to the x-axis.
@@ -72,6 +73,7 @@ def compute_agent_corners(center, width, height, rotation):
         points.append((x + x_offset, y + y_offset))
 
     return points
+
 
 class Env(gym.Env):
     """
@@ -105,7 +107,9 @@ class Env(gym.Env):
         reward_params.rewardType = (
             gpudrive.RewardType.OnGoalAchieved
         )  # Or any other value from the enum
-        reward_params.distanceToGoalThreshold = 3.0  # Set appropriate values
+        reward_params.distanceToGoalThreshold = (
+            self.config.dist_to_goal_threshold  # Set appropriate values
+        )
         reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
 
         # Configure the environment
@@ -113,6 +117,20 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 0.5
         params.observationRadius = 10.0
         params.rewardParams = reward_params
+
+        # Collision behavior
+        if self.config.collision_behavior == "ignore":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
+        elif self.config.collision_behavior == "remove":
+            params.collisionBehaviour = (
+                gpudrive.CollisionBehaviour.AgentRemoved
+            )
+        elif self.config.collision_behavior == "stop":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
+        else:
+            raise ValueError(
+                f"Invalid collision behavior: {self.config.collision_behavior}"
+            )
 
         # Set number of controlled vehicles
         params.maxNumControlledVehicles = max_cont_agents
@@ -129,7 +147,6 @@ class Env(gym.Env):
         self.screen = None
         self.clock = None
 
-        # TODO: @AP / @SK: Allow for num_worlds < num_files
         assert num_worlds == len(
             glob.glob(f"{data_dir}/*.json")
         ), "Number of worlds is not equal to the number of files in the data directory."
@@ -265,10 +282,6 @@ class Env(gym.Env):
                 self.num_sims, self.max_cont_agents, -1
             )
 
-            if not self.config.collision_state:
-                # Remove collision state from SelfObservation
-                ego_state = ego_state[:, :, :-3]
-
             if self.config.normalize_obs:  # Normalize
                 ego_state = self.normalize_ego_state(ego_state)
         else:
@@ -339,8 +352,10 @@ class Env(gym.Env):
 
     def render(self):
         """Render the environment."""
+
         def create_render_mask():
-            agent_to_is_valid = (self.sim.valid_state_tensor()
+            agent_to_is_valid = (
+                self.sim.valid_state_tensor()
                 .to_torch()[self.world_render_idx, :, :]
                 .cpu()
                 .detach()
@@ -394,7 +409,7 @@ class Env(gym.Env):
 
         render_mask = create_render_mask()
 
-        agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask==1)
+        agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask == 1)
 
         num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
@@ -402,7 +417,7 @@ class Env(gym.Env):
         for agent_idx in range(num_agents_in_scene):
             if not render_mask[agent_idx]:
                 continue
-            
+
             # Use the updated scale_coord function to get centered and scaled coordinates
             current_pos_scaled = self.scale_coords(
                 agent_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
@@ -414,14 +429,15 @@ class Env(gym.Env):
 
             mod_idx = agent_idx % len(COLOR_LIST)
 
-            agent_corners = compute_agent_corners(current_pos_scaled, 
-                                                  VEH_WIDTH, 
-                                                  VEH_HEIGHT, 
-                                                  agent_rot[agent_idx])
+            agent_corners = compute_agent_corners(
+                current_pos_scaled, VEH_WIDTH, VEH_HEIGHT, agent_rot[agent_idx]
+            )
 
-            pygame.draw.polygon(surface=self.surf,
-                                color=COLOR_LIST[mod_idx],
-                                points=agent_corners)
+            pygame.draw.polygon(
+                surface=self.surf,
+                color=COLOR_LIST[mod_idx],
+                points=agent_corners,
+            )
 
             pygame.draw.circle(
                 surface=self.surf,
@@ -466,9 +482,7 @@ class Env(gym.Env):
         else:
             return self.isopen
 
-    def scale_coords(
-            self, coords, x_avg, y_avg
-    ):
+    def scale_coords(self, coords, x_avg, y_avg):
         """Scale the coordinates to fit within the pygame surface window and center them.
         Args:
             coords: x, y coordinates
@@ -538,13 +552,14 @@ if __name__ == "__main__":
     # set all other agent pos logs to use this step
     # wandb.define_metric("agent_*", step_metric="episode_step")
 
-    NUM_CONT_AGENTS = 1
+    NUM_CONT_AGENTS = 4
+    NUM_WORLDS = 3
 
     env = Env(
         config=config,
-        num_worlds=1,
+        num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="/home/samk/gpudrive/waymo_data",
+        data_dir="waymo_data",
         device="cuda",
     )
 
@@ -557,19 +572,18 @@ if __name__ == "__main__":
 
         # Take a random action (we're only going straight)
         rand_action = torch.Tensor(
-            [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
-        )
-
-        # print(
-        #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]}"
-        # )
+            [
+                [
+                    env.action_space.sample()
+                    for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+                ]
+            ]
+        ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
 
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        print(
-            f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
-        )
+        print(obs.max())
 
         if done.sum() == NUM_CONT_AGENTS:
             obs = env.reset()

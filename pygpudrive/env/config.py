@@ -28,5 +28,8 @@ class EnvConfig:
     steer_actions: torch.Tensor = torch.tensor([-0.6, 0, 0.6])
     accel_actions: torch.Tensor = torch.tensor([-3, 0, 3])
 
+    ## Collision behavior
+    collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
+
     # Reward
-    # TODO
+    dist_to_goal_threshold: float = 3.0
