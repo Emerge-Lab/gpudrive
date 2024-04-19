@@ -704,7 +704,7 @@ Tensor Manager::controlledStateTensor() const {
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 3 + 4 + 1 + 2});
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
 }
 
 Tensor Manager::validStateTensor() const {
