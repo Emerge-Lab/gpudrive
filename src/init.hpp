@@ -1,41 +1,16 @@
 #pragma once
 
 #include <madrona/physics.hpp>
-#include <madrona/exec_mode.hpp>
-#include <madrona/math.hpp>
-#include <madrona/physics.hpp>
-#include <madrona/types.hpp>
-
-namespace madrona::viz {
-struct VizECSBridge;
-}
+#include "types.hpp"
 
 namespace gpudrive
 {
+
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;
     constexpr size_t MAX_ROADS = 956;
     constexpr size_t MAX_POSITIONS = 91;
     constexpr size_t MAX_GEOMETRY = 1746;
-
-    enum class MapObjectType : uint32_t
-    {
-        Vehicle,
-        Pedestrian,
-        Cyclist,
-        Invalid
-    };
-
-    enum class MapRoadType : uint32_t
-    {
-        RoadEdge,
-        RoadLine,
-        Lane,
-        CrossWalk,
-        SpeedBump,
-        StopSign,
-        Invalid
-    };
 
     // Cannot use Madrona::math::Vector2 because it is not a POD type.
     // Getting all zeros if using any madrona types.
@@ -54,7 +29,7 @@ namespace gpudrive
         MapVector2 velocity[MAX_POSITIONS];
         bool valid[MAX_POSITIONS];
         MapVector2 goalPosition;
-        MapObjectType type;
+        EntityType type;
 
         uint32_t numPositions;
         uint32_t numHeadings;
@@ -67,7 +42,7 @@ namespace gpudrive
     {
         // std::array<MapPosition, MAX_POSITIONS> geometry;
         MapVector2 geometry[MAX_GEOMETRY];
-        MapRoadType type;
+        EntityType type;
         uint32_t numPoints;
         MapVector2 mean;
     };
@@ -93,9 +68,9 @@ namespace gpudrive
 
     enum class RewardType : uint32_t
     {
-        DistanceBased, // negative distance to goal
+        DistanceBased,  // negative distance to goal
         OnGoalAchieved, // 1 if on goal, 0 otherwise
-        Dense // negative distance to expert trajectory
+        Dense           // negative distance to expert trajectory
     };
 
     struct RewardParams
@@ -105,11 +80,19 @@ namespace gpudrive
         float distanceToExpertThreshold;
     };
 
+    enum class CollisionBehaviour: uint32_t
+    {
+        AgentStop,
+        AgentRemoved,
+        Ignore
+    };
+
     struct Parameters
     {
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
+        CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
     };
 
@@ -117,9 +100,7 @@ namespace gpudrive
     {
         EpisodeManager *episodeMgr;
         madrona::phys::ObjectManager *rigidBodyObjMgr;
-        const madrona::viz::VizECSBridge *vizBridge;
         Map *map;
-        madrona::ExecMode mode;
         const Parameters *params;
     };
 

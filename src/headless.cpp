@@ -12,7 +12,6 @@
 #include <vector>
 
 using namespace madrona;
-using namespace madrona::viz;
 
 [[maybe_unused]] static void
 saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,
@@ -62,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "/home/samk/gpudrive/maps.small",
+        .jsonPath = "/home/emerge/gpudrive/data_10",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,

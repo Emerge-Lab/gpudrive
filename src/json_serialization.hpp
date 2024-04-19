@@ -1,6 +1,7 @@
 #pragma once
 
 #include "init.hpp"
+#include "types.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -85,33 +86,33 @@ namespace gpudrive
         from_json(j.at("goalPosition"), obj.goalPosition);
         std::string type = j.at("type");
         if(type == "vehicle")
-            obj.type = MapObjectType::Vehicle;
+            obj.type = EntityType::Vehicle;
         else if(type == "pedestrian")
-            obj.type = MapObjectType::Pedestrian;
+            obj.type = EntityType::Pedestrian;
         else if(type == "cyclist")
-            obj.type = MapObjectType::Cyclist;
+            obj.type = EntityType::Cyclist;
         else
-            obj.type = MapObjectType::Invalid;
+            obj.type = EntityType::None;
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
     {
         road.mean = {0,0};
         std::string type = j.at("type");
-        if(type == "road_edge")
-            road.type = MapRoadType::RoadEdge;
+         if(type == "road_edge")
+            road.type = EntityType::RoadEdge;
         else if(type == "road_line")
-            road.type = MapRoadType::RoadLine;
+            road.type = EntityType::RoadLine;
         else if(type == "lane")
-            road.type = MapRoadType::Lane;
+            road.type = EntityType::RoadLane;
         else if(type == "crosswalk")
-            road.type = MapRoadType::CrossWalk;
+            road.type = EntityType::CrossWalk;
         else if(type == "speed_bump")
-            road.type = MapRoadType::SpeedBump;
+            road.type = EntityType::SpeedBump;
         else if(type == "stop_sign")
-            road.type = MapRoadType::StopSign;
+            road.type = EntityType::StopSign;
         else
-            road.type = MapRoadType::Invalid;
+            road.type = EntityType::None;
         
         std::vector<MapVector2> geometry_points_;
         for(const auto &point: j.at("geometry"))
@@ -124,7 +125,7 @@ namespace gpudrive
         const int64_t num_segments = j["geometry"].size() - 1;
         const int64_t sample_every_n_ = 1;
         const int64_t num_sampled_points = (num_segments + sample_every_n_ - 1) / sample_every_n_ + 1;
-        if (num_segments >= 10 && (road.type == MapRoadType::Lane || road.type == MapRoadType::RoadEdge || road.type == MapRoadType::RoadLine))
+        if (num_segments >= 10 && (road.type == EntityType::RoadLane || road.type == EntityType::RoadEdge || road.type == EntityType::RoadLine))
         {
             std::vector<bool> skip(num_sampled_points, false); // This list tracks the points that are skipped
             int64_t k = 0;
@@ -206,53 +207,67 @@ namespace gpudrive
 
     }
 
+    std::pair<float, float> calc_mean(const nlohmann::json &j)
+    {
+        std::pair<float, float> mean = {0, 0};
+        int64_t numEntities = 0;
+        for (const auto &obj : j["objects"])
+        {
+            int i = 0;
+            for (const auto &pos : obj["position"])
+            {
+                if(obj["valid"][i++] == false)
+                    continue;
+                numEntities++;
+                float newX = pos["x"];
+                float newY = pos["y"];
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        for (const auto &obj : j["roads"])
+        {
+            for (const auto &point : obj["geometry"])
+            {
+                numEntities++;
+                float newX = point["x"];
+                float newY = point["y"];
+
+                // Update mean incrementally
+                mean.first += (newX - mean.first) / numEntities;
+                mean.second += (newY - mean.second) / numEntities;
+            }
+        }
+        return mean;
+    }
+
+
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
-        map.mean = {0,0};
-        size_t totalPoints = 0; // Total count of points
-        uint32_t i = 0;
+        auto mean = calc_mean(j);
+        map.mean = {mean.first, mean.second};
+        map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
+        size_t idx = 0;
         for (const auto &obj : j.at("objects"))
         {
-            if (i < MAX_OBJECTS)
-            {
-                obj.get_to(map.objects[i]);    
-                size_t objPoints = map.objects[i].numPositions;
-                map.mean.x = ((map.mean.x * totalPoints) + (map.objects[i].mean.x * objPoints)) / (totalPoints + objPoints);
-                map.mean.y = ((map.mean.y * totalPoints) + (map.objects[i].mean.y * objPoints)) / (totalPoints + objPoints);
-                totalPoints += objPoints;
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
-            }
+            if (idx >= map.numObjects)
+                break;
+            obj.get_to(map.objects[idx++]);
         }
-        map.numObjects = i;
 
-        i = 0;
-        size_t count_road_points = 0;
+        map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
+        size_t countRoadPoints = 0;
+        idx = 0;
         for (const auto &road : j.at("roads"))
         {
-            if (i < MAX_ROADS)
-            {
-                from_json(road, map.roads[i], polylineReductionThreshold);
-                size_t roadPoints = map.roads[i].numPoints;
-                map.mean.x = ((map.mean.x * totalPoints) + (map.roads[i].mean.x * roadPoints)) / (totalPoints + roadPoints);
-                map.mean.y = ((map.mean.y * totalPoints) + (map.roads[i].mean.y * roadPoints)) / (totalPoints + roadPoints);
-                totalPoints += roadPoints;
-                if(map.roads[i].type <= MapRoadType::Lane)
-                    count_road_points += roadPoints - 1;
-                else if(map.roads[i].type > MapRoadType::Lane)
-                    count_road_points += 1;
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
-            }
+            if (idx >= map.numRoads)
+                break;
+            from_json(road, map.roads[idx], polylineReductionThreshold);
+            size_t roadPoints = map.roads[idx].numPoints;
+            countRoadPoints += (map.roads[idx].type <= EntityType::RoadLane) ? (roadPoints - 1) : 1;
+            ++idx;
         }
-        map.numRoadSegments = count_road_points;
-        map.numRoads = i;
-        // tl_states is ignored as it"s always empty
+        map.numRoadSegments = countRoadPoints;
     }
 }
