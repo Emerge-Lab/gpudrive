@@ -597,7 +597,7 @@ Tensor Manager::bicycleModelTensor() const
         {
             impl_->cfg.numWorlds,
             consts::kMaxAgentCount,
-            4, // Number of states for the bicycle model
+            BicycleModelExportSize, // Number of states for the bicycle model
         });
 }
 
@@ -629,7 +629,7 @@ Tensor Manager::selfObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
-                                   8
+                                   SelfObservationExportSize
 			       });
 }
 
@@ -640,7 +640,7 @@ Tensor Manager::mapObservationTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxRoadEntityCount,
-                                   7
+                                   MapObservationExportSize
                                });
 }
 
@@ -652,7 +652,7 @@ Tensor Manager::partnerObservationsTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
                                    consts::kMaxAgentCount - 1,
-                                   7,
+                                   PartnerObservationExportSize
                                });
 }
 
@@ -664,7 +664,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                    impl_->cfg.numWorlds,
 				   consts::kMaxAgentCount,
                                    consts::kMaxRoadEntityCount,
-                                   4,
+                                   AgentMapObservationExportSize,
                                });
 
 }
@@ -704,7 +704,7 @@ Tensor Manager::controlledStateTensor() const {
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 3 + 4 + 1 + 2});
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
 }
 
 Tensor Manager::validStateTensor() const {
