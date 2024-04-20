@@ -74,6 +74,7 @@ def compute_agent_corners(center, width, height, rotation):
 
     return points
 
+
 class Env(gym.Env):
     """
     GPU Drive Gym Environment.
@@ -282,7 +283,7 @@ class Env(gym.Env):
             )
 
             # Normalize
-            if self.config.normalize_obs:  
+            if self.config.normalize_obs:
                 ego_state = self.normalize_ego_state(ego_state)
         else:
             ego_state = torch.Tensor().to(self.device)
@@ -295,12 +296,12 @@ class Env(gym.Env):
                 .to_torch()
                 .flatten(start_dim=2)
             )
-            
+
             # Only use the information for the controlled agents
-            partner_obs_tensor = partner_obs_tensor[self.cont_agent_mask].reshape(
-                self.num_sims, self.max_cont_agents, -1
-            )
-            
+            partner_obs_tensor = partner_obs_tensor[
+                self.cont_agent_mask
+            ].reshape(self.num_sims, self.max_cont_agents, -1)
+
         else:
             partner_obs_tensor = torch.Tensor().to(self.device)
 
@@ -311,12 +312,12 @@ class Env(gym.Env):
             map_obs_tensor = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
             )
-            
+
             # Only use the information for the controlled agents
             map_obs_tensor = map_obs_tensor[self.cont_agent_mask].reshape(
                 self.num_sims, self.max_cont_agents, -1
             )
-            
+
             # TODO: Normalize
         else:
             map_obs_tensor = torch.Tensor().to(self.device)
@@ -464,12 +465,12 @@ class Env(gym.Env):
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
-        
+
         # Speed, vehicle length, vehicle width
         state[:, :, 0] /= self.config.max_speed
         state[:, :, 1] /= self.config.max_veh_len
         state[:, :, 2] /= self.config.max_veh_width
-        
+
         # Relative goal coordinates
         # state[:, :, 3] /= self.config.max_rel_goal_coord
         # state[:, :, 4] /= self.config.max_rel_goal_coord
@@ -548,7 +549,7 @@ if __name__ == "__main__":
 
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
-        
+
         print(obs.max())
 
         if done.sum() == NUM_CONT_AGENTS:

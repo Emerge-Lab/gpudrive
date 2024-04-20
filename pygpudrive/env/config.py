@@ -10,12 +10,12 @@ class EnvConfig:
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
-    road_map_obs: bool = False # Road graph
-    partner_obs: bool = False # Partner vehicle info
+    road_map_obs: bool = False  # Road graph
+    partner_obs: bool = False  # Partner vehicle info
 
     # Normalize
     normalize_obs: bool = False
-    
+
     # Values to normalize by: Ego state
     max_speed: int = 100
     max_veh_len: int = 25
@@ -31,6 +31,3 @@ class EnvConfig:
 
     # Reward
     dist_to_goal_threshold: float = 3.0
-    
-    
-    
