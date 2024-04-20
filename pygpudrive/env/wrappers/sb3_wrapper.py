@@ -1,6 +1,7 @@
 """Vectorized environment wrapper for multi-agent environments."""
 import logging
 from copy import deepcopy
+from typing import Optional, Sequence
 import torch
 import gymnasium as gym
 import numpy as np
@@ -35,6 +36,7 @@ class SB3MultiAgentEnv(VecEnv):
         data_dir,
         device,
         auto_reset=False,
+        render_mode="rgb_array",
     ):
         self._env = Env(
             config=config,
@@ -53,6 +55,7 @@ class SB3MultiAgentEnv(VecEnv):
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
         self.obs_dim = self._env.observation_space.shape[0]
+        self.render_mode = render_mode
 
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
@@ -179,10 +182,12 @@ class SB3MultiAgentEnv(VecEnv):
 
     def set_attr(self, attr_name, value, indices=None) -> None:
         raise NotImplementedError()
-
+    
     def env_method(
         self, method_name, *method_args, indices=None, **method_kwargs
     ):
+        if "method" == "render":
+            return self._env.render()
         raise NotImplementedError()
 
     def env_is_wrapped(self, wrapper_class, indices=None):
@@ -193,6 +198,11 @@ class SB3MultiAgentEnv(VecEnv):
 
     def step_wait(self) -> VecEnvStepReturn:
         raise NotImplementedError()
+    
+    def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
+        """TODO: Add docstring"""
+        frames = [self._env.render()]
+        return frames
 
 
 if __name__ == "__main__":
