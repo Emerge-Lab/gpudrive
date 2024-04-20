@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import wandb
 from stable_baselines3.common.callbacks import BaseCallback
 
 
@@ -7,10 +9,12 @@ class MultiAgentCallback(BaseCallback):
 
     def __init__(
         self,
+        config,
         wandb_run=None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        self.config = config
         self.wandb_run = wandb_run
 
     def _on_training_start(self) -> None:
@@ -44,7 +48,7 @@ class MultiAgentCallback(BaseCallback):
             nan=0,
         )
 
-        # TODO: note that this only works when we have a fixed number of agents
+        # TODO: fix this, currently only works when we have a fixed number of agents
         num_controlled_agents = rewards.shape[1]
 
         # Number of episodes in the rollout
@@ -62,11 +66,11 @@ class MultiAgentCallback(BaseCallback):
         )
 
         # Rewards for each agent
-        for agent_idx in range(num_controlled_agents):
-            self.logger.record(
-                f"rollout/avg_agent_rew{agent_idx}",
-                rewards[:, agent_idx].sum() / num_episodes_in_rollout,
-            )
+        # for agent_idx in range(num_controlled_agents):
+        #     self.logger.record(
+        #         f"rollout/avg_agent_rew{agent_idx}",
+        #         rewards[:, agent_idx].sum() / num_episodes_in_rollout,
+        #     )
 
         observations = (
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
@@ -97,10 +101,37 @@ class MultiAgentCallback(BaseCallback):
         self.logger.record("rollout/obs_min", observations.min())
 
         # Get categorical max values
-        self.logger.record("norm/speed_max", observations[:, :, 0].max())
-        self.logger.record("norm/veh_len_max", observations[:, :, 1].max())
-        self.logger.record("norm/veh_width_max", observations[:, :, 2].max())
-        self.logger.record("norm/goal_coord_x", observations[:, :, 3].max())
-        self.logger.record("norm/goal_coord_y", observations[:, :, 4].max())
-        self.logger.record("norm/question_mark", observations[:, :, 5].max())
-        self.logger.record("norm/L2_norm_to_goal", observations[:, :, 6].max())
+        # self.logger.record("norm/speed_max", observations[:, :, 0].max())
+        # self.logger.record("norm/veh_len_max", observations[:, :, 1].max())
+        # self.logger.record("norm/veh_width_max", observations[:, :, 2].max())
+        # self.logger.record("norm/goal_coord_x", observations[:, :, 3].max())
+        # self.logger.record("norm/goal_coord_y", observations[:, :, 4].max())
+        # self.logger.record("norm/question_mark", observations[:, :, 5].max())
+        # self.logger.record("norm/L2_norm_to_goal", observations[:, :, 6].max())
+
+        # Render the environment
+        if self.config.render:
+            self._create_and_log_video()
+
+    def _create_and_log_video(self):
+        """Make a video and log to wandb.
+        Note: Currently only works a single world."""
+        policy = self.model
+        env = self.locals["env"]
+
+        obs = env.reset()
+        frames = []
+
+        for _ in range(90):
+
+            action, _ = policy.predict(obs.detach().cpu().numpy())
+
+            # Step the environment
+            obs, reward, done, info = env.step(action)
+
+            frame = env.render()
+            frames.append(frame.T)
+
+        frames = np.array(frames)
+
+        wandb.log({"video": wandb.Video(frames, fps=5, format="gif")})
