@@ -1,0 +1,17 @@
+parameters:
+  collisionBehaviour: Ignore
+  datasetInitOptions: RandomN
+  maxNumControlledVehicles: 10000
+  observationRadius: 1000.0
+  polylineReductionThreshold: 1.0
+  rewardParams: reward_params
+reward_params:
+  distanceToExpertThreshold: 1.0
+  distanceToGoalThreshold: 1.0
+  rewardType: DistanceBased
+sim_manager:
+  auto_reset: true
+  exec_mode: CUDA
+  gpu_id: 0
+  json_path: /home/aarav/nocturne_data/binned_jsons/bin_0
+  num_worlds: 100
