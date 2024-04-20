@@ -74,7 +74,6 @@ def compute_agent_corners(center, width, height, rotation):
 
     return points
 
-
 class Env(gym.Env):
     """
     GPU Drive Gym Environment.
@@ -96,7 +95,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_mode="human",
+        render_mode="rgb_array",
         verbose=True,
     ):
         self.config = config
@@ -272,22 +271,23 @@ class Env(gym.Env):
         Returns:
             torch.Tensor: (num_worlds, max_cont_agents, num_features)
         """
-        # Get the ego states
+        # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
             ego_state = self.sim.self_observation_tensor().to_torch()
 
-            # Filter out the information for the controlled agents
+            # Only use the information for the controlled agents
             ego_state = ego_state[self.cont_agent_mask].reshape(
                 self.num_sims, self.max_cont_agents, -1
             )
 
-            if self.config.normalize_obs:  # Normalize
+            # Normalize
+            if self.config.normalize_obs:  
                 ego_state = self.normalize_ego_state(ego_state)
         else:
             ego_state = torch.Tensor().to(self.device)
 
-        # Get patner obs view
+        # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
             partner_obs_tensor = (
@@ -295,8 +295,12 @@ class Env(gym.Env):
                 .to_torch()
                 .flatten(start_dim=2)
             )
-            # TODO: Normalize
-
+            
+            # Only use the information for the controlled agents
+            partner_obs_tensor = partner_obs_tensor[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+            
         else:
             partner_obs_tensor = torch.Tensor().to(self.device)
 
@@ -307,29 +311,15 @@ class Env(gym.Env):
             map_obs_tensor = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
             )
+            
+            # Only use the information for the controlled agents
+            map_obs_tensor = map_obs_tensor[self.cont_agent_mask].reshape(
+                self.num_sims, self.max_cont_agents, -1
+            )
+            
             # TODO: Normalize
         else:
             map_obs_tensor = torch.Tensor().to(self.device)
-
-        # Get agent info
-        agent_info = self.sim.absolute_self_observation_tensor().to_torch()
-        # Get the agent goal positions and current positions
-        goal_pos = agent_info[:, :, 8:]
-        agent_pos = agent_info[:, :, :2]  # x, y
-
-        # L2 norm to goal position
-        if self.config.goal_dist:
-            goal_dist_tensor = torch.linalg.norm(
-                agent_pos - goal_pos, dim=-1
-            ).unsqueeze(-1)
-
-            goal_dist_tensor = goal_dist_tensor[self.cont_agent_mask].reshape(
-                self.num_sims, self.max_cont_agents, -1
-            )
-            if self.config.normalize_obs:
-                goal_dist_tensor /= self.config.max_dist_to_goal
-        else:
-            goal_dist_tensor = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_all = torch.cat(
@@ -337,7 +327,6 @@ class Env(gym.Env):
                 ego_state,
                 partner_obs_tensor,
                 map_obs_tensor,
-                goal_dist_tensor,
             ),
             dim=-1,
         )
@@ -449,27 +438,6 @@ class Env(gym.Env):
                 radius=GOAL_RADIUS,
             )
 
-            # Log
-            agent_log_dict = {
-                "episode_step": 90
-                - self.steps_remaining[self.world_render_idx, 0, 0].item(),
-                f"goal_pos/agent_{agent_idx}_goal_x": goal_pos[agent_idx, 0],
-                f"goal_pos/agent_{agent_idx}_goal_y": goal_pos[agent_idx, 1],
-                f"pos/agent_{agent_idx}_x": agent_pos[agent_idx, 0],
-                f"pos/agent_{agent_idx}_y": agent_pos[agent_idx, 1],
-                f"dist/agent_{agent_idx}_goal_dist": np.linalg.norm(
-                    agent_pos[agent_idx] - goal_pos[agent_idx]
-                ),
-                f"pos_scaled/agent_{agent_idx}_x": current_pos_scaled[0],
-                f"pos_scaled/agent_{agent_idx}_y": current_pos_scaled[1],
-                f"dist_scaled/agent_{agent_idx}_goal_dist": np.linalg.norm(
-                    np.array(current_pos_scaled)
-                    - np.array(current_goal_scaled)
-                ),
-            }
-
-            # wandb.log(agent_log_dict)
-
         if self.render_mode == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
@@ -496,12 +464,15 @@ class Env(gym.Env):
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
-
+        
+        # Speed, vehicle length, vehicle width
         state[:, :, 0] /= self.config.max_speed
         state[:, :, 1] /= self.config.max_veh_len
         state[:, :, 2] /= self.config.max_veh_width
-        state[:, :, 3] /= self.config.max_rel_goal_coords
-        state[:, :, 4] /= self.config.max_rel_goal_coords
+        
+        # Relative goal coordinates
+        # state[:, :, 3] /= self.config.max_rel_goal_coord
+        # state[:, :, 4] /= self.config.max_rel_goal_coord
 
         return state
 
@@ -547,18 +518,13 @@ if __name__ == "__main__":
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-
-    # wandb.define_metric("episode_step")
-    # set all other agent pos logs to use this step
-    # wandb.define_metric("agent_*", step_metric="episode_step")
-
     NUM_CONT_AGENTS = 4
     NUM_WORLDS = 3
 
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
+        max_cont_agents=NUM_CONT_AGENTS,
         data_dir="waymo_data",
         device="cuda",
     )
@@ -582,7 +548,7 @@ if __name__ == "__main__":
 
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
-
+        
         print(obs.max())
 
         if done.sum() == NUM_CONT_AGENTS:
@@ -590,7 +556,7 @@ if __name__ == "__main__":
             print(f"RESETTING ENVIRONMENT\n")
 
         frame = env.render()
-        # frames.append(frame.T)
+        frames.append(frame.T)
 
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
