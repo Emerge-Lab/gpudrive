@@ -42,7 +42,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_mode="human",
+        render_mode="rgb_array",
         verbose=True,
     ):
         self.config = config
@@ -61,6 +61,7 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 0.5
         params.observationRadius = 10.0
         params.rewardParams = reward_params
+        params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
 
         # Set number of controlled vehicles
         params.maxNumControlledVehicles = max_cont_agents
@@ -109,8 +110,8 @@ class Env(gym.Env):
         self.action_space = self._set_discrete_action_space()
 
         # Set observation space
-        self.observation_space = self._set_observation_space()
-        self.obs_dim = self.observation_space.shape[0]
+        # self.observation_space = self._set_observation_space()
+        # self.obs_dim = self.observation_space.shape[0]
 
         self._print_info(verbose)
 
@@ -322,8 +323,10 @@ class Env(gym.Env):
         render_mask = create_render_mask()
 
         agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask==1)
+        
+        map_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx].cpu().numpy()
 
-        return self.visualizer.draw(agent_pos, agent_rot, goal_pos, render_mask)
+        return self.visualizer.draw(agent_pos, agent_rot, goal_pos, render_mask, map_info)
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -369,46 +372,52 @@ if __name__ == "__main__":
     # set all other agent pos logs to use this step
     # wandb.define_metric("agent_*", step_metric="episode_step")
 
-    NUM_CONT_AGENTS = 1
+    NUM_CONT_AGENTS =0
 
     env = Env(
         config=config,
         num_worlds=1,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data",
+        auto_reset=True,
+        data_dir="/home/aarav/gpudrive/nocturne_data",
         device="cpu"
     )
 
-    obs = env.reset()
+    # obs = env.reset()
     frames = []
+    from tqdm import tqdm
+    for _ in tqdm(range(100)):
 
-    for _ in range(100):
+        # print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
 
-        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
-
-        # Take a random action (we're only going straight)
-        rand_action = torch.Tensor(
-            [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
-        )
+        # # Take a random action (we're only going straight)
+        # rand_action = torch.Tensor(
+        #     [[env.action_space.sample() for _ in range(NUM_CONT_AGENTS)]]
+        # )
 
         # print(
         #     f"action (acc, steer, heading): {env.action_key_to_values[rand_action.item()]}"
         # )
 
         # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        # obs, reward, done, info = env.step(rand_action)
 
-        print(
-            f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
-        )
+        # print(
+        #     f"speed: {obs[0, 0, 0].item():.2f} | x_pos: {obs[0, 0, 3].item():.2f} | y_pos: {obs[0, 0, 4].item():.2f} | reward:{reward[0].item():.2f} | done: {done[0].item()}\n"
+        # )
 
-        if done.sum() == NUM_CONT_AGENTS:
-            obs = env.reset()
-            print(f"RESETTING ENVIRONMENT\n")
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
 
+        env.sim.step()
         frame = env.render()
-        # frames.append(frame.T)
+        frames.append(frame)
 
+    import imageio
+    with imageio.get_writer('out.mp4', fps=20) as video:
+        for frame in frames:
+            video.append_data(frame)    
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
