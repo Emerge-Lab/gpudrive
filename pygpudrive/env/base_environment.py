@@ -84,6 +84,7 @@ class Env(gym.Env):
     metadata = {
         "render_modes": [
             "human",
+
             "rgb_array",
         ],  # human: pop-up, rgb_array: receive the visualization as an array of pixels
         "render_fps": 5,
@@ -113,7 +114,7 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 0.0
+        params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
         params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
@@ -387,7 +388,7 @@ class Env(gym.Env):
     
     def get_endpoints(self, center, map_obj):
         center_pos = center
-        length = map_obj[2] # Already half the length
+        length = map_obj[2]  # Already half the length
         yaw = map_obj[5]
 
         start = center_pos - np.array([length * np.cos(yaw), length * np.sin(yaw)])
@@ -521,8 +522,10 @@ class Env(gym.Env):
             if map_obj[-1] == float(gpudrive.EntityType._None):
                 continue
             elif map_obj[-1] < float(gpudrive.EntityType.CrossWalk):
-                center = self.scale_coords(map_obj[:2], self.window_center[0], self.window_center[1])
-                start, end = self.get_endpoints(center, map_obj)
+                start, end = self.get_endpoints(map_obj[:2], map_obj)
+                # coords = self.scale_coords((start,end), self.window_center[0], self.window_center[1])
+                start = self.scale_coords(start, self.window_center[0], self.window_center[1])
+                end = self.scale_coords(end, self.window_center[0], self.window_center[1])
                 pygame.draw.line(
                     self.surf,
                     color_dict[map_obj[-1]],
