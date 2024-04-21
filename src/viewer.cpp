@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <iostream>
+// #include "json_serialization.hpp"
+#include <nlohmann/json.hpp>
 
 using namespace madrona;
 using namespace madrona::viz;
@@ -22,6 +25,41 @@ static HeapArray<float> readReplayLog(const char *path) {
     replay_log.read((char *)log.data(), (size / sizeof(float)) * sizeof(float));
 
     return log;
+}
+
+std::pair<float, float> calc_mean(const nlohmann::json &j)
+{
+    std::pair<float, float> mean = {0, 0};
+    int64_t numEntities = 0;
+    for (const auto &obj : j["objects"])
+    {
+        int i = 0;
+        for (const auto &pos : obj["position"])
+        {
+            if (obj["valid"][i++] == false)
+                continue;
+            numEntities++;
+            float newX = pos["x"];
+            float newY = pos["y"];
+            // Update mean incrementally
+            mean.first += (newX - mean.first) / numEntities;
+            mean.second += (newY - mean.second) / numEntities;
+        }
+    }
+    for (const auto &obj : j["roads"])
+    {
+        for (const auto &point : obj["geometry"])
+        {
+            numEntities++;
+            float newX = point["x"];
+            float newY = point["y"];
+
+            // Update mean incrementally
+            mean.first += (newX - mean.first) / numEntities;
+            mean.second += (newY - mean.second) / numEntities;
+        }
+    }
+    return mean;
 }
 
 int main(int argc, char *argv[])
@@ -65,23 +103,40 @@ int main(int argc, char *argv[])
 #endif
 
     WindowManager wm {};
-    WindowHandle window = wm.makeWindow("Escape Room", 2730, 1536);
+    WindowHandle window = wm.makeWindow("Escape Room", 1024, 1024);
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .autoReset = replay_log.has_value(),
-        .jsonPath = "../maps",
+        .autoReset = true,
+        .jsonPath = "/home/aarav/gpudrive/nocturne_data",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
+            .maxNumControlledVehicles = 0,
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
         .extRenderDev = render_gpu.device(),
     });
+
+    std::string path = "/home/aarav/gpudrive/nocturne_data";
+    std::string mapPath;
+    for (auto const &mapFile : std::filesystem::directory_iterator(path))
+    {
+        if (mapFile.path().extension() == ".json")
+        {
+            mapPath = mapFile.path().string();
+            break;
+        }
+    }
+    std::cout<<mapPath<<std::endl;
+    std::ifstream in(mapPath);
+    nlohmann::json rawJson;
+    in >> rawJson;
+    auto mean = calc_mean(rawJson);
 
     // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
     math::Quat initial_camera_rotation =
@@ -91,8 +146,8 @@ int main(int argc, char *argv[])
     Viewer viewer(mgr.getRenderManager(), window.get(), {
         .numWorlds = num_worlds,
         .simTickRate = 20,
-        .cameraMoveSpeed = 20.f,
-        .cameraPosition = 20.f * math::up,
+        .cameraMoveSpeed = 200.f,
+        .cameraPosition = mean.first * math::right + mean.second*math::fwd + 100.f * math::up,
         .cameraRotation = initial_camera_rotation,
     });
 
