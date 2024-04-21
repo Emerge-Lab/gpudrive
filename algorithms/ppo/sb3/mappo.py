@@ -81,6 +81,7 @@ class MAPPO(PPO):
             with torch.no_grad():
                 obs_tensor = self._last_obs
 
+                # TODO: Check
                 # # EDIT_1: Mask out invalid observations (NaN dimensions and/or dead agents)
                 # # Create dummy actions, values and log_probs (NaN)
                 # actions = torch.full(fill_value=float('nan'), size=(self.n_envs,)).to(self.device)

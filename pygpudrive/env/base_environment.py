@@ -302,6 +302,11 @@ class Env(gym.Env):
                 self.cont_agent_mask
             ].reshape(self.num_sims, self.max_cont_agents, -1)
 
+            # Normalize
+            if self.config.normalize_obs:
+                partner_obs_tensor = self.normalize_partner_obs(
+                    partner_obs_tensor
+                )
         else:
             partner_obs_tensor = torch.Tensor().to(self.device)
 
@@ -323,7 +328,7 @@ class Env(gym.Env):
             map_obs_tensor = torch.Tensor().to(self.device)
 
         # Combine the observations
-        obs_all = torch.cat(
+        obs_filtered = torch.cat(
             (
                 ego_state,
                 partner_obs_tensor,
@@ -331,12 +336,6 @@ class Env(gym.Env):
             ),
             dim=-1,
         )
-
-        # Only select the observations for the controlled agents
-        obs_filtered = obs_all
-        # obs_filtered = obs_all[self.cont_agent_mask].reshape(
-        #     self.num_sims, self.max_cont_agents, -1
-        # )
 
         return obs_filtered
 
@@ -472,8 +471,20 @@ class Env(gym.Env):
         state[:, :, 2] /= self.config.max_veh_width
 
         # Relative goal coordinates
-        # state[:, :, 3] /= self.config.max_rel_goal_coord
-        # state[:, :, 4] /= self.config.max_rel_goal_coord
+        state[:, :, 3] /= self.config.max_rel_goal_coord
+        state[:, :, 4] /= self.config.max_rel_goal_coord
+
+        return state
+
+    def normalize_partner_obs(self, state):
+        """Normalize ego state features."""
+
+        # print(state.shape)
+        # print(f'max_before: {state.max()}')
+        # Speed, vehicle length, vehicle width
+        state /= self.config.max_partner
+
+        # print(f'max_after: {state.max()}')
 
         return state
 
@@ -519,8 +530,8 @@ if __name__ == "__main__":
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-    NUM_CONT_AGENTS = 4
-    NUM_WORLDS = 3
+    NUM_CONT_AGENTS = 2
+    NUM_WORLDS = 5
 
     env = Env(
         config=config,

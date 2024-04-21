@@ -17,10 +17,11 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         ego_state=True,
-        road_map_obs=False,
-        partner_obs=False,
+        road_map_obs=True,
+        partner_obs=True,
+        normalize_obs=False,
     )
-    
+
     exp_config = ExperimentConfig(
         render=True,
     )
@@ -28,14 +29,12 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=3,
-        max_cont_agents=4,
+        num_worlds=5,
+        max_cont_agents=2,
         data_dir="waymo_data",
         device="cuda",
     )
 
-    # Initialize wandb
-    wandb.login()
     run = wandb.init(
         project="rl_benchmarking",
         sync_tensorboard=True,
@@ -49,10 +48,10 @@ if __name__ == "__main__":
     )
 
     model = MAPPO(
-        policy=exp_config.policy,  
-        n_steps=exp_config.n_steps,  
-        batch_size=exp_config.batch_size, 
-        env=env,  
+        policy=exp_config.policy,
+        n_steps=exp_config.n_steps,
+        batch_size=exp_config.batch_size,
+        env=env,
         seed=exp_config.seed,
         verbose=exp_config.verbose,
         tensorboard_log=f"runs/{run_id}"
@@ -67,3 +66,4 @@ if __name__ == "__main__":
     )
 
     run.finish()
+    env.close()
