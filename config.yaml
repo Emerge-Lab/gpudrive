@@ -45,13 +45,13 @@ parameters:
   observationRadius: 1000.0
   datasetInitOptions: PadN
   collisionBehaviour: Ignore
-  maxNumControlledVehicles: 100
+  maxNumControlledVehicles: 1
   rewardParams: reward_params
 
 sim_manager:
   exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 20
+  num_worlds: 1
   auto_reset: false
   json_path: /home/aarav/gpudrive/nocturne_data/
   enable_batch_renderer: false
