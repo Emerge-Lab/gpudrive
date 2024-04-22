@@ -132,7 +132,7 @@ class Env(gym.Env):
                 f"Invalid collision behavior: {self.config.collision_behavior}"
             )
 
-        # Set number of controlled vehicles
+        # Set maximum number of controlled vehicles per environment
         params.maxNumControlledVehicles = max_cont_agents
 
         self.data_dir = data_dir
@@ -171,6 +171,7 @@ class Env(gym.Env):
         ).squeeze(dim=2)
         # Get the indices of the controlled agents
         self.w_indices, self.k_indices = torch.where(self.cont_agent_mask)
+        self.max_agent_count = self.cont_agent_mask.shape[1]
         self.max_cont_agents = max_cont_agents
 
         # Number of valid controlled agents (without padding agents)
@@ -193,18 +194,18 @@ class Env(gym.Env):
         return self.get_obs()
 
     def step(self, actions):
-        """Take simultaneous actions for each agent in all `num_worlds` environments.
+        """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
 
         Args:
             actions (torch.Tensor): The action indices for all agents in all worlds.
         """
         assert actions.shape == (
             self.num_sims,
-            self.max_cont_agents,
-        ), """Action tensor must match the shape (num_worlds, max_cont_agents)"""
+            self.max_agent_count,
+        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
 
-        # Convert nan values to 0 for dead agents
-        # This does not (these actions will be ignored)
+        # Convert nan values to 0 for dead agents.
+        # These actions will be ignored, their value does not matter (except it cannot be nan)
         actions = torch.nan_to_num(actions, nan=0)
 
         # Convert action indices to action values
@@ -216,7 +217,7 @@ class Env(gym.Env):
         # GPU Drive expects a tensor of shape (num_worlds, kMaxAgentCount, 3)
         # We insert the actions for the controlled vehicles, the others will be ignored
         for world_idx in range(self.num_sims):
-            for agent_idx in range(self.max_cont_agents):
+            for agent_idx in range(self.max_agent_count):
                 action_idx = actions[world_idx, agent_idx].item()
                 action_value_tensor[world_idx, agent_idx, :] = torch.Tensor(
                     self.action_key_to_values[action_idx]
@@ -232,27 +233,27 @@ class Env(gym.Env):
         obs = self.get_obs()
 
         reward = (
-            torch.empty(self.num_sims, self.max_cont_agents)
+            torch.empty(self.num_sims, self.max_agent_count)
             .fill_(float("nan"))
             .to(self.device)
         )
-        reward_full = self.sim.reward_tensor().to_torch().squeeze(dim=2)
-        reward[self.w_indices, self.k_indices] = reward_full[
-            self.w_indices, self.k_indices
-        ]
+        reward[self.cont_agent_mask] = (
+            self.sim.reward_tensor()
+            .to_torch()
+            .squeeze(dim=2)[self.cont_agent_mask]
+        )
 
-        # Return 1s for invalid (padding) agents
         done = (
-            torch.empty(self.num_sims, self.max_cont_agents)
-            .fill_(1)
+            torch.empty(self.num_sims, self.max_agent_count)
+            .fill_(float("nan"))
             .to(self.device)
         )
-        done_full = (
-            self.sim.done_tensor().to_torch().squeeze(dim=2).to(done.dtype)
+        done[self.cont_agent_mask] = (
+            self.sim.done_tensor()
+            .to_torch()
+            .squeeze(dim=2)
+            .to(done.dtype)[self.cont_agent_mask]
         )
-        done[self.w_indices, self.k_indices] = done_full[
-            self.w_indices, self.k_indices
-        ]
 
         # TODO: add info
         info = torch.zeros_like(done)
@@ -288,14 +289,14 @@ class Env(gym.Env):
         """Get observation: Combine different types of environment information into a single tensor.
 
         Returns:
-            torch.Tensor: (num_worlds, max_cont_agents, num_features)
+            torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
 
         # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
             ego_state_padding = (
-                torch.empty(self.num_sims, self.max_cont_agents, 6)
+                torch.empty(self.num_sims, self.max_agent_count, 6)
                 .fill_(float("nan"))
                 .to(self.device)
             )
@@ -315,15 +316,20 @@ class Env(gym.Env):
         # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
-            partner_obs_padding = (
-                torch.empty(self.num_sims, self.max_cont_agents, 4)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
             full_partner_obs = (
                 self.sim.partner_observations_tensor()
                 .to_torch()
                 .flatten(start_dim=2)
+            )
+
+            partner_obs_padding = (
+                torch.empty(
+                    self.num_sims,
+                    self.max_agent_count,
+                    full_partner_obs.shape[2],
+                )
+                .fill_(float("nan"))
+                .to(self.device)
             )
 
             partner_obs_padding[
@@ -342,13 +348,16 @@ class Env(gym.Env):
         # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         if self.config.road_map_obs:
-            map_obs_padding = (
-                torch.empty(self.num_sims, self.max_cont_agents, 4)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
             full_map_obs = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
+            )
+
+            map_obs_padding = (
+                torch.empty(
+                    self.num_sims, self.max_agent_count, full_map_obs.shape[2]
+                )
+                .fill_(float("nan"))
+                .to(self.device)
             )
 
             map_obs_padding[self.w_indices, self.k_indices, :] = full_map_obs[
@@ -544,7 +553,7 @@ class Env(gym.Env):
                 f"Number of maps in data directory: {len(glob.glob(f'{self.data_dir}/*.json'))}"
             )
             logging.info(
-                f"Number of controlled agents: {self.max_cont_agents}"
+                f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents}"
             )
             logging.info("----------------------\n")
 
@@ -557,13 +566,16 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    config = EnvConfig()
+    config = EnvConfig(
+        partner_obs=True,
+        road_map_obs=True,
+    )
     # run = wandb.init(
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-    NUM_CONT_AGENTS = 10
-    NUM_WORLDS = 1
+    NUM_CONT_AGENTS = 50
+    NUM_WORLDS = 3
 
     env = Env(
         config=config,

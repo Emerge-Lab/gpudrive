@@ -53,13 +53,20 @@ The car starts at rest in the position of xthe expert vehicle.
 ## Arguments
 
 
-## Important assumptions
+## Assumptions
 
-- **We use `nan` values for invalid/padding agents.** The number of valid agents differs per scenario. For instance, we can have two maps (scenes), one with 2 agents and the other with 3 agents. Stepping the environment returns tensors of shape `(num_worlds, kMaxAgentCount)`. Scenarios with less than `max_cont_agents` will have `nan` values for padding agents. For instance
+- We use "nan" values to indicate invalid agents in environments. Since the number of valid agents varies per scenario (map), scenarios with fewer than `kMaxAgentCount` controlled agents are padded with `nan` values. For example, suppose we have two scenes, one with two agents and the other with three agents. When we step the environment, we get tensors of shape `(num_worlds, kMaxAgentCount)`, where we can control at most `max_cont_agents` per environment. When we step the environment, the done tensor with `kMaxAgentCount` is five and `max_cont_agents` to three may look like:
 
 ```
-done = torch.Tensor([0, 0, nan, nan], [0, 0, 0, nan])
+done = torch.Tensor(
+    [0, 1, nan, nan, 0],
+    [0, 0, nan, 0, nan],
+)
 ```
 
+The above tensor is interpreted as follows:
+- We have one valid agent that is done (as marked by the value `1`)
+- We have five valid agents that are not done (marked by `0`)
+- We have four invalid agents (as marked by the value `nan`)
 
 ## References

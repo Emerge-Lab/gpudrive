@@ -18,7 +18,7 @@ if __name__ == "__main__":
     env_config = EnvConfig(
         ego_state=True,
         road_map_obs=False,
-        partner_obs=False,
+        partner_obs=True,
         normalize_obs=False,
     )
 
@@ -29,9 +29,9 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=1,
-        max_cont_agents=5,
-        data_dir="waymo_data_new",
+        num_worlds=2,
+        max_cont_agents=10,
+        data_dir="waymo_data",
         device="cuda",
     )
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     # Learn
     model.learn(
-        total_timesteps=3_000_000,
+        total_timesteps=10_000_000,
         callback=custom_callback,
     )
 
