@@ -48,8 +48,13 @@ class MultiAgentCallback(BaseCallback):
             nan=0,
         )
 
-        # TODO: fix this, currently only works when we have a fixed number of agents
-        num_controlled_agents = rewards.shape[1]
+        # Get the total number of controlled agents we are controlling
+        # The number of controllable agents is different per scenario
+        num_controlled_agents = self.locals[
+            "env"
+        ]._get_sum_controlled_valid_agents
+
+        print(f"num_controlled_agents: {num_controlled_agents}")
 
         # Number of episodes in the rollout
         num_episodes_in_rollout = (
@@ -65,36 +70,22 @@ class MultiAgentCallback(BaseCallback):
             / num_controlled_agents
         )
 
-        # Rewards for each agent
-        # for agent_idx in range(num_controlled_agents):
-        #     self.logger.record(
-        #         f"rollout/avg_agent_rew{agent_idx}",
-        #         rewards[:, agent_idx].sum() / num_episodes_in_rollout,
-        #     )
+        mean_reward_per_agent_per_episode = (
+            rewards.sum() / num_episodes_in_rollout / num_controlled_agents
+        )
 
         observations = (
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
         )
 
-        num_episodes_in_rollout = np.nan_to_num(
-            (
-                self.locals["rollout_buffer"]
-                .episode_starts.cpu()
-                .detach()
-                .numpy()
-            ),
-            nan=0,
-        ).sum()
-
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
             "rollout/num_episodes_in_rollout",
-            num_episodes_in_rollout.item() / num_controlled_agents,
+            num_episodes_in_rollout.item(),
         )
         self.logger.record("rollout/sum_reward", rewards.sum())
         self.logger.record(
-            "rollout/avg_reward",
-            (rewards.sum() / (num_episodes_in_rollout)).item(),
+            "rollout/avg_reward", mean_reward_per_agent_per_episode.item()
         )
         self.logger.record("rollout/obs_max", observations.max())
         self.logger.record("rollout/obs_min", observations.min())
@@ -117,7 +108,7 @@ class MultiAgentCallback(BaseCallback):
             action, _ = policy.predict(obs.detach().cpu().numpy())
 
             # Step the environment
-            obs, reward, done, info = env.step(action)
+            obs, _, _, _ = env.step(action)
 
             frame = env.render()
             frames.append(frame.T)

@@ -17,26 +17,27 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         ego_state=True,
-        road_map_obs=True,
-        partner_obs=True,
+        road_map_obs=False,
+        partner_obs=False,
         normalize_obs=False,
     )
 
     exp_config = ExperimentConfig(
-        render=True,
+        render=False,
     )
 
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=5,
-        max_cont_agents=2,
-        data_dir="waymo_data",
+        num_worlds=1,
+        max_cont_agents=5,
+        data_dir="waymo_data_new",
         device="cuda",
     )
 
     run = wandb.init(
         project="rl_benchmarking",
+        group="different_scenes",
         sync_tensorboard=True,
     )
     run_id = run.id

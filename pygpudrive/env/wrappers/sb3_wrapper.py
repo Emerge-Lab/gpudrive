@@ -73,16 +73,14 @@ class SB3MultiAgentEnv(VecEnv):
         # Has shape (num_worlds, max_cont_agents, obs_dim)
         obs = self._env.reset()
 
+        # Make dead agent mask (True for invalid agents)
+        self.dead_agent_mask = torch.isnan(obs[:, :, 0]).to(self.device)
+
         # Flatten over num_worlds and max_cont_agents
         obs = obs.reshape(self.num_envs, self.obs_dim)
 
         # Save observation to buffer
         self._save_obs(obs)
-
-        # Make dead agent mask (initialize to False)
-        self.dead_agent_mask = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=False
-        ).to(self.device)
 
         return self._obs_from_buf()
 
@@ -182,7 +180,7 @@ class SB3MultiAgentEnv(VecEnv):
 
     def set_attr(self, attr_name, value, indices=None) -> None:
         raise NotImplementedError()
-    
+
     def env_method(
         self, method_name, *method_args, indices=None, **method_kwargs
     ):
@@ -198,11 +196,14 @@ class SB3MultiAgentEnv(VecEnv):
 
     def step_wait(self) -> VecEnvStepReturn:
         raise NotImplementedError()
-    
+
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
-        """TODO: Add docstring"""
         frames = [self._env.render()]
         return frames
+
+    @property
+    def _get_sum_controlled_valid_agents(self):
+        return self._env.num_valid_controlled_agents
 
 
 if __name__ == "__main__":
@@ -212,9 +213,9 @@ if __name__ == "__main__":
     # Make environment
     env = SB3MultiAgentEnv(
         config=config,
-        num_worlds=1,
-        max_cont_agents=3,
-        data_dir="waymo_data",
+        num_worlds=2,
+        max_cont_agents=5,
+        data_dir="waymo_data_new",
         device="cuda",
     )
 

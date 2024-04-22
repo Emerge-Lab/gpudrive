@@ -147,10 +147,6 @@ class Env(gym.Env):
         self.screen = None
         self.clock = None
 
-        assert num_worlds == len(
-            glob.glob(f"{data_dir}/*.json")
-        ), "Number of worlds is not equal to the number of files in the data directory."
-
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
 
@@ -173,7 +169,12 @@ class Env(gym.Env):
         self.cont_agent_mask = (
             self.sim.controlled_state_tensor().to_torch() == 1
         ).squeeze(dim=2)
+        # Get the indices of the controlled agents
+        self.w_indices, self.k_indices = torch.where(self.cont_agent_mask)
         self.max_cont_agents = max_cont_agents
+
+        # Number of valid controlled agents (without padding agents)
+        self.num_valid_controlled_agents = self.cont_agent_mask.sum().item()
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -202,6 +203,10 @@ class Env(gym.Env):
             self.max_cont_agents,
         ), """Action tensor must match the shape (num_worlds, max_cont_agents)"""
 
+        # Convert nan values to 0 for dead agents
+        # This does not (these actions will be ignored)
+        actions = torch.nan_to_num(actions, nan=0)
+
         # Convert action indices to action values
         actions_shape = self.sim.action_tensor().to_torch().shape[1]
         action_value_tensor = torch.zeros(
@@ -225,19 +230,32 @@ class Env(gym.Env):
 
         # Obtain the next observations, rewards, and done flags
         obs = self.get_obs()
+
         reward = (
-            self.sim.reward_tensor().to_torch()[self.cont_agent_mask]
-        ).reshape(self.num_sims, self.max_cont_agents)
+            torch.empty(self.num_sims, self.max_cont_agents)
+            .fill_(float("nan"))
+            .to(self.device)
+        )
+        reward_full = self.sim.reward_tensor().to_torch().squeeze(dim=2)
+        reward[self.w_indices, self.k_indices] = reward_full[
+            self.w_indices, self.k_indices
+        ]
+
+        # Return 1s for invalid (padding) agents
         done = (
-            self.sim.done_tensor().to_torch()[self.cont_agent_mask]
-        ).reshape(self.num_sims, self.max_cont_agents)
+            torch.empty(self.num_sims, self.max_cont_agents)
+            .fill_(1)
+            .to(self.device)
+        )
+        done_full = (
+            self.sim.done_tensor().to_torch().squeeze(dim=2).to(done.dtype)
+        )
+        done[self.w_indices, self.k_indices] = done_full[
+            self.w_indices, self.k_indices
+        ]
 
         # TODO: add info
         info = torch.zeros_like(done)
-
-        # The episode is reset automatically if all agents reach their goal
-        # or the episode is over
-        # TODO: also reset when all agents have collided
 
         return obs, reward, done, info
 
@@ -272,67 +290,81 @@ class Env(gym.Env):
         Returns:
             torch.Tensor: (num_worlds, max_cont_agents, num_features)
         """
+
         # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
-            ego_state = self.sim.self_observation_tensor().to_torch()
-
-            # Only use the information for the controlled agents
-            ego_state = ego_state[self.cont_agent_mask].reshape(
-                self.num_sims, self.max_cont_agents, -1
+            ego_state_padding = (
+                torch.empty(self.num_sims, self.max_cont_agents, 6)
+                .fill_(float("nan"))
+                .to(self.device)
             )
+            full_ego_state = self.sim.self_observation_tensor().to_torch()
+
+            # Update ego_state_padding using the mask
+            ego_state_padding[
+                self.w_indices, self.k_indices, :
+            ] = full_ego_state[self.w_indices, self.k_indices, :]
 
             # Normalize
             if self.config.normalize_obs:
-                ego_state = self.normalize_ego_state(ego_state)
+                ego_state_padding = self.normalize_ego_state(ego_state_padding)
         else:
-            ego_state = torch.Tensor().to(self.device)
+            ego_state_padding = torch.Tensor().to(self.device)
 
         # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
-            partner_obs_tensor = (
+            partner_obs_padding = (
+                torch.empty(self.num_sims, self.max_cont_agents, 4)
+                .fill_(float("nan"))
+                .to(self.device)
+            )
+            full_partner_obs = (
                 self.sim.partner_observations_tensor()
                 .to_torch()
                 .flatten(start_dim=2)
             )
 
-            # Only use the information for the controlled agents
-            partner_obs_tensor = partner_obs_tensor[
-                self.cont_agent_mask
-            ].reshape(self.num_sims, self.max_cont_agents, -1)
+            partner_obs_padding[
+                self.w_indices, self.k_indices, :
+            ] = full_partner_obs[self.w_indices, self.k_indices, :]
 
             # Normalize
             if self.config.normalize_obs:
-                partner_obs_tensor = self.normalize_partner_obs(
-                    partner_obs_tensor
+                partner_obs_padding = self.normalize_partner_obs(
+                    partner_obs_padding
                 )
         else:
-            partner_obs_tensor = torch.Tensor().to(self.device)
+            partner_obs_padding = torch.Tensor().to(self.device)
 
         # Get road map
         # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         if self.config.road_map_obs:
-            map_obs_tensor = (
+            map_obs_padding = (
+                torch.empty(self.num_sims, self.max_cont_agents, 4)
+                .fill_(float("nan"))
+                .to(self.device)
+            )
+            full_map_obs = (
                 self.sim.agent_roadmap_tensor().to_torch().flatten(start_dim=2)
             )
 
-            # Only use the information for the controlled agents
-            map_obs_tensor = map_obs_tensor[self.cont_agent_mask].reshape(
-                self.num_sims, self.max_cont_agents, -1
-            )
+            map_obs_padding[self.w_indices, self.k_indices, :] = full_map_obs[
+                self.w_indices, self.k_indices, :
+            ]
 
             # TODO: Normalize
         else:
-            map_obs_tensor = torch.Tensor().to(self.device)
+            map_obs_padding = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_filtered = torch.cat(
             (
-                ego_state,
-                partner_obs_tensor,
-                map_obs_tensor,
+                ego_state_padding,
+                partner_obs_padding,
+                map_obs_padding,
             ),
             dim=-1,
         )
@@ -530,15 +562,15 @@ if __name__ == "__main__":
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-    NUM_CONT_AGENTS = 2
-    NUM_WORLDS = 5
+    NUM_CONT_AGENTS = 10
+    NUM_WORLDS = 1
 
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,
         data_dir="waymo_data",
-        device="cuda",
+        device="cpu",
     )
 
     obs = env.reset()
