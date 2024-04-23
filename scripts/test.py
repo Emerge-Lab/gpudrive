@@ -12,6 +12,7 @@ params = gpudrive.Parameters()
 params.polylineReductionThreshold = 0.5  # Set appropriate value
 params.observationRadius = 10.0  # Set appropriate value
 params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore  # Set appropriate value
+params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN  # Set appropriate value
 params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
 params.maxNumControlledVehicles = 0
 
