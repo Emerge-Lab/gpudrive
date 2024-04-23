@@ -7,6 +7,7 @@
 #include <madrona/physics_loader.hpp>
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
+#include <nlohmann/json.hpp>
 #include <madrona/render/api.hpp>
 
 #include <array>
@@ -17,6 +18,7 @@
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <random>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -381,11 +383,67 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
+
+static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
+{
+    std::filesystem::path path(cfg.jsonPath);
+    auto validFilesJsonPath = path / "valid_files.json";
+    assert(std::filesystem::exists(validFilesJsonPath));
+    // check if validFiles.json exists
+
+    std::ifstream validFilesJson(validFilesJsonPath);
+    assert(validFilesJson.good());
+
+    nlohmann::json validFiles;
+    validFilesJson >> validFiles;
+
+    std::vector<std::string> mapFiles;
+    for (auto& [key, value] : validFiles.items()) {
+        std::filesystem::path fullPath = path / key;
+        mapFiles.emplace_back(fullPath.string());
+    }
+    assert(mapFiles.size() != 0);
+
+    if(cfg.params.datasetInitOptions == DatasetInitOptions::FirstN)
+    {
+        assert(cfg.numWorlds <= mapFiles.size());
+        mapFiles.resize(cfg.numWorlds);
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::RandomN)
+    {
+        assert(cfg.numWorlds <= mapFiles.size());
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(mapFiles.begin(), mapFiles.end(), g);
+        mapFiles.resize(cfg.numWorlds);
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
+    {
+        assert(cfg.numWorlds >= mapFiles.size());
+        for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
+        {
+            mapFiles.push_back(mapFiles[0]);
+        }
+    }
+    else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
+    {
+        // Do nothing
+    }
+    else
+    {
+        FATAL("Invalid datasetInitOptions");
+    }
+
+    return mapFiles;
+}
+
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg;
     sim_cfg.autoReset = mgr_cfg.autoReset;
+
+    std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -408,10 +466,10 @@ Manager::Impl * Manager::Impl::init(
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
         
         int64_t worldIdx{0};
-
-        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+    
+        for (auto const &mapFile : mapFiles)
         {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
                                                            ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, paramsDevicePtr};
         }
@@ -484,9 +542,10 @@ Manager::Impl * Manager::Impl::init(
         HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
 
         int64_t worldIdx{0};
-        for (auto const &mapFile : std::filesystem::directory_iterator(mgr_cfg.jsonPath))
+    
+        for (auto const &mapFile : mapFiles)
         {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile.path(),
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
                                                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
         }
