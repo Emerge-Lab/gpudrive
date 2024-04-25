@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import wandb
 from stable_baselines3.common.callbacks import BaseCallback
 
 
@@ -7,10 +9,12 @@ class MultiAgentCallback(BaseCallback):
 
     def __init__(
         self,
+        config,
         wandb_run=None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        self.config = config
         self.wandb_run = wandb_run
 
     def _on_training_start(self) -> None:
@@ -44,8 +48,13 @@ class MultiAgentCallback(BaseCallback):
             nan=0,
         )
 
-        # TODO: note that this only works when we have a fixed number of agents
-        num_controlled_agents = rewards.shape[1]
+        # Get the total number of controlled agents we are controlling
+        # The number of controllable agents is different per scenario
+        num_controlled_agents = self.locals[
+            "env"
+        ]._get_sum_controlled_valid_agents
+
+        print(f"num_controlled_agents: {num_controlled_agents}")
 
         # Number of episodes in the rollout
         num_episodes_in_rollout = (
@@ -61,45 +70,49 @@ class MultiAgentCallback(BaseCallback):
             / num_controlled_agents
         )
 
-        # Rewards for each agent
-        for agent_idx in range(num_controlled_agents):
-            self.logger.record(
-                f"rollout/avg_agent_rew{agent_idx}",
-                rewards[:, agent_idx].sum() / num_episodes_in_rollout,
-            )
+        mean_reward_per_agent_per_episode = (
+            rewards.sum() / num_episodes_in_rollout / num_controlled_agents
+        )
 
         observations = (
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
         )
 
-        num_episodes_in_rollout = np.nan_to_num(
-            (
-                self.locals["rollout_buffer"]
-                .episode_starts.cpu()
-                .detach()
-                .numpy()
-            ),
-            nan=0,
-        ).sum()
-
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
             "rollout/num_episodes_in_rollout",
-            num_episodes_in_rollout.item() / num_controlled_agents,
+            num_episodes_in_rollout.item(),
         )
         self.logger.record("rollout/sum_reward", rewards.sum())
         self.logger.record(
-            "rollout/avg_reward",
-            (rewards.sum() / (num_episodes_in_rollout)).item(),
+            "rollout/avg_reward", mean_reward_per_agent_per_episode.item()
         )
-
         self.logger.record("rollout/obs_max", observations.max())
         self.logger.record("rollout/obs_min", observations.min())
 
-        # Get categorical max values
-        self.logger.record("norm/speed_max", observations[:, :, 0].max())
-        self.logger.record("norm/veh_len_max", observations[:, :, 1].max())
-        self.logger.record("norm/veh_width_max", observations[:, :, 2].max())
-        self.logger.record("norm/goal_coord_x", observations[:, :, 3].max())
-        self.logger.record("norm/goal_coord_y", observations[:, :, 4].max())
-        self.logger.record("norm/L2_norm_to_goal", observations[:, :, 5].max())
+        # Render the environment
+        if self.config.render:
+            self._create_and_log_video()
+
+    def _create_and_log_video(self):
+        """Make a video and log to wandb.
+        Note: Currently only works a single world."""
+        policy = self.model
+        env = self.locals["env"]
+
+        obs = env.reset()
+        frames = []
+
+        for _ in range(90):
+
+            action, _ = policy.predict(obs.detach().cpu().numpy())
+
+            # Step the environment
+            obs, _, _, _ = env.step(action)
+
+            frame = env.render()
+            frames.append(frame.T)
+
+        frames = np.array(frames)
+
+        wandb.log({"video": wandb.Video(frames, fps=5, format="gif")})

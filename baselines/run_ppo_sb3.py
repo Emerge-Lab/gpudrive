@@ -11,40 +11,50 @@ from algorithms.ppo.sb3.callbacks import MultiAgentCallback
 # Import adapted PPO version
 from algorithms.ppo.sb3.mappo import MAPPO
 
+from baselines.config import ExperimentConfig
+
 if __name__ == "__main__":
 
-    config = EnvConfig()
+    env_config = EnvConfig(
+        ego_state=True,
+        road_map_obs=False,
+        partner_obs=True,
+        normalize_obs=False,
+    )
+
+    exp_config = ExperimentConfig(
+        render=False,
+    )
 
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
-        config=config,
+        config=env_config,
         num_worlds=2,
-        max_cont_agents=3,
+        max_cont_agents=10,
         data_dir="waymo_data",
         device="cuda",
     )
 
-    # Initialize wandb
-    wandb.login()
     run = wandb.init(
-        project="please_drive",
-        group="single_agent_sparse",
+        project="rl_benchmarking",
+        group="different_scenes",
         sync_tensorboard=True,
     )
     run_id = run.id
 
     # Initialize custom callback
     custom_callback = MultiAgentCallback(
+        config=exp_config,
         wandb_run=run if run_id is not None else None,
     )
 
     model = MAPPO(
-        policy="MlpPolicy",  # Policy type
-        n_steps=2048,  # Number of steps per rollout
-        batch_size=256,  # Minibatch size
-        env=env,  # Our wrapped environment
-        seed=42,  # Always seed for reproducibility
-        verbose=0,
+        policy=exp_config.policy,
+        n_steps=exp_config.n_steps,
+        batch_size=exp_config.batch_size,
+        env=env,
+        seed=exp_config.seed,
+        verbose=exp_config.verbose,
         tensorboard_log=f"runs/{run_id}"
         if run_id is not None
         else None,  # Sync with wandb
@@ -52,8 +62,9 @@ if __name__ == "__main__":
 
     # Learn
     model.learn(
-        total_timesteps=3_000_000,
+        total_timesteps=10_000_000,
         callback=custom_callback,
     )
 
     run.finish()
+    env.close()
