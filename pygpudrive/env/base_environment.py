@@ -9,70 +9,18 @@ from itertools import product
 import glob
 import gymnasium as gym
 from gymnasium.error import DependencyNotInstalled
-import pygame
 import random
 import os
 import math
 
-# Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.viz import Visualizer
 
 # Import the simulator
 import gpudrive
 import logging
 
 logging.getLogger(__name__)
-
-WINDOW_W = 500
-WINDOW_H = 500
-WINDOW_SIZE = (WINDOW_W, WINDOW_H)
-VEH_WIDTH = 5
-VEH_HEIGHT = 10
-GOAL_RADIUS = 2
-COLOR_LIST = [
-    (255, 0, 0),  # Red
-    (0, 255, 0),  # Green
-    (0, 0, 255),  # Blue
-    (255, 255, 0),  # Yellow
-    (255, 165, 0),  # Orange
-]
-
-# https://stackoverflow.com/a/73855696
-def compute_agent_corners(center, width, height, rotation):
-    """Draw a rectangle, centered at x, y.
-
-    Arguments:
-      x (int/float):
-        The x coordinate of the center of the shape.
-      y (int/float):
-        The y coordinate of the center of the shape.
-      width (int/float):
-        The width of the rectangle.
-      height (int/float):
-        The height of the rectangle.
-    """
-    x, y = center
-
-    points = []
-
-    # The distance from the center of the rectangle to
-    # one of the corners is the same for each corner.
-    radius = math.sqrt((height / 2) ** 2 + (width / 2) ** 2)
-
-    # Get the angle to one of the corners with respect
-    # to the x-axis.
-    angle = math.atan2(height / 2, width / 2)
-
-    # Transform that angle to reach each corner of the rectangle.
-    angles = [angle, -angle + math.pi, angle + math.pi, -angle]
-
-    # Calculate the coordinates of each point.
-    for angle in angles:
-        y_offset = -1 * radius * math.sin(angle + rotation)
-        x_offset = radius * math.cos(angle + rotation)
-        points.append((x + x_offset, y + y_offset))
-
-    return points
 
 
 class Env(gym.Env):
@@ -140,13 +88,6 @@ class Env(gym.Env):
         self.device = device
         self.action_types = 3  # Acceleration, steering, and heading
 
-        # Rendering
-        self.render_mode = render_mode
-        self.world_render_idx = 0  # Render only the 0th world
-        self.screen_dim = 1000
-        self.screen = None
-        self.clock = None
-
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
 
@@ -161,6 +102,14 @@ class Env(gym.Env):
             json_path=self.data_dir,
             params=params,
         )
+
+        # Rendering
+        self.render_mode = render_mode
+        self.world_render_idx = 0
+        agent_count = (
+            self.sim.shape_tensor().to_torch()[self.world_render_idx, :][0].item()
+        )
+        self.visualizer = Visualizer(agent_count, self.render_mode == "human")
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
@@ -223,7 +172,7 @@ class Env(gym.Env):
                     self.action_key_to_values[action_idx]
                 )
 
-        # Feed the actual action values to GPU Drive
+        # Feed the actual action values to gpudrive
         self.sim.action_tensor().to_torch().copy_(action_value_tensor)
 
         # Step the simulator
@@ -384,15 +333,31 @@ class Env(gym.Env):
         """Render the environment."""
 
         def create_render_mask():
-            agent_to_is_valid = (
-                self.sim.valid_state_tensor()
-                .to_torch()[self.world_render_idx, :, :]
-                .cpu()
-                .detach()
-                .numpy()
+
+            controlled_mask = (
+                (
+                    self.sim.controlled_state_tensor()
+                    .to_torch()[self.world_render_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+                .squeeze(1)
+                .astype(bool)
             )
 
-            return agent_to_is_valid
+            agent_count = (
+                self.sim.shape_tensor().to_torch()[self.world_render_idx][0].item()
+            )
+            padding_count = valid_mask.shape[0] - agent_count
+            real_agent_mask = np.concatenate(
+                (np.array([1] * agent_count), np.array([0] * padding_count))
+            )
+
+            return np.logical_or(
+                np.logical_and(real_agent_mask, valid_mask),
+                np.logical_and(real_agent_mask, controlled_mask),
+            )
 
         if self.render_mode is None:
             assert self.spec is not None
@@ -402,26 +367,6 @@ class Env(gym.Env):
                 f'e.g. gym.make("{self.spec.id}", render_mode="rgb_array")'
             )
             return
-        try:
-            import pygame
-
-        except ImportError as e:
-            raise DependencyNotInstalled(
-                "pygame is not installed, run `pip install gymnasium[classic-control]`"
-            ) from e
-
-        pygame.init()
-        pygame.font.init()
-
-        if self.screen is None and self.render_mode == "human":
-            pygame.display.init()
-            self.screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
-        if self.clock is None:
-            self.clock = pygame.time.Clock()
-
-        # Create a new canvas to draw on
-        self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
-        self.surf.fill((255, 255, 255))  # White background
 
         # Get agent info
         agent_info = (
@@ -438,70 +383,7 @@ class Env(gym.Env):
         goal_pos = agent_info[:, 8:]
 
         render_mask = create_render_mask()
-
-        agent_pos_mean = np.mean(agent_pos, axis=0, where=render_mask == 1)
-
-        num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
-
-        # Draw the agent positions
-        for agent_idx in range(num_agents_in_scene):
-            if not render_mask[agent_idx]:
-                continue
-
-            # Use the updated scale_coord function to get centered and scaled coordinates
-            current_pos_scaled = self.scale_coords(
-                agent_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
-            )
-
-            current_goal_scaled = self.scale_coords(
-                goal_pos[agent_idx], agent_pos_mean[0], agent_pos_mean[1]
-            )
-
-            mod_idx = agent_idx % len(COLOR_LIST)
-
-            agent_corners = compute_agent_corners(
-                current_pos_scaled, VEH_WIDTH, VEH_HEIGHT, agent_rot[agent_idx]
-            )
-
-            pygame.draw.polygon(
-                surface=self.surf,
-                color=COLOR_LIST[mod_idx],
-                points=agent_corners,
-            )
-
-            pygame.draw.circle(
-                surface=self.surf,
-                color=COLOR_LIST[mod_idx],
-                center=(
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                ),
-                radius=GOAL_RADIUS,
-            )
-
-        if self.render_mode == "human":
-            pygame.event.pump()
-            self.clock.tick(self.metadata["render_fps"])
-            assert self.screen is not None
-            self.screen.fill(0)
-            self.screen.blit(self.surf, (0, 0))
-            pygame.display.flip()
-        elif self.render_mode == "rgb_array":
-            return self._create_image_array(self.surf)
-        else:
-            return self.isopen
-
-    def scale_coords(self, coords, x_avg, y_avg):
-        """Scale the coordinates to fit within the pygame surface window and center them.
-        Args:
-            coords: x, y coordinates
-        """
-        x, y = coords
-
-        x_scaled = x - x_avg + (WINDOW_W / 2)
-        y_scaled = y - y_avg + (WINDOW_H / 2)
-
-        return (x_scaled, y_scaled)
+        
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -528,20 +410,6 @@ class Env(gym.Env):
         # print(f'max_after: {state.max()}')
 
         return state
-
-    def close(self):
-        """Close pygame application if open."""
-        if self.screen is not None:
-            import pygame
-
-            pygame.display.quit()
-            pygame.quit()
-            self.isopen = False
-
-    def _create_image_array(self, surf):
-        return np.transpose(
-            np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
-        )
 
     def _print_info(self, verbose=True):
         """Print initialization information."""
@@ -579,9 +447,6 @@ if __name__ == "__main__":
 
     env = Env(
         config=config,
-        num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,
-        data_dir="waymo_data",
         device="cpu",
     )
 
@@ -605,8 +470,6 @@ if __name__ == "__main__":
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        print(obs.max())
-
         if done.sum() == NUM_CONT_AGENTS:
             obs = env.reset()
             print(f"RESETTING ENVIRONMENT\n")
@@ -619,4 +482,4 @@ if __name__ == "__main__":
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
     # run.finish()
-    env.close()
+    env.visualizer.destroy()
