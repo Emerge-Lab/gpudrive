@@ -1,6 +1,7 @@
 """Vectorized environment wrapper for multi-agent environments."""
 import logging
 from copy import deepcopy
+from typing import Optional, Sequence
 import torch
 import gymnasium as gym
 import numpy as np
@@ -35,6 +36,7 @@ class SB3MultiAgentEnv(VecEnv):
         data_dir,
         device,
         auto_reset=False,
+        render_mode="rgb_array",
     ):
         self._env = Env(
             config=config,
@@ -45,14 +47,16 @@ class SB3MultiAgentEnv(VecEnv):
             auto_reset=auto_reset,
         )
         self.num_worlds = num_worlds
-        self.max_cont_agents = max_cont_agents
-        self.num_envs = self.num_worlds * self.max_cont_agents
+        self.max_agent_count = self._env.max_agent_count
+        self.num_envs = self.num_worlds * self.max_agent_count
         self.device = device
+        self.controlled_agent_mask = self._env.cont_agent_mask
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
         self.obs_dim = self._env.observation_space.shape[0]
+        self.render_mode = render_mode
 
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
@@ -63,23 +67,21 @@ class SB3MultiAgentEnv(VecEnv):
 
         Returns:
         --------
-            torch.Tensor (max_cont_agents * num_worlds, obs_dim):
+            torch.Tensor (max_agent_count * num_worlds, obs_dim):
                 Initial observation.
         """
 
-        # Has shape (num_worlds, max_cont_agents, obs_dim)
+        # Has shape (num_worlds, max_agent_count , obs_dim)
         obs = self._env.reset()
 
-        # Flatten over num_worlds and max_cont_agents
+        # Make dead agent mask (True for dead or invalid agents)
+        self.dead_agent_mask = torch.isnan(obs[:, :, 0]).to(self.device)
+
+        # Flatten over num_worlds and max_agent_count
         obs = obs.reshape(self.num_envs, self.obs_dim)
 
         # Save observation to buffer
         self._save_obs(obs)
-
-        # Make dead agent mask (initialize to False)
-        self.dead_agent_mask = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=False
-        ).to(self.device)
 
         return self._obs_from_buf()
 
@@ -87,9 +89,9 @@ class SB3MultiAgentEnv(VecEnv):
         """
         Returns:
         --------
-            torch.Tensor (max_cont_agents * num_worlds, obs_dim): Observations.
-            torch.Tensor (max_cont_agents * num_worlds): Rewards.
-            torch.Tensor (max_cont_agents * num_worlds): Dones.
+            torch.Tensor (max_agent_count * num_worlds, obs_dim): Observations.
+            torch.Tensor (max_agent_count * num_worlds): Rewards.
+            torch.Tensor (max_agent_count * num_worlds): Dones.
             dict: Additional information.
 
         Note:
@@ -101,23 +103,23 @@ class SB3MultiAgentEnv(VecEnv):
         """
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
-        actions = actions.reshape((self.num_worlds, self.max_cont_agents))
+        actions = actions.reshape((self.num_worlds, self.max_agent_count))
 
         # Step the environment
         obs, reward, done, info = self._env.step(actions)
 
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
         ).to(self.device)
         self.buf_dones = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
         ).to(self.device)
         self.buf_infos = torch.full(
-            (self.num_worlds, self.max_cont_agents), fill_value=float("nan")
+            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
         ).to(self.device)
         buf_obs = torch.full(
-            (self.num_worlds, self.max_cont_agents, self.obs_dim),
+            (self.num_worlds, self.max_agent_count, self.obs_dim),
             fill_value=float("nan"),
         ).to(self.device)
 
@@ -131,12 +133,16 @@ class SB3MultiAgentEnv(VecEnv):
         )
         buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
 
-        # Flatten over num_worlds and max_cont_agents and store
+        # Flatten over num_worlds and max_agent_count and store
         obs = obs.reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
-        # Reset episode if all agents in all worlds are done
-        if done.sum() == self.num_envs:
+        # Reset episode if all agents in all worlds are done before
+        # the end of the episode
+        if (
+            done[self.controlled_agent_mask].sum().item()
+            == self._get_sum_controlled_valid_agents
+        ):
             obs = self.reset()
         else:
             # Update dead agent mask: Set to True if agent is done before
@@ -152,7 +158,7 @@ class SB3MultiAgentEnv(VecEnv):
 
     def close(self) -> None:
         """Close the environment."""
-        self.env.close()
+        self._env.close()
 
     def seed(self, seed=None):
         """Set the random seeds for all environments."""
@@ -183,6 +189,8 @@ class SB3MultiAgentEnv(VecEnv):
     def env_method(
         self, method_name, *method_args, indices=None, **method_kwargs
     ):
+        if "method" == "render":
+            return self._env.render()
         raise NotImplementedError()
 
     def env_is_wrapped(self, wrapper_class, indices=None):
@@ -194,6 +202,14 @@ class SB3MultiAgentEnv(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         raise NotImplementedError()
 
+    def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
+        frames = [self._env.render()]
+        return frames
+
+    @property
+    def _get_sum_controlled_valid_agents(self):
+        return self._env.num_valid_controlled_agents
+
 
 if __name__ == "__main__":
 
@@ -203,7 +219,7 @@ if __name__ == "__main__":
     env = SB3MultiAgentEnv(
         config=config,
         num_worlds=1,
-        max_cont_agents=3,
+        max_cont_agents=10,
         data_dir="waymo_data",
         device="cuda",
     )
