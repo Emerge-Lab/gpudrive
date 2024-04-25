@@ -29,8 +29,11 @@ namespace test_utils
         int64_t numEntities = 0;
         for (const auto &obj : rawJson["objects"])
         {
+            int i = 0;
             for (const auto &pos : obj["position"])
             {
+                if(obj["valid"][i++] == false)
+                    continue;
                 numEntities++;
                 float newX = pos["x"];
                 float newY = pos["y"];

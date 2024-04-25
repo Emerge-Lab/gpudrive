@@ -8,6 +8,7 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testJsons)
 
 # Copy test.json to the testJsons directory
 configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/testJsons/test.json COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/tests/valid_files.json ${CMAKE_CURRENT_BINARY_DIR}/testJsons/valid_files.json COPYONLY)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
