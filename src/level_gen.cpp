@@ -310,14 +310,21 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
 
-    CountT agentIdx;
-    for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
+    CountT agentIdx = 0;
+    for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
         if(agentIdx >= consts::kMaxAgentCount)
             break;
-        const auto &agentInit = map->objects[agentIdx];
+        if (ctx.data().params.IgnoreNonVehicles)
+        {
+            if (map->objects[agentCtr].type == EntityType::Pedestrian || map->objects[agentCtr].type == EntityType::Cyclist)
+            {
+                continue;
+            }
+        }
+        const auto &agentInit = map->objects[agentCtr];
         auto agent = createAgent(
             ctx, agentInit);
-        ctx.data().agents[agentIdx] = agent;
+        ctx.data().agents[agentIdx++] = agent;
     } 
     
     ctx.data().numAgents = agentIdx; 
