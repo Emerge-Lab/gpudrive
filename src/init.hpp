@@ -103,6 +103,7 @@ namespace gpudrive
         DatasetInitOptions datasetInitOptions;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
+        bool IgnoreNonVehicles = false; // Default: false
     };
 
     struct WorldInit
