@@ -314,7 +314,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
         if(agentIdx >= consts::kMaxAgentCount)
             break;
-        if (ctx.data().params.IgnorePedestrians)
+        if (ctx.data().params.IgnoreNonVehicles)
         {
             if (map->objects[agentCtr].type == EntityType::Pedestrian || map->objects[agentCtr].type == EntityType::Cyclist)
             {
