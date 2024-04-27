@@ -13,20 +13,21 @@ def run_benchmark(sim: SimManager, config: dict):
     useful_num_agents, useful_num_roads = torch.sum(shape[:, 0]).item(), torch.sum(shape[:, 1]).item() # shape is a tensor of shape (num_envs, 2) 
     num_envs = shape.shape[0]
 
-    actual_num_agents = sim.self_observation_tensor().to_torch().shape[1]
-    actual_num_roads = sim.map_observation_tensor().to_torch().shape[1]
+    actual_num_agents = sim.self_observation_tensor().to_torch().shape[1] * num_envs
+    actual_num_roads = sim.map_observation_tensor().to_torch().shape[1] * num_envs
 
     start = perf_counter()
     for i in range(num_envs):
         sim.reset(i)
+        sim.step()
     time_to_reset = perf_counter() - start
 
     start = perf_counter()
-    for i in range(91):
+    for i in range(89):
         sim.step()
     time_to_step = perf_counter() - start
 
-    fps = (91 / time_to_step) * num_envs
+    fps = (89 / time_to_step)
     afps = fps * actual_num_agents
     useful_afps = fps * useful_num_agents
 
