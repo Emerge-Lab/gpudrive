@@ -15,7 +15,7 @@ def run_bench(args):
         restoreConfig()
         return
     
-    for num_envs in tqdm(range(1, args.totalNumEnvs + 1), desc="Overall progress", unit="env", position=0):
+    for num_envs in tqdm(range(1, args.totalNumEnvs + 1, args.stepSize), desc="Overall progress", unit="env", position=0):
         if args.randomized:
             for _ in range(args.totalNumEnvs + 1 - num_envs):
                 subprocess.run(command_template.format(num_envs), shell=True, check=True)
@@ -61,6 +61,7 @@ if __name__ == "__main__":
     global CONFIG_PATH
     parser = argparse.ArgumentParser(description='GPUDrive Benchmarking Tool')
     parser.add_argument('--totalNumEnvs', type=int, help='Num envs to run benchmark upto (default: 150)', default=150, required=False)
+    parser.add_argument('--stepSize', type=int, help='Step size for num envs (default: 1)', default=1, required=False)
     parser.add_argument('--randomized', help='Randomize the dataset. For every number of envs, 100 iterations of benchmark are run using randomized subset of the dataset.', action='store_true', required=False)
     parser.add_argument('--binned', help='Use binned dataset', action='store_true', required=False)
     parser.add_argument('--config_path', type=str, help='Path to the config file', default='config.yml', required=False)
