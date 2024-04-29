@@ -3,7 +3,7 @@ import gpudrive
 
 def SimCreator(config: dict = None) -> gpudrive.SimManager:
     if(config is None):
-        with open("config.yaml", 'r') as file:
+        with open("config.yml", 'r') as file:
             config = yaml.safe_load(file)
     # Initialize RewardParams
     reward_params_config = config['reward_params']
@@ -15,7 +15,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     # Initialize Parameters
     params_config = config['parameters']
     params = gpudrive.Parameters()
-    params.polylineReductionThreshold = 1.0
+    params.polylineReductionThreshold = params_config['polylineReductionThreshold']
     params.observationRadius = params_config['observationRadius']
     params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
     params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])

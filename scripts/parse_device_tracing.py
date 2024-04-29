@@ -437,13 +437,13 @@ if __name__ == "__main__":
     parser.add_argument("--trace_file", type=str, required=True)
     parser.add_argument("--start_step",
                         type=int,
-                        default=10,
+                        default=1,
                         help="analysis start from which step")
     parser.add_argument("--num_steps",
                         type=int,
-                        default=5,
+                        default=90,
                         help="number of steps to be analyzed")
-    parser.add_argument("--num_highlight_nodes", type=int, default=16)
+    parser.add_argument("--num_highlight_nodes", type=int, default=6)
     parser.add_argument("--aspect_ratio", type=float, default=2)
     parser.add_argument("--fixed_scale", action="store_true")
     parser.add_argument("--tpp",
