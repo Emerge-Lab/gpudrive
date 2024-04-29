@@ -681,6 +681,16 @@ Tensor Manager::doneTensor() const
                                });
 }
 
+Tensor Manager::infoTensor() const
+{
+    return impl_->exportTensor(ExportID::Info, TensorElementType::Int32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::kMaxAgentCount,
+                                   InfoExportSize
+                               });
+}
+
 Tensor Manager::selfObservationTensor() const
 {
     return impl_->exportTensor(ExportID::SelfObservation,

@@ -39,6 +39,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;
+    ctx.get<Info>(agent) = Info{};
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
@@ -352,6 +353,7 @@ static void resetPaddingEntities(Engine &ctx) {
         Entity agent = ctx.data().agents[agentIdx];
         ctx.get<Done>(agent).v = 0;
         ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+        ctx.get<Info>(agent) = Info{};
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 
