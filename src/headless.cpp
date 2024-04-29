@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "../maps.50",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -69,7 +69,8 @@ int main(int argc, char *argv[])
                 .rewardType = RewardType::DistanceBased,
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
-            }
+            },
+	    .datasetInitOptions = DatasetInitOptions::PadN
         }
     });
 
@@ -151,7 +152,7 @@ int main(int argc, char *argv[])
             }
         }
         mgr.step();
-        printObs();
+        // printObs();
     }
 
     auto end = std::chrono::system_clock::now();
@@ -166,6 +167,6 @@ int main(int argc, char *argv[])
       totalAgentCount += agentCount;
     }
 
-    float fpsNormalized = fps * totalAgentCount;
+    float fpsNormalized = (double)num_steps * (double)totalAgentCount / elapsed.count();
     printf("Agent-Normalized FPS %f\n", fpsNormalized);
 }
