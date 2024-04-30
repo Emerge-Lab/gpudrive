@@ -83,6 +83,17 @@ struct Done {
     int32_t v;
 };
 
+struct Info{
+    int collidedWithRoad;
+    int collidedWithVehicle;
+    int collidedWithNonVehicle;
+    int reachedGoal;
+};
+
+const size_t InfoExportSize = 4;
+
+static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
+
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
@@ -252,6 +263,7 @@ struct Agent : public madrona::Archetype<
     // Reward, episode termination
     Reward,
     Done,
+    Info,
 
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component

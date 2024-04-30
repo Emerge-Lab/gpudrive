@@ -64,6 +64,7 @@ public:
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
     MGR_EXPORT madrona::py::Tensor absoluteSelfObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor validStateTensor() const;
+    MGR_EXPORT madrona::py::Tensor infoTensor() const;
     // These functions are used by the viewer to control the simulation
     // with keyboard inputs in place of DNN policy actions
     MGR_EXPORT void triggerReset(int32_t world_idx);

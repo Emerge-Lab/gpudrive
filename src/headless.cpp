@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
+    auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
         printf("Self\n");
@@ -121,6 +122,9 @@ int main(int argc, char *argv[])
         
         printf("Agent Map Obs\n");
         agent_map_obs_printer.print();
+
+        printf("Info\n");
+        info_printer.print();
     };
     // printObs();
 
