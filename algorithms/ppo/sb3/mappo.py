@@ -184,8 +184,10 @@ class MAPPO(PPO):
         )
 
         callback.update_locals(locals())
-
         callback.on_rollout_end()
+
+        # Reset logger info (num_episodes and infos)
+        env._reset_rollout_loggers()
 
         return True
 

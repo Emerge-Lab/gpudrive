@@ -1,4 +1,5 @@
 import wandb
+import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -13,13 +14,15 @@ from algorithms.ppo.sb3.mappo import MAPPO
 
 from baselines.config import ExperimentConfig
 
+torch.cuda.empty_cache()
+
 if __name__ == "__main__":
 
     env_config = EnvConfig(
         ego_state=True,
+        norm_obs=False,
         road_map_obs=False,
-        partner_obs=True,
-        normalize_obs=False,
+        partner_obs=False,
     )
 
     exp_config = ExperimentConfig(
@@ -30,14 +33,14 @@ if __name__ == "__main__":
     env = SB3MultiAgentEnv(
         config=env_config,
         num_worlds=2,
-        max_cont_agents=10,
-        data_dir="waymo_data",
-        device="cuda",
+        max_cont_agents=128,
+        data_dir="formatted_json_v2_no_tl_train",
+        device=exp_config.device,
     )
 
     run = wandb.init(
         project="rl_benchmarking",
-        group="different_scenes",
+        group="abs_coord_frame",
         sync_tensorboard=True,
     )
     run_id = run.id
@@ -55,6 +58,7 @@ if __name__ == "__main__":
         env=env,
         seed=exp_config.seed,
         verbose=exp_config.verbose,
+        device=exp_config.device,
         tensorboard_log=f"runs/{run_id}"
         if run_id is not None
         else None,  # Sync with wandb
@@ -62,7 +66,7 @@ if __name__ == "__main__":
 
     # Learn
     model.learn(
-        total_timesteps=10_000_000,
+        total_timesteps=exp_config.total_timesteps,
         callback=custom_callback,
     )
 
