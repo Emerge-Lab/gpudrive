@@ -42,53 +42,45 @@ class MultiAgentCallback(BaseCallback):
         Triggered before updating the policy.
         """
 
+        # Get the total number of controlled agents we are controlling
+        # The number of controllable agents is different per scenario
+        num_episodes_in_rollout = self.locals["env"].num_episodes
+        num_controlled_agents = self.locals["env"]._tot_controlled_valid_agents
+
         # Filter out all nans
-        rewards = np.nan_to_num(
+        rollout_rewards = np.nan_to_num(
             (self.locals["rollout_buffer"].rewards.cpu().detach().numpy()),
             nan=0,
         )
 
-        # Get the total number of controlled agents we are controlling
-        # The number of controllable agents is different per scenario
-        num_controlled_agents = self.locals[
-            "env"
-        ]._get_sum_controlled_valid_agents
-
-        print(f"num_controlled_agents: {num_controlled_agents}")
-
-        # Number of episodes in the rollout
-        num_episodes_in_rollout = (
-            np.nan_to_num(
-                (
-                    self.locals["rollout_buffer"]
-                    .episode_starts.cpu()
-                    .detach()
-                    .numpy()
-                ),
-                nan=0,
-            ).sum()
-            / num_controlled_agents
+        mean_reward_per_agent_per_episode = rollout_rewards.sum() / (
+            num_episodes_in_rollout * num_controlled_agents
         )
 
-        mean_reward_per_agent_per_episode = (
-            rewards.sum() / num_episodes_in_rollout / num_controlled_agents
-        )
-
-        observations = (
+        rollout_observations = (
             self.locals["rollout_buffer"].observations.cpu().detach().numpy()
         )
 
+        # Average info across agents and episodes
+        rollout_info = self.locals["env"].infos
+        for key, value in rollout_info.items():
+            self.locals["env"].infos[key] = value / (
+                num_episodes_in_rollout * num_controlled_agents
+            )
+            self.logger.record(f"rollout/{key}", self.locals["env"].infos[key])
+
+        # Log
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
             "rollout/num_episodes_in_rollout",
-            num_episodes_in_rollout.item(),
+            num_episodes_in_rollout,
         )
-        self.logger.record("rollout/sum_reward", rewards.sum())
+        self.logger.record("rollout/sum_reward", rollout_rewards.sum())
         self.logger.record(
             "rollout/avg_reward", mean_reward_per_agent_per_episode.item()
         )
-        self.logger.record("rollout/obs_max", observations.max())
-        self.logger.record("rollout/obs_min", observations.min())
+        self.logger.record("rollout/obs_max", rollout_observations.max())
+        self.logger.record("rollout/obs_min", rollout_observations.min())
 
         # Render the environment
         if self.config.render:

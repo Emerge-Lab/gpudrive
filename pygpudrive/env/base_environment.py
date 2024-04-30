@@ -19,7 +19,7 @@ import logging
 
 logging.getLogger(__name__)
 
-os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -55,6 +55,7 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 0.5
         params.observationRadius = self.config.obs_radius
         params.rewardParams = reward_params
+        params.IgnoreNonVehicles = self.config.ignore_non_vehicles
 
         # Collision behavior
         if self.config.collision_behavior == "ignore":
@@ -88,6 +89,7 @@ class Env(gym.Env):
         self.num_sims = num_worlds
         self.device = device
         self.action_types = 3  # Acceleration, steering, and heading
+        self.info_dim = 4
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
@@ -259,8 +261,6 @@ class Env(gym.Env):
         reward_params.distanceToGoalThreshold = (
             self.config.dist_to_goal_threshold
         )
-        # TODO: What is this?
-        reward_params.distanceToExpertThreshold = 1.0
 
         return reward_params
 
@@ -473,12 +473,12 @@ if __name__ == "__main__":
     )
 
     TOTAL_STEPS = 90
-    NUM_CONT_AGENTS = 5
+    NUM_CONT_AGENTS = 128
     NUM_WORLDS = 1
 
     env = Env(
         config=config,
-        device="cpu",
+        device="cuda",
         data_dir="formatted_json_v2_no_tl_train",
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,

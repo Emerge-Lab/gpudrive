@@ -20,6 +20,8 @@ class EnvConfig:
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
+    # Remove all non vehicles (bicylces, pedestrians) from the scene
+    ignore_non_vehicles: bool = True
 
     # Reward
     reward_type: str = "sparse_on_goal_achieved"  # options: "dense", "sparse"
