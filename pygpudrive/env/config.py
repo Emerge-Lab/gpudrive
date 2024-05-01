@@ -21,10 +21,12 @@ class EnvConfig:
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
     # Remove all non vehicles (bicylces, pedestrians) from the scene
-    ignore_non_vehicles: bool = True
+    remove_non_vehicles: bool = True
 
     # Reward
-    reward_type: str = "sparse_on_goal_achieved"  # options: "dense", "sparse"
+    reward_type: str = (
+        "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
+    )
     dist_to_goal_threshold: float = 3.0
 
     """Constants to normalize observations."""
@@ -47,4 +49,9 @@ class EnvConfig:
     # Then it repeats the first file to pad until num_worlds
     # files are loaded. Will fail if the number of files are more than num_worlds.
     # exact_n - Init exactly num_worlds files.
-    dataset_init: str = "first_n"
+    sample_method: str = "first_n"
+
+    # Related to settings
+    eval_expert_mode: bool = (
+        False  # Set this to true if you want to return all agent info
+    )
