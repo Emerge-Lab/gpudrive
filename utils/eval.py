@@ -87,7 +87,7 @@ def evaluate_policy(
     for episode_i in pbar:
         episode_stats[episode_i, :] = run_episode(env, eval_mode)
         pbar.set_description(
-            f"Evaluating in {eval_mode}. Episode {episode_i + 1}/{num_episodes}"
+            f"Evaluating in {eval_mode} mode for {num_episodes} episodes"
         )
 
     # Make dataframe
