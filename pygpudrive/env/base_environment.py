@@ -19,7 +19,7 @@ import logging
 
 logging.getLogger(__name__)
 
-# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -55,7 +55,7 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 0.5
         params.observationRadius = self.config.obs_radius
         params.rewardParams = reward_params
-        params.IgnoreNonVehicles = self.config.ignore_non_vehicles
+        params.IgnoreNonVehicles = self.config.remove_non_vehicles
 
         # Collision behavior
         if self.config.collision_behavior == "ignore":
@@ -73,13 +73,13 @@ class Env(gym.Env):
 
         # Dataset initialization
         # TODO: Put in method
-        if self.config.dataset_init == "first_n":
+        if self.config.sample_method == "first_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.dataset_init == "random":
+        elif self.config.sample_method == "random":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
-        elif self.config.dataset_init == "pad_n":
+        elif self.config.sample_method == "pad_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
-        elif self.config.dataset_init == "exact_n":
+        elif self.config.sample_method == "exact_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
 
         # Set maximum number of controlled vehicles per environment
@@ -154,7 +154,8 @@ class Env(gym.Env):
             actions (torch.Tensor): The action indices for all agents in all worlds.
         """
 
-        self._apply_actions(actions)
+        if actions is not None:
+            self._apply_actions(actions)
 
         self.sim.step()
 
@@ -183,18 +184,25 @@ class Env(gym.Env):
             .to(done.dtype)[self.cont_agent_mask]
         )
 
-        info = (
-            torch.empty(self.num_sims, self.max_agent_count, 4)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
+        if self.config.eval_expert_mode:
+            # This is true when we are evaluating the expert performance
+            info = self.sim.info_tensor().to_torch().squeeze(dim=2)
 
-        info[self.cont_agent_mask] = (
-            self.sim.info_tensor()
-            .to_torch()
-            .squeeze(dim=2)
-            .to(info.dtype)[self.cont_agent_mask]
-        ).to(self.device)
+        else:  # Standard behavior: controlling vehicles
+            info = (
+                torch.empty(self.num_sims, self.max_agent_count, 4)
+                .fill_(float("nan"))
+                .to(self.device)
+            )
+            info[self.cont_agent_mask] = (
+                self.sim.info_tensor()
+                .to_torch()
+                .squeeze(dim=2)
+                .to(info.dtype)[self.cont_agent_mask]
+            ).to(self.device)
+
+        # if info[self.cont_agent_mask].sum().item() > 3:
+        #     print("bug")
 
         return obs, reward, done, info
 
@@ -435,7 +443,13 @@ class Env(gym.Env):
 
         return state
 
+    def normalize_partner_obs(self, state):
+        """Normalize partner state features."""
+        state /= self.config.max_partner
+        return state
+
     def _norm(self, x, min_val, max_val):
+        """Normalize a value between -1 and 1."""
         return 2 * ((x - min_val) / (max_val - min_val)) - 1
 
     def normalize_partner_obs(self, state):
@@ -459,7 +473,7 @@ class Env(gym.Env):
 
     @property
     def steps_remaining(self):
-        return self.sim.steps_remaining_tensor().to_torch()
+        return self.sim.steps_remaining_tensor().to_torch()[0][0].item()
 
 
 if __name__ == "__main__":
