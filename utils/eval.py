@@ -28,7 +28,7 @@ def select_action(obs, env, eval_mode, policy=None):
     return action
 
 
-def run_episode(env, eval_mode, metrics, policy=None):
+def run_episode(env, eval_mode, metrics, norm_scene_level=True, policy=None):
     """Run an episode."""
 
     episode_stats = torch.zeros((env.num_sims, len(metrics) + 1))
@@ -52,7 +52,11 @@ def run_episode(env, eval_mode, metrics, policy=None):
         episode_stats[world_idx, :4] = info[world_idx, :, :][
             valid_veh_mask[world_idx, :]
         ][:, :4].sum(axis=0)
+
         episode_stats[world_idx, 4] = valid_veh_mask[world_idx, :].sum().item()
+
+        if norm_scene_level:  # Divide by number of valid agents
+            episode_stats[world_idx, :4] /= episode_stats[world_idx, 4]
 
     return episode_stats
 
@@ -65,6 +69,7 @@ def evaluate_policy(
     policy=None,
     num_episodes=100,
     device="cuda",
+    norm_scene_level=False,
     metrics=[
         "off_road",
         "veh_collision",
@@ -101,6 +106,7 @@ def evaluate_policy(
             env=env,
             eval_mode=eval_mode,
             metrics=metrics,
+            norm_scene_level=norm_scene_level,
         )
 
         pbar.set_description(
@@ -127,5 +133,6 @@ if __name__ == "__main__":
         eval_mode="expert-teleport",
         data_dir="formatted_json_v2_no_tl_train",
         num_episodes=1,
-        num_worlds=5,
+        num_worlds=1,
+        norm_scene_level=True,
     )
