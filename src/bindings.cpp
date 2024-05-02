@@ -55,17 +55,17 @@ namespace gpudrive
             .value("Ignore", CollisionBehaviour::Ignore);
 
         nb::enum_<EntityType>(m, "EntityType")
-            .value("_None", EntityType::None) 
-            .value("RoadEdge", EntityType::RoadEdge) 
-            .value("RoadLine", EntityType::RoadLine) 
-            .value("RoadLane", EntityType::RoadLane) 
-            .value("CrossWalk", EntityType::CrossWalk) 
-            .value("SpeedBump", EntityType::SpeedBump) 
-            .value("StopSign", EntityType::StopSign) 
-            .value("Vehicle", EntityType::Vehicle) 
-            .value("Pedestrian", EntityType::Pedestrian) 
-            .value("Cyclist", EntityType::Cyclist) 
-            .value("Padding", EntityType::Padding) 
+            .value("_None", EntityType::None)
+            .value("RoadEdge", EntityType::RoadEdge)
+            .value("RoadLine", EntityType::RoadLine)
+            .value("RoadLane", EntityType::RoadLane)
+            .value("CrossWalk", EntityType::CrossWalk)
+            .value("SpeedBump", EntityType::SpeedBump)
+            .value("StopSign", EntityType::StopSign)
+            .value("Vehicle", EntityType::Vehicle) // Number 7
+            .value("Pedestrian", EntityType::Pedestrian)
+            .value("Cyclist", EntityType::Cyclist)
+            .value("Padding", EntityType::Padding) // Number 10
             .value("NumTypes", EntityType::NumTypes);
 
         // Bindings for Manager class
