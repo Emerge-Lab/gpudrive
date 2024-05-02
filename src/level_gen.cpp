@@ -315,8 +315,8 @@ void createPaddingEntities(Engine &ctx) {
 void createPersistentEntities(Engine &ctx, Map *map) {
     createFloorPlane(ctx);
     ctx.data().mean = {0, 0};
-    // ctx.data().mean.x = map->mean.x;
-    // ctx.data().mean.y = map->mean.y;
+    ctx.data().mean.x = map->mean.x;
+    ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
 
     CountT agentIdx = 0;
