@@ -88,9 +88,10 @@ struct Info{
     int collidedWithVehicle;
     int collidedWithNonVehicle;
     int reachedGoal;
+    int type;
 };
 
-const size_t InfoExportSize = 4;
+const size_t InfoExportSize = 5;
 
 static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
 
