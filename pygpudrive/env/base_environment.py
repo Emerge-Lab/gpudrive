@@ -89,7 +89,7 @@ class Env(gym.Env):
         self.num_sims = num_worlds
         self.device = device
         self.action_types = 3  # Acceleration, steering, and heading
-        self.info_dim = 4
+        self.info_dim = 5
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
