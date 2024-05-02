@@ -25,11 +25,12 @@ protected:
         .jsonPath = "testJsons",
         .params = {
             .polylineReductionThreshold = 0.0,
-            .observationRadius = 100.0
+            .observationRadius = 100.0,
+            .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
         }
     });
     
-    int64_t num_agents = gpudrive::consts::kMaxAgentCount;
+    uint32_t num_agents = gpudrive::consts::kMaxAgentCount;
     int64_t num_roads = gpudrive::consts::kMaxRoadEntityCount;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
@@ -110,7 +111,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(speed_next);
     }
     auto obs = mgr.bicycleModelTensor();
-    auto [valid, errorMsg] = test_utils::validateTensor(obs, initialState);
+    auto [valid, errorMsg] = test_utils::validateTensor(obs, initialState, num_agents);
     ASSERT_TRUE(valid);
     
     for(int i = 0; i < num_steps; i++)
@@ -130,7 +131,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         }
         mgr.step();
         obs = mgr.bicycleModelTensor(); 
-        std::tie(valid, errorMsg) = test_utils::validateTensor(obs, expected);
+        std::tie(valid, errorMsg) = test_utils::validateTensor(obs, expected, num_agents);
         ASSERT_TRUE(valid);
     }
 

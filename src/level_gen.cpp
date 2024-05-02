@@ -39,6 +39,8 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;
+    ctx.get<Info>(agent) = Info{};
+    ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
@@ -317,14 +319,21 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     // ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
 
-    CountT agentIdx;
-    for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
+    CountT agentIdx = 0;
+    for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
         if(agentIdx >= consts::kMaxAgentCount)
             break;
-        const auto &agentInit = map->objects[agentIdx];
+        if (ctx.data().params.IgnoreNonVehicles)
+        {
+            if (map->objects[agentCtr].type == EntityType::Pedestrian || map->objects[agentCtr].type == EntityType::Cyclist)
+            {
+                continue;
+            }
+        }
+        const auto &agentInit = map->objects[agentCtr];
         auto agent = createAgent(
             ctx, agentInit);
-        ctx.data().agents[agentIdx] = agent;
+        ctx.data().agents[agentIdx++] = agent;
     } 
     
     ctx.data().numAgents = agentIdx; 
@@ -352,6 +361,8 @@ static void resetPaddingEntities(Engine &ctx) {
         Entity agent = ctx.data().agents[agentIdx];
         ctx.get<Done>(agent).v = 0;
         ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+        ctx.get<Info>(agent) = Info{};
+        ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 

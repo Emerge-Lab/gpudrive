@@ -80,6 +80,14 @@ namespace gpudrive
         float distanceToExpertThreshold;
     };
 
+    enum class DatasetInitOptions : uint32_t
+    {
+        FirstN,
+        RandomN,
+        PadN, // Pad the worlds by repeating the first world.
+        ExactN, // Will fail if N != NumWorlds
+    };
+  
     enum class CollisionBehaviour: uint32_t
     {
         AgentStop,
@@ -92,8 +100,10 @@ namespace gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
+        DatasetInitOptions datasetInitOptions;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
+        bool IgnoreNonVehicles = false; // Default: false
     };
 
     struct WorldInit

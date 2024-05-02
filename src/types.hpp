@@ -42,6 +42,10 @@ struct BicycleModel {
     float speed;
 };
 
+const size_t BicycleModelExportSize = 4;
+
+static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
+
 struct VehicleSize {
   float length;
   float width;
@@ -79,6 +83,18 @@ struct Done {
     int32_t v;
 };
 
+struct Info{
+    int collidedWithRoad;
+    int collidedWithVehicle;
+    int collidedWithNonVehicle;
+    int reachedGoal;
+    int type;
+};
+
+const size_t InfoExportSize = 5;
+
+static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
+
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
@@ -88,6 +104,10 @@ struct SelfObservation {
     float collisionState;
 };
 
+const size_t SelfObservationExportSize = 6;
+
+static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
+
 struct MapObservation {
     madrona::math::Vector2 position;
     Scale scale;
@@ -95,7 +115,9 @@ struct MapObservation {
     float type;
 };
 
-static_assert(sizeof(MapObservation) == sizeof(float) * 7);
+const size_t MapObservationExportSize = 7;
+
+static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
 struct PartnerObservation {
     float speed;
@@ -110,14 +132,19 @@ struct PartnerObservations {
     PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
-// PartnerObservations is exported as a
-// [N, A, consts::numAgents - 1, 3] // tensor to pytorch
+const size_t PartnerObservationExportSize = 7;
+
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * 7);
+    (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
+
+const size_t AgentMapObservationExportSize = 7;
+
+static_assert(sizeof(AgentMapObservations) == sizeof(float) *
+    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
 
 struct LidarSample {
     float depth;
@@ -182,6 +209,10 @@ struct AbsoluteSelfObservation {
     Goal goal;
 };
 
+const size_t AbsoluteSelfObservationExportSize =  10; //  3 + 4 + 1 + 2
+
+static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
 enum class Validity : int32_t {
     Invalid = 0,
     Valid = 1
@@ -233,6 +264,7 @@ struct Agent : public madrona::Archetype<
     // Reward, episode termination
     Reward,
     Done,
+    Info,
 
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component

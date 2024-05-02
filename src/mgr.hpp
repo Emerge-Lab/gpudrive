@@ -64,6 +64,7 @@ public:
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
     MGR_EXPORT madrona::py::Tensor absoluteSelfObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor validStateTensor() const;
+    MGR_EXPORT madrona::py::Tensor infoTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
