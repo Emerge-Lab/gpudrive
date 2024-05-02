@@ -81,7 +81,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     {
         trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]) - M_PI_2;
+        trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];
     }
 
