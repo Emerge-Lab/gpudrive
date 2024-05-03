@@ -58,29 +58,10 @@ class Env(gym.Env):
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
 
         # Collision behavior
-        if self.config.collision_behavior == "ignore":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
-        elif self.config.collision_behavior == "remove":
-            params.collisionBehaviour = (
-                gpudrive.CollisionBehaviour.AgentRemoved
-            )
-        elif self.config.collision_behavior == "stop":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
-        else:
-            raise ValueError(
-                f"Invalid collision behavior: {self.config.collision_behavior}"
-            )
+        params = self._set_collision_behavior(params)
 
         # Dataset initialization
-        # TODO: Put in method
-        if self.config.sample_method == "first_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.sample_method == "random":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
-        elif self.config.sample_method == "pad_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
-        elif self.config.sample_method == "exact_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
+        params = self._init_dataset(params)
 
         # Set maximum number of controlled vehicles per environment
         params.maxNumControlledVehicles = max_cont_agents
@@ -271,6 +252,36 @@ class Env(gym.Env):
         )
 
         return reward_params
+
+    def _set_collision_behavior(self, params):
+        """Define what will happen when a collision occurs."""
+
+        if self.config.collision_behavior == "ignore":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
+        elif self.config.collision_behavior == "remove":
+            params.collisionBehaviour = (
+                gpudrive.CollisionBehaviour.AgentRemoved
+            )
+        elif self.config.collision_behavior == "stop":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
+        else:
+            raise ValueError(
+                f"Invalid collision behavior: {self.config.collision_behavior}"
+            )
+        return params
+
+    def _init_dataset(self, params):
+        """Define how we sample new scenarios."""
+        if self.config.sample_method == "first_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
+        elif self.config.sample_method == "random":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
+        elif self.config.sample_method == "pad_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
+        elif self.config.sample_method == "exact_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
+
+        return params
 
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
