@@ -272,6 +272,13 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
 
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
@@ -306,7 +313,7 @@ void createPaddingEntities(Engine &ctx) {
 }
 
 void createPersistentEntities(Engine &ctx, Map *map) {
-
+    // createFloorPlane(ctx);
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
