@@ -222,6 +222,34 @@ struct ValidState {
     Validity valid[consts::kMaxAgentCount];
 };
 
+struct AgentInterface : public madrona::Archetype<
+    Action,
+
+    // Observations
+    SelfObservation,
+    AbsoluteSelfObservation,
+    PartnerObservations,
+    AgentMapObservations,
+    Lidar,
+    StepsRemaining,
+
+    // Reward, episode termination
+    Reward,
+    Done,
+    Info
+> {};
+
+struct InterfaceEntity
+{
+    madrona::Entity e;
+};
+
+// Needed so that the taskgraph doesnt run on InterfaceEntity from roads
+struct RoadInterfaceEntity
+{
+    madrona::Entity e;
+};
+
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination
@@ -242,30 +270,14 @@ struct Agent : public madrona::Archetype<
     Progress,
     OtherAgents,
     EntityType,
-
-    // gpudrive
+    
     BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,
     ControlledState,
-
-    // Input
-    Action,
-
-    // Observations
-    SelfObservation,
-    AbsoluteSelfObservation,
-    PartnerObservations,
-    AgentMapObservations,
-    Lidar,
-    StepsRemaining,
-    
-    // Reward, episode termination
-    Reward,
-    Done,
-    Info,
-
+    // Interface 
+    InterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
     madrona::render::RenderCamera,
@@ -274,6 +286,10 @@ struct Agent : public madrona::Archetype<
     madrona::render::Renderable
 
 > {};
+
+struct RoadInterface : public madrona::Archetype<
+    MapObservation>
+{};
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
@@ -285,7 +301,7 @@ struct PhysicsEntity : public madrona::Archetype<
     ResponseType,
     madrona::phys::broadphase::LeafID,
     Velocity,
-    MapObservation,
+    RoadInterfaceEntity,
     EntityType,
     madrona::render::Renderable
 > {};

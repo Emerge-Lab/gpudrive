@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "tests/testJsons",
+        .jsonPath = "/home/aarav/gpudrive/build/tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -80,51 +80,51 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::system_clock::now();
     auto action_printer = mgr.actionTensor().makePrinter();
-    auto model_printer = mgr.bicycleModelTensor().makePrinter();
+    // auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
     auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
     auto shapePrinter = mgr.shapeTensor().makePrinter();
     auto rewardPrinter = mgr.rewardTensor().makePrinter();
     auto donePrinter = mgr.doneTensor().makePrinter();
-    auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
+    // auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
     auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
-        printf("Model \n");
-        model_printer.print();
+        // // printf("Model \n");
+        // // model_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
         printf("Map Obs\n");
         map_obs_printer.print();
         printf("\n");
 
-        printf("Shape\n");
-        shapePrinter.print();
+        // printf("Shape\n");
+        // shapePrinter.print();
 
-        printf("Reward\n");
-        rewardPrinter.print();
+        // printf("Reward\n");
+        // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
-        printf("Controlled State\n");
-        controlledStatePrinter.print();
+        // // printf("Controlled State\n");
+        // // controlledStatePrinter.print();
         
-        printf("Agent Map Obs\n");
-        agent_map_obs_printer.print();
+        // printf("Agent Map Obs\n");
+        // agent_map_obs_printer.print();
 
-        printf("Info\n");
-        info_printer.print();
+        // printf("Info\n");
+        // info_printer.print();
     };
     // printObs();
 

@@ -21,6 +21,7 @@ static void registerRigidBodyEntity(
 }
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
+    auto agent_iface = ctx.get<InterfaceEntity>(agent).e;
     auto xCoord = ctx.get<Trajectory>(agent).positions[0].x;
     auto yCoord = ctx.get<Trajectory>(agent).positions[0].y;
     auto xVelocity = ctx.get<Trajectory>(agent).velocities[0].x;
@@ -34,13 +35,13 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    ctx.get<Action>(agent) =
+    ctx.get<Action>(agent_iface) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
-    ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-    ctx.get<Done>(agent).v = 0;
-    ctx.get<Reward>(agent).v = 0;
-    ctx.get<Info>(agent) = Info{};
-    ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
+    ctx.get<StepsRemaining>(agent_iface).t = consts::episodeLen;
+    ctx.get<Done>(agent_iface).v = 0;
+    ctx.get<Reward>(agent_iface).v = 0;
+    ctx.get<Info>(agent_iface) = Info{};
+    ctx.get<Info>(agent_iface).type = (int32_t)ctx.get<EntityType>(agent);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
@@ -59,6 +60,8 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
     ctx.get<EntityType>(agent) = agentInit.type;
+
+    ctx.get<InterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
@@ -116,7 +119,8 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     ctx.get<ObjectID>(road_edge) = ObjectID{(int32_t)SimObject::Cube};
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
-    ctx.get<MapObservation>(road_edge) = MapObservation{.position = ctx.get<Position>(road_edge).xy(),
+    auto road_iface = ctx.get<RoadInterfaceEntity>(road_edge).e = ctx.makeEntity<RoadInterface>();
+    ctx.get<MapObservation>(road_iface) = MapObservation{.position = ctx.get<Position>(road_edge).xy(),
                                                         .scale = ctx.get<Scale>(road_edge), 
                                                         .heading = utils::quatToYaw(ctx.get<Rotation>(road_edge)), 
                                                         .type = (float)type};
@@ -189,7 +193,8 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     ctx.get<ObjectID>(speed_bump) = ObjectID{(int32_t)SimObject::SpeedBump};
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
-    ctx.get<MapObservation>(speed_bump) = MapObservation{.position = ctx.get<Position>(speed_bump).xy(),
+    auto road_iface = ctx.get<RoadInterfaceEntity>(speed_bump).e = ctx.makeEntity<RoadInterface>();
+    ctx.get<MapObservation>(road_iface) = MapObservation{.position = ctx.get<Position>(speed_bump).xy(),
                                                          .scale = ctx.get<Scale>(speed_bump), 
                                                          .heading = utils::quatToYaw(ctx.get<Rotation>(speed_bump)), 
                                                          .type = (float)type};
@@ -208,7 +213,8 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     ctx.get<ObjectID>(stop_sign) = ObjectID{(int32_t)SimObject::StopSign};
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
-    ctx.get<MapObservation>(stop_sign) = MapObservation{.position = ctx.get<Position>(stop_sign).xy(),
+    auto road_iface = ctx.get<RoadInterfaceEntity>(stop_sign).e = ctx.makeEntity<RoadInterface>();
+    ctx.get<MapObservation>(road_iface) = MapObservation{.position = ctx.get<Position>(stop_sign).xy(),
                                                         .scale = ctx.get<Scale>(stop_sign), 
                                                         .heading = utils::quatToYaw(ctx.get<Rotation>(stop_sign)), 
                                                         .type = (float)EntityType::StopSign};
@@ -219,27 +225,36 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
     if (roadInit.type == EntityType::RoadEdge || roadInit.type == EntityType::RoadLine || roadInit.type == EntityType::RoadLane)
     {
         size_t numPoints = roadInit.numPoints;
-        for(size_t j = 1; j <= numPoints - 1; j++)
+        for (size_t j = 1; j <= numPoints - 1; j++)
         {
-            if(idx >= consts::kMaxRoadEntityCount)
-                 return;
-            ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
+            if (idx >= consts::kMaxRoadEntityCount)
+                return;
+            auto road = ctx.data().roads[idx] = makeRoadEdge(ctx, roadInit.geometry[j - 1], roadInit.geometry[j], roadInit.type);
+            ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
         }
-    } else if (roadInit.type == EntityType::SpeedBump || roadInit.type == EntityType::CrossWalk) {
-      assert(roadInit.numPoints >= 4);
-      // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
-      if(idx >= consts::kMaxRoadEntityCount)
-        return;
-      ctx.data().roads[idx++] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
-    } else if (roadInit.type == EntityType::StopSign ) {
-      assert(roadInit.numPoints >= 1);
-      // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
-      if(idx >= consts::kMaxRoadEntityCount)
-        return;
-      ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.geometry[0]);
-    } else {
-      // TODO: Need to handle Cross Walk.
-    //   assert(false);
+    }
+    else if (roadInit.type == EntityType::SpeedBump || roadInit.type == EntityType::CrossWalk)
+    {
+        assert(roadInit.numPoints >= 4);
+        // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
+        if (idx >= consts::kMaxRoadEntityCount)
+            return;
+        auto road = ctx.data().roads[idx] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
+        ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
+    }
+    else if (roadInit.type == EntityType::StopSign)
+    {
+        assert(roadInit.numPoints >= 1);
+        // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
+        if (idx >= consts::kMaxRoadEntityCount)
+            return;
+        auto road = ctx.data().roads[idx] = makeStopSign(ctx, roadInit.geometry[0]);
+        ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
+    }
+    else
+    {
+        // TODO: Need to handle Cross Walk.
+        //   assert(false);
         return;
     }
 }
@@ -255,24 +270,6 @@ static void createFloorPlane(Engine &ctx)
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
-}
-
-static inline Entity createAgentPadding(Engine &ctx) {
-    auto agent = ctx.makeRenderableEntity<Agent>();
-
-    ctx.get<Position>(agent) = consts::kPaddingPosition;
-    ctx.get<Rotation>(agent) = Quat::angleAxis(0, madrona::math::up);
-    ctx.get<Scale>(agent) = Diag3x3{.d0 = 0, .d1 = 0, .d2 = 0};
-    ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
-    ctx.get<ResponseType>(agent) = ResponseType::Static;
-    ctx.get<EntityType>(agent) = EntityType::Padding;
-    ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
-    ctx.get<Done>(agent).v = 0;
-    ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-    ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
-
-    return agent;
 }
 
 static inline Entity createPhysicsEntityPadding(Engine &ctx) {
@@ -296,12 +293,13 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        ctx.data().agents[agentIdx] = createAgentPadding(ctx);
+        ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
          roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
-        ctx.data().roads[roadIdx] = createPhysicsEntityPadding(ctx);
+        // ctx.data().roads[roadIdx] = createPhysicsEntityPadding(ctx);
+        ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
     }
 }
 
@@ -326,6 +324,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         const auto &agentInit = map->objects[agentCtr];
         auto agent = createAgent(
             ctx, agentInit);
+        ctx.data().agent_ifaces[agentIdx] = ctx.get<InterfaceEntity>(agent).e;
         ctx.data().agents[agentIdx++] = agent;
     } 
     
@@ -346,24 +345,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     shape.roadEntityCount = ctx.data().numRoads;
 
     createPaddingEntities(ctx);
-}
-
-static void resetPaddingEntities(Engine &ctx) {
-    for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        Entity agent = ctx.data().agents[agentIdx];
-        ctx.get<Done>(agent).v = 0;
-        ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-        ctx.get<Info>(agent) = Info{};
-        ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
-        registerRigidBodyEntity(ctx, agent, SimObject::Agent);
-    }
-
-    for (CountT roadIdx = ctx.data().numRoads;
-         roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
-        Entity road = ctx.data().roads[roadIdx];
-        registerRigidBodyEntity(ctx, road, SimObject::Cube);
-    }
 }
 
 static void resetPersistentEntities(Engine &ctx)
@@ -413,7 +394,6 @@ static void resetPersistentEntities(Engine &ctx)
 void generateWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
-    resetPaddingEntities(ctx);
 }
 
 }
