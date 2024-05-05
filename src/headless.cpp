@@ -69,8 +69,10 @@ int main(int argc, char *argv[])
                 .rewardType = RewardType::DistanceBased,
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
-            }
-        }
+            },
+            .maxNumControlledVehicles = 0
+        },
+        .enableBatchRenderer = true
     });
 
     std::random_device rd;
@@ -94,6 +96,8 @@ int main(int argc, char *argv[])
     auto printObs = [&]() {
         // printf("Self\n");
         // self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
         // printf("Actions\n");
         // action_printer.print();
@@ -104,9 +108,9 @@ int main(int argc, char *argv[])
         // printf("Partner Obs\n");
         // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
-        printf("\n");
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
 
         // printf("Shape\n");
         // shapePrinter.print();
@@ -114,6 +118,8 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
+        // printf("Done\n");
+        // donePrinter.print();
         // printf("Done\n");
         // donePrinter.print();
 
