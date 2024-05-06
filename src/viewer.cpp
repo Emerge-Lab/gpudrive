@@ -9,46 +9,9 @@
 #include <optional>
 
 #include <iostream>
-// #include "json_serialization.hpp"
-#include <nlohmann/json.hpp>    
 
 using namespace madrona;
 using namespace madrona::viz;
-
-std::pair<float, float> calc_mean(const nlohmann::json &j)
-{
-    std::pair<float, float> mean = {0, 0};
-    int64_t numEntities = 0;
-    for (const auto &obj : j["objects"])
-    {
-        int i = 0;
-        for (const auto &pos : obj["position"])
-        {
-            if (obj["valid"][i++] == false)
-                continue;
-            numEntities++;
-            float newX = pos["x"];
-            float newY = pos["y"];
-            // Update mean incrementally
-            mean.first += (newX - mean.first) / numEntities;
-            mean.second += (newY - mean.second) / numEntities;
-        }
-    }
-    for (const auto &obj : j["roads"])
-    {
-        for (const auto &point : obj["geometry"])
-        {
-            numEntities++;
-            float newX = point["x"];
-            float newY = point["y"];
-
-            // Update mean incrementally
-            mean.first += (newX - mean.first) / numEntities;
-            mean.second += (newY - mean.second) / numEntities;
-        }
-    }
-    return mean;
-}
 
 static HeapArray<float> readReplayLog(const char *path) {
     std::ifstream replay_log(path, std::ios::binary);
@@ -112,7 +75,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
-        .jsonPath = "/home/aarav/gpudrive/nocturne_data",
+        .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -128,27 +91,11 @@ int main(int argc, char *argv[])
             (math::Quat::angleAxis(0, math::up) *
             math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
-    std::string path = "/home/aarav/gpudrive/nocturne_data";
-    std::string mapPath;
-    for (auto const &mapFile : std::filesystem::directory_iterator(path))
-    {
-        if (mapFile.path().extension() == ".json")
-        {
-            mapPath = mapFile.path().string();
-            break;
-        }
-    }
-    std::cout<<mapPath<<std::endl;
-    std::ifstream in(mapPath);
-    nlohmann::json rawJson;
-    in >> rawJson;
-    auto mean = calc_mean(rawJson);
-
-    Viewer viewer(mgr.getRenderManager(), window.get(), {
+        Viewer viewer(mgr.getRenderManager(), window.get(), {
         .numWorlds = num_worlds,
         .simTickRate = 20,
         .cameraMoveSpeed = 20.f,
-        .cameraPosition = mean.first * math::right + mean.second*math::fwd + 100.f * math::up,
+        .cameraPosition = 100.f * math::up,
         .cameraRotation = initial_camera_rotation,
     });
 
