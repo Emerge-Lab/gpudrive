@@ -147,6 +147,21 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 }
 
+#ifdef MADRONA_GPU_MODE
+inline uint32_t warpAllInclusiveScan(uint32_t lane_id, uint32_t val)
+{
+#pragma unroll
+    for (int i = 1; i < 32; i *= 2) {
+        int tmp = __shfl_up_sync(0xFFFF'FFFF, val, i);
+        if ((int)lane_id >= i) {
+            val += tmp;
+        }
+    }
+
+    return val;
+}
+#endif
+
 // This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
@@ -168,6 +183,124 @@ inline void collectObservationsSystem(Engine &ctx,
         return;
     }
 
+#ifdef MADRONA_GPU_MODE
+    const int32_t lane_id = threadIdx.x % 32;
+
+    if (lane_id == 0) {
+        self_obs.speed = model.speed;
+        self_obs.vehicle_size = size;
+        auto goalPos = goal.position - model.position;
+        self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
+
+        auto hasCollided = collisionEvent.hasCollided.load_relaxed();
+        self_obs.collisionState = hasCollided ? 1.f : 0.f;
+    }
+
+    const int32_t num_other_agents = ctx.data().numAgents - 1;
+    int32_t baseArrIndex = 0; int32_t baseAgentIdx = 0;
+    while(baseAgentIdx < num_other_agents)
+    {
+        int32_t thread_agent_idx = baseAgentIdx + lane_id;
+        bool thread_active = thread_agent_idx < num_other_agents;
+        thread_agent_idx = min(thread_agent_idx, num_other_agents - 1);
+
+        Entity other = other_agents.e[thread_agent_idx];
+
+        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
+        Rotation other_rot = ctx.get<Rotation>(other);
+        VehicleSize other_size = ctx.get<VehicleSize>(other);
+
+        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        float relative_speed = other_bicycle_model.speed; // Design decision: return the speed of the other agent directly
+
+        Rotation relative_orientation = rot.inv() * other_rot;
+
+        float relative_heading = utils::quatToYaw(relative_orientation);
+
+        if(relative_pos.length() > ctx.data().params.observationRadius || ctx.get<EntityType>(other) == EntityType::Padding)
+        {
+            thread_active = false;
+        }
+
+        int32_t thread_arr_idx, thread_sum;
+        {
+            int32_t thread_elem = thread_active ? 1 : 0;
+            thread_sum = warpAllInclusiveScan(lane_id, thread_elem);
+            int32_t thread_arr_offset = thread_sum - thread_elem;
+            thread_arr_idx = baseArrIndex + thread_arr_offset;
+        }
+        thread_sum = __shfl_sync(0xFFFF'FFFF, thread_sum, 31);
+
+        if (thread_active) {
+            partner_obs.obs[thread_arr_idx] = {
+                .speed = relative_speed,
+                .position = relative_pos,
+                .heading = relative_heading,
+                .vehicle_size = other_size,
+                .type = (float)ctx.get<EntityType>(other)
+            };
+        }
+
+        baseAgentIdx += 32;
+        baseArrIndex += thread_sum;
+    }
+
+    while(baseArrIndex < consts::kMaxAgentCount - 1)
+    {
+        int32_t thread_arr_idx = baseArrIndex + lane_id;
+        if (thread_arr_idx < consts::kMaxAgentCount - 1) {
+            partner_obs.obs[thread_arr_idx].type = (float)EntityType::None;
+        }
+        baseArrIndex += 32;
+    }
+
+    const int num_roads = ctx.data().numRoads;
+    baseArrIndex = 0; int32_t baseRoadIdx = 0;
+    while(baseRoadIdx < num_roads) {
+        int32_t thread_road_idx = baseRoadIdx + lane_id;
+        bool thread_active = thread_road_idx < num_roads;
+        thread_road_idx = min(thread_road_idx, num_roads - 1);
+
+        Entity road = ctx.data().roads[thread_road_idx];
+        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        if(relative_pos.length() > ctx.data().params.observationRadius)
+        {
+            thread_active = false;
+        }
+
+        int32_t thread_arr_idx, thread_sum;
+        {
+            int32_t thread_elem = thread_active ? 1 : 0;
+            thread_sum = warpAllInclusiveScan(lane_id, thread_elem);
+            int32_t thread_arr_offset = thread_sum - thread_elem;
+            thread_arr_idx = baseArrIndex + thread_arr_offset;
+        }
+        thread_sum = __shfl_sync(0xFFFF'FFFF, thread_sum, 31);
+
+        if (thread_active) {
+            MapObservation global_ob = ctx.get<MapObservation>(road);
+            global_ob.position -= model.position;
+            map_obs.obs[thread_arr_idx] = global_ob;
+        }
+
+        baseRoadIdx += 32;
+        baseArrIndex += thread_sum;
+    }
+
+    while (baseArrIndex < consts::kMaxRoadEntityCount)
+    {
+        int32_t thread_arr_idx = baseArrIndex + lane_id;
+
+        if (thread_arr_idx < consts::kMaxRoadEntityCount) {
+            map_obs.obs[thread_arr_idx].position = Vector2{0.f, 0.f};
+            map_obs.obs[thread_arr_idx].heading = 0.f;
+            map_obs.obs[thread_arr_idx].type = (float)EntityType::None;
+        }
+        baseArrIndex += 32;
+    }
+#else
     self_obs.speed = model.speed;
     self_obs.vehicle_size = size;
     auto goalPos = goal.position - model.position;
@@ -232,6 +365,7 @@ inline void collectObservationsSystem(Engine &ctx,
         map_obs.obs[arrIndex].type = (float)EntityType::None;
         arrIndex++;
     }
+#endif
 }
 
 inline void movementSystem(Engine &e,
@@ -747,8 +881,14 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
                                                            {reset_sys});
 
     // Finally, collect observations for the next step.
-    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
-        collectObservationsSystem,
+    auto collect_obs = 
+#ifdef MADRONA_GPU_MODE
+        builder.addToGraph<CustomParallelForNode<Engine,
+            collectObservationsSystem, 32, 1,
+#else
+        builder.addToGraph<ParallelForNode<Engine,
+            collectObservationsSystem,
+#endif
             BicycleModel,
             VehicleSize,
             Position,
