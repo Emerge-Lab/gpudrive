@@ -6,6 +6,7 @@ import os
 import math
 import gpudrive
 
+
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     BACKGROUND_COLOR = (0, 0, 0)
@@ -17,13 +18,22 @@ class PyGameVisualizer:
         (255, 255, 0),  # Yellow
         (255, 165, 0),  # Orange
     ]
+    color_dict = {
+        float(gpudrive.EntityType.RoadEdge): (255, 255, 255),  # Black
+        float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
+        float(gpudrive.EntityType.RoadLine): (225, 255, 225),  # Green
+        float(gpudrive.EntityType.SpeedBump): (255, 0, 255),  # Red
+        float(gpudrive.EntityType.CrossWalk): (213, 20, 20),  # dark
+        float(gpudrive.EntityType.StopSign): (255, 0, 255),  # Blue
+    }
+
     def __init__(self, sim, world_render_idx, render_mode, goal_radius):
         self.sim = sim
         self.world_render_idx = world_render_idx
         self.render_mode = render_mode
         self.goal_radius = goal_radius
 
-        self.padding_x = self.PADDING_PCT * self.WINDOW_W 
+        self.padding_x = self.PADDING_PCT * self.WINDOW_W
         self.padding_y = self.PADDING_PCT * self.WINDOW_H
 
         pygame.init()
@@ -40,14 +50,23 @@ class PyGameVisualizer:
         self.compute_window_settings()
 
     def compute_window_settings(self):
-        map_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx].cpu().numpy()
+        map_info = (
+            self.sim.map_observation_tensor()
+            .to_torch()[self.world_render_idx]
+            .cpu()
+            .numpy()
+        )
 
         # Adjust window dimensions by subtracting padding
         adjusted_window_width = self.WINDOW_W - self.padding_x
         adjusted_window_height = self.WINDOW_H - self.padding_y
 
-        self.zoom_scale_x = adjusted_window_width / (map_info[:, 0].max() - map_info[:, 0].min())
-        self.zoom_scale_y = adjusted_window_height / (map_info[:, 1].max() - map_info[:, 1].min())
+        self.zoom_scale_x = adjusted_window_width / (
+            map_info[:, 0].max() - map_info[:, 0].min()
+        )
+        self.zoom_scale_y = adjusted_window_height / (
+            map_info[:, 1].max() - map_info[:, 1].min()
+        )
 
         self.window_center = np.mean(map_info, axis=0)
 
@@ -68,8 +87,16 @@ class PyGameVisualizer:
             coords: x, y coordinates
         """
         x, y = coords
-        x_scaled = (x-self.window_center[0]) * self.zoom_scale_x + (self.WINDOW_W / 2) + self.padding_x/2
-        y_scaled = (y-self.window_center[1]) * self.zoom_scale_y + (self.WINDOW_H / 2) + self.padding_y/2
+        x_scaled = (
+            (x - self.window_center[0]) * self.zoom_scale_x
+            + (self.WINDOW_W / 2)
+            + self.padding_x / 2
+        )
+        y_scaled = (
+            (y - self.window_center[1]) * self.zoom_scale_y
+            + (self.WINDOW_H / 2)
+            + self.padding_y / 2
+        )
 
         return (x_scaled, y_scaled)
 
@@ -105,18 +132,18 @@ class PyGameVisualizer:
             angle - math.pi / 2 + rotation,
             math.pi - angle - math.pi / 2 + rotation,
             math.pi + angle - math.pi / 2 + rotation,
-            -angle - math.pi / 2 + rotation
+            -angle - math.pi / 2 + rotation,
         ]
 
         # Calculate the coordinates of each corner for Pygame
         for angle in angles:
-            x_offset = radius * math.cos(angle) 
+            x_offset = radius * math.cos(angle)
             y_offset = radius * math.sin(angle)  # Invert y-coordinate
             points.append((x + x_offset, y + y_offset))
 
         return points
 
-    @staticmethod    
+    @staticmethod
     def get_endpoints(center, map_obj):
         center_pos = center
         length = map_obj[2]  # Already half the length
@@ -125,7 +152,6 @@ class PyGameVisualizer:
         start = center_pos - np.array([length * np.cos(yaw), length * np.sin(yaw)])
         end = center_pos + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
-
 
     def draw(self, cont_agent_mask):
         """Render the environment."""
@@ -156,19 +182,15 @@ class PyGameVisualizer:
 
             agent_corners = PyGameVisualizer.compute_agent_corners(
                 agent_pos[agent_idx],
-                agent_sizes[agent_idx,1],
-                agent_sizes[agent_idx,0],
-                agent_rot[agent_idx]
+                agent_sizes[agent_idx, 1],
+                agent_sizes[agent_idx, 0],
+                agent_rot[agent_idx],
             )
 
             for i, agent_corner in enumerate(agent_corners):
-                agent_corners[i] = self.scale_coords(
-                    agent_corner
-                )
+                agent_corners[i] = self.scale_coords(agent_corner)
 
-            current_goal_scaled = self.scale_coords(
-                goal_pos[agent_idx]
-            )
+            current_goal_scaled = self.scale_coords(goal_pos[agent_idx])
 
             mod_idx = agent_idx % len(self.COLOR_LIST)
 
@@ -188,18 +210,15 @@ class PyGameVisualizer:
                     int(current_goal_scaled[0]),
                     int(current_goal_scaled[1]),
                 ),
-                radius = self.goal_radius * self.zoom_scale_x,
+                radius=self.goal_radius * self.zoom_scale_x,
             )
 
-        map_info = self.sim.map_observation_tensor().to_torch()[self.world_render_idx].cpu().numpy()
-        color_dict = {
-            float(gpudrive.EntityType.RoadEdge): (0, 0, 0), # Black
-            float(gpudrive.EntityType.RoadLane): (255,0,0), # Grey
-            float(gpudrive.EntityType.RoadLine): (0,255,0), # Green
-            float(gpudrive.EntityType.SpeedBump): (255,0,255), # Red
-            float(gpudrive.EntityType.CrossWalk): (213,20,20), # dark
-            float(gpudrive.EntityType.StopSign): (255,0,255), # Blue
-        }
+        map_info = (
+            self.sim.map_observation_tensor()
+            .to_torch()[self.world_render_idx]
+            .cpu()
+            .numpy()
+        )
 
         for idx, map_obj in enumerate(map_info):
             if map_obj[-1] == float(gpudrive.EntityType._None):
@@ -209,31 +228,25 @@ class PyGameVisualizer:
                 # coords = self.scale_coords((start,end), self.window_center[0], self.window_center[1])
                 start = self.scale_coords(start)
                 end = self.scale_coords(end)
-                pygame.draw.line(
-                    self.surf,
-                    color_dict[map_obj[-1]],
-                    start,
-                    end,
-                    2
-                )
+                pygame.draw.line(self.surf, self.color_dict[map_obj[-1]], start, end, 2)
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
-                center, width, height, rotation = map_obj[:2], map_obj[3], map_obj[2], map_obj[5]
-                if(map_obj[-1] == float(gpudrive.EntityType.StopSign)):
-                    width *= self.zoom_scale_x   
+                center, width, height, rotation = (
+                    map_obj[:2],
+                    map_obj[3],
+                    map_obj[2],
+                    map_obj[5],
+                )
+                if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+                    width *= self.zoom_scale_x
                     height *= self.zoom_scale_y
                 box_corners = PyGameVisualizer.compute_agent_corners(
-                    center,
-                    width,
-                    height,
-                    rotation
+                    center, width, height, rotation
                 )
                 for i, box_corner in enumerate(box_corners):
-                    box_corners[i] = self.scale_coords(
-                        box_corner
-                    )
+                    box_corners[i] = self.scale_coords(box_corner)
                 pygame.draw.polygon(
                     surface=self.surf,
-                    color=color_dict[map_obj[-1]],
+                    color=self.color_dict[map_obj[-1]],
                     points=box_corners,
                 )
 
@@ -249,12 +262,9 @@ class PyGameVisualizer:
         else:
             return self.isopen
 
-    @staticmethod        
+    @staticmethod
     def _create_image_array(surf):
-        return np.transpose(
-            np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2)
-        )
-
+        return np.transpose(np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2))
 
     def destroy(self):
         pygame.display.quit()

@@ -62,7 +62,7 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 0.5
+        params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
 
@@ -430,9 +430,7 @@ if __name__ == "__main__":
         frames.append(frame)
 
     import imageio
-    with imageio.get_writer('out.mp4', fps=20) as video:
-        for frame in frames:
-            video.append_data(frame)
+    imageio.mimsave("out.gif", frames)
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
