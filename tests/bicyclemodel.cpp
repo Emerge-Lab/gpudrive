@@ -99,6 +99,91 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
 
+std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, const py::Tensor &self_obs, const std::vector<float> &expected, const uint32_t num_agents)
+{
+    int64_t num_elems = 1;
+    for (int i = 0; i < abs_obs.numDims(); i++)
+    {
+        num_elems *= abs_obs.dims()[i];
+    }
+
+    if (num_agents * gpudrive::AbsoluteSelfObservationExportSize > num_elems)
+    {
+        return {false, "Expected number of elements is less than the number of agents."};
+    }
+
+    num_elems = 1;
+    for (int i = 0; i < self_obs.numDims(); i++)
+    {
+        num_elems *= self_obs.dims()[i];
+    }
+
+    if (num_agents * gpudrive::SelfObservationExportSize > num_elems)
+    {
+        return {false, "Expected number of elements is less than the number of agents."};
+    }
+
+    float *ptr = static_cast<float *>(abs_obs.devicePtr());
+
+    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    {
+        auto x = static_cast<float>(ptr[i]);
+        auto y = static_cast<float>(ptr[i + 1]);
+        auto rot = static_cast<float>(ptr[i + 3]);
+        auto x_exp = expected[agent_idx];
+        auto y_exp = expected[agent_idx + 1];
+        auto rot_exp = expected[agent_idx + 2];
+
+        i += gpudrive::AbsoluteSelfObservationExportSize;
+        agent_idx += 4;
+
+        if (std::abs(x - x_exp) > test_utils::EPSILON || std::abs(y - y_exp) > test_utils::EPSILON || std::abs(rot - rot_exp) > test_utils::EPSILON)
+        {
+            return {false, "Value mismatch."};
+        }
+    }
+    
+    ptr = static_cast<float *>(self_obs.devicePtr());
+    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
+    {
+        auto speed = static_cast<float>(ptr[i]);
+        auto speed_exp = expected[agent_idx+3];
+
+        if(std::abs(speed - speed_exp) > test_utils::EPSILON)
+        {
+            return {false, "Value mismatch."};
+        }
+
+        agent_idx += 4;
+        i += gpudrive::SelfObservationExportSize;
+    }
+
+    return {true, ""};
+}
+
+std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor &self_obs, const uint32_t num_agents)
+{
+    std::vector<float> obs;
+    obs.reserve(num_agents * 4);
+    float *ptr = static_cast<float *>(abs_obs.devicePtr());
+    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    {
+        obs[agent_idx] = static_cast<float>(ptr[i]);
+        obs[agent_idx+1] = static_cast<float>(ptr[i+1]);
+        obs[agent_idx+2] = static_cast<float>(ptr[i+3]);
+        agent_idx += 4;
+        i+=gpudrive::AbsoluteSelfObservationExportSize;
+    }
+    ptr = static_cast<float *>(self_obs.devicePtr());
+    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize; i++)
+    {
+        obs[agent_idx+3] = static_cast<float>(ptr[i]);
+        agent_idx += 4;
+        i+=gpudrive::SelfObservationExportSize;
+    }
+    return obs;
+}
+
 TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     std::vector<float> expected;
     //Check first step -
@@ -110,14 +195,15 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         expected.push_back(theta_next);
         expected.push_back(speed_next);
     }
-    auto obs = mgr.bicycleModelTensor();
-    auto [valid, errorMsg] = test_utils::validateTensor(obs, initialState, num_agents);
+    auto abs_obs = mgr.absoluteSelfObservationTensor();
+    auto self_obs = mgr.selfObservationTensor();
+    auto [valid, errorMsg] = validateBicycleModel(abs_obs, self_obs, initialState, num_agents);
     ASSERT_TRUE(valid);
     
     for(int i = 0; i < num_steps; i++)
     {
         expected.clear();
-        auto prev_state = test_utils::flatten_obs(obs); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
+        auto prev_state = parseBicycleModel(abs_obs, self_obs, num_agents); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
         for(int j = 0; j < num_agents; j++)
         {
             float acc =  acc_distribution(generator);
@@ -130,8 +216,9 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
             expected.push_back(speed_next);
         }
         mgr.step();
-        obs = mgr.bicycleModelTensor(); 
-        std::tie(valid, errorMsg) = test_utils::validateTensor(obs, expected, num_agents);
+        abs_obs = mgr.absoluteSelfObservationTensor(); 
+        self_obs = mgr.selfObservationTensor();
+        std::tie(valid, errorMsg) = validateBicycleModel(abs_obs, self_obs, expected, num_agents);
         ASSERT_TRUE(valid);
     }
 

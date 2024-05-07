@@ -123,7 +123,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
             Entity agent = ctx.data().agents[i];
             auto agent_iface = ctx.get<InterfaceEntity>(agent).e;
             Done done = ctx.get<Done>(agent_iface);
-            ControlledState controlledState = ctx.get<ControlledState>(agent_iface);
+            ControlledState controlledState = ctx.get<ControlledState>(agent);
             if (controlledState.controlledState == ControlMode::BICYCLE && !done.v) {
                 areAllControlledAgentsDone = 0;
             }
@@ -497,7 +497,6 @@ inline void stepTrackerSystem(Engine &ctx,
             info.reachedGoal = 1;
         }
     }
-
 }
 
 void collisionDetectionSystem(Engine &ctx,
@@ -611,7 +610,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
         return;
     }
 
-    auto out = ctx.get<AbsoluteSelfObservation>(agent_iface.e);
+    auto &out = ctx.get<AbsoluteSelfObservation>(agent_iface.e);
     out.position = position;
     out.rotation.rotationAsQuat = rotation;
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
