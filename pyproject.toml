@@ -30,5 +30,6 @@ description = ""
 authors = ["Sébastien Eustace <sebastien@eustace.io>"]
 readme = "README.md"
 packages = [
-    {include = "gpudrive.cpython-311-x86_64-linux-gnu.so", from = "build", to = "gpudrive"}
+    {include = "gpudrive.cpython-311-x86_64-linux-gnu.so", from = "build", to = "gpudrive"},
+    {include = "pygpudrive"}
 ]

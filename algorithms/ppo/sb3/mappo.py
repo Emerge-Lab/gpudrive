@@ -1,9 +1,7 @@
 import logging
-from typing import Optional
 import torch
 from torch.nn import functional as F
 import numpy as np
-from box import Box
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
