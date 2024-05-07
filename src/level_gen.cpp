@@ -78,11 +78,9 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     auto &trajectory = ctx.get<Trajectory>(agent);
-    auto length = agentInit.length/2;
-    auto width = agentInit.width/2;
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];

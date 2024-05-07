@@ -605,6 +605,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Rotation &rotation,
                                               const Goal &goal,
                                               const EntityType &entityType,
+                                              const VehicleSize &vehicleSize,
                                               InterfaceEntity &agent_iface) {
     if (entityType == EntityType::Padding) {
         return;
@@ -615,6 +616,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationAsQuat = rotation;
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
+    out.vehicle_size = vehicleSize;
 }
 
 inline void validStateSystem(Engine &ctx, ValidState &validOut) {
@@ -747,7 +749,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, EntityType, InterfaceEntity>>(
+                        Rotation, Goal, EntityType, VehicleSize, InterfaceEntity>>(
         {collect_obs});
 
         // The lidar system

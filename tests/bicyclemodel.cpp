@@ -61,11 +61,8 @@ protected:
             }
             agent_length_map[n_agents] = (float)obj["length"];
             agent_width_map[n_agents] = (float)obj["width"];
-            auto length = agent_length_map[n_agents] / 2;
-            auto width = agent_width_map[n_agents] / 2;
-            auto x = float(obj["position"][0]["x"]);
-            initialState.push_back(float(obj["position"][0]["x"]) - mean.first + length);
-            initialState.push_back(float(obj["position"][0]["y"]) - mean.second + width);
+            initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
+            initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
             initialState.push_back(test_utils::degreesToRadians(obj["heading"][0]));
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
             n_agents++;
