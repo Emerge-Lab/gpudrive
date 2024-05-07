@@ -21,9 +21,9 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         ego_state=True,
+        road_map_obs=True,
+        partner_obs=True,
         norm_obs=False,
-        road_map_obs=False,
-        partner_obs=False,
         sample_method="rand_n",
     )
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=3,
+        num_worlds=2,
         max_cont_agents=128,
         data_dir="formatted_json_v2_no_tl_train",
         device=exp_config.device,

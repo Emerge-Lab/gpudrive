@@ -21,7 +21,7 @@ class ExperimentConfig:
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
-    n_steps: int = 1028
-    batch_size: int = 256
+    n_steps: int = 180
+    batch_size: int = 180
     verbose: int = 0
     total_timesteps: int = 50_000_000

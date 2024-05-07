@@ -15,8 +15,8 @@ class EnvConfig:
     obs_radius: float = 10.0
 
     # Action space
-    steer_actions: torch.Tensor = torch.tensor([-0.6, 0, 0.6])
-    accel_actions: torch.Tensor = torch.tensor([-3, 0, 3])
+    steer_actions: torch.Tensor = torch.tensor([-0.6, 0.3, 0, 3, 0.6])
+    accel_actions: torch.Tensor = torch.tensor([-3, -1, 0, 1, 3])
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
