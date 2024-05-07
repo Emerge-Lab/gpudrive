@@ -86,21 +86,50 @@ class MultiAgentCallback(BaseCallback):
         if self.config.render:
             self._create_and_log_video()
 
-    def _create_and_log_video(self):
+    def _batchify_and_filter_obs(self, obs, env, render_world_idx=0):
+        # Unsqueeze
+        obs = obs.reshape((env.num_worlds, env.max_agent_count, -1))
+
+        # Only select obs for the render env
+        obs = obs[render_world_idx, :, :]
+
+        return obs[env.controlled_agent_mask[render_world_idx, :]]
+
+    def _pad_actions(self, pred_actions, env, render_world_idx):
+        """Currently we're only rendering the 0th world index."""
+
+        actions = torch.full(
+            (env.num_worlds, env.max_agent_count), fill_value=float("nan")
+        ).to("cpu")
+
+        world_cont_agent_mask = env.controlled_agent_mask[
+            render_world_idx, :
+        ].to("cpu")
+
+        actions[render_world_idx, :][world_cont_agent_mask] = torch.Tensor(
+            pred_actions
+        ).to("cpu")
+        return actions
+
+    def _create_and_log_video(self, render_world_idx=0):
         """Make a video and log to wandb.
         Note: Currently only works a single world."""
         policy = self.model
         env = self.locals["env"]
 
         obs = env.reset()
+        obs = self._batchify_and_filter_obs(obs, env)
+
         frames = []
 
         for _ in range(90):
 
             action, _ = policy.predict(obs.detach().cpu().numpy())
+            action = self._pad_actions(action, env, render_world_idx)
 
             # Step the environment
             obs, _, _, _ = env.step(action)
+            obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
             frames.append(frame.T)

@@ -1,5 +1,6 @@
 import wandb
 import torch
+import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     )
 
     exp_config = ExperimentConfig(
-        render=False,
+        render=True,
     )
 
     # Make SB3-compatible environment
