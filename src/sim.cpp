@@ -324,7 +324,7 @@ inline void movementSystem(Engine &e,
     else
     {
         // Follow expert trajectory
-        CountT curStepIdx = getCurrentStep(stepsRemaining);
+        CountT curStepIdx = getCurrentStep(stepsRemaining) + 1; // +1 to get the next step
         model.position= trajectory.positions[curStepIdx];
         model.heading = trajectory.headings[curStepIdx];
         model.speed = trajectory.velocities[curStepIdx].length();
@@ -499,7 +499,7 @@ inline void stepTrackerSystem(Engine &ctx,
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1)
+    if(done.v != 1 || info.reachedGoal != 1)
     {
         float dist = (model.position - goal.position).length();
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
