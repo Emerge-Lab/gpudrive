@@ -16,6 +16,7 @@ class MultiAgentCallback(BaseCallback):
         super().__init__(**kwargs)
         self.config = config
         self.wandb_run = wandb_run
+        self.num_rollouts = 0
 
     def _on_training_start(self) -> None:
         """
@@ -84,7 +85,10 @@ class MultiAgentCallback(BaseCallback):
 
         # Render the environment
         if self.config.render:
-            self._create_and_log_video()
+            if self.num_rollouts % self.config.render_freq == 0:
+                self._create_and_log_video()
+
+        self.num_rollouts += 1
 
     def _batchify_and_filter_obs(self, obs, env, render_world_idx=0):
         # Unsqueeze
@@ -136,4 +140,4 @@ class MultiAgentCallback(BaseCallback):
 
         frames = np.array(frames)
 
-        wandb.log({"video": wandb.Video(frames, fps=5, format="gif")})
+        wandb.log({"video": wandb.Video(frames, fps=10, format="gif")})

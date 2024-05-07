@@ -24,6 +24,7 @@ if __name__ == "__main__":
         norm_obs=False,
         road_map_obs=False,
         partner_obs=False,
+        sample_method="rand_n",
     )
 
     exp_config = ExperimentConfig(
@@ -33,15 +34,15 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=2,
+        num_worlds=3,
         max_cont_agents=128,
         data_dir="formatted_json_v2_no_tl_train",
         device=exp_config.device,
     )
 
     run = wandb.init(
-        project="rl_benchmarking",
-        group="abs_coord_frame",
+        project="rl_bench",
+        group="render_test",
         sync_tensorboard=True,
     )
     run_id = run.id
