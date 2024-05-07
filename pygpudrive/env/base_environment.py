@@ -14,7 +14,7 @@ import os
 import math
 
 from pygpudrive.env.config import EnvConfig
-from pygpudrive.env.viz import Visualizer
+from pygpudrive.env.viz import PyGameVisualizer
 
 # Import the simulator
 import gpudrive
@@ -98,7 +98,7 @@ class Env(gym.Env):
             else gpudrive.madrona.ExecMode.CUDA,
             gpu_id=0,
             num_worlds=self.num_sims,
-            auto_reset=auto_reset,
+            auto_reset=True,
             json_path=self.data_dir,
             params=params,
         )
@@ -109,7 +109,7 @@ class Env(gym.Env):
         agent_count = (
             self.sim.shape_tensor().to_torch()[self.world_render_idx, :][0].item()
         )
-        self.visualizer = Visualizer(agent_count, self.render_mode == "human")
+        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_mode, self.config.dist_to_goal_threshold)
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
@@ -330,59 +330,7 @@ class Env(gym.Env):
         return obs_filtered
 
     def render(self):
-        """Render the environment."""
-
-        def create_render_mask():
-
-            controlled_mask = (
-                (
-                    self.sim.controlled_state_tensor()
-                    .to_torch()[self.world_render_idx, :, :]
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-                .squeeze(1)
-                .astype(bool)
-            )
-
-            agent_count = (
-                self.sim.shape_tensor().to_torch()[self.world_render_idx][0].item()
-            )
-            padding_count = valid_mask.shape[0] - agent_count
-            real_agent_mask = np.concatenate(
-                (np.array([1] * agent_count), np.array([0] * padding_count))
-            )
-
-            return np.logical_or(
-                np.logical_and(real_agent_mask, valid_mask),
-                np.logical_and(real_agent_mask, controlled_mask),
-            )
-
-        if self.render_mode is None:
-            assert self.spec is not None
-            gym.logger.warn(
-                "You are calling render method without specifying any render mode. "
-                "You can specify the render_mode at initialization, "
-                f'e.g. gym.make("{self.spec.id}", render_mode="rgb_array")'
-            )
-            return
-
-        # Get agent info
-        agent_info = (
-            self.sim.absolute_self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, :]
-            .cpu()
-            .detach()
-            .numpy()
-        )
-
-        # Get the agent goal positions and current positions
-        agent_pos = agent_info[:, :2]  # x, y
-        agent_rot = agent_info[:, 7]
-        goal_pos = agent_info[:, 8:]
-
-        render_mask = create_render_mask()
+        return self.visualizer.draw(self.cont_agent_mask)
         
 
     def normalize_ego_state(self, state):
@@ -442,41 +390,49 @@ if __name__ == "__main__":
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-    NUM_CONT_AGENTS = 50
+    NUM_CONT_AGENTS = 0
     NUM_WORLDS = 3
 
     env = Env(
         config=config,
-        device="cpu",
+        num_worlds=1,
+        auto_reset=False,
+        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
+        data_dir="/home/aarav/gpudrive/nocturne_data",
+        device="cuda",
+        render_mode="rgb_array",
     )
-
+    
     obs = env.reset()
     frames = []
 
     for _ in range(100):
-
-        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
+        print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
 
         # Take a random action (we're only going straight)
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
-                ]
-            ]
-        ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
+        # rand_action = torch.Tensor(
+        #     [
+        #         [
+        #             env.action_space.sample()
+        #             for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+        #         ]
+        #     ]
+        # ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
 
-        # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        # # Step the environment
+        # obs, reward, done, info = env.step(rand_action)
 
-        if done.sum() == NUM_CONT_AGENTS:
-            obs = env.reset()
-            print(f"RESETTING ENVIRONMENT\n")
-
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
+        env.sim.step()
         frame = env.render()
-        frames.append(frame.T)
+        frames.append(frame)
 
+    import imageio
+    with imageio.get_writer('out.mp4', fps=20) as video:
+        for frame in frames:
+            video.append_data(frame)
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
