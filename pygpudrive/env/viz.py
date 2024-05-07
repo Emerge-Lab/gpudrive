@@ -48,6 +48,7 @@ class PyGameVisualizer:
 
         self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
         self.compute_window_settings()
+        self.init_map()
 
     def compute_window_settings(self):
         map_info = (
@@ -152,12 +153,52 @@ class PyGameVisualizer:
         start = center_pos - np.array([length * np.cos(yaw), length * np.sin(yaw)])
         end = center_pos + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
+    
+    def init_map(self):
+        """Initialize the static map elements."""
+        self.map_surf = self.surf.copy()  # Create a copy of the main surface to hold the map
+
+        map_info = (
+            self.sim.map_observation_tensor()
+            .to_torch()[self.world_render_idx]
+            .cpu()
+            .numpy()
+        )
+
+        for idx, map_obj in enumerate(map_info):
+            if map_obj[-1] == float(gpudrive.EntityType._None):
+                continue
+            elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
+                start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)
+                start = self.scale_coords(start)
+                end = self.scale_coords(end)
+                pygame.draw.line(self.map_surf, self.color_dict[map_obj[-1]], start, end, 2)
+            elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
+                center, width, height, rotation = (
+                    map_obj[:2],
+                    map_obj[3],
+                    map_obj[2],
+                    map_obj[5],
+                )
+                if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+                    width *= self.zoom_scale_x
+                    height *= self.zoom_scale_y
+                box_corners = PyGameVisualizer.compute_agent_corners(
+                    center, width, height, rotation
+                )
+                for i, box_corner in enumerate(box_corners):
+                    box_corners[i] = self.scale_coords(box_corner)
+                pygame.draw.polygon(
+                    surface=self.map_surf,
+                    color=self.color_dict[map_obj[-1]],
+                    points=box_corners,
+                )
 
     def draw(self, cont_agent_mask):
         """Render the environment."""
         render_mask = self.create_render_mask()
         self.surf.fill(self.BACKGROUND_COLOR)
-
+        self.surf.blit(self.map_surf, (0, 0))
         # Get agent info
         agent_info = (
             self.sim.absolute_self_observation_tensor()
@@ -212,43 +253,6 @@ class PyGameVisualizer:
                 ),
                 radius=self.goal_radius * self.zoom_scale_x,
             )
-
-        map_info = (
-            self.sim.map_observation_tensor()
-            .to_torch()[self.world_render_idx]
-            .cpu()
-            .numpy()
-        )
-
-        for idx, map_obj in enumerate(map_info):
-            if map_obj[-1] == float(gpudrive.EntityType._None):
-                continue
-            elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
-                start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)
-                # coords = self.scale_coords((start,end), self.window_center[0], self.window_center[1])
-                start = self.scale_coords(start)
-                end = self.scale_coords(end)
-                pygame.draw.line(self.surf, self.color_dict[map_obj[-1]], start, end, 2)
-            elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
-                center, width, height, rotation = (
-                    map_obj[:2],
-                    map_obj[3],
-                    map_obj[2],
-                    map_obj[5],
-                )
-                if map_obj[-1] == float(gpudrive.EntityType.StopSign):
-                    width *= self.zoom_scale_x
-                    height *= self.zoom_scale_y
-                box_corners = PyGameVisualizer.compute_agent_corners(
-                    center, width, height, rotation
-                )
-                for i, box_corner in enumerate(box_corners):
-                    box_corners[i] = self.scale_coords(box_corner)
-                pygame.draw.polygon(
-                    surface=self.surf,
-                    color=self.color_dict[map_obj[-1]],
-                    points=box_corners,
-                )
 
         if self.render_mode == "human":
             pygame.event.pump()
