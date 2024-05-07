@@ -69,8 +69,10 @@ int main(int argc, char *argv[])
                 .rewardType = RewardType::DistanceBased,
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
-            }
-        }
+            },
+            .maxNumControlledVehicles = 0
+        },
+        .enableBatchRenderer = true
     });
 
     std::random_device rd;
@@ -89,38 +91,42 @@ int main(int argc, char *argv[])
     auto donePrinter = mgr.doneTensor().makePrinter();
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
+    auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
         printf("Model \n");
         model_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
-        printf("\n");
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
 
-        printf("Shape\n");
-        shapePrinter.print();
+        // printf("Shape\n");
+        // shapePrinter.print();
 
-        printf("Reward\n");
-        rewardPrinter.print();
+        // printf("Reward\n");
+        // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
-        printf("Controlled State\n");
-        controlledStatePrinter.print();
+        // printf("Controlled State\n");
+        // controlledStatePrinter.print();
         
         printf("Agent Map Obs\n");
         agent_map_obs_printer.print();
+
+        printf("Info\n");
+        info_printer.print();
     };
     // printObs();
 

@@ -48,6 +48,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<ControlledState>();
     registry.registerComponent<CollisionDetectionEvent>();
     registry.registerComponent<AbsoluteSelfObservation>();
+    registry.registerComponent<Info>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<ValidState>();
@@ -84,6 +85,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t) ExportID::ControlledState);
     registry.exportColumn<Agent, AbsoluteSelfObservation>(
         (uint32_t)ExportID::AbsoluteSelfObservation);
+    registry.exportColumn<Agent, Info>(
+        (uint32_t)ExportID::Info);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -161,13 +164,14 @@ inline void collectObservationsSystem(Engine &ctx,
 				                      const EntityType& entityType,
 				                      const CollisionDetectionEvent& collisionEvent)
 {
-     if (entityType == EntityType::Padding) {
-       return;
-     }
+    if (entityType == EntityType::Padding) {
+        return;
+    }
 
     self_obs.speed = model.speed;
     self_obs.vehicle_size = size;
-    self_obs.goal.position = goal.position - model.position;
+    auto goalPos = goal.position - model.position;
+    self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
@@ -183,7 +187,8 @@ inline void collectObservationsSystem(Engine &ctx,
         VehicleSize other_size = ctx.get<VehicleSize>(other);
 
         Vector2 relative_pos = other_bicycle_model.position - model.position;
-        float relative_speed = other_bicycle_model.speed - model.speed;
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        float relative_speed = other_bicycle_model.speed; // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -211,6 +216,7 @@ inline void collectObservationsSystem(Engine &ctx,
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
         Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
         if(relative_pos.length() > ctx.data().params.observationRadius)
         {
             continue;
@@ -481,7 +487,8 @@ inline void stepTrackerSystem(Engine &ctx,
                               const BicycleModel &model,
                               const Goal &goal,
                               StepsRemaining &steps_remaining,
-                              Done &done)
+                              Done &done,
+                              Info &info)
 {
     // Absolute done is 90 steps.
     int32_t num_remaining = --steps_remaining.t;
@@ -498,6 +505,7 @@ inline void stepTrackerSystem(Engine &ctx,
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
         {
             done.v = 1;
+            info.reachedGoal = 1;
         }
     }
 
@@ -531,19 +539,19 @@ void collisionDetectionSystem(Engine &ctx,
         return;
     }
 
-    EntityType aEntitytype = ctx.get<EntityType>(candidateCollision.a);
-    EntityType bEntitytype = ctx.get<EntityType>(candidateCollision.b);
+    EntityType aEntityType = ctx.get<EntityType>(candidateCollision.a);
+    EntityType bEntityType = ctx.get<EntityType>(candidateCollision.b);
 
     // Ignore collisions between certain entity types
-    if(aEntitytype == EntityType::Padding || bEntitytype == EntityType::Padding)
+    if(aEntityType == EntityType::Padding || bEntityType == EntityType::Padding)
     {
         return;
     }
 
     for(auto &pair : ctx.data().collisionPairs)
     {
-        if((pair.first == aEntitytype && pair.second == bEntitytype) ||
-           (pair.first == bEntitytype && pair.second == aEntitytype))
+        if((pair.first == aEntityType && pair.second == bEntityType) ||
+           (pair.first == bEntityType && pair.second == aEntityType))
         {
             return;
         }
@@ -553,13 +561,39 @@ void collisionDetectionSystem(Engine &ctx,
         ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
     if (maybeCollisionDetectionEventA.valid()) {
         maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
+        if(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)
+        {
+            ctx.get<Info>(candidateCollision.a).collidedWithRoad = 1;
+        }
+        else if(bEntityType == EntityType::Vehicle)
+        {
+            ctx.get<Info>(candidateCollision.a).collidedWithVehicle = 1;
+        }
+        else if(bEntityType <= EntityType::Cyclist)
+        {
+            ctx.get<Info>(candidateCollision.a).collidedWithNonVehicle = 1;
+        }
     }
 
     auto maybeCollisionDetectionEventB =
         ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
     if (maybeCollisionDetectionEventB.valid()) {
         maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
+        if(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)
+        {
+            ctx.get<Info>(candidateCollision.b).collidedWithRoad = 1;
+        }
+        else if(aEntityType == EntityType::Vehicle)
+        {
+            ctx.get<Info>(candidateCollision.b).collidedWithVehicle = 1;
+        }
+        else if(aEntityType <= EntityType::Cyclist)
+        {
+            ctx.get<Info>(candidateCollision.b).collidedWithNonVehicle = 1;
+        }
     }
+
+
 }
 
 // Helper function for sorting nodes in the taskgraph.
@@ -587,6 +621,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Rotation &rotation,
                                               const Goal &goal,
                                               const EntityType &entityType,
+                                              const VehicleSize &vehicleSize,
                                               AbsoluteSelfObservation &out) {
     if (entityType == EntityType::Padding) {
         return;
@@ -596,6 +631,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationAsQuat = rotation;
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
+    out.vehicle_size = vehicleSize;
 }
 
 inline void validStateSystem(Engine &ctx, ValidState &validOut) {
@@ -685,7 +721,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<
-        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, StepsRemaining, Done>>(
+        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, StepsRemaining, Done, Info>>(
         {reward_sys});
 
     // Conditionally reset the world if the episode is over
@@ -732,7 +768,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, EntityType, AbsoluteSelfObservation>>(
+                        Rotation, Goal, EntityType, VehicleSize, AbsoluteSelfObservation>>(
         {collect_obs});
 
         // The lidar system

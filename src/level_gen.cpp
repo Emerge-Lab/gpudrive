@@ -39,6 +39,8 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;
+    ctx.get<Info>(agent) = Info{};
+    ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
@@ -73,11 +75,9 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
     auto &trajectory = ctx.get<Trajectory>(agent);
-    auto length = agentInit.length/2;
-    auto width = agentInit.width/2;
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];
@@ -270,6 +270,13 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
 
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
@@ -304,7 +311,7 @@ void createPaddingEntities(Engine &ctx) {
 }
 
 void createPersistentEntities(Engine &ctx, Map *map) {
-
+    // createFloorPlane(ctx);
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
@@ -352,6 +359,8 @@ static void resetPaddingEntities(Engine &ctx) {
         Entity agent = ctx.data().agents[agentIdx];
         ctx.get<Done>(agent).v = 0;
         ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+        ctx.get<Info>(agent) = Info{};
+        ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 
