@@ -13,7 +13,7 @@ class ExperimentConfig:
     # Rendering options
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 1
+    render_freq: int = 10
 
     # TODO: Logging
     log_dir: str = "logs"
@@ -24,4 +24,4 @@ class ExperimentConfig:
     n_steps: int = 1028
     batch_size: int = 256
     verbose: int = 0
-    total_timesteps: int = 10_000_000
+    total_timesteps: int = 50_000_000
