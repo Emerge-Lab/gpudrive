@@ -207,9 +207,10 @@ struct AbsoluteSelfObservation {
     Position position;
     AbsoluteRotation rotation;
     Goal goal;
+    VehicleSize vehicle_size;
 };
 
-const size_t AbsoluteSelfObservationExportSize =  10; //  3 + 4 + 1 + 2
+const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
