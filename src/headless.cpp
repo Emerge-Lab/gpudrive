@@ -80,7 +80,6 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
-    auto start = std::chrono::system_clock::now();
     auto action_printer = mgr.actionTensor().makePrinter();
     auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
@@ -133,7 +132,7 @@ int main(int argc, char *argv[])
     auto worldToShape =
 	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
 
-
+    const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
@@ -155,9 +154,8 @@ int main(int argc, char *argv[])
         mgr.step();
         printObs();
     }
-
-    auto end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
+    const auto end = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> elapsed = end - start;
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);
