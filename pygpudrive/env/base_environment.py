@@ -52,8 +52,8 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 0.5
-        params.observationRadius = self.config.obs_radius
+        params.polylineReductionThreshold = 1.0
+        params.observationRadius = 10.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
 
@@ -444,42 +444,57 @@ if __name__ == "__main__":
 
     config = EnvConfig(
         partner_obs=True,
-        road_map_obs=False,
-        ego_state=False,
+        road_map_obs=True,
     )
-
-    TOTAL_STEPS = 90
-    NUM_CONT_AGENTS = 128
-    NUM_WORLDS = 1
+    # run = wandb.init(
+    #     project="gpudrive",
+    #     group="test_rendering",
+    # )
+    NUM_CONT_AGENTS = 0
+    NUM_WORLDS = 3
 
     env = Env(
         config=config,
+        num_worlds=1,
+        auto_reset=False,
+        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
+        data_dir="/home/aarav/gpudrive/nocturne_data",
         device="cuda",
-        data_dir="formatted_json_v2_no_tl_train",
-        num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,
+        render_mode="rgb_array",
     )
 
     obs = env.reset()
     frames = []
-    running_max = 0
 
-    for _ in range(TOTAL_STEPS):
+    for _ in range(100):
+        print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
 
-        # Take random actions
-        rand_actions = torch.randint(0, 9, size=(env.num_sims, 128)).to(
-            env.device
-        )
+        # Take a random action (we're only going straight)
+        # rand_action = torch.Tensor(
+        #     [
+        #         [
+        #             env.action_space.sample()
+        #             for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+        #         ]
+        #     ]
+        # ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
 
-        # Step the environment
-        obs, reward, done, info = env.step(rand_actions)
+        # # Step the environment
+        # obs, reward, done, info = env.step(rand_action)
 
-        if obs[env.cont_agent_mask].max() > running_max:
-            running_max = obs[env.cont_agent_mask].max()
-            print(f"Max: {running_max}")
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
+        env.sim.step()
+        frame = env.render()
+        frames.append(frame)
 
-        if done[env.cont_agent_mask].sum() == env.num_valid_controlled_agents:
-            obs = env.reset()
+    import imageio
+
+    imageio.mimsave("out.gif", frames)
+    # Log video
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
 
     # run.finish()
     env.visualizer.destroy()

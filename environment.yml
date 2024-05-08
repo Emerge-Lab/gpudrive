@@ -54,12 +54,15 @@ dependencies:
       - poetry-plugin-export==1.7.1
       - ptyprocess==0.7.0
       - pycparser==2.22
+      - pygame
       - pyproject-hooks==1.0.0
       - rapidfuzz==3.7.0
       - requests==2.31.0
       - requests-toolbelt==1.0.0
       - secretstorage==3.3.3
       - shellingham==1.5.4
+      - stable-baselines3==2.3.2
+      - tensorboard
       - tomlkit==0.12.4
       - trove-classifiers==2024.3.25
       - urllib3==2.2.1
