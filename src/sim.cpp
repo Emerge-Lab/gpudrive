@@ -85,8 +85,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Done);
     // registry.exportColumn<AgentInterface, BicycleModel>(
     //     (uint32_t) ExportID::BicycleModel);
-    // registry.exportColumn<AgentInterface, ControlledState>(
-    //     (uint32_t) ExportID::ControlledState);
+    registry.exportColumn<AgentInterface, ControlledState>(
+        (uint32_t) ExportID::ControlledState);
     registry.exportColumn<AgentInterface, AbsoluteSelfObservation>(
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<AgentInterface, Info>(
@@ -123,7 +123,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
             Entity agent = ctx.data().agents[i];
             auto agent_iface = ctx.get<InterfaceEntity>(agent).e;
             Done done = ctx.get<Done>(agent_iface);
-            ControlledState controlledState = ctx.get<ControlledState>(agent);
+            ControlledState controlledState = ctx.get<ControlledState>(agent_iface);
             if (controlledState.controlledState == ControlMode::BICYCLE && !done.v) {
                 areAllControlledAgentsDone = 0;
             }
@@ -234,7 +234,6 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const ControlledState &controlledState,
                            const EntityType &type,
                            const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent) {
@@ -257,6 +256,7 @@ inline void movementSystem(Engine &e,
             // Do nothing. 
         }
     }
+    auto controlledState = e.get<ControlledState>(agent_iface.e);
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     {
@@ -477,7 +477,7 @@ inline void stepTrackerSystem(Engine &ctx,
                               InterfaceEntity &agent_iface)
 {
     // Absolute done is 90 steps.
-    StepsRemaining steps_remaining = ctx.get<StepsRemaining>(agent_iface.e);
+    StepsRemaining &steps_remaining = ctx.get<StepsRemaining>(agent_iface.e);
     Done done = ctx.get<Done>(agent_iface.e);
     Info info = ctx.get<Info>(agent_iface.e);
     int32_t num_remaining = --steps_remaining.t;
@@ -656,7 +656,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Rotation,
             Position,
             Velocity,
-            ControlledState,
             EntityType,
             Trajectory,
             CollisionDetectionEvent

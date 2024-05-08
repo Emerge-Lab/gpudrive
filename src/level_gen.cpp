@@ -61,17 +61,17 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
     ctx.get<EntityType>(agent) = agentInit.type;
 
-    ctx.get<InterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
+    auto agent_iface = ctx.get<InterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
+        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
 
     // Since position, heading, and speed may vary within an episode, their
