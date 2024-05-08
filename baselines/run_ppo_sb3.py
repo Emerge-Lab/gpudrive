@@ -11,7 +11,7 @@ from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from algorithms.ppo.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
-from algorithms.ppo.sb3.mappo import MAPPO
+from algorithms.ppo.sb3.ippo import IPPO
 
 from baselines.config import ExperimentConfig
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         wandb_run=run if run_id is not None else None,
     )
 
-    model = MAPPO(
+    model = IPPO(
         policy=exp_config.policy,
         n_steps=exp_config.n_steps,
         batch_size=exp_config.batch_size,

@@ -36,7 +36,7 @@ def explained_variance(
     return torch.nan if var_y == 0 else 1 - torch.var(y_true - y_pred) / var_y
 
 
-class MAPPO(PPO):
+class IPPO(PPO):
     """Adapted Proximal Policy Optimization algorithm (PPO) that is compatible with multi-agent environments."""
 
     def __init__(
