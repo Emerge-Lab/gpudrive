@@ -138,13 +138,14 @@ static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
-    MapObservation obs[consts::kMaxRoadEntityCount];
+    MapObservation obs[consts::kMaxAgentMapObservationsCount];
 };
 
 const size_t AgentMapObservationExportSize = 7;
 
-static_assert(sizeof(AgentMapObservations) == sizeof(float) *
-    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
+static_assert(sizeof(AgentMapObservations) ==
+              sizeof(float) * consts::kMaxAgentMapObservationsCount *
+                  AgentMapObservationExportSize);
 
 struct LidarSample {
     float depth;
