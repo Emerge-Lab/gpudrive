@@ -273,6 +273,7 @@ inline void movementSystem(Engine &e,
             velocity.linear.y = 0;
             velocity.linear.z = fminf(velocity.linear.z, 0);
             velocity.angular = Vector3::zero();
+            return;
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
@@ -522,6 +523,27 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+
+    // Technically there would never be a collision between (non valid expert) and (non expert). So one of the below checks would always be false.
+    if(ctx.get<ControlledState>(candidateCollision.a).controlledState == ControlMode::EXPERT)
+    {
+        
+        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
+        auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
+        if(!validState)
+        {
+            return;
+        }
+    }
+    else if(ctx.get<ControlledState>(candidateCollision.b).controlledState == ControlMode::EXPERT)
+    {
+        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
+        auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
+        if(!validState)
+        {
+            return;
+        }
+    }
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
@@ -554,7 +576,7 @@ void collisionDetectionSystem(Engine &ctx,
     // Ignore collisions between certain entity types
     if(aEntityType == EntityType::Padding || bEntityType == EntityType::Padding)
     {
-        return;
+       return;
     }
 
     for(auto &pair : ctx.data().collisionPairs)
