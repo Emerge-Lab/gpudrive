@@ -513,7 +513,7 @@ inline void stepTrackerSystem(Engine &ctx,
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1)
+    if(done.v != 1 || info.reachedGoal != 1)
     {
         float dist = (model.position - goal.position).length();
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
