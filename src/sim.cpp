@@ -263,6 +263,10 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.angular = Vector3::zero();
             done.v = 1;
             return;
        }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
