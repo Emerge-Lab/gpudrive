@@ -7,6 +7,7 @@
 #include "obb.hpp"
 #include "sim.hpp"
 #include "utils.hpp"
+#include "knn.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -212,6 +213,14 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
+    const auto alg = ctx.data().params.roadObservationAlgorithm;
+    if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
+        selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
+            ctx, rot, model.position, map_obs.obs);
+        return;
+    }
+
+    assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -697,7 +706,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto detectCollisions = builder.addToGraph<
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
-        {broadphase_setup_sys});
+        {findOverlappingEntities});
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
