@@ -84,8 +84,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Reward);
     registry.exportColumn<AgentInterface, Done>(
         (uint32_t)ExportID::Done);
-    // registry.exportColumn<AgentInterface, BicycleModel>(
-    //     (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<AgentInterface, ControlledState>(
         (uint32_t) ExportID::ControlledState);
     registry.exportColumn<AgentInterface, AbsoluteSelfObservation>(
