@@ -211,7 +211,7 @@ struct AbsoluteSelfObservation {
     VehicleSize vehicle_size;
 };
 
-const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
+const size_t AbsoluteSelfObservationExportSize =  12; // 3 + 4 + 1 + 2 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
@@ -234,6 +234,8 @@ struct AgentInterface : public madrona::Archetype<
     AgentMapObservations,
     Lidar,
     StepsRemaining,
+
+    ControlledState, //Drive Logic
 
     // Reward, episode termination
     Reward,
@@ -277,7 +279,6 @@ struct Agent : public madrona::Archetype<
     VehicleSize,
     Goal,
     Trajectory,
-    ControlledState,
     // Interface 
     InterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can

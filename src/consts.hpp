@@ -3,14 +3,14 @@
 #include <limits>
 #include <madrona/math.hpp>
 #include <madrona/types.hpp>
-
+ 
 namespace gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 300;
-inline constexpr madrona::CountT kMaxRoadEntityCount = 3000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 256;
+inline constexpr madrona::CountT kMaxAgentCount = 3;
+inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 6000;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;

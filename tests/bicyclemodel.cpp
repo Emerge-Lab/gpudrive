@@ -45,6 +45,7 @@ protected:
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
     std::uniform_real_distribution<float> steering_distribution; 
+    madrona::py::Tensor::Printer absolute_obs_printer =  mgr.absoluteSelfObservationTensor().makePrinter();
     void SetUp() override {
         json rawJson;
         data >> rawJson;
@@ -63,7 +64,9 @@ protected:
             agent_width_map[n_agents] = (float)obj["width"];
             initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
             initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
-            initialState.push_back(test_utils::degreesToRadians(obj["heading"][0]));
+            auto theta = std::fmod(test_utils::degreesToRadians(obj["heading"][0]), M_PI*2);
+            theta = theta > M_PI ? theta -  M_PI*2 : (theta < - M_PI ? theta +  M_PI*2 : theta);
+            initialState.push_back(theta);
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());
             n_agents++;
         }
@@ -126,7 +129,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
     {
         auto x = static_cast<float>(ptr[i]);
         auto y = static_cast<float>(ptr[i + 1]);
-        auto rot = static_cast<float>(ptr[i + 3]);
+        auto rot = static_cast<float>(ptr[i + 7]);
         auto x_exp = expected[agent_idx];
         auto y_exp = expected[agent_idx + 1];
         auto rot_exp = expected[agent_idx + 2];
@@ -161,18 +164,18 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
 std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor &self_obs, const uint32_t num_agents)
 {
     std::vector<float> obs;
-    obs.reserve(num_agents * 4);
+    obs.resize(num_agents * 4);
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
     for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
     {
         obs[agent_idx] = static_cast<float>(ptr[i]);
         obs[agent_idx+1] = static_cast<float>(ptr[i+1]);
-        obs[agent_idx+2] = static_cast<float>(ptr[i+3]);
+        obs[agent_idx+2] = static_cast<float>(ptr[i+7]);
         agent_idx += 4;
         i+=gpudrive::AbsoluteSelfObservationExportSize;
     }
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize; i++)
+    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
     {
         obs[agent_idx+3] = static_cast<float>(ptr[i]);
         agent_idx += 4;
@@ -182,6 +185,20 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
 }
 
 TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
+
+    auto printObs = [&]() {
+        printf("Absolute: \n");
+        absolute_obs_printer.print();
+        printf("\n");
+    };
+
+    auto printVector = [](const std::vector<float>& v) {
+        std::cout << "Vector: \n";
+        for(auto i : v) {
+            std::cout << i << " ";
+        }
+        std::cout << "\n";
+    };
     std::vector<float> expected;
     //Check first step -
     for(int i = 0; i < num_agents; i++)
@@ -196,11 +213,14 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     auto self_obs = mgr.selfObservationTensor();
     auto [valid, errorMsg] = validateBicycleModel(abs_obs, self_obs, initialState, num_agents);
     ASSERT_TRUE(valid);
+    printObs();
     
     for(int i = 0; i < num_steps; i++)
     {
         expected.clear();
+        printObs();
         auto prev_state = parseBicycleModel(abs_obs, self_obs, num_agents); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
+        printVector(prev_state);
         for(int j = 0; j < num_agents; j++)
         {
             float acc =  acc_distribution(generator);

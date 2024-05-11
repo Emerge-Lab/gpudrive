@@ -58,8 +58,9 @@ bool isObservationsValid(gpudrive::Engine &ctx,
   sortedObservations.reserve(roadCount);
 
   for (madrona::CountT roadIdx = 0; roadIdx < roadCount; ++roadIdx) {
+    auto &road_iface = ctx.get<gpudrive::RoadInterfaceEntity>(ctx.data().roads[roadIdx]).e;
     const auto &currentObservation =
-        ctx.get<gpudrive::MapObservation>(ctx.data().roads[roadIdx]);
+        ctx.get<gpudrive::MapObservation>(road_iface);
     sortedObservations.emplace_back(relativeObservation(
         currentObservation, referenceRotation, referencePosition));
   }
@@ -88,7 +89,8 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   const auto roadCount = ctx.data().numRoads;
 
   for (madrona::CountT i = 0; i < std::min(roadCount, K); ++i) {
-    heap[i] = relativeObservation(ctx.get<gpudrive::MapObservation>(roads[i]),
+    auto &road_iface = ctx.get<RoadInterfaceEntity>(roads[i]).e;
+    heap[i] = relativeObservation(ctx.get<gpudrive::MapObservation>(road_iface),
                                   referenceRotation, referencePosition);
   }
 
@@ -100,8 +102,9 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   make_heap(heap, heap + K, cmp);
 
   for (madrona::CountT roadIdx = K; roadIdx < roadCount; ++roadIdx) {
+    auto &road_iface = ctx.get<RoadInterfaceEntity>(roads[roadIdx]).e;
     auto currentObservation =
-        relativeObservation(ctx.get<gpudrive::MapObservation>(roads[roadIdx]),
+        relativeObservation(ctx.get<gpudrive::MapObservation>(road_iface),
                             referenceRotation, referencePosition);
 
     const auto &kthNearestObservation = heap[0];
