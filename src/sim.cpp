@@ -167,7 +167,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       const EntityType& entityType,
 				                      const CollisionDetectionEvent& collisionEvent,
-                                      InterfaceEntity &agent_iface)
+                                      const InterfaceEntity &agent_iface)
 {
     auto &self_obs = ctx.get<SelfObservation>(agent_iface.e);
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
@@ -237,7 +237,7 @@ inline void collectObservationsSystem(Engine &ctx,
 }
 
 inline void movementSystem(Engine &e,
-                           InterfaceEntity &agent_iface,
+                           const InterfaceEntity &agent_iface,
                            BicycleModel &model,
                            VehicleSize &size,
                            Rotation &rotation,
@@ -265,11 +265,11 @@ inline void movementSystem(Engine &e,
             // Do nothing. 
         }
     }
-    auto controlledState = e.get<ControlledState>(agent_iface.e);
+    const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     {
-        Action action = e.get<Action>(agent_iface.e);
+        const Action &action = e.get<Action>(agent_iface.e);
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
         // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
@@ -359,9 +359,9 @@ static inline float encodeType(EntityType type)
 // This system is specially optimized in the GPU version:
 // a warp of threads is dispatched for each invocation of the system
 // and each thread in the warp traces one lidar ray for the agent.
-inline void lidarSystem(Engine &ctx, Entity e, InterfaceEntity &agent_iface,
+inline void lidarSystem(Engine &ctx, Entity e, const InterfaceEntity &agent_iface,
                         EntityType &entityType) {
-    Lidar lidar = ctx.get<Lidar>(agent_iface.e);
+    Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
     assert(entityType != EntityType::None);
     if (entityType == EntityType::Padding) {
         return;
@@ -427,9 +427,9 @@ inline void rewardSystem(Engine &ctx,
                          const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
-                         InterfaceEntity &agent_iface)
+                         const InterfaceEntity &agent_iface)
 {
-    Reward out_reward = ctx.get<Reward>(agent_iface.e);
+    Reward &out_reward = ctx.get<Reward>(agent_iface.e);
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
@@ -487,8 +487,8 @@ inline void stepTrackerSystem(Engine &ctx,
 {
     // Absolute done is 90 steps.
     StepsRemaining &steps_remaining = ctx.get<StepsRemaining>(agent_iface.e);
-    Done done = ctx.get<Done>(agent_iface.e);
-    Info info = ctx.get<Info>(agent_iface.e);
+    Done &done = ctx.get<Done>(agent_iface.e);
+    Info &info = ctx.get<Info>(agent_iface.e);
     int32_t num_remaining = --steps_remaining.t;
     if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
         done.v = 0;
