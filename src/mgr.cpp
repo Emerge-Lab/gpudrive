@@ -754,7 +754,7 @@ Tensor Manager::agentMapObservationsTensor() const
                                {
                                    impl_->cfg.numWorlds,
 				   consts::kMaxAgentCount,
-                                   consts::kMaxRoadEntityCount,
+                                   consts::kMaxAgentMapObservationsCount, // TO FIX
                                    AgentMapObservationExportSize,
                                });
 
