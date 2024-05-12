@@ -13,7 +13,7 @@ import random
 import os
 import math
 
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import *
 from pygpudrive.env.viz import PyGameVisualizer
 
 # Import the simulator
@@ -28,24 +28,6 @@ class Env(gym.Env):
     GPU Drive Gym Environment.
     """
 
-    metadata = {
-        "render_mode": [
-            "pygame_absolute",
-            "pygame_egocentric",
-            "madrona_rgb",
-            "madrona_depth"
-        ], 
-        "pygame_option":[
-            "human",
-            "rgb"
-        ],
-        "madrona_option":[
-            "agent_view",
-            "top_down"
-        ],
-        "render_fps": 5,
-    }
-
     def __init__(
         self,
         config,
@@ -54,7 +36,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_options: dict = None, # sample {"render_mode": "madrona_rgb", "view_mode": "agent_view", "resolution": (128, 128)}
+        render_config: RenderConfig = None,
         verbose=True,
     ):
         self.config = config
@@ -75,10 +57,6 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
-        if render_options is not None:
-            params.enable_batch_renderer = render_options['render_mode'].startswith("madrona")
-            params.batch_render_view_width = render_options['resolution'][0]
-            params.batch_render_view_height = render_options['resolution'][1]
 
         # Collision behavior
         if self.config.collision_behavior == "ignore":
@@ -115,15 +93,18 @@ class Env(gym.Env):
             auto_reset=True,
             json_path=self.data_dir,
             params=params,
+            enable_batch_renderer = render_config is not None and render_config.render_mode in [RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH],
+            batch_render_view_width = render_config is not None and render_config.resolution[0],
+            batch_render_view_height = render_config is not None and render_config.resolution[1] 
         )
 
         # Rendering
-        self.render_options = render_options
+        self.render_config = render_config
         self.world_render_idx = 0
         agent_count = (
             self.sim.shape_tensor().to_torch()[self.world_render_idx, :][0].item()
         )
-        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_options, self.config.dist_to_goal_threshold)
+        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_config, self.config.dist_to_goal_threshold)
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
@@ -344,10 +325,10 @@ class Env(gym.Env):
         return obs_filtered
 
     def render(self):
-        if (self.render_mode == "madrona"):
-            return self.sim.rgb_tensor().to_torch()
-
-        return self.visualizer.draw(self.cont_agent_mask)
+        if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}):
+            return self.visualizer.getRender(self.cont_agent_mask)
+        elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
+            return self.visualizer.getRender()
         
 
     def normalize_ego_state(self, state):
@@ -410,14 +391,20 @@ if __name__ == "__main__":
     NUM_CONT_AGENTS = 0
     NUM_WORLDS = 3
 
+    render_config = RenderConfig(
+        render_mode=RenderMode.MADRONA_RGB, 
+        view_option=MadronaOption.AGENT_VIEW, 
+        resolution=(128, 128)
+    )
+
     env = Env(
         config=config,
         num_worlds=1,
         auto_reset=False,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="/home/aarav/gpudrive/nocturne_data",
-        device="cuda",
-        render_mode="rgb_array",
+        data_dir="/home/aarav/gpudrive/build/tests/testJsons",
+        device="cpu",
+        render_config=render_config,
     )
     
     obs = env.reset()
@@ -444,7 +431,7 @@ if __name__ == "__main__":
         #     print(f"RESETTING ENVIRONMENT\n")
         env.sim.step()
         frame = env.render()
-        frames.append(frame)
+        frames.append(frame[0,0,:,:,:4].cpu().numpy())
 
     import imageio
     imageio.mimsave("out.gif", frames)

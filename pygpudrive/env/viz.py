@@ -6,6 +6,8 @@ import os
 import math
 import gpudrive
 
+from pygpudrive.env.config import PygameOption, RenderMode
+
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
@@ -27,28 +29,29 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.StopSign): (255, 0, 255),  # Blue
     }
 
-    def __init__(self, sim, world_render_idx, render_options, goal_radius):
+    def __init__(self, sim, world_render_idx, render_config, goal_radius):
         self.sim = sim
         self.world_render_idx = world_render_idx
-        self.render_options = render_options
+        self.render_config = render_config
         self.goal_radius = goal_radius
 
         self.padding_x = self.PADDING_PCT * self.WINDOW_W
         self.padding_y = self.PADDING_PCT * self.WINDOW_H
 
-        pygame.init()
-        pygame.font.init()
-        self.screen = None
-        self.clock = None
-        if self.screen is None and self.render_mode == "human":
-            pygame.display.init()
-            self.screen = pygame.display.set_mode((self.WINDOW_W, self.WINDOW_H))
-        if self.clock is None:
-            self.clock = pygame.time.Clock()
+        if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
+            pygame.init()
+            pygame.font.init()
+            self.screen = None
+            self.clock = None
+            if self.screen is None and self.render_config.PygameOption == PygameOption.HUMAN:
+                pygame.display.init()
+                self.screen = pygame.display.set_mode((self.WINDOW_W, self.WINDOW_H))
+            if self.clock is None:
+                self.clock = pygame.time.Clock()
 
-        self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
-        self.compute_window_settings()
-        self.init_map()
+            self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
+            self.compute_window_settings()
+            self.init_map()
 
     def compute_window_settings(self):
         map_info = (
@@ -194,14 +197,14 @@ class PyGameVisualizer:
                     points=box_corners,
                 )
 
-    def getRender(self):
-        if self.render_options["render_mode"].startwith("pygame"):
-            return self.draw()
-        elif self.render_options["render_mode"].startwith("madrona"):
-            if(self.render_mode == "madrona_rgb"):
-                return self.sim.rgb_tensor().to_torch()
-            elif(self.render_mode == "madrona_depth"):
-                return self.sim.depth_tensor().to_torch()
+    def getRender(self, **kwargs):
+        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}:
+            cont_agent_mask = kwargs.get('cont_agent_mask', None)
+            return self.draw(cont_agent_mask)
+        elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
+            return self.sim.rgb_tensor().to_torch()
+        elif self.render_config.render_mode == RenderMode.MADRONA_DEPTH:
+            return self.sim.depth_tensor().to_torch()
 
     def draw(self, cont_agent_mask):
         """Render the environment."""
@@ -263,14 +266,14 @@ class PyGameVisualizer:
                 radius=self.goal_radius * self.zoom_scale_x,
             )
 
-        if self.render_options["pygame_option"] == "human":
+        if self.render_config.view_option == PygameOption.HUMAN:
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
             assert self.screen is not None
             self.screen.fill(0)
             self.screen.blit(self.surf, (0, 0))
             pygame.display.flip()
-        elif self.render_options["pygame_option"] == "rgb_array":
+        elif self.render_config.view_option == PygameOption.RGB:
             return PyGameVisualizer._create_image_array(self.surf)
         else:
             return self.isopen
