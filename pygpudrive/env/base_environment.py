@@ -29,10 +29,20 @@ class Env(gym.Env):
     """
 
     metadata = {
-        "render_modes": [
+        "render_mode": [
+            "pygame_absolute",
+            "pygame_egocentric",
+            "madrona_rgb",
+            "madrona_depth"
+        ], 
+        "pygame_option":[
             "human",
-            "rgb_array",
-        ],  # human: pop-up, rgb_array: receive the visualization as an array of pixels
+            "rgb"
+        ],
+        "madrona_option":[
+            "agent_view",
+            "top_down"
+        ],
         "render_fps": 5,
     }
 
@@ -44,7 +54,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_mode="rgb_array",
+        render_options: dict = None, # sample {"render_mode": "madrona_rgb", "view_mode": "agent_view", "resolution": (128, 128)}
         verbose=True,
     ):
         self.config = config
@@ -65,6 +75,10 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
+        if render_options is not None:
+            params.enable_batch_renderer = render_options['render_mode'].startswith("madrona")
+            params.batch_render_view_width = render_options['resolution'][0]
+            params.batch_render_view_height = render_options['resolution'][1]
 
         # Collision behavior
         if self.config.collision_behavior == "ignore":
@@ -104,12 +118,12 @@ class Env(gym.Env):
         )
 
         # Rendering
-        self.render_mode = render_mode
+        self.render_options = render_options
         self.world_render_idx = 0
         agent_count = (
             self.sim.shape_tensor().to_torch()[self.world_render_idx, :][0].item()
         )
-        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_mode, self.config.dist_to_goal_threshold)
+        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_options, self.config.dist_to_goal_threshold)
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
@@ -330,6 +344,9 @@ class Env(gym.Env):
         return obs_filtered
 
     def render(self):
+        if (self.render_mode == "madrona"):
+            return self.sim.rgb_tensor().to_torch()
+
         return self.visualizer.draw(self.cont_agent_mask)
         
 

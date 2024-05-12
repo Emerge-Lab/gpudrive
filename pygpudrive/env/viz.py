@@ -27,10 +27,10 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.StopSign): (255, 0, 255),  # Blue
     }
 
-    def __init__(self, sim, world_render_idx, render_mode, goal_radius):
+    def __init__(self, sim, world_render_idx, render_options, goal_radius):
         self.sim = sim
         self.world_render_idx = world_render_idx
-        self.render_mode = render_mode
+        self.render_options = render_options
         self.goal_radius = goal_radius
 
         self.padding_x = self.PADDING_PCT * self.WINDOW_W
@@ -194,6 +194,15 @@ class PyGameVisualizer:
                     points=box_corners,
                 )
 
+    def getRender(self):
+        if self.render_options["render_mode"].startwith("pygame"):
+            return self.draw()
+        elif self.render_options["render_mode"].startwith("madrona"):
+            if(self.render_mode == "madrona_rgb"):
+                return self.sim.rgb_tensor().to_torch()
+            elif(self.render_mode == "madrona_depth"):
+                return self.sim.depth_tensor().to_torch()
+
     def draw(self, cont_agent_mask):
         """Render the environment."""
         render_mask = self.create_render_mask()
@@ -254,14 +263,14 @@ class PyGameVisualizer:
                 radius=self.goal_radius * self.zoom_scale_x,
             )
 
-        if self.render_mode == "human":
+        if self.render_options["pygame_option"] == "human":
             pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
             assert self.screen is not None
             self.screen.fill(0)
             self.screen.blit(self.surf, (0, 0))
             pygame.display.flip()
-        elif self.render_mode == "rgb_array":
+        elif self.render_options["pygame_option"] == "rgb_array":
             return PyGameVisualizer._create_image_array(self.surf)
         else:
             return self.isopen
