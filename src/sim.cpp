@@ -265,7 +265,7 @@ inline void movementSystem(Engine &e,
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
             velocity.linear.x = 0;
             velocity.linear.y = 0;
-            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
             done.v = 1;
             return;
@@ -275,7 +275,7 @@ inline void movementSystem(Engine &e,
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
             velocity.linear.y = 0;
-            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
             return;
         }
@@ -359,7 +359,7 @@ inline void agentZeroVelSystem(Engine &,
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
-    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.linear.z = 0;
     vel.angular = Vector3::zero();
 }
 
