@@ -1,8 +1,8 @@
 """Vectorized environment wrapper for multi-agent environments."""
 import logging
-from copy import deepcopy
 from typing import Optional, Sequence
 import torch
+from typing import Any, Dict, List, Optional, Sequence
 import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.vec_env.base_vec_env import (
@@ -56,7 +56,16 @@ class SB3MultiAgentEnv(VecEnv):
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
         self.obs_dim = self._env.observation_space.shape[0]
+        self.info_dim = self._env.info_dim
         self.render_mode = render_mode
+
+        self.num_episodes = 0
+        self.infos = {
+            "off_road": 0,
+            "veh_collisions": 0,
+            "non_veh_collision": 0,
+            "goal_achieved": 0,
+        }
 
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
@@ -92,7 +101,7 @@ class SB3MultiAgentEnv(VecEnv):
             torch.Tensor (max_agent_count * num_worlds, obs_dim): Observations.
             torch.Tensor (max_agent_count * num_worlds): Rewards.
             torch.Tensor (max_agent_count * num_worlds): Dones.
-            dict: Additional information.
+            torch.Tensor (max_agent_count * num_worlds, info_dim): Information.
 
         Note:
         -------
@@ -115,9 +124,6 @@ class SB3MultiAgentEnv(VecEnv):
         self.buf_dones = torch.full(
             (self.num_worlds, self.max_agent_count), fill_value=float("nan")
         ).to(self.device)
-        self.buf_infos = torch.full(
-            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
-        ).to(self.device)
         buf_obs = torch.full(
             (self.num_worlds, self.max_agent_count, self.obs_dim),
             fill_value=float("nan"),
@@ -126,9 +132,6 @@ class SB3MultiAgentEnv(VecEnv):
         # Override nan placeholders for alive agents
         self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
         self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
-            torch.float32
-        )
-        self.buf_infos[~self.dead_agent_mask] = info[~self.dead_agent_mask].to(
             torch.float32
         )
         buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
@@ -141,9 +144,15 @@ class SB3MultiAgentEnv(VecEnv):
         # the end of the episode
         if (
             done[self.controlled_agent_mask].sum().item()
-            == self._get_sum_controlled_valid_agents
+            == self._tot_controlled_valid_agents
         ):
+            # Update infos
+            self._update_info_dict(info)
+            self.num_episodes += 1
+
+            # Reset environment
             obs = self.reset()
+
         else:
             # Update dead agent mask: Set to True if agent is done before
             # the end of the episode
@@ -153,7 +162,7 @@ class SB3MultiAgentEnv(VecEnv):
             self._obs_from_buf(),
             torch.clone(self.buf_rews).reshape(self.num_envs),
             torch.clone(self.buf_dones).reshape(self.num_envs),
-            deepcopy(self.buf_infos).reshape(self.num_envs),
+            torch.clone(info).reshape(self.num_envs, self.info_dim),
         )
 
     def close(self) -> None:
@@ -179,6 +188,29 @@ class SB3MultiAgentEnv(VecEnv):
     def _obs_from_buf(self) -> VecEnvObs:
         """Get observation from buffer."""
         return self.buf_obs.clone()
+
+    def _update_info_dict(self, info) -> None:
+        """Update the info logger."""
+
+        controlled_agent_info = info[self.controlled_agent_mask]
+
+        self.infos["off_road"] += controlled_agent_info[:, 0].sum().item()
+        self.infos["veh_collisions"] += (
+            controlled_agent_info[:, 1].sum().item()
+        )
+        self.infos["non_veh_collision"] += (
+            controlled_agent_info[:, 2].sum().item()
+        )
+        self.infos["goal_achieved"] += controlled_agent_info[:, 3].sum().item()
+
+    def _reset_rollout_loggers(self) -> None:
+        self.num_episodes = 0
+        self.infos = {
+            "off_road": 0,
+            "veh_collisions": 0,
+            "non_veh_collision": 0,
+            "goal_achieved": 0,
+        }
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()
@@ -207,7 +239,7 @@ class SB3MultiAgentEnv(VecEnv):
         return frames
 
     @property
-    def _get_sum_controlled_valid_agents(self):
+    def _tot_controlled_valid_agents(self):
         return self._env.num_valid_controlled_agents
 
 
@@ -220,12 +252,12 @@ if __name__ == "__main__":
         config=config,
         num_worlds=1,
         max_cont_agents=10,
-        data_dir="waymo_data",
-        device="cuda",
+        data_dir="formatted_json_v2_no_tl_train",
+        device="cpu",
     )
 
     obs = env.reset()
-    for global_step in range(20):
+    for global_step in range(200):
 
         print(f"Step: {90 - env._env.steps_remaining[0, 0, 0].item()}")
 
