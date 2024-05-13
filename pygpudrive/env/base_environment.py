@@ -45,9 +45,10 @@ class Env(gym.Env):
         # Configure the environment
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = 1.0
-        params.observationRadius = 10.0
+        params.observationRadius = 100.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
+        params.roadObservationAlgorithm = gpudrive.FindRoadObservationsWith.AllEntitiesWithRadiusFiltering
 
         # Collision behavior
         params = self._set_collision_behavior(params)
@@ -372,7 +373,7 @@ class Env(gym.Env):
 
     def render(self):
         if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}):
-            return self.visualizer.getRender(self.cont_agent_mask)
+            return self.visualizer.getRender(cont_agent_mask=self.cont_agent_mask)
         elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
             return self.visualizer.getRender()
         
@@ -448,18 +449,18 @@ if __name__ == "__main__":
     NUM_WORLDS = 3
 
     render_config = RenderConfig(
-        render_mode=RenderMode.MADRONA_RGB, 
-        view_option=MadronaOption.AGENT_VIEW, 
+        render_mode=RenderMode.PYGAME_EGOCENTRIC, 
+        view_option=PygameOption.RGB, 
         resolution=(1024, 1024)
     )
 
     env = Env(
         config=config,
         num_worlds=1,
-        auto_reset=False,
+        auto_reset=True,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="/home/aarav/gpudrive/build/tests/testJsons",
-        device="cpu",
+        device="cuda",
         render_config=render_config,
     )
 
@@ -467,7 +468,7 @@ if __name__ == "__main__":
     frames = []
 
     for _ in range(100):
-        print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
+        # print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
 
         # Take a random action (we're only going straight)
         # rand_action = torch.Tensor(
@@ -487,12 +488,12 @@ if __name__ == "__main__":
         #     print(f"RESETTING ENVIRONMENT\n")
         env.sim.step()
         frame = env.render()
-        frames.append(frame[0,0,:,:,:4].cpu().numpy())
-
-    print(frame.shape)
+        frames.append(frame[0])
+        print(len(frame), frame[0].shape)
+    
     import imageio
-
     imageio.mimsave("out.gif", frames)
+    print("Done")
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})

@@ -38,12 +38,12 @@ class PyGameVisualizer:
         self.padding_x = self.PADDING_PCT * self.WINDOW_W
         self.padding_y = self.PADDING_PCT * self.WINDOW_H
 
-        if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
+        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}:
             pygame.init()
             pygame.font.init()
             self.screen = None
             self.clock = None
-            if self.screen is None and self.render_config.PygameOption == PygameOption.HUMAN:
+            if self.screen is None and self.render_config.view_option == PygameOption.HUMAN:
                 pygame.display.init()
                 self.screen = pygame.display.set_mode((self.WINDOW_W, self.WINDOW_H))
             if self.clock is None:
@@ -51,15 +51,16 @@ class PyGameVisualizer:
 
             self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
             self.compute_window_settings()
-            self.init_map()
+            # self.init_map()
 
-    def compute_window_settings(self):
-        map_info = (
-            self.sim.map_observation_tensor()
-            .to_torch()[self.world_render_idx]
-            .cpu()
-            .numpy()
-        )
+    def compute_window_settings(self, map_info = None):
+        if map_info is None:
+            map_info = (
+                self.sim.map_observation_tensor()
+                .to_torch()[self.world_render_idx]
+                .cpu()
+                .numpy()
+            )
 
         # Adjust window dimensions by subtracting padding
         adjusted_window_width = self.WINDOW_W - self.padding_x
@@ -73,6 +74,7 @@ class PyGameVisualizer:
         )
 
         self.window_center = np.mean(map_info, axis=0)
+        
 
     def create_render_mask(self):
         agent_to_is_valid = (
@@ -157,17 +159,7 @@ class PyGameVisualizer:
         end = center_pos + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
     
-    def init_map(self):
-        """Initialize the static map elements."""
-        self.map_surf = self.surf.copy()  # Create a copy of the main surface to hold the map
-
-        map_info = (
-            self.sim.map_observation_tensor()
-            .to_torch()[self.world_render_idx]
-            .cpu()
-            .numpy()
-        )
-
+    def draw_map(self, surf, map_info):
         for idx, map_obj in enumerate(map_info):
             if map_obj[-1] == float(gpudrive.EntityType._None):
                 continue
@@ -175,7 +167,7 @@ class PyGameVisualizer:
                 start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)
                 start = self.scale_coords(start)
                 end = self.scale_coords(end)
-                pygame.draw.line(self.map_surf, self.color_dict[map_obj[-1]], start, end, 2)
+                pygame.draw.line(surf, self.color_dict[map_obj[-1]], start, end, 2)
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
                 center, width, height, rotation = (
                     map_obj[:2],
@@ -192,10 +184,28 @@ class PyGameVisualizer:
                 for i, box_corner in enumerate(box_corners):
                     box_corners[i] = self.scale_coords(box_corner)
                 pygame.draw.polygon(
-                    surface=self.map_surf,
+                    surface=surf,
                     color=self.color_dict[map_obj[-1]],
                     points=box_corners,
                 )
+
+    def init_map(self):
+        """Initialize the static map elements."""
+
+        if(self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC):
+            return
+        self.map_surf = self.surf.copy()  # Create a copy of the main surface to hold the map
+
+        map_info = (
+            self.sim.map_observation_tensor()
+            .to_torch()[self.world_render_idx]
+            .cpu()
+            .numpy()
+        )
+
+        self.draw_map(self.map_surf, map_info)
+
+        
 
     def getRender(self, **kwargs):
         if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}:
@@ -213,78 +223,171 @@ class PyGameVisualizer:
     def draw(self, cont_agent_mask):
         """Render the environment."""
 
-        if(self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC):
-            raise NotImplementedError
+        if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
+            render_rgbs = []
+            render_mask = self.create_render_mask()
+            num_agents = render_mask.sum().item()
+            # Loop through each agent to render their egocentric view
+            for agent_idx in range(num_agents):
+                self.surf.fill(self.BACKGROUND_COLOR)
+                if(not render_mask[agent_idx]):
+                    continue
+                agent_map_info = (
+                    self.sim.agent_roadmap_tensor()
+                    .to_torch()[self.world_render_idx, agent_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+                agent_map_info = agent_map_info[(agent_map_info[:, -1] != 0.0) & (agent_map_info[:, -1] != 10.0)]
 
-        render_mask = self.create_render_mask()
-        self.surf.fill(self.BACKGROUND_COLOR)
-        self.surf.blit(self.map_surf, (0, 0))
-        # Get agent info
-        agent_info = (
-            self.sim.absolute_self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, :]
-            .cpu()
-            .detach()
-            .numpy()
-        )
+                agent_info = (
+                    self.sim.self_observation_tensor()
+                    .to_torch()[self.world_render_idx, agent_idx, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
 
-        # Get the agent goal positions and current positions
-        agent_pos = agent_info[:, :2]  # x, y
-        goal_pos = agent_info[:, 8:10]  # x, y
-        agent_rot = agent_info[:, 7]  # heading
-        agent_sizes = agent_info[:, 10:12]  # length, width
+                partner_agent_info = (
+                    self.sim.partner_observations_tensor()
+                    .to_torch()[self.world_render_idx, agent_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+                partner_agent_info = partner_agent_info[partner_agent_info[:, -1] == 7.0]
+                
+                goal_pos = agent_info[3:5]  # x, y
+                agent_size = agent_info[1:3]  # length, width
 
-        num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
+                # Create a temporary surface for the egocentric view
+                temp_surf = pygame.Surface((self.surf.get_width(), self.surf.get_height()))
+                temp_surf.fill(self.BACKGROUND_COLOR)
 
-        # Draw the agent positions
-        for agent_idx in range(num_agents_in_scene):
-            if not render_mask[agent_idx]:
-                continue
+                self.draw_map(temp_surf, agent_map_info)
+                # Transform the map surface to the agent's egocentric view
+                agent_corners = PyGameVisualizer.compute_agent_corners(
+                    (0,0),
+                    agent_size[1],
+                    agent_size[0],
+                    0
+                )
+                agent_corners = [self.scale_coords(corner) for corner in agent_corners]
+                current_goal_scaled = self.scale_coords(goal_pos)
 
-            agent_corners = PyGameVisualizer.compute_agent_corners(
-                agent_pos[agent_idx],
-                agent_sizes[agent_idx, 1],
-                agent_sizes[agent_idx, 0],
-                agent_rot[agent_idx],
+                pygame.draw.polygon(
+                    surface=temp_surf,
+                    color=self.COLOR_LIST[0],
+                    points=agent_corners,
+                )
+
+                pygame.draw.circle(
+                    surface=temp_surf,
+                    color=self.COLOR_LIST[0],
+                    center=(
+                        int(current_goal_scaled[0]),
+                        int(current_goal_scaled[1]),
+                    ),
+                    radius= self.goal_radius * self.zoom_scale_x,
+                )
+
+                for agent in partner_agent_info:
+                    agent_pos = agent[1:3]
+                    agent_rot = agent[3]
+                    agent_size = agent[4:6]
+
+                    agent_corners = PyGameVisualizer.compute_agent_corners(
+                        agent_pos,
+                        agent_size[1],
+                        agent_size[0],
+                        agent_rot,
+                    )
+
+                    agent_corners = [self.scale_coords(corner) for corner in agent_corners]
+
+                    pygame.draw.polygon(
+                        surface=temp_surf,
+                        color=self.COLOR_LIST[1],
+                        points=agent_corners,
+                    )
+
+                #blit temp surf on self.surf
+                self.surf.blit(temp_surf, (0, 0))
+                # Capture the RGB array for the agent's view
+                render_rgbs.append(PyGameVisualizer._create_image_array(self.surf))
+
+            return render_rgbs
+        elif self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
+            render_mask = self.create_render_mask()
+            self.surf.fill(self.BACKGROUND_COLOR)
+            self.surf.blit(self.map_surf, (0, 0))
+            # Get agent info
+            agent_info = (
+                self.sim.absolute_self_observation_tensor()
+                .to_torch()[self.world_render_idx, :, :]
+                .cpu()
+                .detach()
+                .numpy()
             )
 
-            for i, agent_corner in enumerate(agent_corners):
-                agent_corners[i] = self.scale_coords(agent_corner)
+            # Get the agent goal positions and current positions
+            agent_pos = agent_info[:, :2]  # x, y
+            goal_pos = agent_info[:, 8:10]  # x, y
+            agent_rot = agent_info[:, 7]  # heading
+            agent_sizes = agent_info[:, 10:12]  # length, width
 
-            current_goal_scaled = self.scale_coords(goal_pos[agent_idx])
+            num_agents_in_scene = np.count_nonzero(goal_pos[:, 0])
 
-            mod_idx = agent_idx % len(self.COLOR_LIST)
+            # Draw the agent positions
+            for agent_idx in range(num_agents_in_scene):
+                if not render_mask[agent_idx]:
+                    continue
 
-            if cont_agent_mask[self.world_render_idx, agent_idx]:
-                mod_idx = 0
+                agent_corners = PyGameVisualizer.compute_agent_corners(
+                    agent_pos[agent_idx],
+                    agent_sizes[agent_idx, 1],
+                    agent_sizes[agent_idx, 0],
+                    agent_rot[agent_idx],
+                )
 
-            pygame.draw.polygon(
-                surface=self.surf,
-                color=self.COLOR_LIST[mod_idx],
-                points=agent_corners,
-            )
+                for i, agent_corner in enumerate(agent_corners):
+                    agent_corners[i] = self.scale_coords(agent_corner)
 
-            pygame.draw.circle(
-                surface=self.surf,
-                color=self.COLOR_LIST[mod_idx],
-                center=(
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                ),
-                radius=self.goal_radius * self.zoom_scale_x,
-            )
+                current_goal_scaled = self.scale_coords(goal_pos[agent_idx])
 
-        if self.render_config.view_option == PygameOption.HUMAN:
-            pygame.event.pump()
-            self.clock.tick(self.metadata["render_fps"])
-            assert self.screen is not None
-            self.screen.fill(0)
-            self.screen.blit(self.surf, (0, 0))
-            pygame.display.flip()
-        elif self.render_config.view_option == PygameOption.RGB:
-            return PyGameVisualizer._create_image_array(self.surf)
-        else:
-            return self.isopen
+                mod_idx = agent_idx % len(self.COLOR_LIST)
+
+                if cont_agent_mask[self.world_render_idx, agent_idx]:
+                    mod_idx = 0
+
+                pygame.draw.polygon(
+                    surface=self.surf,
+                    color=self.COLOR_LIST[mod_idx],
+                    points=agent_corners,
+                )
+
+                pygame.draw.circle(
+                    surface=self.surf,
+                    color=self.COLOR_LIST[mod_idx],
+                    center=(
+                        int(current_goal_scaled[0]),
+                        int(current_goal_scaled[1]),
+                    ),
+                    radius=self.goal_radius * self.zoom_scale_x,
+                )
+
+            if self.render_config.view_option == PygameOption.HUMAN:
+                pygame.event.pump()
+                self.clock.tick(self.metadata["render_fps"])
+                assert self.screen is not None
+                self.screen.fill(0)
+                self.screen.blit(self.surf, (0, 0))
+                pygame.display.flip()
+            elif self.render_config.view_option == PygameOption.RGB:
+                return PyGameVisualizer._create_image_array(self.surf)
+            else:
+                return self.isopen
 
     @staticmethod
     def _create_image_array(surf):
