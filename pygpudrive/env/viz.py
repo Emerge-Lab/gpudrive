@@ -6,7 +6,7 @@ import os
 import math
 import gpudrive
 
-from pygpudrive.env.config import PygameOption, RenderMode
+from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 
 class PyGameVisualizer:
@@ -202,12 +202,20 @@ class PyGameVisualizer:
             cont_agent_mask = kwargs.get('cont_agent_mask', None)
             return self.draw(cont_agent_mask)
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
+            if(self.render_config.view_option == MadronaOption.TOP_DOWN):
+                raise NotImplementedError
             return self.sim.rgb_tensor().to_torch()
         elif self.render_config.render_mode == RenderMode.MADRONA_DEPTH:
+            if(self.render_config.view_option == MadronaOption.TOP_DOWN):
+                raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
 
     def draw(self, cont_agent_mask):
         """Render the environment."""
+
+        if(self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC):
+            raise NotImplementedError
+
         render_mask = self.create_render_mask()
         self.surf.fill(self.BACKGROUND_COLOR)
         self.surf.blit(self.map_surf, (0, 0))

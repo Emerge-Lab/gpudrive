@@ -93,9 +93,9 @@ class Env(gym.Env):
             auto_reset=True,
             json_path=self.data_dir,
             params=params,
-            enable_batch_renderer = render_config is not None and render_config.render_mode in [RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH],
-            batch_render_view_width = render_config is not None and render_config.resolution[0],
-            batch_render_view_height = render_config is not None and render_config.resolution[1] 
+            enable_batch_renderer = render_config is not None and render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width = render_config.resolution[0] if render_config is not None else None,
+            batch_render_view_height = render_config.resolution[1] if render_config is not None else None
         )
 
         # Rendering
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     render_config = RenderConfig(
         render_mode=RenderMode.MADRONA_RGB, 
         view_option=MadronaOption.AGENT_VIEW, 
-        resolution=(128, 128)
+        resolution=(1024, 1024)
     )
 
     env = Env(
@@ -433,6 +433,7 @@ if __name__ == "__main__":
         frame = env.render()
         frames.append(frame[0,0,:,:,:4].cpu().numpy())
 
+    print(frame.shape)
     import imageio
     imageio.mimsave("out.gif", frames)
     # Log video
