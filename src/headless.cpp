@@ -71,10 +71,7 @@ int main(int argc, char *argv[])
                 .distanceToExpertThreshold = 0.5
             },
             .maxNumControlledVehicles = 0,
-        },
-        .enableBatchRenderer  = true,
-        .batchRenderViewWidth = 256,
-        .batchRenderViewHeight = 256
+        }
     });
 
     std::random_device rd;
