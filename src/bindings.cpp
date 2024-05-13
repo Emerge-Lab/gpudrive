@@ -62,10 +62,10 @@ namespace gpudrive
             .value("CrossWalk", EntityType::CrossWalk)
             .value("SpeedBump", EntityType::SpeedBump)
             .value("StopSign", EntityType::StopSign)
-            .value("Vehicle", EntityType::Vehicle) // Number 7
+            .value("Vehicle", EntityType::Vehicle) 
             .value("Pedestrian", EntityType::Pedestrian)
             .value("Cyclist", EntityType::Cyclist)
-            .value("Padding", EntityType::Padding) // Number 10
+            .value("Padding", EntityType::Padding) 
             .value("NumTypes", EntityType::NumTypes);
 
         // Bindings for Manager class
