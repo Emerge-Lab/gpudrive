@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "../maps.16",
+        .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -70,8 +70,11 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-            .maxNumControlledVehicles = 0
-        }
+            .maxNumControlledVehicles = 0,
+        },
+        .enableBatchRenderer  = true,
+        .batchRenderViewWidth = 256,
+        .batchRenderViewHeight = 256
     });
 
     std::random_device rd;
