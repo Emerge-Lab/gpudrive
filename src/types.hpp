@@ -226,6 +226,14 @@ struct ValidState {
 
 /* ECS Archetypes for the game */
 
+struct CameraAgent : public madrona::Archetype<
+    Position,
+    Rotation,
+    madrona::render::RenderCamera,
+    madrona::render::Renderable
+> {};
+
+
 // There are 2 Agents in the environment trying to get to the destination
 struct Agent : public madrona::Archetype<
     // Basic components required for physics. Note that the current physics
