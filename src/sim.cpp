@@ -529,26 +529,36 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
+    auto controlledStateA = ctx.getCheck<ControlledState>(candidateCollision.a);                                
+    auto controlledStateB = ctx.getCheck<ControlledState>(candidateCollision.b);
+
     // Technically there would never be a collision between (non valid expert) and (non expert). So one of the below checks would always be false.
-    if(ctx.get<ControlledState>(candidateCollision.a).controlledState == ControlMode::EXPERT)
+    if(controlledStateA.valid())
     {
+        if (controlledStateA.value().controlledState == ControlMode::EXPERT)
+        {
+            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
+            auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
+            if(!validState)
+            {
+                return;
+            }
+        }
         
-        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
-        auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
-        if(!validState)
-        {
-            return;
-        }
     }
-    else if(ctx.get<ControlledState>(candidateCollision.b).controlledState == ControlMode::EXPERT)
+    else if(controlledStateB.valid())
     {
-        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
-        auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
-        if(!validState)
+        if (controlledStateB.value().controlledState == ControlMode::EXPERT)
         {
-            return;
+            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
+            auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
+            if(!validState)
+            {
+                return;
+            }
         }
     }
+    
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
