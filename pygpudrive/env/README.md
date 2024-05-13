@@ -53,7 +53,7 @@ The car starts at rest in the position of xthe expert vehicle.
 ## Arguments
 
 
-## Assumptions
+## Notes
 
 - We use "nan" values to indicate invalid agents in environments. Since the number of valid agents varies per scenario (map), scenarios with fewer than `kMaxAgentCount` controlled agents are padded with `nan` values. For example, suppose we have two scenes, one with two agents and the other with three agents. When we step the environment, we get tensors of shape `(num_worlds, kMaxAgentCount)`, where we can control at most `max_cont_agents` per environment. When we step the environment, the done tensor with `kMaxAgentCount` is five and `max_cont_agents` to three may look like:
 

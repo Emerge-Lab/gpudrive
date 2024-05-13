@@ -1,4 +1,6 @@
 import wandb
+import torch
+import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -9,35 +11,38 @@ from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from algorithms.ppo.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
-from algorithms.ppo.sb3.mappo import MAPPO
+from algorithms.ppo.sb3.ippo import IPPO
 
 from baselines.config import ExperimentConfig
+
+torch.cuda.empty_cache()
 
 if __name__ == "__main__":
 
     env_config = EnvConfig(
         ego_state=True,
-        road_map_obs=False,
+        road_map_obs=True,
         partner_obs=True,
-        normalize_obs=False,
+        norm_obs=False,
+        sample_method="rand_n",
     )
 
     exp_config = ExperimentConfig(
-        render=False,
+        render=True,
     )
 
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
         num_worlds=2,
-        max_cont_agents=10,
-        data_dir="waymo_data",
-        device="cuda",
+        max_cont_agents=128,
+        data_dir="formatted_json_v2_no_tl_train",
+        device=exp_config.device,
     )
 
     run = wandb.init(
-        project="rl_benchmarking",
-        group="different_scenes",
+        project="rl_bench",
+        group="render_test",
         sync_tensorboard=True,
     )
     run_id = run.id
@@ -48,13 +53,14 @@ if __name__ == "__main__":
         wandb_run=run if run_id is not None else None,
     )
 
-    model = MAPPO(
+    model = IPPO(
         policy=exp_config.policy,
         n_steps=exp_config.n_steps,
         batch_size=exp_config.batch_size,
         env=env,
         seed=exp_config.seed,
         verbose=exp_config.verbose,
+        device=exp_config.device,
         tensorboard_log=f"runs/{run_id}"
         if run_id is not None
         else None,  # Sync with wandb
@@ -62,7 +68,7 @@ if __name__ == "__main__":
 
     # Learn
     model.learn(
-        total_timesteps=10_000_000,
+        total_timesteps=exp_config.total_timesteps,
         callback=custom_callback,
     )
 
