@@ -5,6 +5,8 @@ set(SIMULATOR_SRCS
     level_gen.hpp level_gen.cpp
     obb.hpp
     utils.hpp
+    binary_heap.hpp
+    knn.hpp
 )
 
 add_library(gpudrive_cpu_impl STATIC
