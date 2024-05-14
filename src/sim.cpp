@@ -7,6 +7,7 @@
 #include "obb.hpp"
 #include "sim.hpp"
 #include "utils.hpp"
+#include "knn.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -212,6 +213,14 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
+    const auto alg = ctx.data().params.roadObservationAlgorithm;
+    if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
+        selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
+            ctx, rot, model.position, map_obs.obs);
+        return;
+    }
+
+    assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -254,6 +263,10 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = 0;
+            velocity.angular = Vector3::zero();
             done.v = 1;
             return;
        }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
@@ -262,8 +275,9 @@ inline void movementSystem(Engine &e,
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
             velocity.linear.y = 0;
-            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
+            return;
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
@@ -345,7 +359,7 @@ inline void agentZeroVelSystem(Engine &,
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
-    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.linear.z = 0;
     vel.angular = Vector3::zero();
 }
 
@@ -499,7 +513,7 @@ inline void stepTrackerSystem(Engine &ctx,
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1)
+    if(done.v != 1 || info.reachedGoal != 1)
     {
         float dist = (model.position - goal.position).length();
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
@@ -513,6 +527,27 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+
+    // Technically there would never be a collision between (non valid expert) and (non expert). So one of the below checks would always be false.
+    if(ctx.get<ControlledState>(candidateCollision.a).controlledState == ControlMode::EXPERT)
+    {
+        
+        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
+        auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
+        if(!validState)
+        {
+            return;
+        }
+    }
+    else if(ctx.get<ControlledState>(candidateCollision.b).controlledState == ControlMode::EXPERT)
+    {
+        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
+        auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
+        if(!validState)
+        {
+            return;
+        }
+    }
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
@@ -545,7 +580,7 @@ void collisionDetectionSystem(Engine &ctx,
     // Ignore collisions between certain entity types
     if(aEntityType == EntityType::Padding || bEntityType == EntityType::Padding)
     {
-        return;
+       return;
     }
 
     for(auto &pair : ctx.data().collisionPairs)
@@ -697,7 +732,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto detectCollisions = builder.addToGraph<
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
-        {broadphase_setup_sys});
+        {findOverlappingEntities});
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
