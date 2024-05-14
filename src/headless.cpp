@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
                 .distanceToExpertThreshold = 0.5
             },
             .maxNumControlledVehicles = 0,
-            .roadObservationAlgorithm = FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering
         }
     });
 

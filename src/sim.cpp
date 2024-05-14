@@ -247,7 +247,11 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
-            e.get<Done>(agent_iface.e).v = 1;
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = 0;
+            velocity.angular = Vector3::zero();
+            done.v = 1;
             return;
         }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
         {
@@ -255,8 +259,9 @@ inline void movementSystem(Engine &e,
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
             velocity.linear.y = 0;
-            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
+            return;
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
@@ -339,7 +344,7 @@ inline void agentZeroVelSystem(Engine &,
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
-    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.linear.z = 0;
     vel.angular = Vector3::zero();
 }
 
@@ -495,7 +500,7 @@ inline void stepTrackerSystem(Engine &ctx,
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1)
+    if(done.v != 1 || info.reachedGoal != 1)
     {
         float dist = (model.position - goal.position).length();
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
@@ -508,6 +513,27 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+
+    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
+    {
+        auto controlledState = ctx.getCheck<ControlledState>(candidate);
+        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
+        {
+            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+            if (!validState)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+        isExpertAgentInInvalidState(candidateCollision.b)) {
+        return;
+    }
+
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
