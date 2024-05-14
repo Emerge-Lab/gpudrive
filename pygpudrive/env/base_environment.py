@@ -449,7 +449,7 @@ if __name__ == "__main__":
     NUM_WORLDS = 3
 
     render_config = RenderConfig(
-        render_mode=RenderMode.PYGAME_EGOCENTRIC, 
+        render_mode=RenderMode.PYGAME_LIDAR, 
         view_option=PygameOption.RGB, 
         resolution=(1024, 1024)
     )

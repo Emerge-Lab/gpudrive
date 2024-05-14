@@ -8,6 +8,7 @@ from typing import Tuple
 class RenderMode(Enum):
     PYGAME_ABSOLUTE = "pygame_absolute"
     PYGAME_EGOCENTRIC = "pygame_egocentric"
+    PYGAME_LIDAR = "pygame_lidar"
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
 

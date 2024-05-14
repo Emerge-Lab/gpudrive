@@ -388,7 +388,84 @@ class PyGameVisualizer:
                 return PyGameVisualizer._create_image_array(self.surf)
             else:
                 return self.isopen
+        elif self.render_config.render_mode == RenderMode.PYGAME_LIDAR:
+            render_rgbs = []
+            render_mask = self.create_render_mask()
+            num_agents = render_mask.sum().item()
+            # Loop through each agent to render their egocentric view
+            for agent_idx in range(num_agents):
+                self.surf.fill(self.BACKGROUND_COLOR)
+                temp_surf = pygame.Surface((self.surf.get_width(), self.surf.get_height()))
+                temp_surf.fill(self.BACKGROUND_COLOR)
 
+                agent_info = (
+                    self.sim.self_observation_tensor()
+                    .to_torch()[self.world_render_idx, agent_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+
+                numLidarSamples = 30
+
+                lidar_data = (
+                    self.sim.lidar_tensor()
+                    .to_torch()[self.world_render_idx, agent_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+
+                lidar_depths = lidar_data[:, 0]
+
+                lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
+
+                for i in range(numLidarSamples):
+                    angle = lidar_angles[i]
+                    depth = lidar_depths[i]
+                    if(depth == 0):
+                        continue
+                    x = depth * np.cos(angle)
+                    y = depth * np.sin(angle)
+
+                    start = self.scale_coords(agent_info[:2])
+                    end = self.scale_coords(agent_info[:2] + np.array([x, y]))
+
+                    pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
+                
+                goal_pos = agent_info[3:5]  # x, y
+                agent_size = agent_info[1:3]  # length, width
+
+                agent_corners = PyGameVisualizer.compute_agent_corners(
+                    (0,0),
+                    agent_size[1],
+                    agent_size[0],
+                    0
+                )
+                agent_corners = [self.scale_coords(corner) for corner in agent_corners]
+                current_goal_scaled = self.scale_coords(goal_pos)
+
+                pygame.draw.polygon(
+                    surface=temp_surf,
+                    color=self.COLOR_LIST[0],
+                    points=agent_corners,
+                )
+
+                pygame.draw.circle(
+                    surface=temp_surf,
+                    color=self.COLOR_LIST[0],
+                    center=(
+                        int(current_goal_scaled[0]),
+                        int(current_goal_scaled[1]),
+                    ),
+                    radius= self.goal_radius * self.zoom_scale_x,
+                )
+
+                #blit temp surf on self.surf
+                self.surf.blit(temp_surf, (0, 0))
+                # Capture the RGB array for the agent's view
+                render_rgbs.append(PyGameVisualizer._create_image_array(self.surf))
+                
     @staticmethod
     def _create_image_array(surf):
         return np.transpose(np.array(pygame.surfarray.pixels3d(surf)), axes=(1, 0, 2))
