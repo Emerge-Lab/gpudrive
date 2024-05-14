@@ -37,6 +37,10 @@ namespace gpudrive
             .value("PadN", DatasetInitOptions::PadN)
             .value("ExactN", DatasetInitOptions::ExactN);
 
+        nb::enum_<FindRoadObservationsWith>(m, "FindRoadObservationsWith")
+            .value("KNearestEntitiesWithRadiusFiltering", FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering)
+            .value("AllEntitiesWithRadiusFiltering", FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
+
         // Define Parameters class
         nb::class_<Parameters>(m, "Parameters")
             .def(nb::init<>()) // Default constructor
@@ -46,7 +50,8 @@ namespace gpudrive
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
-            .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles);
+            .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
+            .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
@@ -55,16 +60,16 @@ namespace gpudrive
             .value("Ignore", CollisionBehaviour::Ignore);
 
         nb::enum_<EntityType>(m, "EntityType")
-            .value("_None", EntityType::None) 
-            .value("RoadEdge", EntityType::RoadEdge) 
-            .value("RoadLine", EntityType::RoadLine) 
-            .value("RoadLane", EntityType::RoadLane) 
-            .value("CrossWalk", EntityType::CrossWalk) 
-            .value("SpeedBump", EntityType::SpeedBump) 
-            .value("StopSign", EntityType::StopSign) 
+            .value("_None", EntityType::None)
+            .value("RoadEdge", EntityType::RoadEdge)
+            .value("RoadLine", EntityType::RoadLine)
+            .value("RoadLane", EntityType::RoadLane)
+            .value("CrossWalk", EntityType::CrossWalk)
+            .value("SpeedBump", EntityType::SpeedBump)
+            .value("StopSign", EntityType::StopSign)
             .value("Vehicle", EntityType::Vehicle) 
-            .value("Pedestrian", EntityType::Pedestrian) 
-            .value("Cyclist", EntityType::Cyclist) 
+            .value("Pedestrian", EntityType::Pedestrian)
+            .value("Cyclist", EntityType::Cyclist)
             .value("Padding", EntityType::Padding) 
             .value("NumTypes", EntityType::NumTypes);
 
