@@ -221,6 +221,14 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
+    const auto alg = ctx.data().params.roadObservationAlgorithm;
+    if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
+        selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
+            ctx, rot, model.position, map_obs.obs);
+        return;
+    }
+
+    assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -281,7 +289,7 @@ inline void movementSystem(Engine &e,
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
-            // Do nothing. 
+            // Do nothing.
         }
     }
 
@@ -543,7 +551,7 @@ void collisionDetectionSystem(Engine &ctx,
         return false;
     };
 
-    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+    if (isExpertAgentInInvalidState(candidateCollision.a) ||
         isExpertAgentInInvalidState(candidateCollision.b)) {
         return;
     }
