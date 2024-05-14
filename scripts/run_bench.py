@@ -10,7 +10,6 @@ def run_command(command: str, profiling: bool = False):
     process = subprocess.Popen(command, shell=True)
     process.wait()  # Wait for the process to complete
     if profiling:
-        
         os.makedirs("profiling_data", exist_ok=True)
         dst = f'profiling_data/{process.pid+1}_madrona_device_tracing.bin'
         shutil.move(profile_path.format(process.pid + 1), dst)
