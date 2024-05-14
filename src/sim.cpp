@@ -563,8 +563,8 @@ void collisionDetectionSystem(Engine &ctx,
                 // The agent can also be done because it collided. 
                 // In that case, we dont want to ignore collision. Especially if AgentStop is set.
                 auto done = ctx.get<Done>(candidate);
-                auto collisionEvent = ctx.get<CollisionDetectionEvent>(candidate);
-                if(done.v && !collisionEvent.hasCollided.load_relaxed())
+                auto collisionEvent = ctx.getCheck<CollisionDetectionEvent>(candidate);
+                if(done.v && collisionEvent.valid() && !collisionEvent.value().hasCollided.load_relaxed())
                 {
                     return true;
                 }
