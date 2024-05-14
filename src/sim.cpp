@@ -528,8 +528,9 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
-    auto isExpertAgentInInvalidState = [&](auto candidate, auto controlledState)
+    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
     {
+        auto controlledState = ctx.getCheck<ControlledState>(candidate);
         if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
         {
             auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
@@ -542,11 +543,8 @@ void collisionDetectionSystem(Engine &ctx,
         return true;
     };
 
-    auto controlledStateA = ctx.getCheck<ControlledState>(candidateCollision.a);                                
-    auto controlledStateB = ctx.getCheck<ControlledState>(candidateCollision.b);
-
-    if (!isExpertAgentInInvalidState(candidateCollision.a, controlledStateA) || 
-        !isExpertAgentInInvalidState(candidateCollision.b, controlledStateB)) {
+    if (!isExpertAgentInInvalidState(candidateCollision.a) || 
+        !isExpertAgentInInvalidState(candidateCollision.b)) {
         return;
     }
 
