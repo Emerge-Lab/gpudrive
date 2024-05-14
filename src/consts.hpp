@@ -8,7 +8,7 @@ namespace gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 3;
+inline constexpr madrona::CountT kMaxAgentCount = 128;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
 inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 6000;
 
@@ -22,7 +22,7 @@ inline constexpr float rewardPerDist = 0.05f;
 inline constexpr float slackReward = -0.005f;
 
 // Steps per episode
-inline constexpr int32_t episodeLen = 90;
+inline constexpr int32_t episodeLen = 91;
 
 // Number of lidar samples, arranged in circle around agent
 inline constexpr madrona::CountT numLidarSamples = 1024;
