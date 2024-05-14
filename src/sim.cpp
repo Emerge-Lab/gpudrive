@@ -537,14 +537,14 @@ void collisionDetectionSystem(Engine &ctx,
             auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
             if (!validState)
             {
-                return false;
+                return true;
             }
         }
-        return true;
+        return false;
     };
 
-    if (!isExpertAgentInInvalidState(candidateCollision.a) || 
-        !isExpertAgentInInvalidState(candidateCollision.b)) {
+    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+        isExpertAgentInInvalidState(candidateCollision.b)) {
         return;
     }
 
