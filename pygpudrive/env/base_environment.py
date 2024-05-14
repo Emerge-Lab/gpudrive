@@ -372,7 +372,7 @@ class Env(gym.Env):
         return obs_filtered
 
     def render(self):
-        if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}):
+        if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}):
             return self.visualizer.getRender(cont_agent_mask=self.cont_agent_mask)
         elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
             return self.visualizer.getRender()

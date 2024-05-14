@@ -38,7 +38,7 @@ class PyGameVisualizer:
         self.padding_x = self.PADDING_PCT * self.WINDOW_W
         self.padding_y = self.PADDING_PCT * self.WINDOW_H
 
-        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}:
+        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}:
             pygame.init()
             pygame.font.init()
             self.screen = None
@@ -208,7 +208,7 @@ class PyGameVisualizer:
         
 
     def getRender(self, **kwargs):
-        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC}:
+        if self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}:
             cont_agent_mask = kwargs.get('cont_agent_mask', None)
             return self.draw(cont_agent_mask)
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
@@ -400,13 +400,13 @@ class PyGameVisualizer:
 
                 agent_info = (
                     self.sim.self_observation_tensor()
-                    .to_torch()[self.world_render_idx, agent_idx, :, :]
+                    .to_torch()[self.world_render_idx, agent_idx, :]
                     .cpu()
                     .detach()
                     .numpy()
                 )
 
-                numLidarSamples = 30
+                numLidarSamples = 1024
 
                 lidar_data = (
                     self.sim.lidar_tensor()
@@ -420,6 +420,8 @@ class PyGameVisualizer:
 
                 lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
 
+                num_lidar_plotted = 0
+
                 for i in range(numLidarSamples):
                     angle = lidar_angles[i]
                     depth = lidar_depths[i]
@@ -428,10 +430,20 @@ class PyGameVisualizer:
                     x = depth * np.cos(angle)
                     y = depth * np.sin(angle)
 
-                    start = self.scale_coords(agent_info[:2])
-                    end = self.scale_coords(agent_info[:2] + np.array([x, y]))
+                    start = self.scale_coords((0,0))
+                    end = self.scale_coords(np.array([x, y]))
 
-                    pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
+                    pygame.draw.circle(
+                        surface=temp_surf,
+                        color=(255, 255, 255),
+                        center=(
+                            int(end[0]),
+                            int(end[1]),
+                        ),
+                        radius= 2,
+                    )
+                    # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
+                    num_lidar_plotted += 1
                 
                 goal_pos = agent_info[3:5]  # x, y
                 agent_size = agent_info[1:3]  # length, width
@@ -440,7 +452,7 @@ class PyGameVisualizer:
                     (0,0),
                     agent_size[1],
                     agent_size[0],
-                    0
+                    np.pi/2
                 )
                 agent_corners = [self.scale_coords(corner) for corner in agent_corners]
                 current_goal_scaled = self.scale_coords(goal_pos)
@@ -465,6 +477,7 @@ class PyGameVisualizer:
                 self.surf.blit(temp_surf, (0, 0))
                 # Capture the RGB array for the agent's view
                 render_rgbs.append(PyGameVisualizer._create_image_array(self.surf))
+            return render_rgbs
                 
     @staticmethod
     def _create_image_array(surf):
