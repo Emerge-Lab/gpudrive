@@ -528,26 +528,26 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
-    // Technically there would never be a collision between (non valid expert) and (non expert). So one of the below checks would always be false.
-    if(ctx.get<ControlledState>(candidateCollision.a).controlledState == ControlMode::EXPERT)
+    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
     {
-        
-        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
-        auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
-        if(!validState)
+        auto controlledState = ctx.getCheck<ControlledState>(candidate);
+        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
         {
-            return;
+            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+            if (!validState)
+            {
+                return true;
+            }
         }
+        return false;
+    };
+
+    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+        isExpertAgentInInvalidState(candidateCollision.b)) {
+        return;
     }
-    else if(ctx.get<ControlledState>(candidateCollision.b).controlledState == ControlMode::EXPERT)
-    {
-        auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
-        auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
-        if(!validState)
-        {
-            return;
-        }
-    }
+
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
