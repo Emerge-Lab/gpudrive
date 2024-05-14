@@ -516,14 +516,18 @@ void collisionDetectionSystem(Engine &ctx,
 
     auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
     {
-        auto controlledState = ctx.getCheck<ControlledState>(candidate);
-        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
+        auto agent_iface = ctx.getCheck<InterfaceEntity>(candidate);
+        if (agent_iface.valid())
         {
-            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
-            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
-            if (!validState)
+            auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlledState;
+            if (controlledState == ControlMode::EXPERT)
             {
-                return true;
+                auto currStep = getCurrentStep(ctx.get<StepsRemaining>(agent_iface.value().e));
+                auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                if (!validState)
+                {
+                    return true;
+                }
             }
         }
         return false;
