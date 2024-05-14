@@ -56,6 +56,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<CameraAgent>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
