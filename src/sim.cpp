@@ -534,36 +534,26 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
-    auto controlledStateA = ctx.getCheck<ControlledState>(candidateCollision.a);                                
-    auto controlledStateB = ctx.getCheck<ControlledState>(candidateCollision.b);
+    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
+    {
+        auto controlledState = ctx.getCheck<ControlledState>(candidate);
+        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
+        {
+            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+            if (!validState)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
 
-    // Technically there would never be a collision between (non valid expert) and (non expert). So one of the below checks would always be false.
-    if(controlledStateA.valid())
-    {
-        if (controlledStateA.value().controlledState == ControlMode::EXPERT)
-        {
-            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.a));
-            auto validState = ctx.get<Trajectory>(candidateCollision.a).valids[currStep];
-            if(!validState)
-            {
-                return;
-            }
-        }
-        
+    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+        isExpertAgentInInvalidState(candidateCollision.b)) {
+        return;
     }
-    else if(controlledStateB.valid())
-    {
-        if (controlledStateB.value().controlledState == ControlMode::EXPERT)
-        {
-            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidateCollision.b));
-            auto validState = ctx.get<Trajectory>(candidateCollision.b).valids[currStep];
-            if(!validState)
-            {
-                return;
-            }
-        }
-    }
-    
+
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
