@@ -806,6 +806,11 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
                         Rotation, Goal, EntityType, VehicleSize, AbsoluteSelfObservation>>(
         {collect_obs});
 
+    if (cfg.renderBridge) {
+        RenderingSystem::setupTasks(builder, {reset_sys});
+    }
+
+    if(cfg.enableLidar) {
         // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
@@ -823,9 +828,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             EntityType
         >>({collectAbsoluteSelfObservations});
 
-    if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {reset_sys});
-    }
 
 #ifdef MADRONA_GPU_MODE
     // Sort entities, this could be conditional on reset like the second
@@ -839,6 +841,21 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     (void)lidar;
     (void)collect_obs;
 #endif
+    }
+    else
+    {
+#ifdef MADRONA_GPU_MODE
+        // Sort entities, this could be conditional on reset like the second
+        // BVH build above.
+        auto sort_agents =
+            queueSortByWorld<Agent>(builder, {collectAbsoluteSelfObservations});
+        auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
+            builder, {sort_agents});
+        (void)sort_phys_objects;
+#else
+        (void)collect_obs;
+#endif
+    }
 }
 
 Sim::Sim(Engine &ctx,
