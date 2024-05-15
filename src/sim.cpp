@@ -281,7 +281,7 @@ inline void movementSystem(Engine &e,
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
-            // Do nothing. 
+            // Do nothing.
         }
     }
 
@@ -543,7 +543,7 @@ void collisionDetectionSystem(Engine &ctx,
         return false;
     };
 
-    if (isExpertAgentInInvalidState(candidateCollision.a) || 
+    if (isExpertAgentInInvalidState(candidateCollision.a) ||
         isExpertAgentInInvalidState(candidateCollision.b)) {
         return;
     }
