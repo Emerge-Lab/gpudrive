@@ -231,7 +231,8 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
         map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;
+        map_obs.obs[arrIndex].position = relative_pos;
+        map_obs.obs[arrIndex].heading = utils::quatToYaw(rot.inv() * ctx.get<Rotation>(road));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
