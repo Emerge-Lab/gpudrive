@@ -62,9 +62,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
 
-    
-
-
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
     // their initial values.
