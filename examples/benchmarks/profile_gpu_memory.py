@@ -87,12 +87,6 @@ def main(
         # Step dynamics
         sim.step()
 
-        # Get info
-        obs = sim.self_observation_tensor().to_torch()
-        reward = sim.reward_tensor().to_torch()
-        done = sim.done_tensor().to_torch()
-        info = sim.info_tensor().to_torch()
-
         episode_step += 1
 
         # LOG GPU MEMORY
@@ -108,7 +102,7 @@ def main(
             perc_used.append((memory_info.used / memory_info.total) * 100)
 
             print(
-                f"Global step: {global_step} | Perc. memory used: {memory_info.used / memory_info.total * 100:.3f} % \n"
+                f"Global step: {global_step} | Perc. memory used: {(memory_info.used / memory_info.total) * 100:.3f} % \n"
             )
 
         # RESET if episode is done
@@ -122,7 +116,7 @@ def main(
 
 if __name__ == "__main__":
     (time_checkpoints, free_gpu_mem, used_memory, perc_used,) = main(
-        total_timesteps=10_000,
+        total_timesteps=1_000_000,
         num_worlds=50,
         episode_length=90,
         max_num_objects=128,
