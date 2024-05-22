@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 
 # Import masked rollout buffer class
-from algorithms.ppo.sb3.rollout_buffer import MaskedRolloutBuffer
+from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
 
 # From stable baselines
 def explained_variance(
