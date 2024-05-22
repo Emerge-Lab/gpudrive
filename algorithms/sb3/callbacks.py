@@ -58,35 +58,45 @@ class MultiAgentCallback(BaseCallback):
             num_episodes_in_rollout * num_controlled_agents
         )
 
-        rollout_observations = (
-            self.locals["rollout_buffer"].observations.cpu().detach().numpy()
+        rollout_observations = np.nan_to_num(
+            self.locals["rollout_buffer"].observations.cpu().detach().numpy(),
+            nan=0,
         )
 
-        # Average info across agents and episodes
+        # Evaluation metrics
         rollout_info = self.locals["env"].infos
         for key, value in rollout_info.items():
             self.locals["env"].infos[key] = value / (
                 num_episodes_in_rollout * num_controlled_agents
             )
-            self.logger.record(f"rollout/{key}", self.locals["env"].infos[key])
+            self.logger.record(f"metrics/{key}", self.locals["env"].infos[key])
 
-        # Log
+        # Other
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
             "rollout/num_episodes_in_rollout",
             num_episodes_in_rollout,
         )
-        self.logger.record("rollout/sum_reward", rollout_rewards.sum())
+        self.logger.record("rollout/sum_ep_return", rollout_rewards.sum())
         self.logger.record(
-            "rollout/avg_reward", mean_reward_per_agent_per_episode.item()
+            "rollout/avg_ep_return", mean_reward_per_agent_per_episode.item()
         )
-        self.logger.record("rollout/obs_max", rollout_observations.max())
-        self.logger.record("rollout/obs_min", rollout_observations.min())
+        self.logger.record("data/obs_max", rollout_observations.max())
+        self.logger.record("data/obs_min", rollout_observations.min())
+
+        hist = np.histogram(rollout_observations.reshape(-1))
+        wandb.log(
+            {
+                "global_step": self.num_timesteps,
+                "data/obs_hist": wandb.Histogram(np_histogram=hist),
+            }
+        )
 
         # Render the environment
         if self.config.render:
             if self.num_rollouts % self.config.render_freq == 0:
-                self._create_and_log_video()
+                for world_idx in range(self.config.render_n_worlds):
+                    self._create_and_log_video(render_world_idx=world_idx)
 
         self.num_rollouts += 1
 
@@ -136,8 +146,17 @@ class MultiAgentCallback(BaseCallback):
             obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
-            frames.append(frame.T)
+            frames.append(frame)
 
         frames = np.array(frames)
 
-        wandb.log({"video": wandb.Video(frames, fps=10, format="gif")})
+        wandb.log(
+            {
+                f"video_{render_world_idx}": wandb.Video(
+                    np.moveaxis(frames, -1, 1),
+                    fps=10,
+                    format="gif",
+                    caption=f"Global step: {self.num_timesteps:,}",
+                )
+            }
+        )
