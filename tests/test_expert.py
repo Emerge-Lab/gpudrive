@@ -1,7 +1,5 @@
 import gpudrive
-import torch
 import pytest
-from PIL import Image
 
 @pytest.fixture(scope="module")
 def simulation_results():
