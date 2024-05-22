@@ -30,5 +30,4 @@ jobs:
         poetry install
     - name: Run tests
       run: |
-        cd build/
-        ctest --rerun-failed --output-on-failure
+        pytest -v
