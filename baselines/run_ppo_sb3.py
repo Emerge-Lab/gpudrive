@@ -1,5 +1,6 @@
 import wandb
 import torch
+import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -7,10 +8,10 @@ from pygpudrive.env.config import EnvConfig
 # Import env wrapper that makes gym env compatible with stable-baselines3
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
-from algorithms.ppo.sb3.callbacks import MultiAgentCallback
+from algorithms.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
-from algorithms.ppo.sb3.ippo import IPPO
+from algorithms.sb3.ppo.ippo import IPPO
 
 from baselines.config import ExperimentConfig
 
@@ -22,8 +23,9 @@ if __name__ == "__main__":
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
-        norm_obs=False,
-        sample_method="rand_n",
+        norm_obs=True,
+        road_obs_algorithm="k_nearest_roadpoints",
+        sample_method="first_n",
     )
 
     exp_config = ExperimentConfig(
@@ -35,13 +37,13 @@ if __name__ == "__main__":
         config=env_config,
         num_worlds=2,
         max_cont_agents=128,
-        data_dir="formatted_json_v2_no_tl_train",
+        data_dir=exp_config.data_dir,
         device=exp_config.device,
     )
 
     run = wandb.init(
-        project="rl_bench",
-        group="render_test",
+        project=exp_config.project_name,
+        group=exp_config.group_name,
         sync_tensorboard=True,
     )
     run_id = run.id
