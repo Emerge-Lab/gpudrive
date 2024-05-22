@@ -20,7 +20,7 @@ jobs:
         sudo apt install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
         
     - name: Setup Conda environment.
-      uses: conda-incubator/setup-miniconda@v2
+      uses: conda-incubator/setup-miniconda@v3
       with:
          activate-environment: gpudrive
          environment-file: environment.yml
@@ -31,3 +31,10 @@ jobs:
     - name: Run tests
       run: |
         pytest -v
+
+    - name: Upload core dumps
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: core-dumps
+        path: /home/runner/work/gpudrive/gpudrive/core_dumps/
