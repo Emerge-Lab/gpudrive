@@ -29,27 +29,20 @@ def simulation_results():
         auto_reset=False,
         json_path="nocturne_data",
         params=params,
-        enable_batch_renderer=True, # Optional parameter
+        enable_batch_renderer=False, # Optional parameter
         batch_render_view_width=1024,
         batch_render_view_height=1024
     )
 
     done = sim.done_tensor().to_torch()
-    info = sim.info_tensor().to_torch()
-    shape = sim.shape_tensor().to_torch()
-
-    frames = []
 
     while not done.all():
         sim.step()
-        # Collect RGB frames at each step
-        rgb_frame = sim.rgb_tensor().to_torch().cpu().numpy()
-        frames.append(rgb_frame)
 
-    return sim, frames
+    return sim
 
 def test_goal_reaching(simulation_results):
-    sim, _ = simulation_results
+    sim = simulation_results
     info, shape = sim.info_tensor().to_torch(), sim.shape_tensor().to_torch()
     info_valid = info[info[:, :, -1] == float(gpudrive.EntityType.Vehicle)]
     goal_reached = info_valid[:, -2].sum().item()
@@ -57,7 +50,7 @@ def test_goal_reaching(simulation_results):
     print("Test passed!")
 
 def test_collision_rate(simulation_results):
-    sim, _ = simulation_results
+    sim = simulation_results
     info = sim.info_tensor().to_torch()
 
     info_valid = info[info[:, :, -1] == float(gpudrive.EntityType.Vehicle)]
@@ -69,16 +62,3 @@ def test_collision_rate(simulation_results):
         print(info_valid)
         raise
     print("Test passed!")
-
-def create_gif(frames, filename="simulation.gif"):
-    # Convert frames to images and save as GIF
-    pil_images = [Image.fromarray(frame) for frame in frames]
-    pil_images[0].save(filename, save_all=True, append_images=pil_images[1:], loop=0, duration=100)
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_sessionfinish(session, exitstatus):
-    results = session.config.cache.get("simulation_results/results", None)
-    if results:
-        _, frames = results
-        create_gif(frames)
