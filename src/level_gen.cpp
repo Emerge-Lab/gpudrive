@@ -47,6 +47,25 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 #endif
 }
 
+static inline bool isStatic(Engine &ctx, Entity &e)
+{
+    auto &trajectory = ctx.get<Trajectory>(e);
+    for(CountT i = 0; i < consts::kTrajectoryLength; i++)
+    {
+        if(trajectory.valids[i])
+        {
+            if((ctx.get<Goal>(e).position - trajectory.positions[i]).length() > 0.5f)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+    }
+    return true;
+}
 
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
@@ -74,7 +93,9 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < 0.5f)
+    bool isAgentStatic = isStatic(ctx, agent);
+
+    if(isAgentStatic)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
