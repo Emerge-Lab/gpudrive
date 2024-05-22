@@ -122,11 +122,11 @@ def main(
 
 if __name__ == "__main__":
     (time_checkpoints, free_gpu_mem, used_memory, perc_used,) = main(
-        total_timesteps=2000,
+        total_timesteps=10_000,
         num_worlds=50,
         episode_length=90,
         max_num_objects=128,
-        data_dir="waymo_data",
+        data_dir="example_data",
     )
 
     # Plot stats
@@ -137,21 +137,21 @@ if __name__ == "__main__":
         free_gpu_mem,
         label="Free memory",
         linestyle="-",
-        marker="o",
+        marker=".",
     )
     axs[0].plot(
         time_checkpoints,
         used_memory,
         label="Used memory",
         linestyle="-",
-        marker="o",
+        marker=".",
     )
     axs[1].plot(
         time_checkpoints,
         perc_used,
         label="Perc. GPU memory used",
         linestyle="-",
-        marker="o",
+        marker=".",
         color="red",
     )
     axs[0].set_ylabel("Memory (MB)")
