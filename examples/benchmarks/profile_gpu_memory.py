@@ -1,4 +1,3 @@
-import psutil
 import os
 import torch
 import matplotlib.pyplot as plt
@@ -116,7 +115,7 @@ def main(
 
 if __name__ == "__main__":
     (time_checkpoints, free_gpu_mem, used_memory, perc_used,) = main(
-        total_timesteps=1_000_000,
+        total_timesteps=10_000,
         num_worlds=50,
         episode_length=90,
         max_num_objects=128,
