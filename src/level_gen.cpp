@@ -298,7 +298,7 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
                                                             .scale = ctx.get<Scale>(physicsEntity),
                                                             .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
-                                                            .type = 0};
+                                                            .type = float(EntityType::Padding)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
     return physicsEntity;
