@@ -27,7 +27,7 @@ def simulation_results():
         gpu_id=0,
         num_worlds=1,
         auto_reset=False,
-        json_path="nocturne_data",
+        json_path="tests/pytest_data",
         params=params,
         enable_batch_renderer=False, # Optional parameter
         batch_render_view_width=1024,
