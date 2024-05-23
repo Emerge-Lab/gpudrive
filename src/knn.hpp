@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <madrona/math.hpp>
 #include <madrona/types.hpp>
+#include "utils.hpp"
 
 #ifndef MADRONA_GPU_MODE
 #include <vector>
@@ -40,9 +41,10 @@ relativeObservation(const gpudrive::MapObservation &absoluteObservation,
                       .rotateVec({relativePosition.x, relativePosition.y, 0})
                       .xy(),
       .scale = absoluteObservation.scale,
-      .heading = absoluteObservation.heading,
+      .heading =  gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
       .type = absoluteObservation.type};
 }
+
 
 bool isObservationsValid(gpudrive::Engine &ctx,
                          gpudrive::MapObservation *observations,

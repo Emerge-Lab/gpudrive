@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-            .maxNumControlledVehicles = 0
+            .maxNumControlledVehicles = 0,
         }
     });
 
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
-        
+
         printf("Agent Map Obs\n");
         agent_map_obs_printer.print();
 
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-                    
+
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                     action_store[base_idx] = acc;
                     action_store[base_idx + 1] = steer;
