@@ -31,6 +31,7 @@ enum class ExportID : uint32_t {
     AbsoluteSelfObservation,
     ValidState,
     Info,
+    Trajectory,
     NumExports
 };
 

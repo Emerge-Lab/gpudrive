@@ -87,6 +87,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<Agent, Info>(
         (uint32_t)ExportID::Info);
+    registry.exportColumn<Agent, Trajectory>(
+        (uint32_t)ExportID::Trajectory);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}

@@ -178,8 +178,13 @@ struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
     float headings[consts::kTrajectoryLength];
-    int32_t valids[consts::kTrajectoryLength];
+    float valids[consts::kTrajectoryLength];
+    Action inverseActions[consts::kTrajectoryLength];
 };
+
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+
+static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
 struct Shape {
     int32_t agentEntityCount;

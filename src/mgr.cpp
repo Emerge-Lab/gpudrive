@@ -804,6 +804,12 @@ Tensor Manager::validStateTensor() const {
         {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
+Tensor Manager::expertTrajectoryTensor() const {
+    return impl_->exportTensor(
+        ExportID::Trajectory, TensorElementType::Float32,
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
+}
+
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
