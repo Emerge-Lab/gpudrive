@@ -45,8 +45,7 @@ class MultiAgentCallback(BaseCallback):
 
         # Get the total number of controlled agents we are controlling
         # The number of controllable agents is different per scenario
-        num_episodes_in_rollout = self.locals["env"].num_episodes
-        num_controlled_agents = self.locals["env"]._tot_controlled_valid_agents
+        num_controlled_agents = self.locals["env"]._tot_controlled_valid_agents_across_worlds
 
         # Filter out all nans
         rollout_rewards = np.nan_to_num(
@@ -55,7 +54,7 @@ class MultiAgentCallback(BaseCallback):
         )
 
         mean_reward_per_agent_per_episode = rollout_rewards.sum() / (
-            num_episodes_in_rollout * num_controlled_agents
+            num_controlled_agents * self.locals["env"].num_episodes
         )
 
         rollout_observations = np.nan_to_num(
@@ -67,15 +66,15 @@ class MultiAgentCallback(BaseCallback):
         rollout_info = self.locals["env"].infos
         for key, value in rollout_info.items():
             self.locals["env"].infos[key] = value / (
-                num_episodes_in_rollout * num_controlled_agents
+                 self.locals["env"].num_episodes * num_controlled_agents
             )
             self.logger.record(f"metrics/{key}", self.locals["env"].infos[key])
 
         # Other
         self.logger.record("rollout/global_step", self.num_timesteps)
         self.logger.record(
-            "rollout/num_episodes_in_rollout",
-            num_episodes_in_rollout,
+            "rollout/num_tot_episodes_in_rollout",
+             self.locals["env"].num_episodes * self.locals["env"].num_worlds,
         )
         self.logger.record("rollout/sum_ep_return", rollout_rewards.sum())
         self.logger.record(

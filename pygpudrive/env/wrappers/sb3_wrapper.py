@@ -144,10 +144,11 @@ class SB3MultiAgentEnv(VecEnv):
         # the end of the episode
         if (
             done[self.controlled_agent_mask].sum().item()
-            == self._tot_controlled_valid_agents
+            == self._tot_controlled_valid_agents_across_worlds
         ):
             # Update infos
             self._update_info_dict(info)
+            # Increment episode counter
             self.num_episodes += 1
 
             # Reset environment
@@ -239,8 +240,8 @@ class SB3MultiAgentEnv(VecEnv):
         return frames
 
     @property
-    def _tot_controlled_valid_agents(self):
-        return self._env.num_valid_controlled_agents
+    def _tot_controlled_valid_agents_across_worlds(self):
+        return self._env.num_valid_controlled_agents_across_worlds
 
 
 if __name__ == "__main__":

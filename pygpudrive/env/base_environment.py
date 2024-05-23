@@ -19,7 +19,7 @@ import logging
 
 logging.getLogger(__name__)
 
-os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+#os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -121,8 +121,8 @@ class Env(gym.Env):
         self.max_agent_count = self.cont_agent_mask.shape[1]
         self.max_cont_agents = max_cont_agents
 
-        # Number of valid controlled agents (without padding agents)
-        self.num_valid_controlled_agents = self.cont_agent_mask.sum().item()
+        # Number of valid controlled agents across worlds (without padding agents)
+        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -494,7 +494,7 @@ class Env(gym.Env):
                 f"Number of maps in data directory: {len(glob.glob(f'{self.data_dir}/*.json'))}"
             )
             logging.info(
-                f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents}"
+                f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents_across_worlds}"
             )
             logging.info("----------------------\n")
 
