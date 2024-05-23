@@ -335,7 +335,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
             }
         }
         const auto &agentInit = map->objects[agentCtr];
-        if (agentInit.valid[0] == false)
+        if (!ctx.data().params.initInvalidAgentsAtFirstStep && agentInit.valid[0] == false)
         {
             continue;
         }
