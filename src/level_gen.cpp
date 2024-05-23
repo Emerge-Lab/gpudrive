@@ -47,7 +47,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 #endif
 }
 
-
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
     
