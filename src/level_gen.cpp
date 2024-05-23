@@ -61,15 +61,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
-    {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
-        ctx.data().numControlledVehicles++;
-    }
-    else
-    {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
-    }
 
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
@@ -81,6 +72,21 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = agentInit.valid[i];
+    }
+
+    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < 0.5f)
+    {
+        ctx.get<ResponseType>(agent) = ResponseType::Static;
+    }
+
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
+    {
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
+        ctx.data().numControlledVehicles++;
+    }
+    else
+    {
+        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -292,7 +298,7 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
                                                             .scale = ctx.get<Scale>(physicsEntity),
                                                             .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
-                                                            .type = 0};
+                                                            .type = float(EntityType::Padding)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
     return physicsEntity;
@@ -329,6 +335,10 @@ void createPersistentEntities(Engine &ctx, Map *map) {
             }
         }
         const auto &agentInit = map->objects[agentCtr];
+        if (ctx.data().params.initOnlyValidAgentsAtFirstStep && agentInit.valid[0] == false)
+        {
+            continue;
+        }
         auto agent = createAgent(
             ctx, agentInit);
         ctx.data().agents[agentIdx++] = agent;

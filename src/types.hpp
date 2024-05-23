@@ -215,15 +215,6 @@ const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
-enum class Validity : int32_t {
-    Invalid = 0,
-    Valid = 1
-};
-
-struct ValidState {
-    Validity valid[consts::kMaxAgentCount];
-};
-
 /* ECS Archetypes for the game */
 
 // There are 2 Agents in the environment trying to get to the destination

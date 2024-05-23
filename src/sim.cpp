@@ -52,7 +52,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Info>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
-    registry.registerSingleton<ValidState>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -60,7 +59,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
-    registry.exportSingleton<ValidState>((uint32_t)ExportID::ValidState);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
@@ -701,29 +699,6 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.vehicle_size = vehicleSize;
 }
 
-inline void validStateSystem(Engine &ctx, ValidState &validOut) {
-    // This assumes StepsRemaining is constant across all agents
-    Entity anyAgent = ctx.data().agents[0];
-    const auto stepsRemaining = ctx.get<StepsRemaining>(anyAgent);
-    const CountT currentStep = getCurrentStep(stepsRemaining);
-
-    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        const auto &trajectory = ctx.get<Trajectory>(agentHandle);
-
-        assert(currentStep < consts::kTrajectoryLength);
-        int32_t isValid = trajectory.valids[currentStep];
-
-        validOut.valid[agentIdx] = static_cast<Validity>(isValid);
-    }
-
-    for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        validOut.valid[agentIdx] = Validity::Invalid;
-    }
-}
-
 // Build the task graph
 void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 {
@@ -746,17 +721,12 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Done
         >>({});
 
-    auto updateValidStateSystem =
-        builder
-            .addToGraph<ParallelForNode<Engine, validStateSystem, ValidState>>(
-                {moveSystem});
-
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, {updateValidStateSystem});
+        builder, {moveSystem});
 
     auto findOverlappingEntities =
         phys::PhysicsSystem::setupBroadphaseOverlapTasks(
@@ -882,7 +852,6 @@ Sim::Sim(Engine &ctx,
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
-    assert(init.map->numObjects <= consts::kMaxAgentCount);
     assert(init.map->numRoadSegments <= consts::kMaxRoadEntityCount);
 
     // Currently the physics system needs an upper bound on the number of
