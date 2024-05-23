@@ -80,7 +80,7 @@ namespace gpudrive
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
     }
 
-    Action inverseWaymaxModel(const Rotation &rotation, const Position &position, const Velocity &velocity, const Rotation &targetRotation, const Position &targetPosition, const Velocity &targetVelocity)
+    Action inverseWaymaxModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
     {
         const float dt{0.1};
 
