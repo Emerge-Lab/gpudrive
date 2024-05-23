@@ -111,6 +111,7 @@ namespace gpudrive
         bool IgnoreNonVehicles = false; // Default: false
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
+        bool initOnlyValidAgentsAtFirstStep = true; // Default: true
     };
 
     struct WorldInit

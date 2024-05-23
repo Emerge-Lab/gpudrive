@@ -27,6 +27,7 @@ protected:
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
+            .initOnlyValidAgentsAtFirstStep = false
         }
     });
     
