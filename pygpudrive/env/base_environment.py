@@ -17,6 +17,7 @@ from pygpudrive.env.viz import PyGameVisualizer
 import gpudrive
 import logging
 
+from tqdm import tqdm
 logging.getLogger(__name__)
 
 os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
@@ -373,9 +374,13 @@ class Env(gym.Env):
 
         return obs_filtered
 
-    def render(self):
+    def render(self, world_render_idx = 0):
+        if(world_render_idx >= self.num_sims):
+            # Raise error but dont interrupt the training
+            print(f"Invalid world_render_idx: {world_render_idx}")
+            return None
         if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}):
-            return self.visualizer.getRender(cont_agent_mask=self.cont_agent_mask)
+            return self.visualizer.getRender(world_render_idx=world_render_idx, cont_agent_mask=self.cont_agent_mask)
         elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
             return self.visualizer.getRender()
         
@@ -446,19 +451,11 @@ if __name__ == "__main__":
     )
 
     TOTAL_STEPS = 90
-    NUM_CONT_AGENTS = 128
-    NUM_WORLDS = 1
-        road_map_obs=True,
-    )
-    # run = wandb.init(
-    #     project="gpudrive",
-    #     group="test_rendering",
-    # )
     NUM_CONT_AGENTS = 0
-    NUM_WORLDS = 3
+    NUM_WORLDS = 2
 
     render_config = RenderConfig(
-        render_mode=RenderMode.PYGAME_LIDAR, 
+        render_mode=RenderMode.PYGAME_ABSOLUTE, 
         view_option=PygameOption.RGB, 
         resolution=(1024, 1024)
     )
@@ -466,21 +463,18 @@ if __name__ == "__main__":
     env = Env(
         config=config,
         device="cuda",
-        data_dir="formatted_json_v2_no_tl_train",
         num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,
-        num_worlds=1,
         auto_reset=True,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="/home/aarav/gpudrive/build/tests/testJsons",
-        device="cuda",
+        data_dir="/home/aarav/gpudrive/nocturne_data",
         render_config=render_config,
     )
 
     obs = env.reset()
-    frames = []
+    frames_1 = []
+    frames_2 = []
 
-    for _ in range(100):
+    for _ in tqdm(range(10)):
         # print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
 
         # Take a random action (we're only going straight)
@@ -500,12 +494,14 @@ if __name__ == "__main__":
         #     obs = env.reset()
         #     print(f"RESETTING ENVIRONMENT\n")
         env.sim.step()
-        frame = env.render()
-        frames.append(frame[0])
-        print(len(frame), frame[0].shape)
+        frame = env.render(world_render_idx=0)
+        frames_1.append(frame)
+        frame = env.render(world_render_idx=1)
+        frames_2.append(frame)
     
     import imageio
-    imageio.mimsave("out.gif", frames)
+    imageio.mimsave("world1.gif", frames_1)
+    imageio.mimsave("world2.gif", frames_2)
     print("Done")
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
