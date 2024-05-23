@@ -315,8 +315,27 @@ void createPaddingEntities(Engine &ctx) {
     }
 }
 
+void createCameraEntity(Engine &ctx)
+{
+    auto camera = ctx.makeRenderableEntity<CameraAgent>();
+    ctx.get<Position>(camera) = Vector3{.x = 0, .y = 0, .z = 20};
+    ctx.get<Rotation>(camera) = (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+
+    render::RenderingSystem::attachEntityToView(ctx,
+        camera,
+        150.f, 0.001f,
+        1.5f * math::up);
+}
+
 void createPersistentEntities(Engine &ctx, Map *map) {
     // createFloorPlane(ctx);
+
+    if (ctx.data().enableRender)
+    {
+        createCameraEntity(ctx);
+    }
+
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
