@@ -32,6 +32,7 @@ jobs:
       with:
          activate-environment: gpudrive
          environment-file: environment.yml
+         cache-downloads: true
 
     - name: Cache Poetry dependencies
       uses: actions/cache@v4
