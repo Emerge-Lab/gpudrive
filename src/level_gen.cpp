@@ -60,7 +60,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
 
     for(CountT i = agentInit.numPositions - 2; i >=0; i--)
     {   
-        if(!trajectory.valids[i] && !trajectory.valids[i+1])
+        if(!trajectory.valids[i] || !trajectory.valids[i+1])
         {
             trajectory.inverseActions[i] = Action{.acceleration = 0, .steering = 0, .headAngle = 0};
             continue;
@@ -69,8 +69,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
         Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
-        Action action = inverseWaymaxModel(rot, vel, targetRot, targetVel);
-        trajectory.inverseActions[i] = action;
+        trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
     }
 }
 

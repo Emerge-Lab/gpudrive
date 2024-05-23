@@ -100,7 +100,17 @@ namespace gpudrive
         }
 
         // steering = (new_yaw - yaw) / (speed * dt + 1/2 * accel * dt ** 2)
-        action.steering = (target_yaw - yaw) / (speed * dt + 0.5 * action.acceleration * dt * dt);
+        float denominator = speed * dt + 0.5 * action.acceleration * dt * dt;
+        if (denominator != 0)
+        {
+            action.steering = (target_yaw - yaw) / denominator;
+        }
+        else
+        {
+            action.steering = 0;
+        }
+        
+        return action;
 
     }
 
