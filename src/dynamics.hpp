@@ -8,7 +8,7 @@ using namespace madrona::math;
 namespace gpudrive
 {
 
-    void forwardKinematics(Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
+    inline void forwardKinematics(Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
     {
         const float maxSpeed{std::numeric_limits<float>::max()};
         const float dt{0.1};
@@ -49,7 +49,7 @@ namespace gpudrive
         velocity.angular.z = w;
     }
 
-    void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
+    inline void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering
         action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
@@ -80,7 +80,7 @@ namespace gpudrive
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
     }
 
-    Action inverseWaymaxModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
+    inline Action inverseWaymaxModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
     {
         const float dt{0.1};
 

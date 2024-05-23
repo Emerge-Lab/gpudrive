@@ -1,5 +1,6 @@
 #include "level_gen.hpp"
 #include "utils.hpp"
+#include "dynamics.hpp"
 
 namespace gpudrive {
 
