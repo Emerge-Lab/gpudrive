@@ -51,6 +51,10 @@ namespace gpudrive
 
     void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
+        // Clip acceleration and steering
+        action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
+        action.steering = fmaxf(-3.0, fminf(action.steering, 3.0));
+
         const float dt{0.1};
         float yaw = utils::quatToYaw(rotation);
         float speed = velocity.linear.length();
@@ -74,6 +78,30 @@ namespace gpudrive
         velocity.angular.z = delta_yaw / dt; // Is this correct ? 
 
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
+    }
+
+    Action inverseWaymaxModel(const Rotation &rotation, const Position &position, const Velocity &velocity, const Rotation &targetRotation, const Position &targetPosition, const Velocity &targetVelocity)
+    {
+        const float dt{0.1};
+
+        Action action = {0, 0, 0};
+        float speed = velocity.linear.length();
+        float target_speed = targetVelocity.linear.length();
+
+        // accel = (new_vel - vel) / dt
+        action.acceleration = (target_speed - speed) / dt;
+
+        float yaw = utils::NormalizeAngle<float>(utils::quatToYaw(rotation));
+        float target_yaw = utils::NormalizeAngle<float>(utils::quatToYaw(targetRotation));
+
+        if(consts::useEstimatedYaw)
+        {
+            target_yaw = atan2f(velocity.linear.y, velocity.linear.x);
+        }
+
+        // steering = (new_yaw - yaw) / (speed * dt + 1/2 * accel * dt ** 2)
+        action.steering = (target_yaw - yaw) / (speed * dt + 0.5 * action.acceleration * dt * dt);
+
     }
 
 }
