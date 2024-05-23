@@ -8,6 +8,7 @@
 #include "sim.hpp"
 #include "utils.hpp"
 #include "knn.hpp"
+#include "dynamics.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -242,6 +243,20 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 }
 
+
+// Make the agents easier to control by zeroing out their velocity
+// after each step.
+inline void agentZeroVelSystem(Engine &,
+                               Velocity &vel,
+                               Action &)
+{
+    vel.linear.x = 0;
+    vel.linear.y = 0;
+    vel.linear.z = 0;
+    vel.angular = Vector3::zero();
+}
+
+
 inline void movementSystem(Engine &e,
                            Action &action,
                            BicycleModel &model,
@@ -259,80 +274,37 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (collisionEvent.hasCollided.load_relaxed())
-    {
-        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            done.v = 1;
-            return;
-       }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
-        {
-            done.v = 1;
-            position = consts::kPaddingPosition;
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            return;
-        }
-        else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
-        {
-            // Do nothing.
+    if (collisionEvent.hasCollided.load_relaxed()) {
+        switch (e.data().params.collisionBehaviour) {
+            case CollisionBehaviour::AgentStop:
+                done.v = 1;
+                agentZeroVelSystem(e, velocity, action);
+                break;
+
+            case CollisionBehaviour::AgentRemoved:
+                done.v = 1;
+                position = consts::kPaddingPosition;
+                agentZeroVelSystem(e, velocity, action);
+                break;
+
+            case CollisionBehaviour::Ignore:
+                // Do nothing.
+                break;
         }
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     {
-        // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
-
-        // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
-        // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
-        // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change
-        // gradually.
-
-        // TODO(samk): The following constants are configurable in Nocturne but look to
-        // always use the same hard-coded value in practice. Use in-line constants
-        // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
-        const float maxSpeed{std::numeric_limits<float>::max()};
-        const float dt{0.1};
-
-        auto clipSpeed = [maxSpeed](float speed)
+        if(e.data().params.useWayMaxModel)
         {
-            return std::max(std::min(speed, maxSpeed), -maxSpeed);
-        };
-        // TODO(samk): hoist into Vector2::PolarToVector2D
-        auto polarToVector2D = [](float r, float theta)
+            // Throw not implemented
+            forwardWaymaxModel(action, model, size, rotation, position, velocity);
+        }
+        else 
         {
-            return math::Vector2{r * cosf(theta), r * sinf(theta)};
-        };
-
-        // Average speed
-        const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
-        const float tanDelta{tanf(action.steering)};
-        // Assume center of mass lies at the middle of length, then l / L == 0.5.
-        const float beta{std::atan(0.5f * tanDelta)};
-        const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
-        const float w{v * std::cos(beta) * tanDelta / size.length};
-
-        model.position += d * dt;
-        model.heading = utils::AngleAdd(model.heading, w * dt);
-        model.speed = clipSpeed(model.speed + action.acceleration * dt);
-
-        // The BVH machinery requires the components rotation, position, and velocity
-        // to perform calculations. Thus, to reuse the BVH machinery, we need to also
-        // updates these components.
-
+            forwardKinematics(action, model, size, rotation, position, velocity);
+        }
         // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
-        position = madrona::base::Position({.x = model.position.x, .y = model.position.y, .z = 1});
-        rotation = Quat::angleAxis(model.heading, madrona::math::up);
-        velocity.linear.x = model.speed * cosf(model.heading);
-        velocity.linear.y = model.speed * sinf(model.heading);
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
-        velocity.angular.z = w;
     }
     else
     {
@@ -349,18 +321,6 @@ inline void movementSystem(Engine &e,
     }
 }
 
-
-// Make the agents easier to control by zeroing out their velocity
-// after each step.
-inline void agentZeroVelSystem(Engine &,
-                               Velocity &vel,
-                               Action &)
-{
-    vel.linear.x = 0;
-    vel.linear.y = 0;
-    vel.linear.z = 0;
-    vel.angular = Vector3::zero();
-}
 
 static inline float distObs(float v)
 {
@@ -705,15 +665,9 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
         {findOverlappingEntities});
 
-    // Improve controllability of agents by setting their velocity to 0
-    // after physics is done.
-    auto agent_zero_vel = builder.addToGraph<
-        ParallelForNode<Engine, agentZeroVelSystem, Velocity, Action>>(
-        {detectCollisions});
-
     // Finalize physics subsystem work
     auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
-        builder, {agent_zero_vel});
+        builder, {detectCollisions});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
