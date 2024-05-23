@@ -150,7 +150,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 // This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      const BicycleModel &model,
                                       const VehicleSize &size,
                                       const Position &pos,
                                       const Rotation &rot,
@@ -168,9 +167,9 @@ inline void collectObservationsSystem(Engine &ctx,
         return;
     }
 
-    self_obs.speed = model.speed;
+    self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
-    auto goalPos = goal.position - model.position;
+    auto goalPos = goal.position - pos.xy();
     self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
@@ -182,13 +181,14 @@ inline void collectObservationsSystem(Engine &ctx,
     {
         Entity other = other_agents.e[agentIdx++];
 
-        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
-        Rotation other_rot = ctx.get<Rotation>(other);
-        VehicleSize other_size = ctx.get<VehicleSize>(other);
+        const Position &other_position = ctx.get<Position>(other);
+        const Velocity &other_velocity = ctx.get<Velocity>(other);
+        const Rotation &other_rot = ctx.get<Rotation>(other);
+        const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        Vector2 relative_pos = (other_position - pos).xy();
         relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
-        float relative_speed = other_bicycle_model.speed; // Design decision: return the speed of the other agent directly
+        float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -215,7 +215,7 @@ inline void collectObservationsSystem(Engine &ctx,
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
-            ctx, rot, model.position, map_obs.obs);
+            ctx, rot, pos.xy(), map_obs.obs);
         return;
     }
 
@@ -223,7 +223,7 @@ inline void collectObservationsSystem(Engine &ctx,
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
-        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
+        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - pos.xy();
         relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
         if(relative_pos.length() > ctx.data().params.observationRadius)
         {
@@ -297,12 +297,11 @@ inline void movementSystem(Engine &e,
     {
         if(e.data().params.useWayMaxModel)
         {
-            // Throw not implemented
-            forwardWaymaxModel(action, model, size, rotation, position, velocity);
+            forwardWaymaxModel(action, rotation, position, velocity);
         }
         else 
         {
-            forwardKinematics(action, model, size, rotation, position, velocity);
+            forwardKinematics(action, size, rotation, position, velocity);
         }
         // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
     }
@@ -711,7 +710,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
-            BicycleModel,
             VehicleSize,
             Position,
             Rotation,
