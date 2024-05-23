@@ -22,12 +22,12 @@ class ExperimentConfig:
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
-    n_steps: int = 900
+    n_steps: int = 100
     batch_size: int = 512
     verbose: int = 0
     total_timesteps: int = 150_000_000
 
     # Wandb
     project_name = "gpudrive"
-    group_name = "PPO_05_22"
+    group_name = "PPO_05_23"
     entity = "_emerge"
