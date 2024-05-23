@@ -11,8 +11,8 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (0, 0, 0)
-    PADDING_PCT = 0.1
+    BACKGROUND_COLOR = (255, 255, 255)
+    PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 0, 0),  # Red
         (0, 255, 0),  # Green
@@ -21,7 +21,7 @@ class PyGameVisualizer:
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (255, 255, 255),  # Black
+        float(gpudrive.EntityType.RoadEdge): (0, 0, 0),  # Black
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
         float(gpudrive.EntityType.RoadLine): (225, 255, 225),  # Green
         float(gpudrive.EntityType.SpeedBump): (255, 0, 255),  # Red
@@ -67,11 +67,11 @@ class PyGameVisualizer:
         adjusted_window_height = self.WINDOW_H - self.padding_y
 
         self.zoom_scale_x = adjusted_window_width / (
-            map_info[:, 0].max() - map_info[:, 0].min()
-        )
+            all_endpoints[:, 0].max() - all_endpoints[:, 0].min() 
+        ) 
         self.zoom_scale_y = adjusted_window_height / (
-            map_info[:, 1].max() - map_info[:, 1].min()
-        )
+            all_endpoints[:, 1].max() - all_endpoints[:, 1].min()
+        ) 
 
         self.window_center = np.mean(map_info, axis=0)
         
@@ -95,13 +95,11 @@ class PyGameVisualizer:
         x, y = coords
         x_scaled = (
             (x - self.window_center[0]) * self.zoom_scale_x
-            + (self.WINDOW_W / 2)
-            + self.padding_x / 2
+            + self.WINDOW_W / 2 - self.padding_x / 2
         )
         y_scaled = (
             (y - self.window_center[1]) * self.zoom_scale_y
-            + (self.WINDOW_H / 2)
-            + self.padding_y / 2
+            + self.WINDOW_H / 2 - self.padding_y / 2
         )
 
         return (x_scaled, y_scaled)
@@ -161,7 +159,7 @@ class PyGameVisualizer:
     
     def draw_map(self, surf, map_info):
         for idx, map_obj in enumerate(map_info):
-            if map_obj[-1] == float(gpudrive.EntityType._None):
+            if map_obj[-1] == float(gpudrive.EntityType.Padding):
                 continue
             elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
                 start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)

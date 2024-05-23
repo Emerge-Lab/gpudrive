@@ -44,6 +44,8 @@ class Env(gym.Env):
 
         # Configure the environment
         params = gpudrive.Parameters()
+        params.polylineReductionThreshold = 0.5
+        params.observationRadius = self.config.obs_radius
         params.polylineReductionThreshold = 1.0
         params.observationRadius = 100.0
         params.rewardParams = reward_params
@@ -439,6 +441,13 @@ if __name__ == "__main__":
 
     config = EnvConfig(
         partner_obs=True,
+        road_map_obs=False,
+        ego_state=False,
+    )
+
+    TOTAL_STEPS = 90
+    NUM_CONT_AGENTS = 128
+    NUM_WORLDS = 1
         road_map_obs=True,
     )
     # run = wandb.init(
@@ -456,6 +465,10 @@ if __name__ == "__main__":
 
     env = Env(
         config=config,
+        device="cuda",
+        data_dir="formatted_json_v2_no_tl_train",
+        num_worlds=NUM_WORLDS,
+        max_cont_agents=NUM_CONT_AGENTS,
         num_worlds=1,
         auto_reset=True,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
