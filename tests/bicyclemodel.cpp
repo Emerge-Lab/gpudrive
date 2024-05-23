@@ -22,11 +22,12 @@ protected:
         .gpuID = 0,
         .numWorlds = 1,
         .autoReset = false,
-        .jsonPath = "/home/aarav/gpudrive/build/tests/testJsons",
+        .jsonPath = "testJsons",
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
             .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
+            .useWayMaxModel = false
         }
     });
     
@@ -40,7 +41,7 @@ protected:
 
     std::unordered_map<int64_t, float> agent_length_map;
     std::unordered_map<int64_t, float> agent_width_map;
-    std::ifstream data = std::ifstream("/home/aarav/gpudrive/build/tests/testJsons/test.json");
+    std::ifstream data = std::ifstream("testJsons/test.json");
     std::vector<float> initialState;
     std::default_random_engine generator;
     std::uniform_real_distribution<float> acc_distribution;
