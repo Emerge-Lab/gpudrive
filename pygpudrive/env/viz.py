@@ -9,7 +9,7 @@ import gpudrive
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (0, 0, 0)
+    BACKGROUND_COLOR = (255, 255, 255)
     PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 0, 0),  # Red
@@ -19,7 +19,7 @@ class PyGameVisualizer:
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (255, 255, 255),  # Black
+        float(gpudrive.EntityType.RoadEdge): (0, 0, 0),  # Black
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
         float(gpudrive.EntityType.RoadLine): (225, 255, 225),  # Green
         float(gpudrive.EntityType.SpeedBump): (255, 0, 255),  # Red
@@ -75,8 +75,8 @@ class PyGameVisualizer:
         all_endpoints = np.concatenate(endpoints, axis=0)
         
         # Adjust window dimensions by subtracting padding
-        adjusted_window_width = self.WINDOW_W/2 - self.padding_x
-        adjusted_window_height = self.WINDOW_H/2 - self.padding_y
+        adjusted_window_width = self.WINDOW_W - self.padding_x
+        adjusted_window_height = self.WINDOW_H - self.padding_y
 
         self.zoom_scale_x = adjusted_window_width / (
             all_endpoints[:, 0].max() - all_endpoints[:, 0].min() 
@@ -85,7 +85,9 @@ class PyGameVisualizer:
             all_endpoints[:, 1].max() - all_endpoints[:, 1].min()
         ) 
 
-        self.window_center = np.mean(all_endpoints[:, :2], axis=0)
+        # self.window_center = np.mean(all_endpoints[:, :2], axis=0)
+        self.window_center = np.array([(all_endpoints[:, 0].max() + all_endpoints[:, 0].min()) / 2,
+                                       (all_endpoints[:, 1].max() + all_endpoints[:, 1].min()) / 2])
         print(f"Window center: {self.window_center}")
 
     def create_render_mask(self):
@@ -172,6 +174,7 @@ class PyGameVisualizer:
     def init_map(self):
         """Initialize the static map elements."""
         self.map_surf = self.surf.copy()  # Create a copy of the main surface to hold the map
+        self.map_surf.fill(self.BACKGROUND_COLOR)
 
         map_info = (
             self.sim.map_observation_tensor()
