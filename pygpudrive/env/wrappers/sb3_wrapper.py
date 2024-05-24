@@ -58,9 +58,11 @@ class SB3MultiAgentEnv(VecEnv):
         self.obs_dim = self._env.observation_space.shape[0]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
+        self.tot_reward_per_episode = 0
+        self.reset_flag = False
 
         self.num_episodes = 0
-        self.infos = {
+        self.info_dict = {
             "off_road": 0,
             "veh_collisions": 0,
             "non_veh_collision": 0,
@@ -140,24 +142,34 @@ class SB3MultiAgentEnv(VecEnv):
         obs = obs.reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
+        # Store running total reward across worlds
+        self.tot_reward_per_episode += (
+            reward[~self.dead_agent_mask].sum().item()
+        )
+
         # Reset episode if all agents in all worlds are done before
         # the end of the episode
         if (
             done[self.controlled_agent_mask].sum().item()
             == self._tot_controlled_valid_agents_across_worlds
         ):
-            # Update infos
+            # Update metrics for logging
             self._update_info_dict(info)
+
             # Increment episode counter
             self.num_episodes += 1
 
             # Reset environment
             obs = self.reset()
 
+            # Set reset flag for logging purposes
+            self.reset_flag = True
+
         else:
             # Update dead agent mask: Set to True if agent is done before
             # the end of the episode
             self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
+            self.reset_flag = False
 
         return (
             self._obs_from_buf(),
@@ -195,23 +207,16 @@ class SB3MultiAgentEnv(VecEnv):
 
         controlled_agent_info = info[self.controlled_agent_mask]
 
-        self.infos["off_road"] += controlled_agent_info[:, 0].sum().item()
-        self.infos["veh_collisions"] += (
+        self.info_dict["off_road"] += controlled_agent_info[:, 0].sum().item()
+        self.info_dict["veh_collisions"] += (
             controlled_agent_info[:, 1].sum().item()
         )
-        self.infos["non_veh_collision"] += (
+        self.info_dict["non_veh_collision"] += (
             controlled_agent_info[:, 2].sum().item()
         )
-        self.infos["goal_achieved"] += controlled_agent_info[:, 3].sum().item()
-
-    def _reset_rollout_loggers(self) -> None:
-        self.num_episodes = 0
-        self.infos = {
-            "off_road": 0,
-            "veh_collisions": 0,
-            "non_veh_collision": 0,
-            "goal_achieved": 0,
-        }
+        self.info_dict["goal_achieved"] += (
+            controlled_agent_info[:, 3].sum().item()
+        )
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()
