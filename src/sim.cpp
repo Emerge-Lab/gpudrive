@@ -730,7 +730,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         builder, {moveSystem});
 
     auto findOverlappingEntities =
-        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
+        phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -744,7 +744,10 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {detectCollisions});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
+        builder, {agent_zero_vel});
+
+    phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
