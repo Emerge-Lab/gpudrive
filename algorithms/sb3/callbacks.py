@@ -99,7 +99,10 @@ class MultiAgentCallback(BaseCallback):
                 }
             )
 
-            # TODO (dc): Fix, valid but hacky way to reset metrics
+            # TODO (dc): Works, valid but hacky way to reset metrics
+            # The tricky thing is that the env resets when done (in step), and the callback
+            # call is after step
+            # We use a reset flag to reset the env wrapper metrics
             self.locals["env"].tot_reward_per_episode = 0
             self.locals["env"].info_dict = {
                 "off_road": 0,

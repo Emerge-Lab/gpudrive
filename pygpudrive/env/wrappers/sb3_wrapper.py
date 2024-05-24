@@ -207,14 +207,14 @@ class SB3MultiAgentEnv(VecEnv):
 
         controlled_agent_info = info[self.controlled_agent_mask]
 
-        self.info_dict["off_road"] += controlled_agent_info[:, 0].sum().item()
-        self.info_dict["veh_collisions"] += (
+        self.info_dict["off_road"] = controlled_agent_info[:, 0].sum().item()
+        self.info_dict["veh_collisions"] = (
             controlled_agent_info[:, 1].sum().item()
         )
-        self.info_dict["non_veh_collision"] += (
+        self.info_dict["non_veh_collision"] = (
             controlled_agent_info[:, 2].sum().item()
         )
-        self.info_dict["goal_achieved"] += (
+        self.info_dict["goal_achieved"] = (
             controlled_agent_info[:, 3].sum().item()
         )
 
