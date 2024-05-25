@@ -24,7 +24,7 @@ def sim_init():
         gpu_id=0,
         num_worlds=1,
         auto_reset=False,
-        json_path="/home/aarav/gpudrive/tests/pytest_data",
+        json_path="tests/pytest_data",
         params=params
     )
 
