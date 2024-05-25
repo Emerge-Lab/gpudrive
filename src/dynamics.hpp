@@ -59,9 +59,7 @@ namespace gpudrive
         float yaw = utils::quatToYaw(rotation);
         float speed = velocity.linear.length();
         //new_x = x + vel_x * t + 0.5 * accel * jnp.cos(yaw) * t**2
-        float vt = velocity.linear.x * dt;
-        float at = 0.5 * action.acceleration * cosf(yaw) * dt * dt;
-        position.x = position.x + vt + at;
+        position.x = position.x + velocity.linear.x * dt + 0.5 * action.acceleration * cosf(yaw) * dt * dt;
         // new_y = y + vel_y * t + 0.5 * accel * jnp.sin(yaw) * t**2
         position.y = position.y + velocity.linear.y * dt + 0.5 * action.acceleration * sinf(yaw) * dt * dt;
         // delta_yaw = steering * (speed * t + 0.5 * accel * t**2)
