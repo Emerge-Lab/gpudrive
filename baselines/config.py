@@ -17,6 +17,7 @@ class ExperimentConfig:
 
     # TODO: Logging
     log_dir: str = "logs"
+    use_wandb: bool = True
 
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy

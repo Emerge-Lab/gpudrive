@@ -9,8 +9,8 @@ import gpudrive
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (0, 0, 0)
-    PADDING_PCT = 0.1
+    BACKGROUND_COLOR = (255, 255, 255)
+    PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 0, 0),  # Red
         (0, 255, 0),  # Green
@@ -19,7 +19,7 @@ class PyGameVisualizer:
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (255, 255, 255),  # Black
+        float(gpudrive.EntityType.RoadEdge): (0, 0, 0),  # Black
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
         float(gpudrive.EntityType.RoadLine): (225, 255, 225),  # Green
         float(gpudrive.EntityType.SpeedBump): (255, 0, 255),  # Red
@@ -50,6 +50,17 @@ class PyGameVisualizer:
         self.compute_window_settings()
         self.init_map()
 
+    @staticmethod
+    def get_all_endpoints(map_info):
+        centers = map_info[:, :2]
+        lengths = map_info[:, 2]
+        yaws = map_info[:, 5]
+
+        offsets = np.column_stack((lengths * np.cos(yaws), lengths * np.sin(yaws)))
+        starts = centers - offsets
+        ends = centers + offsets
+        return starts, ends
+    
     def compute_window_settings(self):
         map_info = (
             self.sim.map_observation_tensor()
@@ -57,19 +68,27 @@ class PyGameVisualizer:
             .cpu()
             .numpy()
         )
+        map_info = map_info[map_info[:, -1] != float(gpudrive.EntityType.Padding)]
+        roads = map_info[map_info[:, -1] <= float(gpudrive.EntityType.RoadLane)]
+        endpoints = PyGameVisualizer.get_all_endpoints(roads)
 
+        all_endpoints = np.concatenate(endpoints, axis=0)
+        
         # Adjust window dimensions by subtracting padding
         adjusted_window_width = self.WINDOW_W - self.padding_x
         adjusted_window_height = self.WINDOW_H - self.padding_y
 
         self.zoom_scale_x = adjusted_window_width / (
-            map_info[:, 0].max() - map_info[:, 0].min()
-        )
+            all_endpoints[:, 0].max() - all_endpoints[:, 0].min() 
+        ) 
         self.zoom_scale_y = adjusted_window_height / (
-            map_info[:, 1].max() - map_info[:, 1].min()
-        )
+            all_endpoints[:, 1].max() - all_endpoints[:, 1].min()
+        ) 
 
-        self.window_center = np.mean(map_info, axis=0)
+        # self.window_center = np.mean(all_endpoints[:, :2], axis=0)
+        self.window_center = np.array([(all_endpoints[:, 0].max() + all_endpoints[:, 0].min()) / 2,
+                                       (all_endpoints[:, 1].max() + all_endpoints[:, 1].min()) / 2])
+        print(f"Window center: {self.window_center}")
 
     def create_render_mask(self):
         agent_to_is_valid = (
@@ -90,13 +109,11 @@ class PyGameVisualizer:
         x, y = coords
         x_scaled = (
             (x - self.window_center[0]) * self.zoom_scale_x
-            + (self.WINDOW_W / 2)
-            + self.padding_x / 2
+            + self.WINDOW_W / 2 - self.padding_x / 2
         )
         y_scaled = (
             (y - self.window_center[1]) * self.zoom_scale_y
-            + (self.WINDOW_H / 2)
-            + self.padding_y / 2
+            + self.WINDOW_H / 2 - self.padding_y / 2
         )
 
         return (x_scaled, y_scaled)
@@ -157,6 +174,7 @@ class PyGameVisualizer:
     def init_map(self):
         """Initialize the static map elements."""
         self.map_surf = self.surf.copy()  # Create a copy of the main surface to hold the map
+        self.map_surf.fill(self.BACKGROUND_COLOR)
 
         map_info = (
             self.sim.map_observation_tensor()
@@ -165,8 +183,10 @@ class PyGameVisualizer:
             .numpy()
         )
 
+        map_info = map_info[map_info[:, -1] != float(gpudrive.EntityType.Padding)]
+
         for idx, map_obj in enumerate(map_info):
-            if map_obj[-1] == float(gpudrive.EntityType._None):
+            if map_obj[-1] == float(gpudrive.EntityType.Padding):
                 continue
             elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
                 start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)
@@ -196,7 +216,6 @@ class PyGameVisualizer:
 
     def draw(self, cont_agent_mask):
         """Render the environment."""
-        render_mask = self.create_render_mask()
         self.surf.fill(self.BACKGROUND_COLOR)
         self.surf.blit(self.map_surf, (0, 0))
         # Get agent info
@@ -218,7 +237,8 @@ class PyGameVisualizer:
 
         # Draw the agent positions
         for agent_idx in range(num_agents_in_scene):
-            if not render_mask[agent_idx]:
+            info_tensor = self.sim.info_tensor().to_torch()[self.world_render_idx]
+            if info_tensor[agent_idx, -1] == float(gpudrive.EntityType.Padding) or info_tensor[agent_idx, -1] == float(gpudrive.EntityType._None):
                 continue
 
             agent_corners = PyGameVisualizer.compute_agent_corners(
@@ -251,7 +271,7 @@ class PyGameVisualizer:
                     int(current_goal_scaled[0]),
                     int(current_goal_scaled[1]),
                 ),
-                radius=self.goal_radius * self.zoom_scale_x,
+                radius=self.goal_radius,
             )
 
         if self.render_mode == "human":

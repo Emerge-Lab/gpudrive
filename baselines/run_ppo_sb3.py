@@ -1,6 +1,5 @@
 import wandb
 import torch
-import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -40,12 +39,14 @@ if __name__ == "__main__":
         device=exp_config.device,
     )
 
-    run = wandb.init(
-        project="rl_bench",
-        group="render_test",
-        sync_tensorboard=True,
-    )
-    run_id = run.id
+    run_id = None
+    if exp_config.use_wandb:
+        run = wandb.init(
+            project="rl_bench",
+            group="render_test",
+            sync_tensorboard=True,
+        )
+        run_id = run.id
 
     # Initialize custom callback
     custom_callback = MultiAgentCallback(
