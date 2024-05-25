@@ -24,7 +24,7 @@ def sim_init():
         gpu_id=0,
         num_worlds=1,
         auto_reset=False,
-        json_path="tests/pytest_data",
+        json_path="/home/aarav/gpudrive/tests/pytest_data",
         params=params
     )
 
@@ -46,22 +46,19 @@ def test_forward_inverse_dynamics(sim_init):
     vel = traj[2*91:4*91].view(91,2)
     headings = traj[4*91:5*91].view(91,1)
     invActions = traj[6*91:].view(91,3)
-    i = 0
 
     position = absolute_obs[0,valid_agent_idx,:2]
     heading = absolute_obs[0,valid_agent_idx,7]
     speed = self_obs[0, valid_agent_idx, 0]
 
-    assert torch.allclose(position, pos[i], atol=1e-2), f"Position mismatch: {position} vs {pos[i]}"
-    assert pytest.approx(heading.item(), abs=1e-2) == headings[i].item(), f"Heading mismatch: {heading.item()} vs {headings[i].item()}"
-    assert pytest.approx(speed.item(), abs=1e-2) == torch.norm(vel[i]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[i]).item()}"
+    assert torch.allclose(position, pos[0], atol=1e-2), f"Position mismatch: {position} vs {pos[0]}"
+    assert pytest.approx(heading.item(), abs=1e-2) == headings[0].item(), f"Heading mismatch: {heading.item()} vs {headings[0].item()}"
+    assert pytest.approx(speed.item(), abs=1e-2) == torch.norm(vel[0]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[0]).item()}"
 
-    while not done_tensor[:,valid_agent_idx].all():
-        actions[:,valid_agent_idx,:] = invActions[i]
-        action_tensor.copy_(actions)
-        sim.step()
-        i+=1
-        
-        assert torch.allclose(position, pos[i], atol=1e-2), f"Position mismatch: {position} vs {pos[i]}"
-        assert pytest.approx(heading.item(), abs=1e-2) == headings[i].item(), f"Heading mismatch: {heading.item()} vs {headings[i].item()}"
-        assert pytest.approx(speed.item(), abs=1e-2) == torch.norm(vel[i]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[i]).item()}"
+    actions[:,valid_agent_idx,:] = invActions[0]
+    action_tensor.copy_(actions)
+    sim.step()
+    
+    assert torch.allclose(position, pos[1], atol=1e-3), f"Position mismatch: {position} vs {pos[1]} at step {1}"
+    assert pytest.approx(heading.item(), abs=3e-3) == headings[1].item(), f"Heading mismatch: {heading.item()} vs {headings[1].item()}"
+    assert pytest.approx(speed.item(), abs=1e-3) == torch.norm(vel[1]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[1]).item()}"

@@ -52,14 +52,16 @@ namespace gpudrive
     inline void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering
-        action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
-        action.steering = fmaxf(-3.0, fminf(action.steering, 3.0));
+        // action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
+        // action.steering = fmaxf(-3.0, fminf(action.steering, 3.0));
 
         const float dt{0.1};
         float yaw = utils::quatToYaw(rotation);
         float speed = velocity.linear.length();
         //new_x = x + vel_x * t + 0.5 * accel * jnp.cos(yaw) * t**2
-        position.x = position.x + velocity.linear.x * dt + 0.5 * action.acceleration * cosf(yaw) * dt * dt;
+        float vt = velocity.linear.x * dt;
+        float at = 0.5 * action.acceleration * cosf(yaw) * dt * dt;
+        position.x = position.x + vt + at;
         // new_y = y + vel_y * t + 0.5 * accel * jnp.sin(yaw) * t**2
         position.y = position.y + velocity.linear.y * dt + 0.5 * action.acceleration * sinf(yaw) * dt * dt;
         // delta_yaw = steering * (speed * t + 0.5 * accel * t**2)
@@ -96,7 +98,7 @@ namespace gpudrive
 
         if(consts::useEstimatedYaw)
         {
-            target_yaw = atan2f(velocity.linear.y, velocity.linear.x);
+            target_yaw = atan2f(targetVelocity.linear.y, targetVelocity.linear.x);
         }
 
         // steering = (new_yaw - yaw) / (speed * dt + 1/2 * accel * dt ** 2)
