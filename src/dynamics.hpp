@@ -52,8 +52,8 @@ namespace gpudrive
     inline void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering
-        // action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
-        // action.steering = fmaxf(-3.0, fminf(action.steering, 3.0));
+        action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
+        action.steering = fmaxf(-3.0, fminf(action.steering, 3.0));
 
         const float dt{0.1};
         float yaw = utils::quatToYaw(rotation);
