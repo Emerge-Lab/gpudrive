@@ -255,6 +255,7 @@ inline void movementSystem(Engine &e,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent,
+                           const ResponseType &responseType,
                            Done& done) {
     if (type == EntityType::Padding) {
         return;
@@ -285,7 +286,7 @@ inline void movementSystem(Engine &e,
         }
     }
 
-    if(done.v)
+    if(done.v && responseType != ResponseType::Static)
     {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
@@ -719,6 +720,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             StepsRemaining,
             Trajectory,
             CollisionDetectionEvent,
+            ResponseType,
             Done
         >>({});
 
