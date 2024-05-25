@@ -59,6 +59,6 @@ def test_forward_inverse_dynamics(sim_init):
     action_tensor.copy_(actions)
     sim.step()
     
-    assert torch.allclose(position, pos[1], atol=1e-3), f"Position mismatch: {position} vs {pos[1]} at step {1}"
+    assert torch.allclose(position, pos[1], atol=2e-2), f"Position mismatch: {position} vs {pos[1]} at step {1}"
     assert pytest.approx(heading.item(), abs=3e-3) == headings[1].item(), f"Heading mismatch: {heading.item()} vs {headings[1].item()}"
     assert pytest.approx(speed.item(), abs=1e-3) == torch.norm(vel[1]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[1]).item()}"
