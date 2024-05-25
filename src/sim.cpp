@@ -56,6 +56,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<CameraAgent>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
@@ -295,6 +296,19 @@ inline void movementSystem(Engine &e,
         }
     }
 
+    if(done.v)
+    {
+        // Case: Agent has not collided but is done. 
+        // This can only happen if the agent has reached goal or the episode has ended.
+        // In that case we teleport the agent. The agent will not collide with anything.
+        position = consts::kPaddingPosition;
+        velocity.linear.x = 0;
+        velocity.linear.y = 0;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        return;
+    }
+
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     {
         if(e.data().params.useWayMaxModel)
@@ -488,23 +502,41 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
-    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
+    auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
     {
         auto controlledState = ctx.getCheck<ControlledState>(candidate);
-        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
+        if (controlledState.valid())
         {
-            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
-            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
-            if (!validState)
+            if( controlledState.value().controlledState == ControlMode::EXPERT)
             {
-                return true;
+                // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
+                auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+                auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                if (!validState)
+                {
+                    return true;
+                }
+            }
+            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            {
+                // Case: If a controlled agent gets done, we teleport it to the padding position
+                // Hence we need to ignore the collision detection for it.
+                // The agent can also be done because it collided. 
+                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
+                auto done = ctx.get<Done>(candidate);
+                auto collisionEvent = ctx.getCheck<CollisionDetectionEvent>(candidate);
+                if(done.v && collisionEvent.valid() && !collisionEvent.value().hasCollided.load_relaxed())
+                {
+                    return true;
+                }
             }
         }
         return false;
     };
 
-    if (isExpertAgentInInvalidState(candidateCollision.a) ||
-        isExpertAgentInInvalidState(candidateCollision.b)) {
+    if (isInvalidExpertOrDone(candidateCollision.a) || 
+        isInvalidExpertOrDone(candidateCollision.b)) {
+
         return;
     }
 
@@ -659,7 +691,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         builder, {moveSystem});
 
     auto findOverlappingEntities =
-        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
+        phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -667,7 +699,10 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {findOverlappingEntities});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
+        builder, {detectCollisions});
+
+    phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {detectCollisions});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
