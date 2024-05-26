@@ -243,7 +243,8 @@ inline void movementSystem(Engine &e,
                            Velocity &velocity,
                            const EntityType &type,
                            const Trajectory &trajectory,
-                           const CollisionDetectionEvent &collisionEvent) {
+                           const CollisionDetectionEvent &collisionEvent,
+                           const ResponseType &responseType) {
     
     if (collisionEvent.hasCollided.load_relaxed())
     {
@@ -271,7 +272,7 @@ inline void movementSystem(Engine &e,
     }
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
-    if(e.get<Done>(agent_iface.e).v)
+    if(e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static)
     {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
@@ -701,7 +702,8 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Velocity,
             EntityType,
             Trajectory,
-            CollisionDetectionEvent
+            CollisionDetectionEvent,
+            ResponseType
         >>({});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
