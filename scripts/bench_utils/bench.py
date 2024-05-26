@@ -105,27 +105,27 @@ def run_benchmark(
                     "experiment"
                 ]
             )
-    else:
-        with open("benchmark_results.csv", mode="a") as file:
-            writer = csv.writer(file)
-            writer.writerow(
-                [
-                    actual_num_agents,
-                    actual_num_roads,
-                    useful_num_agents,
-                    useful_num_roads,
-                    num_envs,
-                    time_to_reset,
-                    time_to_step,
-                    num_steps,
-                    fps,
-                    afps,
-                    useful_afps,
-                    config["sim_manager"]["exec_mode"],
-                    config["parameters"]["datasetInitOptions"],
-                    config["experiment"]
-                ]
-            )
+
+    with open("benchmark_results.csv", mode="a") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                actual_num_agents,
+                actual_num_roads,
+                useful_num_agents,
+                useful_num_roads,
+                num_envs,
+                time_to_reset,
+                time_to_step,
+                num_steps,
+                fps,
+                afps,
+                useful_afps,
+                config["sim_manager"]["exec_mode"],
+                config["parameters"]["datasetInitOptions"],
+                config["experiment"]
+            ]
+        )
 
 
 if __name__ == "__main__":
@@ -162,4 +162,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     config["sim_manager"]["num_worlds"] = args.numEnvs
     sim = SimCreator(config)
-    run_benchmark(sim, config, args.profileMemory)
+    if args.profileMemory:
+        run_stress_test(sim, config, args.numSteps)
+    else:
+        run_benchmark(sim, config, args.numSteps)
+    # run_benchmark(sim, config, args.profileMemory)

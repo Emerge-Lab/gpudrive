@@ -5,6 +5,9 @@ from tqdm import tqdm
 import yaml
 import shutil
 
+DATASET_PATH = None
+CONFIG_PATH = None
+
 def run_command(command: str, profiling: bool = False):
     profile_path = "/tmp/{}_madrona_device_tracing.bin"
     process = subprocess.Popen(command, shell=True)
@@ -58,10 +61,10 @@ def modifyConfigToBinned(bin: int):
     with open(CONFIG_PATH, 'r') as file:
         config = yaml.safe_load(file)
 
-    if dataset_path is None:
-        dataset_path = config['sim_manager']['json_path']
+    if DATASET_PATH is None:
+        DATASET_PATH = config['sim_manager']['json_path']
 
-    config['sim_manager']['json_path'] = f"{dataset_path}/binned_jsons/bin_{bin}"
+    config['sim_manager']['json_path'] = f"{DATASET_PATH}/binned_jsons/bin_{bin}"
     
     with open(CONFIG_PATH, 'w') as file:
         yaml.dump(config, file)
@@ -77,9 +80,8 @@ def restoreConfig():
         yaml.dump(config, file)
 
 if __name__ == "__main__":
-    global CONFIG_PATH
     parser = argparse.ArgumentParser(description='GPUDrive Benchmarking Tool')
-    parser.add_argument('--totalNumEnvs', type=int, help='Num envs to run benchmark upto (default: 150)', default=150, required=False)
+    parser.add_argument('--totalNumEnvs', type=int, help='Num envs to run benchmark upto (default: 150)', default=100, required=False)
     parser.add_argument('--stepSize', type=int, help='Step size for num envs (default: 1)', default=1, required=False)
     parser.add_argument('--oneOff', help='Run the benchmark only once', action='store_true', required=False)
     parser.add_argument('--randomized', help='Randomize the dataset. For every number of envs, 100 iterations of benchmark are run using randomized subset of the dataset.', action='store_true', required=False)
