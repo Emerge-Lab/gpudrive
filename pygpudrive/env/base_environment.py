@@ -5,22 +5,21 @@ import numpy as np
 import torch
 from itertools import product
 
-# import wandb
+import wandb
 import glob
 import gymnasium as gym
-from gymnasium.error import DependencyNotInstalled
-import random
 import os
-import math
 
 from pygpudrive.env.config import EnvConfig
-from pygpudrive.env.viz import Visualizer
+from pygpudrive.env.viz import PyGameVisualizer
 
 # Import the simulator
 import gpudrive
 import logging
 
 logging.getLogger(__name__)
+
+os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -49,36 +48,22 @@ class Env(gym.Env):
     ):
         self.config = config
 
-        # Configure rewards
-        # TODO: Make this configurable on the Python side and add docs
-        reward_params = gpudrive.RewardParams()
-        reward_params.rewardType = (
-            gpudrive.RewardType.OnGoalAchieved
-        )  # Or any other value from the enum
-        reward_params.distanceToGoalThreshold = (
-            self.config.dist_to_goal_threshold  # Set appropriate values
-        )
-        reward_params.distanceToExpertThreshold = 1.0  # Set appropriate values
+        reward_params = self._set_reward_params()
 
         # Configure the environment
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = 0.5
+        params.observationRadius = self.config.obs_radius
+        params.polylineReductionThreshold = 1.0
         params.observationRadius = 10.0
         params.rewardParams = reward_params
+        params.IgnoreNonVehicles = self.config.remove_non_vehicles
 
         # Collision behavior
-        if self.config.collision_behavior == "ignore":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
-        elif self.config.collision_behavior == "remove":
-            params.collisionBehaviour = (
-                gpudrive.CollisionBehaviour.AgentRemoved
-            )
-        elif self.config.collision_behavior == "stop":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
-        else:
-            raise ValueError(
-                f"Invalid collision behavior: {self.config.collision_behavior}"
-            )
+        params = self._set_collision_behavior(params)
+
+        # Dataset initialization
+        params = self._init_dataset(params)
 
         # Set maximum number of controlled vehicles per environment
         params.maxNumControlledVehicles = max_cont_agents
@@ -87,6 +72,7 @@ class Env(gym.Env):
         self.num_sims = num_worlds
         self.device = device
         self.action_types = 3  # Acceleration, steering, and heading
+        self.info_dim = 5
 
         if not os.path.exists(data_dir) or not os.listdir(data_dir):
             assert False, "The data directory does not exist or is empty."
@@ -107,13 +93,20 @@ class Env(gym.Env):
         self.render_mode = render_mode
         self.world_render_idx = 0
         agent_count = (
-            self.sim.shape_tensor().to_torch()[self.world_render_idx, :][0].item()
+            self.sim.shape_tensor()
+            .to_torch()[self.world_render_idx, :][0]
+            .item()
         )
-        self.visualizer = Visualizer(agent_count, self.render_mode == "human")
+        self.visualizer = PyGameVisualizer(
+            self.sim,
+            self.world_render_idx,
+            self.render_mode,
+            self.config.dist_to_goal_threshold,
+        )
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
-        # We construct a mask to filter out the information from the expert controlled vehicles (0)
+        # We construct a mask to filter out the information from the non-controlled vehicles (0)
         # Mask size: (num_worlds, kMaxAgentCount)
         self.cont_agent_mask = (
             self.sim.controlled_state_tensor().to_torch() == 1
@@ -148,37 +141,12 @@ class Env(gym.Env):
         Args:
             actions (torch.Tensor): The action indices for all agents in all worlds.
         """
-        assert actions.shape == (
-            self.num_sims,
-            self.max_agent_count,
-        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
 
-        # Convert nan values to 0 for dead agents.
-        # These actions will be ignored, their value does not matter (except it cannot be nan)
-        actions = torch.nan_to_num(actions, nan=0)
+        if actions is not None:
+            self._apply_actions(actions)
 
-        # Convert action indices to action values
-        actions_shape = self.sim.action_tensor().to_torch().shape[1]
-        action_value_tensor = torch.zeros(
-            (self.num_sims, actions_shape, self.action_types)
-        )
-
-        # GPU Drive expects a tensor of shape (num_worlds, kMaxAgentCount, 3)
-        # We insert the actions for the controlled vehicles, the others will be ignored
-        for world_idx in range(self.num_sims):
-            for agent_idx in range(self.max_agent_count):
-                action_idx = actions[world_idx, agent_idx].item()
-                action_value_tensor[world_idx, agent_idx, :] = torch.Tensor(
-                    self.action_key_to_values[action_idx]
-                )
-
-        # Feed the actual action values to gpudrive
-        self.sim.action_tensor().to_torch().copy_(action_value_tensor)
-
-        # Step the simulator
         self.sim.step()
 
-        # Obtain the next observations, rewards, and done flags
         obs = self.get_obs()
 
         reward = (
@@ -204,10 +172,44 @@ class Env(gym.Env):
             .to(done.dtype)[self.cont_agent_mask]
         )
 
-        # TODO: add info
-        info = torch.zeros_like(done)
+        if self.config.eval_expert_mode:
+            # This is true when we are evaluating the expert performance
+            info = self.sim.info_tensor().to_torch().squeeze(dim=2)
+
+        else:  # Standard behavior: controlling vehicles
+            info = (
+                torch.empty(self.num_sims, self.max_agent_count, 5)
+                .fill_(float("nan"))
+                .to(self.device)
+            )
+            info[self.cont_agent_mask] = (
+                self.sim.info_tensor()
+                .to_torch()
+                .squeeze(dim=2)
+                .to(info.dtype)[self.cont_agent_mask]
+            ).to(self.device)
+
+        # if info[self.cont_agent_mask].sum().item() > 3:
+        #     print("bug")
 
         return obs, reward, done, info
+
+    def _apply_actions(self, actions):
+        """Apply the actions to the simulator."""
+
+        assert actions.shape == (
+            self.num_sims,
+            self.max_agent_count,
+        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
+
+        # nan actions will be ignored, but we need to replace them with zeros
+        actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
+
+        # Map action indices to action values
+        action_value_tensor = self.action_keys_tensor[actions]
+
+        # Feed the actual action values to gpudrive
+        self.sim.action_tensor().to_torch().copy_(action_value_tensor)
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
@@ -228,11 +230,65 @@ class Env(gym.Env):
                 head.item(),
             ]
 
+        self.action_keys_tensor = torch.tensor(
+            [
+                self.action_key_to_values[key]
+                for key in sorted(self.action_key_to_values.keys())
+            ]
+        ).to(self.device)
+
         return Discrete(n=int(len(self.action_key_to_values)))
 
     def _set_observation_space(self) -> None:
         """Configure the observation space."""
         return Box(low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],))
+
+    def _set_reward_params(self):
+        """Configure the reward parameters."""
+
+        reward_params = gpudrive.RewardParams()
+
+        if self.config.reward_type == "sparse_on_goal_achieved":
+            reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
+        else:
+            raise ValueError(f"Invalid reward type: {self.config.reward_type}")
+
+        # Set goal is achieved condition
+        reward_params.distanceToGoalThreshold = (
+            self.config.dist_to_goal_threshold
+        )
+
+        return reward_params
+
+    def _set_collision_behavior(self, params):
+        """Define what will happen when a collision occurs."""
+
+        if self.config.collision_behavior == "ignore":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
+        elif self.config.collision_behavior == "remove":
+            params.collisionBehaviour = (
+                gpudrive.CollisionBehaviour.AgentRemoved
+            )
+        elif self.config.collision_behavior == "stop":
+            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
+        else:
+            raise ValueError(
+                f"Invalid collision behavior: {self.config.collision_behavior}"
+            )
+        return params
+
+    def _init_dataset(self, params):
+        """Define how we sample new scenarios."""
+        if self.config.sample_method == "first_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
+        elif self.config.sample_method == "random":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
+        elif self.config.sample_method == "pad_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
+        elif self.config.sample_method == "exact_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
+
+        return params
 
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
@@ -256,9 +312,9 @@ class Env(gym.Env):
                 self.w_indices, self.k_indices, :
             ] = full_ego_state[self.w_indices, self.k_indices, :]
 
-            # Normalize
-            if self.config.normalize_obs:
+            if self.config.norm_obs:
                 ego_state_padding = self.normalize_ego_state(ego_state_padding)
+
         else:
             ego_state_padding = torch.Tensor().to(self.device)
 
@@ -285,11 +341,8 @@ class Env(gym.Env):
                 self.w_indices, self.k_indices, :
             ] = full_partner_obs[self.w_indices, self.k_indices, :]
 
-            # Normalize
-            if self.config.normalize_obs:
-                partner_obs_padding = self.normalize_partner_obs(
-                    partner_obs_padding
-                )
+            # TODO: Add option to normalize
+
         else:
             partner_obs_padding = torch.Tensor().to(self.device)
 
@@ -313,7 +366,7 @@ class Env(gym.Env):
                 self.w_indices, self.k_indices, :
             ]
 
-            # TODO: Normalize
+            # TODO: Add option to normalize
         else:
             map_obs_padding = torch.Tensor().to(self.device)
 
@@ -330,60 +383,7 @@ class Env(gym.Env):
         return obs_filtered
 
     def render(self):
-        """Render the environment."""
-
-        def create_render_mask():
-
-            controlled_mask = (
-                (
-                    self.sim.controlled_state_tensor()
-                    .to_torch()[self.world_render_idx, :, :]
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-                .squeeze(1)
-                .astype(bool)
-            )
-
-            agent_count = (
-                self.sim.shape_tensor().to_torch()[self.world_render_idx][0].item()
-            )
-            padding_count = valid_mask.shape[0] - agent_count
-            real_agent_mask = np.concatenate(
-                (np.array([1] * agent_count), np.array([0] * padding_count))
-            )
-
-            return np.logical_or(
-                np.logical_and(real_agent_mask, valid_mask),
-                np.logical_and(real_agent_mask, controlled_mask),
-            )
-
-        if self.render_mode is None:
-            assert self.spec is not None
-            gym.logger.warn(
-                "You are calling render method without specifying any render mode. "
-                "You can specify the render_mode at initialization, "
-                f'e.g. gym.make("{self.spec.id}", render_mode="rgb_array")'
-            )
-            return
-
-        # Get agent info
-        agent_info = (
-            self.sim.absolute_self_observation_tensor()
-            .to_torch()[self.world_render_idx, :, :]
-            .cpu()
-            .detach()
-            .numpy()
-        )
-
-        # Get the agent goal positions and current positions
-        agent_pos = agent_info[:, :2]  # x, y
-        agent_rot = agent_info[:, 7]
-        goal_pos = agent_info[:, 8:]
-
-        render_mask = create_render_mask()
-        
+        return self.visualizer.draw(self.cont_agent_mask)
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -394,21 +394,31 @@ class Env(gym.Env):
         state[:, :, 2] /= self.config.max_veh_width
 
         # Relative goal coordinates
-        state[:, :, 3] /= self.config.max_rel_goal_coord
-        state[:, :, 4] /= self.config.max_rel_goal_coord
+        state[:, :, 3] = self._norm(
+            state[:, :, 3],
+            self.config.min_rel_goal_coord,
+            self.config.max_rel_goal_coord,
+        )
+        state[:, :, 4] = self._norm(
+            state[:, :, 4],
+            self.config.min_rel_goal_coord,
+            self.config.max_rel_goal_coord,
+        )
 
         return state
 
     def normalize_partner_obs(self, state):
-        """Normalize ego state features."""
-
-        # print(state.shape)
-        # print(f'max_before: {state.max()}')
-        # Speed, vehicle length, vehicle width
+        """Normalize partner state features."""
         state /= self.config.max_partner
+        return state
 
-        # print(f'max_after: {state.max()}')
+    def _norm(self, x, min_val, max_val):
+        """Normalize a value between -1 and 1."""
+        return 2 * ((x - min_val) / (max_val - min_val)) - 1
 
+    def normalize_partner_obs(self, state):
+        """TODO: Normalize ego state features."""
+        state /= self.config.max_partner
         return state
 
     def _print_info(self, verbose=True):
@@ -427,7 +437,7 @@ class Env(gym.Env):
 
     @property
     def steps_remaining(self):
-        return self.sim.steps_remaining_tensor().to_torch()
+        return self.sim.steps_remaining_tensor().to_torch()[0][0].item()
 
 
 if __name__ == "__main__":
@@ -436,47 +446,65 @@ if __name__ == "__main__":
 
     config = EnvConfig(
         partner_obs=True,
+        road_map_obs=False,
+        ego_state=False,
+    )
+
+    TOTAL_STEPS = 90
+    NUM_CONT_AGENTS = 128
+    NUM_WORLDS = 1
         road_map_obs=True,
     )
     # run = wandb.init(
     #     project="gpudrive",
     #     group="test_rendering",
     # )
-    NUM_CONT_AGENTS = 50
+    NUM_CONT_AGENTS = 0
     NUM_WORLDS = 3
 
     env = Env(
         config=config,
-        device="cpu",
+        device="cuda",
+        data_dir="formatted_json_v2_no_tl_train",
+        num_worlds=NUM_WORLDS,
+        max_cont_agents=NUM_CONT_AGENTS,
+        num_worlds=1,
+        auto_reset=False,
+        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
+        data_dir="/home/aarav/gpudrive/nocturne_data",
+        device="cuda",
+        render_mode="rgb_array",
     )
 
     obs = env.reset()
     frames = []
 
     for _ in range(100):
-
-        print(f"Step: {90 - env.steps_remaining[0, 0, 0].item()}")
+        print(f"Step: {90 - env.steps_remaining[0, 2, 0].item()}")
 
         # Take a random action (we're only going straight)
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
-                ]
-            ]
-        ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
+        # rand_action = torch.Tensor(
+        #     [
+        #         [
+        #             env.action_space.sample()
+        #             for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+        #         ]
+        #     ]
+        # ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
 
-        # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        # # Step the environment
+        # obs, reward, done, info = env.step(rand_action)
 
-        if done.sum() == NUM_CONT_AGENTS:
-            obs = env.reset()
-            print(f"RESETTING ENVIRONMENT\n")
-
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
+        env.sim.step()
         frame = env.render()
-        frames.append(frame.T)
+        frames.append(frame)
 
+    import imageio
+
+    imageio.mimsave("out.gif", frames)
     # Log video
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
     # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})

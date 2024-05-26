@@ -8,6 +8,8 @@
 #include <fstream>
 #include <optional>
 
+#include <iostream>
+
 using namespace madrona;
 using namespace madrona::viz;
 
@@ -65,7 +67,7 @@ int main(int argc, char *argv[])
 #endif
 
     WindowManager wm {};
-    WindowHandle window = wm.makeWindow("Escape Room", 2730, 1536);
+    WindowHandle window = wm.makeWindow("Escape Room", 640, 480);
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
@@ -73,10 +75,11 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .autoReset = replay_log.has_value(),
-        .jsonPath = "../maps",
+        .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
+            .maxNumControlledVehicles = 0
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
@@ -88,11 +91,11 @@ int main(int argc, char *argv[])
             (math::Quat::angleAxis(0, math::up) *
             math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
-    Viewer viewer(mgr.getRenderManager(), window.get(), {
+        Viewer viewer(mgr.getRenderManager(), window.get(), {
         .numWorlds = num_worlds,
         .simTickRate = 20,
         .cameraMoveSpeed = 20.f,
-        .cameraPosition = 20.f * math::up,
+        .cameraPosition = 100.f * math::up,
         .cameraRotation = initial_camera_rotation,
     });
 

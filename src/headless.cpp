@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
         .autoReset = false,
-        .jsonPath = "../maps.50",
+        .jsonPath = "../maps.16",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-	    .datasetInitOptions = DatasetInitOptions::PadN
+            .maxNumControlledVehicles = 0
         }
     });
 
@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
-    auto start = std::chrono::system_clock::now();
     auto action_printer = mgr.actionTensor().makePrinter();
     auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
@@ -93,46 +92,45 @@ int main(int argc, char *argv[])
     auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+        // printf("Self\n");
+        // self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
         printf("Model \n");
         model_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
-        printf("\n");
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
 
-        printf("Shape\n");
-        shapePrinter.print();
+        // printf("Shape\n");
+        // shapePrinter.print();
 
-        printf("Reward\n");
-        rewardPrinter.print();
+        // printf("Reward\n");
+        // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
-        printf("Controlled State\n");
-        controlledStatePrinter.print();
-        
+        // printf("Controlled State\n");
+        // controlledStatePrinter.print();
+
         printf("Agent Map Obs\n");
         agent_map_obs_printer.print();
 
         printf("Info\n");
         info_printer.print();
     };
-    // printObs();
 
     auto worldToShape =
 	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
 
-
+    const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
         if (rand_actions) {
             for (CountT j = 0; j < (CountT)num_worlds; j++) {
@@ -143,7 +141,7 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-                    
+
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                     action_store[base_idx] = acc;
                     action_store[base_idx + 1] = steer;
@@ -152,11 +150,9 @@ int main(int argc, char *argv[])
             }
         }
         mgr.step();
-        // printObs();
     }
-
-    auto end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
+    const auto end = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> elapsed = end - start;
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);

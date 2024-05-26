@@ -47,7 +47,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 #endif
 }
 
-
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
     
@@ -61,7 +60,25 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
+
+    // Since position, heading, and speed may vary within an episode, their
+    // values are retained so that on an episode reset they can be restored to
+    // their initial values.
+    auto &trajectory = ctx.get<Trajectory>(agent);
+    for(CountT i = 0; i < agentInit.numPositions; i++)
+    {
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
+        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.valids[i] = agentInit.valid[i];
+    }
+
+    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < 0.5f)
+    {
+        ctx.get<ResponseType>(agent) = ResponseType::Static;
+    }
+
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
@@ -69,20 +86,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     else
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
-    }
-
-    // Since position, heading, and speed may vary within an episode, their
-    // values are retained so that on an episode reset they can be restored to
-    // their initial values.
-    auto &trajectory = ctx.get<Trajectory>(agent);
-    auto length = agentInit.length/2;
-    auto width = agentInit.width/2;
-    for(CountT i = 0; i < agentInit.numPositions; i++)
-    {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
-        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]);
-        trajectory.valids[i] = agentInit.valid[i];
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -272,6 +275,13 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
 
+    if (ctx.data().enableRender) {
+        render::RenderingSystem::attachEntityToView(ctx,
+                agent,
+                90.f, 0.001f,
+                1.5f * math::up);
+    }
+
     return agent;
 }
 
@@ -287,7 +297,7 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
                                                             .scale = ctx.get<Scale>(physicsEntity),
                                                             .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
-                                                            .type = 0};
+                                                            .type = float(EntityType::Padding)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
     return physicsEntity;
@@ -305,7 +315,26 @@ void createPaddingEntities(Engine &ctx) {
     }
 }
 
+void createCameraEntity(Engine &ctx)
+{
+    auto camera = ctx.makeRenderableEntity<CameraAgent>();
+    ctx.get<Position>(camera) = Vector3{.x = 0, .y = 0, .z = 20};
+    ctx.get<Rotation>(camera) = (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+
+    render::RenderingSystem::attachEntityToView(ctx,
+        camera,
+        150.f, 0.001f,
+        1.5f * math::up);
+}
+
 void createPersistentEntities(Engine &ctx, Map *map) {
+    // createFloorPlane(ctx);
+
+    if (ctx.data().enableRender)
+    {
+        createCameraEntity(ctx);
+    }
 
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
@@ -324,6 +353,10 @@ void createPersistentEntities(Engine &ctx, Map *map) {
             }
         }
         const auto &agentInit = map->objects[agentCtr];
+        if (ctx.data().params.initOnlyValidAgentsAtFirstStep && agentInit.valid[0] == false)
+        {
+            continue;
+        }
         auto agent = createAgent(
             ctx, agentInit);
         ctx.data().agents[agentIdx++] = agent;

@@ -1,9 +1,7 @@
 import logging
-from typing import Optional
 import torch
 from torch.nn import functional as F
 import numpy as np
-from box import Box
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
@@ -36,7 +34,7 @@ def explained_variance(
     return torch.nan if var_y == 0 else 1 - torch.var(y_true - y_pred) / var_y
 
 
-class MAPPO(PPO):
+class IPPO(PPO):
     """Adapted Proximal Policy Optimization algorithm (PPO) that is compatible with multi-agent environments."""
 
     def __init__(
@@ -184,8 +182,10 @@ class MAPPO(PPO):
         )
 
         callback.update_locals(locals())
-
         callback.on_rollout_end()
+
+        # Reset logger info (num_episodes and infos)
+        env._reset_rollout_loggers()
 
         return True
 

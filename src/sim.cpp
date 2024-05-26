@@ -7,6 +7,7 @@
 #include "obb.hpp"
 #include "sim.hpp"
 #include "utils.hpp"
+#include "knn.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -51,15 +52,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Info>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
-    registry.registerSingleton<ValidState>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<CameraAgent>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
-    registry.exportSingleton<ValidState>((uint32_t)ExportID::ValidState);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
@@ -345,6 +345,14 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
+    const auto alg = ctx.data().params.roadObservationAlgorithm;
+    if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
+        selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
+            ctx, rot, model.position, map_obs.obs);
+        return;
+    }
+
+    assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -355,7 +363,8 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
         map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;
+        map_obs.obs[arrIndex].position = relative_pos;
+        map_obs.obs[arrIndex].heading = utils::quatToYaw(rot.inv() * ctx.get<Rotation>(road));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
@@ -380,6 +389,7 @@ inline void movementSystem(Engine &e,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent,
+                           const ResponseType &responseType,
                            Done& done) {
     if (type == EntityType::Padding) {
         return;
@@ -388,6 +398,10 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = 0;
+            velocity.angular = Vector3::zero();
             done.v = 1;
             return;
        }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
@@ -396,13 +410,27 @@ inline void movementSystem(Engine &e,
             position = consts::kPaddingPosition;
             velocity.linear.x = 0;
             velocity.linear.y = 0;
-            velocity.linear.z = fminf(velocity.linear.z, 0);
+            velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
+            return;
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
-            // Do nothing. 
+            // Do nothing.
         }
+    }
+
+    if(done.v && responseType != ResponseType::Static)
+    {
+        // Case: Agent has not collided but is done. 
+        // This can only happen if the agent has reached goal or the episode has ended.
+        // In that case we teleport the agent. The agent will not collide with anything.
+        position = consts::kPaddingPosition;
+        velocity.linear.x = 0;
+        velocity.linear.y = 0;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        return;
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
@@ -479,7 +507,7 @@ inline void agentZeroVelSystem(Engine &,
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
-    vel.linear.z = fminf(vel.linear.z, 0);
+    vel.linear.z = 0;
     vel.angular = Vector3::zero();
 }
 
@@ -633,7 +661,7 @@ inline void stepTrackerSystem(Engine &ctx,
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1)
+    if(done.v != 1 || info.reachedGoal != 1)
     {
         float dist = (model.position - goal.position).length();
         if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
@@ -647,6 +675,45 @@ inline void stepTrackerSystem(Engine &ctx,
 
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
+
+    auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
+    {
+        auto controlledState = ctx.getCheck<ControlledState>(candidate);
+        if (controlledState.valid())
+        {
+            if( controlledState.value().controlledState == ControlMode::EXPERT)
+            {
+                // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
+                auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+                auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                if (!validState)
+                {
+                    return true;
+                }
+            }
+            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            {
+                // Case: If a controlled agent gets done, we teleport it to the padding position
+                // Hence we need to ignore the collision detection for it.
+                // The agent can also be done because it collided. 
+                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
+                auto done = ctx.get<Done>(candidate);
+                auto collisionEvent = ctx.getCheck<CollisionDetectionEvent>(candidate);
+                if(done.v && collisionEvent.valid() && !collisionEvent.value().hasCollided.load_relaxed())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    if (isInvalidExpertOrDone(candidateCollision.a) || 
+        isInvalidExpertOrDone(candidateCollision.b)) {
+
+        return;
+    }
+
     const CountT PositionColumn{2};
     const CountT RotationColumn{3};
     const CountT ScaleColumn{4};
@@ -679,7 +746,7 @@ void collisionDetectionSystem(Engine &ctx,
     // Ignore collisions between certain entity types
     if(aEntityType == EntityType::Padding || bEntityType == EntityType::Padding)
     {
-        return;
+       return;
     }
 
     for(auto &pair : ctx.data().collisionPairs)
@@ -755,6 +822,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Rotation &rotation,
                                               const Goal &goal,
                                               const EntityType &entityType,
+                                              const VehicleSize &vehicleSize,
                                               AbsoluteSelfObservation &out) {
     if (entityType == EntityType::Padding) {
         return;
@@ -764,29 +832,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationAsQuat = rotation;
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
-}
-
-inline void validStateSystem(Engine &ctx, ValidState &validOut) {
-    // This assumes StepsRemaining is constant across all agents
-    Entity anyAgent = ctx.data().agents[0];
-    const auto stepsRemaining = ctx.get<StepsRemaining>(anyAgent);
-    const CountT currentStep = getCurrentStep(stepsRemaining);
-
-    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        const auto &trajectory = ctx.get<Trajectory>(agentHandle);
-
-        assert(currentStep < consts::kTrajectoryLength);
-        int32_t isValid = trajectory.valids[currentStep];
-
-        validOut.valid[agentIdx] = static_cast<Validity>(isValid);
-    }
-
-    for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        validOut.valid[agentIdx] = Validity::Invalid;
-    }
+    out.vehicle_size = vehicleSize;
 }
 
 // Build the task graph
@@ -808,28 +854,24 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             StepsRemaining,
             Trajectory,
             CollisionDetectionEvent,
+            ResponseType,
             Done
         >>({});
-
-    auto updateValidStateSystem =
-        builder
-            .addToGraph<ParallelForNode<Engine, validStateSystem, ValidState>>(
-                {moveSystem});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, {updateValidStateSystem});
+        builder, {moveSystem});
 
     auto findOverlappingEntities =
-        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
+        phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
-        {broadphase_setup_sys});
+        {findOverlappingEntities});
 
     // Improve controllability of agents by setting their velocity to 0
     // after physics is done.
@@ -838,7 +880,10 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {detectCollisions});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
+        builder, {agent_zero_vel});
+
+    phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -906,7 +951,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, EntityType, AbsoluteSelfObservation>>(
+                        Rotation, Goal, EntityType, VehicleSize, AbsoluteSelfObservation>>(
         {collect_obs});
 
         // The lidar system
@@ -953,7 +998,6 @@ Sim::Sim(Engine &ctx,
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
-    assert(init.map->numObjects <= consts::kMaxAgentCount);
     assert(init.map->numRoadSegments <= consts::kMaxRoadEntityCount);
 
     // Currently the physics system needs an upper bound on the number of

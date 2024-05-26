@@ -138,13 +138,14 @@ static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
-    MapObservation obs[consts::kMaxRoadEntityCount];
+    MapObservation obs[consts::kMaxAgentMapObservationsCount];
 };
 
 const size_t AgentMapObservationExportSize = 7;
 
-static_assert(sizeof(AgentMapObservations) == sizeof(float) *
-    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
+static_assert(sizeof(AgentMapObservations) ==
+              sizeof(float) * consts::kMaxAgentMapObservationsCount *
+                  AgentMapObservationExportSize);
 
 struct LidarSample {
     float depth;
@@ -207,22 +208,21 @@ struct AbsoluteSelfObservation {
     Position position;
     AbsoluteRotation rotation;
     Goal goal;
+    VehicleSize vehicle_size;
 };
 
-const size_t AbsoluteSelfObservationExportSize =  10; //  3 + 4 + 1 + 2
+const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
-enum class Validity : int32_t {
-    Invalid = 0,
-    Valid = 1
-};
-
-struct ValidState {
-    Validity valid[consts::kMaxAgentCount];
-};
-
 /* ECS Archetypes for the game */
+
+struct CameraAgent : public madrona::Archetype<
+    Position,
+    Rotation,
+    madrona::render::RenderCamera,
+    madrona::render::Renderable
+> {};
 
 // There are 2 Agents in the environment trying to get to the destination
 struct Agent : public madrona::Archetype<
