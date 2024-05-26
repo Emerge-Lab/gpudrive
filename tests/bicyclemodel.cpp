@@ -77,7 +77,7 @@ protected:
 
         auto shape_tensor = mgr.shapeTensor();
         int32_t *ptr = static_cast<int32_t *>(shape_tensor.devicePtr());
-        num_agents = ptr[0];
+        num_agents = 1;
     }
 };
 
@@ -96,7 +96,7 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
     float theta_next = std::fmod(theta + w * dt, M_PI*2); // Clipping necessary to follow the implementation in madrona
     theta_next = theta_next > M_PI ? theta_next -  M_PI*2 : (theta_next < - M_PI ? theta_next +  M_PI*2 : theta_next);
     
-    float speed_next = speed_curr + acceleration * dt;
+    float speed_next = abs(speed_curr + acceleration * dt);
     return std::make_tuple(x_next, y_next, theta_next, speed_next);
 }
 

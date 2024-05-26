@@ -244,6 +244,7 @@ inline void movementSystem(Engine &e,
                            const EntityType &type,
                            const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent) {
+    
     if (collisionEvent.hasCollided.load_relaxed())
     {
         if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
@@ -251,7 +252,7 @@ inline void movementSystem(Engine &e,
             velocity.linear.y = 0;
             velocity.linear.z = 0;
             velocity.angular = Vector3::zero();
-            done.v = 1;
+            e.get<Done>(agent_iface.e).v = 1;
             return;
         }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
         {
@@ -270,7 +271,7 @@ inline void movementSystem(Engine &e,
     }
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
-    if(done.v)
+    if(e.get<Done>(agent_iface.e).v)
     {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
@@ -532,31 +533,28 @@ void collisionDetectionSystem(Engine &ctx,
         auto agent_iface = ctx.getCheck<InterfaceEntity>(candidate);
         if (agent_iface.valid())
         {
-            if( controlledState.value().controlledState == ControlMode::EXPERT)
-            {
-                // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
-                auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlledState;
+            auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlledState;
+            // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
             if (controlledState == ControlMode::EXPERT)
             {
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(agent_iface.value().e));
-                    auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
-                    if (!validState)
-                    {
-                        return true;
-                }
-            }
-            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
-            {
-                // Case: If a controlled agent gets done, we teleport it to the padding position
-                // Hence we need to ignore the collision detection for it.
-                // The agent can also be done because it collided. 
-                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
-                auto done = ctx.get<Done>(agent_iface);
-                auto collisionEvent = ctx.getCheck<CollisionDetectionEvent>(candidate);
-                if(done.v && collisionEvent.valid() && !collisionEvent.value().hasCollided.load_relaxed())
+                auto &validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                if (!validState)
                 {
                     return true;
                 }
+            }
+            else if (controlledState == ControlMode::BICYCLE)
+            {
+                // Case: If a controlled agent gets done, we teleport it to the padding position
+                // Hence we need to ignore the collision detection for it.
+                // The agent can also be done because it collided.
+                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
+                auto &done = ctx.get<Done>(agent_iface.value().e);
+                auto &collisionEvent = ctx.get<CollisionDetectionEvent>(candidate);
+                if (done.v && !collisionEvent.hasCollided.load_relaxed())
+                {
+                    return true;
                 }
             }
         }

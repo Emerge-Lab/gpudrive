@@ -63,15 +63,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent_iface = ctx.get<InterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
-    {
-        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::BICYCLE};
-        ctx.data().numControlledVehicles++;
-    }
-    else
-    {
-        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::EXPERT};
-    }
 
     // Since position, heading, and speed may vary within an episode, their
     // values are retained so that on an episode reset they can be restored to
@@ -92,12 +83,12 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
+        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -312,19 +303,6 @@ void createPaddingEntities(Engine &ctx) {
          roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
         ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
     }
-}
-
-void createCameraEntity(Engine &ctx)
-{
-    auto camera = ctx.makeRenderableEntity<CameraAgent>();
-    ctx.get<Position>(camera) = Vector3{.x = 0, .y = 0, .z = 20};
-    ctx.get<Rotation>(camera) = (math::Quat::angleAxis(0, math::up) *
-            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
-
-    render::RenderingSystem::attachEntityToView(ctx,
-        camera,
-        150.f, 0.001f,
-        1.5f * math::up);
 }
 
 void createCameraEntity(Engine &ctx)
