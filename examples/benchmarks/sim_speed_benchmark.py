@@ -52,7 +52,6 @@ def make_sim(
         else gpudrive.madrona.ExecMode.CUDA,
         gpu_id=0,
         num_worlds=num_worlds,
-        auto_reset=False,
         json_path=data_dir,
         params=params,
     )

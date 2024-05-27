@@ -452,7 +452,6 @@ Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg;
-    sim_cfg.autoReset = mgr_cfg.autoReset;
 
     std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
