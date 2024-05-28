@@ -26,7 +26,6 @@ protected:
         .execMode = ExecMode::CPU,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .autoReset = false,
         .jsonPath = "testJsons",
         .params = {
             .polylineReductionThreshold = 0.0,

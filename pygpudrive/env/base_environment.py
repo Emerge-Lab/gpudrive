@@ -42,7 +42,6 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        auto_reset=False,
         render_mode="rgb_array",
         verbose=True,
     ):
@@ -94,7 +93,6 @@ class Env(gym.Env):
             else gpudrive.madrona.ExecMode.CUDA,
             gpu_id=0,
             num_worlds=self.num_sims,
-            auto_reset=auto_reset,
             json_path=self.data_dir,
             params=params,
         )
@@ -520,7 +518,8 @@ if __name__ == "__main__":
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
-        auto_reset=False,
+        max_cont_agents=NUM_CONT_AGENTS,
+        num_worlds=1,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="waymo_data_repeat",
         device="cuda",
