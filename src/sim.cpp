@@ -105,46 +105,18 @@ static inline void initWorld(Engine &ctx)
     generateWorld(ctx);
 }
 
-// This system runs each frame and checks if the current episode is complete
-// or if code external to the application has forced a reset by writing to the
-// WorldReset singleton.
-//
-// If a reset is needed, cleanup the existing world and generate a new one.
+// This system runs each frame and checks if the code external to the
+// application has forced a reset by writing to the WorldReset singleton. If a
+// reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    int32_t should_reset = reset.reset;
-    if (ctx.data().autoReset && ctx.data().numControlledVehicles > 0) {
-        int32_t areAllControlledAgentsDone = 1;
-        for (CountT i = 0; i < ctx.data().numAgents; i++) {
-            Entity agent = ctx.data().agents[i];
-            Done done = ctx.get<Done>(agent);
-            ControlledState controlledState = ctx.get<ControlledState>(agent);
-            if (controlledState.controlledState == ControlMode::BICYCLE && !done.v) {
-                areAllControlledAgentsDone = 0;
-            }
-        }
-        should_reset = areAllControlledAgentsDone;
-    }
-    else if (ctx.data().autoReset && ctx.data().numControlledVehicles == 0) {
-        should_reset = 1;
-        for(CountT i = 0; i < ctx.data().numAgents; i++) {
-            Entity agent = ctx.data().agents[i];
-            if(ctx.get<EntityType>(agent) == EntityType::Padding) {
-                continue;
-            }
-            if(ctx.get<Done>(agent).v == 0) {
-                should_reset = 0;
-                break;
-            }
-        }
+    if (reset.reset == 0) {
+      return;
     }
 
-    if (should_reset != 0) {
-        reset.reset = 0;
-
-        cleanupWorld(ctx);
-        initWorld(ctx);
-    }
+    reset.reset = 0;
+    cleanupWorld(ctx);
+    initWorld(ctx);
 }
 
 // This system packages all the egocentric observations together
@@ -874,8 +846,6 @@ Sim::Sim(Engine &ctx,
     if (enableRender) {
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
-
-    autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
     createPersistentEntities(ctx, init.map);

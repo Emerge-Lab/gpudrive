@@ -42,7 +42,6 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        auto_reset=False,
         render_mode="rgb_array",
         verbose=True,
     ):
@@ -84,7 +83,6 @@ class Env(gym.Env):
             else gpudrive.madrona.ExecMode.CUDA,
             gpu_id=0,
             num_worlds=self.num_sims,
-            auto_reset=auto_reset,
             json_path=self.data_dir,
             params=params,
         )
@@ -469,7 +467,6 @@ if __name__ == "__main__":
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,
         num_worlds=1,
-        auto_reset=False,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="/home/aarav/gpudrive/nocturne_data",
         device="cuda",

@@ -34,7 +34,6 @@ sim = gpudrive.SimManager(
     exec_mode = gpudrive.madrona.ExecMode.CUDA if args.gpu_sim else gpudrive.madrona.ExecMode.CPU,
     gpu_id = args.gpu_id,
     num_worlds = args.num_worlds,
-    auto_reset = True,
 )
 
 obs, num_obs_features = setup_obs(sim)

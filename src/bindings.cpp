@@ -77,12 +77,11 @@ namespace gpudrive
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, bool auto_reset, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
+                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
                       .numWorlds = (uint32_t)num_worlds,
-                      .autoReset = auto_reset,
                       .jsonPath = jsonPath,
                       .params = params,
                       .enableBatchRenderer = enable_batch_renderer,
@@ -91,7 +90,6 @@ namespace gpudrive
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
                 nb::arg("num_worlds"),
-                nb::arg("auto_reset"),
                 nb::arg("json_path"),
                 nb::arg("params"),
                 nb::arg("enable_batch_renderer") = false,

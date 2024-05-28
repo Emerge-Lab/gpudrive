@@ -35,7 +35,6 @@ class SB3MultiAgentEnv(VecEnv):
         max_cont_agents,
         data_dir,
         device,
-        auto_reset=False,
         render_mode="rgb_array",
     ):
         self._env = Env(
@@ -44,7 +43,6 @@ class SB3MultiAgentEnv(VecEnv):
             max_cont_agents=max_cont_agents,
             data_dir=data_dir,
             device=device,
-            auto_reset=auto_reset,
         )
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count

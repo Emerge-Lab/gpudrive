@@ -74,7 +74,6 @@ int main(int argc, char *argv[])
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .autoReset = replay_log.has_value(),
         .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
