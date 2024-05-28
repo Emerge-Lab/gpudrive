@@ -164,11 +164,12 @@ class MultiAgentCallback(BaseCallback):
         #     }
         # )
 
+        world_to_visualize = torch.argmin(self.unbatchify(self.locals["infos"])[:,:,3].nansum(axis=1) / self.locals["env"].controlled_agent_mask.sum(axis=1))
+
         # Render the environment
         if self.config.render:
             if self.num_rollouts % self.config.render_freq == 0:
-                for world_idx in range(self.config.render_n_worlds):
-                    self._create_and_log_video(render_world_idx=world_idx)
+                self._create_and_log_video(render_world_idx=world_to_visualize)
 
         self.num_rollouts += 1
 
@@ -204,7 +205,7 @@ class MultiAgentCallback(BaseCallback):
         env = self.locals["env"]
 
         obs = env.reset()
-        obs = self._batchify_and_filter_obs(obs, env)
+        obs = self._batchify_and_filter_obs(obs, env, render_world_idx)
 
         frames = []
 
