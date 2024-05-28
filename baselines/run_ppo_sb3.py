@@ -13,6 +13,7 @@ from algorithms.sb3.callbacks import MultiAgentCallback
 # Import adapted PPO version
 from algorithms.sb3.ppo.ippo import IPPO
 from baselines.config import ExperimentConfig
+from networks.basic_ffn import FeedForwardPolicy, FeedForwardNet
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 
 torch.cuda.empty_cache()
