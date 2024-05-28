@@ -19,6 +19,10 @@ class ExperimentConfig:
     render_freq: int = 50  # Render after every kth rollout
     render_n_worlds: int = 1
 
+    # TODO: Logging
+    log_dir: str = "logs"
+    use_wandb: bool = True
+
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
