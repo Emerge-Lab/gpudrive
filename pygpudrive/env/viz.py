@@ -75,8 +75,8 @@ class PyGameVisualizer:
         all_endpoints = np.concatenate(endpoints, axis=0)
         
         # Adjust window dimensions by subtracting padding
-        adjusted_window_width = self.WINDOW_W - self.padding_x
-        adjusted_window_height = self.WINDOW_H - self.padding_y
+        adjusted_window_width = self.WINDOW_W/2 - self.padding_x
+        adjusted_window_height = self.WINDOW_H/2 - self.padding_y
 
         self.zoom_scale_x = adjusted_window_width / (
             all_endpoints[:, 0].max() - all_endpoints[:, 0].min() 
