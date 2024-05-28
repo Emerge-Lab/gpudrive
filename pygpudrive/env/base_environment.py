@@ -413,7 +413,7 @@ class Env(gym.Env):
             self.config.min_rel_goal_coord,
             self.config.max_rel_goal_coord,
         )
-
+        
         return state
 
     def normalize_and_flatten_partner_obs(self, obs):
@@ -470,11 +470,11 @@ class Env(gym.Env):
         )
 
         # Orientation
-        obs[:, :, :, 2] /= self.config.max_orientation_rad
+        obs[:, :, :, 5] /= self.config.max_orientation_rad
 
         # TODO: Type of road entity
         # Remove for now
-        obs = obs[:, :, :, :3]
+        # obs = obs[:, :, :, :3]
 
         return obs.flatten(start_dim=2)
 
@@ -519,9 +519,8 @@ if __name__ == "__main__":
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data_repeat",
-        device="cuda",
         render_mode="rgb_array",
+        data_dir="waymo_data"
     )
 
     obs = env.reset()

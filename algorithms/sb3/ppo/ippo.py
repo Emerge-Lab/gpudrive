@@ -1,4 +1,3 @@
-import logging
 import torch
 from torch.nn import functional as F
 import numpy as np
@@ -11,6 +10,7 @@ from torch import nn
 
 # Import masked rollout buffer class
 from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
+from networks.perm_eq_late_fusion import LateFusionNet
 
 # From stable baselines
 def explained_variance(
@@ -40,8 +40,14 @@ class IPPO(PPO):
     def __init__(
         self,
         *args,
+        env_config = None, 
+        mlp_class: nn.Module = LateFusionNet,
+        mlp_config = None,
         **kwargs,
     ):
+        self.env_config = env_config if env_config is not None else None
+        self.mlp_class = mlp_class
+        self.mlp_config = mlp_config if mlp_config is not None else None
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -208,8 +214,12 @@ class IPPO(PPO):
             self.action_space,
             self.lr_schedule,
             use_sde=self.use_sde,
+            env_config=self.env_config,
+            mlp_class=self.mlp_class,
+            mlp_config=self.mlp_config,
             **self.policy_kwargs,
         )
+       
         self.policy = self.policy.to(self.device)
 
         # Initialize schedules for policy/value clipping

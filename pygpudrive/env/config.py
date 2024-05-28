@@ -34,6 +34,10 @@ class EnvConfig:
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
     dist_to_goal_threshold: float = 3.0
+    
+    """Constants defining the observations"""
+    partner_obs_dim: int = 7
+    map_obs_dim: int = 7
 
     """Constants to normalize observations."""
     norm_obs: bool = False
