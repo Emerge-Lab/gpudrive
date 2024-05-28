@@ -30,7 +30,6 @@ public:
         madrona::ExecMode execMode; // CPU or CUDA
         int gpuID; // Which GPU for CUDA backend?
         uint32_t numWorlds; // Simulation batch size
-        bool autoReset; // Immediately generate new world on episode end
         std::string jsonPath; // Directory path to jsons. Should contain exactly numWorlds files.
         Parameters params;
 
