@@ -470,11 +470,14 @@ class Env(gym.Env):
         )
 
         # Orientation
-        obs[:, :, :, 2] /= self.config.max_orientation_rad
+        obs[:, :, :, 5] /= self.config.max_orientation_rad
+        
+        # Length of road edges
+        obs[:, :, :, 2] /= self.config.max_road_len
 
-        # TODO: Type of road entity
-        # Remove for now
-        obs = obs[:, :, :, :3]
+        # TODO: one-hot the type
+        # here we remove the dy, dz aspects of the scaling
+        obs = torch.cat((obs[:, :, :, :3], (obs[:, :, :, 5:])), dim=-1)
 
         return obs.flatten(start_dim=2)
 
@@ -518,8 +521,6 @@ if __name__ == "__main__":
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,
-        num_worlds=1,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         data_dir="waymo_data_repeat",
         device="cuda",

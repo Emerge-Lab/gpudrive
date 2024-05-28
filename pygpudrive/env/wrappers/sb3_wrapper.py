@@ -80,7 +80,7 @@ class SB3MultiAgentEnv(VecEnv):
                 Initial observation.
         """
 
-        # Has shape (num_worlds, max_agent_count , obs_dim)
+        # Has shape (num_worlds, max_agent_count, obs_dim)
         obs = self._env.reset()
 
         # Make dead agent mask (True for dead or invalid agents)

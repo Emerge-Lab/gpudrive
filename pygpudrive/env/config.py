@@ -49,6 +49,7 @@ class EnvConfig:
     max_orientation_rad: float = 2 * np.pi
     min_rm_coord: int = -300
     max_rm_coord: int = 300
+    max_road_len: int = 100
 
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
