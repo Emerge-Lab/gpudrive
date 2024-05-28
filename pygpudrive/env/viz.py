@@ -29,9 +29,8 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.StopSign): (255, 0, 255),  # Blue
     }
 
-    def __init__(self, sim, world_render_idx, render_config, goal_radius):
+    def __init__(self, sim, render_config, goal_radius):
         self.sim = sim
-        self.world_render_idx = world_render_idx
         self.render_config = render_config
         self.goal_radius = goal_radius
 
@@ -58,8 +57,8 @@ class PyGameVisualizer:
 
             self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
             self.compute_window_settings()
-            if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
-                self.init_map()
+            # if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
+            #     self.init_map()
             # self.init_map()
 
     @staticmethod
@@ -339,7 +338,14 @@ class PyGameVisualizer:
             return render_rgbs
         elif self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
             self.surf.fill(self.BACKGROUND_COLOR)
-            self.surf.blit(self.map_surfs[world_render_idx], (0, 0))
+            # self.surf.blit(self.map_surfs[world_render_idx], (0, 0))
+            map_info = (
+                self.sim.map_observation_tensor()
+                .to_torch()[world_render_idx]
+                .cpu()
+                .numpy()
+            )
+            self.draw_map(self.surf, map_info, world_render_idx)
             # Get agent info
             agent_info = (
                 self.sim.absolute_self_observation_tensor()
