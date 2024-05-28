@@ -29,7 +29,9 @@ class MaskedRolloutBuffer(BaseBuffer):
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         device: Union[torch.device, str] = "auto",
-        storage_device: Union[torch.device, str] = "cpu", #TODO(ev) add storage device to config
+        storage_device: Union[
+            torch.device, str
+        ] = "cpu",  # TODO(ev) add storage device to config
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
