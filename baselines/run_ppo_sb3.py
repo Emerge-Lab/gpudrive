@@ -13,7 +13,7 @@ from algorithms.sb3.callbacks import MultiAgentCallback
 # Import adapted PPO version
 from algorithms.sb3.ppo.ippo import IPPO
 from baselines.config import ExperimentConfig
-from networks.basic_ffn import FeedForwardPolicy, FeedForwardNet
+from networks.basic_ffn import FeedForwardPolicy, FFN
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 
 torch.cuda.empty_cache()
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
-        road_obs_algorithm=None,#"k_nearest_roadpoints",
+        road_obs_algorithm=None,  # "k_nearest_roadpoints",
         sample_method="pad_n",
     )
 
@@ -36,8 +36,8 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=15,
-        max_cont_agents=128,
+        num_worlds=env_config.num_worlds,
+        max_cont_agents=env_config.num_controlled_vehicles,
         data_dir=exp_config.data_dir,
         device=exp_config.device,
     )
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         if run_id is not None
         else None,  # Sync with wandb
         mlp_class=LateFusionNet,
-        policy=LateFusionPolicy # TODO(ev) configure from config
+        policy=LateFusionPolicy,  # TODO(ev) configure from config
     )
 
     # Learn

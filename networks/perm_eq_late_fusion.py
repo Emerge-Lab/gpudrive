@@ -17,6 +17,7 @@ from pygpudrive.env.config import EnvConfig
 
 os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
+
 class LateFusionNet(nn.Module):
     """Processes the env observation using a late fusion architecture."""
 
@@ -25,7 +26,7 @@ class LateFusionNet(nn.Module):
         observation_space: spaces.Box,
         env_config: EnvConfig = None,
         obj_dims: List[int] = [6, 7, 7],
-        arch_ego_state: List[int] = [10],
+        arch_ego_state: List[int] = [64, 32],
         arch_road_objects: List[int] = [64, 32],
         arch_road_graph: List[int] = [64, 32],
         arch_shared_net: List[int] = [256, 128, 64],
@@ -106,7 +107,9 @@ class LateFusionNet(nn.Module):
             last_dim = layer_dim
         return nn.Sequential(*layers)
 
-    def _build_out_network(self, input_dim: int, output_dim: int, net_arch: List[int]):
+    def _build_out_network(
+        self, input_dim: int, output_dim: int, net_arch: List[int]
+    ):
         """Create the output network architecture."""
         layers = []
         prev_dim = input_dim
@@ -123,7 +126,9 @@ class LateFusionNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, features: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Args:
             features (torch.Tensor): input tensor of shape (batch_size, feature_dim)
@@ -146,11 +151,17 @@ class LateFusionNet(nn.Module):
 
         # Max pooling across the object dimension
         # (M, E) -> (1, E) (max pool across features)
-        road_objects = F.max_pool1d(road_objects.permute(0, 2, 1), kernel_size=self.ro_max).squeeze(-1)
-        road_graph = F.max_pool1d(road_graph.permute(0, 2, 1), kernel_size=self.rg_max).squeeze(-1)
+        road_objects = F.max_pool1d(
+            road_objects.permute(0, 2, 1), kernel_size=self.ro_max
+        ).squeeze(-1)
+        road_graph = F.max_pool1d(
+            road_graph.permute(0, 2, 1), kernel_size=self.rg_max
+        ).squeeze(-1)
 
         # Concatenate processed ego state and observation and pass through the output layer
-        out = self.actor_out_net(torch.cat((ego_state, road_objects, road_graph), dim=1))
+        out = self.actor_out_net(
+            torch.cat((ego_state, road_objects, road_graph), dim=1)
+        )
 
         return out
 
@@ -166,11 +177,17 @@ class LateFusionNet(nn.Module):
 
         # Max pooling across the object dimension
         # (M, E) -> (1, E) (max pool across features)
-        road_objects = F.max_pool1d(road_objects.permute(0, 2, 1), kernel_size=self.ro_max).squeeze(-1)
-        road_graph = F.max_pool1d(road_graph.permute(0, 2, 1), kernel_size=self.rg_max).squeeze(-1)
+        road_objects = F.max_pool1d(
+            road_objects.permute(0, 2, 1), kernel_size=self.ro_max
+        ).squeeze(-1)
+        road_graph = F.max_pool1d(
+            road_graph.permute(0, 2, 1), kernel_size=self.rg_max
+        ).squeeze(-1)
 
         # Concatenate processed ego state and observation and pass through the output layer
-        out = self.val_out_net(torch.cat((ego_state, road_objects, road_graph), dim=1))
+        out = self.val_out_net(
+            torch.cat((ego_state, road_objects, road_graph), dim=1)
+        )
 
         return out
 
@@ -193,7 +210,9 @@ class LateFusionNet(nn.Module):
         rg_end_idx = ro_end_idx + (self.rg_input_dim * self.rg_max)
 
         # Unflatten and reshape to (batch_size, num_objects, object_dim)
-        road_objects = (vis_state[:, :ro_end_idx]).reshape(-1, self.ro_max, self.ro_input_dim)
+        road_objects = (vis_state[:, :ro_end_idx]).reshape(
+            -1, self.ro_max, self.ro_input_dim
+        )
         road_graph = (vis_state[:, ro_end_idx:rg_end_idx]).reshape(
             -1,
             self.rg_max,
@@ -205,8 +224,8 @@ class LateFusionNet(nn.Module):
     def _set_obj_dims(self, config):
         # Define original object dimensions
         # TODO(ev) this doesn't exist in the config so remove hardcoding
-        self.ro_max = 127 # config.partner_obs_dim
-        self.rg_max = 2000 # config.map_obs_dim
+        self.ro_max = 127  # config.partner_obs_dim
+        self.rg_max = 200  # config.map_obs_dim
 
 
 class LateFusionPolicy(ActorCriticPolicy):
@@ -249,8 +268,10 @@ if __name__ == "__main__":
     # Import adapted PPO version
     from algorithms.sb3.ppo.ippo import IPPO
     from baselines.config import ExperimentConfig
+
     # Import the EnvConfig dataclass
     from pygpudrive.env.config import EnvConfig
+
     # Load configs
     env_config = EnvConfig(
         ego_state=True,
@@ -293,7 +314,7 @@ if __name__ == "__main__":
         else None,  # Sync with wandb
         mlp_class=LateFusionNet,
         mlp_config=model_config,
-        policy=LateFusionPolicy
+        policy=LateFusionPolicy,
     )
 
     model.learn(5000)

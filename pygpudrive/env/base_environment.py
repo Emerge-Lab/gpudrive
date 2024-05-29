@@ -19,7 +19,7 @@ import logging
 
 logging.getLogger(__name__)
 
-#os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -96,6 +96,8 @@ class Env(gym.Env):
             json_path=self.data_dir,
             params=params,
         )
+        # Update the config with the relevant number of controlled agents
+        # TODO(ev)
 
         # Rendering
         self.render_mode = render_mode
@@ -120,7 +122,9 @@ class Env(gym.Env):
         self.max_cont_agents = max_cont_agents
 
         # Number of valid controlled agents across worlds (without padding agents)
-        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -413,7 +417,7 @@ class Env(gym.Env):
             self.config.min_rel_goal_coord,
             self.config.max_rel_goal_coord,
         )
-        
+
         return state
 
     def normalize_and_flatten_partner_obs(self, obs):
@@ -520,7 +524,7 @@ if __name__ == "__main__":
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
         render_mode="rgb_array",
-        data_dir="waymo_data"
+        data_dir="waymo_data",
     )
 
     obs = env.reset()
