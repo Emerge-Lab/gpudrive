@@ -87,11 +87,9 @@ class MultiAgentCallback(BaseCallback):
             self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
             self.mean_reward_per_episode.append(self.locals["env"].info_dict["mean_reward_per_episode"])
             self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
-            # TODO(ev) add logging of agents that did not achieve their goals
             wandb.log(
                 {
                     "global_step": self.num_timesteps,
-                    # TODO(ev) this metric is broken
                     "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
                     "metrics/perc_off_road": (
                         sum(self.perc_off_road) / sum(self.num_agent_rollouts)
@@ -161,18 +159,17 @@ class MultiAgentCallback(BaseCallback):
         env = self.locals["env"]
 
         obs = env.reset()
-        obs = self._batchify_and_filter_obs(obs, env)
 
         frames = []
 
         for _ in range(90):
 
             action, _ = policy.predict(obs.detach().cpu().numpy())
-            action = self._pad_actions(action, env, render_world_idx)
+            action = torch.Tensor(action).to("cuda")
 
             # Step the environment
             obs, _, _, _ = env.step(action)
-            obs = self._batchify_and_filter_obs(obs, env)
+            # obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
             frames.append(frame)
