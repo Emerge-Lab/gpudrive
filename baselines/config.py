@@ -16,7 +16,7 @@ class ExperimentConfig:
     # Rendering settings
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 50  # Render after every kth rollout
+    render_freq: int = 10  # Render after every kth rollout
     render_n_worlds: int = 1
 
     # TODO: Logging

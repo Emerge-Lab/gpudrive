@@ -76,6 +76,38 @@ class MultiAgentCallback(BaseCallback):
             # total number of agents
             total_valid_agents = self.locals["env"].info_dict["num_finished_agents"]
 
+            # self.perc_off_road += self.locals["env"].info_dict["off_road"]
+            # self.perc_veh_collisions += self.locals["env"].info_dict["veh_collisions"]
+            # self.perc_non_veh_collision += self.locals["env"].info_dict["non_veh_collision"]
+            # self.perc_goal_achieved += self.locals["env"].info_dict["goal_achieved"]
+            # self.num_agent_rollouts += total_valid_agents
+            # wandb.log(
+            #     {
+            #         "global_step": self.num_timesteps,
+            #         # TODO(ev) this metric is broken
+            #         "metrics/mean_ep_reward_per_agent": self.locals[
+            #             "env"
+            #         ].tot_reward_per_episode
+            #         / total_valid_agents,
+            #         "metrics/perc_off_road": (
+            #             self.perc_off_road / self.num_agent_rollouts
+            #         )
+            #         * 100,
+            #         "metrics/perc_veh_collisions": (
+            #             self.perc_veh_collisions / self.num_agent_rollouts
+            #         )
+            #         * 100,
+            #         "metrics/perc_non_veh_collision": (
+            #             self.perc_non_veh_collision / self.num_agent_rollouts
+            #         )
+            #         * 100,
+            #         "metrics/perc_goal_achieved": (
+            #             self.perc_goal_achieved / self.num_agent_rollouts
+            #         )
+            #         * 100,
+            #     }
+            # )
+            
             self.perc_off_road += self.locals["env"].info_dict["off_road"]
             self.perc_veh_collisions += self.locals["env"].info_dict["veh_collisions"]
             self.perc_non_veh_collision += self.locals["env"].info_dict["non_veh_collision"]
@@ -90,23 +122,25 @@ class MultiAgentCallback(BaseCallback):
                     ].tot_reward_per_episode
                     / total_valid_agents,
                     "metrics/perc_off_road": (
-                        self.perc_off_road / self.num_agent_rollouts
+                        self.locals["env"].info_dict["off_road"] / total_valid_agents
                     )
                     * 100,
                     "metrics/perc_veh_collisions": (
-                        self.perc_veh_collisions / self.num_agent_rollouts
+                        self.locals["env"].info_dict["veh_collisions"] / total_valid_agents
                     )
                     * 100,
                     "metrics/perc_non_veh_collision": (
-                        self.perc_non_veh_collision / self.num_agent_rollouts
+                        self.locals["env"].info_dict["non_veh_collision"] / total_valid_agents
                     )
                     * 100,
                     "metrics/perc_goal_achieved": (
-                        self.perc_goal_achieved / self.num_agent_rollouts
+                        self.locals["env"].info_dict["goal_achieved"] / total_valid_agents
                     )
                     * 100,
                 }
             )
+            
+            # Temporarily disable smoothing
 
             # TODO (dc): Works, valid but hacky way to reset metrics
             # The tricky thing is that the env resets when done (in step), and the callback
