@@ -31,7 +31,6 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
         exec_mode=getattr(gpudrive.madrona.ExecMode, sim_manager_config['exec_mode']),
         gpu_id=sim_manager_config['gpu_id'],
         num_worlds=sim_manager_config['num_worlds'],
-        auto_reset=sim_manager_config['auto_reset'],
         json_path=sim_manager_config['json_path'],
         params=params
     )
