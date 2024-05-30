@@ -9,8 +9,8 @@ namespace gpudrive {
 namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 128;
-inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 6000;
+inline constexpr madrona::CountT kMaxRoadEntityCount = 2000;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 2000;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
@@ -41,7 +41,7 @@ inline constexpr madrona::CountT kTrajectoryLength = 91; // Nocturne has 90 time
 inline constexpr madrona::CountT kMaxRoadGeometryLength = 1810;
 
 inline constexpr madrona::math::Vector3 kPaddingPosition = {
-    0, 0, std::numeric_limits<float>::max()};
+    -11000, -11000, std::numeric_limits<float>::max()};
 }
 
 }

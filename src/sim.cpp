@@ -52,15 +52,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Info>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
-    registry.registerSingleton<ValidState>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
+    registry.registerArchetype<CameraAgent>();
 
     registry.exportSingleton<WorldReset>(
         (uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
-    registry.exportSingleton<ValidState>((uint32_t)ExportID::ValidState);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<Agent, SelfObservation>(
@@ -106,46 +105,18 @@ static inline void initWorld(Engine &ctx)
     generateWorld(ctx);
 }
 
-// This system runs each frame and checks if the current episode is complete
-// or if code external to the application has forced a reset by writing to the
-// WorldReset singleton.
-//
-// If a reset is needed, cleanup the existing world and generate a new one.
+// This system runs each frame and checks if the code external to the
+// application has forced a reset by writing to the WorldReset singleton. If a
+// reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    int32_t should_reset = reset.reset;
-    if (ctx.data().autoReset && ctx.data().numControlledVehicles > 0) {
-        int32_t areAllControlledAgentsDone = 1;
-        for (CountT i = 0; i < ctx.data().numAgents; i++) {
-            Entity agent = ctx.data().agents[i];
-            Done done = ctx.get<Done>(agent);
-            ControlledState controlledState = ctx.get<ControlledState>(agent);
-            if (controlledState.controlledState == ControlMode::BICYCLE && !done.v) {
-                areAllControlledAgentsDone = 0;
-            }
-        }
-        should_reset = areAllControlledAgentsDone;
-    }
-    else if (ctx.data().autoReset && ctx.data().numControlledVehicles == 0) {
-        should_reset = 1;
-        for(CountT i = 0; i < ctx.data().numAgents; i++) {
-            Entity agent = ctx.data().agents[i];
-            if(ctx.get<EntityType>(agent) == EntityType::Padding) {
-                continue;
-            }
-            if(ctx.get<Done>(agent).v == 0) {
-                should_reset = 0;
-                break;
-            }
-        }
+    if (reset.reset == 0) {
+      return;
     }
 
-    if (should_reset != 0) {
-        reset.reset = 0;
-
-        cleanupWorld(ctx);
-        initWorld(ctx);
-    }
+    reset.reset = 0;
+    cleanupWorld(ctx);
+    initWorld(ctx);
 }
 
 // This system packages all the egocentric observations together
@@ -231,7 +202,8 @@ inline void collectObservationsSystem(Engine &ctx,
             continue;
         }
         map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = map_obs.obs[arrIndex].position - model.position;
+        map_obs.obs[arrIndex].position = relative_pos;
+        map_obs.obs[arrIndex].heading = utils::quatToYaw(rot.inv() * ctx.get<Rotation>(road));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxRoadEntityCount)
@@ -255,6 +227,7 @@ inline void movementSystem(Engine &e,
                            const StepsRemaining &stepsRemaining,
                            const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent,
+                           const ResponseType &responseType,
                            Done& done) {
     if (type == EntityType::Padding) {
         return;
@@ -281,8 +254,21 @@ inline void movementSystem(Engine &e,
         }
         else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
         {
-            // Do nothing. 
+            // Do nothing.
         }
+    }
+
+    if(done.v && responseType != ResponseType::Static)
+    {
+        // Case: Agent has not collided but is done. 
+        // This can only happen if the agent has reached goal or the episode has ended.
+        // In that case we teleport the agent. The agent will not collide with anything.
+        position = consts::kPaddingPosition;
+        velocity.linear.x = 0;
+        velocity.linear.y = 0;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        return;
     }
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
@@ -528,23 +514,41 @@ inline void stepTrackerSystem(Engine &ctx,
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
-    auto isExpertAgentInInvalidState = [&](const Loc &candidate) -> bool
+    auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
     {
         auto controlledState = ctx.getCheck<ControlledState>(candidate);
-        if (controlledState.valid() && controlledState.value().controlledState == ControlMode::EXPERT)
+        if (controlledState.valid())
         {
-            auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
-            auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
-            if (!validState)
+            if( controlledState.value().controlledState == ControlMode::EXPERT)
             {
-                return true;
+                // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
+                auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
+                auto validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                if (!validState)
+                {
+                    return true;
+                }
+            }
+            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            {
+                // Case: If a controlled agent gets done, we teleport it to the padding position
+                // Hence we need to ignore the collision detection for it.
+                // The agent can also be done because it collided. 
+                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
+                auto done = ctx.get<Done>(candidate);
+                auto collisionEvent = ctx.getCheck<CollisionDetectionEvent>(candidate);
+                if(done.v && collisionEvent.valid() && !collisionEvent.value().hasCollided.load_relaxed())
+                {
+                    return true;
+                }
             }
         }
         return false;
     };
 
-    if (isExpertAgentInInvalidState(candidateCollision.a) || 
-        isExpertAgentInInvalidState(candidateCollision.b)) {
+    if (isInvalidExpertOrDone(candidateCollision.a) || 
+        isInvalidExpertOrDone(candidateCollision.b)) {
+
         return;
     }
 
@@ -669,29 +673,6 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.vehicle_size = vehicleSize;
 }
 
-inline void validStateSystem(Engine &ctx, ValidState &validOut) {
-    // This assumes StepsRemaining is constant across all agents
-    Entity anyAgent = ctx.data().agents[0];
-    const auto stepsRemaining = ctx.get<StepsRemaining>(anyAgent);
-    const CountT currentStep = getCurrentStep(stepsRemaining);
-
-    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        const auto &trajectory = ctx.get<Trajectory>(agentHandle);
-
-        assert(currentStep < consts::kTrajectoryLength);
-        int32_t isValid = trajectory.valids[currentStep];
-
-        validOut.valid[agentIdx] = static_cast<Validity>(isValid);
-    }
-
-    for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        auto agentHandle = ctx.data().agents[agentIdx];
-        validOut.valid[agentIdx] = Validity::Invalid;
-    }
-}
-
 // Build the task graph
 void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 {
@@ -711,23 +692,19 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             StepsRemaining,
             Trajectory,
             CollisionDetectionEvent,
+            ResponseType,
             Done
         >>({});
-
-    auto updateValidStateSystem =
-        builder
-            .addToGraph<ParallelForNode<Engine, validStateSystem, ValidState>>(
-                {moveSystem});
 
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, {updateValidStateSystem});
+        builder, {moveSystem});
 
     auto findOverlappingEntities =
-        phys::PhysicsSystem::setupBroadphaseOverlapTasks(
+        phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
             builder, {broadphase_setup_sys});
 
     auto detectCollisions = builder.addToGraph<
@@ -741,7 +718,10 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {detectCollisions});
 
     // Finalize physics subsystem work
-    auto phys_done = phys::PhysicsSystem::setupCleanupTasks(
+    auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
+        builder, {agent_zero_vel});
+
+    phys_done = phys::PhysicsSystem::setupCleanupTasks(
         builder, {agent_zero_vel});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -867,7 +847,6 @@ Sim::Sim(Engine &ctx,
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
-    assert(init.map->numObjects <= consts::kMaxAgentCount);
     assert(init.map->numRoadSegments <= consts::kMaxRoadEntityCount);
 
     // Currently the physics system needs an upper bound on the number of
@@ -884,8 +863,6 @@ Sim::Sim(Engine &ctx,
     if (enableRender) {
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
-
-    autoReset = cfg.autoReset;
 
     // Creates agents, walls, etc.
     createPersistentEntities(ctx, init.map);

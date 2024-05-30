@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 
 # Import masked rollout buffer class
-from algorithms.ppo.sb3.rollout_buffer import MaskedRolloutBuffer
+from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
 
 # From stable baselines
 def explained_variance(
@@ -149,8 +149,8 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of samples in rollout step
-            self.num_timesteps += int(env.num_envs)
+            # EDIT_2: Increment the global step by the number of valid samples in rollout step
+            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
 
             # Give access to local variables
             callback.update_locals(locals())
@@ -183,9 +183,6 @@ class IPPO(PPO):
 
         callback.update_locals(locals())
         callback.on_rollout_end()
-
-        # Reset logger info (num_episodes and infos)
-        env._reset_rollout_loggers()
 
         return True
 

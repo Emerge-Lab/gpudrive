@@ -9,6 +9,8 @@
 .vscode/launch.json
 .vscode/settings.json
 .vscode/tasks.json
+/examples/benchmarks/results/
+/maps_16/
 
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
@@ -19,8 +21,7 @@
 # Data
 /formatted_json_v2_no_tl_train
 /waymo_data_new
-
-
+/maps_16
 
 # Logging
 /wandb
@@ -87,6 +88,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*.csv
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
