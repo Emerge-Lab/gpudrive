@@ -56,7 +56,8 @@ class SB3MultiAgentEnv(VecEnv):
         self.obs_dim = self._env.observation_space.shape[0]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
-        self.tot_reward_per_episode = 0
+        self.tot_reward_per_episode = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+        self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
 
         self.num_episodes = 0
         self.info_dict = {
@@ -161,9 +162,8 @@ class SB3MultiAgentEnv(VecEnv):
         self._save_obs(obs)
 
         # Store running total reward across worlds
-        self.tot_reward_per_episode += (
-            reward[~self.dead_agent_mask].sum().item()
-        )            
+        self.tot_reward_per_episode += reward * ~self.dead_agent_mask
+        self.agent_step += 1
         
         # Update dead agent mask: Set to True if agent is done before
         # the end of the episode
@@ -172,6 +172,8 @@ class SB3MultiAgentEnv(VecEnv):
         # Now override the dead agent mask for the reset worlds
         if done_worlds.any().item():
             self.dead_agent_mask[done_worlds] = torch.isnan(done[done_worlds]).to(self.device)
+            self.tot_reward_per_episode[done_worlds] = 0
+            self.agent_step[done_worlds] = 0
 
         return (
             self._obs_from_buf(),
@@ -220,6 +222,11 @@ class SB3MultiAgentEnv(VecEnv):
             controlled_agent_info[:, 3].sum().item()
         )
         self.info_dict["num_finished_agents"] = self.controlled_agent_mask[indices].sum()
+        self.info_dict["mean_reward_per_episode"] = \
+            self.tot_reward_per_episode[indices][self.controlled_agent_mask[indices]].sum().item()
+        # log the agents that are done but did not receive any reward i.e. truncated
+        # TODO(ev) remove hardcoded 91
+        self.info_dict["truncated"] = ((self.agent_step[indices] == 91) * ~self.dead_agent_mask[indices]).sum().item()
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()

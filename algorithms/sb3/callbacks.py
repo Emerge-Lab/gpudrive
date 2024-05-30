@@ -27,6 +27,8 @@ class MultiAgentCallback(BaseCallback):
         self.perc_veh_collisions = deque(maxlen=self.config.logging_collection_window)
         self.perc_non_veh_collision = deque(maxlen=self.config.logging_collection_window)
         self.num_agent_rollouts = deque(maxlen=self.config.logging_collection_window)
+        self.mean_reward_per_episode = deque(maxlen=self.config.logging_collection_window)
+        self.perc_truncated = deque(maxlen=self.config.logging_collection_window)
         
         self._define_wandb_metrics()  # Set x-axis for metrics
 
@@ -83,15 +85,14 @@ class MultiAgentCallback(BaseCallback):
             self.perc_veh_collisions.append(self.locals["env"].info_dict["veh_collisions"])
             self.perc_non_veh_collision.append(self.locals["env"].info_dict["non_veh_collision"])
             self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
+            self.mean_reward_per_episode.append(self.locals["env"].info_dict["mean_reward_per_episode"])
+            self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
             # TODO(ev) add logging of agents that did not achieve their goals
             wandb.log(
                 {
                     "global_step": self.num_timesteps,
                     # TODO(ev) this metric is broken
-                    "metrics/mean_ep_reward_per_agent": self.locals[
-                        "env"
-                    ].tot_reward_per_episode
-                    / self.num_agent_rollouts.sum(),
+                    "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
                     "metrics/perc_off_road": (
                         sum(self.perc_off_road) / sum(self.num_agent_rollouts)
                     )
@@ -108,12 +109,12 @@ class MultiAgentCallback(BaseCallback):
                         sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
                     )
                     * 100,
+                    "metrics/perc_truncated": (
+                        sum(self.perc_truncated) / sum(self.num_agent_rollouts)
+                    )
+                    * 100,
                 }
             )
-
-        
-            # TODO(ev) this is broken
-            self.locals["env"].tot_reward_per_episode = 0
 
     def _on_rollout_end(self) -> None:
         """

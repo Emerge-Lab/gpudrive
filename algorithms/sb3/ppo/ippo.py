@@ -149,8 +149,8 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of samples in rollout step
-            self.num_timesteps += int(env.num_envs)
+            # EDIT_2: Increment the global step by the number of valid samples in rollout step
+            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
 
             # Give access to local variables
             callback.update_locals(locals())
