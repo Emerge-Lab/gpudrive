@@ -112,6 +112,7 @@ namespace gpudrive
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
+        bool initAgentsAsStatic = false; // Default: false
     };
 
     struct WorldInit

@@ -42,6 +42,12 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Info>(agent) = Info{};
     ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
 
+    if(ctx.get<ResponseType>(agent) == ResponseType::Static)
+    {
+        // Make sure the agent does not move.
+        ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
+    }
+
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
@@ -73,7 +79,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < 0.5f)
+    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold && ctx.data().params.initAgentsAsStatic)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
