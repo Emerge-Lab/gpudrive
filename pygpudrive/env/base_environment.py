@@ -496,7 +496,7 @@ class Env(gym.Env):
             logging.info(f"Device: {self.device}")
             logging.info(f"Number of worlds: {self.num_sims}")
             logging.info(
-                f"Number of maps in data directory: {len(glob.glob(f'{self.data_dir}/*.json'))}"
+                f"Number of maps in data directory: {len(glob.glob(f'{self.data_dir}/*.json')) - 1}"
             )
             logging.info(
                 f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents_across_worlds}"
