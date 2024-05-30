@@ -351,7 +351,7 @@ inline void agentZeroVelSystem(Engine &,
 
 static inline float distObs(float v)
 {
-    return v / consts::worldLength;;
+    return v / consts::worldLength;
 }
 
 static inline float encodeType(EntityType type)
