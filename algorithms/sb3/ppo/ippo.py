@@ -1,4 +1,6 @@
 import logging
+import time
+
 import torch
 from torch.nn import functional as F
 import numpy as np
@@ -66,6 +68,8 @@ class IPPO(PPO):
             self.policy.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
+        
+        time_rollout = time.perf_counter()
 
         while n_steps < n_rollout_steps:
             if (
@@ -113,9 +117,12 @@ class IPPO(PPO):
                 ].reshape(-1, obs_tensor.shape[-1])
 
                 # Predict actions, vals and log_probs given obs
+                time_actions = time.perf_counter()
                 actions_tmp, values_tmp, log_prob_tmp = self.policy(
                     obs_tensor_alive
                 )
+                nn_fps = actions_tmp.shape[0] / (time.perf_counter() - time_actions)
+                self.logger.record("rollout/nn_fps", nn_fps)
 
                 # Store
                 (
@@ -152,7 +159,7 @@ class IPPO(PPO):
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
-
+            print(int((~rewards.isnan()).float().sum().item()), self.num_timesteps)
             # Give access to local variables
             callback.update_locals(locals())
             if callback.on_step() is False:
@@ -173,6 +180,12 @@ class IPPO(PPO):
             )
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
+            
+        total_steps = self.n_envs * n_rollout_steps
+        elapsed_time = time.perf_counter() - time_rollout
+        fps = total_steps / elapsed_time
+        print(fps)
+        self.logger.record("rollout/fps", fps)
 
         with torch.no_grad():
             # Compute value for the last timestep

@@ -89,7 +89,6 @@ class MultiAgentCallback(BaseCallback):
             self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
             wandb.log(
                 {
-                    "global_step": self.num_timesteps,
                     "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
                     "metrics/perc_off_road": (
                         sum(self.perc_off_road) / sum(self.num_agent_rollouts)

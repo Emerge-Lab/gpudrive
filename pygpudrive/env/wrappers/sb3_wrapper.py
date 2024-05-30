@@ -46,7 +46,7 @@ class SB3MultiAgentEnv(VecEnv):
         )
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count
-        self.num_envs = self._env.cont_agent_mask.sum()
+        self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
         self.controlled_agent_mask = self._env.cont_agent_mask
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
@@ -117,7 +117,10 @@ class SB3MultiAgentEnv(VecEnv):
         # Unsqueeze action tensor to a shape the gpudrive env expects
         self.actions_tensor[self.controlled_agent_mask] = actions
         # Step the environment
-        _, reward, done, info = self._env.step(self.actions_tensor)
+        self._env.step_dynamics(self.actions_tensor)
+        reward = self._env.get_rewards()
+        done = self._env.get_dones()
+        info = self._env.get_infos()
         # # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done

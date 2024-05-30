@@ -29,7 +29,7 @@ if __name__ == "__main__":
     )
 
     exp_config = ExperimentConfig(
-        render=True,
+        render=False,
     )
 
     # Make SB3-compatible environment
