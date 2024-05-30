@@ -3,7 +3,33 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
+from enum import Enum
+from typing import Tuple
 
+class RenderMode(Enum):
+    PYGAME_ABSOLUTE = "pygame_absolute"
+    PYGAME_EGOCENTRIC = "pygame_egocentric"
+    PYGAME_LIDAR = "pygame_lidar"
+    MADRONA_RGB = "madrona_rgb"
+    MADRONA_DEPTH = "madrona_depth"
+
+class PygameOption(Enum):
+    HUMAN = "human"
+    RGB = "rgb"
+
+class MadronaOption(Enum):
+    AGENT_VIEW = "agent_view"
+    TOP_DOWN = "top_down"
+
+
+@dataclass
+class RenderConfig:
+    render_mode: RenderMode
+    view_option: Enum
+    resolution: Tuple[int, int]
+
+    def __str__(self):
+        return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
 
 @dataclass
 class EnvConfig:
