@@ -102,8 +102,9 @@ class IPPO(PPO):
 
                 # Get indices of alive agent ids
                 # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
+                # TODO(ev) I don't like that we're accessing agent attributes here like this
                 alive_agent_mask = ~(
-                    env.dead_agent_mask.reshape(env.num_envs, 1)
+                    env.dead_agent_mask[env.controlled_agent_mask].reshape(env.num_envs, 1)
                 )  # .expand_as(obs_tensor)
 
                 # Use boolean indexing to select elements in obs_tensor
