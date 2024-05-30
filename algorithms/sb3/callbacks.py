@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import torch
 import wandb
@@ -18,6 +20,16 @@ class MultiAgentCallback(BaseCallback):
         self.wandb_run = wandb_run
         self.num_rollouts = 0
 
+        # TODO(ev) don't just define these here
+        self.mean_ep_reward_per_agent = deque(maxlen=self.config.logging_collection_window)
+        self.perc_goal_achieved = deque(maxlen=self.config.logging_collection_window)
+        self.perc_off_road = deque(maxlen=self.config.logging_collection_window)
+        self.perc_veh_collisions = deque(maxlen=self.config.logging_collection_window)
+        self.perc_non_veh_collision = deque(maxlen=self.config.logging_collection_window)
+        self.num_agent_rollouts = deque(maxlen=self.config.logging_collection_window)
+        self.mean_reward_per_episode = deque(maxlen=self.config.logging_collection_window)
+        self.perc_truncated = deque(maxlen=self.config.logging_collection_window)
+        
         self._define_wandb_metrics()  # Set x-axis for metrics
 
     def _define_wandb_metrics(self):
@@ -64,105 +76,48 @@ class MultiAgentCallback(BaseCallback):
         """
 
         # LOG AND RESET METRICS AFTER EACH EPISODE (when all worlds are done)
-        if self.locals["env"].reset_flag:
-            dead_agent_mask = self.locals["env"].dead_agent_mask
-            done = self.unbatchify(self.locals["dones"])[~dead_agent_mask]
-            total_valid_agents = done.shape[0]
-
+        if len(self.locals["env"].info_dict) > 0:
+            # total number of agents
+            self.num_agent_rollouts.append(self.locals["env"].info_dict[
+                "num_finished_agents"
+            ])
+            self.perc_off_road.append(self.locals["env"].info_dict["off_road"])
+            self.perc_veh_collisions.append(self.locals["env"].info_dict["veh_collisions"])
+            self.perc_non_veh_collision.append(self.locals["env"].info_dict["non_veh_collision"])
+            self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
+            self.mean_reward_per_episode.append(self.locals["env"].info_dict["mean_reward_per_episode"])
+            self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
             wandb.log(
                 {
                     "global_step": self.num_timesteps,
-                    "metrics/mean_ep_reward_per_agent": self.locals[
-                        "env"
-                    ].tot_reward_per_episode
-                    / total_valid_agents,
+                    "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
                     "metrics/perc_off_road": (
-                        self.locals["env"].info_dict["off_road"]
-                        / total_valid_agents
+                        sum(self.perc_off_road) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_veh_collisions": (
-                        self.locals["env"].info_dict["veh_collisions"]
-                        / total_valid_agents
+                        sum(self.perc_veh_collisions) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_non_veh_collision": (
-                        self.locals["env"].info_dict["non_veh_collision"]
-                        / total_valid_agents
+                        sum(self.perc_non_veh_collision) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_goal_achieved": (
-                        self.locals["env"].info_dict["goal_achieved"]
-                        / total_valid_agents
+                        sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
+                    )
+                    * 100,
+                    "metrics/perc_truncated": (
+                        sum(self.perc_truncated) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                 }
             )
 
-            # TODO (dc): Works, valid but hacky way to reset metrics
-            # The tricky thing is that the env resets when done (in step), and the callback
-            # call is after step
-            # We use a reset flag to reset the env wrapper metrics
-            self.locals["env"].tot_reward_per_episode = 0
-            self.locals["env"].info_dict = {
-                "off_road": 0,
-                "veh_collisions": 0,
-                "non_veh_collision": 0,
-                "goal_achieved": 0,
-            }
-
     def _on_rollout_end(self) -> None:
         """
         Triggered before updating the policy.
         """
-
-        # # Get the total number of controlled agents we are controlling
-        # # The number of controllable agents is different per scenario
-        # num_controlled_agents = self.locals["env"]._tot_controlled_valid_agents_across_worlds
-
-        # # Filter out all nans
-        # rollout_rewards = np.nan_to_num(
-        #     (self.locals["rollout_buffer"].rewards.cpu().detach().numpy()),
-        #     nan=0,
-        # )
-
-        # mean_reward_per_agent_per_episode = rollout_rewards.sum() / (
-        #     num_controlled_agents * self.locals["env"].num_episodes
-        # )
-
-        # rollout_observations = np.nan_to_num(
-        #     self.locals["rollout_buffer"].observations.cpu().detach().numpy(),
-        #     nan=0,
-        # )
-
-        # # Evaluation metrics
-        # rollout_info = self.locals["env"].infos
-        # for key, value in rollout_info.items():
-        #     self.locals["env"].infos[key] = value / (
-        #          self.locals["env"].num_episodes * num_controlled_agents
-        #     )
-        #     self.logger.record(f"metrics/{key}", self.locals["env"].infos[key])
-
-        # # Other
-        # self.logger.record("rollout/global_step", self.num_timesteps)
-        # self.logger.record(
-        #     "rollout/num_tot_episodes_in_rollout",
-        #      self.locals["env"].num_episodes * self.locals["env"].num_worlds,
-        # )
-        # self.logger.record("rollout/sum_ep_return", rollout_rewards.sum())
-        # self.logger.record(
-        #     "rollout/avg_ep_return", mean_reward_per_agent_per_episode.item()
-        # )
-        # self.logger.record("data/obs_max", rollout_observations.max())
-        # self.logger.record("data/obs_min", rollout_observations.min())
-
-        # hist = np.histogram(rollout_observations.reshape(-1))
-        # wandb.log(
-        #     {
-        #         "global_step": self.num_timesteps,
-        #         "data/obs_hist": wandb.Histogram(np_histogram=hist),
-        #     }
-        # )
 
         # Render the environment
         if self.config.render:
@@ -204,18 +159,17 @@ class MultiAgentCallback(BaseCallback):
         env = self.locals["env"]
 
         obs = env.reset()
-        obs = self._batchify_and_filter_obs(obs, env)
 
         frames = []
 
         for _ in range(90):
 
             action, _ = policy.predict(obs.detach().cpu().numpy())
-            action = self._pad_actions(action, env, render_world_idx)
+            action = torch.Tensor(action).to("cuda")
 
             # Step the environment
             obs, _, _, _ = env.step(action)
-            obs = self._batchify_and_filter_obs(obs, env)
+            # obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
             frames.append(frame)

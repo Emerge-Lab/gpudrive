@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=15,
+        num_worlds=150,
         max_cont_agents=128,
         data_dir=exp_config.data_dir,
         device=exp_config.device,
