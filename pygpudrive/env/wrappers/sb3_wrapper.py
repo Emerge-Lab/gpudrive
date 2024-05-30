@@ -117,9 +117,9 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Step the environment
         self._env.step_dynamics(actions)
-        
-        # Get the dones for resets
-        done = self._env.get_dones()
+        _, reward, done, info = self._env.get_transitions()
+        # # Get the dones for resets
+        # done = self._env.get_dones()
         # Reset any of the worlds that are done
         # First, find the indices of all the done worlds
         # this is where the done flag for a world equals the sum of 
@@ -127,17 +127,16 @@ class SB3MultiAgentEnv(VecEnv):
         done_worlds = torch.where(
             (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1) == self.controlled_agent_mask.sum(dim=1)
         )[0]
-        info = self._env.get_info()
+        # info = self._env.get_info()
         if done_worlds.any().item():
             self._update_info_dict(info, done_worlds)
             for world_idx in done_worlds:
                 self.num_episodes += 1
                 self._env.sim.reset(world_idx.item())
-                # reset the corresponding masks
-                self.dead_agent_mask[world_idx] = torch.isnan(done[world_idx]).to(self.device)
-            
-        obs, reward, done, info = self._env.get_transitions()
-
+                
+        # now construct obs after the reset
+        obs = self._env.get_obs()
+        
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
             (self.num_worlds, self.max_agent_count), fill_value=float("nan")
@@ -169,6 +168,10 @@ class SB3MultiAgentEnv(VecEnv):
         # Update dead agent mask: Set to True if agent is done before
         # the end of the episode
         self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
+        
+        # Now override the dead agent mask for the reset worlds
+        if done_worlds.any().item():
+            self.dead_agent_mask[done_worlds] = torch.isnan(done[done_worlds]).to(self.device)
 
         return (
             self._obs_from_buf(),
