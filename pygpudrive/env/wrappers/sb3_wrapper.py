@@ -60,7 +60,6 @@ class SB3MultiAgentEnv(VecEnv):
         self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
 
-
         self.num_episodes = 0
         self.info_dict = {
             "off_road": 0,
@@ -117,9 +116,8 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
         self.actions_tensor[self.controlled_agent_mask] = actions
-
         # Step the environment
-        _, reward, done, info = self._env.step(actions)
+        _, reward, done, info = self._env.step(self.actions_tensor)
         # # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done
