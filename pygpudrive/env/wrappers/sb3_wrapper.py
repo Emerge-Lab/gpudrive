@@ -117,8 +117,7 @@ class SB3MultiAgentEnv(VecEnv):
         actions = actions.reshape((self.num_worlds, self.max_agent_count))
 
         # Step the environment
-        self._env.step_dynamics(actions)
-        _, reward, done, info = self._env.get_transitions()
+        _, reward, done, info = self._env.step(actions)
         # # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done
