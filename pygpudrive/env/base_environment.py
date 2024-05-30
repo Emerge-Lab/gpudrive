@@ -138,7 +138,7 @@ class Env(gym.Env):
 
         return self.get_obs()
 
-    def step(self, actions):
+    def step_dynamics(self, actions):
         """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
 
         Args:
@@ -149,20 +149,8 @@ class Env(gym.Env):
             self._apply_actions(actions)
 
         self.sim.step()
-
-        obs = self.get_obs()
-
-        reward = (
-            torch.empty(self.num_sims, self.max_agent_count)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
-        reward[self.cont_agent_mask] = (
-            self.sim.reward_tensor()
-            .to_torch()
-            .squeeze(dim=2)[self.cont_agent_mask]
-        )
-
+        
+    def get_dones(self):
         done = (
             torch.empty(self.num_sims, self.max_agent_count)
             .fill_(float("nan"))
@@ -174,7 +162,9 @@ class Env(gym.Env):
             .squeeze(dim=2)
             .to(done.dtype)[self.cont_agent_mask]
         )
-
+        return done
+    
+    def get_info(self):
         if self.config.eval_expert_mode:
             # This is true when we are evaluating the expert performance
             info = self.sim.info_tensor().to_torch().squeeze(dim=2)
@@ -191,6 +181,23 @@ class Env(gym.Env):
                 .squeeze(dim=2)
                 .to(info.dtype)[self.cont_agent_mask]
             ).to(self.device)
+        return info
+        
+    def get_transitions(self):
+        obs = self.get_obs()
+        reward = (
+            torch.empty(self.num_sims, self.max_agent_count)
+            .fill_(float("nan"))
+            .to(self.device)
+        )
+        reward[self.cont_agent_mask] = (
+            self.sim.reward_tensor()
+            .to_torch()
+            .squeeze(dim=2)[self.cont_agent_mask]
+        )
+
+        done = self.get_dones()
+        info = self.get_info()
 
         # if info[self.cont_agent_mask].sum().item() > 3:
         #     print("bug")
