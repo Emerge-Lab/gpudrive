@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import torch
 import wandb
@@ -17,15 +19,15 @@ class MultiAgentCallback(BaseCallback):
         self.config = config
         self.wandb_run = wandb_run
         self.num_rollouts = 0
-        self.num_agent_rollouts = 0 # This tracks total agent rollouts
-        
-        # TODO(ev) don't just define these here
-        self.mean_ep_reward_per_agent = 0
-        self.perc_goal_achieved = 0
-        self.perc_off_road = 0
-        self.perc_veh_collisions = 0
-        self.perc_non_veh_collision = 0 
 
+        # TODO(ev) don't just define these here
+        self.mean_ep_reward_per_agent = deque(maxlen=self.config.logging_collection_window)
+        self.perc_goal_achieved = deque(maxlen=self.config.logging_collection_window)
+        self.perc_off_road = deque(maxlen=self.config.logging_collection_window)
+        self.perc_veh_collisions = deque(maxlen=self.config.logging_collection_window)
+        self.perc_non_veh_collision = deque(maxlen=self.config.logging_collection_window)
+        self.num_agent_rollouts = deque(maxlen=self.config.logging_collection_window)
+        
         self._define_wandb_metrics()  # Set x-axis for metrics
 
     def _define_wandb_metrics(self):
@@ -74,45 +76,14 @@ class MultiAgentCallback(BaseCallback):
         # LOG AND RESET METRICS AFTER EACH EPISODE (when all worlds are done)
         if len(self.locals["env"].info_dict) > 0:
             # total number of agents
-            total_valid_agents = self.locals["env"].info_dict["num_finished_agents"]
-
-            # self.perc_off_road += self.locals["env"].info_dict["off_road"]
-            # self.perc_veh_collisions += self.locals["env"].info_dict["veh_collisions"]
-            # self.perc_non_veh_collision += self.locals["env"].info_dict["non_veh_collision"]
-            # self.perc_goal_achieved += self.locals["env"].info_dict["goal_achieved"]
-            # self.num_agent_rollouts += total_valid_agents
-            # wandb.log(
-            #     {
-            #         "global_step": self.num_timesteps,
-            #         # TODO(ev) this metric is broken
-            #         "metrics/mean_ep_reward_per_agent": self.locals[
-            #             "env"
-            #         ].tot_reward_per_episode
-            #         / total_valid_agents,
-            #         "metrics/perc_off_road": (
-            #             self.perc_off_road / self.num_agent_rollouts
-            #         )
-            #         * 100,
-            #         "metrics/perc_veh_collisions": (
-            #             self.perc_veh_collisions / self.num_agent_rollouts
-            #         )
-            #         * 100,
-            #         "metrics/perc_non_veh_collision": (
-            #             self.perc_non_veh_collision / self.num_agent_rollouts
-            #         )
-            #         * 100,
-            #         "metrics/perc_goal_achieved": (
-            #             self.perc_goal_achieved / self.num_agent_rollouts
-            #         )
-            #         * 100,
-            #     }
-            # )
-            
-            self.perc_off_road += self.locals["env"].info_dict["off_road"]
-            self.perc_veh_collisions += self.locals["env"].info_dict["veh_collisions"]
-            self.perc_non_veh_collision += self.locals["env"].info_dict["non_veh_collision"]
-            self.perc_goal_achieved += self.locals["env"].info_dict["goal_achieved"]
-            self.num_agent_rollouts += total_valid_agents
+            self.num_agent_rollouts.append(self.locals["env"].info_dict[
+                "num_finished_agents"
+            ])
+            self.perc_off_road.append(self.locals["env"].info_dict["off_road"])
+            self.perc_veh_collisions.append(self.locals["env"].info_dict["veh_collisions"])
+            self.perc_non_veh_collision.append(self.locals["env"].info_dict["non_veh_collision"])
+            self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
+            # TODO(ev) add logging of agents that did not achieve their goals
             wandb.log(
                 {
                     "global_step": self.num_timesteps,
@@ -120,40 +91,29 @@ class MultiAgentCallback(BaseCallback):
                     "metrics/mean_ep_reward_per_agent": self.locals[
                         "env"
                     ].tot_reward_per_episode
-                    / total_valid_agents,
+                    / self.num_agent_rollouts.sum(),
                     "metrics/perc_off_road": (
-                        self.locals["env"].info_dict["off_road"] / total_valid_agents
+                        sum(self.perc_off_road) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_veh_collisions": (
-                        self.locals["env"].info_dict["veh_collisions"] / total_valid_agents
+                        sum(self.perc_veh_collisions) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_non_veh_collision": (
-                        self.locals["env"].info_dict["non_veh_collision"] / total_valid_agents
+                        sum(self.perc_non_veh_collision) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                     "metrics/perc_goal_achieved": (
-                        self.locals["env"].info_dict["goal_achieved"] / total_valid_agents
+                        sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
                     )
                     * 100,
                 }
             )
-            
-            # Temporarily disable smoothing
 
-            # TODO (dc): Works, valid but hacky way to reset metrics
-            # The tricky thing is that the env resets when done (in step), and the callback
-            # call is after step
-            # We use a reset flag to reset the env wrapper metrics
+        
             # TODO(ev) this is broken
             self.locals["env"].tot_reward_per_episode = 0
-            # self.locals["env"].info_dict = {
-            #     "off_road": 0,
-            #     "veh_collisions": 0,
-            #     "non_veh_collision": 0,
-            #     "goal_achieved": 0,
-            # }
 
     def _on_rollout_end(self) -> None:
         """

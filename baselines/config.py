@@ -22,6 +22,7 @@ class ExperimentConfig:
     # TODO: Logging
     log_dir: str = "logs"
     use_wandb: bool = True
+    logging_collection_window: int = 1000 # how many trajectories we average logs over
 
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
