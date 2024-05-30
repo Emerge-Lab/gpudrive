@@ -351,7 +351,7 @@ inline void agentZeroVelSystem(Engine &,
 
 static inline float distObs(float v)
 {
-    return v;
+    return v / consts::worldLength;;
 }
 
 static inline float encodeType(EntityType type)
@@ -387,8 +387,8 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
         float hit_t;
         Vector3 hit_normal;
         Entity hit_entity =
-            bvh.traceRay(pos, ray_dir, &hit_t,
-                         &hit_normal, 500.f);
+            bvh.traceRay(pos + 0.5f * math::up, ray_dir, &hit_t,
+                         &hit_normal, 200.f);
 
         if (hit_entity == Entity::none()) {
             lidar.samples[idx] = {
@@ -412,12 +412,8 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 
-    // if (idx < consts::numLidarSamples) {
-    //     traceRay(idx);
-    // }
-    while (idx < consts::numLidarSamples) {
+    if (idx < consts::numLidarSamples) {
         traceRay(idx);
-        idx += 32;
     }
 #else
     for (CountT i = 0; i < consts::numLidarSamples; i++) {
