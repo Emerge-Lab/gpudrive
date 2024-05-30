@@ -453,6 +453,7 @@ Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg;
+    sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
     std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
