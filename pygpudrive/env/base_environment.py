@@ -19,7 +19,7 @@ import logging
 
 logging.getLogger(__name__)
 
-#os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
@@ -120,7 +120,9 @@ class Env(gym.Env):
         self.max_cont_agents = max_cont_agents
 
         # Number of valid controlled agents across worlds (without padding agents)
-        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -137,7 +139,7 @@ class Env(gym.Env):
             self.sim.reset(sim_idx)
 
         return self.get_obs()
-        
+
     def get_dones(self):
         done = (
             torch.empty(self.num_sims, self.max_agent_count)
@@ -151,7 +153,7 @@ class Env(gym.Env):
             .to(done.dtype)[self.cont_agent_mask]
         )
         return done
-    
+
     def get_info(self):
         if self.config.eval_expert_mode:
             # This is true when we are evaluating the expert performance
@@ -170,7 +172,7 @@ class Env(gym.Env):
                 .to(info.dtype)[self.cont_agent_mask]
             ).to(self.device)
         return info
-        
+
     def step(self, actions):
         """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
 
@@ -445,7 +447,7 @@ class Env(gym.Env):
             self.config.max_rel_agent_pos,
         )
 
-        # Orientation
+        # Orientation (heading)
         obs[:, :, :, 3] /= self.config.max_orientation_rad
 
         # Vehicle length and width
@@ -453,14 +455,24 @@ class Env(gym.Env):
         obs[:, :, :, 5] /= self.config.max_veh_width
 
         # Object type
-        # TODO: One hot encode
+        shifted_type_obs = obs[:, :, :, 6] - 6
+        one_hot_object_type = torch.nn.functional.one_hot(
+            torch.where(
+                condition=shifted_type_obs >= 0,
+                input=shifted_type_obs,
+                other=0,
+            ).long(),
+            num_classes=4,
+        )
+        # Concatenate the one-hot encoding with the rest of the features
+        obs = torch.concat((obs, one_hot_object_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
 
-        # Position coordinates
+        # Road point coordinates
         obs[:, :, :, 0] = self._norm(
             obs[:, :, :, 0],
             self.config.min_rm_coord,
@@ -473,12 +485,20 @@ class Env(gym.Env):
             self.config.max_rm_coord,
         )
 
-        # Orientation
-        obs[:, :, :, 2] /= self.config.max_orientation_rad
+        # Road line segment length
+        # TODO: Check what a good value for the max road line segment length is
+        obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        # TODO: Type of road entity
-        # Remove for now
-        obs = obs[:, :, :, :3]
+        # Road point orientation
+        obs[:, :, :, 5] /= self.config.max_orientation_rad
+
+        # One-hot encode the road types
+        one_hot_road_type = torch.nn.functional.one_hot(
+            obs[:, :, :, 6].long(), num_classes=7
+        )
+
+        # Concatenate the one-hot encoding with the rest of the features
+        obs = torch.cat((obs, one_hot_road_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
@@ -517,13 +537,13 @@ if __name__ == "__main__":
     )
 
     NUM_CONT_AGENTS = 128
-    NUM_WORLDS = 1
+    NUM_WORLDS = 10
 
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data_repeat",
+        data_dir="waymo_data",
         device="cuda",
         render_mode="rgb_array",
     )
