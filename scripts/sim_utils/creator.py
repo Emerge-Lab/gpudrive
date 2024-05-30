@@ -20,6 +20,9 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
     params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])
     params.maxNumControlledVehicles = params_config['maxNumControlledVehicles']
+    params.IgnoreNonVehicles = params_config['IgnoreNonVehicles']
+    params.roadObservationAlgorithm = getattr(gpudrive.FindRoadObservationsWith, params_config['roadObservationAlgorithm'])
+    params.initOnlyValidAgentsAtFirstStep = params_config['initOnlyValidAgentsAtFirstStep']
     params.rewardParams = reward_params
 
     # Initialize SimManager with parameters from the config

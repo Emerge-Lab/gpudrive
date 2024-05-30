@@ -1,16 +1,20 @@
 parameters:
-  collisionBehaviour: Ignore
-  datasetInitOptions: PadN
+  collisionBehaviour: AgentRemoved
+  datasetInitOptions: FirstN
   maxNumControlledVehicles: 10000
   observationRadius: 1000.0
   polylineReductionThreshold: 10.0
   rewardParams: reward_params
+  IgnoreNonVehicles: true
+  roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
+  initOnlyValidAgentsAtFirstStep: true
+
 reward_params:
   distanceToExpertThreshold: 1.0
   distanceToGoalThreshold: 1.0
   rewardType: DistanceBased
+
 sim_manager:
-  auto_reset: true
   exec_mode: CUDA
   gpu_id: 0
   json_path: /home/aarav/gpudrive/nocturne_data
