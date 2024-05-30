@@ -52,12 +52,8 @@ namespace gpudrive
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
-<<<<<<< ap_LidarFlag
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
             .def_rw("enableLidar", &Parameters::enableLidar);
-=======
-            .def_rw("initOnlyValidAgentsAtFirstStep", &Parameters::initOnlyValidAgentsAtFirstStep);
->>>>>>> main
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
