@@ -79,7 +79,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold && ctx.data().params.initAgentsAsStatic)
+    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
