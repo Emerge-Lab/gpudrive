@@ -37,6 +37,13 @@ def run_bench(args):
         run_command(command_template.format(args.totalNumEnvs), args.profiling)
         return
 
+    if args.runExponential:
+        # run 1, 2 , ... args.totalNumEnvs
+        env_list =  [2**i for i in range(0, args.totalNumEnvs.bit_length())]
+        env_list.append(args.totalNumEnvs)
+        for num_envs in tqdm(env_list, desc="Overall progress", unit="env", position=0):
+            run_command(command_template.format(num_envs), args.profiling)
+
     for num_envs in tqdm(range(1, args.totalNumEnvs + 1, args.stepSize), desc="Overall progress", unit="env", position=0):
         if args.randomized:
             for _ in range(args.totalNumEnvs + 1 - num_envs):
@@ -82,6 +89,7 @@ def restoreConfig():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='GPUDrive Benchmarking Tool')
     parser.add_argument('--totalNumEnvs', type=int, help='Num envs to run benchmark upto (default: 150)', default=100, required=False)
+    parser.add_argument('--runExponential', help='Run the benchmark with exponential step size', action='store_true', required=False, default=True)
     parser.add_argument('--stepSize', type=int, help='Step size for num envs (default: 1)', default=1, required=False)
     parser.add_argument('--oneOff', help='Run the benchmark only once', action='store_true', required=False)
     parser.add_argument('--randomized', help='Randomize the dataset. For every number of envs, 100 iterations of benchmark are run using randomized subset of the dataset.', action='store_true', required=False)
