@@ -78,8 +78,20 @@ def run_speed_bench(
     total_reset_time = 0
     total_valid_frames = 0
     total_agent_frames = 0
+    total_useful_agent_frames = 0
     # buffer = []
 
+    def get_shapes(sim):
+        shape = sim.shape_tensor().to_torch()
+        useful_num_agents, useful_num_roads = (
+            torch.sum(shape[:, 0]).item(),
+            torch.sum(shape[:, 1]).item(),
+        )  # shape is a tensor of shape (num_envs, 2)
+        num_envs = shape.shape[0]
+
+        actual_num_agents = sim.self_observation_tensor().to_torch().shape[1] * num_envs
+        actual_num_roads = sim.map_observation_tensor().to_torch().shape[1] * num_envs
+        return actual_num_agents, actual_num_roads, useful_num_agents, useful_num_roads
     # Make simulator
     sim = make_sim(
         data_dir=data_dir,
@@ -87,6 +99,8 @@ def run_speed_bench(
         device=device,
         actor_type=actor_type,
     )
+
+    actual_agents, actual_roads, useful_agents, useful_roads = get_shapes(sim)
 
     for sim_idx in range(batch_size):
         obs = sim.reset(sim_idx)
@@ -122,6 +136,9 @@ def run_speed_bench(
         total_valid_frames += (
             (sim.controlled_state_tensor().to_torch() == 1).sum().item()
         )
+
+        total_useful_agent_frames += useful_agents
+
         total_agent_frames += (
             sim.controlled_state_tensor().to_torch().flatten().shape[0]
         )
@@ -139,6 +156,7 @@ def run_speed_bench(
         start_reset = time.time()
         for sim_idx in range(batch_size):
             obs = sim.reset(sim_idx)
+        sim.step()
         end_reset = time.time()
         total_reset_time += end_reset - start_reset
 
@@ -149,7 +167,10 @@ def run_speed_bench(
             do_n_resets,
             episode_length,
             total_valid_frames,
+            total_useful_agent_frames,
             total_agent_frames,
+            useful_roads,
+            actual_roads,
             valid_obj_dist,
         )
     )
@@ -200,7 +221,10 @@ if __name__ == "__main__":
     tot_resets = np.zeros(len(BATCH_SIZE_LIST))
     tot_steps = np.zeros(len(BATCH_SIZE_LIST))
     tot_valid_frames = np.zeros(len(BATCH_SIZE_LIST))
+    tot_useful_agent_frames = np.zeros(len(BATCH_SIZE_LIST))
     tot_agent_frames = np.zeros(len(BATCH_SIZE_LIST))
+    actual_roads = np.zeros(len(BATCH_SIZE_LIST))
+    useful_roads = np.zeros(len(BATCH_SIZE_LIST))
     valid_obj_dist_lst = []
 
     pbar = tqdm(BATCH_SIZE_LIST, colour="green")
@@ -225,7 +249,10 @@ if __name__ == "__main__":
             tot_resets[idx],
             tot_steps[idx],
             tot_valid_frames[idx],
+            tot_useful_agent_frames[idx],
             tot_agent_frames[idx],
+            useful_roads[idx],
+            actual_roads[idx],
             valid_obj_dist,
         ) = result
 
@@ -251,6 +278,9 @@ if __name__ == "__main__":
             "tot_reset_time (s)": tot_reset_times,
             "val_agent_frames": tot_valid_frames,
             "tot_agent_frames": tot_agent_frames,
+            "tot_useful_agent_frames": tot_useful_agent_frames,
+            "useful_roads": useful_roads,
+            "actual_roads": actual_roads,
         }
     )
 
