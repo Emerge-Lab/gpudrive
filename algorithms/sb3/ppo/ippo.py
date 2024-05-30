@@ -102,8 +102,9 @@ class IPPO(PPO):
 
                 # Get indices of alive agent ids
                 # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
+                # TODO(ev) I don't like that we're accessing agent attributes here like this
                 alive_agent_mask = ~(
-                    env.dead_agent_mask.reshape(env.num_envs, 1)
+                    env.dead_agent_mask[env.controlled_agent_mask].reshape(env.num_envs, 1)
                 )  # .expand_as(obs_tensor)
 
                 # Use boolean indexing to select elements in obs_tensor
@@ -149,8 +150,8 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of samples in rollout step
-            self.num_timesteps += int(env.num_envs)
+            # EDIT_2: Increment the global step by the number of valid samples in rollout step
+            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
 
             # Give access to local variables
             callback.update_locals(locals())
