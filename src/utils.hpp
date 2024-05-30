@@ -1,9 +1,9 @@
 #pragma once
 
+#include "types.hpp"
 #include <cmath>
 #include <madrona/components.hpp>
 #include <madrona/mw_gpu_entry.hpp>
-#include "types.hpp"
 
 namespace gpudrive {
 namespace utils {
@@ -27,37 +27,38 @@ inline float quatToYaw(madrona::base::Rotation q) {
 class ReferenceFrame {
 public:
   ReferenceFrame(const madrona::math::Vector2 &position,
-		 const madrona::base::Rotation &rotation)
-    : referenceRotation(rotation), referencePosition(position) {}
+                 const madrona::base::Rotation &rotation)
+      : referenceRotation(rotation), referencePosition(position) {}
 
-  gpudrive::MapObservation observationOf(const madrona::math::Vector3 &position,
-					 const madrona::base::Rotation &rotation,
-					 const Scale& scale, gpudrive::EntityType type) const {
-    return gpudrive::MapObservation{
-      .position = relative(position),
-      .scale = scale,
-      .heading = relative(rotation),
-      .type = static_cast<float>(type)
-    };
+  gpudrive::MapObservation
+  observationOf(const madrona::math::Vector3 &position,
+                const madrona::base::Rotation &rotation, const Scale &scale,
+                gpudrive::EntityType type) const {
+    return gpudrive::MapObservation{.position = relative(position),
+                                    .scale = scale,
+                                    .heading = relative(rotation),
+                                    .type = static_cast<float>(type)};
   }
 
-  float distanceTo(const madrona::math::Vector3& position) const {
+  float distanceTo(const madrona::math::Vector3 &position) const {
     return relative(position).length();
   }
 
 private:
-    madrona::math::Vector2 relative(const madrona::math::Vector3& absolutePos) const {
-      auto relativePosition = absolutePos.xy() - referencePosition;
+  madrona::math::Vector2
+  relative(const madrona::math::Vector3 &absolutePos) const {
+    auto relativePosition = absolutePos.xy() - referencePosition;
 
-      return referenceRotation.inv().rotateVec({relativePosition.x, relativePosition.y, 0}).xy();
-    }
+    return referenceRotation.inv()
+        .rotateVec({relativePosition.x, relativePosition.y, 0})
+        .xy();
+  }
 
-    float relative(const madrona::base::Rotation & absoluteRot) const {
-      return gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
-    }
+  float relative(const madrona::base::Rotation &absoluteRot) const {
+    return gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
+  }
 
-    madrona::math::Vector2 referencePosition;
-    madrona::base::Rotation referenceRotation;
+  madrona::math::Vector2 referencePosition;
+  madrona::base::Rotation referenceRotation;
 };
-
 }}

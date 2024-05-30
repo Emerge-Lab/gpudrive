@@ -197,28 +197,25 @@ inline void collectObservationsSystem(Engine &ctx,
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
-	auto roadPos = ctx.get<Position>(road);
-	auto roadRot = ctx.get<Rotation>(road);
-	
-	auto dist = referenceFrame.distanceTo(roadPos);
-        if(dist > ctx.data().params.observationRadius)
-        {
+        auto roadPos = ctx.get<Position>(road);
+        auto roadRot = ctx.get<Rotation>(road);
+
+        auto dist = referenceFrame.distanceTo(roadPos);
+        if (dist > ctx.data().params.observationRadius) {
             continue;
         }
 
-	map_obs.obs[arrIndex] = referenceFrame.observationOf(roadPos, 
-							     roadRot,
-							     ctx.get<Scale>(road),
-							     ctx.get<EntityType>(road));
+        map_obs.obs[arrIndex] = referenceFrame.observationOf(
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
         arrIndex++;
     }
 
     while (arrIndex < consts::kMaxRoadEntityCount)
     {
-	map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
-	map_obs.obs[arrIndex].heading = 0.f;
-	map_obs.obs[arrIndex].type = (float)EntityType::None;
-       arrIndex++;
+        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
+        map_obs.obs[arrIndex].heading = 0.f;
+        map_obs.obs[arrIndex].type = (float)EntityType::None;
+        arrIndex++;
     }
 }
 
