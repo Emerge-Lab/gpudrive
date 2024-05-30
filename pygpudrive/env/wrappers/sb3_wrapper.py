@@ -119,8 +119,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.actions_tensor[self.controlled_agent_mask] = actions
 
         # Step the environment
-        self._env.step_dynamics(self.actions_tensor)
-        _, reward, done, info = self._env.get_transitions()
+        _, reward, done, info = self._env.step(actions)
         # # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done

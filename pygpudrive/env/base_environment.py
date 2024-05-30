@@ -137,18 +137,6 @@ class Env(gym.Env):
             self.sim.reset(sim_idx)
 
         return self.get_obs()
-
-    def step_dynamics(self, actions):
-        """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
-
-        Args:
-            actions (torch.Tensor): The action indices for all agents in all worlds.
-        """
-
-        if actions is not None:
-            self._apply_actions(actions)
-
-        self.sim.step()
         
     def get_dones(self):
         done = (
@@ -183,7 +171,16 @@ class Env(gym.Env):
             ).to(self.device)
         return info
         
-    def get_transitions(self):
+    def step(self, actions):
+        """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
+
+        Args:
+            actions (torch.Tensor): The action indices for all agents in all worlds.
+        """
+        if actions is not None:
+            self._apply_actions(actions)
+
+        self.sim.step()
         obs = self.get_obs()
         reward = (
             torch.empty(self.num_sims, self.max_agent_count)
