@@ -17,6 +17,14 @@ class MultiAgentCallback(BaseCallback):
         self.config = config
         self.wandb_run = wandb_run
         self.num_rollouts = 0
+        self.num_agent_rollouts = 0 # This tracks total agent rollouts
+        
+        # TODO(ev) don't just define these here
+        self.mean_ep_reward_per_agent = 0
+        self.perc_goal_achieved = 0
+        self.perc_off_road = 0
+        self.perc_veh_collisions = 0
+        self.perc_non_veh_collision = 0 
 
         self._define_wandb_metrics()  # Set x-axis for metrics
 
@@ -64,36 +72,37 @@ class MultiAgentCallback(BaseCallback):
         """
 
         # LOG AND RESET METRICS AFTER EACH EPISODE (when all worlds are done)
-        if self.locals["env"].reset_flag:
-            dead_agent_mask = self.locals["env"].dead_agent_mask
-            done = self.unbatchify(self.locals["dones"])[~dead_agent_mask]
-            total_valid_agents = done.shape[0]
+        if len(self.locals["env"].info_dict) > 0:
+            # total number of agents
+            total_valid_agents = self.locals["env"].info_dict["num_finished_agents"]
 
+            self.perc_off_road += self.locals["env"].info_dict["off_road"]
+            self.perc_veh_collisions += self.locals["env"].info_dict["veh_collisions"]
+            self.perc_non_veh_collision += self.locals["env"].info_dict["non_veh_collision"]
+            self.perc_goal_achieved += self.locals["env"].info_dict["goal_achieved"]
+            self.num_agent_rollouts += total_valid_agents
             wandb.log(
                 {
                     "global_step": self.num_timesteps,
+                    # TODO(ev) this metric is broken
                     "metrics/mean_ep_reward_per_agent": self.locals[
                         "env"
                     ].tot_reward_per_episode
                     / total_valid_agents,
                     "metrics/perc_off_road": (
-                        self.locals["env"].info_dict["off_road"]
-                        / total_valid_agents
+                        self.perc_off_road / self.num_agent_rollouts
                     )
                     * 100,
                     "metrics/perc_veh_collisions": (
-                        self.locals["env"].info_dict["veh_collisions"]
-                        / total_valid_agents
+                        self.perc_veh_collisions / self.num_agent_rollouts
                     )
                     * 100,
                     "metrics/perc_non_veh_collision": (
-                        self.locals["env"].info_dict["non_veh_collision"]
-                        / total_valid_agents
+                        self.perc_non_veh_collision / self.num_agent_rollouts
                     )
                     * 100,
                     "metrics/perc_goal_achieved": (
-                        self.locals["env"].info_dict["goal_achieved"]
-                        / total_valid_agents
+                        self.perc_goal_achieved / self.num_agent_rollouts
                     )
                     * 100,
                 }
@@ -103,66 +112,19 @@ class MultiAgentCallback(BaseCallback):
             # The tricky thing is that the env resets when done (in step), and the callback
             # call is after step
             # We use a reset flag to reset the env wrapper metrics
+            # TODO(ev) this is broken
             self.locals["env"].tot_reward_per_episode = 0
-            self.locals["env"].info_dict = {
-                "off_road": 0,
-                "veh_collisions": 0,
-                "non_veh_collision": 0,
-                "goal_achieved": 0,
-            }
+            # self.locals["env"].info_dict = {
+            #     "off_road": 0,
+            #     "veh_collisions": 0,
+            #     "non_veh_collision": 0,
+            #     "goal_achieved": 0,
+            # }
 
     def _on_rollout_end(self) -> None:
         """
         Triggered before updating the policy.
         """
-
-        # # Get the total number of controlled agents we are controlling
-        # # The number of controllable agents is different per scenario
-        # num_controlled_agents = self.locals["env"]._tot_controlled_valid_agents_across_worlds
-
-        # # Filter out all nans
-        # rollout_rewards = np.nan_to_num(
-        #     (self.locals["rollout_buffer"].rewards.cpu().detach().numpy()),
-        #     nan=0,
-        # )
-
-        # mean_reward_per_agent_per_episode = rollout_rewards.sum() / (
-        #     num_controlled_agents * self.locals["env"].num_episodes
-        # )
-
-        # rollout_observations = np.nan_to_num(
-        #     self.locals["rollout_buffer"].observations.cpu().detach().numpy(),
-        #     nan=0,
-        # )
-
-        # # Evaluation metrics
-        # rollout_info = self.locals["env"].infos
-        # for key, value in rollout_info.items():
-        #     self.locals["env"].infos[key] = value / (
-        #          self.locals["env"].num_episodes * num_controlled_agents
-        #     )
-        #     self.logger.record(f"metrics/{key}", self.locals["env"].infos[key])
-
-        # # Other
-        # self.logger.record("rollout/global_step", self.num_timesteps)
-        # self.logger.record(
-        #     "rollout/num_tot_episodes_in_rollout",
-        #      self.locals["env"].num_episodes * self.locals["env"].num_worlds,
-        # )
-        # self.logger.record("rollout/sum_ep_return", rollout_rewards.sum())
-        # self.logger.record(
-        #     "rollout/avg_ep_return", mean_reward_per_agent_per_episode.item()
-        # )
-        # self.logger.record("data/obs_max", rollout_observations.max())
-        # self.logger.record("data/obs_min", rollout_observations.min())
-
-        # hist = np.histogram(rollout_observations.reshape(-1))
-        # wandb.log(
-        #     {
-        #         "global_step": self.num_timesteps,
-        #         "data/obs_hist": wandb.Histogram(np_histogram=hist),
-        #     }
-        # )
 
         # Render the environment
         if self.config.render:
