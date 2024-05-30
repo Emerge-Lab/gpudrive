@@ -786,38 +786,47 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
                         Rotation, Goal, EntityType, VehicleSize, AbsoluteSelfObservation>>(
         {collect_obs});
 
+    if (cfg.renderBridge) {
+        RenderingSystem::setupTasks(builder, {reset_sys});
+    }
+
+    TaskGraphNodeID lidar;
+    if(cfg.enableLidar) {
         // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
     // that launches a warp of threads (32) for each invocation (1).
     // The 32, 1 parameters could be changed to 32, 32 to create a system
     // that cooperatively processes 32 entities within a warp.
-    auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
+    lidar = builder.addToGraph<CustomParallelForNode<Engine,
         lidarSystem, 32, 1,
 #else
-    auto lidar = builder.addToGraph<ParallelForNode<Engine,
+    lidar = builder.addToGraph<ParallelForNode<Engine,
         lidarSystem,
 #endif
             Entity,
             Lidar,
             EntityType
         >>({collectAbsoluteSelfObservations});
-
-    if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {reset_sys});
     }
 
 #ifdef MADRONA_GPU_MODE
+    TaskGraphNodeID sort_agents;
+    if(cfg.enableLidar)
+    {
+        sort_agents = queueSortByWorld<Agent>(builder, {lidar});
+    } else {
+        sort_agents = queueSortByWorld<Agent>(builder, {collectAbsoluteSelfObservations});
+    }
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
-    auto sort_agents =
-        queueSortByWorld<Agent>(builder, {lidar, collect_obs});
+        
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     (void)sort_phys_objects;
 #else
     (void)lidar;
-    (void)collect_obs;
+    (void)collectAbsoluteSelfObservations;
 #endif
 }
 
