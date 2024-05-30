@@ -16,13 +16,15 @@ class ExperimentConfig:
     # Rendering settings
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 10  # Render after every kth rollout
+    render_freq: int = 10000  # Render after every kth rollout
     render_n_worlds: int = 1
 
     # TODO: Logging
     log_dir: str = "logs"
     use_wandb: bool = True
-    logging_collection_window: int = 1000 # how many trajectories we average logs over
+    logging_collection_window: int = (
+        1000  # how many trajectories we average logs over
+    )
 
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
@@ -34,5 +36,5 @@ class ExperimentConfig:
 
     # Wandb
     project_name = "gpudrive"
-    group_name = "PPO_05_24"
+    group_name = "dc/05/30"
     entity = "_emerge"
