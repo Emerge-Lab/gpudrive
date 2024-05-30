@@ -46,7 +46,7 @@ class SB3MultiAgentEnv(VecEnv):
         )
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count
-        self.num_envs = self.num_worlds * self.max_agent_count
+        self.num_envs = self._env.cont_agent_mask.sum()
         self.device = device
         self.controlled_agent_mask = self._env.cont_agent_mask
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
@@ -58,6 +58,8 @@ class SB3MultiAgentEnv(VecEnv):
         self.render_mode = render_mode
         self.tot_reward_per_episode = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+        self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+
 
         self.num_episodes = 0
         self.info_dict = {
@@ -87,7 +89,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.dead_agent_mask = torch.isnan(obs[:, :, 0]).to(self.device)
 
         # Flatten over num_worlds and max_agent_count
-        obs = obs.reshape(self.num_envs, self.obs_dim)
+        obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
 
         # Save observation to buffer
         self._save_obs(obs)
@@ -114,10 +116,10 @@ class SB3MultiAgentEnv(VecEnv):
         self.info_dict = {}
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
-        actions = actions.reshape((self.num_worlds, self.max_agent_count))
+        self.actions_tensor[self.controlled_agent_mask] = actions
 
         # Step the environment
-        self._env.step_dynamics(actions)
+        self._env.step_dynamics(self.actions_tensor)
         _, reward, done, info = self._env.get_transitions()
         # # Get the dones for resets
         # done = self._env.get_dones()
@@ -158,7 +160,7 @@ class SB3MultiAgentEnv(VecEnv):
         buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
 
         # Flatten over num_worlds and max_agent_count and store
-        obs = obs.reshape(self.num_envs, self.obs_dim)
+        obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
         # Store running total reward across worlds
@@ -177,9 +179,9 @@ class SB3MultiAgentEnv(VecEnv):
 
         return (
             self._obs_from_buf(),
-            torch.clone(self.buf_rews).reshape(self.num_envs),
-            torch.clone(self.buf_dones).reshape(self.num_envs),
-            torch.clone(info).reshape(self.num_envs, self.info_dim),
+            torch.clone(self.buf_rews[self.controlled_agent_mask]).reshape(self.num_envs),
+            torch.clone(self.buf_dones[self.controlled_agent_mask]).reshape(self.num_envs),
+            torch.clone(info[self.controlled_agent_mask]).reshape(self.num_envs, self.info_dim),
         )
 
     def close(self) -> None:

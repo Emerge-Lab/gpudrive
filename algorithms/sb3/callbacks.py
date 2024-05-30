@@ -161,18 +161,17 @@ class MultiAgentCallback(BaseCallback):
         env = self.locals["env"]
 
         obs = env.reset()
-        obs = self._batchify_and_filter_obs(obs, env)
 
         frames = []
 
         for _ in range(90):
 
             action, _ = policy.predict(obs.detach().cpu().numpy())
-            action = self._pad_actions(action, env, render_world_idx)
+            action = torch.Tensor(action).to("cuda")
 
             # Step the environment
             obs, _, _, _ = env.step(action)
-            obs = self._batchify_and_filter_obs(obs, env)
+            # obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
             frames.append(frame)
