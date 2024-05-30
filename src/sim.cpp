@@ -192,20 +192,24 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
+
+    utils::ReferenceFrame referenceFrame(model.position, rot);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads) {
         Entity road = ctx.data().roads[roadIdx++];
-        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
-        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
-        if(relative_pos.length() > ctx.data().params.observationRadius)
-        {
+        auto roadPos = ctx.get<Position>(road);
+        auto roadRot = ctx.get<Rotation>(road);
+
+        auto dist = referenceFrame.distanceTo(roadPos);
+        if (dist > ctx.data().params.observationRadius) {
             continue;
         }
-        map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = relative_pos;
-        map_obs.obs[arrIndex].heading = utils::quatToYaw(rot.inv() * ctx.get<Rotation>(road));
+
+        map_obs.obs[arrIndex] = referenceFrame.observationOf(
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
         arrIndex++;
     }
+
     while (arrIndex < consts::kMaxRoadEntityCount)
     {
         map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
