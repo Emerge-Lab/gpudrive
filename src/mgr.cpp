@@ -420,9 +420,10 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
     {
         assert(cfg.numWorlds >= mapFiles.size());
+        auto numFiles = mapFiles.size();
         for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
         {
-            mapFiles.push_back(mapFiles[0]);
+            mapFiles.push_back(mapFiles[i % numFiles]);
         }
     }
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
