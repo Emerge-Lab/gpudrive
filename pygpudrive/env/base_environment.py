@@ -5,7 +5,6 @@ import numpy as np
 import torch
 from itertools import product
 
-import wandb
 import glob
 import gymnasium as gym
 import os
@@ -18,9 +17,8 @@ import gpudrive
 import logging
 
 from tqdm import tqdm
-logging.getLogger(__name__)
 
-# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+logging.getLogger(__name__)
 
 
 class Env(gym.Env):
@@ -50,7 +48,6 @@ class Env(gym.Env):
         params.observationRadius = 100.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
-        params.roadObservationAlgorithm = gpudrive.FindRoadObservationsWith.AllEntitiesWithRadiusFiltering
 
         # Collision behavior
         params = self._set_collision_behavior(params)
@@ -92,9 +89,15 @@ class Env(gym.Env):
             num_worlds=self.num_sims,
             json_path=self.data_dir,
             params=params,
-            enable_batch_renderer = render_config is not None and render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-            batch_render_view_width = render_config.resolution[0] if render_config is not None else None,
-            batch_render_view_height = render_config.resolution[1] if render_config is not None else None
+            enable_batch_renderer=render_config is not None
+            and render_config.render_mode
+            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=render_config.resolution[0]
+            if render_config is not None
+            else None,
+            batch_render_view_height=render_config.resolution[1]
+            if render_config is not None
+            else None,
         )
         # Update the config with the relevant number of controlled agents
         # TODO(ev)
@@ -102,12 +105,9 @@ class Env(gym.Env):
         # Rendering
         self.render_config = render_config
         self.world_render_idx = 0
-        agent_count = (
-            self.sim.shape_tensor()
-            .to_torch()[self.world_render_idx, :][0]
-            .item()
+        self.visualizer = PyGameVisualizer(
+            self.sim, self.render_config, self.config.dist_to_goal_threshold
         )
-        self.visualizer = PyGameVisualizer(self.sim, self.render_config, self.config.dist_to_goal_threshold)
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
@@ -143,14 +143,9 @@ class Env(gym.Env):
         return self.get_obs()
 
     def get_dones(self):
-        done = (
-            self.sim.done_tensor()
-            .to_torch()
-            .squeeze(dim=2)
-            .to(torch.float)
-        )
+        done = self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
         return done
-    
+
     def get_infos(self):
         if self.config.eval_expert_mode:
             # This is true when we are evaluating the expert performance
@@ -166,19 +161,15 @@ class Env(gym.Env):
         return info
 
     def get_rewards(self):
-        reward = (
-            self.sim.reward_tensor()
-            .to_torch()
-            .squeeze(dim=2)
-        )
+        reward = self.sim.reward_tensor().to_torch().squeeze(dim=2)
         return reward
-    
+
     def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
 
         self.sim.step()
-        
+
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
@@ -317,7 +308,9 @@ class Env(gym.Env):
             map_obs_padding = self.sim.agent_roadmap_tensor().to_torch()
 
             if self.config.norm_obs:
-                map_obs_padding = self.normalize_and_flatten_map_obs(map_obs_padding)
+                map_obs_padding = self.normalize_and_flatten_map_obs(
+                    map_obs_padding
+                )
             else:
                 map_obs_padding = map_obs_padding.flatten(start_dim=2)
         else:
@@ -335,16 +328,25 @@ class Env(gym.Env):
 
         return obs_filtered
 
-    def render(self, world_render_idx = 0):
-        if(world_render_idx >= self.num_sims):
+    def render(self, world_render_idx=0):
+        if world_render_idx >= self.num_sims:
             # Raise error but dont interrupt the training
             print(f"Invalid world_render_idx: {world_render_idx}")
             return None
-        if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}):
-            return self.visualizer.getRender(world_render_idx=world_render_idx, cont_agent_mask=self.cont_agent_mask)
-        elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
+        if self.render_config.render_mode in {
+            RenderMode.PYGAME_ABSOLUTE,
+            RenderMode.PYGAME_EGOCENTRIC,
+            RenderMode.PYGAME_LIDAR,
+        }:
+            return self.visualizer.getRender(
+                world_render_idx=world_render_idx,
+                cont_agent_mask=self.cont_agent_mask,
+            )
+        elif self.render_config.render_mode in {
+            RenderMode.MADRONA_RGB,
+            RenderMode.MADRONA_DEPTH,
+        }:
             return self.visualizer.getRender()
-        
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -475,69 +477,45 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    config = EnvConfig(
-        ego_state=True,
-        partner_obs=True,
-        road_map_obs=True,
-        norm_obs=True,
-    )
+    env_config = EnvConfig(sample_method="pad_n")
+    render_config = RenderConfig()
 
     TOTAL_STEPS = 90
-    NUM_CONT_AGENTS = 0
-    NUM_WORLDS = 2
-
-    render_config = RenderConfig(
-        render_mode=RenderMode.PYGAME_ABSOLUTE, 
-        view_option=PygameOption.RGB, 
-        resolution=(1024, 1024)
-    )
-
+    MAX_NUM_OBJECTS = 128
+    NUM_WORLDS = 10
 
     env = Env(
-        config=config,
+        config=env_config,
         num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        render_mode="rgb_array",
+        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         data_dir="waymo_data",
+        device="cuda",
+        render_config=render_config,
     )
 
     obs = env.reset()
-    frames_1 = []
-    frames_2 = []
 
-    for _ in range(200):
+    for _ in range(TOTAL_STEPS):
 
-        print(f"Step: {91 - env.steps_remaining}")
-
-        # Take a random action (we're only going straight)
+        # Take a random actions
         rand_action = torch.Tensor(
             [
                 [
                     env.action_space.sample()
-                    for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+                    for _ in range(MAX_NUM_OBJECTS * NUM_WORLDS)
                 ]
             ]
-        ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
+        ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
 
         # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        env.step_dynamics(rand_action)
 
-        # if done.sum() == NUM_CONT_AGENTS:
-        #     obs = env.reset()
-        #     print(f"RESETTING ENVIRONMENT\n")
-        env.sim.step()
-        frame = env.render(world_render_idx=0)
-        frames_1.append(frame)
-        frame = env.render(world_render_idx=1)
-        frames_2.append(frame)
-    
-    import imageio
-    imageio.mimsave("world1.gif", frames_1)
-    imageio.mimsave("world2.gif", frames_2)
-    print("Done")
-    # Log video
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
-    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+        obs = env.get_obs()
+        reward = env.get_rewards()
+        done = env.get_dones()
+
+    # import imageio
+    # imageio.mimsave("world1.gif", frames_1)
 
     # run.finish()
     env.visualizer.destroy()

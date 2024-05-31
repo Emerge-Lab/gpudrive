@@ -21,41 +21,41 @@ class LateFusionNet(nn.Module):
     def __init__(
         self,
         observation_space: spaces.Box,
-        env_config: EnvConfig = None,
-        obj_dims: List[int] = [6, 11, 14],
-        arch_ego_state: List[int] = [64, 32],
-        arch_road_objects: List[int] = [64, 32],
-        arch_road_graph: List[int] = [64, 32],
-        arch_shared_net: List[int] = [256, 128, 64],
-        act_func: str = "tanh",
-        dropout: float = 0.0,
-        last_layer_dim_pi: int = 64,
-        last_layer_dim_vf: int = 64,
+        env_config: EnvConfig,
+        exp_config,
     ):
         super().__init__()
-        # Unpack feature dimensions
-        self.ego_input_dim = obj_dims[0]
-        self.ro_input_dim = obj_dims[1]
-        self.rg_input_dim = obj_dims[2]
 
         self.config = env_config
-        self._set_obj_dims(env_config)
+        self.net_config = exp_config
+
+        # Unpack feature dimensions
+        self.ego_input_dim = self.config.EGO_STATE_DIM
+        self.ro_input_dim = self.config.PARTNER_DIM
+        self.rg_input_dim = self.config.ROAD_MAP_DIM
+
+        self.ro_max = self.config.road_map_agent_feat_dim
+        self.rg_max = self.config.top_k_roadpoints
 
         # Network architectures
-        self.arch_ego_state = arch_ego_state
-        self.arch_road_objects = arch_road_objects
-        self.arch_road_graph = arch_road_graph
-        self.arch_shared_net = arch_shared_net
-        self.act_func = nn.Tanh() if act_func == "tanh" else nn.ReLU()
-        self.dropout = dropout
+        self.arch_ego_state = self.net_config.ego_state_layers
+        self.arch_road_objects = self.net_config.road_object_layers
+        self.arch_road_graph = self.net_config.road_graph_layers
+        self.arch_shared_net = self.net_config.shared_layers
+        self.act_func = (
+            nn.Tanh() if self.net_config.act_func == "tanh" else nn.ReLU()
+        )
+        self.dropout = self.net_config.dropout
 
         # Save output dimensions, used to create the action distribution & value
-        self.latent_dim_pi = last_layer_dim_pi
-        self.latent_dim_vf = last_layer_dim_vf
+        self.latent_dim_pi = self.net_config.last_layer_dim_pi
+        self.latent_dim_vf = self.net_config.last_layer_dim_vf
 
         # If using max pool across object dim
         self.shared_net_input_dim = (
-            arch_ego_state[-1] + arch_road_objects[-1] + arch_road_graph[-1]
+            self.net_config.ego_state_layers[-1]
+            + self.net_config.road_object_layers[-1]
+            + self.net_config.road_graph_layers[-1]
         )
 
         # Build the networks
@@ -201,7 +201,7 @@ class LateFusionNet(nn.Module):
         ego_state = obs_flat[:, : self.ego_input_dim]
         vis_state = obs_flat[:, self.ego_input_dim :]
 
-        # Visible state object order: road_objects, road_points, traffic_lights, stop_signs
+        # Visible state object order: road_objects, road_points
         # Find the ends of each section
         ro_end_idx = self.ro_input_dim * self.ro_max
         rg_end_idx = ro_end_idx + (self.rg_input_dim * self.rg_max)
@@ -218,20 +218,15 @@ class LateFusionNet(nn.Module):
 
         return ego_state, road_objects, road_graph
 
-    def _set_obj_dims(self, config):
-        # Define original object dimensions
-        # TODO(ev) this doesn't exist in the config so remove hardcoding
-        self.ro_max = 127  # config.partner_obs_dim
-        self.rg_max = 200  # config.map_obs_dim
-
 
 class LateFusionPolicy(ActorCriticPolicy):
     def __init__(
         self,
         observation_space: spaces.Space,
+        env_config: Box,
+        exp_config: Box,
         action_space: spaces.Space,
         lr_schedule: Callable[[float], float],
-        env_config: Box,
         mlp_class: Type[LateFusionNet] = LateFusionNet,
         mlp_config: Optional[Box] = None,
         *args,
@@ -241,6 +236,7 @@ class LateFusionPolicy(ActorCriticPolicy):
         kwargs["ortho_init"] = False
         self.observation_space = observation_space
         self.env_config = env_config
+        self.exp_config = exp_config
         self.mlp_class = mlp_class
         self.mlp_config = mlp_config if mlp_config is not None else Box({})
         super().__init__(
@@ -257,6 +253,7 @@ class LateFusionPolicy(ActorCriticPolicy):
         self.mlp_extractor = self.mlp_class(
             self.observation_space,
             self.env_config,
+            self.exp_config,
             **self.mlp_config,
         )
 
@@ -264,7 +261,7 @@ class LateFusionPolicy(ActorCriticPolicy):
 if __name__ == "__main__":
     # Import adapted PPO version
     from algorithms.sb3.ppo.ippo import IPPO
-    from baselines.config import ExperimentConfig
+    from baselines.ippo.config import ExperimentConfig
 
     # Import the EnvConfig dataclass
     from pygpudrive.env.config import EnvConfig
