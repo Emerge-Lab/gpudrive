@@ -1,4 +1,4 @@
-from networks.basic_ffn import FeedForwardPolicy
+from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
 import torch
 
@@ -19,23 +19,38 @@ class ExperimentConfig:
     render_freq: int = 10  # Render after every kth rollout
     render_n_worlds: int = 1
 
-    # TODO: Logging
-    log_dir: str = "logs"
+    # Logging
     use_wandb: bool = True
+    sync_tensorboard: bool = True
     logging_collection_window: int = (
         1000  # how many trajectories we average logs over
     )
     log_freq: int = 100
 
     # Hyperparameters
-    policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+    clip_range: float = 0.2
+    vf_coef: float = 0.5
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
-    total_timesteps: int = 150_000_000
+    total_timesteps: int = 10e7
+
+    # Network
+    mlp_class = LateFusionNet
+    policy = LateFusionPolicy
+    ego_state_layers = [64, 32]
+    road_object_layers = [64, 64]
+    road_graph_layers = [64, 64]
+    shared_layers = [64, 64]
+    act_func = "tanh"
+    dropout = 0.0
+    last_layer_dim_pi = 64
+    last_layer_dim_vf = 64
 
     # Wandb
     project_name = "gpudrive"
-    group_name = "PPO"
+    group_name = "dc/PPO"
     entity = "_emerge"
