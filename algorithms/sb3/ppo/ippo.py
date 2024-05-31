@@ -43,14 +43,16 @@ class IPPO(PPO):
     def __init__(
         self,
         *args,
-        env_config = None, 
+        env_config=None,
+        exp_config=None,
         mlp_class: nn.Module = LateFusionNet,
-        mlp_config = None,
+        mlp_config=None,
         **kwargs,
     ):
-        self.env_config = env_config if env_config is not None else None
+        self.env_config = env_config
+        self.exp_config = exp_config
         self.mlp_class = mlp_class
-        self.mlp_config = mlp_config if mlp_config is not None else None
+        self.mlp_config = mlp_config
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -75,7 +77,7 @@ class IPPO(PPO):
             self.policy.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
-        
+
         time_rollout = time.perf_counter()
 
         while n_steps < n_rollout_steps:
@@ -115,7 +117,9 @@ class IPPO(PPO):
                 # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
                 # TODO(ev) I don't like that we're accessing agent attributes here like this
                 alive_agent_mask = ~(
-                    env.dead_agent_mask[env.controlled_agent_mask].reshape(env.num_envs, 1)
+                    env.dead_agent_mask[env.controlled_agent_mask].reshape(
+                        env.num_envs, 1
+                    )
                 )  # .expand_as(obs_tensor)
 
                 # Use boolean indexing to select elements in obs_tensor
@@ -128,7 +132,9 @@ class IPPO(PPO):
                 actions_tmp, values_tmp, log_prob_tmp = self.policy(
                     obs_tensor_alive
                 )
-                nn_fps = actions_tmp.shape[0] / (time.perf_counter() - time_actions)
+                nn_fps = actions_tmp.shape[0] / (
+                    time.perf_counter() - time_actions
+                )
                 self.logger.record("rollout/nn_fps", nn_fps)
 
                 # Store
@@ -186,7 +192,7 @@ class IPPO(PPO):
             )
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
-            
+
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time
@@ -223,11 +229,12 @@ class IPPO(PPO):
         )
 
         self.policy = self.policy_class(
-            self.observation_space,
-            self.action_space,
-            self.lr_schedule,
-            use_sde=self.use_sde,
+            observation_space=self.observation_space,
             env_config=self.env_config,
+            exp_config=self.exp_config,
+            action_space=self.action_space,
+            lr_schedule=self.lr_schedule,
+            use_sde=self.use_sde,
             mlp_class=self.mlp_class,
             mlp_config=self.mlp_config,
             **self.policy_kwargs,
