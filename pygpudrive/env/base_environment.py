@@ -36,7 +36,7 @@ class Env(gym.Env):
         data_dir,
         device="cuda",
         auto_reset=False,
-        render_config: RenderConfig = None,
+        render_config: RenderConfig = RenderConfig(),
         verbose=True,
     ):
         self.config = config
