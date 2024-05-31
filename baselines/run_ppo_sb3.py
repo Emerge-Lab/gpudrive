@@ -1,6 +1,7 @@
+import os
+
+import torch
 import wandb
-import torch
-import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -17,6 +18,8 @@ from baselines.config import ExperimentConfig
 
 torch.cuda.empty_cache()
 
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+
 if __name__ == "__main__":
 
     env_config = EnvConfig(
@@ -29,7 +32,7 @@ if __name__ == "__main__":
     )
 
     exp_config = ExperimentConfig(
-        render=True,
+        render=False,
     )
 
     # Make SB3-compatible environment

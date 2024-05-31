@@ -42,7 +42,7 @@ class EnvConfig:
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
-    obs_radius: float = 10.0
+    obs_radius: float = 100.0
 
     # Action space (discrete)
     steer_actions: torch.Tensor = torch.tensor(
