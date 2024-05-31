@@ -24,7 +24,7 @@ if __name__ == "__main__":
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
-        road_obs_algorithm=None,  # "k_nearest_roadpoints",
+        road_obs_algorithm="k_nearest_roadpoints",
         sample_method="pad_n",
     )
 
