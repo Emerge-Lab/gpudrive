@@ -35,6 +35,10 @@ class RenderConfig:
 class EnvConfig:
     """Configurations for gpudrive gym environment."""
 
+    # Environment settings
+    num_controlled_vehicles: int = 128
+    num_worlds: int = 15
+
     # Observation space
     ego_state: bool = True  # Ego vehicle state
     road_map_obs: bool = False  # Road graph
@@ -60,13 +64,13 @@ class EnvConfig:
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
     dist_to_goal_threshold: float = 3.0
-    
+
     """Constants defining the observations"""
-    partner_obs_dim: int = 7
-    map_obs_dim: int = 7
+    max_num_vehs: int = None
+    max_num_road_points: int = None
 
     """Constants to normalize observations."""
-    norm_obs: bool = False
+    norm_obs: bool = True
 
     # Values to normalize by: Ego state
     max_speed: int = 100

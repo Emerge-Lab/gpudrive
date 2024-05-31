@@ -96,6 +96,8 @@ class Env(gym.Env):
             batch_render_view_width = render_config.resolution[0] if render_config is not None else None,
             batch_render_view_height = render_config.resolution[1] if render_config is not None else None
         )
+        # Update the config with the relevant number of controlled agents
+        # TODO(ev)
 
         # Rendering
         self.render_config = render_config
@@ -363,7 +365,7 @@ class Env(gym.Env):
             self.config.min_rel_goal_coord,
             self.config.max_rel_goal_coord,
         )
-        
+
         return state
 
     def normalize_and_flatten_partner_obs(self, obs):
@@ -502,7 +504,7 @@ if __name__ == "__main__":
         device="cuda",
 >>>>>>> 3e45263ddcf38200cc993fd054dd1ca222fef349
         render_mode="rgb_array",
-        data_dir="waymo_data"
+        data_dir="waymo_data",
     )
 
     obs = env.reset()
