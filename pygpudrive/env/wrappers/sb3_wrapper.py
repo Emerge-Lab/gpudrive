@@ -96,15 +96,12 @@ class SB3MultiAgentEnv(VecEnv):
         obs = self._env.reset()
 
         # Make dead agent mask (True for dead or invalid agents)
-        self.dead_agent_mask = torch.isnan(obs[:, :, 0]).to(self.device)
+        self.dead_agent_mask = ~self.controlled_agent_mask.clone()
 
         # Flatten over num_worlds and max_agent_count
         obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
 
-        # Save observation to buffer
-        self._save_obs(obs)
-
-        return self._obs_from_buf()
+        return obs
 
     def step(self, actions) -> VecEnvStepReturn:
         """
@@ -158,12 +155,6 @@ class SB3MultiAgentEnv(VecEnv):
         self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
             torch.float32
         )
-        # self.buf_obs = obs[~self.dead_agent_mask]
-
-        # Flatten over num_worlds and max_agent_count and store
-        # obs[self.dead_agent_mask] = torch.nan
-        obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
-        self._save_obs(obs)
 
         # Store running total reward across worlds
         self.tot_reward_per_episode += reward * ~self.dead_agent_mask
@@ -175,12 +166,12 @@ class SB3MultiAgentEnv(VecEnv):
         
         # Now override the dead agent mask for the reset worlds
         if done_worlds.any().item():
-            self.dead_agent_mask[done_worlds] = torch.isnan(done[done_worlds]).to(self.device)
+            self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[done_worlds].clone()
             self.tot_reward_per_episode[done_worlds] = 0
             self.agent_step[done_worlds] = 0
 
         return (
-            self._obs_from_buf().clone(),
+            obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim).clone(),
             self.buf_rews[self.controlled_agent_mask].reshape(self.num_envs).clone(),
             self.buf_dones[self.controlled_agent_mask].reshape(self.num_envs).clone(),
             info[self.controlled_agent_mask].reshape(self.num_envs, self.info_dim).clone(),
@@ -201,14 +192,6 @@ class SB3MultiAgentEnv(VecEnv):
 
         self._seeds = [seed + idx for idx in range(self.num_envs)]
         return self._seeds
-
-    def _save_obs(self, obs: VecEnvObs) -> None:
-        """Save observations into buffer."""
-        self.buf_obs = obs
-
-    def _obs_from_buf(self) -> VecEnvObs:
-        """Get observation from buffer."""
-        return self.buf_obs
 
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""
