@@ -10,30 +10,23 @@ import glob
 import gymnasium as gym
 import os
 
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import *
 from pygpudrive.env.viz import PyGameVisualizer
 
 # Import the simulator
 import gpudrive
 import logging
 
+from tqdm import tqdm
 logging.getLogger(__name__)
 
-#os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 
 class Env(gym.Env):
     """
     GPU Drive Gym Environment.
     """
-
-    metadata = {
-        "render_modes": [
-            "human",
-            "rgb_array",
-        ],  # human: pop-up, rgb_array: receive the visualization as an array of pixels
-        "render_fps": 5,
-    }
 
     def __init__(
         self,
@@ -42,7 +35,8 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        render_mode="rgb_array",
+        auto_reset=False,
+        render_config: RenderConfig = None,
         verbose=True,
     ):
         self.config = config
@@ -52,8 +46,12 @@ class Env(gym.Env):
         # Configure the environment
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = 0.5
+        params.observationRadius = self.config.obs_radius
+        params.polylineReductionThreshold = 1.0
+        params.observationRadius = 100.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
+        params.roadObservationAlgorithm = gpudrive.FindRoadObservationsWith.AllEntitiesWithRadiusFiltering
 
         # Collision behavior
         params = self._set_collision_behavior(params)
@@ -95,18 +93,21 @@ class Env(gym.Env):
             num_worlds=self.num_sims,
             json_path=self.data_dir,
             params=params,
+            enable_batch_renderer = render_config is not None and render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width = render_config.resolution[0] if render_config is not None else None,
+            batch_render_view_height = render_config.resolution[1] if render_config is not None else None
         )
 
         # Rendering
-        self.render_mode = render_mode
-        # By default, we render the first world
+        self.render_config = render_config
         self.world_render_idx = 0
-        self.visualizer = PyGameVisualizer(
-            self.sim,
-            self.world_render_idx,
-            self.render_mode,
-            self.config.dist_to_goal_threshold,
+        agent_count = (
+            self.sim.shape_tensor()
+            .to_torch()[self.world_render_idx, :][0]
+            .item()
         )
+        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_config, self.config.dist_to_goal_threshold)
+
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
         # We construct a mask to filter out the information from the non-controlled vehicles (0)
@@ -120,7 +121,9 @@ class Env(gym.Env):
         self.max_cont_agents = max_cont_agents
 
         # Number of valid controlled agents across worlds (without padding agents)
-        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -137,7 +140,7 @@ class Env(gym.Env):
             self.sim.reset(sim_idx)
 
         return self.get_obs()
-        
+
     def get_dones(self):
         done = (
             self.sim.done_tensor()
@@ -331,8 +334,16 @@ class Env(gym.Env):
 
         return obs_filtered
 
-    def render(self):
-        return self.visualizer.draw(self.cont_agent_mask)
+    def render(self, world_render_idx = 0):
+        if(world_render_idx >= self.num_sims):
+            # Raise error but dont interrupt the training
+            print(f"Invalid world_render_idx: {world_render_idx}")
+            return None
+        if(self.render_config.render_mode in {RenderMode.PYGAME_ABSOLUTE, RenderMode.PYGAME_EGOCENTRIC, RenderMode.PYGAME_LIDAR}):
+            return self.visualizer.getRender(world_render_idx=world_render_idx, cont_agent_mask=self.cont_agent_mask)
+        elif(self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH}):
+            return self.visualizer.getRender()
+        
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -381,7 +392,7 @@ class Env(gym.Env):
             self.config.max_rel_agent_pos,
         )
 
-        # Orientation
+        # Orientation (heading)
         obs[:, :, :, 3] /= self.config.max_orientation_rad
 
         # Vehicle length and width
@@ -389,14 +400,24 @@ class Env(gym.Env):
         obs[:, :, :, 5] /= self.config.max_veh_width
 
         # Object type
-        # TODO: One hot encode
+        shifted_type_obs = obs[:, :, :, 6] - 6
+        one_hot_object_type = torch.nn.functional.one_hot(
+            torch.where(
+                condition=shifted_type_obs >= 0,
+                input=shifted_type_obs,
+                other=0,
+            ).long(),
+            num_classes=4,
+        )
+        # Concatenate the one-hot encoding with the rest of the features
+        obs = torch.concat((obs, one_hot_object_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
 
-        # Position coordinates
+        # Road point coordinates
         obs[:, :, :, 0] = self._norm(
             obs[:, :, :, 0],
             self.config.min_rm_coord,
@@ -409,12 +430,20 @@ class Env(gym.Env):
             self.config.max_rm_coord,
         )
 
-        # Orientation
-        obs[:, :, :, 2] /= self.config.max_orientation_rad
+        # Road line segment length
+        # TODO: Check what a good value for the max road line segment length is
+        obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        # TODO: Type of road entity
-        # Remove for now
-        obs = obs[:, :, :, :3]
+        # Road point orientation
+        obs[:, :, :, 5] /= self.config.max_orientation_rad
+
+        # One-hot encode the road types
+        one_hot_road_type = torch.nn.functional.one_hot(
+            obs[:, :, :, 6].long(), num_classes=7
+        )
+
+        # Concatenate the one-hot encoding with the rest of the features
+        obs = torch.cat((obs, one_hot_road_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
@@ -452,20 +481,30 @@ if __name__ == "__main__":
         norm_obs=True,
     )
 
-    NUM_CONT_AGENTS = 128
-    NUM_WORLDS = 1
+    TOTAL_STEPS = 90
+    NUM_CONT_AGENTS = 0
+    NUM_WORLDS = 2
+
+    render_config = RenderConfig(
+        render_mode=RenderMode.PYGAME_ABSOLUTE, 
+        view_option=PygameOption.RGB, 
+        resolution=(1024, 1024)
+    )
+
 
     env = Env(
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data_repeat",
+        data_dir="/home/aarav/gpudrive/nocturne_data",
+        render_config=render_config,
         device="cuda",
         render_mode="rgb_array",
     )
 
     obs = env.reset()
-    frames = []
+    frames_1 = []
+    frames_2 = []
 
     for _ in range(200):
 
@@ -484,5 +523,22 @@ if __name__ == "__main__":
         # Step the environment
         obs, reward, done, info = env.step(rand_action)
 
-        if env.steps_remaining == 0:
-            obs = env.reset()
+        # if done.sum() == NUM_CONT_AGENTS:
+        #     obs = env.reset()
+        #     print(f"RESETTING ENVIRONMENT\n")
+        env.sim.step()
+        frame = env.render(world_render_idx=0)
+        frames_1.append(frame)
+        frame = env.render(world_render_idx=1)
+        frames_2.append(frame)
+    
+    import imageio
+    imageio.mimsave("world1.gif", frames_1)
+    imageio.mimsave("world2.gif", frames_2)
+    print("Done")
+    # Log video
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+    # wandb.log({"scene": wandb.Video(np.array(frames), fps=10, format="gif")})
+
+    # run.finish()
+    env.visualizer.destroy()

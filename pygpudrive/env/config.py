@@ -3,7 +3,33 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
+from enum import Enum
+from typing import Tuple
 
+class RenderMode(Enum):
+    PYGAME_ABSOLUTE = "pygame_absolute"
+    PYGAME_EGOCENTRIC = "pygame_egocentric"
+    PYGAME_LIDAR = "pygame_lidar"
+    MADRONA_RGB = "madrona_rgb"
+    MADRONA_DEPTH = "madrona_depth"
+
+class PygameOption(Enum):
+    HUMAN = "human"
+    RGB = "rgb"
+
+class MadronaOption(Enum):
+    AGENT_VIEW = "agent_view"
+    TOP_DOWN = "top_down"
+
+
+@dataclass
+class RenderConfig:
+    render_mode: RenderMode
+    view_option: Enum
+    resolution: Tuple[int, int]
+
+    def __str__(self):
+        return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
 
 @dataclass
 class EnvConfig:
@@ -49,6 +75,7 @@ class EnvConfig:
     max_orientation_rad: float = 2 * np.pi
     min_rm_coord: int = -300
     max_rm_coord: int = 300
+    max_road_line_segmment_len: int = 100
 
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
@@ -57,7 +84,7 @@ class EnvConfig:
     # Then it repeats the first file to pad until num_worlds
     # files are loaded. Will fail if the number of files are more than num_worlds.
     # exact_n - Init exactly num_worlds files.
-    sample_method: str = "first_n"
+    sample_method: str = "pad_n"
 
     # Related to settings
     eval_expert_mode: bool = (
