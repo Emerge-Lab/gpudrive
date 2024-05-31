@@ -60,6 +60,7 @@ enum class TaskGraphID : uint32_t {
 struct Sim : public madrona::WorldBase {
     struct Config {
         const madrona::render::RenderECSBridge *renderBridge;
+        bool enableLidar = false;
     };
 
     // Sim::registerTypes is called during initialization
