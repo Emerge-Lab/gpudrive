@@ -117,7 +117,7 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   }
 
   if (roadCount < K) {
-    auto newBeyond = radiusFilter(heap, K, ctx.data().params.observationRadius);
+    auto newBeyond = radiusFilter(heap, roadCount, ctx.data().params.observationRadius);
     fillZeros(heap + newBeyond, heap + K);
     return;
   }
