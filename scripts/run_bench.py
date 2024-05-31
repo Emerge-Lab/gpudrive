@@ -43,7 +43,8 @@ def run_bench(args):
         env_list.append(args.totalNumEnvs)
         for num_envs in tqdm(env_list, desc="Overall progress", unit="env", position=0):
             run_command(command_template.format(num_envs), args.profiling)
-
+        return 
+    
     for num_envs in tqdm(range(1, args.totalNumEnvs + 1, args.stepSize), desc="Overall progress", unit="env", position=0):
         if args.randomized:
             for _ in range(args.totalNumEnvs + 1 - num_envs):
