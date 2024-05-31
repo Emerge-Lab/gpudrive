@@ -28,7 +28,7 @@ class ExperimentConfig:
     policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    batch_size: int = 256
+    batch_size: int = 2048
     verbose: int = 0
     total_timesteps: int = 150_000_000
 

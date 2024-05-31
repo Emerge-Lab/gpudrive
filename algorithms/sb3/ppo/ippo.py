@@ -159,7 +159,6 @@ class IPPO(PPO):
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
-            print(int((~rewards.isnan()).float().sum().item()), self.num_timesteps)
             # Give access to local variables
             callback.update_locals(locals())
             if callback.on_step() is False:
@@ -184,7 +183,6 @@ class IPPO(PPO):
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        print(fps)
         self.logger.record("rollout/fps", fps)
 
         with torch.no_grad():

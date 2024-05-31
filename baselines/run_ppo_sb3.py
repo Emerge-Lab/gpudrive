@@ -1,6 +1,7 @@
+import os
+
+import torch
 import wandb
-import torch
-import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -17,6 +18,8 @@ from baselines.config import ExperimentConfig
 
 torch.cuda.empty_cache()
 
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+
 if __name__ == "__main__":
 
     env_config = EnvConfig(
@@ -24,7 +27,7 @@ if __name__ == "__main__":
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
-        road_obs_algorithm=None,#"k_nearest_roadpoints",
+        road_obs_algorithm="k_nearest_roadpoints",
         sample_method="pad_n",
     )
 

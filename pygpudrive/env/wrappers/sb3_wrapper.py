@@ -59,6 +59,17 @@ class SB3MultiAgentEnv(VecEnv):
         self.tot_reward_per_episode = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+        # Storage: Fill buffer with nan values
+        self.buf_rews = torch.full(
+            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
+        ).to(self.device)
+        self.buf_dones = torch.full(
+            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
+        ).to(self.device)
+        self.buf_obs = torch.full(
+            (self.num_envs, self.obs_dim),
+            fill_value=float("nan"),
+        ).to(self.device)
 
         self.num_episodes = 0
         self.info_dict = {
@@ -139,27 +150,18 @@ class SB3MultiAgentEnv(VecEnv):
                 
         # now construct obs after the reset
         obs = self._env.get_obs()
-        
-        # Storage: Fill buffer with nan values
-        self.buf_rews = torch.full(
-            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
-        ).to(self.device)
-        self.buf_dones = torch.full(
-            (self.num_worlds, self.max_agent_count), fill_value=float("nan")
-        ).to(self.device)
-        buf_obs = torch.full(
-            (self.num_worlds, self.max_agent_count, self.obs_dim),
-            fill_value=float("nan"),
-        ).to(self.device)
 
         # Override nan placeholders for alive agents
+        self.buf_rews[self.dead_agent_mask] = torch.nan
         self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
+        self.buf_dones[self.dead_agent_mask] = torch.nan
         self.buf_dones[~self.dead_agent_mask] = done[~self.dead_agent_mask].to(
             torch.float32
         )
-        buf_obs[~self.dead_agent_mask] = obs[~self.dead_agent_mask]
+        # self.buf_obs = obs[~self.dead_agent_mask]
 
         # Flatten over num_worlds and max_agent_count and store
+        # obs[self.dead_agent_mask] = torch.nan
         obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
         self._save_obs(obs)
 
@@ -178,10 +180,10 @@ class SB3MultiAgentEnv(VecEnv):
             self.agent_step[done_worlds] = 0
 
         return (
-            self._obs_from_buf(),
-            torch.clone(self.buf_rews[self.controlled_agent_mask]).reshape(self.num_envs),
-            torch.clone(self.buf_dones[self.controlled_agent_mask]).reshape(self.num_envs),
-            torch.clone(info[self.controlled_agent_mask]).reshape(self.num_envs, self.info_dim),
+            self._obs_from_buf().clone(),
+            self.buf_rews[self.controlled_agent_mask].reshape(self.num_envs).clone(),
+            self.buf_dones[self.controlled_agent_mask].reshape(self.num_envs).clone(),
+            info[self.controlled_agent_mask].reshape(self.num_envs, self.info_dim).clone(),
         )
 
     def close(self) -> None:
@@ -206,7 +208,7 @@ class SB3MultiAgentEnv(VecEnv):
 
     def _obs_from_buf(self) -> VecEnvObs:
         """Get observation from buffer."""
-        return self.buf_obs.clone()
+        return self.buf_obs
 
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""

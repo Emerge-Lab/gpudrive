@@ -140,15 +140,10 @@ class Env(gym.Env):
         
     def get_dones(self):
         done = (
-            torch.empty(self.num_sims, self.max_agent_count)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
-        done[self.cont_agent_mask] = (
             self.sim.done_tensor()
             .to_torch()
             .squeeze(dim=2)
-            .to(done.dtype)[self.cont_agent_mask]
+            .to(torch.float)
         )
         return done
     
@@ -159,28 +154,18 @@ class Env(gym.Env):
 
         else:  # Standard behavior: controlling vehicles
             info = (
-                torch.empty(self.num_sims, self.max_agent_count, 5)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-            info[self.cont_agent_mask] = (
                 self.sim.info_tensor()
                 .to_torch()
                 .squeeze(dim=2)
-                .to(info.dtype)[self.cont_agent_mask]
+                .to(torch.float)
             ).to(self.device)
         return info
 
     def get_rewards(self):
         reward = (
-            torch.empty(self.num_sims, self.max_agent_count)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
-        reward[self.cont_agent_mask] = (
             self.sim.reward_tensor()
             .to_torch()
-            .squeeze(dim=2)[self.cont_agent_mask]
+            .squeeze(dim=2)
         )
         return reward
     
@@ -296,17 +281,7 @@ class Env(gym.Env):
         # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
-            ego_state_padding = (
-                torch.empty(self.num_sims, self.max_agent_count, 6)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-            full_ego_state = self.sim.self_observation_tensor().to_torch()
-
-            # Update ego_state_padding using the mask
-            ego_state_padding[
-                self.w_indices, self.k_indices, :
-            ] = full_ego_state[self.w_indices, self.k_indices, :]
+            ego_state_padding = self.sim.self_observation_tensor().to_torch()
 
             if self.config.norm_obs:
                 ego_state_padding = self.normalize_ego_state(ego_state_padding)
@@ -317,30 +292,15 @@ class Env(gym.Env):
         # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
-            full_partner_obs = (
+            partner_obs_padding = (
                 self.sim.partner_observations_tensor().to_torch()
             )
             if self.config.norm_obs:  # Normalize observations and then flatten
-                full_partner_obs = self.normalize_and_flatten_partner_obs(
-                    full_partner_obs
+                partner_obs_padding = self.normalize_and_flatten_partner_obs(
+                    partner_obs_padding
                 )
             else:  # Flatten along the last two dimensions
-                full_partner_obs = full_partner_obs.flatten(start_dim=2)
-
-            # Pad with nans
-            partner_obs_padding = (
-                torch.empty(
-                    self.num_sims,
-                    self.max_agent_count,
-                    full_partner_obs.shape[2],
-                )
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-
-            partner_obs_padding[
-                self.w_indices, self.k_indices, :
-            ] = full_partner_obs[self.w_indices, self.k_indices, :]
+                partner_obs_padding = partner_obs_padding.flatten(start_dim=2)
 
         else:
             partner_obs_padding = torch.Tensor().to(self.device)
@@ -350,25 +310,12 @@ class Env(gym.Env):
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         if self.config.road_map_obs:
 
-            full_map_obs = self.sim.agent_roadmap_tensor().to_torch()
+            map_obs_padding = self.sim.agent_roadmap_tensor().to_torch()
 
             if self.config.norm_obs:
-                full_map_obs = self.normalize_and_flatten_map_obs(full_map_obs)
+                map_obs_padding = self.normalize_and_flatten_map_obs(map_obs_padding)
             else:
-                full_map_obs = full_map_obs.flatten(start_dim=2)
-
-            map_obs_padding = (
-                torch.empty(
-                    self.num_sims, self.max_agent_count, full_map_obs.shape[2]
-                )
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-
-            map_obs_padding[self.w_indices, self.k_indices, :] = full_map_obs[
-                self.w_indices, self.k_indices, :
-            ]
-
+                map_obs_padding = map_obs_padding.flatten(start_dim=2)
         else:
             map_obs_padding = torch.Tensor().to(self.device)
 
