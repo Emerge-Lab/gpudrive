@@ -26,7 +26,7 @@ Next, for Linux and MacOS: Run `cmake` and then `make` to build the simulator:
 ```bash
 mkdir build
 cd build
-cmake ..
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j # cores to build with
 cd ..
 ```

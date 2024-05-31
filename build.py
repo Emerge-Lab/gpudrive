@@ -17,7 +17,7 @@ def main():
     os.chdir('build')
     
     # Run CMake and Make
-    subprocess.check_call(['cmake', '..'])
+    subprocess.check_call(['cmake', '..', '-DCMAKE_BUILD_TYPE=Release'])
     subprocess.check_call(['make', f"-j{os.cpu_count()}"])  # Utilize all available cores
 
     # Going back to the root directory
