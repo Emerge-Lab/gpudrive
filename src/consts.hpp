@@ -10,7 +10,7 @@ namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 128;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 2000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 2000;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
