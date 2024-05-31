@@ -6,6 +6,7 @@ import torch
 from enum import Enum
 from typing import Tuple
 
+
 class RenderMode(Enum):
     PYGAME_ABSOLUTE = "pygame_absolute"
     PYGAME_EGOCENTRIC = "pygame_egocentric"
@@ -13,9 +14,11 @@ class RenderMode(Enum):
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
 
+
 class PygameOption(Enum):
     HUMAN = "human"
     RGB = "rgb"
+
 
 class MadronaOption(Enum):
     AGENT_VIEW = "agent_view"
@@ -31,18 +34,21 @@ class RenderConfig:
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
 
+
 @dataclass
 class EnvConfig:
     """Configurations for gpudrive gym environment."""
 
     # Environment settings
     num_controlled_vehicles: int = 128
+    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
+    top_k_roadpoints: int = 200
     num_worlds: int = 15
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
-    road_map_obs: bool = False  # Road graph
-    partner_obs: bool = False  # Partner vehicle info
+    road_map_obs: bool = True  # Road graph
+    partner_obs: bool = True  # Partner vehicle info
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
@@ -98,3 +104,8 @@ class EnvConfig:
     eval_expert_mode: bool = (
         False  # Set this to true if you want to return all agent info
     )
+
+    # DON'T CHANGE: Used for network
+    EGO_STATE_DIM = 6 if ego_state else 0
+    ROAD_MAP_DIM = 11 if road_map_obs else 0
+    PARTNER_DIM = 14 if partner_obs else 0
