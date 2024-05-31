@@ -96,6 +96,8 @@ class Env(gym.Env):
             batch_render_view_width = render_config.resolution[0] if render_config is not None else None,
             batch_render_view_height = render_config.resolution[1] if render_config is not None else None
         )
+        # Update the config with the relevant number of controlled agents
+        # TODO(ev)
 
         # Rendering
         self.render_config = render_config
@@ -495,10 +497,8 @@ if __name__ == "__main__":
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="/home/aarav/gpudrive/nocturne_data",
-        render_config=render_config,
-        device="cuda",
         render_mode="rgb_array",
+        data_dir="waymo_data",
     )
 
     obs = env.reset()

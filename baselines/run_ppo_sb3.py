@@ -13,8 +13,9 @@ from algorithms.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
 from algorithms.sb3.ppo.ippo import IPPO
-
 from baselines.config import ExperimentConfig
+from networks.basic_ffn import FeedForwardPolicy, FFN
+from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 
 torch.cuda.empty_cache()
 
@@ -60,7 +61,6 @@ if __name__ == "__main__":
     )
 
     model = IPPO(
-        policy=exp_config.policy,
         n_steps=exp_config.n_steps,
         batch_size=exp_config.batch_size,
         env=env,
@@ -70,6 +70,8 @@ if __name__ == "__main__":
         tensorboard_log=f"runs/{run_id}"
         if run_id is not None
         else None,  # Sync with wandb
+        mlp_class=LateFusionNet,
+        policy=LateFusionPolicy,  # TODO(ev) configure from config
     )
 
     # Learn
