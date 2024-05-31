@@ -1,6 +1,7 @@
+import os
+
+import torch
 import wandb
-import torch
-import torch
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -12,10 +13,13 @@ from algorithms.sb3.callbacks import MultiAgentCallback
 
 # Import adapted PPO version
 from algorithms.sb3.ppo.ippo import IPPO
-
 from baselines.config import ExperimentConfig
+from networks.basic_ffn import FeedForwardPolicy, FFN
+from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 
 torch.cuda.empty_cache()
+
+# os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
 
 if __name__ == "__main__":
 
@@ -24,18 +28,18 @@ if __name__ == "__main__":
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
-        road_obs_algorithm=None,#"k_nearest_roadpoints",
+        road_obs_algorithm="k_nearest_roadpoints",
         sample_method="pad_n",
     )
 
     exp_config = ExperimentConfig(
-        render=True,
+        render=False,
     )
 
     # Make SB3-compatible environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=150,
+        num_worlds=100,
         max_cont_agents=128,
         data_dir=exp_config.data_dir,
         device=exp_config.device,
@@ -57,7 +61,6 @@ if __name__ == "__main__":
     )
 
     model = IPPO(
-        policy=exp_config.policy,
         n_steps=exp_config.n_steps,
         batch_size=exp_config.batch_size,
         env=env,
@@ -67,6 +70,8 @@ if __name__ == "__main__":
         tensorboard_log=f"runs/{run_id}"
         if run_id is not None
         else None,  # Sync with wandb
+        mlp_class=LateFusionNet,
+        policy=LateFusionPolicy,  # TODO(ev) configure from config
     )
 
     # Learn

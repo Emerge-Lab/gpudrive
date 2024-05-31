@@ -22,17 +22,20 @@ class ExperimentConfig:
     # TODO: Logging
     log_dir: str = "logs"
     use_wandb: bool = True
-    logging_collection_window: int = 1000 # how many trajectories we average logs over
+    logging_collection_window: int = (
+        1000  # how many trajectories we average logs over
+    )
+    log_freq: int = 100
 
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy
     seed: int = 42
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    batch_size: int = 256
+    batch_size: int = 2048
     verbose: int = 0
     total_timesteps: int = 150_000_000
 
     # Wandb
     project_name = "gpudrive"
-    group_name = "PPO_05_24"
+    group_name = "PPO"
     entity = "_emerge"
