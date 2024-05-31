@@ -35,8 +35,7 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        auto_reset=False,
-        render_config: RenderConfig = None,
+        render_config: RenderConfig = RenderConfig(),
         verbose=True,
     ):
         self.config = config
@@ -106,7 +105,7 @@ class Env(gym.Env):
             .to_torch()[self.world_render_idx, :][0]
             .item()
         )
-        self.visualizer = PyGameVisualizer(self.sim, self.world_render_idx, self.render_config, self.config.dist_to_goal_threshold)
+        self.visualizer = PyGameVisualizer(self.sim, self.render_config, self.config.dist_to_goal_threshold)
 
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene

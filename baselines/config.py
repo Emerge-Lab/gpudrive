@@ -16,7 +16,7 @@ class ExperimentConfig:
     # Rendering settings
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 10000  # Render after every kth rollout
+    render_freq: int = 10  # Render after every kth rollout
     render_n_worlds: int = 1
 
     # TODO: Logging
@@ -25,6 +25,7 @@ class ExperimentConfig:
     logging_collection_window: int = (
         1000  # how many trajectories we average logs over
     )
+    log_freq: int = 100
 
     # Hyperparameters
     policy: torch.nn.Module = FeedForwardPolicy

@@ -24,9 +24,9 @@ class MadronaOption(Enum):
 
 @dataclass
 class RenderConfig:
-    render_mode: RenderMode
-    view_option: Enum
-    resolution: Tuple[int, int]
+    render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
+    view_option: Enum = PygameOption.RGB
+    resolution: Tuple[int, int] = (256, 256)
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
@@ -42,7 +42,7 @@ class EnvConfig:
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
-    obs_radius: float = 10.0
+    obs_radius: float = 100.0
 
     # Action space (discrete)
     steer_actions: torch.Tensor = torch.tensor(

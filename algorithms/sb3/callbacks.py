@@ -19,6 +19,7 @@ class MultiAgentCallback(BaseCallback):
         self.config = config
         self.wandb_run = wandb_run
         self.num_rollouts = 0
+        self.step_counter = 0
 
         # TODO(ev) don't just define these here
         self.mean_ep_reward_per_agent = deque(maxlen=self.config.logging_collection_window)
@@ -75,7 +76,7 @@ class MultiAgentCallback(BaseCallback):
         Will be called by the model after each call to `env.step()`.
         """
 
-        # LOG AND RESET METRICS AFTER EACH EPISODE (when all worlds are done)
+        self.step_counter += 1
         if len(self.locals["env"].info_dict) > 0:
             # total number of agents
             self.num_agent_rollouts.append(self.locals["env"].info_dict[
@@ -87,31 +88,32 @@ class MultiAgentCallback(BaseCallback):
             self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
             self.mean_reward_per_episode.append(self.locals["env"].info_dict["mean_reward_per_episode"])
             self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
-            wandb.log(
-                {
-                    "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
-                    "metrics/perc_off_road": (
-                        sum(self.perc_off_road) / sum(self.num_agent_rollouts)
-                    )
-                    * 100,
-                    "metrics/perc_veh_collisions": (
-                        sum(self.perc_veh_collisions) / sum(self.num_agent_rollouts)
-                    )
-                    * 100,
-                    "metrics/perc_non_veh_collision": (
-                        sum(self.perc_non_veh_collision) / sum(self.num_agent_rollouts)
-                    )
-                    * 100,
-                    "metrics/perc_goal_achieved": (
-                        sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
-                    )
-                    * 100,
-                    "metrics/perc_truncated": (
-                        sum(self.perc_truncated) / sum(self.num_agent_rollouts)
-                    )
-                    * 100,
-                }
-            )
+            if self.step_counter % self.config.log_freq == 0:
+                wandb.log(
+                    {
+                        "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
+                        "metrics/perc_off_road": (
+                            sum(self.perc_off_road) / sum(self.num_agent_rollouts)
+                        )
+                        * 100,
+                        "metrics/perc_veh_collisions": (
+                            sum(self.perc_veh_collisions) / sum(self.num_agent_rollouts)
+                        )
+                        * 100,
+                        "metrics/perc_non_veh_collision": (
+                            sum(self.perc_non_veh_collision) / sum(self.num_agent_rollouts)
+                        )
+                        * 100,
+                        "metrics/perc_goal_achieved": (
+                            sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
+                        )
+                        * 100,
+                        "metrics/perc_truncated": (
+                            sum(self.perc_truncated) / sum(self.num_agent_rollouts)
+                        )
+                        * 100,
+                    }
+                )
 
     def _on_rollout_end(self) -> None:
         """
