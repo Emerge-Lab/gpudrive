@@ -3,10 +3,10 @@ parameters:
   datasetInitOptions: FirstN
   maxNumControlledVehicles: 10000
   observationRadius: 1000.0
-  polylineReductionThreshold: 10.0
+  polylineReductionThreshold: 0.5
   rewardParams: reward_params
   IgnoreNonVehicles: true
-  roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
+  roadObservationAlgorithm: KNearestEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: true
 
 reward_params:
@@ -17,5 +17,7 @@ reward_params:
 sim_manager:
   exec_mode: CUDA
   gpu_id: 0
-  json_path: /home/aarav/gpudrive/nocturne_data
+  json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid/
   num_worlds: 100
+
+experiment: 2
