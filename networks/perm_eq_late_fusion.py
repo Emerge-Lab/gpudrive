@@ -15,9 +15,6 @@ from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from pygpudrive.env.config import EnvConfig
 
 
-os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
-
-
 class LateFusionNet(nn.Module):
     """Processes the env observation using a late fusion architecture."""
 
