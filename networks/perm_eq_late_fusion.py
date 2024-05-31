@@ -25,7 +25,7 @@ class LateFusionNet(nn.Module):
         self,
         observation_space: spaces.Box,
         env_config: EnvConfig = None,
-        obj_dims: List[int] = [6, 7, 7],
+        obj_dims: List[int] = [6, 11, 14],
         arch_ego_state: List[int] = [64, 32],
         arch_road_objects: List[int] = [64, 32],
         arch_road_graph: List[int] = [64, 32],

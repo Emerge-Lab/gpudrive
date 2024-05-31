@@ -497,12 +497,6 @@ if __name__ == "__main__":
         config=config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-<<<<<<< HEAD
-=======
-        data_dir="/home/aarav/gpudrive/nocturne_data",
-        render_config=render_config,
-        device="cuda",
->>>>>>> 3e45263ddcf38200cc993fd054dd1ca222fef349
         render_mode="rgb_array",
         data_dir="waymo_data",
     )
