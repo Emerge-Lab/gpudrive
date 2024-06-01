@@ -78,6 +78,19 @@ class EnvConfig:
     """Constants to normalize observations."""
     norm_obs: bool = True
 
+    # Values to normalize by: Ego state
+    max_speed: int = 100
+    max_veh_len: int = 30
+    max_veh_width: int = 10
+    min_rel_goal_coord: int = -1000
+    max_rel_goal_coord: int = 1000
+    min_rel_agent_pos: int = -1000
+    max_rel_agent_pos: int = 1000
+    max_orientation_rad: float = 2 * np.pi
+    min_rm_coord: int = -1000
+    max_rm_coord: int = 1000
+    max_road_line_segmment_len: int = 100
+
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
     # random_n - Takes num_worlds files randomly. Fails if num files < num_worlds.
