@@ -11,8 +11,11 @@ class ExperimentConfig:
     data_dir: str = "formatted_json_v2_no_tl_train"
     device: str = "cuda"
 
-    # RENDERING
-    render: bool = True
+    # Dataset
+    data_dir: str = "formatted_json_v2_no_tl_train"
+
+    # Rendering settings
+    render: bool = False
     render_mode: str = "rgb_array"
     render_freq: int = 100
     # Start rendering success/failure modes after this many global timesteps
@@ -24,6 +27,7 @@ class ExperimentConfig:
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
+        100  # how many trajectories we average logs over
         100  # how many trajectories we average logs over
     )
     log_freq: int = 100
@@ -46,6 +50,10 @@ class ExperimentConfig:
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
+    total_timesteps: int = 10e7
+    ent_coef: float = 0.01
+    vf_coef: float = 0.5
+    lr: float = 3e-4
     total_timesteps: int = 3e8
     ent_coef: float = 0.001
     vf_coef: float = 0.5
