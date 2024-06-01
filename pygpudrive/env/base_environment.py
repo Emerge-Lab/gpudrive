@@ -373,8 +373,9 @@ class Env(gym.Env):
             self.config.max_rel_goal_coord,
         )
 
-        # Exclude the collision state
-        state = state[:, :, :5]
+        # Uncommment this to exclude the collision state 
+        # (1 if vehicle is in collision, 1 otherwise)
+        #state = state[:, :, :5]
 
         return state
 
@@ -385,7 +386,7 @@ class Env(gym.Env):
         """
 
         # TODO: Fix (there should not be nans in the obs)
-        # BUG: remove nan values
+        # BUG: remove nan values?
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
@@ -456,7 +457,6 @@ class Env(gym.Env):
             obs[:, :, :, 6].long(), num_classes=7
         )
 
-        # Exclude (index 3 and 4)
         # Concatenate the one-hot encoding with the rest of the features (exclude index 3 and 4)
         obs = torch.cat((obs[:, :, :, :6], one_hot_road_type), dim=-1)
 

@@ -22,6 +22,8 @@
 /formatted_json_v2_no_tl_train
 /waymo_data_new
 /maps_16
+**/*ppo_model*/
+/wandb*
 
 # Logging
 /wandb

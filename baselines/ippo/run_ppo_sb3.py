@@ -12,12 +12,9 @@ from baselines.ippo.config import ExperimentConfig
 def train():
     """Run PPO training with stable-baselines3."""
 
+    # CONFIG
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
-
-    env_config = EnvConfig(
-        road_obs_algorithm="k_nearest_roadpoints",
-        sample_method="pad_n",
-    )
+    env_config = EnvConfig()
 
     # MAKE SB3-COMPATIBLE ENVIRONMENT
     env = SB3MultiAgentEnv(
@@ -35,6 +32,9 @@ def train():
             project=exp_config.project_name,
             group=exp_config.group_name,
             sync_tensorboard=exp_config.sync_tensorboard,
+            tags=exp_config.tags,
+            mode=exp_config.wandb_mode,
+            config={**exp_config.__dict__, **env_config.__dict__},
         )
         run_id = run.id
 

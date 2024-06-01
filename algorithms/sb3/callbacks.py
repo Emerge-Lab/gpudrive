@@ -1,5 +1,7 @@
 from collections import deque
 
+import os
+import logging
 import numpy as np
 import torch
 import wandb
@@ -20,6 +22,9 @@ class MultiAgentCallback(BaseCallback):
         self.wandb_run = wandb_run
         self.num_rollouts = 0
         self.step_counter = 0
+        self.policy_base_path = os.path.join(wandb.run.dir, "policies")
+        if self.policy_base_path is not None:
+            os.makedirs(self.policy_base_path, exist_ok=True)
 
         # TODO(ev) don't just define these here
         self.mean_ep_reward_per_agent = deque(
@@ -75,6 +80,14 @@ class MultiAgentCallback(BaseCallback):
         This method is called before the first rollout starts.
         """
         pass
+    
+    def _on_training_end(self) -> None:
+        """
+        This method is called at the end of training.
+        """
+        # Save the policy before ending the run
+        if self.config.save_policy and self.policy_base_path is not None:
+            self._save_policy_checkpoint()
 
     def _on_rollout_start(self) -> None:
         """
@@ -162,6 +175,11 @@ class MultiAgentCallback(BaseCallback):
                         "charts/min_obs": np.array(self.min_obs).min(),
                     }
                 )
+                
+            # Model checkpointing
+            if self.config.save_policy:
+                if self.step_counter % self.config.save_policy_freq == 0:
+                    self._save_policy_checkpoint()
 
     def _on_rollout_end(self) -> None:
         """
@@ -218,7 +236,6 @@ class MultiAgentCallback(BaseCallback):
 
             # Step the environment
             obs, _, _, _ = env.step(action)
-            # obs = self._batchify_and_filter_obs(obs, env)
 
             frame = env.render()
             frames.append(frame)
@@ -229,9 +246,22 @@ class MultiAgentCallback(BaseCallback):
             {
                 f"video_{render_world_idx}": wandb.Video(
                     np.moveaxis(frames, -1, 1),
-                    fps=10,
+                    fps=15,
                     format="gif",
                     caption=f"Global step: {self.num_timesteps:,}",
                 )
             }
         )
+        
+    def _save_policy_checkpoint(self) -> None:
+        """Save the policy locally and to wandb."""
+
+        self.path = os.path.join(
+            self.policy_base_path,
+            f"policy_{self.num_timesteps}.zip",
+        )
+        self.model.save(self.path)
+        if self.wandb_run is not None:
+            wandb.save(self.path, base_path=self.policy_base_path)
+        
+        print(f"Saved policy on global_step {self.num_timesteps:,} at: \n {self.path}")
