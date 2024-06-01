@@ -11,22 +11,22 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (255, 255, 255)
+    BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
-        (255, 0, 0),  # Red
+        (255, 69, 69),  # Red
         (0, 255, 0),  # Green
         (0, 0, 255),  # Blue
         (255, 255, 0),  # Yellow
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (0, 0, 0),  # Black
+        float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
+        float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.RoadLine): (225, 255, 225),  # Green
-        float(gpudrive.EntityType.SpeedBump): (255, 0, 255),  # Red
-        float(gpudrive.EntityType.CrossWalk): (213, 20, 20),  # dark
-        float(gpudrive.EntityType.StopSign): (255, 0, 255),  # Blue
+        float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
+        float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
+        float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
     }
 
     def __init__(self, sim, render_config, goal_radius):
@@ -179,13 +179,36 @@ class PyGameVisualizer:
 
     def draw_map(self, surf, map_info, world_render_idx = 0):
         for idx, map_obj in enumerate(map_info):
+            
             if map_obj[-1] == float(gpudrive.EntityType.Padding):
                 continue
+            
             elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
                 start, end = PyGameVisualizer.get_endpoints(map_obj[:2], map_obj)
                 start = self.scale_coords(start, world_render_idx)
                 end = self.scale_coords(end, world_render_idx)
-                pygame.draw.line(surf, self.color_dict[map_obj[-1]], start, end, 2)
+                
+                # DRAW ROAD EDGE
+                if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
+                    pygame.draw.line(
+                        self.map_surf,
+                        self.color_dict[map_obj[-1]],
+                        start_pos=start,
+                        end_pos=end,
+                        width=2,
+                    )
+                    
+                # DRAW ROAD LINES/LANES
+                else:
+                    pygame.draw.line(
+                        self.map_surf,
+                        self.color_dict[map_obj[-1]],
+                        start,
+                        end,
+                        width=1,
+                    )
+            
+            # DRAW STOP SIGNS
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
                 center, width, height, rotation = (
                     map_obj[:2],
@@ -196,11 +219,16 @@ class PyGameVisualizer:
                 if map_obj[-1] == float(gpudrive.EntityType.StopSign):
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
+               
                 box_corners = PyGameVisualizer.compute_agent_corners(
                     center, width, height, rotation
                 )
                 for i, box_corner in enumerate(box_corners):
-                    box_corners[i] = self.scale_coords(box_corner, world_render_idx)
+                    box_corners[i] = self.scale_coords(
+                        box_corner, 
+                        world_render_idx
+                    )
+                
                 pygame.draw.polygon(
                     surface=surf,
                     color=self.color_dict[map_obj[-1]],
@@ -213,6 +241,7 @@ class PyGameVisualizer:
         if(self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC):
             return
         # self.map_surfs = [self.surf.copy() * self.num  # Create a copy of the main surface to hold the map
+        self.map_surf.fill(self.BACKGROUND_COLOR)
         self.map_surfs = []
         for i in range(self.num_worlds):
             map_surf = self.surf.copy()

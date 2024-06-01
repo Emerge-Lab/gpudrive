@@ -42,7 +42,7 @@ class EnvConfig:
     # Environment settings
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
-    top_k_roadpoints: int = 200
+    top_k_roadpoints: int = 500
     num_worlds: int = 200
 
     # Observation space
@@ -54,9 +54,9 @@ class EnvConfig:
     road_obs_algorithm: str = "k_nearest_roadpoints"
     obs_radius: float = 100.0
 
-    # Action space (discrete)
-    steer_actions: torch.Tensor = torch.linspace(-0.6, 0.6, 9)
-    accel_actions: torch.Tensor = torch.linspace(-3, 3, 9)
+    # Action space (joint discrete)
+    steer_actions: torch.Tensor = torch.linspace(-0.6, 0.6, 7)
+    accel_actions: torch.Tensor = torch.linspace(-3, 3, 7)
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
@@ -88,6 +88,7 @@ class EnvConfig:
     min_rm_coord: int = -1000
     max_rm_coord: int = 1000
     max_road_line_segmment_len: int = 100
+    max_road_scale: int = 100
 
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
@@ -106,7 +107,7 @@ class EnvConfig:
     # DON'T CHANGE: Used for network
     EGO_STATE_DIM = 5 if ego_state else 0
     PARTNER_DIM = 10 if partner_obs else 0
-    ROAD_MAP_DIM = 12 if road_map_obs else 0
+    ROAD_MAP_DIM = 13 if road_map_obs else 0
 
     """
     Obs feature dictionary:
@@ -130,20 +131,22 @@ class EnvConfig:
             ),
         )
     - road_map_obs:
-        - shape: (max_num_objects, top_k_road_points, 12)
+        - shape: (max_num_objects, top_k_road_points, 13)
         - what: (
             road_point_x,
             road_point_y,
             road_line_segment_len,
+            road_point_scale, ?? [TBD]
+            road_point_scale, ?? [TBD]
             road_line_segment_orientation,
             road_line_segment_type: (
                 0: _None,
-                1: RoadEdge,
-                2: RoadLane,
-                3: CrossWalk,
-                4: SpeedBump
-                5: StopSign
-                6: ??? (TBD: What is this, I need 7 classes)
+                1: RoadLine,
+                2: RoadEdge,
+                3: RoadLane,
+                4: CrossWalk,
+                5: SpeedBump
+                6: StopSign
             ),
         )
     """

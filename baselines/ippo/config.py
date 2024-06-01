@@ -11,12 +11,12 @@ class ExperimentConfig:
     device: str = "cuda"
 
     # Dataset
-    data_dir: str = "formatted_json_v2_no_tl_train"
+    data_dir: str = "waymo_data"
 
     # Rendering settings
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 10  # Render after every kth rollout
+    render_freq: int = 100  # Render after every kth rollout
     render_n_worlds: int = 1
 
     # Logging
@@ -36,8 +36,8 @@ class ExperimentConfig:
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
-    total_timesteps: int = 10e7
-    ent_coef: float = 0.01
+    total_timesteps: int = 1e8
+    ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 3e-4
 
@@ -55,5 +55,5 @@ class ExperimentConfig:
 
     # Wandb
     project_name = "gpudrive"
-    group_name = "dc/PPO"
+    group_name = "dc/PPO_3_scenes"
     entity = "_emerge"

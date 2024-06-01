@@ -277,7 +277,7 @@ class Env(gym.Env):
         if self.config.ego_state:
             ego_states = self.sim.self_observation_tensor().to_torch()
             if self.config.norm_obs:
-                ego_states_norm = self.normalize_ego_state(ego_states)
+                ego_states = self.normalize_ego_state(ego_states)
         else:
             ego_states = torch.Tensor().to(self.device)
 
@@ -320,14 +320,14 @@ class Env(gym.Env):
         # Combine the observations
         obs_filtered = torch.cat(
             (
-                ego_states_norm,
+                ego_states,
                 partner_observations,
                 road_map_observations,
             ),
             dim=-1,
         )
 
-        # print(f"ego_states: {ego_states_norm.max()}")
+        # print(f"ego_states: {ego_states.max()}")
         # print(f"partner_observations: {partner_observations.max()}")
         # print(f"road_map_observations: {road_map_observations.max()}")
 
@@ -444,6 +444,10 @@ class Env(gym.Env):
         # Road line segment length
         obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
+        # TODO: Road scale (width and height)
+        obs[:, :, :, 3] /= self.config.max_road_scale
+        # obs[:, :, :, 4] seems already scaled
+
         # Road point orientation
         obs[:, :, :, 5] /= self.config.max_orientation_rad
 
@@ -454,9 +458,7 @@ class Env(gym.Env):
 
         # Exclude (index 3 and 4)
         # Concatenate the one-hot encoding with the rest of the features (exclude index 3 and 4)
-        obs = torch.cat(
-            (obs[:, :, :, :3], obs[:, :, :, 5:6], one_hot_road_type), dim=-1
-        )
+        obs = torch.cat((obs[:, :, :, :6], one_hot_road_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
