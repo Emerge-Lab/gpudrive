@@ -11,11 +11,8 @@ class ExperimentConfig:
     data_dir: str = "formatted_json_v2_no_tl_train"
     device: str = "cuda"
 
-    # Dataset
-    data_dir: str = "waymo_data"
-
-    # Rendering settings
-    render: bool = False
+    # RENDERING
+    render: bool = True
     render_mode: str = "rgb_array"
     render_freq: int = 100
     # Start rendering success/failure modes after this many global timesteps

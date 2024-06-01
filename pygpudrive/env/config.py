@@ -46,9 +46,9 @@ class EnvConfig:
     num_worlds: int = 100
 
     # Observation space
-    ego_state: bool = True  # Ego vehicle state
+    ego_state: bool = True     # Ego vehicle state
     road_map_obs: bool = True  # Road graph
-    partner_obs: bool = True  # Partner vehicle info
+    partner_obs: bool = True   # Partner vehicle info
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
@@ -78,7 +78,23 @@ class EnvConfig:
     """Constants to normalize observations."""
     norm_obs: bool = True
 
-    # Values to normalize by: Ego state
+    # Datasete settings
+    # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
+    # random_n - Takes num_worlds files randomly. Fails if num files < num_worlds.
+    # pad_n - Initializes as many files as possible first.
+    # Then it repeats the first file to pad until num_worlds
+    # files are loaded. Will fail if the number of files are more than num_worlds.
+    # exact_n - Init exactly num_worlds files.
+    sample_method: str = "first_n"
+
+    # Related to settings
+    eval_expert_mode: bool = (
+        False  # Set this to true if you want to return all agent info
+    )
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
     max_speed: int = 100
     max_veh_len: int = 30
     max_veh_width: int = 10
