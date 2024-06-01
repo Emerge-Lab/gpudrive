@@ -275,55 +275,61 @@ class Env(gym.Env):
         # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
-            ego_state_padding = self.sim.self_observation_tensor().to_torch()
-
+            ego_states = self.sim.self_observation_tensor().to_torch()
             if self.config.norm_obs:
-                ego_state_padding = self.normalize_ego_state(ego_state_padding)
-
+                ego_states_norm = self.normalize_ego_state(ego_states)
         else:
-            ego_state_padding = torch.Tensor().to(self.device)
+            ego_states = torch.Tensor().to(self.device)
 
         # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
-            partner_obs_padding = (
+            partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
             )
             if self.config.norm_obs:  # Normalize observations and then flatten
-                partner_obs_padding = self.normalize_and_flatten_partner_obs(
-                    partner_obs_padding
+                partner_observations = self.normalize_and_flatten_partner_obs(
+                    partner_observations
                 )
             else:  # Flatten along the last two dimensions
-                partner_obs_padding = partner_obs_padding.flatten(start_dim=2)
+                partner_observations = partner_observations.flatten(
+                    start_dim=2
+                )
 
         else:
-            partner_obs_padding = torch.Tensor().to(self.device)
+            partner_observations = torch.Tensor().to(self.device)
 
         # Get road map
         # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         if self.config.road_map_obs:
 
-            map_obs_padding = self.sim.agent_roadmap_tensor().to_torch()
+            road_map_observations = self.sim.agent_roadmap_tensor().to_torch()
 
             if self.config.norm_obs:
-                map_obs_padding = self.normalize_and_flatten_map_obs(
-                    map_obs_padding
+                road_map_observations = self.normalize_and_flatten_map_obs(
+                    road_map_observations
                 )
             else:
-                map_obs_padding = map_obs_padding.flatten(start_dim=2)
+                road_map_observations = road_map_observations.flatten(
+                    start_dim=2
+                )
         else:
-            map_obs_padding = torch.Tensor().to(self.device)
+            road_map_observations = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_filtered = torch.cat(
             (
-                ego_state_padding,
-                partner_obs_padding,
-                map_obs_padding,
+                ego_states_norm,
+                partner_observations,
+                road_map_observations,
             ),
             dim=-1,
         )
+
+        # print(f"ego_states: {ego_states_norm.max()}")
+        # print(f"partner_observations: {partner_observations.max()}")
+        # print(f"road_map_observations: {road_map_observations.max()}")
 
         return obs_filtered
 
@@ -366,6 +372,9 @@ class Env(gym.Env):
             self.config.min_rel_goal_coord,
             self.config.max_rel_goal_coord,
         )
+
+        # Exclude the collision state
+        state = state[:, :, :5]
 
         return state
 
@@ -412,7 +421,7 @@ class Env(gym.Env):
             num_classes=4,
         )
         # Concatenate the one-hot encoding with the rest of the features
-        obs = torch.concat((obs, one_hot_object_type), dim=-1)
+        obs = torch.concat((obs[:, :, :, :6], one_hot_object_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
@@ -433,19 +442,21 @@ class Env(gym.Env):
         )
 
         # Road line segment length
-        # TODO: Check what a good value for the max road line segment length is
         obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
         # Road point orientation
         obs[:, :, :, 5] /= self.config.max_orientation_rad
 
-        # One-hot encode the road types
+        # Road types: one-hot encode them
         one_hot_road_type = torch.nn.functional.one_hot(
             obs[:, :, :, 6].long(), num_classes=7
         )
 
-        # Concatenate the one-hot encoding with the rest of the features
-        obs = torch.cat((obs, one_hot_road_type), dim=-1)
+        # Exclude (index 3 and 4)
+        # Concatenate the one-hot encoding with the rest of the features (exclude index 3 and 4)
+        obs = torch.cat(
+            (obs[:, :, :, :3], obs[:, :, :, 5:6], one_hot_road_type), dim=-1
+        )
 
         return obs.flatten(start_dim=2)
 
@@ -476,10 +487,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    env_config = EnvConfig(sample_method="pad_n")
+    env_config = EnvConfig(sample_method="first_n")
     render_config = RenderConfig()
 
-    TOTAL_STEPS = 90
+    TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
     NUM_WORLDS = 10
 
@@ -487,7 +498,7 @@ if __name__ == "__main__":
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="waymo_data",
+        data_dir="formatted_json_v2_no_tl_train",
         device="cuda",
         render_config=render_config,
     )
@@ -512,6 +523,10 @@ if __name__ == "__main__":
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
+
+        if done.any():
+            print("Done")
+            obs = env.reset()
 
     # import imageio
     # imageio.mimsave("world1.gif", frames_1)

@@ -78,15 +78,15 @@ class EnvConfig:
 
     # Values to normalize by: Ego state
     max_speed: int = 100
-    max_veh_len: int = 25
-    max_veh_width: int = 5
-    min_rel_goal_coord: int = -100
-    max_rel_goal_coord: int = 100
-    min_rel_agent_pos: int = -100
-    max_rel_agent_pos: int = 100
+    max_veh_len: int = 30
+    max_veh_width: int = 10
+    min_rel_goal_coord: int = -1000
+    max_rel_goal_coord: int = 1000
+    min_rel_agent_pos: int = -1000
+    max_rel_agent_pos: int = 1000
     max_orientation_rad: float = 2 * np.pi
-    min_rm_coord: int = -300
-    max_rm_coord: int = 300
+    min_rm_coord: int = -1000
+    max_rm_coord: int = 1000
     max_road_line_segmment_len: int = 100
 
     # Datasete settings
@@ -104,6 +104,46 @@ class EnvConfig:
     )
 
     # DON'T CHANGE: Used for network
-    EGO_STATE_DIM = 6 if ego_state else 0
-    PARTNER_DIM = 11 if partner_obs else 0
-    ROAD_MAP_DIM = 14 if road_map_obs else 0
+    EGO_STATE_DIM = 5 if ego_state else 0
+    PARTNER_DIM = 10 if partner_obs else 0
+    ROAD_MAP_DIM = 12 if road_map_obs else 0
+
+    """
+    Obs feature dictionary:
+    - ego_state shape:
+        - shape: (max_num_objects, 5)
+        - what: (speed, veh_len, veh_width, rel_goal_x, rel_goal_y)
+    - partner_obs:
+        - shape: (max_num_objects, max_num_objects - 1, 10)
+        - what: (
+            other_speed,
+            other_pos_x,
+            other_pos_y,
+            other_orientation,
+            other_veh_len,
+            other_veh_width,
+            other_type (
+                0: _None,
+                1: Vehicle,
+                2: Pedestrian,
+                3: Cyclist
+            ),
+        )
+    - road_map_obs:
+        - shape: (max_num_objects, top_k_road_points, 12)
+        - what: (
+            road_point_x,
+            road_point_y,
+            road_line_segment_len,
+            road_line_segment_orientation,
+            road_line_segment_type: (
+                0: _None,
+                1: RoadEdge,
+                2: RoadLane,
+                3: CrossWalk,
+                4: SpeedBump
+                5: StopSign
+                6: ??? (TBD: What is this, I need 7 classes)
+            ),
+        )
+    """
