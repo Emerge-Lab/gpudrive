@@ -16,6 +16,7 @@ def train():
 
     env_config = EnvConfig(
         road_obs_algorithm="k_nearest_roadpoints",
+        sample_method="first_n",
     )
 
     # MAKE SB3-COMPATIBLE ENVIRONMENT
@@ -60,6 +61,8 @@ def train():
         gae_lambda=exp_config.gae_lambda,
         vf_coef=exp_config.vf_coef,
         clip_range=exp_config.clip_range,
+        learning_rate=exp_config.lr,
+        ent_coef=exp_config.ent_coef,
         env_config=env_config,
         exp_config=exp_config,
     )

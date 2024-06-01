@@ -11,7 +11,7 @@ class ExperimentConfig:
     device: str = "cuda"
 
     # Dataset
-    data_dir: str = "waymo_data"
+    data_dir: str = "formatted_json_v2_no_tl_train"
 
     # Rendering settings
     render: bool = False
@@ -23,7 +23,7 @@ class ExperimentConfig:
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        1000  # how many trajectories we average logs over
+        100  # how many trajectories we average logs over
     )
     log_freq: int = 100
 
@@ -37,6 +37,9 @@ class ExperimentConfig:
     batch_size: int = 2048
     verbose: int = 0
     total_timesteps: int = 10e7
+    ent_coef: float = 0.01
+    vf_coef: float = 0.5
+    lr: float = 3e-4
 
     # Network
     mlp_class = LateFusionNet

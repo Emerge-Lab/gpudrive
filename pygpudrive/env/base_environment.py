@@ -45,7 +45,6 @@ class Env(gym.Env):
         params.polylineReductionThreshold = 0.5
         params.observationRadius = self.config.obs_radius
         params.polylineReductionThreshold = 1.0
-        params.observationRadius = 100.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
 

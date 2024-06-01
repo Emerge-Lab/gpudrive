@@ -22,15 +22,33 @@ class MultiAgentCallback(BaseCallback):
         self.step_counter = 0
 
         # TODO(ev) don't just define these here
-        self.mean_ep_reward_per_agent = deque(maxlen=self.config.logging_collection_window)
-        self.perc_goal_achieved = deque(maxlen=self.config.logging_collection_window)
-        self.perc_off_road = deque(maxlen=self.config.logging_collection_window)
-        self.perc_veh_collisions = deque(maxlen=self.config.logging_collection_window)
-        self.perc_non_veh_collision = deque(maxlen=self.config.logging_collection_window)
-        self.num_agent_rollouts = deque(maxlen=self.config.logging_collection_window)
-        self.mean_reward_per_episode = deque(maxlen=self.config.logging_collection_window)
-        self.perc_truncated = deque(maxlen=self.config.logging_collection_window)
-        
+        self.mean_ep_reward_per_agent = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.perc_goal_achieved = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.perc_off_road = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.perc_veh_collisions = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.perc_non_veh_collision = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.num_agent_rollouts = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.mean_reward_per_episode = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.perc_truncated = deque(
+            maxlen=self.config.logging_collection_window
+        )
+        self.max_obs = deque(maxlen=self.config.logging_collection_window)
+        self.min_obs = deque(maxlen=self.config.logging_collection_window)
+
         self._define_wandb_metrics()  # Set x-axis for metrics
 
     def _define_wandb_metrics(self):
@@ -49,6 +67,8 @@ class MultiAgentCallback(BaseCallback):
         wandb.define_metric(
             "metrics/perc_non_veh_collision", step_metric="global_step"
         )
+        wandb.define_metric("charts/max_obs", step_metric="global_step")
+        wandb.define_metric("charts/min_obs", step_metric="global_step")
 
     def _on_training_start(self) -> None:
         """
@@ -79,39 +99,67 @@ class MultiAgentCallback(BaseCallback):
         self.step_counter += 1
         if len(self.locals["env"].info_dict) > 0:
             # total number of agents
-            self.num_agent_rollouts.append(self.locals["env"].info_dict[
-                "num_finished_agents"
-            ])
+            self.num_agent_rollouts.append(
+                self.locals["env"].info_dict["num_finished_agents"]
+            )
             self.perc_off_road.append(self.locals["env"].info_dict["off_road"])
-            self.perc_veh_collisions.append(self.locals["env"].info_dict["veh_collisions"])
-            self.perc_non_veh_collision.append(self.locals["env"].info_dict["non_veh_collision"])
-            self.perc_goal_achieved.append(self.locals["env"].info_dict["goal_achieved"])
-            self.mean_reward_per_episode.append(self.locals["env"].info_dict["mean_reward_per_episode"])
-            self.perc_truncated.append(self.locals["env"].info_dict["truncated"])
+            self.perc_veh_collisions.append(
+                self.locals["env"].info_dict["veh_collisions"]
+            )
+            self.perc_non_veh_collision.append(
+                self.locals["env"].info_dict["non_veh_collision"]
+            )
+            self.perc_goal_achieved.append(
+                self.locals["env"].info_dict["goal_achieved"]
+            )
+            self.mean_reward_per_episode.append(
+                self.locals["env"].info_dict["mean_reward_per_episode"]
+            )
+            self.perc_truncated.append(
+                self.locals["env"].info_dict["truncated"]
+            )
+            self.max_obs.append(self.locals["obs_tensor"].max().item())
+            self.min_obs.append(self.locals["obs_tensor"].min().item())
+
             if self.step_counter % self.config.log_freq == 0:
                 wandb.log(
                     {
-                        "metrics/mean_ep_reward_per_agent": sum(self.mean_reward_per_episode) / sum(self.num_agent_rollouts),
+                        "metrics/mean_ep_reward_per_agent": sum(
+                            self.mean_reward_per_episode
+                        )
+                        / sum(self.num_agent_rollouts),
                         "metrics/perc_off_road": (
-                            sum(self.perc_off_road) / sum(self.num_agent_rollouts)
+                            sum(self.perc_off_road)
+                            / sum(self.num_agent_rollouts)
                         )
                         * 100,
                         "metrics/perc_veh_collisions": (
-                            sum(self.perc_veh_collisions) / sum(self.num_agent_rollouts)
+                            sum(self.perc_veh_collisions)
+                            / sum(self.num_agent_rollouts)
                         )
                         * 100,
                         "metrics/perc_non_veh_collision": (
-                            sum(self.perc_non_veh_collision) / sum(self.num_agent_rollouts)
+                            sum(self.perc_non_veh_collision)
+                            / sum(self.num_agent_rollouts)
                         )
                         * 100,
                         "metrics/perc_goal_achieved": (
-                            sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
+                            sum(self.perc_goal_achieved)
+                            / sum(self.num_agent_rollouts)
                         )
                         * 100,
                         "metrics/perc_truncated": (
-                            sum(self.perc_truncated) / sum(self.num_agent_rollouts)
+                            sum(self.perc_truncated)
+                            / sum(self.num_agent_rollouts)
                         )
                         * 100,
+                    }
+                )
+
+                wandb.log(
+                    {
+                        "charts/max_obs": np.array(self.max_obs).max(),
+                        "charts/min_obs": np.array(self.min_obs).min(),
                     }
                 )
 

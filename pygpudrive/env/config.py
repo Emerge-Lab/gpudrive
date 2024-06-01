@@ -43,7 +43,7 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-    num_worlds: int = 15
+    num_worlds: int = 200
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
@@ -55,10 +55,8 @@ class EnvConfig:
     obs_radius: float = 100.0
 
     # Action space (discrete)
-    steer_actions: torch.Tensor = torch.tensor(
-        [-0.6, -0.3, -0.1, 0, 0.1, 0.3, 0.6]
-    )
-    accel_actions: torch.Tensor = torch.tensor([-3, -1, 0, 1, 3])
+    steer_actions: torch.Tensor = torch.linspace(-0.6, 0.6, 9)
+    accel_actions: torch.Tensor = torch.linspace(-3, 3, 9)
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
@@ -107,5 +105,5 @@ class EnvConfig:
 
     # DON'T CHANGE: Used for network
     EGO_STATE_DIM = 6 if ego_state else 0
-    ROAD_MAP_DIM = 11 if road_map_obs else 0
-    PARTNER_DIM = 14 if partner_obs else 0
+    PARTNER_DIM = 11 if partner_obs else 0
+    ROAD_MAP_DIM = 14 if road_map_obs else 0
