@@ -174,12 +174,7 @@ class MultiAgentCallback(BaseCallback):
                         "charts/max_obs": np.array(self.max_obs).max(),
                         "charts/min_obs": np.array(self.min_obs).min(),
                     }
-                )
-                
-            # Model checkpointing
-            if self.config.save_policy:
-                if self.step_counter % self.config.save_policy_freq == 0:
-                    self._save_policy_checkpoint()
+                )            
 
     def _on_rollout_end(self) -> None:
         """
@@ -191,6 +186,11 @@ class MultiAgentCallback(BaseCallback):
             if self.num_rollouts % self.config.render_freq == 0:
                 for world_idx in range(self.config.render_n_worlds):
                     self._create_and_log_video(render_world_idx=world_idx)
+                    
+        # Model checkpointing
+        if self.config.save_policy:
+            if self.num_rollouts % self.config.save_policy_freq == 0:
+                self._save_policy_checkpoint()
 
         self.num_rollouts += 1
 

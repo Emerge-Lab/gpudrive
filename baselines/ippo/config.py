@@ -14,7 +14,7 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 10 
+    render_freq: int = 200 
     render_n_worlds: int = 1
 
     # LOGGING & WANDB
@@ -32,7 +32,7 @@ class ExperimentConfig:
     
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 5000
+    save_policy_freq: int = 500
     
     # HYPERPARAMETERS
     seed: int = 42
