@@ -90,6 +90,7 @@ class EnvConfig:
     min_rm_coord: int = -1000
     max_rm_coord: int = 1000
     max_road_line_segmment_len: int = 100
+    max_road_scale: int = 100
 
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.

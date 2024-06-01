@@ -12,7 +12,7 @@ class ExperimentConfig:
     device: str = "cuda"
 
     # Dataset
-    data_dir: str = "formatted_json_v2_no_tl_train"
+    data_dir: str = "waymo_data"
 
     # Rendering settings
     render: bool = False
