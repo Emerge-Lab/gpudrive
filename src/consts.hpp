@@ -15,6 +15,11 @@ inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
 
+// This factor rescales the length of the vehicles by a tiny amount
+// To account for the fact that noise occasionally puts vehicles into initial
+// collisions. This is a dataset artifact that we are handling here like this.
+inline constexpr float vehicleLengthScale = 0.9f;
+
 // Each unit of distance forward (+ y axis) rewards the agents by this amount
 inline constexpr float rewardPerDist = 0.05f;
 // Each step that the agents don't make additional progress they get a small
