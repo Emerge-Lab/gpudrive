@@ -92,61 +92,16 @@ class IPPO(PPO):
             with torch.no_grad():
                 obs_tensor = self._last_obs
 
-                # TODO: Check
-                # EDIT_1: Mask out invalid observations (NaN axes and/or dead agents)
-                # Create dummy actions, values and log_probs (NaN)
-                actions = torch.full(
-                    fill_value=float("nan"), size=(self.n_envs,)
-                ).to(self.device)
-                log_probs = torch.full(
-                    fill_value=float("nan"),
-                    size=(self.n_envs,),
-                    dtype=torch.float32,
-                ).to(self.device)
-                values = (
-                    torch.full(
-                        fill_value=float("nan"),
-                        size=(self.n_envs,),
-                        dtype=torch.float32,
-                    )
-                    .unsqueeze(dim=1)
-                    .to(self.device)
-                )
-
-                # Get indices of alive agent ids
-                # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
-                # TODO(ev) I don't like that we're accessing agent attributes here like this
-                alive_agent_mask = ~(
-                    env.dead_agent_mask[env.controlled_agent_mask].reshape(
-                        env.num_envs, 1
-                    )
-                )  # .expand_as(obs_tensor)
-
-                # Use boolean indexing to select elements in obs_tensor
-                obs_tensor_alive = obs_tensor[
-                    alive_agent_mask.expand_as(obs_tensor)
-                ].reshape(-1, obs_tensor.shape[-1])
 
                 # Predict actions, vals and log_probs given obs
                 time_actions = time.perf_counter()
-                actions_tmp, values_tmp, log_prob_tmp = self.policy(
-                    obs_tensor_alive
+                actions, values, log_probs = self.policy(
+                    obs_tensor
                 )
-                nn_fps = actions_tmp.shape[0] / (
+                nn_fps = actions.shape[0] / (
                     time.perf_counter() - time_actions
                 )
                 self.logger.record("rollout/nn_fps", nn_fps)
-
-                # Store
-                (
-                    actions[alive_agent_mask.squeeze(dim=1)],
-                    values[alive_agent_mask.squeeze(dim=1)],
-                    log_probs[alive_agent_mask.squeeze(dim=1)],
-                ) = (
-                    actions_tmp.float(),
-                    values_tmp.float(),
-                    log_prob_tmp.float(),
-                )
 
                 # Predict actions, vals and log_probs given obs
                 # actions, values, log_probs = self.policy(obs_tensor)
@@ -167,8 +122,8 @@ class IPPO(PPO):
                     clipped_actions = torch.clamp(
                         actions, self.action_space.low, self.action_space.high
                     )
-
-            new_obs, rewards, dones, infos = env.step(clipped_actions)
+                    
+            new_obs, rewards, dones, infos = env.step(clipped_actions.float())
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())

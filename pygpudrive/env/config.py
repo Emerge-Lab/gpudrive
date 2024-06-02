@@ -43,7 +43,7 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-    num_worlds: int = 15
+    num_worlds: int = 128
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
@@ -63,7 +63,7 @@ class EnvConfig:
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
     # Remove all non vehicles (bicylces, pedestrians) from the scene
-    remove_non_vehicles: bool = True
+    remove_non_vehicles: bool = False
 
     # Reward
     reward_type: str = (
@@ -98,7 +98,7 @@ class EnvConfig:
     # Then it repeats the first file to pad until num_worlds
     # files are loaded. Will fail if the number of files are more than num_worlds.
     # exact_n - Init exactly num_worlds files.
-    sample_method: str = "pad_n"
+    sample_method: str = "first_n"
 
     # Related to settings
     eval_expert_mode: bool = (

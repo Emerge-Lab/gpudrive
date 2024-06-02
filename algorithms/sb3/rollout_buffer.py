@@ -1,5 +1,6 @@
 """Module containing regularized PPO algorithm."""
 import logging
+import time
 from typing import Generator, Optional
 import gymnasium as gym
 import numpy as np
@@ -31,7 +32,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         device: Union[torch.device, str] = "auto",
         storage_device: Union[
             torch.device, str
-        ] = "cpu",  # TODO(ev) add storage device to config
+        ] = "cuda",  # TODO(ev) add storage device to config
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
@@ -194,12 +195,15 @@ class MaskedRolloutBuffer(BaseBuffer):
                 "returns",
             ]
             # Create mask
+            t_mask = time.perf_counter()
             self.valid_samples_mask = ~torch.isnan(
                 self.swap_and_flatten(self.__dict__["rewards"])
             )
+            print(f"Time to create mask: {time.perf_counter() - t_mask}")
 
             # Flatten data
             # EDIT_5: And mask out invalid samples
+            t_flatten = time.perf_counter()
             for tensor in _tensor_names:
                 if tensor == "observations":
                     self.__dict__[tensor] = self.swap_and_flatten(
@@ -214,6 +218,7 @@ class MaskedRolloutBuffer(BaseBuffer):
                     self.__dict__[tensor]
                 ).any(), f"{tensor} tensor contains NaN values; something went wrong"
 
+            print(f"Time to flatten data: {time.perf_counter() - t_flatten}")
             self.generator_ready = True
 
         # EDIT_6: Compute total number of samples and create indices
@@ -236,6 +241,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         batch_inds: np.ndarray,
         env: Optional[VecNormalize] = None,
     ) -> RolloutBufferSamples:  # type: ignore[signature-mismatch]
+        t_index = time.perf_counter()
         data = (
             self.observations[batch_inds],
             self.actions[batch_inds],
@@ -244,4 +250,5 @@ class MaskedRolloutBuffer(BaseBuffer):
             self.advantages[batch_inds].flatten(),
             self.returns[batch_inds].flatten(),
         )
+        print(f"Time to get samples: {time.perf_counter() - t_index}")
         return RolloutBufferSamples(*tuple(map(self.to_torch, data)))

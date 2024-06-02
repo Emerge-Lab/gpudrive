@@ -275,7 +275,7 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
+    if (controlledState.controlledState == ControlMode::BICYCLE)
     {
         // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
 
