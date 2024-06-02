@@ -23,6 +23,8 @@ def get_shapes():
     )  # shape is a tensor of shape (num_envs, 2)
     num_envs = shape.shape[0]
 
+    useful_num_agents = sim.controlled_state_tensor().to_torch().sum().item()
+
     actual_num_agents = sim.self_observation_tensor().to_torch().shape[1] * num_envs
     actual_num_roads = sim.map_observation_tensor().to_torch().shape[1] * num_envs
     return actual_num_agents, actual_num_roads, useful_num_agents, useful_num_roads, num_envs
@@ -42,8 +44,9 @@ def reset(sim: SimManager, num_envs: int):
     sim.step()
 
 @timeit
-def step(sim: SimManager, num_steps: int):
+def step(sim: SimManager, num_steps: int, actions: torch.Tensor):
     for i in range(num_steps):
+        sim.action_tensor().to_torch().copy_(actions)
         sim.step()
 
 def save_results():
@@ -71,7 +74,8 @@ def run_benchmark(
     actual_num_agents, actual_num_roads, useful_num_agents, useful_num_roads, num_envs = get_shapes()
 
     time_to_reset = reset(sim, num_envs)
-    time_to_step = step(sim, num_steps)
+    actions_tensor = torch.randn_like(sim.action_tensor().to_torch())
+    time_to_step = step(sim, num_steps,actions_tensor)
 
     fps = num_steps / time_to_step
     afps = fps * actual_num_agents
