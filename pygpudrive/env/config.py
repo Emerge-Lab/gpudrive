@@ -46,15 +46,21 @@ class EnvConfig:
     num_worlds: int = 100
 
     # Observation space
-    ego_state: bool = True     # Ego vehicle state
+    ego_state: bool = True  # Ego vehicle state
     road_map_obs: bool = True  # Road graph
-    partner_obs: bool = True   # Partner vehicle info
+    partner_obs: bool = True  # Partner vehicle info
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
     obs_radius: float = 100.0
 
     # Action space (joint discrete)
+    steer_actions: torch.Tensor = torch.round(
+        torch.linspace(-0.6, 0.6, 11), decimals=3
+    )
+    accel_actions: torch.Tensor = torch.round(
+        torch.linspace(-3, 3, 11), decimals=3
+    )
     steer_actions: torch.Tensor = torch.round(
         torch.linspace(-0.6, 0.6, 7), decimals=3
     )
@@ -72,7 +78,9 @@ class EnvConfig:
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
     # The radius around the goal point within which the agent is considered
+    # The radius around the goal point within which the agent is considered
     # to have reached the goal
+    dist_to_goal_threshold: float = 5.0
     dist_to_goal_threshold: float = 4.0
 
     """Constants to normalize observations."""
@@ -138,6 +146,7 @@ class EnvConfig:
     max_road_line_segmment_len: int = 100
     max_road_scale: int = 50
 
+
     # DON'T CHANGE: Used for network
     EGO_STATE_DIM = 6 if ego_state else 0
     PARTNER_DIM = 10 if partner_obs else 0
@@ -170,6 +179,8 @@ class EnvConfig:
             road_point_x,
             road_point_y,
             road_line_segment_len,
+            road_point_scale_x,
+            road_point_scale_y,
             road_point_scale_x,
             road_point_scale_y,
             road_line_segment_orientation,
