@@ -90,6 +90,7 @@ def run_speed_bench(
 
     for sim_idx in range(batch_size):
         obs = sim.reset(sim_idx)
+    sim.step()
 
     # PROFILE STEPS
     for _ in range(episode_length):
