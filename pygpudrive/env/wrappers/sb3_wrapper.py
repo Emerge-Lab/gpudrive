@@ -58,6 +58,10 @@ class SB3MultiAgentEnv(VecEnv):
         self.render_mode = render_mode
         self.tot_reward_per_episode = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+        # because we have to step the environment after it resets before it is ready
+        # environments after reset cannot be used for an additional step.
+        # we want the dead agent mask to remain dead until after that happens
+        self.world_ready = torch.ones((self.num_worlds, self.max_agent_count)).to(self.device)
         self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
@@ -93,7 +97,10 @@ class SB3MultiAgentEnv(VecEnv):
         """
 
         # Has shape (num_worlds, max_agent_count , obs_dim)
-        obs = self._env.reset()
+        self._env.reset()
+        # we have to take an additional step to finish the taskgraph setup
+        self._env.step_dynamics(None)
+        obs = self._env.get_obs()
 
         # Make dead agent mask (True for dead or invalid agents)
         self.dead_agent_mask = ~self.controlled_agent_mask.clone()
@@ -144,6 +151,12 @@ class SB3MultiAgentEnv(VecEnv):
             for world_idx in done_worlds:
                 self.num_episodes += 1
                 self._env.sim.reset(world_idx.item())
+            self.world_ready[done_worlds] = 0
+            self.agent_step[done_worlds] = 0
+
+
+        # the world is only ready after a fake step has been taken to reset the task graph
+        self.world_ready[self.agent_step == 1] = 1
                 
         # now construct obs after the reset
         obs = self._env.get_obs()
@@ -165,10 +178,9 @@ class SB3MultiAgentEnv(VecEnv):
         self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
         
         # Now override the dead agent mask for the reset worlds
-        if done_worlds.any().item():
+        if self.world_ready.any().item():
             self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[done_worlds].clone()
             self.tot_reward_per_episode[done_worlds] = 0
-            self.agent_step[done_worlds] = 0
 
         return (
             obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim).clone(),
@@ -211,9 +223,9 @@ class SB3MultiAgentEnv(VecEnv):
         self.info_dict["num_finished_agents"] = self.controlled_agent_mask[indices].sum()
         self.info_dict["mean_reward_per_episode"] = \
             self.tot_reward_per_episode[indices][self.controlled_agent_mask[indices]].sum().item()
-        # log the agents that are done but did not receive any reward i.e. truncated
-        # TODO(ev) remove hardcoded 91
-        self.info_dict["truncated"] = ((self.agent_step[indices] == 91) * ~self.dead_agent_mask[indices]).sum().item()
+        # log the agents that are done but did not reach their goal or collide i.e. truncated
+        # TODO(ev) remove hardcoded 92
+        self.info_dict["truncated"] = ((self.agent_step[indices] == 92) * ~self.dead_agent_mask[indices]).sum().item()
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()
