@@ -228,7 +228,7 @@ class MultiAgentCallback(BaseCallback):
                             ]:
                                 self._create_and_log_video(
                                     render_world_idx=world_idx,
-                                    caption=f"World index: {world_idx} | Collision rate: {veh_coll_dist[world_idx].item()}",
+                                    caption=f"World index: {world_idx} | Collision rate: {veh_coll_dist[world_idx]}",
                                 )
 
                 # Reset
