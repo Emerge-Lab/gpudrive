@@ -79,6 +79,23 @@ bool isObservationsValid(gpudrive::Engine &ctx,
                     });
 #endif
 }
+
+madrona::CountT radiusFilter(gpudrive::MapObservation *heap, madrona::CountT K, float radius) {
+  madrona::CountT newBeyond{K};
+
+  madrona::CountT idx{0};
+  while (idx < newBeyond) {
+    if (heap[idx].position.length() <= radius) {
+      ++idx;
+      continue;
+    }
+
+    heap[idx] = heap[--newBeyond];
+  }
+
+  return newBeyond;
+}
+
 } // namespace
 
 namespace gpudrive {
@@ -101,7 +118,8 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   }
 
   if (roadCount < K) {
-    fillZeros(heap + roadCount, heap + K);
+    auto newBeyond = radiusFilter(heap, roadCount, ctx.data().params.observationRadius);
+    fillZeros(heap + newBeyond, heap + K);
     return;
   }
 
@@ -131,19 +149,7 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   assert(
       isObservationsValid(ctx, heap, K, referenceRotation, referencePosition));
 
-  madrona::CountT newBeyond{K};
-  {
-    madrona::CountT idx{0};
-    while (idx < newBeyond) {
-      if (heap[idx].position.length() <= ctx.data().params.observationRadius) {
-        ++idx;
-        continue;
-      }
-
-      heap[idx] = heap[--newBeyond];
-    }
-  }
-
+  auto newBeyond = radiusFilter(heap, K, ctx.data().params.observationRadius);
   fillZeros(heap + newBeyond, heap + K);
 }
 
