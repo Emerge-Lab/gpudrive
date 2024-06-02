@@ -179,8 +179,8 @@ class SB3MultiAgentEnv(VecEnv):
         
         # Now override the dead agent mask for the reset worlds
         if self.world_ready.any().item():
-            self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[done_worlds].clone()
-            self.tot_reward_per_episode[done_worlds] = 0
+            self.dead_agent_mask[self.world_ready] = ~self.controlled_agent_mask[done_worlds].clone()
+            self.tot_reward_per_episode[self.world_ready] = 0
 
         return (
             obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim).clone(),
