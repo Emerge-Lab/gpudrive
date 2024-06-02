@@ -14,8 +14,10 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 200 
-    render_n_worlds: int = 1
+    render_freq: int = 100
+    # Start rendering failure modes after this many global timesteps
+    log_failure_modes_after: int = 5e6
+    render_n_worlds: int = 10  # Number of worlds to render
 
     # LOGGING & WANDB
     use_wandb: bool = True
@@ -29,11 +31,11 @@ class ExperimentConfig:
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
-    
+
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 500
-    
+    save_policy_freq: int = 1000
+
     # HYPERPARAMETERS
     seed: int = 42
     gamma: float = 0.99
