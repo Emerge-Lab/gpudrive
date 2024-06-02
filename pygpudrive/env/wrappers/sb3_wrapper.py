@@ -61,7 +61,7 @@ class SB3MultiAgentEnv(VecEnv):
         # because we have to step the environment after it resets before it is ready
         # environments after reset cannot be used for an additional step.
         # we want the dead agent mask to remain dead until after that happens
-        self.world_ready = torch.ones((self.num_worlds, self.max_agent_count)).to(self.device)
+        self.world_ready = torch.ones((self.num_worlds, self.max_agent_count), dtype=torch.bool).to(self.device)
         self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
@@ -179,7 +179,7 @@ class SB3MultiAgentEnv(VecEnv):
         
         # Now override the dead agent mask for the reset worlds
         if self.world_ready.any().item():
-            self.dead_agent_mask[self.world_ready] = ~self.controlled_agent_mask[done_worlds].clone()
+            self.dead_agent_mask[self.world_ready] = ~self.controlled_agent_mask[self.world_ready].clone()
             self.tot_reward_per_episode[self.world_ready] = 0
 
         return (
