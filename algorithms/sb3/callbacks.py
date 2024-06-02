@@ -75,11 +75,6 @@ class MultiAgentCallback(BaseCallback):
         )
         wandb.define_metric("charts/max_obs", step_metric="global_step")
         wandb.define_metric("charts/min_obs", step_metric="global_step")
-        wandb.define_metric(
-            "charts/goal_achieved_dist", step_metric="global_step"
-        )
-        wandb.define_metric("charts/veh_coll_dist", step_metric="global_step")
-        wandb.define_metric("charts/off_road_dist", step_metric="global_step")
 
     def _on_training_start(self) -> None:
         """
