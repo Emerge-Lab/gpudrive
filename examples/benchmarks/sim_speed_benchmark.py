@@ -15,6 +15,8 @@ import gpudrive
 MAX_CONT_AGENTS = 128
 EPISODE_LENGTH = 80
 
+os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+
 
 def make_sim(
     data_dir,
