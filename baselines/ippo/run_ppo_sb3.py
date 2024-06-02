@@ -16,7 +16,6 @@ def train():
 
     env_config = EnvConfig(
         road_obs_algorithm="k_nearest_roadpoints",
-        sample_method="pad_n",
     )
 
     # MAKE SB3-COMPATIBLE ENVIRONMENT
