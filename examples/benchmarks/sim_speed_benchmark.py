@@ -12,8 +12,6 @@ from multiprocessing import Process, Queue
 
 import gpudrive
 
-os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
-
 MAX_CONT_AGENTS = 128
 EPISODE_LENGTH = 80
 
