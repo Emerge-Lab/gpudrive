@@ -360,6 +360,7 @@ class PyGameVisualizer:
             goal_pos = agent_info[:, 8:10]  # x, y
             agent_rot = agent_info[:, 7]  # heading
             agent_sizes = agent_info[:, 10:12]  # length, width
+            agent_response_types = self.sim.response_type_tensor().to_torch()[world_render_idx, :, :].cpu().detach().numpy()
 
             num_agents = self.num_agents[world_render_idx][0]
 
@@ -368,7 +369,8 @@ class PyGameVisualizer:
                 info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
                 if info_tensor[agent_idx, -1] == float(gpudrive.EntityType.Padding) or info_tensor[agent_idx, -1] == float(gpudrive.EntityType._None):
                     continue
-
+                if info_tensor[agent_idx, 3]:
+                    continue
                 agent_corners = PyGameVisualizer.compute_agent_corners(
                     agent_pos[agent_idx],
                     agent_sizes[agent_idx, 1],
@@ -386,21 +388,26 @@ class PyGameVisualizer:
                 if cont_agent_mask[world_render_idx, agent_idx]:
                     mod_idx = 0
 
+                color = self.COLOR_LIST[mod_idx]
+
+                if(agent_response_types[agent_idx] == 2):
+                    color = (128, 128, 128)
+
                 pygame.draw.polygon(
                     surface=self.surf,
-                    color=self.COLOR_LIST[mod_idx],
+                    color=color,
                     points=agent_corners,
                 )
-
-                pygame.draw.circle(
-                    surface=self.surf,
-                    color=self.COLOR_LIST[mod_idx],
-                    center=(
-                        int(current_goal_scaled[0]),
-                        int(current_goal_scaled[1]),
-                    ),
-                    radius=self.goal_radius * self.zoom_scales_x[world_render_idx],
-                )
+                if(agent_response_types[agent_idx] != 2):
+                    pygame.draw.circle(
+                        surface=self.surf,
+                        color=color,
+                        center=(
+                            int(current_goal_scaled[0]),
+                            int(current_goal_scaled[1]),
+                        ),
+                        radius=self.goal_radius * self.zoom_scales_x[world_render_idx],
+                    )
 
             if self.render_config.view_option == PygameOption.HUMAN:
                 pygame.event.pump()

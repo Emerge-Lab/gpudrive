@@ -116,7 +116,8 @@ namespace gpudrive
             .def("valid_state_tensor", &Manager::validStateTensor)
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
-            .def("depth_tensor", &Manager::depthTensor);
+            .def("depth_tensor", &Manager::depthTensor)
+            .def("response_type_tensor", &Manager::responseTypeTensor);
     }
 
 }
