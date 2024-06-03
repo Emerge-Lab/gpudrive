@@ -434,7 +434,13 @@ class PyGameVisualizer:
             goal_pos = agent_info[:, 8:10]  # x, y
             agent_rot = agent_info[:, 7]  # heading
             agent_sizes = agent_info[:, 10:12]  # length, width
-            agent_response_types = self.sim.response_type_tensor().to_torch()[world_render_idx, :, :].cpu().detach().numpy()
+            agent_response_types = (
+                self.sim.response_type_tensor()
+                .to_torch()[world_render_idx, :, :]
+                .cpu()
+                .detach()
+                .numpy()
+            )
 
             num_agents = self.num_agents[world_render_idx][0]
 
@@ -449,7 +455,7 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
-                
+
                 agent_corners = PyGameVisualizer.compute_agent_corners(
                     agent_pos[agent_idx],
                     agent_sizes[agent_idx, 1],
@@ -473,7 +479,7 @@ class PyGameVisualizer:
 
                 color = self.COLOR_LIST[mod_idx]
 
-                if(agent_response_types[agent_idx] == 2):
+                if agent_response_types[agent_idx] == 2:
                     color = (128, 128, 128)
 
                 pygame.draw.polygon(
@@ -481,7 +487,7 @@ class PyGameVisualizer:
                     color=color,
                     points=agent_corners,
                 )
-                if(agent_response_types[agent_idx] != 2):
+                if agent_response_types[agent_idx] != 2:
                     pygame.draw.circle(
                         surface=self.surf,
                         color=color,
@@ -489,7 +495,8 @@ class PyGameVisualizer:
                             int(current_goal_scaled[0]),
                             int(current_goal_scaled[1]),
                         ),
-                        radius=self.goal_radius * self.zoom_scales_x[world_render_idx],
+                        radius=self.goal_radius
+                        * self.zoom_scales_x[world_render_idx],
                         width=3,
                     )
 
