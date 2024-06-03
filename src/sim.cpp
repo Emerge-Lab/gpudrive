@@ -186,7 +186,11 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
+    while(arrIndex < consts::kMaxAgentMapObservationsCount) {
+        if(roadIdx >= ctx.data().numRoads)
+        {
+            break;
+        }
         Entity road = ctx.data().roads[roadIdx++];
         Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
         relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
@@ -200,7 +204,7 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    while (arrIndex < consts::kMaxRoadEntityCount)
+    while (arrIndex < consts::kMaxAgentMapObservationsCount)
     {
         map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
         map_obs.obs[arrIndex].heading = 0.f;
