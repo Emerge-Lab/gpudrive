@@ -369,8 +369,7 @@ class PyGameVisualizer:
                 info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
                 if info_tensor[agent_idx, -1] == float(gpudrive.EntityType.Padding) or info_tensor[agent_idx, -1] == float(gpudrive.EntityType._None):
                     continue
-                if info_tensor[agent_idx, 3]:
-                    continue
+                
                 agent_corners = PyGameVisualizer.compute_agent_corners(
                     agent_pos[agent_idx],
                     agent_sizes[agent_idx, 1],
