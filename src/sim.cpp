@@ -197,11 +197,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     utils::ReferenceFrame referenceFrame(model.position, rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(arrIndex < consts::kMaxAgentMapObservationsCount) {
-        if(roadIdx >= ctx.data().numRoads)
-        {
-            break;
-        }
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
