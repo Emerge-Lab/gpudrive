@@ -446,7 +446,7 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
                FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
            (algo ==
                 FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
-            roadObservationsCount == consts::kMaxRoadEntityCount);
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
 Manager::Impl * Manager::Impl::init(
