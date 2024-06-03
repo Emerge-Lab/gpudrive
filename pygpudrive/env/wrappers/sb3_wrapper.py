@@ -146,7 +146,7 @@ class SB3MultiAgentEnv(VecEnv):
         info = self._env.get_infos()
 
         # add the collisions to the rewards
-        reward += -abs(self.config.collision_penalty) * (info[:, 1] + info[:,2]).to(torch.float32)
+        reward += -abs(self.config.collision_penalty) * (info[..., 1] + info[..., 2])
 
         # Get the dones for resets
         # done = self._env.get_dones()
