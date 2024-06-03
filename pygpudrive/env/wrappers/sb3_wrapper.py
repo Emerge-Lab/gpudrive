@@ -44,6 +44,7 @@ class SB3MultiAgentEnv(VecEnv):
             data_dir=data_dir,
             device=device,
         )
+        self.config = config
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
