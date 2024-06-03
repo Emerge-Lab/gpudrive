@@ -62,8 +62,8 @@ class EnvConfig:
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
-    # Remove all non vehicles (bicylces, pedestrians) from the scene
-    remove_non_vehicles: bool = False
+    # Remove all non vehicles (bicycles, pedestrians) from the scene
+    remove_non_vehicles: bool = True
 
     # Reward
     reward_type: str = (
