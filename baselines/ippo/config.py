@@ -14,20 +14,21 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 100
+    render_freq: int = 10
     # Start rendering failure modes after this many global timesteps
-    log_failure_modes_after: int = 5e6
+    log_failure_modes_after: int = 1e6
+    log_success_modes_after: int = 1e6  # Set to None to disable
     render_n_worlds: int = 10  # Number of worlds to render
 
     # LOGGING & WANDB
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        100  # how many trajectories we average logs over
+        500  # how many trajectories we average logs over
     )
-    log_freq: int = 100
+    log_freq: int = 500
     project_name = "gpudrive"
-    group_name = "dc/PPO"
+    group_name = "dc/PPO_cluster"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
@@ -45,10 +46,11 @@ class ExperimentConfig:
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
-    total_timesteps: int = 1e8
+    total_timesteps: int = 3e8
     ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 3e-4
+    n_epochs: int = 5
 
     # NETWORK
     mlp_class = LateFusionNet
@@ -59,5 +61,5 @@ class ExperimentConfig:
     shared_layers = [64, 64]
     act_func = "tanh"
     dropout = 0.0
-    last_layer_dim_pi = 64
-    last_layer_dim_vf = 64
+    last_layer_dim_pi = 128
+    last_layer_dim_vf = 32

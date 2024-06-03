@@ -200,6 +200,10 @@ class MultiAgentCallback(BaseCallback):
                     -np.array(veh_coll_dist)
                 )
 
+                self.best_to_worst_scene_perf_idx = np.argsort(
+                    np.array(veh_coll_dist)
+                )
+
                 # Log as histograms to wandb
                 wandb.log(
                     {
@@ -216,20 +220,68 @@ class MultiAgentCallback(BaseCallback):
                 )
 
                 # Render
-                if (
-                    self.config.render
-                    and self.num_timesteps
-                    > self.config.log_failure_modes_after
-                ):
-                    if self.num_rollouts % self.config.render_freq == 0:
-                        if self.worst_to_best_scene_perf_idx is not None:
-                            for world_idx in self.worst_to_best_scene_perf_idx[
-                                : self.config.render_n_worlds
-                            ]:
-                                self._create_and_log_video(
-                                    render_world_idx=world_idx,
-                                    caption=f"World index: {world_idx} | Collision rate: {veh_coll_dist[world_idx]}",
-                                )
+                if self.config.render:
+
+                    # LOG FAILURE MODES
+                    if (
+                        self.config.log_failure_modes_after is not None
+                        and self.num_timesteps
+                        > self.config.log_failure_modes_after
+                    ):
+                        if self.num_rollouts % self.config.render_freq == 0:
+                            if self.worst_to_best_scene_perf_idx is not None:
+                                for (
+                                    world_idx
+                                ) in self.worst_to_best_scene_perf_idx[
+                                    : self.config.render_n_worlds
+                                ]:
+                                    controlled_agents_in_world = (
+                                        self.locals["env"]
+                                        .controlled_agent_mask[world_idx]
+                                        .sum()
+                                        .item()
+                                    )
+
+                                    self._create_and_log_video(
+                                        render_world_idx=world_idx,
+                                        caption=f"Index: {world_idx} | Cont. agents: {controlled_agents_in_world} | OR: {off_road_dist[world_idx]:.2f} | CR: {veh_coll_dist[world_idx]:.2f}",
+                                        render_type="failure_modes",
+                                    )
+
+                    # LOG BEST SCENES
+                    if (
+                        self.config.log_success_modes_after is not None
+                        and self.num_timesteps
+                        > self.config.log_success_modes_after
+                    ):
+                        if self.num_rollouts % self.config.render_freq == 0:
+                            if self.best_to_worst_scene_perf_idx is not None:
+
+                                for (
+                                    world_idx
+                                ) in self.best_to_worst_scene_perf_idx[
+                                    : self.config.render_n_worlds
+                                ]:
+                                    controlled_agents_in_world = (
+                                        self.locals["env"]
+                                        .controlled_agent_mask[world_idx]
+                                        .sum()
+                                        .item()
+                                    )
+
+                                    goal_achieved = goal_achieved_dist[
+                                        world_idx
+                                    ]
+                                    total_collision_rate = (
+                                        veh_coll_dist[world_idx]
+                                        + off_road_dist[world_idx]
+                                    )
+
+                                    self._create_and_log_video(
+                                        render_world_idx=world_idx,
+                                        caption=f"Index: {world_idx} | Cont. agents: {controlled_agents_in_world} | GR: {goal_achieved:.2f} | OR + CR: {total_collision_rate:.2f}",
+                                        render_type="best_scenes",
+                                    )
 
                 # Reset
                 self.locals["env"].log_agg_world_info = False
@@ -273,7 +325,11 @@ class MultiAgentCallback(BaseCallback):
         return actions
 
     def _create_and_log_video(
-        self, render_world_idx=0, caption=" ", sub_directory=""
+        self,
+        render_world_idx=0,
+        caption=" ",
+        render_type=" ",
+        sub_directory="",
     ):
         """Make a video and log to wandb.
         Note: Currently only works a single world."""
@@ -299,7 +355,7 @@ class MultiAgentCallback(BaseCallback):
 
         wandb.log(
             {
-                f"global_step: {self.num_timesteps:,}": wandb.Video(
+                f"{render_type} | Global step: {self.num_timesteps:,}": wandb.Video(
                     np.moveaxis(frames, -1, 1),
                     fps=15,
                     format="gif",

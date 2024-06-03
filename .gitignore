@@ -17,8 +17,10 @@
 /bin
 /zipp*
 .python-version
+/baselines/ippo/logs/*
 
 # Data
+hpc/overlay*
 /formatted_json_v2_no_tl_train
 /waymo_data_new
 /maps_16

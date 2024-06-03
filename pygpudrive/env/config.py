@@ -73,7 +73,7 @@ class EnvConfig:
     )
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
-    dist_to_goal_threshold: float = 5.0
+    dist_to_goal_threshold: float = 4.0
 
     """Constants to normalize observations."""
     norm_obs: bool = True

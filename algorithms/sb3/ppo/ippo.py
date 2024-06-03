@@ -1,6 +1,6 @@
 import logging
 import time
-
+import wandb
 import torch
 from torch.nn import functional as F
 import numpy as np
@@ -386,10 +386,12 @@ class IPPO(PPO):
         )
 
         # Logs
+        self.logger.record("train/explained_var", explained_var.item())
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
         self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
+        self.logger.record("train/advantages_dist", advantages)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))

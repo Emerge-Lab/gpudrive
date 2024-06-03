@@ -63,6 +63,7 @@ def train():
         clip_range=exp_config.clip_range,
         learning_rate=exp_config.lr,
         ent_coef=exp_config.ent_coef,
+        n_epochs=exp_config.n_epochs,
         env_config=env_config,
         exp_config=exp_config,
     )
