@@ -490,6 +490,7 @@ class PyGameVisualizer:
                             int(current_goal_scaled[1]),
                         ),
                         radius=self.goal_radius * self.zoom_scales_x[world_render_idx],
+                        width=3,
                     )
 
             if self.render_config.view_option == PygameOption.HUMAN:
