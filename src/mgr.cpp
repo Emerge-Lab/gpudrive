@@ -793,6 +793,11 @@ Tensor Manager::controlledStateTensor() const {
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
+Tensor Manager::responseTypeTensor() const {
+    return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
+                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
