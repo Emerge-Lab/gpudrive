@@ -21,7 +21,6 @@ add_executable(my_tests
     observationTest.cpp
     test_utils.cpp
     CollisionDetectionTests.cpp
-    EgocentricRoadObservationTests.cpp
 )
 
 # Link against required libraries. Ensure that the paths and names are correct.

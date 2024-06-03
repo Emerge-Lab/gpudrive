@@ -6,7 +6,6 @@ set(SIMULATOR_SRCS
     obb.hpp
     utils.hpp
     binary_heap.hpp
-    knn.hpp
 )
 
 add_library(gpudrive_cpu_impl STATIC

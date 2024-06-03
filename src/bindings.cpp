@@ -37,10 +37,6 @@ namespace gpudrive
             .value("PadN", DatasetInitOptions::PadN)
             .value("ExactN", DatasetInitOptions::ExactN);
 
-        nb::enum_<FindRoadObservationsWith>(m, "FindRoadObservationsWith")
-            .value("KNearestEntitiesWithRadiusFiltering", FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering)
-            .value("AllEntitiesWithRadiusFiltering", FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
-
         // Define Parameters class
         nb::class_<Parameters>(m, "Parameters")
             .def(nb::init<>()) // Default constructor
@@ -51,7 +47,6 @@ namespace gpudrive
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
-            .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
             .def_rw("enableLidar", &Parameters::enableLidar);
 
