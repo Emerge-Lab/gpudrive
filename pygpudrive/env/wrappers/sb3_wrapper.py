@@ -259,17 +259,18 @@ class SB3MultiAgentEnv(VecEnv):
         for (
             world_idx
         ) in indices:  # max agents, goal achieved, off road, veh collisions
-            self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
-                [
-                    self.controlled_agent_mask[indices].sum(),
-                    controlled_agent_info[:, 3].sum().item()
-                    / self.controlled_agent_mask[indices].sum().item(),
-                    controlled_agent_info[:, 0].sum().item()
-                    / self.controlled_agent_mask[indices].sum().item(),
-                    controlled_agent_info[:, 1].sum().item()
-                    / self.controlled_agent_mask[indices].sum().item(),
-                ]
-            )
+            if world_idx not in self.aggregate_world_dict:
+                self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
+                    [
+                        self.controlled_agent_mask[indices].sum(),
+                        controlled_agent_info[:, 3].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                        controlled_agent_info[:, 0].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                        controlled_agent_info[:, 1].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                    ]
+                )
 
         if len(self.aggregate_world_dict) == self.num_worlds:
             # Log stats

@@ -42,7 +42,7 @@ class EnvConfig:
     # Environment settings
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
-    top_k_roadpoints: int = 500
+    top_k_roadpoints: int = 200
     num_worlds: int = 100
 
     # Observation space
@@ -56,10 +56,10 @@ class EnvConfig:
 
     # Action space (joint discrete)
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-0.6, 0.6, 11), decimals=3
+        torch.linspace(-0.6, 0.6, 7), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-3, 3, 11), decimals=3
+        torch.linspace(-3, 3, 7), decimals=3
     )
 
     # Collision behavior
