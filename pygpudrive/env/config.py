@@ -43,7 +43,7 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-    num_worlds: int = 15
+    num_worlds: int = 100
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
@@ -54,11 +54,13 @@ class EnvConfig:
     road_obs_algorithm: str = "k_nearest_roadpoints"
     obs_radius: float = 100.0
 
-    # Action space (discrete)
-    steer_actions: torch.Tensor = torch.tensor(
-        [-0.6, -0.3, -0.1, 0, 0.1, 0.3, 0.6]
+    # Action space (joint discrete)
+    steer_actions: torch.Tensor = torch.round(
+        torch.linspace(-0.6, 0.6, 7), decimals=3
     )
-    accel_actions: torch.Tensor = torch.tensor([-3, -1, 0, 1, 3])
+    accel_actions: torch.Tensor = torch.round(
+        torch.linspace(-3, 3, 7), decimals=3
+    )
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
@@ -69,27 +71,12 @@ class EnvConfig:
     reward_type: str = (
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
-    dist_to_goal_threshold: float = 3.0
-
-    """Constants defining the observations"""
-    max_num_vehs: int = None
-    max_num_road_points: int = None
+    # The radius around the goal point within which the agent is considered
+    # to have reached the goal
+    dist_to_goal_threshold: float = 4.0
 
     """Constants to normalize observations."""
     norm_obs: bool = True
-
-    # Values to normalize by: Ego state
-    max_speed: int = 100
-    max_veh_len: int = 25
-    max_veh_width: int = 5
-    min_rel_goal_coord: int = -100
-    max_rel_goal_coord: int = 100
-    min_rel_agent_pos: int = -100
-    max_rel_agent_pos: int = 100
-    max_orientation_rad: float = 2 * np.pi
-    min_rm_coord: int = -300
-    max_rm_coord: int = 300
-    max_road_line_segmment_len: int = 100
 
     # Datasete settings
     # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
@@ -98,14 +85,72 @@ class EnvConfig:
     # Then it repeats the first file to pad until num_worlds
     # files are loaded. Will fail if the number of files are more than num_worlds.
     # exact_n - Init exactly num_worlds files.
-    sample_method: str = "pad_n"
+    sample_method: str = "first_n"
 
     # Related to settings
     eval_expert_mode: bool = (
         False  # Set this to true if you want to return all agent info
     )
 
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    max_speed: int = 100
+    max_veh_len: int = 30
+    max_veh_width: int = 10
+    min_rel_goal_coord: int = -1000
+    max_rel_goal_coord: int = 1000
+    min_rel_agent_pos: int = -1000
+    max_rel_agent_pos: int = 1000
+    max_orientation_rad: float = 2 * np.pi
+    min_rm_coord: int = -1000
+    max_rm_coord: int = 1000
+    max_road_line_segmment_len: int = 100
+    max_road_scale: int = 50
+
     # DON'T CHANGE: Used for network
     EGO_STATE_DIM = 6 if ego_state else 0
-    ROAD_MAP_DIM = 11 if road_map_obs else 0
-    PARTNER_DIM = 14 if partner_obs else 0
+    PARTNER_DIM = 10 if partner_obs else 0
+    ROAD_MAP_DIM = 13 if road_map_obs else 0
+
+    """
+    Obs feature dictionary:
+    - ego_state shape:
+        - shape: (max_num_objects, 6)
+        - what: (speed, veh_len, veh_width, rel_goal_x, rel_goal_y, collision_state)
+    - partner_obs:
+        - shape: (max_num_objects, max_num_objects - 1, 10)
+        - what: (
+            other_speed,
+            other_pos_x,
+            other_pos_y,
+            other_orientation,
+            other_veh_len,
+            other_veh_width,
+            other_type (
+                0: _None,
+                1: Vehicle,
+                2: Pedestrian,
+                3: Cyclist
+            ),
+        )
+    - road_map_obs:
+        - shape: (max_num_objects, top_k_road_points, 13)
+        - what: (
+            road_point_x,
+            road_point_y,
+            road_line_segment_len,
+            road_point_scale_x,
+            road_point_scale_y,
+            road_line_segment_orientation,
+            road_line_segment_type: (
+                0: _None,
+                1: RoadLine,
+                2: RoadEdge,
+                3: RoadLane,
+                4: CrossWalk,
+                5: SpeedBump
+                6: StopSign
+            ),
+        )
+    """

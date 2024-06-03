@@ -11,17 +11,22 @@
 .vscode/tasks.json
 /examples/benchmarks/results/
 /maps_16/
+/baselines/ippo/logs/*
 
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
 /bin
 /zipp*
 .python-version
+/baselines/ippo/logs/*
 
 # Data
+hpc/overlay*
 /formatted_json_v2_no_tl_train
 /waymo_data_new
 /maps_16
+**/*ppo_model*/
+/wandb*
 
 # Logging
 /wandb
