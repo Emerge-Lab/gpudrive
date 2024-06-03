@@ -241,7 +241,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         batch_inds: np.ndarray,
         env: Optional[VecNormalize] = None,
     ) -> RolloutBufferSamples:  # type: ignore[signature-mismatch]
-        t_index = time.perf_counter()
+        # t_index = time.perf_counter()
         data = (
             self.observations[batch_inds],
             self.actions[batch_inds],
@@ -250,5 +250,5 @@ class MaskedRolloutBuffer(BaseBuffer):
             self.advantages[batch_inds].flatten(),
             self.returns[batch_inds].flatten(),
         )
-        print(f"Time to get samples: {time.perf_counter() - t_index}")
+        # print(f"Time to get samples: {time.perf_counter() - t_index}")
         return RolloutBufferSamples(*tuple(map(self.to_torch, data)))

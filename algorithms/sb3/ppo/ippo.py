@@ -225,13 +225,16 @@ class IPPO(PPO):
         entropy_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
+        observed_data = 0
 
+        train_time = time.time()
         continue_training = True
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
+                observed_data += len(rollout_data)
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -345,6 +348,8 @@ class IPPO(PPO):
         self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
+        self.logger.record("train/train_throughput", observed_data / (time.time() - train_time))
+        self.logger.record("train/expliained_variance", explained_var)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
