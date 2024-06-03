@@ -30,7 +30,8 @@ protected:
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
-            .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore
+            .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
+            .roadObservationAlgorithm = gpudrive::FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering
         }
     });
 

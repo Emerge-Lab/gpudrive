@@ -438,6 +438,17 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     return mapFiles;
 }
 
+bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
+    madrona::CountT roadObservationsCount =
+        sizeof(AgentMapObservations) / sizeof(MapObservation);
+
+    return algo ==
+               FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
+           (algo ==
+                FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
+            roadObservationsCount == consts::kMaxRoadEntityCount);
+}
+
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
@@ -446,6 +457,8 @@ Manager::Impl * Manager::Impl::init(
 
     std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
+    assert(isRoadObservationAlgorithmValid(
+        mgr_cfg.params.roadObservationAlgorithm));
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
