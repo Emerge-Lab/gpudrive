@@ -10,7 +10,7 @@ namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 128;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 500;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
 
 inline constexpr float staticThreshold = 0.2f;
 

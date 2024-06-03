@@ -24,6 +24,11 @@ class ExperimentConfig:
     log_failure_modes_after: int = 1e6
     log_success_modes_after: int = 1e6  # Set to None to disable
     render_n_worlds: int = 10  # Number of worlds to render
+    render_freq: int = 100
+    # Start rendering success/failure modes after this many global timesteps
+    log_failure_modes_after: int = 1e5  # Set to None to disable
+    log_success_modes_after: int = 1e5  # Set to None to disable
+    render_n_worlds: int = 5  # Number of worlds to render
 
     # LOGGING & WANDB
     use_wandb: bool = True
@@ -32,8 +37,9 @@ class ExperimentConfig:
         100  # how many trajectories we average logs over
         100  # how many trajectories we average logs over
         500  # how many trajectories we average logs over
+        100  # how many trajectories we average logs over
     )
-    log_freq: int = 500
+    log_freq: int = 100
     project_name = "gpudrive"
     group_name = "dc/PPO_cluster"
     group_name = "dc/PPO_cluster"
@@ -65,6 +71,7 @@ class ExperimentConfig:
     lr: float = 3e-4
     n_epochs: int = 10
     n_epochs: int = 5
+    n_epochs: int = 10
 
     # NETWORK
     mlp_class = LateFusionNet
@@ -75,5 +82,5 @@ class ExperimentConfig:
     shared_layers = [64, 64]
     act_func = "tanh"
     dropout = 0.0
-    last_layer_dim_pi = 128
-    last_layer_dim_vf = 32
+    last_layer_dim_pi = 64
+    last_layer_dim_vf = 64
