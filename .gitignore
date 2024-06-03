@@ -13,8 +13,10 @@
 /maps_16/
 /baselines/ippo/logs/*
 
+*.sif
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
+*madrona.diff
 /bin
 /zipp*
 .python-version
@@ -23,13 +25,14 @@
 # Data
 hpc/overlay*
 /formatted_json_v2_no_tl_train
+/formatted_json_v2_no_tl_valid/*
 /waymo_data_new
 /maps_16
 **/*ppo_model*/
 /wandb*
 
 # Logging
-/wandb
+/wandb 
 events.out.tfevents.*
 
 ### C++ ###

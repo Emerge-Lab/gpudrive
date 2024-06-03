@@ -12,7 +12,7 @@ class ExperimentConfig:
     device: str = "cuda"
 
     # RENDERING
-    render: bool = True
+    render: bool = False
     render_mode: str = "rgb_array"
     render_freq: int = 100
     # Start rendering success/failure modes after this many global timesteps
