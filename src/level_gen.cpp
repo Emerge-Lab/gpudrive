@@ -60,6 +60,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // be set once
     ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
     ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);

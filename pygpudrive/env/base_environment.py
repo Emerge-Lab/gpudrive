@@ -5,35 +5,26 @@ import numpy as np
 import torch
 from itertools import product
 
-import wandb
 import glob
 import gymnasium as gym
 import os
 
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import *
 from pygpudrive.env.viz import PyGameVisualizer
 
 # Import the simulator
 import gpudrive
 import logging
 
-logging.getLogger(__name__)
+from tqdm import tqdm
 
-#os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
+logging.getLogger(__name__)
 
 
 class Env(gym.Env):
     """
     GPU Drive Gym Environment.
     """
-
-    metadata = {
-        "render_modes": [
-            "human",
-            "rgb_array",
-        ],  # human: pop-up, rgb_array: receive the visualization as an array of pixels
-        "render_fps": 5,
-    }
 
     def __init__(
         self,
@@ -42,7 +33,7 @@ class Env(gym.Env):
         max_cont_agents,
         data_dir,
         device="cuda",
-        render_mode="rgb_array",
+        render_config: RenderConfig = RenderConfig(),
         verbose=True,
     ):
         self.config = config
@@ -52,6 +43,8 @@ class Env(gym.Env):
         # Configure the environment
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = 0.5
+        params.observationRadius = self.config.obs_radius
+        params.polylineReductionThreshold = 1.0
         params.rewardParams = reward_params
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
 
@@ -95,18 +88,26 @@ class Env(gym.Env):
             num_worlds=self.num_sims,
             json_path=self.data_dir,
             params=params,
+            enable_batch_renderer=render_config is not None
+            and render_config.render_mode
+            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=render_config.resolution[0]
+            if render_config is not None
+            else None,
+            batch_render_view_height=render_config.resolution[1]
+            if render_config is not None
+            else None,
         )
+        # Update the config with the relevant number of controlled agents
+        # TODO(ev)
 
         # Rendering
-        self.render_mode = render_mode
-        # By default, we render the first world
+        self.render_config = render_config
         self.world_render_idx = 0
         self.visualizer = PyGameVisualizer(
-            self.sim,
-            self.world_render_idx,
-            self.render_mode,
-            self.config.dist_to_goal_threshold,
+            self.sim, self.render_config, self.config.dist_to_goal_threshold
         )
+
         # We only want to obtain information from vehicles we control
         # By default, the sim returns information for all vehicles in a scene
         # We construct a mask to filter out the information from the non-controlled vehicles (0)
@@ -120,7 +121,9 @@ class Env(gym.Env):
         self.max_cont_agents = max_cont_agents
 
         # Number of valid controlled agents across worlds (without padding agents)
-        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
         # Set up action space
         self.action_space = self._set_discrete_action_space()
@@ -137,69 +140,34 @@ class Env(gym.Env):
             self.sim.reset(sim_idx)
 
         return self.get_obs()
-        
+
     def get_dones(self):
-        done = (
-            torch.empty(self.num_sims, self.max_agent_count)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
-        done[self.cont_agent_mask] = (
-            self.sim.done_tensor()
-            .to_torch()
-            .squeeze(dim=2)
-            .to(done.dtype)[self.cont_agent_mask]
-        )
+        done = self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
         return done
-    
-    def get_info(self):
+
+    def get_infos(self):
         if self.config.eval_expert_mode:
             # This is true when we are evaluating the expert performance
             info = self.sim.info_tensor().to_torch().squeeze(dim=2)
 
         else:  # Standard behavior: controlling vehicles
             info = (
-                torch.empty(self.num_sims, self.max_agent_count, 5)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-            info[self.cont_agent_mask] = (
                 self.sim.info_tensor()
                 .to_torch()
                 .squeeze(dim=2)
-                .to(info.dtype)[self.cont_agent_mask]
+                .to(torch.float)
             ).to(self.device)
         return info
-        
-    def step(self, actions):
-        """Take simultaneous actions for each controlled agent in all `num_worlds` environments.
 
-        Args:
-            actions (torch.Tensor): The action indices for all agents in all worlds.
-        """
+    def get_rewards(self):
+        reward = self.sim.reward_tensor().to_torch().squeeze(dim=2)
+        return reward
+
+    def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
 
         self.sim.step()
-        obs = self.get_obs()
-        reward = (
-            torch.empty(self.num_sims, self.max_agent_count)
-            .fill_(float("nan"))
-            .to(self.device)
-        )
-        reward[self.cont_agent_mask] = (
-            self.sim.reward_tensor()
-            .to_torch()
-            .squeeze(dim=2)[self.cont_agent_mask]
-        )
-
-        done = self.get_dones()
-        info = self.get_info()
-
-        # if info[self.cont_agent_mask].sum().item() > 3:
-        #     print("bug")
-
-        return obs, reward, done, info
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
@@ -307,96 +275,83 @@ class Env(gym.Env):
         # Get the ego state
         # Ego state: (num_worlds, kMaxAgentCount, features)
         if self.config.ego_state:
-            ego_state_padding = (
-                torch.empty(self.num_sims, self.max_agent_count, 6)
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-            full_ego_state = self.sim.self_observation_tensor().to_torch()
-
-            # Update ego_state_padding using the mask
-            ego_state_padding[
-                self.w_indices, self.k_indices, :
-            ] = full_ego_state[self.w_indices, self.k_indices, :]
-
+            ego_states = self.sim.self_observation_tensor().to_torch()
             if self.config.norm_obs:
-                ego_state_padding = self.normalize_ego_state(ego_state_padding)
-
+                ego_states = self.normalize_ego_state(ego_states)
         else:
-            ego_state_padding = torch.Tensor().to(self.device)
+            ego_states = torch.Tensor().to(self.device)
 
         # Get patner observation
         # Partner obs: (num_worlds, kMaxAgentCount, kMaxAgentCount - 1 * num_features)
         if self.config.partner_obs:
-            full_partner_obs = (
+            partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
             )
             if self.config.norm_obs:  # Normalize observations and then flatten
-                full_partner_obs = self.normalize_and_flatten_partner_obs(
-                    full_partner_obs
+                partner_observations = self.normalize_and_flatten_partner_obs(
+                    partner_observations
                 )
             else:  # Flatten along the last two dimensions
-                full_partner_obs = full_partner_obs.flatten(start_dim=2)
-
-            # Pad with nans
-            partner_obs_padding = (
-                torch.empty(
-                    self.num_sims,
-                    self.max_agent_count,
-                    full_partner_obs.shape[2],
+                partner_observations = partner_observations.flatten(
+                    start_dim=2
                 )
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-
-            partner_obs_padding[
-                self.w_indices, self.k_indices, :
-            ] = full_partner_obs[self.w_indices, self.k_indices, :]
 
         else:
-            partner_obs_padding = torch.Tensor().to(self.device)
+            partner_observations = torch.Tensor().to(self.device)
 
         # Get road map
         # Roadmap obs: (num_worlds, kMaxAgentCount, kMaxRoadEntityCount, num_features)
         # Flatten over the last two dimensions to get (num_worlds, kMaxAgentCount, kMaxRoadEntityCount * num_features)
         if self.config.road_map_obs:
 
-            full_map_obs = self.sim.agent_roadmap_tensor().to_torch()
+            road_map_observations = self.sim.agent_roadmap_tensor().to_torch()
 
             if self.config.norm_obs:
-                full_map_obs = self.normalize_and_flatten_map_obs(full_map_obs)
-            else:
-                full_map_obs = full_map_obs.flatten(start_dim=2)
-
-            map_obs_padding = (
-                torch.empty(
-                    self.num_sims, self.max_agent_count, full_map_obs.shape[2]
+                road_map_observations = self.normalize_and_flatten_map_obs(
+                    road_map_observations
                 )
-                .fill_(float("nan"))
-                .to(self.device)
-            )
-
-            map_obs_padding[self.w_indices, self.k_indices, :] = full_map_obs[
-                self.w_indices, self.k_indices, :
-            ]
-
+            else:
+                road_map_observations = road_map_observations.flatten(
+                    start_dim=2
+                )
         else:
-            map_obs_padding = torch.Tensor().to(self.device)
+            road_map_observations = torch.Tensor().to(self.device)
 
         # Combine the observations
         obs_filtered = torch.cat(
             (
-                ego_state_padding,
-                partner_obs_padding,
-                map_obs_padding,
+                ego_states,
+                partner_observations,
+                road_map_observations,
             ),
             dim=-1,
         )
 
+        # print(f"ego_states: {ego_states.max()}")
+        # print(f"partner_observations: {partner_observations.max()}")
+        # print(f"road_map_observations: {road_map_observations.max()}")
+
         return obs_filtered
 
-    def render(self):
-        return self.visualizer.draw(self.cont_agent_mask)
+    def render(self, world_render_idx=0):
+        if world_render_idx >= self.num_sims:
+            # Raise error but dont interrupt the training
+            print(f"Invalid world_render_idx: {world_render_idx}")
+            return None
+        if self.render_config.render_mode in {
+            RenderMode.PYGAME_ABSOLUTE,
+            RenderMode.PYGAME_EGOCENTRIC,
+            RenderMode.PYGAME_LIDAR,
+        }:
+            return self.visualizer.getRender(
+                world_render_idx=world_render_idx,
+                cont_agent_mask=self.cont_agent_mask,
+            )
+        elif self.render_config.render_mode in {
+            RenderMode.MADRONA_RGB,
+            RenderMode.MADRONA_DEPTH,
+        }:
+            return self.visualizer.getRender()
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -418,6 +373,10 @@ class Env(gym.Env):
             self.config.max_rel_goal_coord,
         )
 
+        # Uncommment this to exclude the collision state 
+        # (1 if vehicle is in collision, 1 otherwise)
+        #state = state[:, :, :5]
+
         return state
 
     def normalize_and_flatten_partner_obs(self, obs):
@@ -427,7 +386,7 @@ class Env(gym.Env):
         """
 
         # TODO: Fix (there should not be nans in the obs)
-        # BUG: remove nan values
+        # BUG: remove nan values?
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
@@ -445,7 +404,7 @@ class Env(gym.Env):
             self.config.max_rel_agent_pos,
         )
 
-        # Orientation
+        # Orientation (heading)
         obs[:, :, :, 3] /= self.config.max_orientation_rad
 
         # Vehicle length and width
@@ -453,14 +412,24 @@ class Env(gym.Env):
         obs[:, :, :, 5] /= self.config.max_veh_width
 
         # Object type
-        # TODO: One hot encode
+        shifted_type_obs = obs[:, :, :, 6] - 6
+        one_hot_object_type = torch.nn.functional.one_hot(
+            torch.where(
+                condition=shifted_type_obs >= 0,
+                input=shifted_type_obs,
+                other=0,
+            ).long(),
+            num_classes=4,
+        )
+        # Concatenate the one-hot encoding with the rest of the features
+        obs = torch.concat((obs[:, :, :, :6], one_hot_object_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
 
-        # Position coordinates
+        # Road point coordinates
         obs[:, :, :, 0] = self._norm(
             obs[:, :, :, 0],
             self.config.min_rm_coord,
@@ -473,12 +442,23 @@ class Env(gym.Env):
             self.config.max_rm_coord,
         )
 
-        # Orientation
-        obs[:, :, :, 2] /= self.config.max_orientation_rad
+        # Road line segment length
+        obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        # TODO: Type of road entity
-        # Remove for now
-        obs = obs[:, :, :, :3]
+        # TODO: Road scale (width and height)
+        obs[:, :, :, 3] /= self.config.max_road_scale
+        # obs[:, :, :, 4] seems already scaled
+
+        # Road point orientation
+        obs[:, :, :, 5] /= self.config.max_orientation_rad
+
+        # Road types: one-hot encode them
+        one_hot_road_type = torch.nn.functional.one_hot(
+            obs[:, :, :, 6].long(), num_classes=7
+        )
+
+        # Concatenate the one-hot encoding with the rest of the features (exclude index 3 and 4)
+        obs = torch.cat((obs[:, :, :, :6], one_hot_road_type), dim=-1)
 
         return obs.flatten(start_dim=2)
 
@@ -509,44 +489,49 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    config = EnvConfig(
-        ego_state=True,
-        partner_obs=True,
-        road_map_obs=True,
-        norm_obs=True,
-    )
+    env_config = EnvConfig(sample_method="first_n")
+    render_config = RenderConfig()
 
-    NUM_CONT_AGENTS = 128
-    NUM_WORLDS = 1
+    TOTAL_STEPS = 1000
+    MAX_NUM_OBJECTS = 128
+    NUM_WORLDS = 10
 
     env = Env(
-        config=config,
+        config=env_config,
         num_worlds=NUM_WORLDS,
-        max_cont_agents=NUM_CONT_AGENTS,  # Number of agents to control
-        data_dir="waymo_data_repeat",
+        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
+        data_dir="formatted_json_v2_no_tl_train",
         device="cuda",
-        render_mode="rgb_array",
+        render_config=render_config,
     )
 
     obs = env.reset()
-    frames = []
 
-    for _ in range(200):
+    for _ in range(TOTAL_STEPS):
 
-        print(f"Step: {91 - env.steps_remaining}")
-
-        # Take a random action (we're only going straight)
+        # Take a random actions
         rand_action = torch.Tensor(
             [
                 [
                     env.action_space.sample()
-                    for _ in range(NUM_CONT_AGENTS * NUM_WORLDS)
+                    for _ in range(MAX_NUM_OBJECTS * NUM_WORLDS)
                 ]
             ]
-        ).reshape(NUM_WORLDS, NUM_CONT_AGENTS)
+        ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
 
         # Step the environment
-        obs, reward, done, info = env.step(rand_action)
+        env.step_dynamics(rand_action)
 
-        if env.steps_remaining == 0:
+        obs = env.get_obs()
+        reward = env.get_rewards()
+        done = env.get_dones()
+
+        if done.any():
+            print("Done")
             obs = env.reset()
+
+    # import imageio
+    # imageio.mimsave("world1.gif", frames_1)
+
+    # run.finish()
+    env.visualizer.destroy()

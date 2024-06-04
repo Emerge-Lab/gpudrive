@@ -87,6 +87,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<Agent, Info>(
         (uint32_t)ExportID::Info);
+    registry.exportColumn<Agent, ResponseType>(
+        (uint32_t)ExportID::ResponseType);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -148,6 +150,8 @@ inline void collectObservationsSystem(Engine &ctx,
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
 
+    if(ctx.data().params.disableClassicalObs)
+        return;
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
@@ -192,21 +196,25 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
+
+    utils::ReferenceFrame referenceFrame(model.position, rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
-        Vector2 relative_pos = Vector2{ctx.get<Position>(road).x, ctx.get<Position>(road).y} - model.position;
-        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
-        if(relative_pos.length() > ctx.data().params.observationRadius)
-        {
+        auto roadPos = ctx.get<Position>(road);
+        auto roadRot = ctx.get<Rotation>(road);
+
+        auto dist = referenceFrame.distanceTo(roadPos);
+        if (dist > ctx.data().params.observationRadius) {
             continue;
         }
-        map_obs.obs[arrIndex] = ctx.get<MapObservation>(road);
-        map_obs.obs[arrIndex].position = relative_pos;
-        map_obs.obs[arrIndex].heading = utils::quatToYaw(rot.inv() * ctx.get<Rotation>(road));
+
+        map_obs.obs[arrIndex] = referenceFrame.observationOf(
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
         arrIndex++;
     }
-    while (arrIndex < consts::kMaxRoadEntityCount)
+
+    while (arrIndex < consts::kMaxAgentMapObservationsCount)
     {
         map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
         map_obs.obs[arrIndex].heading = 0.f;
@@ -793,38 +801,47 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
                         Rotation, Goal, EntityType, VehicleSize, AbsoluteSelfObservation>>(
         {collect_obs});
 
+    if (cfg.renderBridge) {
+        RenderingSystem::setupTasks(builder, {reset_sys});
+    }
+
+    TaskGraphNodeID lidar;
+    if(cfg.enableLidar) {
         // The lidar system
 #ifdef MADRONA_GPU_MODE
     // Note the use of CustomParallelForNode to create a taskgraph node
     // that launches a warp of threads (32) for each invocation (1).
     // The 32, 1 parameters could be changed to 32, 32 to create a system
     // that cooperatively processes 32 entities within a warp.
-    auto lidar = builder.addToGraph<CustomParallelForNode<Engine,
+    lidar = builder.addToGraph<CustomParallelForNode<Engine,
         lidarSystem, 32, 1,
 #else
-    auto lidar = builder.addToGraph<ParallelForNode<Engine,
+    lidar = builder.addToGraph<ParallelForNode<Engine,
         lidarSystem,
 #endif
             Entity,
             Lidar,
             EntityType
         >>({collectAbsoluteSelfObservations});
-
-    if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {reset_sys});
     }
 
 #ifdef MADRONA_GPU_MODE
+    TaskGraphNodeID sort_agents;
+    if(cfg.enableLidar)
+    {
+        sort_agents = queueSortByWorld<Agent>(builder, {lidar});
+    } else {
+        sort_agents = queueSortByWorld<Agent>(builder, {collectAbsoluteSelfObservations});
+    }
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
-    auto sort_agents =
-        queueSortByWorld<Agent>(builder, {lidar, collect_obs});
+        
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
     (void)sort_phys_objects;
 #else
     (void)lidar;
-    (void)collect_obs;
+    (void)collectAbsoluteSelfObservations;
 #endif
 }
 
