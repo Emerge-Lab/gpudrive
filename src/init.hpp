@@ -113,6 +113,7 @@ namespace gpudrive
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
         bool enableLidar = false;
+        bool disableClassicalObs = false;
     };
 
     struct WorldInit
