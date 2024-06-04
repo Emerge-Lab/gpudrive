@@ -28,6 +28,7 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.CrossWalk): (255, 0, 255),  # Purple
         float(gpudrive.EntityType.StopSign): (255, 0, 0),  # Bright Red
         float(gpudrive.EntityType.Vehicle): (192, 192, 192),  # Light Grey
+        float(gpudrive.EntityType.Pedestrian): (128, 128, 128),  # Dark grey
     }
     # color_dict = {
     #     float(gpudrive.EntityType.RoadEdge): (34, 139, 34),  # Dark Green
@@ -308,12 +309,16 @@ class PyGameVisualizer:
 
     def draw_circle(self, surf, center, radius, color, thickness):
         for i in range(thickness):
-            pygame.gfxdraw.aacircle(
-                surf,
-                int(center[0]),
-                int(center[1]),
-                int(radius) + i,
-                color)
+            try:
+                pygame.gfxdraw.aacircle(
+                    surf,
+                    int(center[0]),
+                    int(center[1]),
+                    int(radius) + i,
+                    color)
+            except:
+                continue
+
 
     def plotLidar(self, surf, lidar_data, world_render_idx):
         numLidarSamples = lidar_data.shape[0]
@@ -470,6 +475,7 @@ class PyGameVisualizer:
                     agent_pos = agent[1:3]
                     agent_rot = agent[3]
                     agent_size = agent[4:6]
+                    agent_type = agent[-1]
 
                     agent_corners = PyGameVisualizer.compute_agent_corners(
                         agent_pos,
@@ -484,9 +490,9 @@ class PyGameVisualizer:
                     ]
 
                     pygame.gfxdraw.aapolygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.color_dict[agent_type])
                     pygame.gfxdraw.filled_polygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.color_dict[agent_type])
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
@@ -619,28 +625,14 @@ class PyGameVisualizer:
                 ):
                     continue
 
-                if agent_response_types[agent_idx] == 2:
-                    continue
+                # if agent_response_types[agent_idx] == 2:
+                #     continue
 
                 self.surf.fill(self.BACKGROUND_COLOR)
                 temp_surf = pygame.Surface(
                     (self.surf.get_width(), self.surf.get_height())
                 )
                 temp_surf.fill(self.BACKGROUND_COLOR)
-
-                agent_map_info = (
-                    self.sim.agent_roadmap_tensor()
-                    .to_torch()[world_render_idx, agent_idx, :, :]
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-                agent_map_info = agent_map_info[
-                    (agent_map_info[:, -1] != 0.0)
-                    & (agent_map_info[:, -1] != 10.0)
-                ]
-
-                # self.draw_map(temp_surf, agent_map_info, world_render_idx)
 
                 agent_info = (
                     self.sim.self_observation_tensor()
@@ -679,12 +671,12 @@ class PyGameVisualizer:
                 pygame.gfxdraw.filled_polygon( 
                     temp_surf, agent_corners, self.COLOR_LIST[0])
 
-                pygame.gfxdraw.aacircle(
+                self.draw_circle(
                     temp_surf,
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                    int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
-                    self.COLOR_LIST[0]
+                    current_goal_scaled,
+                    self.goal_radius * self.zoom_scales_x[world_render_idx] / 2,
+                    self.COLOR_LIST[0],
+                    5,
                 )
 
                 # blit temp surf on self.surf
