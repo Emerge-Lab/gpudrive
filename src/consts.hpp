@@ -31,6 +31,10 @@ inline constexpr int32_t episodeLen = 91;
 
 // Number of lidar samples, arranged in circle around agent
 inline constexpr madrona::CountT numLidarSamples = 1024;
+inline constexpr float lidarCarOffset = 0.5f;
+inline constexpr float lidarRoadEdgeOffset = 0.1f;
+inline constexpr float lidarRoadLineOffset = -0.1f;
+inline constexpr float lidarDistance = 200.f;
 
 // Time (seconds) per step
 inline constexpr float deltaT = 0.04f;

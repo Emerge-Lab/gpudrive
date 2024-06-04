@@ -394,7 +394,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
         Vector3 hit_normal;
         Entity hit_entity =
             bvh.traceRay(pos + offset * math::up, ray_dir, &hit_t,
-                         &hit_normal, 200.f);
+                         &hit_normal, consts::lidarDistance);
 
         if (hit_entity == Entity::none()) {
             samples[idx] = {
@@ -422,16 +422,16 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     //     traceRay(idx);
     // }
     while (idx < consts::numLidarSamples) {
-        traceRay(idx, 0.5f, lidar.samplesCars);
-        traceRay(idx, 0.1f, lidar.samplesRoadEdges);
-        traceRay(idx, -0.1f, lidar.samplesRoadLines);
+        traceRay(idx, consts::lidarCarOffset, lidar.samplesCars);
+        traceRay(idx, consts::lidarRoadEdgeOffset, lidar.samplesRoadEdges);
+        traceRay(idx, consts::lidarRoadLineOffset, lidar.samplesRoadLines);
         idx += 32;
     }
 #else
     for (CountT i = 0; i < consts::numLidarSamples; i++) {
-        traceRay(i, 0.5f, lidar.samplesCars);
-        traceRay(i, 0.1f, lidar.samplesRoadEdges);
-        traceRay(i, -0.1f, lidar.samplesRoadLines);
+        traceRay(i, consts::lidarCarOffset, lidar.samplesCars);
+        traceRay(i, consts::lidarRoadEdgeOffset, lidar.samplesRoadEdges);
+        traceRay(i, consts::lidarRoadLineOffset, lidar.samplesRoadLines);
     }
 #endif
 }
