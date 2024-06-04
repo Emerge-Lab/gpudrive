@@ -362,7 +362,7 @@ static inline float distObs(float v)
 
 static inline float encodeType(EntityType type)
 {
-    return (float)type / (float)EntityType::NumTypes;
+    return (float)type;
 }
 
 // Launches consts::numLidarSamples per agent.
@@ -382,9 +382,9 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     Vector3 agent_fwd = rot.rotateVec(math::fwd);
     Vector3 right = rot.rotateVec(math::right);
 
-    auto traceRay = [&](int32_t idx) {
+    auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
         float theta = 2.f * math::pi * (
-            float(idx) / float(consts::numLidarSamples)) + math::pi / 2.f;
+            float(idx) / float(consts::numLidarSamples));
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -393,19 +393,19 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
         float hit_t;
         Vector3 hit_normal;
         Entity hit_entity =
-            bvh.traceRay(pos + 0.5f * math::up, ray_dir, &hit_t,
+            bvh.traceRay(pos + offset * math::up, ray_dir, &hit_t,
                          &hit_normal, 200.f);
 
         if (hit_entity == Entity::none()) {
-            lidar.samples[idx] = {
+            samples[idx] = {
                 .depth = 0.f,
                 .encodedType = encodeType(EntityType::None),
             };
         } else {
             EntityType entity_type = ctx.get<EntityType>(hit_entity);
 
-            lidar.samples[idx] = {
-                .depth = distObs(hit_t),
+            samples[idx] = {
+                .depth = hit_t,
                 .encodedType = encodeType(entity_type),
             };
         }
@@ -418,12 +418,20 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 
-    if (idx < consts::numLidarSamples) {
-        traceRay(idx);
+    // if (idx < consts::numLidarSamples) {
+    //     traceRay(idx);
+    // }
+    while (idx < consts::numLidarSamples) {
+        traceRay(idx, 0.5f, lidar.samplesCars);
+        traceRay(idx, 0.1f, lidar.samplesRoadEdges);
+        traceRay(idx, -0.1f, lidar.samplesRoadLines);
+        idx += 32;
     }
 #else
     for (CountT i = 0; i < consts::numLidarSamples; i++) {
-        traceRay(i);
+        traceRay(i, 0.5f, lidar.samplesCars);
+        traceRay(i, 0.1f, lidar.samplesRoadEdges);
+        traceRay(i, -0.1f, lidar.samplesRoadLines);
     }
 #endif
 }

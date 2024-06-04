@@ -154,9 +154,14 @@ struct LidarSample {
 
 // Linear depth values and entity type in a circle around the agent
 struct Lidar {
-    LidarSample samples[consts::numLidarSamples];
+    LidarSample samplesCars[consts::numLidarSamples];
+    LidarSample samplesRoadEdges[consts::numLidarSamples];
+    LidarSample samplesRoadLines[consts::numLidarSamples];
 };
 
+const size_t LidarExportSize = 3 * consts::numLidarSamples * 2;
+
+static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
 // Number of steps remaining in the episode. Allows non-recurrent policies
 // to track the progression of time.
 struct StepsRemaining {

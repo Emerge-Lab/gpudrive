@@ -767,6 +767,7 @@ Tensor Manager::lidarTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
+                                   LidarExportSize / (2 * consts::numLidarSamples), 
                                    consts::numLidarSamples,
                                    2,
                                });

@@ -30,7 +30,7 @@ inline constexpr float slackReward = -0.005f;
 inline constexpr int32_t episodeLen = 91;
 
 // Number of lidar samples, arranged in circle around agent
-inline constexpr madrona::CountT numLidarSamples = 30;
+inline constexpr madrona::CountT numLidarSamples = 1024;
 
 // Time (seconds) per step
 inline constexpr float deltaT = 0.04f;

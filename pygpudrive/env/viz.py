@@ -27,6 +27,7 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
         float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
+        float(gpudrive.EntityType.Vehicle): (128, 0, 128),  # Purple
     }
 
     def __init__(self, sim, render_config, goal_radius):
@@ -290,6 +291,43 @@ class PyGameVisualizer:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
+        
+
+    def plotLidar(self, surf, lidar_data, world_render_idx):
+        numLidarSamples = lidar_data.shape[0]
+
+        lidar_depths = lidar_data[:, 0]
+        lidar_entity_types = lidar_data[:, 1]
+
+        lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
+
+        num_lidar_plotted = 0
+
+        for i in range(numLidarSamples):
+            if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
+                continue
+            angle = lidar_angles[i]
+            depth = lidar_depths[i]
+            if depth == 0:
+                continue
+            x = depth * np.cos(angle)
+            y = depth * np.sin(angle)
+
+            start = self.scale_coords((0, 0), world_render_idx)
+            end = self.scale_coords(np.array([x, y]), world_render_idx)
+
+            pygame.draw.circle(
+                surface=surf,
+                color=self.color_dict[lidar_entity_types[i]],
+                center=(
+                    int(end[0]),
+                    int(end[1]),
+                ),
+                radius=2,
+            )
+            # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
+            num_lidar_plotted += 1
+
 
     def draw(self, cont_agent_mask, world_render_idx=0):
         """Render the environment."""
@@ -513,15 +551,46 @@ class PyGameVisualizer:
                 return self.isopen
         elif self.render_config.render_mode == RenderMode.PYGAME_LIDAR:
             render_rgbs = []
-            render_mask = self.create_render_mask()
-            num_agents = render_mask.sum().item()
+            num_agents = self.num_agents[world_render_idx][0]
+            agent_response_types = (
+                self.sim.response_type_tensor()
+                .to_torch()[world_render_idx, :, :]
+                .cpu()
+                .detach()
+                .numpy()
+            )
             # Loop through each agent to render their egocentric view
             for agent_idx in range(num_agents):
+                info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
+                if info_tensor[agent_idx, -1] == float(
+                    gpudrive.EntityType.Padding
+                ) or info_tensor[agent_idx, -1] == float(
+                    gpudrive.EntityType._None
+                ):
+                    continue
+
+                if agent_response_types[agent_idx] == 2:
+                    continue
+
                 self.surf.fill(self.BACKGROUND_COLOR)
                 temp_surf = pygame.Surface(
                     (self.surf.get_width(), self.surf.get_height())
                 )
                 temp_surf.fill(self.BACKGROUND_COLOR)
+                
+                agent_map_info = (
+                    self.sim.agent_roadmap_tensor()
+                    .to_torch()[world_render_idx, agent_idx, :, :]
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+                agent_map_info = agent_map_info[
+                    (agent_map_info[:, -1] != 0.0)
+                    & (agent_map_info[:, -1] != 10.0)
+                ]
+
+                # self.draw_map(temp_surf, agent_map_info, world_render_idx)
 
                 agent_info = (
                     self.sim.self_observation_tensor()
@@ -531,50 +600,21 @@ class PyGameVisualizer:
                     .numpy()
                 )
 
-                numLidarSamples = 1024
-
                 lidar_data = (
                     self.sim.lidar_tensor()
-                    .to_torch()[world_render_idx, agent_idx, :, :]
+                    .to_torch()[world_render_idx, agent_idx, :, :, :] # shape is (num_worlds, num_agents, num_planes, num_samples, 2)
                     .cpu()
                     .detach()
                     .numpy()
                 )
-
-                lidar_depths = lidar_data[:, 0]
-
-                lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
-
-                num_lidar_plotted = 0
-
-                for i in range(numLidarSamples):
-                    angle = lidar_angles[i]
-                    depth = lidar_depths[i]
-                    if depth == 0:
-                        continue
-                    x = depth * np.cos(angle)
-                    y = depth * np.sin(angle)
-
-                    start = self.scale_coords((0, 0), world_render_idx)
-                    end = self.scale_coords(np.array([x, y]), world_render_idx)
-
-                    pygame.draw.circle(
-                        surface=temp_surf,
-                        color=(255, 255, 255),
-                        center=(
-                            int(end[0]),
-                            int(end[1]),
-                        ),
-                        radius=2,
-                    )
-                    # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
-                    num_lidar_plotted += 1
+                for lidar_plane in lidar_data:
+                    self.plotLidar(temp_surf, lidar_plane, world_render_idx)
 
                 goal_pos = agent_info[3:5]  # x, y
                 agent_size = agent_info[1:3]  # length, width
 
                 agent_corners = PyGameVisualizer.compute_agent_corners(
-                    (0, 0), agent_size[1], agent_size[0], np.pi / 2
+                    (0, 0), agent_size[1], agent_size[0], 0
                 )
                 agent_corners = [
                     self.scale_coords(corner, world_render_idx)
@@ -597,7 +637,7 @@ class PyGameVisualizer:
                         int(current_goal_scaled[0]),
                         int(current_goal_scaled[1]),
                     ),
-                    radius=self.goal_radius * self.zoom_scale_x,
+                    radius=self.goal_radius,
                 )
 
                 # blit temp surf on self.surf
