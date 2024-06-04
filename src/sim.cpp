@@ -383,8 +383,9 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     Vector3 right = rot.rotateVec(math::right);
 
     auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
-        float theta = 2.f * math::pi * (
-            float(idx) / float(consts::numLidarSamples)); 
+        // float theta = 2.f * math::pi * (
+        //     float(idx) / float(consts::numLidarSamples)); 
+        float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1);
         float x = cosf(theta);
         float y = sinf(theta);
 
