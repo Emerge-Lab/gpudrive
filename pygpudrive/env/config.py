@@ -51,7 +51,7 @@ class EnvConfig:
     partner_obs: bool = True  # Partner vehicle info
 
     # Road observation algorithm
-    road_obs_algorithm: str = "k_nearest_roadpoints"
+    road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
 
     # Action space (joint discrete)
