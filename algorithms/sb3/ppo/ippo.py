@@ -135,6 +135,7 @@ class IPPO(PPO):
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             total_steps = int((~rewards.isnan()).float().sum().item())
+            self.logger.record("rollout/step_fps", total_steps/(time.perf_counter() - t_step))
             self.num_timesteps += total_steps
             observed_samples += total_steps
             # Give access to local variables
@@ -247,7 +248,7 @@ class IPPO(PPO):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
-                observed_data += len(rollout_data)
+                observed_data += len(rollout_data[0])
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -362,7 +363,7 @@ class IPPO(PPO):
         self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
-        self.logger.record("train/train_throughput", observed_data / (time.time() - train_time))
+        self.logger.record("train/train_fps", observed_data / (time.time() - train_time))
         self.logger.record("train/advantages_dist", advantages)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
