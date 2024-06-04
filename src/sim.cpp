@@ -150,7 +150,7 @@ inline void collectObservationsSystem(Engine &ctx,
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
 
-    if(ctx.data().params.onlyLidarObs)
+    if(ctx.data().params.disableClassicalObs)
         return;
 
     CountT arrIndex = 0; CountT agentIdx = 0;
