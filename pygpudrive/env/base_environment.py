@@ -46,7 +46,10 @@ class Env(gym.Env):
         params.observationRadius = self.config.obs_radius
         params.polylineReductionThreshold = 1.0
         params.rewardParams = reward_params
-        params.IgnoreNonVehicles = self.config.remove_non_vehicles
+        params.IgnoreNonVehicles = False
+        params.enableLidar = True
+        params.disableClassicalObs = True
+        params.initOnlyValidAgentsAtFirstStep = True
 
         # Collision behavior
         params = self._set_collision_behavior(params)
@@ -492,46 +495,51 @@ if __name__ == "__main__":
     env_config = EnvConfig(sample_method="first_n")
     render_config = RenderConfig()
 
-    TOTAL_STEPS = 1000
-    MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 10
+    TOTAL_STEPS = 11
+    MAX_NUM_OBJECTS = 0
+    NUM_WORLDS = 1
 
     env = Env(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="formatted_json_v2_no_tl_train",
+        data_dir="example_data",
         device="cuda",
         render_config=render_config,
     )
 
     obs = env.reset()
+    print(env.sim.shape_tensor().to_torch())
+    frames = []
+    from tqdm import tqdm
+    for _ in tqdm(range(TOTAL_STEPS)):
 
-    for _ in range(TOTAL_STEPS):
+        # # Take a random actions
+        # rand_action = torch.Tensor(
+        #     [
+        #         [
+        #             env.action_space.sample()
+        #             for _ in range(MAX_NUM_OBJECTS * NUM_WORLDS)
+        #         ]
+        #     ]
+        # ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
 
-        # Take a random actions
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(MAX_NUM_OBJECTS * NUM_WORLDS)
-                ]
-            ]
-        ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
+        # # Step the environment
+        # env.step_dynamics(rand_action)
 
-        # Step the environment
-        env.step_dynamics(rand_action)
+        # obs = env.get_obs()
+        # reward = env.get_rewards()
+        # done = env.get_dones()
 
-        obs = env.get_obs()
-        reward = env.get_rewards()
-        done = env.get_dones()
+        # if done.any():
+        #     print("Done")
+        #     obs = env.reset()
+        env.sim.step()
+        frame = env.render(world_render_idx=0)
+        frames.append(frame[1])
 
-        if done.any():
-            print("Done")
-            obs = env.reset()
-
-    # import imageio
-    # imageio.mimsave("world1.gif", frames_1)
-
+    import imageio
+    # imageio.mimsave("plots/absolute.gif", frames)
+    imageio.imsave("plots/Lidar360.png", frames[10])
     # run.finish()
     env.visualizer.destroy()
