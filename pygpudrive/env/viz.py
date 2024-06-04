@@ -11,7 +11,7 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
+    BACKGROUND_COLOR = (55, 55, 55)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 69, 69),  # Red
@@ -21,14 +21,23 @@ class PyGameVisualizer:
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
-        float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
-        float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
-        float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
-        float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
-        float(gpudrive.EntityType.Vehicle): (128, 0, 128),  # Purple
+        float(gpudrive.EntityType.RoadEdge): (102, 255, 102),  # Bright Green
+        float(gpudrive.EntityType.RoadLine): (255, 255, 0),  # Bright Yellow
+        float(gpudrive.EntityType.RoadLane): (200, 200, 200),  # Light Grey
+        float(gpudrive.EntityType.SpeedBump): (255, 165, 0),  # Bright Orange
+        float(gpudrive.EntityType.CrossWalk): (255, 0, 255),  # Purple
+        float(gpudrive.EntityType.StopSign): (255, 0, 0),  # Bright Red
+        float(gpudrive.EntityType.Vehicle): (192, 192, 192),  # Light Grey
     }
+    # color_dict = {
+    #     float(gpudrive.EntityType.RoadEdge): (34, 139, 34),  # Dark Green
+    #     float(gpudrive.EntityType.RoadLine): (204, 204, 0),  # Dark Yellow
+    #     float(gpudrive.EntityType.RoadLane): (105, 105, 105),  # Dark Grey
+    #     float(gpudrive.EntityType.SpeedBump): (255, 140, 0),  # Dark Orange
+    #     float(gpudrive.EntityType.CrossWalk): (0, 0, 139),  # Dark Blue
+    #     float(gpudrive.EntityType.StopSign): (139, 0, 0),  # Dark Red
+    #     float(gpudrive.EntityType.Vehicle): (169, 169, 169),  # Dark Grey
+    # }
 
     def __init__(self, sim, render_config, goal_radius):
         self.sim = sim
@@ -201,6 +210,26 @@ class PyGameVisualizer:
         )
         return start, end
 
+    def draw_line(self, surf, start, end, color):
+        c1 = (start[0] + end[0]) / 2
+        c2 = (start[1] + end[1]) / 2
+        center_L1 = (c1, c2)
+        length = math.sqrt((start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2)
+        thickness = 2
+        angle = math.atan2(start[1] - end[1], start[0] - end[0])
+
+        UL = (center_L1[0] + (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
+            center_L1[1] + (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
+        UR = (center_L1[0] - (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
+            center_L1[1] + (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+        BL = (center_L1[0] + (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
+            center_L1[1] - (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
+        BR = (center_L1[0] - (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
+            center_L1[1] - (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+
+        pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
+        pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
+
     def draw_map(self, surf, map_info, world_render_idx=0):
         for idx, map_obj in enumerate(map_info):
 
@@ -216,23 +245,10 @@ class PyGameVisualizer:
 
                 # DRAW ROAD EDGE
                 if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
-                    pygame.draw.aaline(
-                        surf,
-                        self.color_dict[map_obj[-1]],
-                        start,
-                        end,
-                        blend=1
-                    )
-
+                    self.draw_line(surf, start, end, self.color_dict[map_obj[-1]])
                 # DRAW ROAD LINES/LANES
                 else:
-                    pygame.draw.aaline(
-                        surf,
-                        self.color_dict[map_obj[-1]],
-                        start,
-                        end,
-                        blend=2
-                    )
+                    self.draw_line(surf, start, end, self.color_dict[map_obj[-1]])
 
             # DRAW STOP SIGNS
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
@@ -254,9 +270,6 @@ class PyGameVisualizer:
                         box_corner, world_render_idx
                     )
                 pygame.gfxdraw.aapolygon(
-                    surf, box_corners, self.color_dict[map_obj[-1]]
-                )
-                pygame.gfxdraw.filled_polygon(
                     surf, box_corners, self.color_dict[map_obj[-1]]
                 )
 
@@ -292,7 +305,15 @@ class PyGameVisualizer:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
-        
+
+    def draw_circle(self, surf, center, radius, color, thickness):
+        for i in range(thickness):
+            pygame.gfxdraw.aacircle(
+                surf,
+                int(center[0]),
+                int(center[1]),
+                int(radius) + i,
+                color)
 
     def plotLidar(self, surf, lidar_data, world_render_idx):
         numLidarSamples = lidar_data.shape[0]
@@ -326,6 +347,7 @@ class PyGameVisualizer:
                 2,
                 self.color_dict[lidar_entity_types[i]]
             )
+
             pygame.gfxdraw.filled_circle(
                 surf,
                 int(scaled_coords[0]),
@@ -334,8 +356,6 @@ class PyGameVisualizer:
                 self.color_dict[lidar_entity_types[i]]
             )
             num_lidar_plotted += 1
-
-
 
         # for i in range(numLidarSamples):
         #     if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
@@ -361,7 +381,6 @@ class PyGameVisualizer:
         #     )
         #     # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
         #     num_lidar_plotted += 1
-
 
     def draw(self, cont_agent_mask, world_render_idx=0):
         """Render the environment."""
@@ -439,14 +458,13 @@ class PyGameVisualizer:
                 pygame.gfxdraw.filled_polygon(
                     temp_surf, agent_corners, self.COLOR_LIST[0])
 
-                pygame.gfxdraw.aacircle(
+                self.draw_circle(
                     temp_surf,
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                    int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
-                    self.COLOR_LIST[0]
+                    current_goal_scaled,
+                    self.goal_radius * self.zoom_scales_x[world_render_idx] / 2,
+                    self.COLOR_LIST[0],
+                    5,
                 )
-
 
                 for agent in partner_agent_info:
                     agent_pos = agent[1:3]
@@ -540,12 +558,16 @@ class PyGameVisualizer:
                     goal_pos[agent_idx], world_render_idx
                 )
 
-                mod_idx = agent_idx % len(self.COLOR_LIST)
+                # mod_idx = agent_idx % len(self.COLOR_LIST)
 
-                if cont_agent_mask[world_render_idx, agent_idx]:
-                    mod_idx = 0
+                # if cont_agent_mask[world_render_idx, agent_idx]:
+                #     mod_idx = 0
 
-                color = self.COLOR_LIST[mod_idx]
+                # color = self.COLOR_LIST[mod_idx]
+                if agent_idx == 1:
+                    color = (255, 0, 0) # Red
+                else:
+                    color = (211, 211, 211) # Light grey
 
                 if agent_response_types[agent_idx] == 2:
                     color = (128, 128, 128)
@@ -556,14 +578,14 @@ class PyGameVisualizer:
                 pygame.gfxdraw.filled_polygon(
                     self.surf, agent_corners, color
                 )
-            
-                if agent_response_types[agent_idx] != 2:
-                    pygame.gfxdraw.aacircle(
+
+                if agent_response_types[agent_idx] != 2 and info_tensor[agent_idx, -1] == float(gpudrive.EntityType.Vehicle):
+                    self.draw_circle(
                         self.surf,
-                        int(current_goal_scaled[0]),
-                        int(current_goal_scaled[1]),
-                        int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
-                        color
+                        current_goal_scaled,
+                        self.goal_radius * self.zoom_scales_x[world_render_idx] / 2,
+                        color,
+                        5,
                     )
 
             if self.render_config.view_option == PygameOption.HUMAN:
@@ -605,7 +627,7 @@ class PyGameVisualizer:
                     (self.surf.get_width(), self.surf.get_height())
                 )
                 temp_surf.fill(self.BACKGROUND_COLOR)
-                
+
                 agent_map_info = (
                     self.sim.agent_roadmap_tensor()
                     .to_torch()[world_render_idx, agent_idx, :, :]
@@ -656,7 +678,6 @@ class PyGameVisualizer:
                     temp_surf, agent_corners, self.COLOR_LIST[0])
                 pygame.gfxdraw.filled_polygon( 
                     temp_surf, agent_corners, self.COLOR_LIST[0])
-                
 
                 pygame.gfxdraw.aacircle(
                     temp_surf,
@@ -665,7 +686,6 @@ class PyGameVisualizer:
                     int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
                     self.COLOR_LIST[0]
                 )
-
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
