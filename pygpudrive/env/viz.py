@@ -215,24 +215,22 @@ class PyGameVisualizer:
 
                 # DRAW ROAD EDGE
                 if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
-                    pygame.gfxdraw.line(
+                    pygame.draw.aaline(
                         surf,
-                        int(start[0]),
-                        int(start[1]),
-                        int(end[0]),
-                        int(end[1]),
-                        self.color_dict[map_obj[-1]]
+                        self.color_dict[map_obj[-1]],
+                        start,
+                        end,
+                        blend=1
                     )
 
                 # DRAW ROAD LINES/LANES
                 else:
-                     pygame.gfxdraw.line(
+                    pygame.draw.aaline(
                         surf,
-                        int(start[0]),
-                        int(start[1]),
-                        int(end[0]),
-                        int(end[1]),
-                        self.color_dict[map_obj[-1]]
+                        self.color_dict[map_obj[-1]],
+                        start,
+                        end,
+                        blend=2
                     )
 
             # DRAW STOP SIGNS
