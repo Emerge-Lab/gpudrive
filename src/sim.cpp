@@ -418,9 +418,6 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 
-    // if (idx < consts::numLidarSamples) {
-    //     traceRay(idx);
-    // }
     while (idx < consts::numLidarSamples) {
         traceRay(idx, consts::lidarCarOffset, lidar.samplesCars);
         traceRay(idx, consts::lidarRoadEdgeOffset, lidar.samplesRoadEdges);
