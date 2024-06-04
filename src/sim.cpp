@@ -384,7 +384,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 
     auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
         float theta = 2.f * math::pi * (
-            float(idx) / float(consts::numLidarSamples));
+            float(idx) / float(consts::numLidarSamples)); 
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -400,6 +400,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
             samples[idx] = {
                 .depth = 0.f,
                 .encodedType = encodeType(EntityType::None),
+                .position = {0.f, 0.f},
             };
         } else {
             EntityType entity_type = ctx.get<EntityType>(hit_entity);
@@ -407,6 +408,8 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
             samples[idx] = {
                 .depth = hit_t,
                 .encodedType = encodeType(entity_type),
+                .position = {hit_t * x,
+                             hit_t * y},
             };
         }
     };

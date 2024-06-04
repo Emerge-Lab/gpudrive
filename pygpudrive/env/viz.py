@@ -298,6 +298,7 @@ class PyGameVisualizer:
 
         lidar_depths = lidar_data[:, 0]
         lidar_entity_types = lidar_data[:, 1]
+        lidar_pos = lidar_data[:, 2:4]
 
         lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
 
@@ -306,27 +307,42 @@ class PyGameVisualizer:
         for i in range(numLidarSamples):
             if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
                 continue
-            angle = lidar_angles[i]
-            depth = lidar_depths[i]
-            if depth == 0:
-                continue
-            x = depth * np.cos(angle)
-            y = depth * np.sin(angle)
-
-            start = self.scale_coords((0, 0), world_render_idx)
-            end = self.scale_coords(np.array([x, y]), world_render_idx)
-
+            coords = lidar_pos[i]
+            scaled_coords = self.scale_coords(coords, world_render_idx)
             pygame.draw.circle(
                 surface=surf,
                 color=self.color_dict[lidar_entity_types[i]],
                 center=(
-                    int(end[0]),
-                    int(end[1]),
+                    int(scaled_coords[0]),
+                    int(scaled_coords[1]),
                 ),
                 radius=2,
             )
-            # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
-            num_lidar_plotted += 1
+
+        # for i in range(numLidarSamples):
+        #     if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
+        #         continue
+        #     angle = lidar_angles[i]
+        #     depth = lidar_depths[i]
+        #     if depth == 0:
+        #         continue
+        #     x = depth * np.cos(angle)
+        #     y = depth * np.sin(angle)
+
+        #     start = self.scale_coords((0, 0), world_render_idx)
+        #     end = self.scale_coords(np.array([x, y]), world_render_idx)
+
+        #     pygame.draw.circle(
+        #         surface=surf,
+        #         color=self.color_dict[lidar_entity_types[i]],
+        #         center=(
+        #             int(end[0]),
+        #             int(end[1]),
+        #         ),
+        #         radius=2,
+        #     )
+        #     # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
+        #     num_lidar_plotted += 1
 
 
     def draw(self, cont_agent_mask, world_render_idx=0):

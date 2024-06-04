@@ -150,6 +150,7 @@ static_assert(sizeof(AgentMapObservations) ==
 struct LidarSample {
     float depth;
     float encodedType;
+    madrona::math::Vector2 position;
 };
 
 // Linear depth values and entity type in a circle around the agent
@@ -159,7 +160,7 @@ struct Lidar {
     LidarSample samplesRoadLines[consts::numLidarSamples];
 };
 
-const size_t LidarExportSize = 3 * consts::numLidarSamples * 2;
+const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
 
 static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
 // Number of steps remaining in the episode. Allows non-recurrent policies
