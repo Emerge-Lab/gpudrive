@@ -369,8 +369,8 @@ static inline float encodeType(EntityType type)
 // This system is specially optimized in the GPU version:
 // a warp of threads is dispatched for each invocation of the system
 // and each thread in the warp traces one lidar ray for the agent.
-inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
-                        EntityType &entityType) {
+inline void lidarSystem(Engine &ctx, const Entity &e, Lidar &lidar,
+                        const EntityType &entityType, const Action &action) {
     assert(entityType != EntityType::None);
     if (entityType == EntityType::Padding) {
         return;
@@ -385,7 +385,8 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
     auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
         // float theta = 2.f * math::pi * (
         //     float(idx) / float(consts::numLidarSamples)); 
-        float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1);
+        float head_angle = ctx.get<ControlledState>(e).controlledState == ControlMode::BICYCLE ? action.headAngle : 0.f;
+        float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1) + head_angle;
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -821,7 +822,8 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 #endif
             Entity,
             Lidar,
-            EntityType
+            EntityType,
+            Action
         >>({collectAbsoluteSelfObservations});
     }
 
