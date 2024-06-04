@@ -53,12 +53,20 @@ class SB3MultiAgentEnv(VecEnv):
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
+        self.log_agg_world_info = False
+        self.aggregate_world_dict = {}
         self.obs_dim = self._env.observation_space.shape[0]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
-        self.tot_reward_per_episode = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
-        self.agent_step = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
-        self.actions_tensor = torch.zeros((self.num_worlds, self.max_agent_count)).to(self.device)
+        self.tot_reward_per_episode = torch.zeros(
+            (self.num_worlds, self.max_agent_count)
+        ).to(self.device)
+        self.agent_step = torch.zeros(
+            (self.num_worlds, self.max_agent_count)
+        ).to(self.device)
+        self.actions_tensor = torch.zeros(
+            (self.num_worlds, self.max_agent_count)
+        ).to(self.device)
         # Storage: Fill buffer with nan values
         self.buf_rews = torch.full(
             (self.num_worlds, self.max_agent_count), fill_value=float("nan")
@@ -101,7 +109,9 @@ class SB3MultiAgentEnv(VecEnv):
         self.dead_agent_mask = ~self.controlled_agent_mask.clone()
 
         # Flatten over num_worlds and max_agent_count
-        obs = obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim)
+        obs = obs[self.controlled_agent_mask].reshape(
+            self.num_envs, self.obs_dim
+        )
 
         return obs
 
@@ -126,27 +136,30 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
         self.actions_tensor[self.controlled_agent_mask] = actions
+
         # Step the environment
         self._env.step_dynamics(self.actions_tensor)
+
         reward = self._env.get_rewards()
         done = self._env.get_dones()
         info = self._env.get_infos()
-        # # Get the dones for resets
+        # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done
         # First, find the indices of all the done worlds
-        # this is where the done flag for a world equals the sum of 
+        # this is where the done flag for a world equals the sum of
         # the controlled agent mask for that world
         done_worlds = torch.where(
-            (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1) == self.controlled_agent_mask.sum(dim=1)
+            (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
+            == self.controlled_agent_mask.sum(dim=1)
         )[0]
-        # info = self._env.get_info()
+
         if done_worlds.any().item():
             self._update_info_dict(info, done_worlds)
             for world_idx in done_worlds:
                 self.num_episodes += 1
                 self._env.sim.reset(world_idx.item())
-                
+
         # now construct obs after the reset
         obs = self._env.get_obs()
 
@@ -161,22 +174,32 @@ class SB3MultiAgentEnv(VecEnv):
         # Store running total reward across worlds
         self.tot_reward_per_episode += reward * ~self.dead_agent_mask
         self.agent_step += 1
-        
+
         # Update dead agent mask: Set to True if agent is done before
         # the end of the episode
         self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
-        
+
         # Now override the dead agent mask for the reset worlds
         if done_worlds.any().item():
-            self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[done_worlds].clone()
+            self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[
+                done_worlds
+            ].clone()
             self.tot_reward_per_episode[done_worlds] = 0
             self.agent_step[done_worlds] = 0
 
         return (
-            obs[self.controlled_agent_mask].reshape(self.num_envs, self.obs_dim).clone(),
-            self.buf_rews[self.controlled_agent_mask].reshape(self.num_envs).clone(),
-            self.buf_dones[self.controlled_agent_mask].reshape(self.num_envs).clone(),
-            info[self.controlled_agent_mask].reshape(self.num_envs, self.info_dim).clone(),
+            obs[self.controlled_agent_mask]
+            .reshape(self.num_envs, self.obs_dim)
+            .clone(),
+            self.buf_rews[self.controlled_agent_mask]
+            .reshape(self.num_envs)
+            .clone(),
+            self.buf_dones[self.controlled_agent_mask]
+            .reshape(self.num_envs)
+            .clone(),
+            info[self.controlled_agent_mask]
+            .reshape(self.num_envs, self.info_dim)
+            .clone(),
         )
 
     def close(self) -> None:
@@ -198,7 +221,10 @@ class SB3MultiAgentEnv(VecEnv):
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""
 
-        controlled_agent_info = info[indices][self.controlled_agent_mask[indices]]
+        # Select info for controlled agents
+        controlled_agent_info = info[indices][
+            self.controlled_agent_mask[indices]
+        ]
 
         self.info_dict["off_road"] = controlled_agent_info[:, 0].sum().item()
         self.info_dict["veh_collisions"] = (
@@ -210,12 +236,45 @@ class SB3MultiAgentEnv(VecEnv):
         self.info_dict["goal_achieved"] = (
             controlled_agent_info[:, 3].sum().item()
         )
-        self.info_dict["num_finished_agents"] = self.controlled_agent_mask[indices].sum()
-        self.info_dict["mean_reward_per_episode"] = \
-            self.tot_reward_per_episode[indices][self.controlled_agent_mask[indices]].sum().item()
+        self.info_dict["num_finished_agents"] = self.controlled_agent_mask[
+            indices
+        ].sum()
+        self.info_dict["mean_reward_per_episode"] = (
+            self.tot_reward_per_episode[indices][
+                self.controlled_agent_mask[indices]
+            ]
+            .sum()
+            .item()
+        )
+
         # log the agents that are done but did not receive any reward i.e. truncated
         # TODO(ev) remove hardcoded 91
-        self.info_dict["truncated"] = ((self.agent_step[indices] == 91) * ~self.dead_agent_mask[indices]).sum().item()
+        self.info_dict["truncated"] = (
+            ((self.agent_step[indices] == 91) * ~self.dead_agent_mask[indices])
+            .sum()
+            .item()
+        )
+
+        # Store per world info
+        for (
+            world_idx
+        ) in indices:  # max agents, goal achieved, off road, veh collisions
+            if world_idx not in self.aggregate_world_dict:
+                self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
+                    [
+                        self.controlled_agent_mask[indices].sum(),
+                        controlled_agent_info[:, 3].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                        controlled_agent_info[:, 0].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                        controlled_agent_info[:, 1].sum().item()
+                        / self.controlled_agent_mask[indices].sum().item(),
+                    ]
+                )
+
+        if len(self.aggregate_world_dict) == self.num_worlds:
+            # Log stats
+            self.log_agg_world_info = True
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()

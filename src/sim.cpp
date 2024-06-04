@@ -87,6 +87,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<Agent, Info>(
         (uint32_t)ExportID::Info);
+    registry.exportColumn<Agent, ResponseType>(
+        (uint32_t)ExportID::ResponseType);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -195,7 +197,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     utils::ReferenceFrame referenceFrame(model.position, rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
@@ -210,7 +212,7 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    while (arrIndex < consts::kMaxRoadEntityCount)
+    while (arrIndex < consts::kMaxAgentMapObservationsCount)
     {
         map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
         map_obs.obs[arrIndex].heading = 0.f;
