@@ -27,9 +27,9 @@ class MadronaOption(Enum):
 
 @dataclass
 class RenderConfig:
-    render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
+    render_mode: RenderMode = RenderMode.PYGAME_LIDAR
     view_option: Enum = PygameOption.RGB
-    resolution: Tuple[int, int] = (256, 256)
+    resolution: Tuple[int, int] = (3840, 2160)
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
@@ -49,6 +49,9 @@ class EnvConfig:
     ego_state: bool = True  # Ego vehicle state
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
+    enable_lidar: bool = True  # Lidar sensor
+    disable_classical_obs: bool = True  # Disable classical obs
+
 
     # Road observation algorithm
     road_obs_algorithm: str = "k_nearest_roadpoints"
@@ -65,7 +68,7 @@ class EnvConfig:
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
     # Remove all non vehicles (bicylces, pedestrians) from the scene
-    remove_non_vehicles: bool = True
+    remove_non_vehicles: bool = False
 
     # Reward
     reward_type: str = (
