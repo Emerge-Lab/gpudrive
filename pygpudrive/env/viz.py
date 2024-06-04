@@ -310,15 +310,32 @@ class PyGameVisualizer:
                 continue
             coords = lidar_pos[i]
             scaled_coords = self.scale_coords(coords, world_render_idx)
-            pygame.draw.circle(
-                surface=surf,
-                color=self.color_dict[lidar_entity_types[i]],
-                center=(
-                    int(scaled_coords[0]),
-                    int(scaled_coords[1]),
-                ),
-                radius=2,
+            # pygame.draw.circle(
+            #     surface=surf,
+            #     color=self.color_dict[lidar_entity_types[i]],
+            #     center=(
+            #         int(scaled_coords[0]),
+            #         int(scaled_coords[1]),
+            #     ),
+            #     radius=2,
+            # )
+            pygame.gfxdraw.aacircle(
+                surf,
+                int(scaled_coords[0]),
+                int(scaled_coords[1]),
+                2,
+                self.color_dict[lidar_entity_types[i]]
             )
+            pygame.gfxdraw.filled_circle(
+                surf,
+                int(scaled_coords[0]),
+                int(scaled_coords[1]),
+                2,
+                self.color_dict[lidar_entity_types[i]]
+            )
+            num_lidar_plotted += 1
+
+
 
         # for i in range(numLidarSamples):
         #     if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
