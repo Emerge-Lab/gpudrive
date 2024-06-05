@@ -104,9 +104,11 @@ if __name__ == "__main__":
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
     if exp_config.generate_valid_json:
-        generate_valid_files_json(
+        actual_num_files = generate_valid_files_json(
             num_unique_scenes=exp_config.train_on_k_unique_scenes,
             data_dir=exp_config.data_dir,
         )
+        
+    exp_config.actual_num_files = actual_num_files
 
     train(exp_config)
