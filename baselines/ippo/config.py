@@ -10,7 +10,10 @@ class ExperimentConfig:
     # DATASET & DEVICE
     data_dir: str = "formatted_json_v2_no_tl_valid"
     generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 1 # If generate_valid_json = True, generates a json file with k unique scenarios
+    train_on_k_unique_scenes: int = 100 # If generate_valid_json = True, generates a json file with k unique scenarios
+
+    # BATCH SIZE / NUM WORLDS
+    num_worlds: int = 512
 
     device: str = "cuda"
 
@@ -27,18 +30,18 @@ class ExperimentConfig:
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        100  # how many trajectories we average logs over
+        500  # how many trajectories we average logs over
     )
-    log_freq: int = 100
+    log_freq: int = 500
     project_name = "gpudrive"
-    group_name = "dc/solve_n_scenes"
+    group_name = "dc/world_explore"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 1000
+    save_policy_freq: int = 500
 
     # HYPERPARAMETERS
     seed: int = 42
@@ -49,11 +52,11 @@ class ExperimentConfig:
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
-    total_timesteps: int = 1e7
+    total_timesteps: int = 1e8
     ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 1e-3
-    n_epochs: int = 10
+    n_epochs: int = 5
 
     # NETWORK
     mlp_class = LateFusionNet
