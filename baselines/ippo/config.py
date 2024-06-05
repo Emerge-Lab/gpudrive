@@ -9,6 +9,9 @@ class ExperimentConfig:
 
     # DATASET & DEVICE
     data_dir: str = "maps_1"
+    generate_valid_json: bool = True
+    train_on_k_unique_scenes: int = 1
+
     device: str = "cuda"
 
     # RENDERING

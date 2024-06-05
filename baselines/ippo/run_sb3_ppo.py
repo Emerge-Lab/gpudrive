@@ -101,13 +101,12 @@ def train(exp_config: ExperimentConfig):
 
 if __name__ == "__main__":
 
-    TRAIN_ON_K_UNIQUE_SCENES = 1
-
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
-    generate_valid_files_json(
-        num_unique_scenes=TRAIN_ON_K_UNIQUE_SCENES,
-        data_dir=exp_config.data_dir,
-    )
+    if exp_config.generate_valid_json:
+        generate_valid_files_json(
+            num_unique_scenes=exp_config.train_on_k_unique_scenes,
+            data_dir=exp_config.data_dir,
+        )
 
     train(exp_config)
