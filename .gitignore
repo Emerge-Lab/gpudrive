@@ -21,6 +21,7 @@
 /zipp*
 .python-version
 /baselines/ippo/logs/*
+/google-cloud-sdk/*
 
 # Data
 hpc/overlay*

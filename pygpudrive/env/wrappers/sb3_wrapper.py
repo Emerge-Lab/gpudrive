@@ -44,6 +44,7 @@ class SB3MultiAgentEnv(VecEnv):
             data_dir=data_dir,
             device=device,
         )
+        self.config = config
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
@@ -143,6 +144,10 @@ class SB3MultiAgentEnv(VecEnv):
         reward = self._env.get_rewards()
         done = self._env.get_dones()
         info = self._env.get_infos()
+        
+        # Add collision penalty to rewards
+        reward += -abs(self.config.collision_penalty) * (info[..., 1] + info[..., 2])
+        
         # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done

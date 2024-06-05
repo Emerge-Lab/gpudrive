@@ -8,21 +8,16 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "formatted_json_v2_no_tl_train"
+    data_dir: str = "formatted_json_v2_no_tl_valid"
     device: str = "cuda"
 
     # RENDERING
-    render: bool = False
+    render: bool = True
     render_mode: str = "rgb_array"
     render_freq: int = 100
     # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = 1e5  # Set to None to disable
-    log_success_modes_after: int = 1e5  # Set to None to disable
-    render_n_worlds: int = 5  # Number of worlds to render
-    render_freq: int = 10
-    # Start rendering failure modes after this many global timesteps
-    log_failure_modes_after: int = 1e6
-    log_success_modes_after: int = 1e6  # Set to None to disable
+    log_failure_modes_after: int = 5e5  # Set to None to disable
+    log_success_modes_after: int = 5e5  # Set to None to disable
     render_n_worlds: int = 10  # Number of worlds to render
     render_freq: int = 100
     # Start rendering success/failure modes after this many global timesteps
@@ -34,15 +29,11 @@ class ExperimentConfig:
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        100  # how many trajectories we average logs over
-        100  # how many trajectories we average logs over
         500  # how many trajectories we average logs over
-        100  # how many trajectories we average logs over
     )
-    log_freq: int = 100
+    log_freq: int = 500
     project_name = "gpudrive"
-    group_name = "dc/PPO_cluster"
-    group_name = "dc/PPO_cluster"
+    group_name = "dc/PPO_sweep"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
@@ -68,9 +59,7 @@ class ExperimentConfig:
     total_timesteps: int = 3e8
     ent_coef: float = 0.001
     vf_coef: float = 0.5
-    lr: float = 3e-4
-    n_epochs: int = 10
-    n_epochs: int = 5
+    lr: float = 1e-3
     n_epochs: int = 10
 
     # NETWORK

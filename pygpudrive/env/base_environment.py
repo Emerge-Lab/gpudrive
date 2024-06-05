@@ -478,6 +478,7 @@ class Env(gym.Env):
             logging.info(
                 f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents_across_worlds}"
             )
+            logging.info(f"using {self.config.road_obs_algorithm}")
             logging.info("----------------------\n")
 
     @property

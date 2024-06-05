@@ -1,6 +1,6 @@
 import wandb
 import pyrallis
-
+from typing import Callable
 from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
@@ -8,6 +8,25 @@ from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
 
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
 
 def train():
     """Run PPO training with stable-baselines3."""
@@ -61,7 +80,7 @@ def train():
         gae_lambda=exp_config.gae_lambda,
         vf_coef=exp_config.vf_coef,
         clip_range=exp_config.clip_range,
-        learning_rate=exp_config.lr,
+        learning_rate=linear_schedule(exp_config.lr),
         ent_coef=exp_config.ent_coef,
         n_epochs=exp_config.n_epochs,
         env_config=env_config,

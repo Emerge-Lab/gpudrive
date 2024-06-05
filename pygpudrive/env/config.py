@@ -43,7 +43,7 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-    num_worlds: int = 100
+    num_worlds: int = 512
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
@@ -51,12 +51,12 @@ class EnvConfig:
     partner_obs: bool = True  # Partner vehicle info
 
     # Road observation algorithm
-    road_obs_algorithm: str = "k_nearest_roadpoints"
+    road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
 
     # Action space (joint discrete)
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-0.6, 0.6, 7), decimals=3
+        torch.linspace(-1, 1, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-3, 3, 7), decimals=3
@@ -77,6 +77,8 @@ class EnvConfig:
     reward_type: str = (
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
+    collision_penalty: int = -0.1
+    
     # The radius around the goal point within which the agent is considered
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
@@ -93,7 +95,7 @@ class EnvConfig:
     # Then it repeats the first file to pad until num_worlds
     # files are loaded. Will fail if the number of files are more than num_worlds.
     # exact_n - Init exactly num_worlds files.
-    sample_method: str = "first_n"
+    sample_method: str = "pad_n"
 
     # Related to settings
     eval_expert_mode: bool = (
