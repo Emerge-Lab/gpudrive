@@ -263,7 +263,7 @@ class SB3MultiAgentEnv(VecEnv):
                 world_info = info[world_idx][self.controlled_agent_mask[world_idx]]
                 self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
                     [
-                        self.controlled_agent_mask[world_idx],
+                        self.controlled_agent_mask[world_idx].sum(),
                         world_info[:, 3].sum().item()
                         / self.controlled_agent_mask[world_idx].sum().item(),
                         world_info[:, 0].sum().item()

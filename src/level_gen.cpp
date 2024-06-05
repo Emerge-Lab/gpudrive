@@ -80,10 +80,22 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold)
-    {
-        ctx.get<ResponseType>(agent) = ResponseType::Static;
-    }
+    // If the agent is within a certain distance of the goal and its maximum speed never exceeds a threshold
+    // mark it as static
+    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticDistanceThreshold) {
+        bool isStatic = true;
+        for(CountT i = 0; i < agentInit.numPositions; i++)
+        {
+            if(trajectory.velocities[i].length() > consts::staticSpeedThreshold)
+            {
+                isStatic = false;
+                break;
+            }
+        }
+        if(isStatic)
+        {
+            ctx.get<ResponseType>(agent) = ResponseType::Static;
+        }
 
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {

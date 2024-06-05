@@ -12,7 +12,8 @@ inline constexpr madrona::CountT kMaxAgentCount = 128;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
 inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
 
-inline constexpr float staticThreshold = 0.2f;
+inline constexpr float staticThreshold = 1.0f;
+inline constexpr float staticSpeedThreshold = 0.1f;
 
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
