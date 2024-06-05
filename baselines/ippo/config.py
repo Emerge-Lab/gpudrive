@@ -50,7 +50,7 @@ class ExperimentConfig:
     ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 3e-4
-    n_epochs: int = 10
+    n_epochs: int = 5
 
     # NETWORK
     mlp_class = LateFusionNet
