@@ -40,3 +40,5 @@ def generate_valid_files_json(
     print(
         f"Generated valid_files.json with {num_unique_scenes} unique scene(s): \n {file_dict}"
     )
+    
+    

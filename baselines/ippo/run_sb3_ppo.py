@@ -40,7 +40,7 @@ def train(exp_config: ExperimentConfig):
     # MAKE SB3-COMPATIBLE ENVIRONMENT
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=env_config.num_worlds,
+        num_worlds=exp_config.num_worlds,
         max_cont_agents=env_config.num_controlled_vehicles,
         data_dir=exp_config.data_dir,
         device=exp_config.device,
