@@ -11,7 +11,7 @@ TOTAL_NUM_STEPS = 91
 
 def load_policy(policy_path: str, device: str):
     policy = ippo.IPPO.load(policy_path)
-    policy.policy.to("cpu")
+    policy.policy.to(device)
     return policy
 
 def init_Env(env_config: EnvConfig):
