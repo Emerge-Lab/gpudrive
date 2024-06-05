@@ -8,9 +8,9 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "maps_1"
+    data_dir: str = "formatted_json_v2_no_tl_valid"
     generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 1
+    train_on_k_unique_scenes: int = 1 # If generate_valid_json = True, generates a json file with k unique scenarios
 
     device: str = "cuda"
 
@@ -27,9 +27,9 @@ class ExperimentConfig:
     use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        500  # how many trajectories we average logs over
+        100  # how many trajectories we average logs over
     )
-    log_freq: int = 500
+    log_freq: int = 100
     project_name = "gpudrive"
     group_name = "dc/solve_n_scenes"
     entity = "_emerge"
@@ -49,12 +49,7 @@ class ExperimentConfig:
     n_steps: int = 92  # Has to be at least > episode_length = 91
     batch_size: int = 2048
     verbose: int = 0
-    total_timesteps: int = 10e7
-    ent_coef: float = 0.01
-    vf_coef: float = 0.5
-    lr: float = 3e-4
-    total_timesteps: int = 3e8
-    total_timesteps: int = 3e8
+    total_timesteps: int = 1e7
     ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 1e-3
