@@ -8,21 +8,16 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "formatted_json_v2_no_tl_valid"
+    data_dir: str = "maps_1"
     device: str = "cuda"
 
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 100
+    render_freq: int = 250
     # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = 5e5  # Set to None to disable
-    log_success_modes_after: int = 5e5  # Set to None to disable
-    render_n_worlds: int = 10  # Number of worlds to render
-    render_freq: int = 100
-    # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = 1e5  # Set to None to disable
-    log_success_modes_after: int = 1e5  # Set to None to disable
+    log_failure_modes_after: int = 2e5  # Set to None to disable
+    log_success_modes_after: int = 2e5  # Set to None to disable
     render_n_worlds: int = 5  # Number of worlds to render
 
     # LOGGING & WANDB
@@ -33,7 +28,7 @@ class ExperimentConfig:
     )
     log_freq: int = 500
     project_name = "gpudrive"
-    group_name = "dc/PPO_sweep"
+    group_name = "dc/solve_n_scenes"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"

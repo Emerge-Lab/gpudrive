@@ -25,6 +25,7 @@
 
 # Data
 hpc/overlay*
+/maps_*/*
 /formatted_json_v2_no_tl_train
 /formatted_json_v2_no_tl_valid/*
 /waymo_data_new
@@ -33,7 +34,7 @@ hpc/overlay*
 /wandb*
 
 # Logging
-/wandb 
+/wandb
 events.out.tfevents.*
 
 ### C++ ###
