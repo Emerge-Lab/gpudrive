@@ -4,9 +4,11 @@ from typing import Callable
 from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
+from utils.process import generate_valid_files_json
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
+
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
     """
@@ -28,11 +30,11 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 
     return func
 
-def train():
+
+def train(exp_config: ExperimentConfig):
     """Run PPO training with stable-baselines3."""
 
     # CONFIG
-    exp_config = pyrallis.parse(config_class=ExperimentConfig)
     env_config = EnvConfig()
 
     # MAKE SB3-COMPATIBLE ENVIRONMENT
@@ -98,4 +100,14 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+
+    TRAIN_ON_K_UNIQUE_SCENES = 1
+
+    exp_config = pyrallis.parse(config_class=ExperimentConfig)
+
+    generate_valid_files_json(
+        num_unique_scenes=TRAIN_ON_K_UNIQUE_SCENES,
+        data_dir=exp_config.data_dir,
+    )
+
+    train(exp_config)
