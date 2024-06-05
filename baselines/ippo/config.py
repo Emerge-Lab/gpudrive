@@ -35,7 +35,7 @@ class ExperimentConfig:
     )
     log_freq: int = 500
     project_name = "gpudrive"
-    group_name = "dc/world_explore"
+    group_name = "dc/paper_fig"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
