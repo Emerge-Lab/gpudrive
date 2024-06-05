@@ -181,19 +181,20 @@ class MultiAgentCallback(BaseCallback):
                     }
                 )
             
-            if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.9 and self.log_first_to_90:
-                wandb.log({
-                    'charts/time_to_90': perf_counter() - self.start_training,
-                    'charts/steps_to_90': self.num_timesteps,
-                })
-                self.log_first_to_90 = False
-            
-            if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.95 and self.log_first_to_95:
-                wandb.log({
-                    'charts/time_to_95': perf_counter() - self.start_training,
-                    'charts/steps_to_95': self.num_timesteps,
-                })
-                self.log_first_to_95 = False
+            if self.config.track_time_to_solve:
+                if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.9 and self.log_first_to_90:
+                    wandb.log({
+                        'charts/time_to_90': perf_counter() - self.start_training,
+                        'charts/steps_to_90': self.num_timesteps,
+                    })
+                    self.log_first_to_90 = False
+                
+                if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.95 and self.log_first_to_95:
+                    wandb.log({
+                        'charts/time_to_95': perf_counter() - self.start_training,
+                        'charts/steps_to_95': self.num_timesteps,
+                    })
+                    self.log_first_to_95 = False
                 
             
             # LOG FAILURE MODES AND DISTRIBUTIONS
