@@ -34,7 +34,7 @@ def evaluate():
     for step in tqdm(range(TOTAL_NUM_STEPS)):
         actions, _ = policy.predict(obs.cpu().numpy(), deterministic=True)
         actions = torch.as_tensor(actions).float().to(args.device)
-        env.step(actions)
+        obs, _ =env.step(actions)
         for i in range(args.numWorlds):
             world_frames[i].append(env._env.render(i))
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     policy = load_policy(args.policyPath, args.device)
 
-    env_config = EnvConfig(sample_method="first_n")
+    env_config = EnvConfig(sample_method="random_n")
     render_config = RenderConfig(
         render_mode=RenderMode.PYGAME_ABSOLUTE,
         view_option=PygameOption.RGB,
