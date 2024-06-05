@@ -8,10 +8,12 @@ import os
 from tqdm import tqdm
 
 TOTAL_NUM_STEPS = 91
+torch.set_float32_matmul_precision('high')
 
 def load_policy(policy_path: str, device: str):
     policy = ippo.IPPO.load(policy_path)
     policy.policy.to(device)
+    # torch.compile(policy.policy)
     return policy
 
 def init_Env(env_config: EnvConfig):
@@ -24,27 +26,28 @@ def init_Env(env_config: EnvConfig):
     )
     return env
 
-def evaluate():
-
+@torch.compile()
+def evaluate(warmup: bool = False):
     obs = env.reset()
     # env._env.sim.step() # Throwaway step 
     world_frames = {}
     for i in range(args.numWorlds):
         world_frames[i] = list()
     for step in tqdm(range(TOTAL_NUM_STEPS)):
-        actions, _ = policy.predict(obs.cpu().numpy(), deterministic=True)
-        actions = torch.as_tensor(actions).float().to(args.device)
-        obs, _ =env.step(actions)
+        actions, _, _ = policy.policy(obs)
+        obs, _, _, _ = env.step(actions.float())
+        if(args.disableRender and warmup):
+            continue
         for i in range(args.numWorlds):
             world_frames[i].append(env._env.render(i))
 
+    if(args.disableRender and warmup):
+        return
     os.makedirs(args.renderPath, exist_ok=True)
 
     for i in range(args.numWorlds):
         render_path = os.path.join(args.renderPath, f"world_{i}.gif")
         imageio.mimsave(render_path, world_frames[i])
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -68,4 +71,5 @@ if __name__ == "__main__":
     env_config.render_config = render_config
     env = init_Env(env_config)
 
-    evaluate()
+    evaluate(warmup=True) # Warmup
+    evaluate() 
