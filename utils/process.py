@@ -2,6 +2,9 @@ import os
 import yaml
 import json
 import numpy as np
+from numpy.random import default_rng
+
+
 
 
 def generate_valid_files_json(
@@ -20,7 +23,8 @@ def generate_valid_files_json(
             file_dict[filename] = []
 
     # Sample n random files
-    rand_int = np.random.randint(1, len(file_dict), size=num_unique_scenes)
+    rng = default_rng()
+    rand_int = rng.choice(a=len(file_dict), size=num_unique_scenes, replace=False)
 
     # create a new dictionary with only the items from the random indices
     file_dict = {
@@ -40,5 +44,7 @@ def generate_valid_files_json(
     print(
         f"Generated valid_files.json with {num_unique_scenes} unique scene(s): \n {file_dict}"
     )
+    
+    return len(file_dict)
     
     
