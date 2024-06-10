@@ -327,10 +327,6 @@ class Env(gym.Env):
             dim=-1,
         )
 
-        # print(f"ego_states: {ego_states.max()}")
-        # print(f"partner_observations: {partner_observations.max()}")
-        # print(f"road_map_observations: {road_map_observations.max()}")
-
         return obs_filtered
 
     def render(self, world_render_idx=0):
@@ -373,9 +369,9 @@ class Env(gym.Env):
             self.config.max_rel_goal_coord,
         )
 
-        # Uncommment this to exclude the collision state 
+        # Uncommment this to exclude the collision state
         # (1 if vehicle is in collision, 1 otherwise)
-        #state = state[:, :, :5]
+        # state = state[:, :, :5]
 
         return state
 

@@ -263,27 +263,30 @@ class SB3MultiAgentEnv(VecEnv):
         )
 
         # Store per world info
-        # for (
-        #     world_idx
-        # ) in indices:  # max agents, goal achieved, off road, veh collisions
-        #     if world_idx not in self.aggregate_world_dict:
+        for (
+            world_idx
+        ) in indices:  # max agents, goal achieved, off road, veh collisions
+            if world_idx not in self.aggregate_world_dict:
 
-        #         cont_agents_in_world = self.controlled_agent_mask[world_idx, :]
-        #         controlled_agent_info_in_world = info[
-        #             world_idx, cont_agents_in_world, :
-        #         ]
+                cont_agents_in_world = self.controlled_agent_mask[world_idx, :]
+                controlled_agent_info_in_world = info[
+                    world_idx, cont_agents_in_world, :
+                ]
 
-        #         self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
-        #             [
-        #                 self.controlled_agent_mask[world_idx].sum().item(),
-        #                 controlled_agent_info_in_world[:, 3].sum().item()
-        #                 / cont_agents_in_world.sum().item() + 1e-8,
-        #                 controlled_agent_info[:, 0].sum().item()
-        #                 / cont_agents_in_world.sum().item() + 1e-8,
-        #                 controlled_agent_info[:, 1].sum().item()
-        #                 / cont_agents_in_world.sum().item() + 1e-8,
-        #             ]
-        #         )
+                self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
+                    [
+                        self.controlled_agent_mask[world_idx].sum().item(),
+                        controlled_agent_info_in_world[:, 3].sum().item()
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
+                        controlled_agent_info[:, 0].sum().item()
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
+                        controlled_agent_info[:, 1].sum().item()
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
+                    ]
+                )
 
         if len(self.aggregate_world_dict) == self.num_worlds:
             # Log stats
