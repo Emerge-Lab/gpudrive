@@ -89,6 +89,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<AgentInterface, Info>(
         (uint32_t)ExportID::Info);
+    registry.exportColumn<Agent, ResponseType>(
+        (uint32_t)ExportID::ResponseType);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -148,6 +150,8 @@ inline void collectObservationsSystem(Engine &ctx,
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
 
+    if(ctx.data().params.disableClassicalObs)
+        return;
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
@@ -190,7 +194,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     utils::ReferenceFrame referenceFrame(model.position, rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
@@ -243,6 +247,13 @@ inline void movementSystem(Engine &e,
         }
     }
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
+
+    if(responseType == ResponseType::Static)
+    {
+        // Do nothing. The agent is static.
+        // Agent can only be static if initAgentsAsStatic is set to true.
+        return;
+    }
 
     if(e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static)
     {

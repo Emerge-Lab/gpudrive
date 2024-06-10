@@ -446,7 +446,7 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
                FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
            (algo ==
                 FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
-            roadObservationsCount == consts::kMaxRoadEntityCount);
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
 Manager::Impl * Manager::Impl::init(
@@ -790,6 +790,11 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
+                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::responseTypeTensor() const {
+    return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 

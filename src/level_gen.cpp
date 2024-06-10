@@ -43,6 +43,12 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Info>(agent_iface) = Info{};
     ctx.get<Info>(agent_iface).type = (int32_t)ctx.get<EntityType>(agent);
 
+    if(ctx.get<ResponseType>(agent) == ResponseType::Static)
+    {
+        // Make sure the agent does not move.
+        ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
+    }
+
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
@@ -55,6 +61,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // be set once
     ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
     ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
@@ -76,7 +83,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         trajectory.valids[i] = agentInit.valid[i];
     }
 
-    if((ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < 0.5f)
+    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
