@@ -143,8 +143,6 @@ class EnvConfig:
             road_line_segment_len,
             road_point_scale_x,
             road_point_scale_y,
-            road_point_scale_x,
-            road_point_scale_y,
             road_line_segment_orientation,
             road_line_segment_type: (
                 0: _None,
