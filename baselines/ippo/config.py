@@ -8,12 +8,12 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "formatted_json_v2_no_tl_valid"
+    data_dir: str = "formatted_json_v2_no_tl_train"
     generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 100 # If generate_valid_json = True, generates a json file with k unique scenarios
+    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
 
     # BATCH SIZE / NUM WORLDS
-    num_worlds: int = 512
+    num_worlds: int = 256
 
     device: str = "cuda"
 
@@ -23,8 +23,8 @@ class ExperimentConfig:
     render_freq: int = 250
     track_time_to_solve: bool = False
     # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = 2e5  # Set to None to disable
-    log_success_modes_after: int = 2e5  # Set to None to disable
+    log_failure_modes_after: int = None  # Set to None to disable
+    log_success_modes_after: int = None  # Set to None to disable
     render_n_worlds: int = 5  # Number of worlds to render
 
     # LOGGING & WANDB
