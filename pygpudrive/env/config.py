@@ -60,12 +60,6 @@ class EnvConfig:
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-3, 3, 7), decimals=3
     )
-    steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-0.6, 0.6, 7), decimals=3
-    )
-    accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-3, 3, 7), decimals=3
-    )
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
@@ -76,12 +70,10 @@ class EnvConfig:
     reward_type: str = (
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
-    collision_penalty: int = 0 
+    collision_penalty: int = 0
 
     # The radius around the goal point within which the agent is considered
-    # The radius around the goal point within which the agent is considered
     # to have reached the goal
-    dist_to_goal_threshold: float = 5.0
     dist_to_goal_threshold: float = 4.0
 
     """Constants to normalize observations."""
@@ -116,37 +108,6 @@ class EnvConfig:
     max_rm_coord: int = 1000
     max_road_line_segmment_len: int = 100
     max_road_scale: int = 100
-
-    # Datasete settings
-    # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
-    # random_n - Takes num_worlds files randomly. Fails if num files < num_worlds.
-    # pad_n - Initializes as many files as possible first.
-    # Then it repeats the first file to pad until num_worlds
-    # files are loaded. Will fail if the number of files are more than num_worlds.
-    # exact_n - Init exactly num_worlds files.
-    sample_method: str = "first_n"
-
-    # Related to settings
-    eval_expert_mode: bool = (
-        False  # Set this to true if you want to return all agent info
-    )
-
-    # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
-    # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    max_speed: int = 100
-    max_veh_len: int = 30
-    max_veh_width: int = 10
-    min_rel_goal_coord: int = -1000
-    max_rel_goal_coord: int = 1000
-    min_rel_agent_pos: int = -1000
-    max_rel_agent_pos: int = 1000
-    max_orientation_rad: float = 2 * np.pi
-    min_rm_coord: int = -1000
-    max_rm_coord: int = 1000
-    max_road_line_segmment_len: int = 100
-    max_road_scale: int = 50
-
 
     # DON'T CHANGE: Used for network
     EGO_STATE_DIM = 6 if ego_state else 0
