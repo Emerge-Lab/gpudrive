@@ -103,7 +103,6 @@ namespace gpudrive
             .def("action_tensor", &Manager::actionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
-            .def("bicycle_model_tensor", &Manager::bicycleModelTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)
             .def("map_observation_tensor", &Manager::mapObservationTensor)
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
