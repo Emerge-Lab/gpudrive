@@ -200,7 +200,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
-    utils::ReferenceFrame referenceFrame(model.position, rot);
+    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];

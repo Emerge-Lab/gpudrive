@@ -14,6 +14,8 @@ inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 4500;
 
 inline constexpr bool useEstimatedYaw = true;
 
+inline constexpr float staticThreshold = 0.2f;
+
 // Various world / entity size parameters
 inline constexpr float worldLength = 40.f;
 
