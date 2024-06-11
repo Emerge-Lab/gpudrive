@@ -53,7 +53,9 @@ namespace gpudrive
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
-            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel);
+            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
+            .def_rw("enableLidar", &Parameters::enableLidar)
+            .def_rw("disableClassicalObs", &Parameters::disableClassicalObs);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
@@ -78,12 +80,11 @@ namespace gpudrive
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, bool auto_reset, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
+                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
                       .numWorlds = (uint32_t)num_worlds,
-                      .autoReset = auto_reset,
                       .jsonPath = jsonPath,
                       .params = params,
                       .enableBatchRenderer = enable_batch_renderer,
@@ -92,7 +93,6 @@ namespace gpudrive
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
                 nb::arg("num_worlds"),
-                nb::arg("auto_reset"),
                 nb::arg("json_path"),
                 nb::arg("params"),
                 nb::arg("enable_batch_renderer") = false,
@@ -119,6 +119,7 @@ namespace gpudrive
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor)
+            .def("response_type_tensor", &Manager::responseTypeTensor)
             .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
     }
 

@@ -420,9 +420,10 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
     {
         assert(cfg.numWorlds >= mapFiles.size());
+        auto numFiles = mapFiles.size();
         for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
         {
-            mapFiles.push_back(mapFiles[0]);
+            mapFiles.push_back(mapFiles[i % numFiles]);
         }
     }
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
@@ -445,14 +446,14 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
                FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
            (algo ==
                 FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
-            roadObservationsCount == consts::kMaxRoadEntityCount);
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg;
-    sim_cfg.autoReset = mgr_cfg.autoReset;
+    sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
     std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
 
@@ -789,6 +790,11 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
+                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::responseTypeTensor() const {
+    return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 

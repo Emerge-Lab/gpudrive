@@ -112,6 +112,9 @@ namespace gpudrive
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
+        bool initAgentsAsStatic = false; // Default: false
+        bool enableLidar = false;
+        bool disableClassicalObs = false;
         bool useWayMaxModel = false; // Default: false
     };
 

@@ -31,6 +31,7 @@ enum class ExportID : uint32_t {
     AbsoluteSelfObservation,
     ValidState,
     Info,
+    ResponseType,
     Trajectory,
     NumExports
 };
@@ -60,8 +61,8 @@ enum class TaskGraphID : uint32_t {
 // in this class in order to ensure efficient access patterns.
 struct Sim : public madrona::WorldBase {
     struct Config {
-        bool autoReset;
         const madrona::render::RenderECSBridge *renderBridge;
+        bool enableLidar = false;
     };
 
     // Sim::registerTypes is called during initialization
@@ -132,10 +133,6 @@ struct Sim : public madrona::WorldBase {
 
     // Episode ID number
     int32_t curEpisodeIdx;
-
-    // Should the environment automatically reset (generate a new episode)
-    // at the end of each episode?
-    bool autoReset;
 
     // Are we visualizing the simulation in the viewer?
     bool enableRender;

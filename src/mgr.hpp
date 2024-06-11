@@ -30,7 +30,6 @@ public:
         madrona::ExecMode execMode; // CPU or CUDA
         int gpuID; // Which GPU for CUDA backend?
         uint32_t numWorlds; // Simulation batch size
-        bool autoReset; // Immediately generate new world on episode end
         std::string jsonPath; // Directory path to jsons. Should contain exactly numWorlds files.
         Parameters params;
 
@@ -65,6 +64,7 @@ public:
     MGR_EXPORT madrona::py::Tensor absoluteSelfObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor validStateTensor() const;
     MGR_EXPORT madrona::py::Tensor infoTensor() const;
+    MGR_EXPORT madrona::py::Tensor responseTypeTensor() const;
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;

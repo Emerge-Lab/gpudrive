@@ -1,4 +1,6 @@
 import logging
+import time
+import wandb
 import torch
 from torch.nn import functional as F
 import numpy as np
@@ -10,7 +12,8 @@ from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 
 # Import masked rollout buffer class
-from algorithms.ppo.sb3.rollout_buffer import MaskedRolloutBuffer
+from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
+from networks.perm_eq_late_fusion import LateFusionNet
 
 # From stable baselines
 def explained_variance(
@@ -40,8 +43,16 @@ class IPPO(PPO):
     def __init__(
         self,
         *args,
+        env_config=None,
+        exp_config=None,
+        mlp_class: nn.Module = LateFusionNet,
+        mlp_config=None,
         **kwargs,
     ):
+        self.env_config = env_config
+        self.exp_config = exp_config
+        self.mlp_class = mlp_class
+        self.mlp_config = mlp_config
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -66,6 +77,8 @@ class IPPO(PPO):
             self.policy.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
+
+        time_rollout = time.perf_counter()
 
         while n_steps < n_rollout_steps:
             if (
@@ -102,8 +115,11 @@ class IPPO(PPO):
 
                 # Get indices of alive agent ids
                 # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
+                # TODO(ev) I don't like that we're accessing agent attributes here like this
                 alive_agent_mask = ~(
-                    env.dead_agent_mask.reshape(env.num_envs, 1)
+                    env.dead_agent_mask[env.controlled_agent_mask].reshape(
+                        env.num_envs, 1
+                    )
                 )  # .expand_as(obs_tensor)
 
                 # Use boolean indexing to select elements in obs_tensor
@@ -112,9 +128,14 @@ class IPPO(PPO):
                 ].reshape(-1, obs_tensor.shape[-1])
 
                 # Predict actions, vals and log_probs given obs
+                time_actions = time.perf_counter()
                 actions_tmp, values_tmp, log_prob_tmp = self.policy(
                     obs_tensor_alive
                 )
+                nn_fps = actions_tmp.shape[0] / (
+                    time.perf_counter() - time_actions
+                )
+                self.logger.record("rollout/nn_fps", nn_fps)
 
                 # Store
                 (
@@ -149,9 +170,8 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of samples in rollout step
-            self.num_timesteps += int(env.num_envs)
-
+            # EDIT_2: Increment the global step by the number of valid samples in rollout step
+            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
             # Give access to local variables
             callback.update_locals(locals())
             if callback.on_step() is False:
@@ -173,6 +193,11 @@ class IPPO(PPO):
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
 
+        total_steps = self.n_envs * n_rollout_steps
+        elapsed_time = time.perf_counter() - time_rollout
+        fps = total_steps / elapsed_time
+        self.logger.record("rollout/fps", fps)
+
         with torch.no_grad():
             # Compute value for the last timestep
             values = self.policy.predict_values(new_obs)  # type: ignore[arg-type]
@@ -183,9 +208,6 @@ class IPPO(PPO):
 
         callback.update_locals(locals())
         callback.on_rollout_end()
-
-        # Reset logger info (num_episodes and infos)
-        env._reset_rollout_loggers()
 
         return True
 
@@ -207,12 +229,17 @@ class IPPO(PPO):
         )
 
         self.policy = self.policy_class(
-            self.observation_space,
-            self.action_space,
-            self.lr_schedule,
+            observation_space=self.observation_space,
+            env_config=self.env_config,
+            exp_config=self.exp_config,
+            action_space=self.action_space,
+            lr_schedule=self.lr_schedule,
             use_sde=self.use_sde,
+            mlp_class=self.mlp_class,
+            mlp_config=self.mlp_config,
             **self.policy_kwargs,
         )
+
         self.policy = self.policy.to(self.device)
 
         # Initialize schedules for policy/value clipping
@@ -359,14 +386,17 @@ class IPPO(PPO):
         )
 
         # Logs
+        self.logger.record("train/explained_var", explained_var.item())
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/mean_advantages", advantages.mean().item())
+        self.logger.record(
+            "train/mean_abs_advantages", advantages.abs().mean().item()
+        )
+        self.logger.record("train/advantages_dist", advantages)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
-        # self.logger.record("train/explained_variance",explained_var)
         if hasattr(self.policy, "log_std"):
             self.logger.record(
                 "train/std", torch.exp(self.policy.log_std).mean().item()
