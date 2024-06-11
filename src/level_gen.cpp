@@ -282,24 +282,6 @@ static void createFloorPlane(Engine &ctx)
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 }
 
-static inline Entity createPhysicsEntityPadding(Engine &ctx) {
-    auto physicsEntity = ctx.makeRenderableEntity<PhysicsEntity>();
-
-    ctx.get<Position>(physicsEntity) = consts::kPaddingPosition;
-    ctx.get<Rotation>(physicsEntity) = Quat::angleAxis(0, madrona::math::up);
-    ctx.get<Scale>(physicsEntity) = Diag3x3{.d0 = 0, .d1 = 0, .d2 = 0};
-    ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
-    ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
-                                                            .scale = ctx.get<Scale>(physicsEntity),
-                                                            .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
-                                                            .type = float(EntityType::Padding)};
-    ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
-
-    return physicsEntity;
-}
-
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
