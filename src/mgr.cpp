@@ -673,17 +673,6 @@ Tensor Manager::actionTensor() const
         });
 }
 
-Tensor Manager::bicycleModelTensor() const
-{
-    return impl_->exportTensor(ExportID::BicycleModel, TensorElementType::Float32,
-        {
-            impl_->cfg.numWorlds,
-            consts::kMaxAgentCount,
-            BicycleModelExportSize, // Number of states for the bicycle model
-        });
-}
-
-
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,

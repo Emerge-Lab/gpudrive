@@ -43,7 +43,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
-    registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
@@ -80,8 +79,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
         (uint32_t)ExportID::Done);
-    registry.exportColumn<Agent, BicycleModel>(
-        (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
     registry.exportColumn<Agent, AbsoluteSelfObservation>(
@@ -242,7 +239,6 @@ inline void agentZeroVelSystem(Engine &,
 
 inline void movementSystem(Engine &e,
                            Action &action,
-                           BicycleModel &model,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -313,13 +309,13 @@ inline void movementSystem(Engine &e,
     {
         // Follow expert trajectory
         CountT curStepIdx = getCurrentStep(stepsRemaining);
-        model.position= trajectory.positions[curStepIdx];
-        model.heading = trajectory.headings[curStepIdx];
-        model.speed = trajectory.velocities[curStepIdx].length();
         position.x = trajectory.positions[curStepIdx].x;
         position.y = trajectory.positions[curStepIdx].y;
+        position.z = 1;
         velocity.linear.x = trajectory.velocities[curStepIdx].x;
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
     }
 }
@@ -402,7 +398,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 // so far through the challenge. Continuous reward is provided for any new
 // distance achieved.
 inline void rewardSystem(Engine &ctx,
-                         const BicycleModel &model,
+                         const Position &position,
                          const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
@@ -412,13 +408,13 @@ inline void rewardSystem(Engine &ctx,
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = -dist;
         out_reward.v = reward;
     }
     else if(rewardType == RewardType::OnGoalAchieved)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = (dist < ctx.data().params.rewardParams.distanceToGoalThreshold) ? 1.f : 0.f;
         out_reward.v = reward;
     }
@@ -460,7 +456,7 @@ inline void bonusRewardSystem(Engine &ctx,
 // notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
 inline void stepTrackerSystem(Engine &ctx,
-                              const BicycleModel &model,
+                              const Position &position,
                               const Goal &goal,
                               StepsRemaining &steps_remaining,
                               Done &done,
@@ -468,23 +464,25 @@ inline void stepTrackerSystem(Engine &ctx,
 {
     // Absolute done is 90 steps.
     int32_t num_remaining = --steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
+    if (num_remaining == consts::episodeLen - 1 && done.v != 1)
+    { // Make sure to not reset an agent's done flag
         done.v = 0;
-    } else if (num_remaining == 0) {
+    }
+    else if (num_remaining == 0)
+    {
         done.v = 1;
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1 || info.reachedGoal != 1)
+    if (done.v != 1 || info.reachedGoal != 1)
     {
-        float dist = (model.position - goal.position).length();
-        if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+        float dist = (position.xy() - goal.position).length();
+        if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
         {
             done.v = 1;
             info.reachedGoal = 1;
         }
     }
-
 }
 
 void collisionDetectionSystem(Engine &ctx,
@@ -658,7 +656,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             Action,
-            BicycleModel,
             VehicleSize,
             Rotation,
             Position,
@@ -696,7 +693,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
-            BicycleModel,
+            Position,
             Trajectory,
             Goal,
             Progress,
@@ -706,7 +703,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<
-        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, StepsRemaining, Done, Info>>(
+        ParallelForNode<Engine, stepTrackerSystem, Position, Goal, StepsRemaining, Done, Info>>(
         {reward_sys});
 
     // Conditionally reset the world if the episode is over

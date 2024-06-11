@@ -29,8 +29,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
 
-    ctx.get<BicycleModel>(agent) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
