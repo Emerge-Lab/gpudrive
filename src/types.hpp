@@ -211,9 +211,39 @@ struct AbsoluteSelfObservation {
     VehicleSize vehicle_size;
 };
 
-const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
+const size_t AbsoluteSelfObservationExportSize =  12; // 3 + 4 + 1 + 2 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
+struct AgentInterface : public madrona::Archetype<
+    Action,
+
+    // Observations
+    SelfObservation,
+    AbsoluteSelfObservation,
+    PartnerObservations,
+    AgentMapObservations,
+    Lidar,
+    StepsRemaining,
+
+    ControlledState, //Drive Logic
+
+    // Reward, episode termination
+    Reward,
+    Done,
+    Info
+> {};
+
+struct InterfaceEntity
+{
+    madrona::Entity e;
+};
+
+// Needed so that the taskgraph doesnt run on InterfaceEntity from roads
+struct RoadInterfaceEntity
+{
+    madrona::Entity e;
+};
 
 /* ECS Archetypes for the game */
 
@@ -242,30 +272,13 @@ struct Agent : public madrona::Archetype<
     Progress,
     OtherAgents,
     EntityType,
-
-    // gpudrive
+    
     BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,
-    ControlledState,
-
-    // Input
-    Action,
-
-    // Observations
-    SelfObservation,
-    AbsoluteSelfObservation,
-    PartnerObservations,
-    AgentMapObservations,
-    Lidar,
-    StepsRemaining,
-    
-    // Reward, episode termination
-    Reward,
-    Done,
-    Info,
-
+    // Interface 
+    InterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
     madrona::render::RenderCamera,
@@ -274,6 +287,10 @@ struct Agent : public madrona::Archetype<
     madrona::render::Renderable
 
 > {};
+
+struct RoadInterface : public madrona::Archetype<
+    MapObservation>
+{};
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
@@ -285,7 +302,7 @@ struct PhysicsEntity : public madrona::Archetype<
     ResponseType,
     madrona::phys::broadphase::LeafID,
     Velocity,
-    MapObservation,
+    RoadInterfaceEntity,
     EntityType,
     madrona::render::Renderable
 > {};
