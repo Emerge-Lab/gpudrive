@@ -6,6 +6,12 @@ This is an Batch RL environment simulator of Nocturne built on the [Madrona Engi
 ![Simulation Demo](data/absolute.gif)
 
 
+<p align="center">
+  <img src="data/egocentric.gif" alt="Egocentric" width="200"/>
+  <img src="data/lidar360.gif" alt="Lidar with 360 FOV" width="200"/>
+  <img src="data/lidarEgocentric.gif" alt="Lidar with Ego" width="200"/>
+</p>
+
 Build Instructions
 --------
 First, make sure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (briefly, recent python and cmake, as well as Xcode or Visual Studio on MacOS or Windows respectively).
