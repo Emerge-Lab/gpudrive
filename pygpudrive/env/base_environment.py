@@ -256,8 +256,8 @@ class Env(gym.Env):
         """Define how we sample new scenarios."""
         if self.config.sample_method == "first_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.sample_method == "random":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
+        elif self.config.sample_method == "random_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.RandomN
         elif self.config.sample_method == "pad_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
         elif self.config.sample_method == "exact_n":
@@ -327,10 +327,6 @@ class Env(gym.Env):
             dim=-1,
         )
 
-        # print(f"ego_states: {ego_states.max()}")
-        # print(f"partner_observations: {partner_observations.max()}")
-        # print(f"road_map_observations: {road_map_observations.max()}")
-
         return obs_filtered
 
     def render(self, world_render_idx=0):
@@ -373,9 +369,9 @@ class Env(gym.Env):
             self.config.max_rel_goal_coord,
         )
 
-        # Uncommment this to exclude the collision state 
+        # Uncommment this to exclude the collision state
         # (1 if vehicle is in collision, 1 otherwise)
-        #state = state[:, :, :5]
+        # state = state[:, :, :5]
 
         return state
 
@@ -478,6 +474,7 @@ class Env(gym.Env):
             logging.info(
                 f"Total number of controlled agents across scenes: {self.num_valid_controlled_agents_across_worlds}"
             )
+            logging.info(f"using {self.config.road_obs_algorithm}")
             logging.info("----------------------\n")
 
     @property

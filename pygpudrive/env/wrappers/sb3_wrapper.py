@@ -44,6 +44,7 @@ class SB3MultiAgentEnv(VecEnv):
             data_dir=data_dir,
             device=device,
         )
+        self.config = config
         self.num_worlds = num_worlds
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
@@ -143,6 +144,12 @@ class SB3MultiAgentEnv(VecEnv):
         reward = self._env.get_rewards()
         done = self._env.get_dones()
         info = self._env.get_infos()
+
+        # Add collision penalty to rewards
+        reward += -abs(self.config.collision_penalty) * (
+            info[..., 1] + info[..., 2]
+        )
+
         # Get the dones for resets
         # done = self._env.get_dones()
         # Reset any of the worlds that are done
@@ -260,15 +267,24 @@ class SB3MultiAgentEnv(VecEnv):
             world_idx
         ) in indices:  # max agents, goal achieved, off road, veh collisions
             if world_idx not in self.aggregate_world_dict:
+
+                cont_agents_in_world = self.controlled_agent_mask[world_idx, :]
+                controlled_agent_info_in_world = info[
+                    world_idx, cont_agents_in_world, :
+                ]
+
                 self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
                     [
-                        self.controlled_agent_mask[indices].sum(),
-                        controlled_agent_info[:, 3].sum().item()
-                        / self.controlled_agent_mask[indices].sum().item(),
+                        self.controlled_agent_mask[world_idx].sum().item(),
+                        controlled_agent_info_in_world[:, 3].sum().item()
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
                         controlled_agent_info[:, 0].sum().item()
-                        / self.controlled_agent_mask[indices].sum().item(),
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
                         controlled_agent_info[:, 1].sum().item()
-                        / self.controlled_agent_mask[indices].sum().item(),
+                        / cont_agents_in_world.sum().item()
+                        + 1e-8,
                     ]
                 )
 
