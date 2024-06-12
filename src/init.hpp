@@ -115,6 +115,7 @@ namespace gpudrive
         bool initAgentsAsStatic = false; // Default: false
         bool enableLidar = false;
         bool disableClassicalObs = false;
+        bool useWayMaxModel = false; // Default: false
     };
 
     struct WorldInit
