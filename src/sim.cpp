@@ -276,7 +276,7 @@ inline void movementSystem(Engine &e,
     if(responseType == ResponseType::Static)
     {
         // Do nothing. The agent is static.
-        // Agent can only be static if initAgentsAsStatic is set to true.
+        // Agent can only be static if isStaticAgentControlled is set to true.
         return;
     }
 
