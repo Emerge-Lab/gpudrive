@@ -256,8 +256,8 @@ class Env(gym.Env):
         """Define how we sample new scenarios."""
         if self.config.sample_method == "first_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.sample_method == "random":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.Random
+        elif self.config.sample_method == "random_n":
+            params.datasetInitOptions = gpudrive.DatasetInitOptions.RandomN
         elif self.config.sample_method == "pad_n":
             params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
         elif self.config.sample_method == "exact_n":
