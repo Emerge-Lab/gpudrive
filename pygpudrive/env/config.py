@@ -55,7 +55,7 @@ class EnvConfig:
 
     # Action space (joint discrete)
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-1, 1, 13), decimals=3
+        torch.linspace(-1.0, 1.0, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-3, 3, 7), decimals=3
