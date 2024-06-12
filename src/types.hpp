@@ -36,16 +36,6 @@ enum class EntityType : uint32_t {
     NumTypes,
 };
 
-struct BicycleModel {
-    madrona::math::Vector2 position;
-    float heading;
-    float speed;
-};
-
-const size_t BicycleModelExportSize = 4;
-
-static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
-
 struct VehicleSize {
   float length;
   float width;
@@ -244,7 +234,6 @@ struct Agent : public madrona::Archetype<
     EntityType,
 
     // gpudrive
-    BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,
