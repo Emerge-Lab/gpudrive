@@ -47,7 +47,8 @@ pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_B
 Create a conda environment using `environment.yml` and then run `poetry install`
 
 ```bash
-conda env create -f environment.yml`
+conda env create -f environment.yml
+conda activate gpudrive
 poetry install
 ```
 
