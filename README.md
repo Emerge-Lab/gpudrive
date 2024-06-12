@@ -84,6 +84,8 @@ cd build
 ./headless CPU 1 1 # Run on CPU , 1 world, 1 step
 ```
 
+To interface with the sim, checkout the [tutorial notebook](https://github.com/Emerge-Lab/gpudrive/blob/main/examples/tutorials/sim_demo.ipynb).
+
 
 The Environment and Learning Task
 --------------
@@ -157,7 +159,7 @@ For easy troubleshooting and learning various policies, the behaviour of the age
 * `ObservationRadius` : Defines the radius of the circle within which an agent can observe its surrounding. The outputs in observation are set to invalid type for the objects not in the `ObservationRadius` and its observations are zeroed out.
 * `MaxNumControlledVehicles` : Controls how many maximum agents can be controlled in the sim. Specifically, we try to initialize as many controlled agents as possible. However, a particular file may have lesser valid agents, in which case certain worlds may not have as many controlled agents. We pick the first `MaxNumControlledVehicles` **valid** agents to control, and the rest are controlled via their expert trajectories.
 * `IgnoreNonVehicles` : Defines the policy of not initializing pedestrians/cyclists. Default: `false`.
-* `roadObservationAlgorithm`:
+* `roadObservationAlgorithm`: Select from `KNearestEntitiesWithRadiusFiltering` and `AllEntitiesWithRadiusFiltering`. The `KNearestEntitiesWithRadiusFiltering` filters out `kMaxAgentMapObservationsCount` nearest points in the `observationRadius` of the agents, while `AllEntitiesWithRadiusFiltering` runs a linear search in the same radius. Default: `KNearestEntitiesWithRadiusFiltering`
 * `initOnlyValidAgentsAtFirstStep`: Controls if only the agents that are valid at the first step are intialized into the sim. Default: `true`.
 * `initAgentsAsStatic`: Controls if agents like parked vehicles who are already at their goals should be allowed to be controlled or set as static. Default: `false`.
 * `enableLidar`: Enables lidar observations.
@@ -181,14 +183,6 @@ For easy troubleshooting and learning various policies, the behaviour of the age
 
 * `None` type - This is a special type that is used to mark entities as invalid and should not be considered for learning. It can arise if an entity is outside `ObservationRadius` or if the entity collided and the collision behaviour is set to `AgentRemoved`. 
 
-
-## Testing
-To run tests, simply run the following 
-
-```bash
-cd build
-ctest
-```
 
 Citation
 --------
