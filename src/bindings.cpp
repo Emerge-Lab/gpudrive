@@ -54,7 +54,8 @@ namespace gpudrive
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
             .def_rw("enableLidar", &Parameters::enableLidar)
-            .def_rw("disableClassicalObs", &Parameters::disableClassicalObs);
+            .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
+            .def_rw("initAgentsAsStatic", &Parameters::initAgentsAsStatic);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
