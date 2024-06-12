@@ -53,6 +53,7 @@ namespace gpudrive
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("initAgentsAsStatic", &Parameters::initAgentsAsStatic);
@@ -118,7 +119,8 @@ namespace gpudrive
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor)
-            .def("response_type_tensor", &Manager::responseTypeTensor);
+            .def("response_type_tensor", &Manager::responseTypeTensor)
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
     }
 
 }
