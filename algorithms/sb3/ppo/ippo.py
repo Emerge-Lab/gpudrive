@@ -391,7 +391,6 @@ class IPPO(PPO):
         self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
-        self.logger.record("train/advantages_dist", advantages)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
