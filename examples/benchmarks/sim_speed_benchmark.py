@@ -185,11 +185,10 @@ def run_simulation(
 
 if __name__ == "__main__":
 
-    DATA_FOLDER = "formatted_json_v2_no_tl_valid"
-    BATCH_SIZE_LIST = [1024]
-    ACTOR_TYPE = "random" # "expert_actor"
+    DATA_FOLDER = "/home/emerge/gpudrive/maps_16"
+    BATCH_SIZE_LIST = [1, 2, 4, 8, 16]
+    ACTOR_TYPE = "expert_actor"  # "random" #"expert_actor"
     DEVICE = "cuda"
-    DATASET_INIT = "first_n"
 
     # Get device info
     device_name = GPUtil.getGPUs()[0].name
@@ -257,7 +256,7 @@ if __name__ == "__main__":
 
     df_metadata = pd.DataFrame(
         data={
-            "sim_type": "GPUDrive",
+            "sim_type": "Waymax",
             "device_name": device_name,
             "num_envs (BS)": BATCH_SIZE_LIST,
             "num_valid_objects_per_scene (dist)": valid_obj_dist_lst,
