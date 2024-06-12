@@ -36,12 +36,12 @@ def evaluate(warmup: bool = False):
     for step in tqdm(range(TOTAL_NUM_STEPS)):
         actions, _, _ = policy.policy(obs)
         obs, _, _, _ = env.step(actions.float())
-        if(args.disableRender and warmup):
+        if(args.disableRender or warmup):
             continue
         for i in range(args.numWorlds):
             world_frames[i].append(env._env.render(i))
 
-    if(args.disableRender and warmup):
+    if(args.disableRender or warmup):
         return
     os.makedirs(args.renderPath, exist_ok=True)
 
