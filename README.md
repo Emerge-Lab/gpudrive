@@ -71,10 +71,10 @@ To control which files get initialized, the input parameter `datasetInitOptions`
 * `ExactN` - Takes exactly `num_worlds` files from the `valid_files.json`. Ensure that the `valid_files.json` contains exactly `num_worlds` files.
 
 ## Run the sim
-To test that the simulator compiled and installed correctly, change the location of the dataset in `test.py` and run it.
+To test that the simulator compiled and installed correctly, run pytests in the root directory
 
 ```bash
-python scripts/test.py
+pytest
 ```
 
 Alternatively, to test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory. Remember to change the location of the data in `src/headless.cpp` and compiling again before running it.
@@ -111,8 +111,9 @@ The `SelfObservation` tensor of shape `(5,)` for each agent provides information
 The `MapObservation` tensor of shape `(4,)` for each agent provides the *absolute* position of map objects. The values are 
 
 - `MapObservation[0:2]`: Represents the position of the `MapObject`
-- `MapObservation[2]`: Represents the heading angle of the `MapObject`
-- `MapObservation[3]`: Represents the type of the Map Object.
+- `MapObservation[2:5]`: Represents the scale of the `MapObject` in terms of length, width and height
+- `MapObservation[5]`: Represents the heading angle of the `MapObject`
+- `MapObservation[6]`: Represents the type of the Map Object.
 
 **PartnerObservation**
 
@@ -126,11 +127,7 @@ The `PartnerObservation` tensor of shape `(num_agents-1,7)` for each agent provi
 
 **AgentMapObservations**
 
-The `AgentMapObservations` tensor of shape (num_road_objs, 4) for each agent provides information about the road objects in the range `params.observationRadius`. All the values in this tensor are *relative to the ego agent*. The respective values for each `AgentMapObservations` are
-
-- `AgentMapObservations[0:2]`: The position coordinates for the road object.
-- `AgentMapObservations[2]`: The relative orientation of the road object.
-- `AgentMapObservations[3]`: The road object type.
+The `AgentMapObservations` tensor of shape (num_road_objs, 7) for each agent provides information about the road objects in the range `params.observationRadius`. All the values in this tensor are *relative to the ego agent*. The respective values for each `AgentMapObservations` are the same as `MapObservations`.
 
 ## Configuring the Sim 
 The `SimManager` constructor takes in a `params` object that can be used to configure various aspects of the Sim. 
@@ -139,14 +136,14 @@ The `SimManager` constructor takes in a `params` object that can be used to conf
 * `RewardType`: There are 3 types of rewards that can be exported from the sim. 
   - `DistanceBased` - Exports the distance of the agent to the goal. 
   - `OnGoalAchieved` - Exports 1 if the agent has reached the goal, else 0.
-  - `Dense` - Exports the distance of the agent from its expert trajectory specified in the dataset.
+  - `Dense`(Not Implemented)- Exports the distance of the agent from its expert trajectory specified in the dataset.
 * `distanceToGoalThreshold`: This threshold is used to determine if the agent has reached the goal or not. `Default: 0.0`
 * `distanceToExpertThreshold`: This threshold is used to determine agent is following the expert trajectory or not. `Default: 0.0`
 
 ### Road reduction algorithm
 To manage the performance and simplify the observation space of the simulator, we apply a polyline reduction algorithm on the road edges, lines and lanes. We use the ['Visvalingam-Whyatt Algorithm'](https://en.wikipedia.org/wiki/Visvalingam%E2%80%93Whyatt_algorithm).
 
-* `polylineReductionThreshold`: This threshold determines how much reduction is to be applied to the road lines. Ranges from `0` to `+ve inf`. If set to `0`, no reduction will be applied. `Default: 1.0`
+* `polylineReductionThreshold`: This threshold determines how much reduction is to be applied to the road lines. Ranges from `0` to `+ve inf`. If set to `0`, no reduction will be applied. `Default: 0.5`
 
 ### Collision Behaviour
 For easy troubleshooting and learning various policies, the behaviour of the agents on collisions can be configured. 
@@ -157,8 +154,14 @@ For easy troubleshooting and learning various policies, the behaviour of the age
 
 ### Misc params 
 
-* `ObservationRadius` : The `ObservationRadius` defines the radius of the circle within which an agent can observe its surrounding. The outputs in observation are set to invalid type for the objects not in the `ObservationRadius` and its observations are zeroed out.
-* `MaxNumControlledVehicles` : This param controls how many maximum agents can be controlled in the sim. Specifically, we try to initialize as many controlled agents as possible. However, a particular file may have lesser valid agents, in which case certain worlds may not have as many controlled agents. We pick the first `MaxNumControlledVehicles` **valid** agents to control, and the rest are controlled via their expert trajectories.
+* `ObservationRadius` : Defines the radius of the circle within which an agent can observe its surrounding. The outputs in observation are set to invalid type for the objects not in the `ObservationRadius` and its observations are zeroed out.
+* `MaxNumControlledVehicles` : Controls how many maximum agents can be controlled in the sim. Specifically, we try to initialize as many controlled agents as possible. However, a particular file may have lesser valid agents, in which case certain worlds may not have as many controlled agents. We pick the first `MaxNumControlledVehicles` **valid** agents to control, and the rest are controlled via their expert trajectories.
+* `IgnoreNonVehicles` : Defines the policy of not initializing pedestrians/cyclists. Default: `false`.
+* `roadObservationAlgorithm`:
+* `initOnlyValidAgentsAtFirstStep`: Controls if only the agents that are valid at the first step are intialized into the sim. Default: `true`.
+* `initAgentsAsStatic`: Controls if agents like parked vehicles who are already at their goals should be allowed to be controlled or set as static. Default: `false`.
+* `enableLidar`: Enables lidar observations.
+* `disableClassicalObs`: Disables setting `PartnerObservations` and `AgentMapObservations`. Generally this would be used to speed up sim if lidar observations are turned on and the above observations are not used. Default: `false`.
 
 ### Types of objects
 
