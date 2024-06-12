@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import wandb
 from stable_baselines3.common.callbacks import BaseCallback
-
+from time import perf_counter
 
 class MultiAgentCallback(BaseCallback):
     """SB3 callback for gpudrive."""
@@ -80,7 +80,9 @@ class MultiAgentCallback(BaseCallback):
         """
         This method is called before the first rollout starts.
         """
-        pass
+        self.start_training = perf_counter()
+        self.log_first_to_95 = True
+        self.log_first_to_90 = True
 
     def _on_training_end(self) -> None:
         """
@@ -134,8 +136,10 @@ class MultiAgentCallback(BaseCallback):
             )
             self.max_obs.append(self.locals["obs_tensor"].max().item())
             self.min_obs.append(self.locals["obs_tensor"].min().item())
+            
 
             if self.step_counter % self.config.log_freq == 0:
+                      
                 wandb.log(
                     {
                         "metrics/mean_ep_reward_per_agent": sum(
@@ -176,7 +180,23 @@ class MultiAgentCallback(BaseCallback):
                         "charts/min_obs": np.array(self.min_obs).min(),
                     }
                 )
-
+            
+            if self.config.track_time_to_solve:
+                if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.9 and self.log_first_to_90:
+                    wandb.log({
+                        'charts/time_to_90': perf_counter() - self.start_training,
+                        'charts/steps_to_90': self.num_timesteps,
+                    })
+                    self.log_first_to_90 = False
+                
+                if sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts) >= 0.95 and self.log_first_to_95:
+                    wandb.log({
+                        'charts/time_to_95': perf_counter() - self.start_training,
+                        'charts/steps_to_95': self.num_timesteps,
+                    })
+                    self.log_first_to_95 = False
+                
+            
             # LOG FAILURE MODES AND DISTRIBUTIONS
             if self.locals["env"].log_agg_world_info:
 
