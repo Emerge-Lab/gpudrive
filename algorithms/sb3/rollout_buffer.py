@@ -1,5 +1,6 @@
 """Module containing regularized PPO algorithm."""
 import logging
+import time
 from typing import Generator, Optional
 import gymnasium as gym
 import numpy as np
@@ -31,7 +32,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         device: Union[torch.device, str] = "auto",
         storage_device: Union[
             torch.device, str
-        ] = "cpu",  # TODO(ev) add storage device to config
+        ] = "cuda",  # TODO(ev) add storage device to config
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
@@ -197,9 +198,9 @@ class MaskedRolloutBuffer(BaseBuffer):
             self.valid_samples_mask = ~torch.isnan(
                 self.swap_and_flatten(self.__dict__["rewards"])
             )
-
             # Flatten data
             # EDIT_5: And mask out invalid samples
+            t_flatten = time.perf_counter()
             for tensor in _tensor_names:
                 if tensor == "observations":
                     self.__dict__[tensor] = self.swap_and_flatten(

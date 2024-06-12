@@ -1,12 +1,13 @@
-import logging
 import time
-import wandb
+from typing import TypeVar
+
 import torch
 from torch.nn import functional as F
 import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.type_aliases import MaybeCallback
 from stable_baselines3.common.utils import get_schedule_fn
 from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
@@ -14,6 +15,8 @@ from torch import nn
 # Import masked rollout buffer class
 from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
 from networks.perm_eq_late_fusion import LateFusionNet
+
+SelfIPPO = TypeVar("SelfIPPO", bound="IPPO")
 
 # From stable baselines
 def explained_variance(
@@ -71,6 +74,9 @@ class IPPO(PPO):
         self.policy.set_training_mode(False)
 
         n_steps = 0
+        observed_samples = 0
+        total_step_time = 0
+        total_add_buffer_time = 0
         rollout_buffer.reset()
         # Sample new weights for the state dependent exploration
         if self.use_sde:
@@ -92,61 +98,16 @@ class IPPO(PPO):
             with torch.no_grad():
                 obs_tensor = self._last_obs
 
-                # TODO: Check
-                # EDIT_1: Mask out invalid observations (NaN axes and/or dead agents)
-                # Create dummy actions, values and log_probs (NaN)
-                actions = torch.full(
-                    fill_value=float("nan"), size=(self.n_envs,)
-                ).to(self.device)
-                log_probs = torch.full(
-                    fill_value=float("nan"),
-                    size=(self.n_envs,),
-                    dtype=torch.float32,
-                ).to(self.device)
-                values = (
-                    torch.full(
-                        fill_value=float("nan"),
-                        size=(self.n_envs,),
-                        dtype=torch.float32,
-                    )
-                    .unsqueeze(dim=1)
-                    .to(self.device)
-                )
-
-                # Get indices of alive agent ids
-                # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
-                # TODO(ev) I don't like that we're accessing agent attributes here like this
-                alive_agent_mask = ~(
-                    env.dead_agent_mask[env.controlled_agent_mask].reshape(
-                        env.num_envs, 1
-                    )
-                )  # .expand_as(obs_tensor)
-
-                # Use boolean indexing to select elements in obs_tensor
-                obs_tensor_alive = obs_tensor[
-                    alive_agent_mask.expand_as(obs_tensor)
-                ].reshape(-1, obs_tensor.shape[-1])
 
                 # Predict actions, vals and log_probs given obs
                 time_actions = time.perf_counter()
-                actions_tmp, values_tmp, log_prob_tmp = self.policy(
-                    obs_tensor_alive
+                actions, values, log_probs = self.policy(
+                    obs_tensor
                 )
-                nn_fps = actions_tmp.shape[0] / (
+                nn_fps = actions.shape[0] / (
                     time.perf_counter() - time_actions
                 )
                 self.logger.record("rollout/nn_fps", nn_fps)
-
-                # Store
-                (
-                    actions[alive_agent_mask.squeeze(dim=1)],
-                    values[alive_agent_mask.squeeze(dim=1)],
-                    log_probs[alive_agent_mask.squeeze(dim=1)],
-                ) = (
-                    actions_tmp.float(),
-                    values_tmp.float(),
-                    log_prob_tmp.float(),
-                )
 
                 # Predict actions, vals and log_probs given obs
                 # actions, values, log_probs = self.policy(obs_tensor)
@@ -167,11 +128,16 @@ class IPPO(PPO):
                     clipped_actions = torch.clamp(
                         actions, self.action_space.low, self.action_space.high
                     )
-
-            new_obs, rewards, dones, infos = env.step(clipped_actions)
+                    
+            t_step = time.perf_counter()
+            new_obs, rewards, dones, _ = env.step(clipped_actions.float())
+            total_step_time += time.perf_counter() - t_step
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
-            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
+            total_steps = int((~rewards.isnan()).float().sum().item())
+            self.logger.record("rollout/step_fps", total_steps/(time.perf_counter() - t_step))
+            self.num_timesteps += total_steps
+            observed_samples += total_steps
             # Give access to local variables
             callback.update_locals(locals())
             if callback.on_step() is False:
@@ -182,6 +148,7 @@ class IPPO(PPO):
                 # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
 
+            t_buffer = time.perf_counter()
             rollout_buffer.add(
                 self._last_obs,  # type: ignore[arg-type]
                 actions,
@@ -190,13 +157,15 @@ class IPPO(PPO):
                 values,
                 log_probs,
             )
+            total_add_buffer_time += time.perf_counter() - t_buffer
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
 
-        total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
-        fps = total_steps / elapsed_time
+        fps = observed_samples / elapsed_time
         self.logger.record("rollout/fps", fps)
+        print("total step time", total_step_time)
+        print("total add buffer time", total_add_buffer_time)
 
         with torch.no_grad():
             # Compute value for the last timestep
@@ -209,7 +178,7 @@ class IPPO(PPO):
         callback.update_locals(locals())
         callback.on_rollout_end()
 
-        return True
+        return observed_samples, True
 
     def _setup_model(self) -> None:
         self._setup_lr_schedule()
@@ -270,13 +239,16 @@ class IPPO(PPO):
         entropy_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
+        observed_data = 0
 
+        train_time = time.time()
         continue_training = True
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
+                observed_data += len(rollout_data[0])
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -391,6 +363,7 @@ class IPPO(PPO):
         self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
+        self.logger.record("train/train_fps", observed_data / (time.time() - train_time))
         self.logger.record("train/advantages_dist", advantages)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
@@ -408,3 +381,52 @@ class IPPO(PPO):
         self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
+
+    def learn(
+        self: SelfIPPO,
+        total_timesteps: int,
+        callback: MaybeCallback = None,
+        log_interval: int = 1,
+        tb_log_name: str = "PPO",
+        reset_num_timesteps: bool = True,
+        progress_bar: bool = False,
+    ) -> SelfIPPO:
+        iteration = 0
+
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps,
+            callback,
+            reset_num_timesteps,
+            tb_log_name,
+            progress_bar,
+        )
+
+        callback.on_training_start(locals(), globals())
+
+        assert self.env is not None
+
+        while self.num_timesteps < total_timesteps:
+            t_start = time.perf_counter()
+            observed_steps, continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+            print("rollout time", time.perf_counter() - t_start)
+            if not continue_training:
+                break
+
+            iteration += 1
+            self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
+
+            # Display training infos
+            if log_interval is not None and iteration % log_interval == 0:
+                assert self.ep_info_buffer is not None
+                self._dump_logs(iteration)
+
+            t_train = time.perf_counter()
+            self.train()
+            print("train time", time.perf_counter() - t_train)
+            print("observed number of steps", observed_steps)
+            print("time taken", time.perf_counter() - t_start)
+            self.logger.record("time/total_fps", observed_steps / (time.perf_counter() - t_start))
+
+        callback.on_training_end()
+
+        return self

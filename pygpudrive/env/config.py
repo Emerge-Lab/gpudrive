@@ -43,7 +43,7 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-    num_worlds: int = 100
+    num_worlds: int = 128
 
     # Observation space
     ego_state: bool = True  # Ego vehicle state
@@ -51,7 +51,7 @@ class EnvConfig:
     partner_obs: bool = True  # Partner vehicle info
 
     # Road observation algorithm
-    road_obs_algorithm: str = "k_nearest_roadpoints"
+    road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
 
     # Action space (joint discrete)
@@ -64,7 +64,7 @@ class EnvConfig:
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
-    # Remove all non vehicles (bicylces, pedestrians) from the scene
+    # Remove all non vehicles (bicycles, pedestrians) from the scene
     remove_non_vehicles: bool = True
 
     # Reward
