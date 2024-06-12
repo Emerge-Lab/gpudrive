@@ -12,13 +12,15 @@
 
 #include <array>
 #include <charconv>
-#include <iostream>
-#include <iterator>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <string>
-#include <cstdlib>
+#include <iostream>
+#include <iterator>
 #include <random>
+#include <string>
+#include <utility>
+#include <vector>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -383,9 +385,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
-
-static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
-{
+static std::vector<std::pair<std::string, std::vector<CountT>>>
+getMapFiles(const Manager::Config &cfg) {
     std::filesystem::path path(cfg.jsonPath);
     auto validFilesJsonPath = path / "valid_files.json";
     assert(std::filesystem::exists(validFilesJsonPath));
@@ -397,10 +398,11 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     nlohmann::json validFiles;
     validFilesJson >> validFiles;
 
-    std::vector<std::string> mapFiles;
+    std::vector<std::pair<std::string, std::vector<CountT>>> mapFiles;
     for (auto& [key, value] : validFiles.items()) {
         std::filesystem::path fullPath = path / key;
-        mapFiles.emplace_back(fullPath.string());
+        mapFiles.emplace_back(fullPath.string(),
+                              value.get<std::vector<CountT>>());
     }
     assert(mapFiles.size() != 0);
 
@@ -455,7 +457,7 @@ Manager::Impl * Manager::Impl::init(
     Sim::Config sim_cfg;
     sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
-    std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
+    auto mapFiles = getMapFiles(mgr_cfg);
 
     assert(isRoadObservationAlgorithmValid(
         mgr_cfg.params.roadObservationAlgorithm));
@@ -484,8 +486,9 @@ Manager::Impl * Manager::Impl::init(
     
         for (auto const &mapFile : mapFiles)
         {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
-                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(
+                mapFile.first, ExecMode::CUDA,
+                mgr_cfg.params.polylineReductionThreshold, mapFile.second);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, paramsDevicePtr};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
@@ -560,13 +563,14 @@ Manager::Impl * Manager::Impl::init(
     
         for (auto const &mapFile : mapFiles)
         {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
-                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+          Map *map_ = (Map *)MapReader::parseAndWriteOut(
+              mapFile.first, ExecMode::CPU,
+              mgr_cfg.params.polylineReductionThreshold, mapFile.second);
+
+          world_inits[worldIdx++] =
+              WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
-
-
 
         Optional<RenderGPUState> render_gpu_state =
             initRenderGPUState(mgr_cfg);
