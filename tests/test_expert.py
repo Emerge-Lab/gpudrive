@@ -18,7 +18,7 @@ def simulation_results():
     params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
     params.maxNumControlledVehicles = 0
     params.IgnoreNonVehicles = True
-    params.isStaticAgentControlled = True
+    params.isStaticAgentControlled = False
 
     # Now use the 'params' instance when creating SimManager
     sim = gpudrive.SimManager(
