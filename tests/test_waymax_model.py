@@ -23,7 +23,6 @@ def sim_init():
         exec_mode=gpudrive.madrona.ExecMode.CPU,
         gpu_id=0,
         num_worlds=1,
-        auto_reset=False,
         json_path="tests/pytest_data",
         params=params
     )
