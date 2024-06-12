@@ -2,6 +2,8 @@
 
 #include "init.hpp"
 #include "types.hpp"
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -204,7 +206,6 @@ namespace gpudrive
             road.mean.x += (road.geometry[i].x - road.mean.x)/(i+1);
             road.mean.y += (road.geometry[i].y - road.mean.y)/(i+1);
         }
-
     }
 
     std::pair<float, float> calc_mean(const nlohmann::json &j)
@@ -242,19 +243,34 @@ namespace gpudrive
         return mean;
     }
 
-
-    void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
-    {
+    void from_json(const nlohmann::json &j, Map &map,
+                   float polylineReductionThreshold,
+                   const std::vector<madrona::CountT> &vehiclesToSkip) {
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
-        map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
+
         size_t idx = 0;
+        madrona::CountT vechicleIdx{0};
         for (const auto &obj : j.at("objects"))
         {
-            if (idx >= map.numObjects)
+            if (idx >= std::min(j.at("objects").size(),
+                                static_cast<size_t>(MAX_OBJECTS)))
                 break;
-            obj.get_to(map.objects[idx++]);
+            obj.get_to(map.objects[idx]);
+
+            if (map.objects[idx].type != EntityType::Vehicle) {
+                ++idx;
+                continue;
+            }
+
+            auto expertCandidateIt = std::find(
+                vehiclesToSkip.cbegin(), vehiclesToSkip.cend(), vechicleIdx++);
+            if (expertCandidateIt == vehiclesToSkip.cend()) {
+                ++idx;
+                continue;
+            }
         }
+        map.numObjects = idx;
 
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
@@ -270,4 +286,4 @@ namespace gpudrive
         }
         map.numRoadSegments = countRoadPoints;
     }
-}
+    } // namespace gpudrive
