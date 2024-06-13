@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 )
 
 # Import base gumenvironment
-from pygpudrive.env.base_environment import Env
+from pygpudrive.env.base_env_torch import Env
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig

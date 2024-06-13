@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-from pygpudrive.env.base_environment import Env
+from pygpudrive.env.base_env_torch import Env
 from pygpudrive.env.config import EnvConfig
 
 # Constansts

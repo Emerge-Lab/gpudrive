@@ -1,24 +1,18 @@
-# Navigation in multi-agent traffic scenarios
+# GPU Drive Multi-Agent Environments Documentation
 
-This base environment provides a `gymnasium` environment that interfaces with the `gpudrive` simulator.
+This repository provides base environments for multi-agent reinforcement learning using `torch` and `jax` in to interface with the `gpudrive` simulator. It follows the `gymnasium` environment standards as closely as possible.
 
-[TODO: Insert gif here]
+## Quick Start
 
-## Description
+Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. Here, we named our directly `waymo_data`.
 
-
-## Quick start
-
-Download a number of traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and place them in a directory. Let's call our folder `waymo_data`.
-
-We configure our environment with the basic `config`:
+Configure the environment using the basic settings in `config`:
 ```Python
 config = EnvConfig()
 ```
-more on that later.
+This `config` holds essential parameters of the environment.
 
-Once you have the data, we can create the environment. Below, we are making an environment with 1 world and choose to control a maximum of 3 agents per episode. The number of worlds sets the parallism, it defines from how many environments we want to learn and act in at the same time. We also set our `'device'`.
-
+To initiate the environment with one world and a maximum of three controllable agents per episode, set the `data_dir` and `device`:
 ```Python
 env = Env(
     config=config,
@@ -29,44 +23,69 @@ env = Env(
 )
 ```
 
-Stepping the the environment results in
-
+Step the environment using:
 ```Python
-obs, reward, done, info = env.step(action)
+obs, reward, done, info = env.step_dynamics(action)
 ```
 
-Next, we discuss how to configure the environment, which is all done in `config.py`.
+Further configuration details are available in `config.py`.
 
-## Action space
+## Action Space
 
-
-## Observation space
-
-
-## Rewards
-
-
-## Starting state
-
-The car starts at rest in the position of xthe expert vehicle.
-
-## Arguments
-
-
-## Notes
-
-- We use "nan" values to indicate invalid agents in environments. Since the number of valid agents varies per scenario (map), scenarios with fewer than `kMaxAgentCount` controlled agents are padded with `nan` values. For example, suppose we have two scenes, one with two agents and the other with three agents. When we step the environment, we get tensors of shape `(num_worlds, kMaxAgentCount)`, where we can control at most `max_cont_agents` per environment. When we step the environment, the done tensor with `kMaxAgentCount` is five and `max_cont_agents` to three may look like:
-
-```
-done = torch.Tensor(
-    [0, 1, nan, nan, 0],
-    [0, 0, nan, 0, nan],
+### Discrete (default; `action_type='discrete'`)
+Generates a grid of possible steering and acceleration actions:
+```Python
+# Action space (joint discrete)
+steer_actions: torch.Tensor = torch.round(
+    torch.linspace(-1.0, 1.0, 13), decimals=3
+)
+accel_actions: torch.Tensor = torch.round(
+    torch.linspace(-3, 3, 7), decimals=3
 )
 ```
 
-The above tensor is interpreted as follows:
-- We have one valid agent that is done (as marked by the value `1`)
-- We have five valid agents that are not done (marked by `0`)
-- We have four invalid agents (as marked by the value `nan`)
+### Continuous
+Not supported currently.
 
-## References
+## Observation Space
+
+Key observation flags include:
+```
+ego_state: bool = True  # Indicates ego vehicle state
+road_map_obs: bool = True  # Provides road graph data
+partner_obs: bool = True  # Includes partner vehicle information
+norm_obs: bool = True  # Normalizes observations if true
+```
+
+## Rewards
+
+A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` from the goal, marking the end of the expert trajectory for that vehicle.
+
+## Starting State
+
+Upon initialization, every vehicle starts at the beginning of the expert trajectory.
+
+## Rendering
+
+TODO(dc)
+
+## Sharp Bits
+
+TODO(dc)
+
+## Citations
+
+The Waymo Open Dataset is described in the following publication:
+
+```
+@misc{ettinger2021large,
+      title={Large Scale Interactive Motion Forecasting for Autonomous Driving : The Waymo Open Motion Dataset},
+      author={Scott Ettinger and others},
+      year={2021},
+      eprint={2104.10133},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+This documentation provides concise, clear
