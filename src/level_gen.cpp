@@ -1,5 +1,6 @@
 #include "level_gen.hpp"
 #include "utils.hpp"
+#include "dynamics.hpp"
 
 namespace gpudrive {
 
@@ -28,8 +29,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
 
-    ctx.get<BicycleModel>(agent) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
@@ -53,6 +52,31 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 #endif
 }
 
+static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, const MapObject &agentInit) {
+    auto &trajectory = ctx.get<Trajectory>(agent);
+    for(CountT i = 0; i < agentInit.numPositions; i++)
+    {
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
+        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.valids[i] = (float)agentInit.valid[i];
+    }
+
+    for(CountT i = agentInit.numPositions - 2; i >=0; i--)
+    {   
+        if(!trajectory.valids[i] || !trajectory.valids[i+1])
+        {
+            trajectory.inverseActions[i] = Action{.acceleration = 0, .steering = 0, .headAngle = 0};
+            continue;
+        }
+        Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
+        Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
+        Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
+        Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
+        trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
+    }
+}
+
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
     
@@ -68,19 +92,9 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
 
-    // Since position, heading, and speed may vary within an episode, their
-    // values are retained so that on an episode reset they can be restored to
-    // their initial values.
-    auto &trajectory = ctx.get<Trajectory>(agent);
-    for(CountT i = 0; i < agentInit.numPositions; i++)
-    {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
-        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]);
-        trajectory.valids[i] = agentInit.valid[i];
-    }
+    populateExpertTrajectory(ctx, agent, agentInit);
 
-    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - trajectory.positions[0]).length() < consts::staticThreshold)
+    if(ctx.data().params.initAgentsAsStatic && (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent).positions[0]).length() < consts::staticThreshold)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }

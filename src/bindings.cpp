@@ -53,6 +53,7 @@ namespace gpudrive
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("initAgentsAsStatic", &Parameters::initAgentsAsStatic);
@@ -104,7 +105,6 @@ namespace gpudrive
             .def("action_tensor", &Manager::actionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
-            .def("bicycle_model_tensor", &Manager::bicycleModelTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)
             .def("map_observation_tensor", &Manager::mapObservationTensor)
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
@@ -119,7 +119,8 @@ namespace gpudrive
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor)
-            .def("response_type_tensor", &Manager::responseTypeTensor);
+            .def("response_type_tensor", &Manager::responseTypeTensor)
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
     }
 
 }
