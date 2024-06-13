@@ -56,7 +56,7 @@ namespace gpudrive
             .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
-            .def_rw("initAgentsAsStatic", &Parameters::initAgentsAsStatic);
+            .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
