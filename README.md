@@ -167,9 +167,10 @@ For easy troubleshooting and learning various policies, the behaviour of the age
 * `IgnoreNonVehicles` : Defines the policy of not initializing pedestrians/cyclists. Default: `false`.
 * `roadObservationAlgorithm`: Select from `KNearestEntitiesWithRadiusFiltering` and `AllEntitiesWithRadiusFiltering`. The `KNearestEntitiesWithRadiusFiltering` filters out `kMaxAgentMapObservationsCount` nearest points in the `observationRadius` of the agents, while `AllEntitiesWithRadiusFiltering` runs a linear search in the same radius. Default: `KNearestEntitiesWithRadiusFiltering`
 * `initOnlyValidAgentsAtFirstStep`: Controls if only the agents that are valid at the first step are intialized into the sim. Default: `true`.
-* `initAgentsAsStatic`: Controls if agents like parked vehicles who are already at their goals should be allowed to be controlled or set as static. Default: `false`.
+* `isStaticAgentControlled`: Controls if agents like parked vehicles who are already at their goals should be allowed to be controlled or set as static. Default: `false`.
 * `enableLidar`: Enables lidar observations.
 * `disableClassicalObs`: Disables setting `PartnerObservations` and `AgentMapObservations`. Generally this would be used to speed up sim if lidar observations are turned on and the above observations are not used. Default: `false`.
+* `useWayMaxModel`: Sets if the waymax dynamics model should be used. Default: `false`.
 
 ### Types of objects
 
