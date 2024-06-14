@@ -43,7 +43,7 @@ class EnvConfig:
     ego_state: bool = True  # Ego vehicle state
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
-    norm_obs: bool = True 
+    norm_obs: bool = True
 
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
@@ -71,10 +71,10 @@ class EnvConfig:
     # to have reached the goal
     dist_to_goal_threshold: float = 4.0
     collision_penalty: int = 0
-    
+
     # How to sample scenes
     sample_method: str = "pad_n"
-    
+
     # TODO(dc): should be removed
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1

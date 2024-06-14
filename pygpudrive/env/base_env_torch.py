@@ -23,7 +23,7 @@ logging.getLogger(__name__)
 
 class Env(gym.Env):
     """
-    GPU Drive Gym Environment.
+    GPUDrive torch gym environment.
     """
 
     def __init__(

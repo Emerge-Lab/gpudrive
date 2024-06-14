@@ -19,20 +19,23 @@ import gpudrive
 import logging
 
 logging.getLogger(__name__)
+
+
 class Env(gym.Env):
     """
     GPUDrive jax gymnasium environment.
     """
+
     def __init__(
-        self, 
-        config, 
-        num_worlds, 
+        self,
+        config,
+        num_worlds,
         max_cont_agents,
-        data_dir, 
+        data_dir,
         device="cuda",
-        render_config: RenderConfig = RenderConfig(), 
-        action_type="discrete", 
-        verbose=True
+        render_config: RenderConfig = RenderConfig(),
+        action_type="discrete",
+        verbose=True,
     ):
         # Initialization of environment configurations
         self.config = config
@@ -258,12 +261,12 @@ class Env(gym.Env):
             ),
             axis=-1,
         )
-        
-        print(f'ego_state: {ego_states.max()}')
-        print(f'partner_observations: {partner_observations.max()}')
-        print(f'road_map_observations: {road_map_observations.max()}')
+
+        print(f"ego_state: {ego_states.max()}")
+        print(f"partner_observations: {partner_observations.max()}")
+        print(f"road_map_observations: {road_map_observations.max()}")
         if obs_filtered.max() > 1:
-            print(f'obs_filtered: {obs_filtered.max()}')
+            print(f"obs_filtered: {obs_filtered.max()}")
 
         return obs_filtered
 
@@ -442,14 +445,16 @@ class Env(gym.Env):
     @property
     def steps_remaining(self):
         return self.sim.steps_remaining_tensor().to_jax()[0][0].item()
-    
+
     def _validate_data_dir(self):
         if not os.path.exists(self.data_dir) or not os.listdir(self.data_dir):
             assert False, "The data directory does not exist or is empty."
 
     def _setup_environment_parameters(self):
         params = gpudrive.Parameters()
-        params.polylineReductionThreshold = self.config.polyline_reduction_threshold
+        params.polylineReductionThreshold = (
+            self.config.polyline_reduction_threshold
+        )
         params.rewardParams = self._set_reward_params()
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledVehicles = self.max_cont_agents
@@ -459,26 +464,44 @@ class Env(gym.Env):
         return params
 
     def _initialize_simulator(self, params):
-        exec_mode = gpudrive.madrona.ExecMode.CPU if self.device == "cpu" else gpudrive.madrona.ExecMode.CUDA
+        exec_mode = (
+            gpudrive.madrona.ExecMode.CPU
+            if self.device == "cpu"
+            else gpudrive.madrona.ExecMode.CUDA
+        )
         return gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
             num_worlds=self.num_sims,
             json_path=self.data_dir,
             params=params,
-            enable_batch_renderer=self.render_config and self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-            batch_render_view_width=self.render_config.resolution[0] if self.render_config else None,
-            batch_render_view_height=self.render_config.resolution[1] if self.render_config else None,
+            enable_batch_renderer=self.render_config
+            and self.render_config.render_mode
+            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=self.render_config.resolution[0]
+            if self.render_config
+            else None,
+            batch_render_view_height=self.render_config.resolution[1]
+            if self.render_config
+            else None,
         )
 
     def _setup_rendering(self):
-        return PyGameVisualizer(self.sim, self.render_config, self.config.dist_to_goal_threshold)
+        return PyGameVisualizer(
+            self.sim, self.render_config, self.config.dist_to_goal_threshold
+        )
 
     def _setup_controlled_agents(self):
-        self.cont_agent_mask = (self.sim.controlled_state_tensor().to_jax() == 1).squeeze(axis=2)
+        self.cont_agent_mask = (
+            self.sim.controlled_state_tensor().to_jax() == 1
+        ).squeeze(axis=2)
         self.max_agent_count = self.cont_agent_mask.shape[1]
-        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
-        self.config.total_controlled_vehicles = self.num_valid_controlled_agents_across_worlds
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+        self.config.total_controlled_vehicles = (
+            self.num_valid_controlled_agents_across_worlds
+        )
 
     def _setup_action_space(self, action_type):
         if action_type == "discrete":
@@ -492,7 +515,9 @@ class Env(gym.Env):
 
     def _print_info(self, verbose):
         if verbose:
-            print(f"Environment initialized with device {self.device} and action space {self.action_space}.")
+            print(
+                f"Environment initialized with device {self.device} and action space {self.action_space}."
+            )
 
 
 if __name__ == "__main__":
@@ -533,6 +558,5 @@ if __name__ == "__main__":
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-        
-        
+
         print(obs.max())
