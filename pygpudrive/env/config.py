@@ -45,6 +45,15 @@ class EnvConfig:
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
     dist_to_goal_threshold: float = 4.0
+    collision_penalty: int = 0
+
+    # How to sample scenes
+    sample_method: str = "pad_n"
+
+    # TODO(dc): should be removed
+    num_controlled_vehicles: int = 128
+    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
+    top_k_roadpoints: int = 200
 
     # How to sample scenes
     sample_method: str = "pad_n"
