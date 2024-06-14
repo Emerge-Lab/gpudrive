@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-from pygpudrive.env.base_env_torch import Env
+from pygpudrive.env.base_env_torch import BaseEnvTorch
 from pygpudrive.env.config import EnvConfig
 
 # Constansts
@@ -89,7 +89,7 @@ def evaluate_policy(
         )
 
     # Make environment
-    env = Env(
+    env = BaseEnvTorch(
         config=env_config,
         num_worlds=num_worlds,
         max_cont_agents=max_controlled_agents,
@@ -125,7 +125,6 @@ def evaluate_policy(
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        eval_expert_mode=True,
         sample_method="first_n",
     )
 
