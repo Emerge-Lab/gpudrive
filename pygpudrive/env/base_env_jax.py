@@ -19,114 +19,49 @@ import gpudrive
 import logging
 
 logging.getLogger(__name__)
-
-
 class Env(gym.Env):
     """
-    GPU Drive Gym Environment.
+    GPUDrive jax gymnasium environment.
     """
-
     def __init__(
-        self,
-        config,
-        num_worlds,
+        self, 
+        config, 
+        num_worlds, 
         max_cont_agents,
-        data_dir,
+        data_dir, 
         device="cuda",
-        render_config: RenderConfig = RenderConfig(),
-        action_type="discrete",
-        verbose=True,
+        render_config: RenderConfig = RenderConfig(), 
+        action_type="discrete", 
+        verbose=True
     ):
+        # Initialization of environment configurations
         self.config = config
-
-        reward_params = self._set_reward_params()
-
-        # Configure the environment
-        params = gpudrive.Parameters()
-        params.polylineReductionThreshold = 1.0
-        params.rewardParams = reward_params
-        params.IgnoreNonVehicles = self.config.remove_non_vehicles
-
-        # Collision behavior
-        params = self._set_collision_behavior(params)
-
-        # Dataset initialization
-        params = self._init_dataset(params, data_dir)
-
-        # Set maximum number of controlled vehicles per environment
-        params.maxNumControlledVehicles = max_cont_agents
-
-        # Set road point observation radius and reduction algorithm
-        params = self._set_road_reduction_params(params)
-
         self.num_sims = num_worlds
-        self.device = device
-        self.action_types = 3  # Acceleration, steering, and heading
-        self.info_dim = 5
-
-        if not os.path.exists(data_dir) or not os.listdir(data_dir):
-            assert False, "The data directory does not exist or is empty."
-
-        # Initialize the simulator
-        self.sim = gpudrive.SimManager(
-            exec_mode=gpudrive.madrona.ExecMode.CPU
-            if device == "cpu"
-            else gpudrive.madrona.ExecMode.CUDA,
-            gpu_id=0,
-            num_worlds=self.num_sims,
-            json_path=self.data_dir,
-            params=params,
-            enable_batch_renderer=render_config is not None
-            and render_config.render_mode
-            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-            batch_render_view_width=render_config.resolution[0]
-            if render_config is not None
-            else None,
-            batch_render_view_height=render_config.resolution[1]
-            if render_config is not None
-            else None,
-        )
-
-        # Rendering
-        self.render_config = render_config
-        self.world_render_idx = 0
-        self.visualizer = PyGameVisualizer(
-            self.sim, self.render_config, self.config.dist_to_goal_threshold
-        )
-
-        # We only want to obtain information from vehicles we control
-        # By default, the sim returns information for all vehicles in a scene
-        # We construct a mask to filter out the information from the non-controlled vehicles (0)
-        # Mask size: (num_worlds, kMaxAgentCount)
-        self.cont_agent_mask = (
-            self.sim.controlled_state_tensor().to_jax() == 1
-        ).squeeze(axis=2)
-
-        # Get the indices of the controlled agents
-        self.w_indices, self.k_indices = jnp.where(self.cont_agent_mask)
-        self.max_agent_count = self.cont_agent_mask.shape[1]
         self.max_cont_agents = max_cont_agents
+        self.data_dir = data_dir
+        self.device = device
+        self.render_config = render_config
 
-        # Number of valid controlled agents across worlds (without padding agents)
-        self.num_valid_controlled_agents_across_worlds = (
-            self.cont_agent_mask.sum().item()
-        )
+        # Ensure data directory is valid
+        self._validate_data_dir()
 
-        # Update the config with the relevant number of controlled agents
-        self.config.total_controlled_vehicles = (
-            self.num_valid_controlled_agents_across_worlds
-        )
+        # Environment parameter setup
+        params = self._setup_environment_parameters()
 
-        # Set up action space
-        if action_type == "discrete":
-            self.action_space = self._set_discrete_action_space()
-        else:
-            raise ValueError(f"Action space not supported: {action_type}")
+        # Initialize simulator with parameters
+        self.sim = self._initialize_simulator(params)
 
-        # Set observation space
-        self.observation_space = self._set_observation_space()
-        self.obs_dim = self.observation_space.shape[0]
+        # Rendering setup
+        self.visualizer = self._setup_rendering()
 
+        # Controlled agents setup
+        self._setup_controlled_agents()
+
+        # Setup action and observation spaces
+        self._setup_action_space(action_type)
+        self._setup_observation_space()
+
+        # Optional verbose output
         self._print_info(verbose)
 
     def reset(self):
@@ -323,6 +258,12 @@ class Env(gym.Env):
             ),
             axis=-1,
         )
+        
+        print(f'ego_state: {ego_states.max()}')
+        print(f'partner_observations: {partner_observations.max()}')
+        print(f'road_map_observations: {road_map_observations.max()}')
+        if obs_filtered.max() > 1:
+            print(f'obs_filtered: {obs_filtered.max()}')
 
         return obs_filtered
 
@@ -350,12 +291,12 @@ class Env(gym.Env):
         """Normalize ego state features."""
 
         # Speed, vehicle length, vehicle width
-        state.at[:, :, 0].divide(self.config.max_speed)
-        state.at[:, :, 1].divide(self.config.max_veh_len)
-        state.at[:, :, 2].divide(self.config.max_veh_width)
+        state = state.at[:, :, 0].divide(self.config.max_speed)
+        state = state.at[:, :, 1].divide(self.config.max_veh_len)
+        state = state.at[:, :, 2].divide(self.config.max_veh_width)
 
         # Relative goal coordinates
-        state.at[:, :, 3].set(
+        state = state.at[:, :, 3].set(
             self._norm(
                 state[:, :, 3],
                 self.config.min_rel_goal_coord,
@@ -363,7 +304,7 @@ class Env(gym.Env):
             )
         )
 
-        state.at[:, :, 4].set(
+        state = state.at[:, :, 4].set(
             self._norm(
                 state[:, :, 4],
                 self.config.min_rel_goal_coord,
@@ -384,17 +325,17 @@ class Env(gym.Env):
         """
 
         # Speed
-        obs.at[:, :, :, 0].divide(self.config.max_speed)
+        obs = obs.at[:, :, :, 0].divide(self.config.max_speed)
 
         # Relative position
-        obs.at[:, :, :, 1].set(
+        obs = obs.at[:, :, :, 1].set(
             self._norm(
                 obs[:, :, :, 1],
                 self.config.min_rel_agent_pos,
                 self.config.max_rel_agent_pos,
             )
         )
-        obs.at[:, :, :, 2].set(
+        obs = obs.at[:, :, :, 2].set(
             self._norm(
                 obs[:, :, :, 2],
                 self.config.min_rel_agent_pos,
@@ -403,11 +344,11 @@ class Env(gym.Env):
         )
 
         # Orientation (heading)
-        obs.at[:, :, :, 3].divide(self.config.max_orientation_rad)
+        obs = obs.at[:, :, :, 3].divide(self.config.max_orientation_rad)
 
         # Vehicle length and width
-        obs.at[:, :, :, 4].divide(self.config.max_veh_len)
-        obs.at[:, :, :, 5].divide(self.config.max_veh_width)
+        obs = obs.at[:, :, :, 4].divide(self.config.max_veh_len)
+        obs = obs.at[:, :, :, 5].divide(self.config.max_veh_width)
 
         # Hot-encode object type
         shifted_type_obs = obs[:, :, :, 6] - 6
@@ -430,7 +371,7 @@ class Env(gym.Env):
         """Normalize map observation features."""
 
         # Road point coordinates
-        obs.at[:, :, :, 0].set(
+        obs = obs.at[:, :, :, 0].set(
             self._norm(
                 obs[:, :, :, 0],
                 self.config.min_rm_coord,
@@ -438,7 +379,7 @@ class Env(gym.Env):
             )
         )
 
-        obs.at[:, :, :, 1].set(
+        obs = obs.at[:, :, :, 1].set(
             self._norm(
                 obs[:, :, :, 1],
                 self.config.min_rm_coord,
@@ -447,14 +388,14 @@ class Env(gym.Env):
         )
 
         # Road line segment length
-        obs.at[:, :, :, 2].divide(self.config.max_road_line_segmment_len)
+        obs = obs.at[:, :, :, 2].divide(self.config.max_road_line_segmment_len)
 
         # Road scale (width and height)
-        obs.at[:, :, :, 3].divide(self.config.max_road_scale)
-        # obs.at[:, :, :, 4] seems already scaled
+        obs = obs.at[:, :, :, 3].divide(self.config.max_road_scale)
+        obs = obs.at[:, :, :, 4].divide(self.config.max_road_scale)
 
         # Road point orientation
-        obs.at[:, :, :, 5].divide(self.config.max_orientation_rad)
+        obs = obs.at[:, :, :, 5].divide(self.config.max_orientation_rad)
 
         # Road types: one-hot encode them
         one_hot_road_type = jax.nn.one_hot(obs[:, :, :, 6], num_classes=7)
@@ -484,7 +425,7 @@ class Env(gym.Env):
         return params
 
     def _print_info(self, verbose=True):
-        """Print initialization information."""
+        """Print setup information."""
         if verbose:
             logging.info("----------------------")
             logging.info(f"Device: {self.device}")
@@ -501,24 +442,75 @@ class Env(gym.Env):
     @property
     def steps_remaining(self):
         return self.sim.steps_remaining_tensor().to_jax()[0][0].item()
+    
+    def _validate_data_dir(self):
+        if not os.path.exists(self.data_dir) or not os.listdir(self.data_dir):
+            assert False, "The data directory does not exist or is empty."
+
+    def _setup_environment_parameters(self):
+        params = gpudrive.Parameters()
+        params.polylineReductionThreshold = self.config.polyline_reduction_threshold
+        params.rewardParams = self._set_reward_params()
+        params.IgnoreNonVehicles = self.config.remove_non_vehicles
+        params.maxNumControlledVehicles = self.max_cont_agents
+        params = self._set_collision_behavior(params)
+        params = self._init_dataset(params, self.data_dir)
+        params = self._set_road_reduction_params(params)
+        return params
+
+    def _initialize_simulator(self, params):
+        exec_mode = gpudrive.madrona.ExecMode.CPU if self.device == "cpu" else gpudrive.madrona.ExecMode.CUDA
+        return gpudrive.SimManager(
+            exec_mode=exec_mode,
+            gpu_id=0,
+            num_worlds=self.num_sims,
+            json_path=self.data_dir,
+            params=params,
+            enable_batch_renderer=self.render_config and self.render_config.render_mode in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=self.render_config.resolution[0] if self.render_config else None,
+            batch_render_view_height=self.render_config.resolution[1] if self.render_config else None,
+        )
+
+    def _setup_rendering(self):
+        return PyGameVisualizer(self.sim, self.render_config, self.config.dist_to_goal_threshold)
+
+    def _setup_controlled_agents(self):
+        self.cont_agent_mask = (self.sim.controlled_state_tensor().to_jax() == 1).squeeze(axis=2)
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = self.cont_agent_mask.sum().item()
+        self.config.total_controlled_vehicles = self.num_valid_controlled_agents_across_worlds
+
+    def _setup_action_space(self, action_type):
+        if action_type == "discrete":
+            self.action_space = self._set_discrete_action_space()
+        else:
+            raise ValueError(f"Action space not supported: {action_type}")
+
+    def _setup_observation_space(self):
+        self.observation_space = self._set_observation_space()
+        self.obs_dim = self.observation_space.shape[0]
+
+    def _print_info(self, verbose):
+        if verbose:
+            print(f"Environment initialized with device {self.device} and action space {self.action_space}.")
 
 
 if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    env_config = EnvConfig(sample_method="first_n")
+    env_config = EnvConfig()
     render_config = RenderConfig()
 
-    TOTAL_STEPS = 1000
+    TOTAL_STEPS = 10
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 10
+    NUM_WORLDS = 3
 
     env = Env(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="formatted_json_v2_no_tl_train",
+        data_dir="example_data",
         device="cuda",
         render_config=render_config,
     )
@@ -541,10 +533,6 @@ if __name__ == "__main__":
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-
-        if done.any():
-            print("Done")
-            obs = env.reset()
-
-    # run.finish()
-    env.visualizer.destroy()
+        
+        
+        print(obs.max())
