@@ -1,4 +1,5 @@
 """Configs for GPUDrive Environments."""
+"""Configs for GPUDrive Environments."""
 
 from dataclasses import dataclass
 import numpy as np
@@ -16,13 +17,11 @@ class EnvConfig:
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
     norm_obs: bool = True
-    enable_lidar: bool = (
-        False  # TODO(dc): Actually integrate this with the env
-    )
 
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
+    polyline_reduction_threshold: float = 0.1
     polyline_reduction_threshold: float = 0.1
 
     # Action space (joint discrete)
@@ -54,10 +53,6 @@ class EnvConfig:
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
     top_k_roadpoints: int = 200
-
-    # How to sample scenes
-    sample_method: str = "pad_n"
-
     # TODO(dc): should be removed
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
@@ -107,8 +102,7 @@ class MadronaOption(Enum):
 class RenderConfig:
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
     view_option: Enum = PygameOption.RGB
-    resolution: Tuple[int, int] = (1200, 1200) # Quality of the rendered image
-    line_thickness: int = .7 # Thickness of the road lines
+    resolution: Tuple[int, int] = (256, 256)
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"

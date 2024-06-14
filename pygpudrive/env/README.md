@@ -11,9 +11,12 @@ Configure the environment using the basic settings in `config`:
 config = EnvConfig()
 ```
 This `config` all environment parameters.
+This `config` all environment parameters.
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
+For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 ```Python
+env = BaseEnvTorch(
 env = GPUDriveJaxEnv(
     config=config,
     num_worlds=1,

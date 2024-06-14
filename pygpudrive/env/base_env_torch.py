@@ -21,7 +21,7 @@ from tqdm import tqdm
 logging.getLogger(__name__)
 
 
-class Env(gym.Env):
+class BaseEnvTorch(gym.Env):
     """
     GPUDrive torch gym environment.
     """
@@ -146,17 +146,9 @@ class Env(gym.Env):
         return done
 
     def get_infos(self):
-        if self.config.eval_expert_mode:
-            # This is true when we are evaluating the expert performance
-            info = self.sim.info_tensor().to_torch().squeeze(dim=2)
-
-        else:  # Standard behavior: controlling vehicles
-            info = (
-                self.sim.info_tensor()
-                .to_torch()
-                .squeeze(dim=2)
-                .to(torch.float)
-            ).to(self.device)
+        info = (
+            self.sim.info_tensor().to_torch().squeeze(dim=2).to(torch.float)
+        ).to(self.device)
         return info
 
     def get_rewards(self):
@@ -493,7 +485,7 @@ if __name__ == "__main__":
     MAX_NUM_OBJECTS = 128
     NUM_WORLDS = 10
 
-    env = Env(
+    env = BaseEnvTorch(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
