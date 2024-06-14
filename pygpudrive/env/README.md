@@ -4,7 +4,7 @@ This repository provides base environments for multi-agent reinforcement learnin
 
 ## Quick Start
 
-Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. Here, we named our directly `waymo_data`.
+Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `example_data` folder.
 
 Configure the environment using the basic settings in `config`:
 ```Python
@@ -18,7 +18,7 @@ env = Env(
     config=config,
     num_worlds=1,
     max_cont_agents=3,
-    data_dir="waymo_data",
+    data_dir="example_data",
 )
 ```
 
@@ -60,13 +60,13 @@ partner_obs: bool = True  # Includes partner vehicle information
 norm_obs: bool = True  # Normalizes observations if true
 ```
 
-| Observation Feature | Shape                                      | Description                                                                                         |
-|---------------------|--------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| **ego_state**       | (max_num_objects, 6)                       | speed, veh_len, veh_width, rel_goal_x, rel_goal_y, collision_state                                  |
-| **partner_obs**     | (max_num_objects, max_num_objects - 1, 10) | other_speed, other_pos_x, other_pos_y, other_orientation, other_veh_len, other_veh_width, other_type (0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist) |
-| **road_map_obs**    | (max_num_objects, top_k_road_points, 13)   | road_point_x, road_point_y, road_line_segment_len, road_point_scale_x, road_point_scale_y, road_line_segment_orientation, road_line_segment_type (0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign) |
+| Observation Feature | Shape                                      | Description | Features                                         |
+|---------------------|--------------------------------------------|-------------|--------------------------------------------------|
+| **ego_state** 🚘   | `(max_num_objects, 6)`                     |  Basic ego information.           | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise) |
+| **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_objects, max_num_objects - 1, 10)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius.   | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)` |
+| **road_map_obs** 🛣️ 🛑  | `(max_num_objects, top_k_road_points, 13)`  | Information about the road graph  and other static road objects.   | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)` |
 
-Note that all observations are already transformed to be **relative to an ego agent**.
+Note that all observations are already transformed to be in a relative coordinate frame.
 
 ## Rewards
 
@@ -76,9 +76,9 @@ A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` 
 
 Upon initialization, every vehicle starts at the beginning of the expert trajectory.
 
-## Dataset 
+## Dataset
 
-How to sample the set of scenarios you want to train on can be set using `sample_method`. 
+How to sample the set of scenarios you want to train on can be set using `sample_method`.
 
 | `sample_method` | Description |
 |----------|-------------|
@@ -92,7 +92,7 @@ How to sample the set of scenarios you want to train on can be set using `sample
 
 TODO(dc + av)
 
-## Sharp Bits 
+## Sharp Bits
 
 TODO(dc)
 
@@ -110,5 +110,3 @@ Soe Waymo Open Dataset is discussed in the following publication:
       primaryClass={cs.CV}
 }
 ```
-
-
