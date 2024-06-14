@@ -132,7 +132,7 @@ Below are the renders for each mode
   </tr>
 </table>
 
-## Sharp Bits 
+## Sharp Bits
 
 TODO(dc)
 
