@@ -39,19 +39,16 @@ class RenderConfig:
 class EnvConfig:
     """Configurations for gpudrive gym environment."""
 
-    # Environment settings
-    num_controlled_vehicles: int = 128
-    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
-    top_k_roadpoints: int = 200
-
     # Observation space
     ego_state: bool = True  # Ego vehicle state
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
+    norm_obs: bool = True 
 
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
+    polyline_reduction_threshold: float = 0.1
 
     # Action space (joint discrete)
     steer_actions: torch.Tensor = torch.round(
@@ -70,23 +67,20 @@ class EnvConfig:
     reward_type: str = (
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
-    collision_penalty: int = 0
-
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
     dist_to_goal_threshold: float = 4.0
+    collision_penalty: int = 0
+    
+    # How to sample scenes
+    sample_method: str = "pad_n"
+    
+    # TODO(dc): should be removed
+    num_controlled_vehicles: int = 128
+    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
+    top_k_roadpoints: int = 200
 
     """Constants to normalize observations."""
-    norm_obs: bool = True
-
-    # Datasete settings
-    # first_n - Takes the first num_worlds files. Fails if num files < num_worlds.
-    # random_n - Takes num_worlds files randomly. Fails if num files < num_worlds.
-    # pad_n - Initializes as many files as possible first.
-    # Then it repeats the first file to pad until num_worlds
-    # files are loaded. Will fail if the number of files are more than num_worlds.
-    # exact_n - Init exactly num_worlds files.
-    sample_method: str = "pad_n"
 
     # Related to settings
     eval_expert_mode: bool = (
