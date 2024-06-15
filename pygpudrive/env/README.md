@@ -4,14 +4,17 @@ This repository provides base environments for multi-agent reinforcement learnin
 
 ## Quick Start
 
+<<<<<<< HEAD
 Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `example_data` folder.
 Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `example_data` folder.
+=======
+Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. For convenience, we added a couple of scenes in the `example_data` folder to get started.
+>>>>>>> Add JaxMARL wrapper
 
-Configure the environment using the basic settings in `config`:
+The environment configuration settings are found in the `config`:
 ```Python
 config = EnvConfig()
 ```
-This `config` all environment parameters.
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 ```Python
@@ -60,9 +63,9 @@ Not supported currently.
 
 Key observation flags include:
 ```
-ego_state: bool = True  # Indicates ego vehicle state
-road_map_obs: bool = True  # Provides road graph data
-partner_obs: bool = True  # Includes partner vehicle information
+ego_state: bool = True
+road_map_obs: bool = True
+partner_obs: bool = True
 norm_obs: bool = True  # Normalizes observations if true
 ```
 
@@ -118,13 +121,15 @@ How to sample the set of scenarios you want to train on can be set using `sample
 
 TODO(dc + av)
 
+<a href="https://drive.google.com/uc?export=view&id=1z902uYrzvH2Ud9vlg6GcL5fNoFfAfz1V"><img src="https://drive.google.com/uc?export=view&id=1z902uYrzvH2Ud9vlg6GcL5fNoFfAfz1V" style="width: 650px; max-width: 100%; height: auto" title="Click to enlarge picture" />
+
 ## Sharp Bits
 
 TODO(dc)
 
 ## Citations
 
-Soe Waymo Open Dataset is discussed in the following publication:
+The Waymo Open Dataset is discussed in the following publication:
 
 ```
 @misc{ettinger2021large,

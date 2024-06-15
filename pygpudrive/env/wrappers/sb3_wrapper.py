@@ -104,7 +104,6 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Has shape (num_worlds, max_agent_count , obs_dim)
         self._env.reset()
-        self._env.step_dynamics(None)
         obs = self._env.get_obs()
 
         # Make dead agent mask (True for dead or invalid agents)
