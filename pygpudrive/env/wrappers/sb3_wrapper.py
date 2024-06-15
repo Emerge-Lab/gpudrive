@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 )
 
 # Import base gumenvironment
-from pygpudrive.env.base_environment import Env
+from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 # Import the EnvConfig dataclass
 from pygpudrive.env.config import EnvConfig
@@ -37,7 +37,7 @@ class SB3MultiAgentEnv(VecEnv):
         device,
         render_mode="rgb_array",
     ):
-        self._env = Env(
+        self._env = GPUDriveTorchEnv(
             config=config,
             num_worlds=num_worlds,
             max_cont_agents=max_cont_agents,
@@ -80,6 +80,7 @@ class SB3MultiAgentEnv(VecEnv):
             fill_value=float("nan"),
         ).to(self.device)
 
+        self.collision_penalty = 0.0
         self.num_episodes = 0
         self.info_dict = {
             "off_road": 0,
@@ -146,9 +147,7 @@ class SB3MultiAgentEnv(VecEnv):
         info = self._env.get_infos()
 
         # Add collision penalty to rewards
-        reward += -abs(self.config.collision_penalty) * (
-            info[..., 1] + info[..., 2]
-        )
+        reward += -abs(self.collision_penalty) * (info[..., 1] + info[..., 2])
 
         # Get the dones for resets
         # done = self._env.get_dones()
