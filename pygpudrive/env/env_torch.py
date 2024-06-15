@@ -8,6 +8,7 @@ from itertools import product
 from pygpudrive.env.config import *
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
+
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -50,7 +51,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
         self._setup_action_space(action_type)
-        self.info_dim = 5 # Number of info features
+        self.info_dim = 5  # Number of info features
 
         # Rendering setup
         self.visualizer = self._setup_rendering()
@@ -186,7 +187,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
-    
+
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
