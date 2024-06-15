@@ -108,11 +108,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
-    
-    if(ctx.get<ControlledState>(agent).controlledState == ControlMode::BICYCLE)
-    {
-        ctx.data().maxDist = fmaxf(ctx.data().maxDist, (ctx.get<Goal>(agent).position - trajectory.positions[0]).length());
-    }
 
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
@@ -121,7 +116,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         render::RenderingSystem::attachEntityToView(ctx,
                 agent,
                 90.f, 0.001f,
-                -50.0f * math::fwd + 20.0f * math::up);
+                1.5f * math::up);
     }
 
     return agent;
@@ -284,12 +279,6 @@ static void createFloorPlane(Engine &ctx)
     ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
     ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
-    // if (ctx.data().enableRender) {
-    //     render::RenderingSystem::attachEntityToView(ctx,
-    //             ctx.data().floorPlane,
-    //             90.f, 0.001f,
-    //             100.0f * math::up);
-    // }
 }
 
 static inline Entity createAgentPadding(Engine &ctx) {
@@ -372,7 +361,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
-    ctx.data().maxDist = 1;
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
@@ -412,8 +400,6 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     shape.roadEntityCount = ctx.data().numRoads;
 
     createPaddingEntities(ctx);
-
-    printf("maxDist: %f\n", ctx.data().maxDist);
 }
 
 static void resetPaddingEntities(Engine &ctx) {

@@ -10,7 +10,6 @@
 #include <fstream>
 #include <random>
 #include <vector>
-#include <iostream>
 
 using namespace madrona;
 
@@ -66,7 +65,7 @@ int main(int argc, char *argv[])
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
             .rewardParams = {
-                .rewardType = RewardType::Dense,
+                .rewardType = RewardType::DistanceBased,
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },

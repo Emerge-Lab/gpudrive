@@ -115,6 +115,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     if (reset.reset == 0) {
       return;
     }
+
     reset.reset = 0;
     cleanupWorld(ctx);
     initWorld(ctx);
@@ -184,10 +185,6 @@ inline void collectObservationsSystem(Engine &ctx,
     while(arrIndex < consts::kMaxAgentCount - 1)
     {
         partner_obs.obs[arrIndex].type = (float)EntityType::None;
-        partner_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
-        partner_obs.obs[arrIndex].heading = 0.f;
-        partner_obs.obs[arrIndex].speed = 0.f;
-        partner_obs.obs[arrIndex].vehicle_size = VehicleSize{0.f, 0.f};
         arrIndex++;
     }
 
@@ -404,7 +401,7 @@ inline void rewardSystem(Engine &ctx,
                          const Position &position,
                          const Trajectory &trajectory,
                          const Goal &goal,
-                         const StepsRemaining &stepsRemaining,
+                         Progress &progress,
                          Reward &out_reward)
 {
 
@@ -423,19 +420,8 @@ inline void rewardSystem(Engine &ctx,
     }
     else if(rewardType == RewardType::Dense)
     {
-        auto idx = consts::episodeLen - stepsRemaining.t;
-        if (trajectory.valids[idx])
-        {
-            auto traj_pos = trajectory.positions[idx];
-            float dist = (model.position - traj_pos).length();
-            out_reward.v = (dist < ctx.data().params.rewardParams.distanceToExpertThreshold) ? 0.1 : 0.f;
-        }
-
-        auto goal_dist = (model.position - goal.position).length();
-        if(goal_dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
-        {
-            out_reward.v = 1.f;
-        }
+        // TODO: Implement full trajectory reward
+        assert(false);
     }
 
     // Just in case agents do something crazy, clamp total reward
@@ -710,7 +696,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Position,
             Trajectory,
             Goal,
-            StepsRemaining,
+            Progress,
             Reward
         >>({phys_done});
 
@@ -834,7 +820,6 @@ Sim::Sim(Engine &ctx,
 
     if (enableRender) {
         RenderingSystem::init(ctx, cfg.renderBridge);
-        printf("Rendering enabled\n");
     }
 
     // Creates agents, walls, etc.

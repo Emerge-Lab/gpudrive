@@ -9,7 +9,6 @@
 #include <madrona/mw_cpu.hpp>
 #include <nlohmann/json.hpp>
 #include <madrona/render/api.hpp>
-#include <nlohmann/json.hpp>
 
 #include <array>
 #include <charconv>
@@ -256,6 +255,8 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     render_mgr.loadObjects(render_assets->objects, materials, {
         { (std::filesystem::path(DATA_DIR) /
            "green_grid.png").string().c_str() },
+        { (std::filesystem::path(DATA_DIR) /
+           "smile.png").string().c_str() },
     });
 
     render_mgr.configureLighting({
