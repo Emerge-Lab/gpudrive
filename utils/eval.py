@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-from pygpudrive.env.base_environment import Env
+from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.env.config import EnvConfig
 
 # Constansts
@@ -31,7 +31,7 @@ def select_action(obs, env, eval_mode, policy=None):
 def run_episode(env, eval_mode, metrics, norm_scene_level=True, policy=None):
     """Run an episode."""
 
-    episode_stats = torch.zeros((env.num_sims, len(metrics) + 1))
+    episode_stats = torch.zeros((env.num_worlds, len(metrics) + 1))
 
     # Reset environment
     obs = env.reset()
@@ -48,7 +48,7 @@ def run_episode(env, eval_mode, metrics, norm_scene_level=True, policy=None):
     valid_veh_mask = info[:, :, 4] == VEH_TYPE_ID
 
     # Return episode stats
-    for world_idx in range(env.num_sims):
+    for world_idx in range(env.num_worlds):
         episode_stats[world_idx, :4] = info[world_idx, :, :][
             valid_veh_mask[world_idx, :]
         ][:, :4].sum(axis=0)
@@ -89,7 +89,7 @@ def evaluate_policy(
         )
 
     # Make environment
-    env = Env(
+    env = GPUDriveTorchEnv(
         config=env_config,
         num_worlds=num_worlds,
         max_cont_agents=max_controlled_agents,
@@ -125,7 +125,6 @@ def evaluate_policy(
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        eval_expert_mode=True,
         sample_method="first_n",
     )
 
