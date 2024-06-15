@@ -8,7 +8,6 @@ from itertools import product
 from pygpudrive.env.config import *
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
-
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -51,7 +50,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
         self._setup_action_space(action_type)
-        self.info_dim = 5  # Number of info features
+        self.info_dim = 5 # Number of info features
 
         # Rendering setup
         self.visualizer = self._setup_rendering()
@@ -187,7 +186,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
-
+    
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
@@ -286,7 +285,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Road line segment length
         obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        #  Road scale (width and height)
+        # TODO: Road scale (width and height)
         obs[:, :, :, 3] /= self.config.max_road_scale
         # obs[:, :, :, 4] seems already scaled
 
@@ -306,18 +305,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    env_config = EnvConfig()
+    env_config = EnvConfig(sample_method="first_n")
     render_config = RenderConfig()
 
     TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 50
+    NUM_WORLDS = 10
 
     env = GPUDriveTorchEnv(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="example_data",
+        data_dir="formatted_json_v2_no_tl_train",
         device="cuda",
         render_config=render_config,
     )
