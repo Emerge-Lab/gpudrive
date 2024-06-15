@@ -16,6 +16,9 @@ class EnvConfig:
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
     norm_obs: bool = True
+    enable_lidar: bool = (
+        False  # TODO(dc): Actually integrate this with the env
+    )
 
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
@@ -42,7 +45,6 @@ class EnvConfig:
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
     dist_to_goal_threshold: float = 4.0
-    collision_penalty: int = 0
 
     # How to sample scenes
     sample_method: str = "pad_n"

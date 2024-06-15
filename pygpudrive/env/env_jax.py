@@ -5,10 +5,10 @@ import jax
 import jax.numpy as jnp
 
 from pygpudrive.env.config import EnvConfig, RenderConfig
-from pygpudrive.env.abstract_base_env import AbstractMultiAgentEnv
+from pygpudrive.env.base_env import GPUDriveGymEnv
 
 
-class BaseEnvJax(AbstractMultiAgentEnv):
+class GPUDriveJaxEnv(GPUDriveGymEnv):
     """Jax Gym Environment that interfaces with the GPU Drive simulator."""
 
     def __init__(
@@ -38,17 +38,21 @@ class BaseEnvJax(AbstractMultiAgentEnv):
         # Initialize simulator with parameters
         self.sim = self._initialize_simulator(params)
 
-        # Rendering setup
-        self.visualizer = self._setup_rendering()
-
         # Controlled agents setup
-        self._setup_controlled_agents()
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
         # Setup action and observation spaces
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
         self._setup_action_space(action_type)
+
+        # Rendering setup
+        self.visualizer = self._setup_rendering()
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -120,6 +124,12 @@ class BaseEnvJax(AbstractMultiAgentEnv):
 
         return Discrete(n=int(len(self.action_key_to_values)))
 
+    def get_controlled_agents_mask(self):
+        """Get the control mask."""
+        return (self.sim.controlled_state_tensor().to_jax() == 1).squeeze(
+            axis=2
+        )
+
     def get_obs(self):
         """Get observation: Aggregate multi-modal environment information into
             a single flattened tensor. All information is in the shape of
@@ -178,7 +188,6 @@ class BaseEnvJax(AbstractMultiAgentEnv):
             ),
             axis=-1,
         )
-
         return obs_filtered
 
     def normalize_ego_state(self, state):
@@ -191,7 +200,7 @@ class BaseEnvJax(AbstractMultiAgentEnv):
 
         # Relative goal coordinates
         state = state.at[:, :, 3].set(
-            self._norm(
+            self.normalize_tensor(
                 state[:, :, 3],
                 self.config.min_rel_goal_coord,
                 self.config.max_rel_goal_coord,
@@ -199,7 +208,7 @@ class BaseEnvJax(AbstractMultiAgentEnv):
         )
 
         state = state.at[:, :, 4].set(
-            self._norm(
+            self.normalize_tensor(
                 state[:, :, 4],
                 self.config.min_rel_goal_coord,
                 self.config.max_rel_goal_coord,
@@ -223,14 +232,14 @@ class BaseEnvJax(AbstractMultiAgentEnv):
 
         # Relative position
         obs = obs.at[:, :, :, 1].set(
-            self._norm(
+            self.normalize_tensor(
                 obs[:, :, :, 1],
                 self.config.min_rel_agent_pos,
                 self.config.max_rel_agent_pos,
             )
         )
         obs = obs.at[:, :, :, 2].set(
-            self._norm(
+            self.normalize_tensor(
                 obs[:, :, :, 2],
                 self.config.min_rel_agent_pos,
                 self.config.max_rel_agent_pos,
@@ -266,7 +275,7 @@ class BaseEnvJax(AbstractMultiAgentEnv):
 
         # Road point coordinates
         obs = obs.at[:, :, :, 0].set(
-            self._norm(
+            self.normalize_tensor(
                 obs[:, :, :, 0],
                 self.config.min_rm_coord,
                 self.config.max_rm_coord,
@@ -274,7 +283,7 @@ class BaseEnvJax(AbstractMultiAgentEnv):
         )
 
         obs = obs.at[:, :, :, 1].set(
-            self._norm(
+            self.normalize_tensor(
                 obs[:, :, :, 1],
                 self.config.min_rm_coord,
                 self.config.max_rm_coord,
@@ -299,21 +308,17 @@ class BaseEnvJax(AbstractMultiAgentEnv):
 
         return obs.reshape(self.num_worlds, self.max_agent_count, -1)
 
-    def _norm(self, x, min_val, max_val):
-        """Normalize between -1 and 1."""
-        return 2 * ((x - min_val) / (max_val - min_val)) - 1
-
 
 if __name__ == "__main__":
 
     env_config = EnvConfig()
     render_config = RenderConfig()
 
-    TOTAL_STEPS = 10
+    EPISODE_LEN = 90
     MAX_NUM_OBJECTS = 128
     NUM_WORLDS = 3
 
-    env = BaseEnvJax(
+    env = GPUDriveJaxEnv(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
@@ -324,9 +329,8 @@ if __name__ == "__main__":
 
     obs = env.reset()
 
-    for _ in range(TOTAL_STEPS):
+    for _ in range(EPISODE_LEN):
 
-        # Take a random actions
         rand_action = jax.random.randint(
             key=jax.random.PRNGKey(0),
             shape=(NUM_WORLDS, MAX_NUM_OBJECTS),
@@ -334,7 +338,6 @@ if __name__ == "__main__":
             maxval=env.action_space.n,
         )
 
-        # Step the environment
         env.step_dynamics(rand_action)
 
         obs = env.get_obs()
