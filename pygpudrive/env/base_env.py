@@ -231,7 +231,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         Returns:
             Any: Rendered view of the world, or None if an invalid index is specified.
         """
-        if world_render_idx >= self.num_sims:
+        if world_render_idx >= self.num_worlds:
             print(f"Invalid world_render_idx: {world_render_idx}")
             return None
         if self.render_config.render_mode in {

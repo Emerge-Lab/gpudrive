@@ -5,22 +5,8 @@ import numpy as np
 import torch
 from itertools import product
 
-import glob
-import gymnasium as gym
-import os
-
 from pygpudrive.env.config import *
-from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.base_env import GPUDriveGymEnv
-
-# Import the simulator
-import gpudrive
-import logging
-
-from tqdm import tqdm
-
-logging.getLogger(__name__)
-
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -64,13 +50,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
         self._setup_action_space(action_type)
+        self.info_dim = 5 # Number of info features
 
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
-        for sim_idx in range(self.num_sims):
+        for sim_idx in range(self.num_worlds):
             self.sim.reset(sim_idx)
         self.sim.step()  # We require one step to trigger the reset
         return self.get_obs()
@@ -93,14 +80,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
-
         self.sim.step()
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
         assert actions.shape == (
-            self.num_sims,
+            self.num_worlds,
             self.max_agent_count,
         ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
 
@@ -200,6 +186,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
+    
+    def get_controlled_agents_mask(self):
+        """Get the control mask."""
+        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
+            axis=2
+        )
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -312,8 +304,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-
-    logging.basicConfig(level=logging.INFO)
 
     env_config = EnvConfig(sample_method="first_n")
     render_config = RenderConfig()
