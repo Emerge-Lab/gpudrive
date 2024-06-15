@@ -11,6 +11,7 @@ import os
 
 from pygpudrive.env.config import *
 from pygpudrive.env.viz import PyGameVisualizer
+from pygpudrive.env.base_env import GPUDriveGymEnv
 
 # Import the simulator
 import gpudrive
@@ -21,7 +22,7 @@ from tqdm import tqdm
 logging.getLogger(__name__)
 
 
-class GPUDriveTorchEnv(gym.Env):
+class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
     def __init__(
