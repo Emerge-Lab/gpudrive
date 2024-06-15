@@ -35,8 +35,8 @@ public:
 
         // Rendering settings
         bool enableBatchRenderer = false;
-        uint32_t batchRenderViewWidth = 1024;
-        uint32_t batchRenderViewHeight = 1024;
+        uint32_t batchRenderViewWidth = 64;
+        uint32_t batchRenderViewHeight = 64;
         madrona::render::APIBackend *extRenderAPI = nullptr;
         madrona::render::GPUDevice *extRenderDev = nullptr;
     };

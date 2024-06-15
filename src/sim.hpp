@@ -129,8 +129,6 @@ struct Sim : public madrona::WorldBase {
 
     madrona::math::Vector2 mean;
 
-    float maxDist;
-
     Parameters params;
 
     // Episode ID number

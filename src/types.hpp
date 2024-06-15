@@ -90,7 +90,6 @@ static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
 struct SelfObservation {
     float speed;
     VehicleSize vehicle_size;
-    float heading;
     Goal goal;
     float collisionState;
 };
@@ -129,7 +128,7 @@ static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
-    MapObservation obs[consts::kMaxRoadEntityCount];
+    MapObservation obs[consts::kMaxAgentMapObservationsCount];
 };
 
 const size_t AgentMapObservationExportSize = 7;
