@@ -37,6 +37,10 @@ namespace gpudrive
             .value("PadN", DatasetInitOptions::PadN)
             .value("ExactN", DatasetInitOptions::ExactN);
 
+        nb::enum_<FindRoadObservationsWith>(m, "FindRoadObservationsWith")
+            .value("KNearestEntitiesWithRadiusFiltering", FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering)
+            .value("AllEntitiesWithRadiusFiltering", FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
+
         // Define Parameters class
         nb::class_<Parameters>(m, "Parameters")
             .def(nb::init<>()) // Default constructor
@@ -45,7 +49,14 @@ namespace gpudrive
             .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
-            .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles);
+            .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
+            .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
+            .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
+            .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
+            .def_rw("enableLidar", &Parameters::enableLidar)
+            .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
+            .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
@@ -53,33 +64,47 @@ namespace gpudrive
             .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
             .value("Ignore", CollisionBehaviour::Ignore);
 
+        nb::enum_<EntityType>(m, "EntityType")
+            .value("_None", EntityType::None)
+            .value("RoadEdge", EntityType::RoadEdge)
+            .value("RoadLine", EntityType::RoadLine)
+            .value("RoadLane", EntityType::RoadLane)
+            .value("CrossWalk", EntityType::CrossWalk)
+            .value("SpeedBump", EntityType::SpeedBump)
+            .value("StopSign", EntityType::StopSign)
+            .value("Vehicle", EntityType::Vehicle) 
+            .value("Pedestrian", EntityType::Pedestrian)
+            .value("Cyclist", EntityType::Cyclist)
+            .value("Padding", EntityType::Padding) 
+            .value("NumTypes", EntityType::NumTypes);
 
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, bool auto_reset, std::string jsonPath, Parameters params, bool enable_batch_renderer = false)
+                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
                       .numWorlds = (uint32_t)num_worlds,
-                      .autoReset = auto_reset,
                       .jsonPath = jsonPath,
                       .params = params,
-                      .enableBatchRenderer = enable_batch_renderer}); },
+                      .enableBatchRenderer = enable_batch_renderer,
+                      .batchRenderViewWidth = batch_render_view_width,
+                      .batchRenderViewHeight = batch_render_view_height});},
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
                 nb::arg("num_worlds"),
-                nb::arg("auto_reset"),
                 nb::arg("json_path"),
                 nb::arg("params"),
-                nb::arg("enable_batch_renderer"))
+                nb::arg("enable_batch_renderer") = false,
+                nb::arg("batch_render_view_width") = 64,
+                nb::arg("batch_render_view_height") = 64)
             .def("step", &Manager::step)
             .def("reset", &Manager::triggerReset)
             .def("reset_tensor", &Manager::resetTensor)
             .def("action_tensor", &Manager::actionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
-            .def("bicycle_model_tensor", &Manager::bicycleModelTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)
             .def("map_observation_tensor", &Manager::mapObservationTensor)
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
@@ -91,9 +116,11 @@ namespace gpudrive
             .def("absolute_self_observation_tensor",
                  &Manager::absoluteSelfObservationTensor)
             .def("valid_state_tensor", &Manager::validStateTensor)
-            .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
+            .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
-            .def("depth_tensor", &Manager::depthTensor);
+            .def("depth_tensor", &Manager::depthTensor)
+            .def("response_type_tensor", &Manager::responseTypeTensor)
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
     }
 
 }

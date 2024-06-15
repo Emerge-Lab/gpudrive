@@ -8,6 +8,7 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testJsons)
 
 # Copy test.json to the testJsons directory
 configure_file(${CMAKE_SOURCE_DIR}/tests/test.json ${CMAKE_CURRENT_BINARY_DIR}/testJsons/test.json COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/tests/valid_files.json ${CMAKE_CURRENT_BINARY_DIR}/testJsons/valid_files.json COPYONLY)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
@@ -17,9 +18,9 @@ include_directories(
 # Add your test file(s) to the add_executable command
 add_executable(my_tests
     bicyclemodel.cpp
-    observationTest.cpp
     test_utils.cpp
     CollisionDetectionTests.cpp
+    EgocentricRoadObservationTests.cpp
 )
 
 # Link against required libraries. Ensure that the paths and names are correct.

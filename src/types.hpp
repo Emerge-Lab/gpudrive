@@ -36,16 +36,6 @@ enum class EntityType : uint32_t {
     NumTypes,
 };
 
-struct BicycleModel {
-    madrona::math::Vector2 position;
-    float heading;
-    float speed;
-};
-
-const int BicycleModelExportSize = 4;
-
-static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
-
 struct VehicleSize {
   float length;
   float width;
@@ -83,6 +73,18 @@ struct Done {
     int32_t v;
 };
 
+struct Info{
+    int collidedWithRoad;
+    int collidedWithVehicle;
+    int collidedWithNonVehicle;
+    int reachedGoal;
+    int type;
+};
+
+const size_t InfoExportSize = 5;
+
+static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
+
 // Observation state for the current agent.
 // Positions are rescaled to the bounds of the play area to assist training.
 struct SelfObservation {
@@ -93,7 +95,7 @@ struct SelfObservation {
     float collisionState;
 };
 
-const int SelfObservationExportSize = 7;
+const size_t SelfObservationExportSize = 6;
 
 static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -104,7 +106,7 @@ struct MapObservation {
     float type;
 };
 
-const int MapObservationExportSize = 7;
+const size_t MapObservationExportSize = 7;
 
 static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -121,7 +123,7 @@ struct PartnerObservations {
     PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
-const int PartnerObservationExportSize = 7;
+const size_t PartnerObservationExportSize = 7;
 
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
@@ -130,10 +132,11 @@ struct AgentMapObservations {
     MapObservation obs[consts::kMaxRoadEntityCount];
 };
 
-const int AgentMapObservationExportSize = 7;
+const size_t AgentMapObservationExportSize = 7;
 
-static_assert(sizeof(AgentMapObservations) == sizeof(float) *
-    consts::kMaxRoadEntityCount * AgentMapObservationExportSize);
+static_assert(sizeof(AgentMapObservations) ==
+              sizeof(float) * consts::kMaxAgentMapObservationsCount *
+                  AgentMapObservationExportSize);
 
 struct LidarSample {
     float depth;
@@ -166,8 +169,13 @@ struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
     float headings[consts::kTrajectoryLength];
-    int32_t valids[consts::kTrajectoryLength];
+    float valids[consts::kTrajectoryLength];
+    Action inverseActions[consts::kTrajectoryLength];
 };
+
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+
+static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
 struct Shape {
     int32_t agentEntityCount;
@@ -196,18 +204,21 @@ struct AbsoluteSelfObservation {
     Position position;
     AbsoluteRotation rotation;
     Goal goal;
+    VehicleSize vehicle_size;
 };
 
-enum class Validity : int32_t {
-    Invalid = 0,
-    Valid = 1
-};
+const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
 
-struct ValidState {
-    Validity valid[consts::kMaxAgentCount];
-};
+static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
 /* ECS Archetypes for the game */
+
+struct CameraAgent : public madrona::Archetype<
+    Position,
+    Rotation,
+    madrona::render::RenderCamera,
+    madrona::render::Renderable
+> {};
 
 // There are 2 Agents in the environment trying to get to the destination
 struct Agent : public madrona::Archetype<
@@ -229,7 +240,6 @@ struct Agent : public madrona::Archetype<
     EntityType,
 
     // gpudrive
-    BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,
@@ -249,6 +259,7 @@ struct Agent : public madrona::Archetype<
     // Reward, episode termination
     Reward,
     Done,
+    Info,
 
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component

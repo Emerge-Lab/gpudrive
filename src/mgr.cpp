@@ -7,6 +7,7 @@
 #include <madrona/physics_loader.hpp>
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
+#include <nlohmann/json.hpp>
 #include <madrona/render/api.hpp>
 #include <nlohmann/json.hpp>
 
@@ -81,8 +82,8 @@ static inline Optional<render::RenderManager> initRenderManager(
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = mgr_cfg.numWorlds,
-        .maxViewsPerWorld = consts::kMaxAgentCount, // FIXME?
-        .maxInstancesPerWorld = 1000,
+        .maxViewsPerWorld = consts::kMaxAgentCount + 1, // FIXME?
+        .maxInstancesPerWorld = 3000,
         .execMode = mgr_cfg.execMode,
         .voxelCfg = {},
     });
@@ -418,9 +419,10 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
     {
         assert(cfg.numWorlds >= mapFiles.size());
+        auto numFiles = mapFiles.size();
         for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
         {
-            mapFiles.push_back(mapFiles[0]);
+            mapFiles.push_back(mapFiles[i % numFiles]);
         }
     }
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
@@ -435,13 +437,27 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     return mapFiles;
 }
 
+bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
+    madrona::CountT roadObservationsCount =
+        sizeof(AgentMapObservations) / sizeof(MapObservation);
+
+    return algo ==
+               FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
+           (algo ==
+                FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
+}
+
 Manager::Impl * Manager::Impl::init(
     const Manager::Config &mgr_cfg)
 {
     Sim::Config sim_cfg;
-    sim_cfg.autoReset = mgr_cfg.autoReset;
+    sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
     std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
+
+    assert(isRoadObservationAlgorithmValid(
+        mgr_cfg.params.roadObservationAlgorithm));
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -467,9 +483,9 @@ Manager::Impl * Manager::Impl::init(
     
         for (auto const &mapFile : mapFiles)
         {
-            auto map_ = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                map_, paramsDevicePtr};
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
+                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, paramsDevicePtr};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -543,9 +559,9 @@ Manager::Impl * Manager::Impl::init(
     
         for (auto const &mapFile : mapFiles)
         {
-            auto map_ = MapReader::parseAndWriteOut(mapFile, mgr_cfg.execMode, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr,
-                                                map_, &(mgr_cfg.params)};
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
+                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
         }
         assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
 
@@ -656,17 +672,6 @@ Tensor Manager::actionTensor() const
         });
 }
 
-Tensor Manager::bicycleModelTensor() const
-{
-    return impl_->exportTensor(ExportID::BicycleModel, TensorElementType::Float32,
-        {
-            impl_->cfg.numWorlds,
-            consts::kMaxAgentCount,
-            BicycleModelExportSize, // Number of states for the bicycle model
-        });
-}
-
-
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
@@ -687,6 +692,16 @@ Tensor Manager::doneTensor() const
                                });
 }
 
+Tensor Manager::infoTensor() const
+{
+    return impl_->exportTensor(ExportID::Info, TensorElementType::Int32,
+                               {
+                                   impl_->cfg.numWorlds,
+                                   consts::kMaxAgentCount,
+                                   InfoExportSize
+                               });
+}
+
 Tensor Manager::selfObservationTensor() const
 {
     return impl_->exportTensor(ExportID::SelfObservation,
@@ -695,7 +710,7 @@ Tensor Manager::selfObservationTensor() const
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
                                    SelfObservationExportSize
-                               });
+			       });
 }
 
 Tensor Manager::mapObservationTensor() const
@@ -716,8 +731,8 @@ Tensor Manager::partnerObservationsTensor() const
                                {
                                    impl_->cfg.numWorlds,
                                    consts::kMaxAgentCount,
-                                   consts::kMaxAgentCount-1,
-                                   PartnerObservationExportSize,
+                                   consts::kMaxAgentCount - 1,
+                                   PartnerObservationExportSize
                                });
 }
 
@@ -727,8 +742,8 @@ Tensor Manager::agentMapObservationsTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->cfg.numWorlds,
-				                   consts::kMaxAgentCount,
-                                   consts::kMaxRoadEntityCount,
+				   consts::kMaxAgentCount,
+                                   consts::kMaxAgentMapObservationsCount,
                                    AgentMapObservationExportSize,
                                });
 
@@ -766,16 +781,45 @@ Tensor Manager::controlledStateTensor() const {
                                {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
 }
 
+Tensor Manager::responseTypeTensor() const {
+    return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
+                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 3 + 4 + 1 + 2});
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
 }
 
 Tensor Manager::validStateTensor() const {
     return impl_->exportTensor(
         ExportID::ValidState, TensorElementType::Int32,
         {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::expertTrajectoryTensor() const {
+    return impl_->exportTensor(
+        ExportID::Trajectory, TensorElementType::Float32,
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
+}
+
+void Manager::triggerReset(int32_t world_idx)
+{
+    WorldReset reset {
+        1,
+    };
+
+    auto *reset_ptr = impl_->worldResetBuffer + world_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(reset_ptr, &reset, sizeof(WorldReset),
+                   cudaMemcpyHostToDevice);
+#endif
+    }  else {
+        *reset_ptr = reset;
+    }
 }
 
 Tensor Manager::rgbTensor() const
@@ -805,26 +849,6 @@ Tensor Manager::depthTensor() const
         1,
     }, impl_->cfg.gpuID);
 }
-
-
-void Manager::triggerReset(int32_t world_idx)
-{
-    WorldReset reset {
-        1,
-    };
-
-    auto *reset_ptr = impl_->worldResetBuffer + world_idx;
-
-    if (impl_->cfg.execMode == ExecMode::CUDA) {
-#ifdef MADRONA_CUDA_SUPPORT
-        cudaMemcpy(reset_ptr, &reset, sizeof(WorldReset),
-                   cudaMemcpyHostToDevice);
-#endif
-    }  else {
-        *reset_ptr = reset;
-    }
-}
-
 
 void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                         float acceleration, float steering, float headAngle) {

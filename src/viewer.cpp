@@ -8,7 +8,6 @@
 #include <fstream>
 #include <optional>
 
-#include <nlohmann/json.hpp>
 #include <iostream>
 
 using namespace madrona;
@@ -110,19 +109,19 @@ int main(int argc, char *argv[])
         true;
 #endif
 
-    WindowManager wm{};
-    WindowHandle window = wm.makeWindow("Escape Room", 2730, 1536);
-    render::GPUHandle render_gpu = wm.initGPU(0, {window.get()});
+    WindowManager wm {};
+    WindowHandle window = wm.makeWindow("Escape Room", 640, 480);
+    render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = num_worlds,
-        .autoReset = replay_log.has_value(),
-        .jsonPath = "/home/aarav/gpudrive/nocturne_data",
+        .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
+            .maxNumControlledVehicles = 0
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
@@ -135,19 +134,13 @@ int main(int argc, char *argv[])
          math::Quat::angleAxis(-math::pi / 2.f, math::right))
             .normalize();
 
-    std::string path = "/home/aarav/gpudrive/nocturne_data/test.json";
-    std::cout << path << std::endl;
-    std::ifstream in(path);
-    nlohmann::json rawJson;
-    in >> rawJson;
-    auto mean = calc_mean(rawJson);
-    Viewer viewer(mgr.getRenderManager(), window.get(), {
-                                                            .numWorlds = num_worlds,
-                                                            .simTickRate = 20,
-                                                            .cameraMoveSpeed = 20.f,
-                                                            .cameraPosition = mean.first * math::right + mean.second * math::fwd + 200.f * math::up,
-                                                            .cameraRotation = initial_camera_rotation,
-                                                        });
+        Viewer viewer(mgr.getRenderManager(), window.get(), {
+        .numWorlds = num_worlds,
+        .simTickRate = 20,
+        .cameraMoveSpeed = 20.f,
+        .cameraPosition = 100.f * math::up,
+        .cameraRotation = initial_camera_rotation,
+    });
 
     auto replayStep = [&]()
     {

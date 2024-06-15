@@ -1,5 +1,6 @@
 #include "level_gen.hpp"
 #include "utils.hpp"
+#include "dynamics.hpp"
 
 namespace gpudrive {
 
@@ -28,8 +29,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
 
-    ctx.get<BicycleModel>(agent) = {
-        .position = {.x = xCoord, .y = yCoord}, .heading = heading, .speed = speed};
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
@@ -39,12 +38,44 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;
+    ctx.get<Info>(agent) = Info{};
+    ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
+
+    if(ctx.get<ResponseType>(agent) == ResponseType::Static)
+    {
+        // Make sure the agent does not move.
+        ctx.get<Velocity>(agent) = {Vector3::zero(), Vector3::zero()};
+    }
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
 #endif
 }
 
+static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, const MapObject &agentInit) {
+    auto &trajectory = ctx.get<Trajectory>(agent);
+    for(CountT i = 0; i < agentInit.numPositions; i++)
+    {
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
+        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.valids[i] = (float)agentInit.valid[i];
+    }
+
+    for(CountT i = agentInit.numPositions - 2; i >=0; i--)
+    {   
+        if(!trajectory.valids[i] || !trajectory.valids[i+1])
+        {
+            trajectory.inverseActions[i] = Action{.acceleration = 0, .steering = 0, .headAngle = 0};
+            continue;
+        }
+        Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
+        Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
+        Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
+        Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
+        trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
+    }
+}
 
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
@@ -53,13 +84,22 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     // be set once
     ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
     ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<ResponseType>(agent) = ResponseType::Dynamic;
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
     ctx.get<EntityType>(agent) = agentInit.type;
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0])
+
+    populateExpertTrajectory(ctx, agent, agentInit);
+
+    if(!ctx.data().params.isStaticAgentControlled && (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent).positions[0]).length() < consts::staticThreshold)
+    {
+        ctx.get<ResponseType>(agent) = ResponseType::Static;
+    }
+
+    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
         ctx.data().numControlledVehicles++;
@@ -68,25 +108,12 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     {
         ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
     }
-
-    // Since position, heading, and speed may vary within an episode, their
-    // values are retained so that on an episode reset they can be restored to
-    // their initial values.
-    auto &trajectory = ctx.get<Trajectory>(agent);
-    auto length = agentInit.length/2;
-    auto width = agentInit.width/2;
-    for(CountT i = 0; i < agentInit.numPositions; i++)
-    {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x + length, .y = agentInit.position[i].y - ctx.data().mean.y + width};
-        trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]);
-        trajectory.valids[i] = agentInit.valid[i];
-    }
-
+    
     if(ctx.get<ControlledState>(agent).controlledState == ControlMode::BICYCLE)
     {
         ctx.data().maxDist = fmaxf(ctx.data().maxDist, (ctx.get<Goal>(agent).position - trajectory.positions[0]).length());
     }
+
     // This is not stricly necessary since , but is kept here for consistency
     resetAgent(ctx, agent);
 
@@ -302,7 +329,7 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
                                                             .scale = ctx.get<Scale>(physicsEntity),
                                                             .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
-                                                            .type = 0};
+                                                            .type = float(EntityType::Padding)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
     return physicsEntity;
@@ -320,22 +347,52 @@ void createPaddingEntities(Engine &ctx) {
     }
 }
 
+void createCameraEntity(Engine &ctx)
+{
+    auto camera = ctx.makeRenderableEntity<CameraAgent>();
+    ctx.get<Position>(camera) = Vector3{.x = 0, .y = 0, .z = 20};
+    ctx.get<Rotation>(camera) = (math::Quat::angleAxis(0, math::up) *
+            math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
+
+    render::RenderingSystem::attachEntityToView(ctx,
+        camera,
+        150.f, 0.001f,
+        1.5f * math::up);
+}
+
 void createPersistentEntities(Engine &ctx, Map *map) {
-    createFloorPlane(ctx);
+    // createFloorPlane(ctx);
+
+    if (ctx.data().enableRender)
+    {
+        createCameraEntity(ctx);
+    }
+
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
     ctx.data().numControlledVehicles = 0;
     ctx.data().maxDist = 1;
 
-    CountT agentIdx;
-    for (agentIdx = 0; agentIdx < map->numObjects; ++agentIdx) {
+    CountT agentIdx = 0;
+    for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
         if(agentIdx >= consts::kMaxAgentCount)
             break;
-        const auto &agentInit = map->objects[agentIdx];
+        if (ctx.data().params.IgnoreNonVehicles)
+        {
+            if (map->objects[agentCtr].type == EntityType::Pedestrian || map->objects[agentCtr].type == EntityType::Cyclist)
+            {
+                continue;
+            }
+        }
+        const auto &agentInit = map->objects[agentCtr];
+        if (ctx.data().params.initOnlyValidAgentsAtFirstStep && agentInit.valid[0] == false)
+        {
+            continue;
+        }
         auto agent = createAgent(
             ctx, agentInit);
-        ctx.data().agents[agentIdx] = agent;
+        ctx.data().agents[agentIdx++] = agent;
     } 
     
     ctx.data().numAgents = agentIdx; 
@@ -365,6 +422,8 @@ static void resetPaddingEntities(Engine &ctx) {
         Entity agent = ctx.data().agents[agentIdx];
         ctx.get<Done>(agent).v = 0;
         ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
+        ctx.get<Info>(agent) = Info{};
+        ctx.get<Info>(agent).type = (int32_t)ctx.get<EntityType>(agent);
         registerRigidBodyEntity(ctx, agent, SimObject::Agent);
     }
 
