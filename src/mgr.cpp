@@ -673,17 +673,6 @@ Tensor Manager::actionTensor() const
         });
 }
 
-Tensor Manager::bicycleModelTensor() const
-{
-    return impl_->exportTensor(ExportID::BicycleModel, TensorElementType::Float32,
-        {
-            impl_->cfg.numWorlds,
-            consts::kMaxAgentCount,
-            BicycleModelExportSize, // Number of states for the bicycle model
-        });
-}
-
-
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
@@ -809,6 +798,12 @@ Tensor Manager::validStateTensor() const {
     return impl_->exportTensor(
         ExportID::ValidState, TensorElementType::Int32,
         {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::expertTrajectoryTensor() const {
+    return impl_->exportTensor(
+        ExportID::Trajectory, TensorElementType::Float32,
+        {impl_->cfg.numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
 }
 
 void Manager::triggerReset(int32_t world_idx)
