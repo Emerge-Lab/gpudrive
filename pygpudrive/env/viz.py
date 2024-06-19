@@ -21,24 +21,13 @@ class PyGameVisualizer:
         (255, 165, 0),  # Orange
     ]
     color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (102, 255, 102),  # Bright Green
-        float(gpudrive.EntityType.RoadLine): (255, 255, 0),  # Bright Yellow
-        float(gpudrive.EntityType.RoadLane): (200, 200, 200),  # Light Grey
-        float(gpudrive.EntityType.SpeedBump): (255, 165, 0),  # Bright Orange
-        float(gpudrive.EntityType.CrossWalk): (255, 0, 255),  # Purple
-        float(gpudrive.EntityType.StopSign): (255, 0, 0),  # Bright Red
-        float(gpudrive.EntityType.Vehicle): (192, 192, 192),  # Light Grey
-        float(gpudrive.EntityType.Pedestrian): (128, 128, 128),  # Dark grey
+        float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
+        float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
+        float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
+        float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
+        float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
+        float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
     }
-    # color_dict = {
-    #     float(gpudrive.EntityType.RoadEdge): (34, 139, 34),  # Dark Green
-    #     float(gpudrive.EntityType.RoadLine): (204, 204, 0),  # Dark Yellow
-    #     float(gpudrive.EntityType.RoadLane): (105, 105, 105),  # Dark Grey
-    #     float(gpudrive.EntityType.SpeedBump): (255, 140, 0),  # Dark Orange
-    #     float(gpudrive.EntityType.CrossWalk): (0, 0, 139),  # Dark Blue
-    #     float(gpudrive.EntityType.StopSign): (139, 0, 0),  # Dark Red
-    #     float(gpudrive.EntityType.Vehicle): (169, 169, 169),  # Dark Grey
-    # }
 
     def __init__(self, sim, render_config, goal_radius):
         self.sim = sim
