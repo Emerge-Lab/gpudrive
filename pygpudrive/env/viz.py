@@ -27,6 +27,9 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
         float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
+        float(gpudrive.EntityType.Vehicle): (255, 0, 0),  # Red
+        float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
+        float(gpudrive.EntityType.Cyclist): (0, 0, 255),  # Blue
     }
 
     def __init__(self, sim, render_config, goal_radius):
@@ -326,28 +329,15 @@ class PyGameVisualizer:
     def plotLidar(self, surf, lidar_data, world_render_idx):
         numLidarSamples = lidar_data.shape[0]
 
-        lidar_depths = lidar_data[:, 0]
         lidar_entity_types = lidar_data[:, 1]
         lidar_pos = lidar_data[:, 2:4]
-
-        lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
-
-        num_lidar_plotted = 0
 
         for i in range(numLidarSamples):
             if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
                 continue
             coords = lidar_pos[i]
             scaled_coords = self.scale_coords(coords, world_render_idx)
-            # pygame.draw.circle(
-            #     surface=surf,
-            #     color=self.color_dict[lidar_entity_types[i]],
-            #     center=(
-            #         int(scaled_coords[0]),
-            #         int(scaled_coords[1]),
-            #     ),
-            #     radius=2,
-            # )
+           
             pygame.gfxdraw.aacircle(
                 surf,
                 int(scaled_coords[0]),
@@ -363,32 +353,6 @@ class PyGameVisualizer:
                 2,
                 self.color_dict[lidar_entity_types[i]]
             )
-            num_lidar_plotted += 1
-
-        # for i in range(numLidarSamples):
-        #     if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
-        #         continue
-        #     angle = lidar_angles[i]
-        #     depth = lidar_depths[i]
-        #     if depth == 0:
-        #         continue
-        #     x = depth * np.cos(angle)
-        #     y = depth * np.sin(angle)
-
-        #     start = self.scale_coords((0, 0), world_render_idx)
-        #     end = self.scale_coords(np.array([x, y]), world_render_idx)
-
-        #     pygame.draw.circle(
-        #         surface=surf,
-        #         color=self.color_dict[lidar_entity_types[i]],
-        #         center=(
-        #             int(end[0]),
-        #             int(end[1]),
-        #         ),
-        #         radius=2,
-        #     )
-        #     # pygame.draw.line(temp_surf, (255, 255, 255), start, end, 2)
-        #     num_lidar_plotted += 1
 
     def draw(self, cont_agent_mask, world_render_idx=0):
         """Render the environment."""
@@ -610,13 +574,7 @@ class PyGameVisualizer:
         elif self.render_config.render_mode == RenderMode.PYGAME_LIDAR:
             render_rgbs = []
             num_agents = self.num_agents[world_render_idx][0]
-            agent_response_types = (
-                self.sim.response_type_tensor()
-                .to_torch()[world_render_idx, :, :]
-                .cpu()
-                .detach()
-                .numpy()
-            )
+
             # Loop through each agent to render their egocentric view
             for agent_idx in range(num_agents):
                 info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
@@ -626,9 +584,6 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
-
-                # if agent_response_types[agent_idx] == 2:
-                #     continue
 
                 self.surf.fill(self.BACKGROUND_COLOR)
                 temp_surf = pygame.Surface(
@@ -651,39 +606,9 @@ class PyGameVisualizer:
                     .detach()
                     .numpy()
                 )
-
-                lidar_depths = lidar_data[:, 0]
-
-                lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
-
-                num_lidar_plotted = 0
-
-                for i in range(numLidarSamples):
-                    angle = lidar_angles[i]
-                    depth = lidar_depths[i]
-                    if depth == 0:
-                        continue
-                    x = depth * np.cos(angle)
-                    y = depth * np.sin(angle)
-
-                    start = self.scale_coords((0, 0), world_render_idx)
-                    end = self.scale_coords(np.array([x, y]), world_render_idx)
-
-                    pygame.gfxdraw.aacircle(
-                        temp_surf,
-                        int(end[0]),
-                        int(end[1]),
-                        2,
-                        (255, 255, 255)
-                    )
-                    pygame.gfxdraw.filled_circle(
-                        temp_surf,
-                        int(end[0]),
-                        int(end[1]),
-                        2,
-                        (255, 255, 255)
-                    )
-                    num_lidar_plotted += 1
+                
+                for lidar_plane in lidar_data:
+                    self.plotLidar(temp_surf, lidar_plane, world_render_idx)
 
                 goal_pos = agent_info[3:5]  # x, y
                 agent_size = agent_info[1:3]  # length, width
