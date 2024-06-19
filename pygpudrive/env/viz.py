@@ -231,26 +231,6 @@ class PyGameVisualizer:
         )
         return start, end
 
-    def draw_line(self, surf, start, end, color):
-        c1 = (start[0] + end[0]) / 2
-        c2 = (start[1] + end[1]) / 2
-        center_L1 = (c1, c2)
-        length = math.sqrt((start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2)
-        thickness = 2
-        angle = math.atan2(start[1] - end[1], start[0] - end[0])
-
-        UL = (center_L1[0] + (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        UR = (center_L1[0] - (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
-        BL = (center_L1[0] + (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        BR = (center_L1[0] - (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
-
-        pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
-        pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
-
     def draw_map(self, surf, map_info, world_render_idx=0):
         for idx, map_obj in enumerate(map_info):
 
@@ -342,19 +322,6 @@ class PyGameVisualizer:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
-
-    def draw_circle(self, surf, center, radius, color, thickness):
-        for i in range(thickness):
-            try:
-                pygame.gfxdraw.aacircle(
-                    surf,
-                    int(center[0]),
-                    int(center[1]),
-                    int(radius) + i,
-                    color)
-            except:
-                continue
-
 
     def plotLidar(self, surf, lidar_data, world_render_idx):
         numLidarSamples = lidar_data.shape[0]
