@@ -340,6 +340,7 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
+                
                 self.surf.fill(self.BACKGROUND_COLOR)
                 agent_map_info = (
                     self.sim.agent_roadmap_tensor()
@@ -424,9 +425,9 @@ class PyGameVisualizer:
                     ]
 
                     pygame.gfxdraw.aapolygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.COLOR_LIST[1])
                     pygame.gfxdraw.filled_polygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.COLOR_LIST[1], )
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
