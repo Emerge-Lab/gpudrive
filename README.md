@@ -3,12 +3,17 @@ GPUDrive
 
 This is an Batch RL environment simulator of Nocturne built on the [Madrona Engine](https://madrona-engine.github.io). It supports loading multiple worlds with multi agent support. Python bindings are exposed for easy integration with RL algorithms.
 
-<p align="center">
-  <img src="data/Egocentric.gif" alt="Egocentric" width="400"/>
-  <img src="data/absolute.gif" alt="Absolute" width="400">
-  <img src="data/Lidar360.gif" alt="Lidar with 360 FOV" width="400"/>
-  <img src="data/Lidar120.gif" alt="Lidar with 120 FOV" width="400"/>
-</p>
+<table>
+  <tr>
+    <td><img src="data/absolute.gif" alt="Absolute"></td>
+    <td><img src="data/Egocentric.gif" alt="Egocentric"/></td>
+  </tr>
+  <tr>
+    <td><img src="data/Lidar360.gif" alt="Lidar with 360 FOV"/></td>
+    <td><img src="data/Lidar120.gif" alt="Lidar with 120 FOV"/></td>
+  </tr>
+</table>
+
 
 Build Instructions
 --------
