@@ -11,7 +11,7 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (55, 55, 55)  # Charcoal
+    BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 69, 69),  # Red
@@ -531,16 +531,12 @@ class PyGameVisualizer:
                     goal_pos[agent_idx], world_render_idx
                 )
 
-                # mod_idx = agent_idx % len(self.COLOR_LIST)
+                mod_idx = agent_idx % len(self.COLOR_LIST)
 
-                # if cont_agent_mask[world_render_idx, agent_idx]:
-                #     mod_idx = 0
+                if cont_agent_mask[world_render_idx, agent_idx]:
+                    mod_idx = 0
 
-                # color = self.COLOR_LIST[mod_idx]
-                if agent_idx == 1:
-                    color = (255, 0, 0) # Red
-                else:
-                    color = (211, 211, 211) # Light grey
+                color = self.COLOR_LIST[mod_idx]
 
                 if agent_response_types[agent_idx] == 2:
                     color = (128, 128, 128)
