@@ -27,7 +27,7 @@ class PyGameVisualizer:
         float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
         float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
-        float(gpudrive.EntityType.Vehicle): (255, 0, 0),  # Red
+        float(gpudrive.EntityType.Vehicle): (0, 255, 0),  # Green
         float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
         float(gpudrive.EntityType.Cyclist): (0, 0, 255),  # Blue
     }
