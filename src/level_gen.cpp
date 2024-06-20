@@ -26,7 +26,6 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto yCoord = ctx.get<Trajectory>(agent).positions[0].y;
     auto xVelocity = ctx.get<Trajectory>(agent).velocities[0].x;
     auto yVelocity = ctx.get<Trajectory>(agent).velocities[0].y;
-    auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent).headings[0];
 
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
@@ -268,19 +267,6 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
     }
 }
 
-static void createFloorPlane(Engine &ctx)
-{
-    ctx.data().floorPlane = ctx.makeRenderableEntity<PhysicsEntity>();
-    ctx.get<Position>(ctx.data().floorPlane) = Vector3{.x = 0, .y = 0, .z = 0};
-    ctx.get<Rotation>(ctx.data().floorPlane) = Quat { 1, 0, 0, 0 };
-    ctx.get<Scale>(ctx.data().floorPlane) = Diag3x3{1, 1, 1};
-    ctx.get<ObjectID>(ctx.data().floorPlane) = ObjectID{(int32_t)SimObject::Plane};
-    ctx.get<Velocity>(ctx.data().floorPlane) = {Vector3::zero(), Vector3::zero()};
-    ctx.get<ResponseType>(ctx.data().floorPlane) = ResponseType::Static;
-    ctx.get<EntityType>(ctx.data().floorPlane) = EntityType::None;
-    registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
-}
-
 static inline Entity createAgentPadding(Engine &ctx) {
     auto agent = ctx.makeRenderableEntity<Agent>();
 
@@ -350,8 +336,6 @@ void createCameraEntity(Engine &ctx)
 }
 
 void createPersistentEntities(Engine &ctx, Map *map) {
-    // createFloorPlane(ctx);
-
     if (ctx.data().enableRender)
     {
         createCameraEntity(ctx);

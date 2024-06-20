@@ -30,9 +30,9 @@ protected:
             .useWayMaxModel = false
         }
     });
-    
-    uint32_t num_agents = gpudrive::consts::kMaxAgentCount;
-    int64_t num_roads = gpudrive::consts::kMaxRoadEntityCount;
+
+    CountT num_agents = gpudrive::consts::kMaxAgentCount;
+    CountT num_roads = gpudrive::consts::kMaxRoadEntityCount;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
     int64_t numEntities = 0;
@@ -102,7 +102,7 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
 
 std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, const py::Tensor &self_obs, const std::vector<float> &expected, const uint32_t num_agents)
 {
-    int64_t num_elems = 1;
+    std::size_t num_elems = 1;
     for (int i = 0; i < abs_obs.numDims(); i++)
     {
         num_elems *= abs_obs.dims()[i];
@@ -126,8 +126,8 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
 
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
 
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
-    {
+    for (std::size_t i = 0, agent_idx = 0;
+         i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;) {
         auto x = static_cast<float>(ptr[i]);
         auto y = static_cast<float>(ptr[i + 1]);
         auto rot = static_cast<float>(ptr[i + 7]);
@@ -143,10 +143,10 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
             return {false, "Value mismatch."};
         }
     }
-    
+
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
-    {
+    for (std::size_t i = 0, agent_idx = 0;
+         i < num_agents * gpudrive::SelfObservationExportSize;) {
         auto speed = static_cast<float>(ptr[i]);
         auto speed_exp = expected[agent_idx+3];
 
@@ -167,8 +167,8 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
     std::vector<float> obs;
     obs.resize(num_agents * 4);
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
-    {
+    for (std::size_t i = 0, agent_idx = 0;
+         i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;) {
         obs[agent_idx] = static_cast<float>(ptr[i]);
         obs[agent_idx+1] = static_cast<float>(ptr[i+1]);
         obs[agent_idx+2] = static_cast<float>(ptr[i+7]);
@@ -176,8 +176,8 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
         i+=gpudrive::AbsoluteSelfObservationExportSize;
     }
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
-    {
+    for (std::size_t i = 0, agent_idx = 0;
+         i < num_agents * gpudrive::SelfObservationExportSize;) {
         obs[agent_idx+3] = static_cast<float>(ptr[i]);
         agent_idx += 4;
         i+=gpudrive::SelfObservationExportSize;
@@ -239,5 +239,4 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
         std::tie(valid, errorMsg) = validateBicycleModel(abs_obs, self_obs, expected, num_agents);
         ASSERT_TRUE(valid);
     }
-
 }
