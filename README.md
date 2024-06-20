@@ -5,14 +5,35 @@ This is an Batch RL environment simulator of Nocturne built on the [Madrona Engi
 
 <table>
   <tr>
-    <td><img src="data/absolute.gif" alt="Absolute"></td>
-    <td><img src="data/Egocentric.gif" alt="Egocentric"/></td>
+    <td>
+      <figure>
+        <img src="data/absolute.gif" alt="Absolute">
+        <center><figcaption>Absolute</figcaption></center>
+      </figure>
+    </td>
+    <td>
+      <figure>
+        <img src="data/Egocentric.gif" alt="Egocentric">
+        <center><figcaption>Egocentric</figcaption></center>
+      </figure>
+    </td>
   </tr>
   <tr>
-    <td><img src="data/Lidar360.gif" alt="Lidar with 360 FOV"/></td>
-    <td><img src="data/Lidar120.gif" alt="Lidar with 120 FOV"/></td>
+    <td>
+      <figure>
+        <img src="data/Lidar360.gif" alt="Lidar with 360 FOV">
+        <center><figcaption>Lidar with 360 FOV</figcaption></center>
+      </figure>
+    </td>
+    <td>
+      <figure>
+        <img src="data/Lidar120.gif" alt="Lidar with 120 FOV">
+        <center><figcaption>Lidar with 120 FOV</figcaption></center>
+      </figure>
+    </td>
   </tr>
 </table>
+
 
 
 Build Instructions
