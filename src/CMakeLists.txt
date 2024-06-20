@@ -1,5 +1,3 @@
-add_compile_options(-Wall -Wextra -Werror)
-
 set(SIMULATOR_SRCS
     types.hpp
     sim.hpp sim.cpp

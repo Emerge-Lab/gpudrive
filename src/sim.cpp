@@ -37,6 +37,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentMapObservations>();
     registry.registerComponent<Reward>();
     registry.registerComponent<Done>();
+    registry.registerComponent<Progress>();
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
     registry.registerComponent<Lidar>();
@@ -90,6 +91,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Trajectory);
 }
 
+static inline void cleanupWorld(Engine &ctx) {}
+
 static inline void initWorld(Engine &ctx)
 {
     phys::PhysicsSystem::reset(ctx);
@@ -114,6 +117,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     reset.reset = 0;
+    cleanupWorld(ctx);
     initWorld(ctx);
 }
 
@@ -125,6 +129,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const Rotation &rot,
                                       const Velocity &vel,
                                       const Goal &goal,
+                                      const Progress &progress,
                                       const OtherAgents &other_agents,
                                       SelfObservation &self_obs,
                                       PartnerObservations &partner_obs,
@@ -394,7 +399,9 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 // distance achieved.
 inline void rewardSystem(Engine &ctx,
                          const Position &position,
+                         const Trajectory &trajectory,
                          const Goal &goal,
+                         Progress &progress,
                          Reward &out_reward)
 {
 
@@ -421,6 +428,29 @@ inline void rewardSystem(Engine &ctx,
     // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
 }
 
+// Each agent gets a small bonus to it's reward if the other agent has
+// progressed a similar distance, to encourage them to cooperate.
+// This system reads the values of the Progress component written by
+// rewardSystem for other agents, so it must run after.
+inline void bonusRewardSystem(Engine &ctx,
+                              OtherAgents &others,
+                              Progress &progress,
+                              Reward &reward)
+{
+    bool partners_close = true;
+    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
+        Entity other = others.e[i];
+        Progress other_progress = ctx.get<Progress>(other);
+
+        if (fabsf(other_progress.maxY - progress.maxY) > 2.f) {
+            partners_close = false;
+        }
+    }
+
+    if (partners_close && reward.v > 0.f) {
+        reward.v *= 1.25f;
+    }
+}
 
 // Keep track of the number of steps remaining in the episode and
 // notify training that an episode has completed by
@@ -599,7 +629,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-inline void collectAbsoluteObservationsSystem(Engine &/* ctx */,
+inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Position &position,
                                               const Rotation &rotation,
                                               const Goal &goal,
@@ -664,7 +694,9 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
             Position,
+            Trajectory,
             Goal,
+            Progress,
             Reward
         >>({phys_done});
 
@@ -706,6 +738,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Rotation,
             Velocity,
             Goal,
+            Progress,
             OtherAgents,
             SelfObservation,
 	        PartnerObservations,
