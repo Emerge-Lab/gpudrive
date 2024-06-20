@@ -106,16 +106,16 @@ namespace gpudrive
         float observationRadius;
         RewardParams rewardParams;
         DatasetInitOptions datasetInitOptions;
-        CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
+        CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop;
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
-        bool IgnoreNonVehicles = false; // Default: false
+        bool IgnoreNonVehicles = false;
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
-        bool initOnlyValidAgentsAtFirstStep = true; // Default: true
-        bool isStaticAgentControlled = false; // Default: false
+        bool initOnlyValidAgentsAtFirstStep = true;
+        bool isStaticAgentControlled = false;
         bool enableLidar = false;
         bool disableClassicalObs = false;
-        bool useWayMaxModel = false; // Default: false
+        bool useWayMaxModel = false;
     };
 
     struct WorldInit
