@@ -56,26 +56,74 @@ int main(int argc, char *argv[])
         }
     }
 
-    Manager mgr({.execMode = exec_mode,
-                 .gpuID = 0,
-                 .numWorlds = (uint32_t)num_worlds,
-                 .jsonPath = "tests/testJsons",
-                 .params = {
-                     .polylineReductionThreshold = 1.0,
-                     .observationRadius = 100.0,
-                     .rewardParams = {.rewardType = RewardType::DistanceBased,
-                                      .distanceToGoalThreshold = 0.5,
-                                      .distanceToExpertThreshold = 0.5},
-                     .datasetInitOptions = DatasetInitOptions::ExactN,
-                     .maxNumControlledVehicles = 0,
-                 }});
+    Manager mgr({
+        .execMode = exec_mode,
+        .gpuID = 0,
+        .numWorlds = (uint32_t)num_worlds,
+        .jsonPath = "tests/testJsons",
+        .params = {
+            .polylineReductionThreshold = 1.0,
+            .observationRadius = 100.0,
+            .rewardParams = {
+                .rewardType = RewardType::DistanceBased,
+                .distanceToGoalThreshold = 0.5,
+                .distanceToExpertThreshold = 0.5
+            },
+            .maxNumControlledVehicles = 0,
+        }
+    });
 
     std::random_device rd;
     std::mt19937 rand_gen(rd());
     std::uniform_real_distribution<float> acc_gen(-3.0,2.0);
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
-    auto worldToShape = mgr.getShapeTensorFromDeviceMemory(num_worlds);
+    auto action_printer = mgr.actionTensor().makePrinter();
+    auto self_printer = mgr.selfObservationTensor().makePrinter();
+    auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
+    auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
+    auto shapePrinter = mgr.shapeTensor().makePrinter();
+    auto rewardPrinter = mgr.rewardTensor().makePrinter();
+    auto donePrinter = mgr.doneTensor().makePrinter();
+    auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
+    auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
+    auto info_printer = mgr.infoTensor().makePrinter();
+
+    auto printObs = [&]() {
+        // printf("Self\n");
+        // self_printer.print();
+
+        // printf("Actions\n");
+        // action_printer.print();
+
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
+
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
+        // printf("\n");
+
+        // printf("Shape\n");
+        // shapePrinter.print();
+
+        // printf("Reward\n");
+        // rewardPrinter.print();
+
+        // printf("Done\n");
+        // donePrinter.print();
+
+        // printf("Controlled State\n");
+        // controlledStatePrinter.print();
+
+        printf("Agent Map Obs\n");
+        agent_map_obs_printer.print();
+
+        printf("Info\n");
+        info_printer.print();
+    };
+
+    auto worldToShape =
+	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {

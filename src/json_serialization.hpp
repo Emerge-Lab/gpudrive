@@ -2,7 +2,7 @@
 
 #include "init.hpp"
 #include "types.hpp"
-#include <cstddef>
+#include <iostream>
 #include <nlohmann/json.hpp>
 
 namespace gpudrive
@@ -13,7 +13,10 @@ namespace gpudrive
         p.y = j.at("y").get<float>();
     }
 
-    void from_json(const nlohmann::json &j, MapObject &obj) {
+    void from_json(const nlohmann::json &j, MapObject &obj)
+    {
+        const auto &valid = j.at("valid");
+
         obj.mean = {0,0};
         uint32_t i = 0;
         for (const auto &pos : j.at("position"))
@@ -177,7 +180,8 @@ namespace gpudrive
                 }
                 k++;
             }
-            for (std::size_t i = 0; i < new_geometry_points.size(); i++) {
+            for (int i = 0; i < new_geometry_points.size(); i++)
+            {
                 if(i==MAX_GEOMETRY)
                     break;
                 road.geometry[i] = new_geometry_points[i]; // Create the road lines
@@ -186,18 +190,21 @@ namespace gpudrive
         }
         else
         {
-            for (int64_t i = 0; i < num_sampled_points; ++i) {
+            for (int64_t i = 0; i < num_sampled_points ; ++i)
+            {
                 if(i==MAX_GEOMETRY)
                     break;
-                road.geometry[i] = geometry_points_[i * sample_every_n_];
+                road.geometry[i] = geometry_points_[i * sample_every_n_]; 
             }
             road.numPoints = num_sampled_points;
         }
 
-        for (std::size_t i = 0; i < road.numPoints; i++) {
+        for (int i = 0; i < road.numPoints; i++)
+        {
             road.mean.x += (road.geometry[i].x - road.mean.x)/(i+1);
             road.mean.y += (road.geometry[i].y - road.mean.y)/(i+1);
         }
+
     }
 
     std::pair<float, float> calc_mean(const nlohmann::json &j)
@@ -263,4 +270,4 @@ namespace gpudrive
         }
         map.numRoadSegments = countRoadPoints;
     }
-    } // namespace gpudrive
+}

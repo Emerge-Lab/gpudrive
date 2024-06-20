@@ -75,13 +75,11 @@ int main(int argc, char *argv[])
         .gpuID = 0,
         .numWorlds = num_worlds,
         .jsonPath = "tests/testJsons",
-        .params = {.polylineReductionThreshold = 1.0,
-                   .observationRadius = 100.0,
-                   .rewardParams = {.rewardType = RewardType::OnGoalAchieved,
-                                    .distanceToGoalThreshold = 0.5,
-                                    .distanceToExpertThreshold = 0.5},
-                   .datasetInitOptions = DatasetInitOptions::ExactN,
-		   .maxNumControlledVehicles = 0},
+        .params = {
+            .polylineReductionThreshold = 1.0,
+            .observationRadius = 100.0,
+            .maxNumControlledVehicles = 0
+        },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
         .extRenderDev = render_gpu.device(),
@@ -155,7 +153,7 @@ int main(int argc, char *argv[])
     };
 
     viewer.loop(
-    [](CountT world_idx, const Viewer::UserInput & /* input */) {
+    [](CountT world_idx, const Viewer::UserInput &input) {
         (void)world_idx;
     },
     [&mgr](CountT world_idx, CountT agent_idx,
@@ -171,6 +169,8 @@ int main(int argc, char *argv[])
         if (input.keyPressed(Key::R)) {
             mgr.triggerReset(world_idx);
         }
+
+        bool shift_pressed = input.keyPressed(Key::Shift);
 
         if (input.keyPressed(Key::W)) {
             acceleration += accelerationDelta;
