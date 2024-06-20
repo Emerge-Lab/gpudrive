@@ -28,7 +28,7 @@ class ReferenceFrame {
 public:
   ReferenceFrame(const madrona::math::Vector2 &position,
                  const madrona::base::Rotation &rotation)
-      : referencePosition(position), referenceRotation(rotation) {}
+      : referenceRotation(rotation), referencePosition(position) {}
 
   gpudrive::MapObservation
   observationOf(const madrona::math::Vector3 &position,

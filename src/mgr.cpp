@@ -12,13 +12,13 @@
 
 #include <array>
 #include <charconv>
-#include <cstddef>
-#include <cstdlib>
+#include <iostream>
+#include <iterator>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
-#include <random>
 #include <string>
+#include <cstdlib>
+#include <random>
 
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
@@ -343,8 +343,9 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.5f,
     });
 
-    SourceCollisionPrimitive plane_prim{.type = CollisionPrimitive::Type::Plane,
-                                        .plane = {}};
+    SourceCollisionPrimitive plane_prim {
+        .type = CollisionPrimitive::Type::Plane,
+    };
 
     src_objs[(CountT)SimObject::Plane] = {
         .prims = Span<const SourceCollisionPrimitive>(&plane_prim, 1),
@@ -420,8 +421,9 @@ static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
     {
         assert(cfg.numWorlds >= mapFiles.size());
         auto numFiles = mapFiles.size();
-        for (std::size_t i = mapFiles.size(); i < cfg.numWorlds; i++) {
-          mapFiles.push_back(mapFiles[i % numFiles]);
+        for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
+        {
+            mapFiles.push_back(mapFiles[i % numFiles]);
         }
     }
     else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
@@ -866,7 +868,9 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     }
 }
 
-std::vector<Shape> Manager::getShapeTensorFromDeviceMemory(uint32_t numWorlds) {
+std::vector<Shape>
+Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
+                                        uint32_t numWorlds) {
     const auto &tensor = shapeTensor();
 
     const std::size_t floatsPerShape{2};

@@ -153,6 +153,11 @@ struct StepsRemaining {
     uint32_t t;
 };
 
+// Can be refactored for rewards
+struct Progress {
+    float maxY;
+};
+
 // Per-agent component storing Entity IDs of the other agents. Used to
 // build the egocentric observations of their state.
 struct OtherAgents {
@@ -229,6 +234,7 @@ struct Agent : public madrona::Archetype<
     CollisionDetectionEvent,
   
     // Internal logic state.
+    Progress,
     OtherAgents,
     EntityType,
 
