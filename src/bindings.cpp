@@ -52,7 +52,7 @@ namespace gpudrive
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
-            .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("initOnlyValidAgentsAtFirstStep", &Parameters::initOnlyValidAgentsAtFirstStep)
             .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)

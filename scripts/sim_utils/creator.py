@@ -15,12 +15,20 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     # Initialize Parameters
     params_config = config['parameters']
     params = gpudrive.Parameters()
-    params.polylineReductionThreshold = 1.0
+    params.polylineReductionThreshold = params_config['polylineReductionThreshold']
     params.observationRadius = params_config['observationRadius']
     params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
+    params.rewardParams = reward_params
     params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])
     params.maxNumControlledVehicles = params_config['maxNumControlledVehicles']
-    params.rewardParams = reward_params
+    params.IgnoreNonVehicles = params_config['IgnoreNonVehicles']
+    params.roadObservationAlgorithm = getattr(gpudrive.FindRoadObservationsWith, params_config['roadObservationAlgorithm'])
+    params.initOnlyValidAgentsAtFirstStep = params_config['initOnlyValidAgentsAtFirstStep']
+    params.useWayMaxModel = params_config['useWayMaxModel']
+    params.enableLidar = params_config['enableLidar']
+    params.disableClassicalObs = params_config['disableClassicalObs']
+    params.isStaticAgentControlled = params_config['isStaticAgentControlled']
+
 
     # Initialize SimManager with parameters from the config
     sim_manager_config = config['sim_manager']
@@ -28,10 +36,8 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
         exec_mode=getattr(gpudrive.madrona.ExecMode, sim_manager_config['exec_mode']),
         gpu_id=sim_manager_config['gpu_id'],
         num_worlds=sim_manager_config['num_worlds'],
-        auto_reset=sim_manager_config['auto_reset'],
         json_path=sim_manager_config['json_path'],
-        params=params,
-        enable_batch_renderer = sim_manager_config['enable_batch_renderer'],
+        params=params
     )
     return sim
 
