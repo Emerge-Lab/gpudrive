@@ -83,6 +83,37 @@ class PyGameVisualizer:
         starts = centers - offsets
         ends = centers + offsets
         return starts, ends
+    
+    def draw_line(self, surf, start, end, color, thickness=2):
+        c1 = (start[0] + end[0]) / 2
+        c2 = (start[1] + end[1]) / 2
+        center_L1 = (c1, c2)
+        length = math.sqrt((start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2)
+        angle = math.atan2(start[1] - end[1], start[0] - end[0])
+
+        UL = (center_L1[0] + (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
+            center_L1[1] + (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
+        UR = (center_L1[0] - (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
+            center_L1[1] + (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+        BL = (center_L1[0] + (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
+            center_L1[1] - (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
+        BR = (center_L1[0] - (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
+            center_L1[1] - (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+
+        pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
+        pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
+    
+    def draw_circle(self, surf, center, radius, color, thickness=2):
+        for i in range(thickness):
+            try:
+                pygame.gfxdraw.aacircle(
+                    surf,
+                    int(center[0]),
+                    int(center[1]),
+                    int(radius) + i,
+                    color)
+            except:
+                continue
 
     def compute_window_settings(self, map_infos=None):
         if map_infos is None:
@@ -215,22 +246,22 @@ class PyGameVisualizer:
 
                 # DRAW ROAD EDGE
                 if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
-                    pygame.draw.aaline(
+                    self.draw_line(
                         surf,
-                        self.color_dict[map_obj[-1]],
                         start,
                         end,
-                        blend=1
+                        self.color_dict[map_obj[-1]],
+                        thickness=2
                     )
 
                 # DRAW ROAD LINES/LANES
                 else:
-                    pygame.draw.aaline(
+                    self.draw_line(
                         surf,
-                        self.color_dict[map_obj[-1]],
                         start,
                         end,
-                        blend=2
+                        self.color_dict[map_obj[-1]],
+                        thickness=2
                     )
 
             # DRAW STOP SIGNS
@@ -309,6 +340,7 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
+                
                 self.surf.fill(self.BACKGROUND_COLOR)
                 agent_map_info = (
                     self.sim.agent_roadmap_tensor()
@@ -368,14 +400,12 @@ class PyGameVisualizer:
                 pygame.gfxdraw.filled_polygon(
                     temp_surf, agent_corners, self.COLOR_LIST[0])
 
-                pygame.gfxdraw.aacircle(
+                self.draw_circle(
                     temp_surf,
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                    int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
+                    current_goal_scaled,
+                    self.goal_radius * self.zoom_scales_x[world_render_idx],
                     self.COLOR_LIST[0]
                 )
-
 
                 for agent in partner_agent_info:
                     agent_pos = agent[1:3]
@@ -395,9 +425,9 @@ class PyGameVisualizer:
                     ]
 
                     pygame.gfxdraw.aapolygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.COLOR_LIST[1])
                     pygame.gfxdraw.filled_polygon(
-                        temp_surf, self.COLOR_LIST[1], agent_corners)
+                        temp_surf, agent_corners, self.COLOR_LIST[1], )
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
@@ -487,11 +517,10 @@ class PyGameVisualizer:
                 )
             
                 if agent_response_types[agent_idx] != 2:
-                    pygame.gfxdraw.aacircle(
+                    self.draw_circle(
                         self.surf,
-                        int(current_goal_scaled[0]),
-                        int(current_goal_scaled[1]),
-                        int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
+                        current_goal_scaled,
+                        self.goal_radius * self.zoom_scales_x[world_render_idx],
                         color
                     )
 
@@ -588,12 +617,10 @@ class PyGameVisualizer:
                 pygame.gfxdraw.filled_polygon( 
                     temp_surf, agent_corners, self.COLOR_LIST[0])
                 
-
-                pygame.gfxdraw.aacircle(
+                self.draw_circle(
                     temp_surf,
-                    int(current_goal_scaled[0]),
-                    int(current_goal_scaled[1]),
-                    int(self.goal_radius * self.zoom_scales_x[world_render_idx]),
+                    current_goal_scaled,
+                    self.goal_radius * self.zoom_scales_x[world_render_idx],
                     self.COLOR_LIST[0]
                 )
 
