@@ -241,11 +241,10 @@ class MultiAgentCallback(BaseCallback):
 
                 # Render
                 if self.config.render:
-
                     # LOG FAILURE MODES
                     if (
-                        self.config.log_failure_modes_after is not None
-                        and self.num_timesteps
+                        self.config.log_failure_modes_after is None
+                        or self.num_timesteps
                         > self.config.log_failure_modes_after
                     ):
                         if self.num_rollouts % self.config.render_freq == 0:
@@ -270,8 +269,8 @@ class MultiAgentCallback(BaseCallback):
 
                     # LOG BEST SCENES
                     if (
-                        self.config.log_success_modes_after is not None
-                        and self.num_timesteps
+                        self.config.log_success_modes_after is None
+                        or self.num_timesteps
                         > self.config.log_success_modes_after
                     ):
                         if self.num_rollouts % self.config.render_freq == 0:
