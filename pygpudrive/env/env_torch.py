@@ -140,9 +140,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_states = self.sim.self_observation_tensor().to_torch()
             if self.config.norm_obs:
                 ego_states = self.normalize_ego_state(ego_states)
-                
-                if ego_states[self.cont_agent_mask].max() > 1.0 or ego_states[self.cont_agent_mask].min() < -1.0:
-                    print(f'ego_states: {ego_states[self.cont_agent_mask].max()}')
+
+                if (
+                    ego_states[self.cont_agent_mask].max() > 1.0
+                    or ego_states[self.cont_agent_mask].min() < -1.0
+                ):
+                    print(
+                        f"ego_states: {ego_states[self.cont_agent_mask].max()}"
+                    )
         else:
             ego_states = torch.Tensor().to(self.device)
 
@@ -159,9 +164,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 partner_observations = partner_observations.flatten(
                     start_dim=2
                 )
-                
-            if partner_observations[self.cont_agent_mask].max() > 1.0 or partner_observations[self.cont_agent_mask].min() < -1.0:
-                print(f'partner_observations: {partner_observations[self.cont_agent_mask].max()}')
+
+            if (
+                partner_observations[self.cont_agent_mask].max() > 1.0
+                or partner_observations[self.cont_agent_mask].min() < -1.0
+            ):
+                print(
+                    f"partner_observations: {partner_observations[self.cont_agent_mask].max()}"
+                )
 
         else:
             partner_observations = torch.Tensor().to(self.device)
@@ -179,9 +189,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 road_map_observations = road_map_observations.flatten(
                     start_dim=2
                 )
-                
-                if road_map_observations[self.cont_agent_mask].max() > 1.0 or road_map_observations[self.cont_agent_mask].min() < -1.0:
-                    print(f'road_map_observations: {road_map_observations[self.cont_agent_mask].max()}')
+
+                if (
+                    road_map_observations[self.cont_agent_mask].max() > 1.0
+                    or road_map_observations[self.cont_agent_mask].min() < -1.0
+                ):
+                    print(
+                        f"road_map_observations: {road_map_observations[self.cont_agent_mask].max()}"
+                    )
         else:
             road_map_observations = torch.Tensor().to(self.device)
 
@@ -349,7 +364,7 @@ if __name__ == "__main__":
         env.step_dynamics(rand_action)
 
         obs = env.get_obs()
-       
+
         reward = env.get_rewards()
         done = env.get_dones()
 
