@@ -8,24 +8,24 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "formatted_json_v2_no_tl_train"
-    generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
+    data_dir: str = "example_data"
+    generate_valid_json: bool = False
+    train_on_k_unique_scenes: int = 1  # If generate_valid_json = True, generates a json file with k unique scenarios
 
     # BATCH SIZE / NUM WORLDS
-    num_worlds: int = 512
+    num_worlds: int = 100
 
     device: str = "cuda"
 
     # RENDERING
     render: bool = False
     render_mode: str = "rgb_array"
-    render_freq: int = 250
+    render_freq: int = 1000
     track_time_to_solve: bool = False
     # Start rendering success/failure modes after this many global timesteps
     log_failure_modes_after: int = None  # Set to None to disable
     log_success_modes_after: int = None  # Set to None to disable
-    render_n_worlds: int = 5  # Number of worlds to render
+    render_n_worlds: int = 1  # Number of worlds to render
 
     # LOGGING & WANDB
     use_wandb: bool = True
@@ -34,8 +34,8 @@ class ExperimentConfig:
         100  # how many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "gpudrive"
-    group_name = "dc/paper_fig"
+    project_name = "gpudrive_debug"
+    group_name = "compare_single_scene"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
@@ -50,14 +50,14 @@ class ExperimentConfig:
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     vf_coef: float = 0.5
-    n_steps: int = 92  # Has to be at least > episode_length = 91
-    batch_size: int = 2048
+    n_steps: int = 4096 # Has to be at least > episode_length = 91
+    batch_size: int = 512
     verbose: int = 0
-    total_timesteps: int = 1e8
-    ent_coef: float = 0.001
+    total_timesteps: int = 1e7
+    ent_coef: float = 0.0
     vf_coef: float = 0.5
-    lr: float = 1e-3
-    n_epochs: int = 5
+    lr: float = 3e-4
+    n_epochs: int = 10
 
     # NETWORK
     mlp_class = LateFusionNet

@@ -73,8 +73,8 @@ class MultiAgentCallback(BaseCallback):
         wandb.define_metric(
             "metrics/perc_non_veh_collision", step_metric="global_step"
         )
-        wandb.define_metric("charts/max_obs", step_metric="global_step")
-        wandb.define_metric("charts/min_obs", step_metric="global_step")
+        wandb.define_metric("charts/obs_max", step_metric="global_step")
+        wandb.define_metric("charts/obs_min", step_metric="global_step")
 
     def _on_training_start(self) -> None:
         """
@@ -134,14 +134,15 @@ class MultiAgentCallback(BaseCallback):
             self.perc_truncated.append(
                 self.locals["env"].info_dict["truncated"]
             )
-            self.max_obs.append(self.locals["obs_tensor"].max().item())
-            self.min_obs.append(self.locals["obs_tensor"].min().item())
             
-
+            self.max_obs.append(self.locals["env"].obs_alive.max().item())
+            self.min_obs.append(self.locals["env"].obs_alive.min().item())
+            
             if self.step_counter % self.config.log_freq == 0:
                       
                 wandb.log(
                     {
+                        "metrics/global_step": self.num_timesteps,
                         "metrics/mean_ep_reward_per_agent": sum(
                             self.mean_reward_per_episode
                         )
@@ -176,8 +177,8 @@ class MultiAgentCallback(BaseCallback):
 
                 wandb.log(
                     {
-                        "charts/max_obs": np.array(self.max_obs).max(),
-                        "charts/min_obs": np.array(self.min_obs).min(),
+                        "charts/obs_max": np.array(self.max_obs).max(),
+                        "charts/obs_min": np.array(self.min_obs).min(),
                     }
                 )
             

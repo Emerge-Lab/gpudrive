@@ -3,6 +3,7 @@ import pyrallis
 from typing import Callable
 from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
+from datetime import datetime
 
 from utils.process import generate_valid_files_json
 from algorithms.sb3.ppo.ippo import IPPO
@@ -48,16 +49,19 @@ def train(exp_config: ExperimentConfig):
 
     # INIT WANDB
     run_id = None
+    datetime_ = datetime.now().strftime("%m_%d_%H_%S")
+    run_id = f"gpudrive_{datetime_}"
     if exp_config.use_wandb:
         run = wandb.init(
             project=exp_config.project_name,
+            name=run_id,
+            id=run_id,
             group=exp_config.group_name,
             sync_tensorboard=exp_config.sync_tensorboard,
             tags=exp_config.tags,
             mode=exp_config.wandb_mode,
             config={**exp_config.__dict__, **env_config.__dict__},
         )
-        run_id = run.id
 
     # CALLBACK
     custom_callback = MultiAgentCallback(
@@ -102,6 +106,9 @@ def train(exp_config: ExperimentConfig):
 if __name__ == "__main__":
 
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
+    
+    # Set number of steps in rollout based on batch size
+    exp_config.n_steps = 92 #max((4096 // exp_config.num_worlds), 92)
 
     if exp_config.generate_valid_json:
         actual_num_files = generate_valid_files_json(
@@ -109,6 +116,6 @@ if __name__ == "__main__":
             data_dir=exp_config.data_dir,
         )
         
-    exp_config.actual_num_files = actual_num_files
+        exp_config.actual_num_files = actual_num_files
 
     train(exp_config)
