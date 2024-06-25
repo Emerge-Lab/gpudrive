@@ -389,6 +389,9 @@ class IPPO(PPO):
         self.logger.record("train/explained_var", explained_var.item())
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
         self.logger.record(
+            "train/mean_advantages", advantages.abs().mean().item()
+        )
+        self.logger.record(
             "train/mean_abs_advantages", advantages.abs().mean().item()
         )
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))

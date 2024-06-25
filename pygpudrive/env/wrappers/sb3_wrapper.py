@@ -167,6 +167,12 @@ class SB3MultiAgentEnv(VecEnv):
 
         # now construct obs after the reset
         obs = self._env.get_obs()
+        
+        self.obs_alive = obs[~self.dead_agent_mask]
+        
+        if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
+            print(f"obs_alive: {self.obs_alive.max()}")
+            _ = self._env.get_obs()       
 
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
