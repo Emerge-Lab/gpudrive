@@ -50,7 +50,7 @@ class ExperimentConfig:
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     vf_coef: float = 0.5
-    n_steps: int = 4096 # Has to be at least > episode_length = 91
+    n_steps: int = 4096  # Has to be at least > episode_length = 91
     batch_size: int = 512
     verbose: int = 0
     total_timesteps: int = 1e7
