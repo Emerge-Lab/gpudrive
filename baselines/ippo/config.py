@@ -1,7 +1,5 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
-import torch
-
 
 @dataclass
 class ExperimentConfig:
@@ -9,11 +7,11 @@ class ExperimentConfig:
 
     # DATASET & DEVICE
     data_dir: str = "example_data"
-    generate_valid_json: bool = False
+    generate_valid_json: bool = True
     train_on_k_unique_scenes: int = 1  # If generate_valid_json = True, generates a json file with k unique scenarios
 
     # BATCH SIZE / NUM WORLDS
-    num_worlds: int = 100
+    num_worlds: int = 2
 
     device: str = "cuda"
 
@@ -35,7 +33,7 @@ class ExperimentConfig:
     )
     log_freq: int = 100
     project_name = "gpudrive_debug"
-    group_name = "compare_single_scene"
+    group_name = "observations"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
@@ -53,8 +51,8 @@ class ExperimentConfig:
     n_steps: int = 4096  # Has to be at least > episode_length = 91
     batch_size: int = 512
     verbose: int = 0
-    total_timesteps: int = 1e7
-    ent_coef: float = 0.0
+    total_timesteps: int = 5_000_000
+    ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 3e-4
     n_epochs: int = 10
