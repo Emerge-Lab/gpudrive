@@ -170,6 +170,14 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
+            # (dc) DEBUG
+            mask = ~torch.isnan(rewards)
+            if (
+                self._last_obs[mask].max() > 1
+                or self._last_obs[mask].min() < -1
+            ):
+                logging.error("New observation is out of bounds")
+
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
             # Give access to local variables
@@ -192,6 +200,8 @@ class IPPO(PPO):
             )
             self._last_obs = new_obs  # type: ignore[assignment]
             self._last_episode_starts = dones
+
+        # # # # # END LOOP # # # # #
 
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout

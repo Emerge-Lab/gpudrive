@@ -1,6 +1,7 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
 
+
 @dataclass
 class ExperimentConfig:
     """Configurations for experiments."""
@@ -21,7 +22,7 @@ class ExperimentConfig:
     render_freq: int = 1000
     track_time_to_solve: bool = False
     # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = None  # Set to None to disable
+    log_failure_modes_after: int = 10  # Set to None to disable
     log_success_modes_after: int = None  # Set to None to disable
     render_n_worlds: int = 1  # Number of worlds to render
 
@@ -48,8 +49,10 @@ class ExperimentConfig:
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     vf_coef: float = 0.5
-    n_steps: int = 4096  # Has to be at least > episode_length = 91
-    batch_size: int = 512
+    n_steps: int = 92  # Has to be at least > episode_length = 91
+    batch_size: int = (
+        460  # `batch_size` should be a factor of `n_steps * n_envs`.
+    )
     verbose: int = 0
     total_timesteps: int = 5_000_000
     ent_coef: float = 0.001

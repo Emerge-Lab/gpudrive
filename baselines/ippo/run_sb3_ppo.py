@@ -107,9 +107,6 @@ if __name__ == "__main__":
 
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
-    # Set number of steps in rollout based on batch size
-    exp_config.n_steps = 92  # max((4096 // exp_config.num_worlds), 92)
-
     if exp_config.generate_valid_json:
         actual_num_files = generate_valid_files_json(
             num_unique_scenes=exp_config.train_on_k_unique_scenes,
