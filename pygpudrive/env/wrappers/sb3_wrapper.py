@@ -49,7 +49,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
-        self.controlled_agent_mask = self._env.cont_agent_mask
+        self.controlled_agent_mask = self._env.cont_agent_mask.clone()
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
@@ -132,7 +132,7 @@ class SB3MultiAgentEnv(VecEnv):
             agent is done. After that, we return nan for the rewards, infos
             and done for that agent until the end of the episode.
         """
-        # reset the info dict
+        # Reset the info dict
         self.info_dict = {}
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
@@ -148,8 +148,6 @@ class SB3MultiAgentEnv(VecEnv):
         # Add collision penalty to rewards
         reward += -abs(self.collision_penalty) * (info[..., 1] + info[..., 2])
 
-        # Get the dones for resets
-        # done = self._env.get_dones()
         # Reset any of the worlds that are done
         # First, find the indices of all the done worlds
         # this is where the done flag for a world equals the sum of
@@ -171,7 +169,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.obs_alive = obs[~self.dead_agent_mask]
 
         if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
-            print(f"obs_alive: {self.obs_alive.max()}")
+            print(f"obs_alive: {self.obs_alive.max()} | min: {self.obs_alive.min()}")
             _ = self._env.get_obs()
 
         # Override nan placeholders for alive agents
@@ -257,7 +255,7 @@ class SB3MultiAgentEnv(VecEnv):
             .sum()
             .item()
         )
-
+        
         # log the agents that are done but did not receive any reward i.e. truncated
         # TODO(ev) remove hardcoded 91
         self.info_dict["truncated"] = (
@@ -321,11 +319,6 @@ class SB3MultiAgentEnv(VecEnv):
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
         frames = [self._env.render()]
         return frames
-
-    @property
-    def _tot_controlled_valid_agents_across_worlds(self):
-        return self._env.num_valid_controlled_agents_across_worlds
-
 
 if __name__ == "__main__":
 
