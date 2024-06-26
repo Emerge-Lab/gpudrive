@@ -137,7 +137,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # EGO STATE
         if self.config.ego_state:
-            ego_states_unprocessed = self.sim.self_observation_tensor().to_torch()
+            ego_states_unprocessed = (
+                self.sim.self_observation_tensor().to_torch()
+            )
             if self.config.norm_obs:
                 ego_states = self.normalize_ego_state(ego_states_unprocessed)
         else:
@@ -162,7 +164,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # ROAD MAP OBSERVATIONS
         if self.config.road_map_obs:
 
-            road_map_observations_unprocessed = self.sim.agent_roadmap_tensor().to_torch()
+            road_map_observations_unprocessed = (
+                self.sim.agent_roadmap_tensor().to_torch()
+            )
 
             if self.config.norm_obs:
                 road_map_observations = self.normalize_and_flatten_map_obs(
@@ -184,10 +188,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
-        
-        if obs_filtered[self.cont_agent_mask].max() > 1.0 or obs_filtered[self.cont_agent_mask].min() < -1.0:
-            print("Warning: Obs outside of [-1, 1] range")
-            #print(obs_filtered.max(), obs_filtered.min())
 
         return obs_filtered
 
