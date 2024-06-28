@@ -1,4 +1,3 @@
-import wandb
 import pyrallis
 from typing import Callable
 from pygpudrive.env.config import EnvConfig
@@ -7,8 +6,8 @@ from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from utils.process import generate_valid_files_json
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
+from algorithms.sb3.wandb_wrapper import WandbLogger, NoWandbLogger, PolicyCheckpointer, NoPolicyCheckpointer
 from baselines.ippo.config import ExperimentConfig
-
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
     """
@@ -46,23 +45,13 @@ def train(exp_config: ExperimentConfig):
         device=exp_config.device,
     )
 
-    # INIT WANDB
-    run_id = None
-    if exp_config.use_wandb:
-        run = wandb.init(
-            project=exp_config.project_name,
-            group=exp_config.group_name,
-            sync_tensorboard=exp_config.sync_tensorboard,
-            tags=exp_config.tags,
-            mode=exp_config.wandb_mode,
-            config={**exp_config.__dict__, **env_config.__dict__},
-        )
-        run_id = run.id
-
-    # CALLBACK
+    logger = WandbLogger(exp_config, env_config) if exp_config.use_wandb else NoWandbLogger(exp_config, env_config)
+    checkpointer = PolicyCheckpointer(logger, exp_config) if exp_config.save_policy else NoPolicyCheckpointer(logger, exp_config)
+     
     custom_callback = MultiAgentCallback(
         config=exp_config,
-        wandb_run=run if run_id is not None else None,
+        wandb_logger=logger,
+        policy_checkpointer=checkpointer
     )
 
     # INITIALIZE IPPO
@@ -73,9 +62,6 @@ def train(exp_config: ExperimentConfig):
         seed=exp_config.seed,
         verbose=exp_config.verbose,
         device=exp_config.device,
-        tensorboard_log=f"runs/{run_id}"
-        if run_id is not None
-        else None,  # Sync with wandb
         mlp_class=exp_config.mlp_class,
         policy=exp_config.policy,
         gamma=exp_config.gamma,
