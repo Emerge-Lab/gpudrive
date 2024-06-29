@@ -92,7 +92,6 @@ class IPPO(PPO):
             with torch.no_grad():
                 obs_tensor = self._last_obs
 
-                # TODO: Check
                 # EDIT_1: Mask out invalid observations (NaN axes and/or dead agents)
                 # Create dummy actions, values and log_probs (NaN)
                 actions = torch.full(
@@ -115,12 +114,11 @@ class IPPO(PPO):
 
                 # Get indices of alive agent ids
                 # Convert env_dead_agent_mask to boolean tensor with the same shape as obs_tensor
-                # TODO(ev) I don't like that we're accessing agent attributes here like this
                 alive_agent_mask = ~(
                     env.dead_agent_mask[env.controlled_agent_mask].reshape(
                         env.num_envs, 1
                     )
-                )  # .expand_as(obs_tensor)
+                )
 
                 # Use boolean indexing to select elements in obs_tensor
                 obs_tensor_alive = obs_tensor[
@@ -137,7 +135,7 @@ class IPPO(PPO):
                 )
                 self.logger.record("rollout/nn_fps", nn_fps)
 
-                # Store
+                # Predict actions, vals and log_probs given obs
                 (
                     actions[alive_agent_mask.squeeze(dim=1)],
                     values[alive_agent_mask.squeeze(dim=1)],
@@ -147,9 +145,6 @@ class IPPO(PPO):
                     values_tmp.float(),
                     log_prob_tmp.float(),
                 )
-
-                # Predict actions, vals and log_probs given obs
-                # actions, values, log_probs = self.policy(obs_tensor)
 
             # Rescale and perform action
             clipped_actions = actions
@@ -170,13 +165,13 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # (dc) DEBUG
-            mask = ~torch.isnan(rewards)
-            if (
-                self._last_obs[mask].max() > 1
-                or self._last_obs[mask].min() < -1
-            ):
-                logging.error("New observation is out of bounds")
+            # # (dc) DEBUG
+            # mask = ~torch.isnan(rewards)
+            # if (
+            #     self._last_obs[mask].max() > 1
+            #     or self._last_obs[mask].min() < -1
+            # ):
+            #     logging.error("New observation is out of bounds")
 
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
@@ -206,7 +201,7 @@ class IPPO(PPO):
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        self.logger.record("rollout/fps", fps)
+        self.logger.record("Charts/fps", fps)
 
         with torch.no_grad():
             # Compute value for the last timestep
@@ -398,12 +393,7 @@ class IPPO(PPO):
         # Logs
         self.logger.record("train/explained_var", explained_var.item())
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record(
-            "train/mean_advantages", advantages.abs().mean().item()
-        )
-        self.logger.record(
-            "train/mean_abs_advantages", advantages.abs().mean().item()
-        )
+        self.logger.record("train/advantages", advantages.mean().item())
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
@@ -413,7 +403,6 @@ class IPPO(PPO):
             self.logger.record(
                 "train/std", torch.exp(self.policy.log_std).mean().item()
             )
-
         self.logger.record(
             "train/n_updates", self._n_updates, exclude="tensorboard"
         )
