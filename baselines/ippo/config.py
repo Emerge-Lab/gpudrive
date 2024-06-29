@@ -7,9 +7,9 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "example_data"
-    generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 3  # If generate_valid_json = True, generates a json file with k unique scenarios
+    data_dir: str = "maps_10"
+    generate_valid_json: bool = False
+    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
 
     # BATCH SIZE / NUM ENVIRONMENTS
     num_worlds: int = 45
@@ -19,10 +19,10 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 15  # Render every k rollouts
-    render_n_worlds: int = 3  # Number of worlds to render
+    render_freq: int = 50  # Render every k rollouts
+    render_n_worlds: int = 10  # Number of worlds to render
 
-    track_time_to_solve: bool = False
+    track_time_to_solve: bool = True
 
     # LOGGING & WANDB
     use_wandb: bool = True
@@ -31,8 +31,8 @@ class ExperimentConfig:
         100  # how many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "gpudrive_debug"
-    group_name = "logging"
+    project_name = "gpudrive_benchmark"
+    group_name = "experiments"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"
