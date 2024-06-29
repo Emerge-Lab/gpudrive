@@ -9,22 +9,20 @@ class ExperimentConfig:
     # DATASET & DEVICE
     data_dir: str = "example_data"
     generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 1  # If generate_valid_json = True, generates a json file with k unique scenarios
+    train_on_k_unique_scenes: int = 3  # If generate_valid_json = True, generates a json file with k unique scenarios
 
-    # BATCH SIZE / NUM WORLDS
-    num_worlds: int = 2
+    # BATCH SIZE / NUM ENVIRONMENTS
+    num_worlds: int = 45
 
     device: str = "cuda"
 
     # RENDERING
-    render: bool = False
+    render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 1000
+    render_freq: int = 15  # Render every k rollouts
+    render_n_worlds: int = 3  # Number of worlds to render
+
     track_time_to_solve: bool = False
-    # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = 10  # Set to None to disable
-    log_success_modes_after: int = None  # Set to None to disable
-    render_n_worlds: int = 1  # Number of worlds to render
 
     # LOGGING & WANDB
     use_wandb: bool = True
@@ -34,7 +32,7 @@ class ExperimentConfig:
     )
     log_freq: int = 100
     project_name = "gpudrive_debug"
-    group_name = "observations"
+    group_name = "logging"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"

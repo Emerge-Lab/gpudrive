@@ -158,7 +158,7 @@ class SB3MultiAgentEnv(VecEnv):
             for world_idx in done_worlds:
                 self.num_episodes += 1
                 self.reset(world_idx=world_idx)
-                print(f"world {world_idx} is reset")
+                # print(f"world {world_idx} is reset")
 
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
@@ -182,18 +182,18 @@ class SB3MultiAgentEnv(VecEnv):
                 self.dead_agent_mask[
                     world_idx, :
                 ] = ~self.controlled_agent_mask[world_idx, :].clone()
-            self.tot_reward_per_episode[done_worlds] = 0
+            self.tot_reward_per_episode[world_idx] = 0
             self.agent_step[done_worlds] = 0
 
         # Construct the next observation
         next_obs = self._env.get_obs()
         self.obs_alive = next_obs[~self.dead_agent_mask]
 
-        if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
-            print(
-                f"obs_alive: {self.obs_alive.max()} | min: {self.obs_alive.min()}"
-            )
-            _ = self._env.get_obs()
+        # if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
+        #     print(
+        #         f"obs_alive: {self.obs_alive.max()} | min: {self.obs_alive.min()}"
+        #     )
+        #     _ = self._env.get_obs()
 
         # RETURN NEXT_OBS, REWARD, DONE, INFO
         return (
