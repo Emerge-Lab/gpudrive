@@ -49,6 +49,7 @@ enum class SimObject : uint32_t {
 
 enum class TaskGraphID : uint32_t {
     Step,
+    Reset,
     NumTaskGraphs,
 };
 
