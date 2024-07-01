@@ -90,7 +90,47 @@ How to sample the set of scenarios you want to train on can be set using `sample
 
 ## Rendering
 
-TODO(dc + av)
+Render settings can be changed using the `RenderConfig`.
+
+| `Render Mode` | Description
+|--|--|
+| **PYGAME_ABSOLUTE** | Renders the absolute view of the scene with all the agents. Returns a single frame for a world.
+| **PYGAME_EGOCENTRIC** | Renders the egocentric view for each agent in a scene. Returns `num_agents` frames for each world. 
+| **PYGAME_LIDAR** | Renders the Lidar views for an egent in a scene if Lidar is enabled. Returns `num_agents` frames for each world. 
+
+Resolution of the frames can be specified using the `resolution` param which takes in a tuple of (W,H).
+
+Below are the renders for each mode
+<table>
+  <tr>
+    <td>
+      <figure>
+        <img src="../../data/absolute.gif" alt="Absolute">
+        <center><figcaption>Absolute</figcaption></center>
+      </figure>
+    </td>
+    <td>
+      <figure>
+        <img src="../../data/Egocentric.gif" alt="Egocentric">
+        <center><figcaption>Egocentric</figcaption></center>
+      </figure>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <figure>
+        <img src="../../data/Lidar360.gif" alt="Lidar with 360 FOV">
+        <center><figcaption>Lidar with 360 FOV</figcaption></center>
+      </figure>
+    </td>
+    <td>
+      <figure>
+        <img src="../../data/Lidar120.gif" alt="Lidar with 120 FOV">
+        <center><figcaption>Lidar with 120 FOV</figcaption></center>
+      </figure>
+    </td>
+  </tr>
+</table>
 
 ## Sharp Bits
 
