@@ -45,19 +45,21 @@ MapReader::~MapReader() {
     delete map_;
 }
 
-void MapReader::doParse(float polylineReductionThreshold) {
+void MapReader::doParse(float polylineReductionThreshold,
+                        const std::vector<madrona::CountT> &vehiclesToSkip) {
   nlohmann::json rawJson;
   in_ >> rawJson;
 
-  from_json(rawJson, *map_, polylineReductionThreshold);
+  from_json(rawJson, *map_, polylineReductionThreshold, vehiclesToSkip);
 }
 
-gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
-                            madrona::ExecMode executionMode, float polylineReductionThreshold) {
+gpudrive::Map *MapReader::parseAndWriteOut(
+    const std::string &path, madrona::ExecMode executionMode,
+    float polylineReductionThreshold,
+    const std::vector<madrona::CountT> &vehiclesToSkip) {
   MapReader reader(path);
-  reader.doParse(polylineReductionThreshold);
+  reader.doParse(polylineReductionThreshold, vehiclesToSkip);
 
   return copyToArrayOnHostOrDevice(reader.map_, executionMode);
-
-} 
+}
 } // namespace gpudrive
