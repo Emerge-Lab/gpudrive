@@ -1,8 +1,6 @@
 import pygame
 import pygame.gfxdraw
 import numpy as np
-from pygame.sprite import Sprite
-import os
 import math
 import gpudrive
 
@@ -14,18 +12,18 @@ class PyGameVisualizer:
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
-        (255, 69, 69),  # Red
-        (0, 255, 0),  # Green
-        (0, 0, 255),  # Blue
-        (255, 255, 0),  # Yellow
-        (255, 165, 0),  # Orange
+        (255, 105, 180),  # Hot Pink
+        (124, 252, 0),    # Lawn Green
+        (0, 191, 255),    # Deep Sky Blue
+        (30, 144, 255),   # Dodger Blue
+        (255, 69, 0),     # Red-Orange
     ]
     color_dict = {
         float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
         float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
         float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
-        float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
+        float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
     }
 
@@ -84,7 +82,7 @@ class PyGameVisualizer:
         ends = centers + offsets
         return starts, ends
     
-    def draw_line(self, surf, start, end, color, thickness=2):
+    def draw_line(self, surf, start, end, color, thickness=1):
         c1 = (start[0] + end[0]) / 2
         c2 = (start[1] + end[1]) / 2
         center_L1 = (c1, c2)
@@ -251,17 +249,17 @@ class PyGameVisualizer:
                         start,
                         end,
                         self.color_dict[map_obj[-1]],
-                        thickness=2
+                        thickness=self.render_config.line_thickness,
                     )
 
-                # DRAW ROAD LINES/LANES
+                # DRAW ROAD LINES/LANES + crosswalk
                 else:
                     self.draw_line(
                         surf,
                         start,
                         end,
                         self.color_dict[map_obj[-1]],
-                        thickness=2
+                        thickness=self.render_config.line_thickness,
                     )
 
             # DRAW STOP SIGNS
@@ -501,6 +499,7 @@ class PyGameVisualizer:
 
                 mod_idx = agent_idx % len(self.COLOR_LIST)
 
+                # Controlled agents are red
                 if cont_agent_mask[world_render_idx, agent_idx]:
                     mod_idx = 0
 

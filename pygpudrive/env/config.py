@@ -98,7 +98,8 @@ class MadronaOption(Enum):
 class RenderConfig:
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
     view_option: Enum = PygameOption.RGB
-    resolution: Tuple[int, int] = (256, 256)
+    resolution: Tuple[int, int] = (1200, 1200) # Quality of the rendered image
+    line_thickness: int = .7 # Thickness of the road lines
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"

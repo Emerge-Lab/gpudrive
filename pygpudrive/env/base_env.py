@@ -135,22 +135,29 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             if self.device == "cpu"
             else gpudrive.madrona.ExecMode.CUDA
         )
-        return gpudrive.SimManager(
-            exec_mode=exec_mode,
-            gpu_id=0,
-            num_worlds=self.num_worlds,
-            json_path=self.data_dir,
-            params=params,
-            enable_batch_renderer=self.render_config
-            and self.render_config.render_mode
-            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-            batch_render_view_width=self.render_config.resolution[0]
-            if self.render_config
-            else None,
-            batch_render_view_height=self.render_config.resolution[1]
-            if self.render_config
-            else None,
-        )
+
+        sim = None
+        try:
+            sim = gpudrive.SimManager(
+                exec_mode=exec_mode,
+                gpu_id=0,
+                num_worlds=self.num_worlds,
+                json_path=self.data_dir,
+                params=params,
+                enable_batch_renderer=self.render_config
+                and self.render_config.render_mode
+                in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+                batch_render_view_width=self.render_config.resolution[0]
+                if self.render_config
+                else None,
+                batch_render_view_height=self.render_config.resolution[1]
+                if self.render_config
+                else None,
+            )
+        except:
+            raise ValueError("Error in initializing the simulator")
+
+        return sim
 
     def _setup_rendering(self):
         """Sets up the rendering mechanism based on the configuration.
