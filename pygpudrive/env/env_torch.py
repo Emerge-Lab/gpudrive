@@ -286,7 +286,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Road line segment length
         obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        # TODO: Road scale (width and height)
+        #  Road scale (width and height)
         obs[:, :, :, 3] /= self.config.max_road_scale
         # obs[:, :, :, 4] seems already scaled
 
@@ -306,18 +306,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    env_config = EnvConfig(sample_method="first_n")
+    env_config = EnvConfig()
     render_config = RenderConfig()
 
     TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 10
+    NUM_WORLDS = 50
 
     env = GPUDriveTorchEnv(
         config=env_config,
         num_worlds=NUM_WORLDS,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="formatted_json_v2_no_tl_train",
+        data_dir="example_data",
         device="cuda",
         render_config=render_config,
     )

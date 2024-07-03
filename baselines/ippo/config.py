@@ -9,8 +9,8 @@ class ExperimentConfig:
 
     # DATASET & DEVICE
     data_dir: str = "formatted_json_v2_no_tl_train"
-    generate_valid_json: bool = True
-    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
+    generate_valid_json: bool = False
+    train_on_k_unique_scenes: int = 500  # If generate_valid_json = True, generates a json file with k unique scenarios
 
     # BATCH SIZE / NUM WORLDS
     num_worlds: int = 512
