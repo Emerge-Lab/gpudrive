@@ -3,40 +3,14 @@ GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS
 
 GPUDrive is a batched simulator of Nocturne, built on the [Madrona Engine](https://madrona-engine.github.io). It supports multiple worlds and multi-agent environments. Python bindings are available for seamless integration with RL algorithms.
 
-For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guides you through the basic usage.
+For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 
-<table>
-  <tr>
-    <td>
-      <figure>
-        <img src="data/absolute.gif" alt="Absolute" width="250">
-        <center><figcaption>Absolute</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="data/Egocentric.gif" alt="Egocentric" width="250">
-        <center><figcaption>Egocentric</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <figure>
-        <img src="data/Lidar360.gif" alt="Lidar with 360 FOV" width="250">
-        <center><figcaption>Lidar with 360 FOV</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="data/Lidar120.gif" alt="Lidar with 120 FOV" width="250">
-        <center><figcaption>Lidar with 120 FOV</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-</table>
 
+<figure>
+<img src="data/gpudrive_gif_collage.gif" alt="...">
+<center><figcaption>Three example scenarios from a bird's eye view.</figcaption></center>
+</figure>
 
 ## Baseline algorithms
 
