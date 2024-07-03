@@ -37,7 +37,7 @@ This is an Batch RL environment simulator of Nocturne built on the [Madrona Engi
 Getting started 🚀
 ----
 
-To get started, see our [intro tutorials](). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and gymnasium wrappers.
+To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and gymnasium wrappers.
 
 <p align="center">
   <img src="data/navigation.png" width="350" title="Getting started">
