@@ -95,8 +95,8 @@ Render settings can be changed using the `RenderConfig`.
 | `Render Mode` | Description
 |--|--|
 | **PYGAME_ABSOLUTE** | Renders the absolute view of the scene with all the agents. Returns a single frame for a world.
-| **PYGAME_EGOCENTRIC** | Renders the egocentric view for each agent in a scene. Returns `num_agents` frames for each world. 
-| **PYGAME_LIDAR** | Renders the Lidar views for an egent in a scene if Lidar is enabled. Returns `num_agents` frames for each world. 
+| **PYGAME_EGOCENTRIC** | Renders the egocentric view for each agent in a scene. Returns `num_agents` frames for each world.
+| **PYGAME_LIDAR** | Renders the Lidar views for an egent in a scene if Lidar is enabled. Returns `num_agents` frames for each world.
 
 Resolution of the frames can be specified using the `resolution` param which takes in a tuple of (W,H).
 
@@ -138,7 +138,11 @@ TODO(dc)
 
 ## Citations
 
-Soe Waymo Open Dataset is discussed in the following publication:
+If you use GPUDrive in your work, please cite us:
+TODO(dc)
+
+
+The Waymo Open Dataset is discussed in the following publication:
 
 ```
 @misc{ettinger2021large,
