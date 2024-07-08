@@ -18,7 +18,7 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 50  # Render every k rollouts
+    render_freq: int = 100  # Render every k rollouts
     render_n_worlds: int = 10  # Number of worlds to render
 
     track_time_to_solve: bool = True
@@ -47,9 +47,9 @@ class ExperimentConfig:
     clip_range: float = 0.2
     vf_coef: float = 0.5
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    num_minibatches: 4 # Used to determine the batch size
+    num_minibatches: int = 5 # Used to determine the batch size
     verbose: int = 0
-    total_timesteps: int = 5_000_000
+    total_timesteps: int = 6e7
     ent_coef: float = 0.001
     vf_coef: float = 0.5
     lr: float = 3e-4

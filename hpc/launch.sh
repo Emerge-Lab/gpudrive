@@ -6,8 +6,8 @@
 # Constants
 PROJECT="gpudrive"
 PROJECT_DOCKER=docker://daphnecor/gpudrive
-SINGULARITY_IMAGE=./hpc/gpudrive.sif
-OVERLAY_LOC=/scratch/work/public/overlay-fs-ext3
+SINGULARITY_IMAGE=/scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif 
+OVERLAY_LOC=hpc/overlay-15GB-500K.ext3
 OVERLAY_FILE=overlay-15GB-500K.ext3
 
 # Overwrite wandb cache dir to avoid storage capacity problems
@@ -23,7 +23,7 @@ fi
 if [ ! -f "./hpc/${OVERLAY_FILE}" ]; then  # Overlay file does not exist
     echo "Setting up ${PROJECT_DOCKER} with initial overlay ${OVERLAY_FILE}.gz"
 
-    if [ ! -f "${OVERLAY_FILE}.gz" ]; then  # Overlay file has not been copiepd yet
+    if [ ! -f "${OVERLAY_FILE}.gz" ]; then  # Overlay file has not been copied yet
         echo "Copying overlay ${OVERLAY_FILE}.gz from ${OVERLAY_LOC}..."
         cp -rp "${OVERLAY_LOC}/${OVERLAY_FILE}.gz" ./hpc -n
         echo "Unzipping overlay ./hpc/${OVERLAY_FILE}.gz..."
