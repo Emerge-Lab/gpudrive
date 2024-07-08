@@ -31,7 +31,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         device: Union[torch.device, str] = "auto",
         storage_device: Union[
             torch.device, str
-        ] = "cpu",  # TODO(ev) add storage device to config
+        ] = "cpu",  
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
