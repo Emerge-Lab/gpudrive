@@ -50,7 +50,6 @@ def train(exp_config: ExperimentConfig):
     # SET MINIBATCH SIZE BASED ON ROLLOUT LENGTH
     exp_config.batch_size = (exp_config.num_worlds * exp_config.n_steps) // exp_config.num_minibatches
     
-
     # INIT WANDB
     run_id = None
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
