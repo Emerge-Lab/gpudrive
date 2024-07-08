@@ -11,7 +11,7 @@ class ExperimentConfig:
     generate_valid_json: bool = False
     train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
 
-    # BATCH SIZE / NUM ENVIRONMENTS
+    # NUM ENVIRONMENTS
     num_worlds: int = 45
     device: str = "cuda"
 
@@ -47,9 +47,7 @@ class ExperimentConfig:
     clip_range: float = 0.2
     vf_coef: float = 0.5
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    batch_size: int = (
-        460  # `batch_size` should be a factor of `n_steps * n_envs`.
-    )
+    num_minibatches: 4 # Used to determine the batch size
     verbose: int = 0
     total_timesteps: int = 5_000_000
     ent_coef: float = 0.001
