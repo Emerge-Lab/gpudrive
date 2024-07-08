@@ -24,7 +24,6 @@ class ExperimentConfig:
     track_time_to_solve: bool = True
 
     # LOGGING & WANDB
-    use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
         100  # How many trajectories we average logs over
@@ -34,7 +33,7 @@ class ExperimentConfig:
     group_name = "experiments"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
-    wandb_mode = "online"
+    wandb_mode = "online"  # Options: online, offline, disabled
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
