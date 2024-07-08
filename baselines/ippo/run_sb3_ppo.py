@@ -56,17 +56,16 @@ def train(exp_config: ExperimentConfig):
     run_id = None
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
     run_id = f"gpudrive_{datetime_}"
-    if exp_config.use_wandb:
-        run = wandb.init(
-            project=exp_config.project_name,
-            name=run_id,
-            id=run_id,
-            group=exp_config.group_name,
-            sync_tensorboard=exp_config.sync_tensorboard,
-            tags=exp_config.tags,
-            mode=exp_config.wandb_mode,
-            config={**exp_config.__dict__, **env_config.__dict__},
-        )
+    run = wandb.init(
+        project=exp_config.project_name,
+        name=run_id,
+        id=run_id,
+        group=exp_config.group_name,
+        sync_tensorboard=exp_config.sync_tensorboard,
+        tags=exp_config.tags,
+        mode=exp_config.wandb_mode,
+        config={**exp_config.__dict__, **env_config.__dict__},
+    )
 
     # CALLBACK
     custom_callback = MultiAgentCallback(
