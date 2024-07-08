@@ -1,7 +1,7 @@
 GPUDrive
 ============================
 
-GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide gymnasium Python wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
+GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
 For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
@@ -10,30 +10,37 @@ For more details, see our [paper]() and the [introduction tutorials](https://git
 <center><figcaption>Three example scenarios from a bird's eye view.</figcaption></center>
 </figure>
 
-## Baseline algorithms
-
+## Implemented algorithms 🌱
 
 | Algorithm | Reference | README |
 |----------|----------|----------|
 |   **IPPO**   |   [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)   |   [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)   |
 
 
-## Installation
+## Installation 🛠️
 
 To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake, as well as Xcode on macOS or Visual Studio on Windows.
-
-To build the simulator with visualization support on Linux (`build/viewer`), you also need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
-```bash
-sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
-```
 
 Once you have the required dependencies, clone the repository (don't forget --recursive!):
 ```bash
 git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 cd gpudrive
 ```
+---
 
-Then, you can choose between two options for building the simulator:
+<details>
+  <summary>Optional: If you want to use the Madrona viewer in C++ (Not needed to render with pygame)</summary>
+
+  #### Extra dependencies to use Madrona viewer
+  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
+  ```bash
+  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
+  ```
+</details>
+
+---
+
+Then, you can *choose* between two options for building the simulator:
 
 - **Option 1**: Manual Install
 
@@ -53,7 +60,7 @@ Next, set up the Python components of the repository with pip:
 pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
 ```
 
-- **Option 2**:  Poetry Install
+- **Option 2**:  Poetry install
 
 First create a conda environment using `environment.yml`:
 ```bash
@@ -71,7 +78,7 @@ poetry install
 ```
 
 Test whether the installation was successful by importing the simulator:
-```bash
+```Python
 import gpudrive
 ```
 
@@ -85,7 +92,6 @@ To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive
 
 
 ## Tests
-
 
 To further test the setup, you can run the pytests in the root directory:
 ```bash
