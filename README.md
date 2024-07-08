@@ -91,7 +91,7 @@ To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive
 </p>
 
 
-## Dataset `{ 🚦 🚗 }`
+## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
 ### How to download the Waymo Open Motion Dataset
 Two versions of the dataset are available:
