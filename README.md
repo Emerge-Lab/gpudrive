@@ -91,7 +91,17 @@ To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive
 </p>
 
 
-## Tests
+## Dataset `{ 🚦 🚗 }`
+
+### How to download the Waymo Open Motion Dataset
+Two versions of the dataset are available:
+- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
+- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
+
+The simulator supports initializing scenes from the Nocturne dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The directory should contain a `valid_files.json` with a list of the files to be initialized.
+
+
+## Tests 📈
 
 To further test the setup, you can run the pytests in the root directory:
 ```bash
