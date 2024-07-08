@@ -46,10 +46,12 @@ def train(exp_config: ExperimentConfig):
         data_dir=exp_config.data_dir,
         device=exp_config.device,
     )
-    
+
     # SET MINIBATCH SIZE BASED ON ROLLOUT LENGTH
-    exp_config.batch_size = (exp_config.num_worlds * exp_config.n_steps) // exp_config.num_minibatches
-    
+    exp_config.batch_size = (
+        exp_config.num_worlds * exp_config.n_steps
+    ) // exp_config.num_minibatches
+
     # INIT WANDB
     run_id = None
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
@@ -109,7 +111,7 @@ def train(exp_config: ExperimentConfig):
 if __name__ == "__main__":
 
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
-    
+
     if exp_config.generate_valid_json:
         actual_num_files = generate_valid_files_json(
             num_unique_scenes=exp_config.train_on_k_unique_scenes,

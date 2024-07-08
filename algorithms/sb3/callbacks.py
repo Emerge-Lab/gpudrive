@@ -137,6 +137,8 @@ class MultiAgentCallback(BaseCallback):
 
                 wandb.log(
                     {
+                        "metrics/wallclock_time (s)": perf_counter()
+                        - self.start_training,
                         "metrics/global_step": self.num_timesteps,
                         "metrics/mean_ep_reward_per_agent": sum(
                             self.mean_reward_per_episode
@@ -253,7 +255,7 @@ class MultiAgentCallback(BaseCallback):
 
         frames = []
 
-        for _ in range(EPISODE_LENGTH):
+        for step_num in range(EPISODE_LENGTH):
 
             actions, _ = policy.predict(obs.detach().cpu().numpy())
             actions = torch.Tensor(actions)
@@ -272,8 +274,9 @@ class MultiAgentCallback(BaseCallback):
             done = base_env.get_dones()
 
             # Render
-            frame = base_env.render(world_render_idx=render_world_idx)
-            frames.append(frame)
+            if step_num % 2 == 0:
+                frame = base_env.render(world_render_idx=render_world_idx)
+                frames.append(frame)
 
             if done[control_mask].sum() == control_mask.sum():
                 break
