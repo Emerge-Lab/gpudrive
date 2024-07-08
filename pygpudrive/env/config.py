@@ -71,7 +71,7 @@ class EnvConfig:
     reward_type: str = (
         "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
     )
-    collision_penalty: int = -0.1
+    collision_penalty: int = -0.0
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
     dist_to_goal_threshold: float = 4.0
