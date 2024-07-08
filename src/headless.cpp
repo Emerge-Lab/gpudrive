@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
         .execMode = exec_mode,
         .gpuID = 0,
         .numWorlds = (uint32_t)num_worlds,
-        .jsonPath = "../maps.16",
+        .jsonPath = "tests/testJsons",
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
     auto action_printer = mgr.actionTensor().makePrinter();
-    auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
     auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
@@ -96,9 +95,6 @@ int main(int argc, char *argv[])
 
         // printf("Actions\n");
         // action_printer.print();
-
-        printf("Model \n");
-        model_printer.print();
 
         // printf("Partner Obs\n");
         // partner_obs_printer.print();
