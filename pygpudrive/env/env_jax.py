@@ -351,5 +351,3 @@ if __name__ == "__main__":
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()
-
-        print(obs[env.cont_agent_mask].max())

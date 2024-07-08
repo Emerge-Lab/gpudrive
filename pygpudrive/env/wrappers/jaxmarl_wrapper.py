@@ -192,7 +192,7 @@ if __name__ == "__main__":
         config=env_config,
         num_worlds=10,
         max_cont_agents=128,
-        data_dir="example_data",
+        data_dir="data",
     )
 
     jaxmarl_env = GPUDriveToJaxMARL(base_env)

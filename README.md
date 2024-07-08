@@ -1,80 +1,104 @@
-# GPU Drive Multi-Agent Environments Documentation
+GPUDrive
+============================
 
-This repository provides base environments for multi-agent reinforcement learning using `torch` and `jax` in to interface with the `gpudrive` simulator. It follows the `gymnasium` environment standards as closely as possible.
+GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide gymnasium Python wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
-## Quick Start
+For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `example_data` folder.
+<figure>
+<img src="docs/assets/gpudrive_gif_collage.gif" alt="...">
+<center><figcaption>Three example scenarios from a bird's eye view.</figcaption></center>
+</figure>
 
-Configure the environment using the basic settings in `config`:
-```Python
-config = EnvConfig()
-```
-This `config` all environment parameters.
+## Baseline algorithms
 
-For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
-```Python
-env = GPUDriveJaxEnv(
-    config=config,
-    num_worlds=1,
-    max_cont_agents=3,
-    data_dir="example_data",
-)
-```
 
-Step the environment using:
-```Python
-obs, reward, done, info = env.step_dynamics(action)
-```
+| Algorithm | Reference | README |
+|----------|----------|----------|
+|   **IPPO**   |   [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)   |   [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)   |
 
-Further configuration details are available in `config.py`.
 
----
-> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, kMaxAgentCount)`, where `kMaxAgentCount` defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
----
+## Installation
 
-## Action Space
+To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake, as well as Xcode on macOS or Visual Studio on Windows.
 
-### Discrete (default; `action_type='discrete'`)
-Generates a grid of possible steering and acceleration actions:
-```Python
-# Action space (joint discrete)
-steer_actions: torch.Tensor = torch.round(
-    torch.linspace(-1.0, 1.0, 13), decimals=3
-)
-accel_actions: torch.Tensor = torch.round(
-    torch.linspace(-3, 3, 7), decimals=3
-)
+To build the simulator with visualization support on Linux (`build/viewer`), you also need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
+```bash
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
 ```
 
-### Continuous
-Not supported currently.
-
-## Observation Space
-
-Key observation flags include:
-```
-ego_state: bool = True  # Indicates ego vehicle state
-road_map_obs: bool = True  # Provides road graph data
-partner_obs: bool = True  # Includes partner vehicle information
-norm_obs: bool = True  # Normalizes observations if true
+Once you have the required dependencies, clone the repository (don't forget --recursive!):
+```bash
+git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+cd gpudrive
 ```
 
-| Observation Feature | Shape                                      | Description | Features                                         |
-|---------------------|--------------------------------------------|-------------|--------------------------------------------------|
-| **ego_state** 🚘   | `(max_num_objects, 6)`                     |  Basic ego information.           | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise) |
-| **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_objects, max_num_objects - 1, 10)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius.   | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)` |
-| **road_map_obs** 🛣️ 🛑  | `(max_num_objects, top_k_road_points, 13)`  | Information about the road graph  and other static road objects.   | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)` |
+Then, you can choose between two options for building the simulator:
 
-Note that all observations are already transformed to be in a relative coordinate frame.
+- **Option 1**: Manual Install
 
-## Rewards
+For Linux and macOS, use the following commands:
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j # cores to build with, e.g. 32
+cd ..
+```
 
-A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` from the goal, marking the end of the expert trajectory for that vehicle.
+For Windows, open the cloned repository in Visual Studio and build the project using the integrated `cmake` functionality.
 
-## Starting State
+Next, set up the Python components of the repository with pip:
+```bash
+pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
+```
 
-Upon initialization, every vehicle starts at the beginning of the expert trajectory.
+- **Option 2**:  Poetry Install
+
+First create a conda environment using `environment.yml`:
+```bash
+conda env create -f environment.yml
+```
+
+Activate the environment:
+```bash
+conda activate gpudrive
+```
+
+Run:
+```bash
+poetry install
+```
+
+Test whether the installation was successful by importing the simulator:
+```bash
+import gpudrive
+```
+
+## Getting started 🚀
+
+To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and gymnasium wrappers.
+
+<p align="center">
+  <img src="docs/assets/navigation.png" width="350" title="Getting started">
+</p>
+
+
+## Tests
+
+
+To further test the setup, you can run the pytests in the root directory:
+```bash
+pytest
+```
+
+To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory. Remember to change the location of the data in `src/headless.cpp` and compiling again before running it.
+
+```bash
+cd build
+./headless CPU 1 1 # Run on CPU , 1 world, 1 step
+```
+
 
 ## Dataset
 

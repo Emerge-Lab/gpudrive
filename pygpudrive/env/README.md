@@ -4,7 +4,7 @@ This repository provides base environments for multi-agent reinforcement learnin
 
 ## Quick Start
 
-Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `example_data` folder.
+Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `data` folder.
 
 Configure the environment using the basic settings in `config`:
 ```Python
@@ -18,7 +18,7 @@ env = GPUDriveTorchEnv(
     config=config,
     num_worlds=1,
     max_cont_agents=3,
-    data_dir="example_data",
+    data_dir="data",
 )
 ```
 
@@ -105,13 +105,13 @@ Below are the renders for each mode
   <tr>
     <td>
       <figure>
-        <img src="../../data/absolute.gif" alt="Absolute">
+        <img src="../../docs/assets/absolute.gif" alt="Absolute">
         <center><figcaption>Absolute</figcaption></center>
       </figure>
     </td>
     <td>
       <figure>
-        <img src="../../data/Egocentric.gif" alt="Egocentric">
+        <img src="../../docs/assets/Egocentric.gif" alt="Egocentric">
         <center><figcaption>Egocentric</figcaption></center>
       </figure>
     </td>
@@ -119,13 +119,13 @@ Below are the renders for each mode
   <tr>
     <td>
       <figure>
-        <img src="../../data/Lidar360.gif" alt="Lidar with 360 FOV">
+        <img src="../../docs/assets/Lidar360.gif" alt="Lidar with 360 FOV">
         <center><figcaption>Lidar with 360 FOV</figcaption></center>
       </figure>
     </td>
     <td>
       <figure>
-        <img src="../../data/Lidar120.gif" alt="Lidar with 120 FOV">
+        <img src="../../docs/assets/Lidar120.gif" alt="Lidar with 120 FOV">
         <center><figcaption>Lidar with 120 FOV</figcaption></center>
       </figure>
     </td>
