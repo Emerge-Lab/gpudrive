@@ -46,7 +46,7 @@ class ExperimentConfig:
     clip_range: float = 0.2
     vf_coef: float = 0.5
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    num_minibatches: int = 5  # Used to determine the minibatch size
+    num_minibatches: int = 5 # Used to determine the minibatch size
     verbose: int = 0
     total_timesteps: int = 6e7
     ent_coef: float = 0.001
