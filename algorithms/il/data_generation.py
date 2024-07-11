@@ -78,8 +78,6 @@ def generate_state_action_pairs(
         if (dead_agent_mask == True).all():
             break
 
-    # Convert lists to tensors
-    # Flatten the lists
     flattened_expert_obs = torch.cat(expert_observations_lst, dim=0)
     flattened_expert_actions = torch.cat(expert_actions_lst, dim=0)
 
