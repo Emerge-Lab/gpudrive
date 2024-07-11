@@ -49,6 +49,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
+        self.episode_len = self.config.episode_length
 
         # Rendering setup
         self.visualizer = self._setup_rendering()
@@ -193,7 +194,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
-
         return obs_filtered
 
     def get_controlled_agents_mask(self):
@@ -201,6 +201,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
             axis=2
         )
+
+    def get_expert_actions(self):
+        """Get expert actions for the full trajectories across worlds."""
+        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+
+        # Extract the inferred expert actions for the full trajectory
+        inferred_expert_actions = expert_traj[
+            :, :, -3 * self.episode_len :
+        ].reshape(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
+        return inferred_expert_actions
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
