@@ -45,6 +45,10 @@ class EnvConfig:
     # to have reached the goal
     dist_to_goal_threshold: float = 3.0
 
+    # Use bicycle model to infer expert actions
+    use_bicycle_model: bool = False
+
+
     # Maximum number of controlled vehicles and feature dimensions for network
     MAX_CONTROLLED_VEHICLES: int = 128
     ROADMAP_AGENT_FEAT_DIM: int = MAX_CONTROLLED_VEHICLES - 1

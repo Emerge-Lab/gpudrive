@@ -4,8 +4,15 @@
 ### Overview
 
 
+<p align="center">
+  <img src="data/imitation_learning.png" width="350" title="Getting started">
+</p>
 
-### Trajectory object
+
+### Extra information
+
+- the trajectory object stores all trajectory information, such as
+- expert vehicle positions, velocitires, heading, and if they are valid
 
 ```C
 struct Trajectory {
