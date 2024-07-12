@@ -6,6 +6,20 @@ from pygpudrive.env.config import EnvConfig, RenderConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 
+def map_to_closest_discrete_value(grid, cont_actions):
+    """
+    Find the nearest value in the action grid for a given expert action.
+    """
+    # Calculate the absolute differences and find the indices of the minimum values
+    abs_diff = torch.abs(grid.unsqueeze(0) - cont_actions.unsqueeze(-1))
+    indx = torch.argmin(abs_diff, dim=-1)
+
+    # Gather the closest values based on the indices
+    closest_values = grid[indx]
+
+    return closest_values, indx
+
+
 def generate_state_action_pairs(
     env_config,
     render_config,
@@ -14,7 +28,6 @@ def generate_state_action_pairs(
     data_dir,
     device,
     discretize_actions=False,
-    use_heading=False,
     make_video=False,
     save_path="output_video.mp4",
 ):
@@ -28,11 +41,11 @@ def generate_state_action_pairs(
         data_dir (str): Path to folder with scenarios (Waymo Open Motion Dataset)
         device (str): Where to run the simulation (cpu or cuda).
         discretize_actions (bool): Whether to discretize the expert actions.
-        use_heading (bool): Whether to use heading information in the expert actions.
         make_video (bool): Whether to save a video of the expert trajectory.
 
     Returns:
-        expert_actions: Expert actions for the controlled agents.
+        expert_actions: Expert actions for the controlled agents. An action is a
+            tuple with (acceleration, steering, heading).
         obs_tensor: Expert observations for the controlled agents.
     """
     frames = []
@@ -53,8 +66,19 @@ def generate_state_action_pairs(
     # Get expert actions for full trajectory in all worlds
     expert_actions = env.get_expert_actions()
     if discretize_actions:
-        # TODO(dc): Implement discretization
-        expert_actions = env.discretize_actions(expert_actions)
+        # Discretize the expert actions: map every value to the closest
+        # value in the action grid.
+        disc_expert_actions = expert_actions.clone()
+
+        # Acceleration
+        disc_expert_actions[:, :, :, 0], _ = map_to_closest_discrete_value(
+            grid=env.accel_actions, cont_actions=expert_actions[:, :, :, 0]
+        )
+        # Steering
+        disc_expert_actions[:, :, :, 1], _ = map_to_closest_discrete_value(
+            grid=env.steer_actions, cont_actions=expert_actions[:, :, :, 1]
+        )
+        expert_actions = disc_expert_actions
 
     # Storage
     expert_observations_lst = []
@@ -112,6 +136,7 @@ if __name__ == "__main__":
         num_worlds=10,
         data_dir="example_data",
         device="cuda",
+        discretize_actions=False,  # Discretize the expert actions
         make_video=True,  # Record the trajectories as sanity check
         save_path="output_video.mp4",
     )
