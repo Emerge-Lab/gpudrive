@@ -143,6 +143,16 @@ Two versions of the dataset are available:
 
 The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
+### Using human driving demonstrations 
+
+To use human driving demonstrations for, for example, imitation learning, navigate to `il/data_generation.py`. This script generates observation-action pairs by using inferred expert actions to step through the simulator. The Figure below provides an overview of the steps involved:
+<p align="center">
+  <img src="/home/emerge/gpudrive/data/imitation_learning.png" width="700" title="Getting started">
+</p>
+
+
+
+
 
 ## Citations
 
