@@ -113,17 +113,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.steer_actions = self.config.steer_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
-        # Create a mapping from action indices to action values
+        # Map action indices -> action values and vice versa
         self.action_key_to_values = {}
+        self.values_to_action_key = {}
 
         for action_idx, (accel, steer, head) in enumerate(
             product(self.accel_actions, self.steer_actions, self.head_actions)
         ):
             self.action_key_to_values[action_idx] = [
-                accel.item(),
-                steer.item(),
-                head.item(),
+                round(accel.item(), 3),
+                round(steer.item(), 3),
+                round(head.item(), 3),
             ]
+
+            self.values_to_action_key[
+                round(accel.item(), 3),
+                round(steer.item(), 3),
+                round(head.item(), 3),
+            ] = action_idx
 
         self.action_keys_tensor = torch.tensor(
             [
@@ -132,8 +139,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ]
         ).to(self.device)
 
+        self.value_keys_tensor = torch.tensor(
+            [
+                self.values_to_action_key[key]
+                for key in sorted(self.values_to_action_key.keys())
+            ]
+        ).to(self.device)
+
         return Discrete(n=int(len(self.action_key_to_values)))
-    
+
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
 

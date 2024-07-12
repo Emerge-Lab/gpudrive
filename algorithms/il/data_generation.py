@@ -28,6 +28,7 @@ def generate_state_action_pairs(
     data_dir,
     device,
     discretize_actions=False,
+    use_action_indices=False,
     make_video=False,
     save_path="output_video.mp4",
 ):
@@ -41,6 +42,7 @@ def generate_state_action_pairs(
         data_dir (str): Path to folder with scenarios (Waymo Open Motion Dataset)
         device (str): Where to run the simulation (cpu or cuda).
         discretize_actions (bool): Whether to discretize the expert actions.
+        use_action_indices (bool): Whether to return action indices instead of action values.
         make_video (bool): Whether to save a video of the expert trajectory.
 
     Returns:
@@ -65,6 +67,12 @@ def generate_state_action_pairs(
 
     # Get expert actions for full trajectory in all worlds
     expert_actions = env.get_expert_actions()
+    expert_action_indices = torch.zeros(
+        expert_actions.shape[0],
+        expert_actions.shape[1],
+        expert_actions.shape[2],
+        dtype=torch.int32,
+    )
     if discretize_actions:
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
@@ -78,6 +86,26 @@ def generate_state_action_pairs(
         disc_expert_actions[:, :, :, 1], _ = map_to_closest_discrete_value(
             grid=env.steer_actions, cont_actions=expert_actions[:, :, :, 1]
         )
+
+        if use_action_indices:
+            # Map action values to joint action index
+            for world_idx in range(disc_expert_actions.shape[0]):
+                for agent_idx in range(disc_expert_actions.shape[1]):
+                    for time_idx in range(disc_expert_actions.shape[2]):
+                        action_val_tuple = tuple(
+                            round(x, 3)
+                            for x in disc_expert_actions[
+                                world_idx, agent_idx, time_idx, :
+                            ].tolist()
+                        )
+                        action_idx = env.values_to_action_key.get(
+                            action_val_tuple
+                        )
+                        expert_action_indices[
+                            world_idx, agent_idx, time_idx
+                        ] = action_idx
+
+        # Map action values to joint action index
         expert_actions = disc_expert_actions
 
     # Storage
@@ -136,7 +164,7 @@ if __name__ == "__main__":
         num_worlds=10,
         data_dir="example_data",
         device="cuda",
-        discretize_actions=False,  # Discretize the expert actions
+        discretize_actions=True,  # Discretize the expert actions
         make_video=True,  # Record the trajectories as sanity check
         save_path="output_video.mp4",
     )
