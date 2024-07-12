@@ -147,7 +147,7 @@ The simulator supports initializing scenes from the `Nocturne` dataset. The inpu
 
 To use human driving demonstrations for, for example, imitation learning, navigate to `il/data_generation.py`. This script generates observation-action pairs by using inferred expert actions to step through the simulator. The Figure below provides an overview of the steps involved:
 <p align="center">
-  <img src="/home/emerge/gpudrive/data/imitation_learning.png" width="700" title="Getting started">
+  <img src="data/imitation_learning.png" width="700" title="Getting started">
 </p>
 
 
