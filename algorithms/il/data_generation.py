@@ -1,8 +1,9 @@
 """Extract expert states and actions from Waymo Open Dataset."""
 import torch
+import numpy as np
+import imageio
 from pygpudrive.env.config import EnvConfig, RenderConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-
 
 def generate_state_action_pairs(
     env_config,
@@ -13,6 +14,8 @@ def generate_state_action_pairs(
     device,
     discretize_actions=False,
     use_heading=False,
+    make_video=False,
+    save_path = 'output_video.mp4'
 ):
     """Generate pairs of states and actions from the Waymo Open Dataset.
 
@@ -25,11 +28,13 @@ def generate_state_action_pairs(
         device (str): Where to run the simulation (cpu or cuda).
         discretize_actions (bool): Whether to discretize the expert actions.
         use_heading (bool): Whether to use heading information in the expert actions.
+        make_video (bool): Whether to save a video of the expert trajectory.
 
     Returns:
         expert_actions: Expert actions for the controlled agents.
         obs_tensor: Expert observations for the controlled agents.
     """
+    frames = []
 
     # Make environment with chosen scenarios
     env = GPUDriveTorchEnv(
@@ -74,9 +79,17 @@ def generate_state_action_pairs(
         # Update
         obs = next_obs
         dead_agent_mask = torch.logical_or(dead_agent_mask, dones)
+        
+        # Render
+        if make_video:
+            frame = env.render(world_render_idx=2)
+            frames.append(frame)
 
         if (dead_agent_mask == True).all():
             break
+    
+    if make_video:
+        imageio.mimwrite(save_path, np.array(frames), fps=30)
 
     flattened_expert_obs = torch.cat(expert_observations_lst, dim=0)
     flattened_expert_actions = torch.cat(expert_actions_lst, dim=0)
@@ -98,6 +111,8 @@ if __name__ == "__main__":
         num_worlds=10,
         data_dir="example_data",
         device="cuda",
+        make_video=True, # Record the trajectories as sanity check
+        save_path = 'output_video.mp4'
     )
 
     # Save the expert actions and observations
