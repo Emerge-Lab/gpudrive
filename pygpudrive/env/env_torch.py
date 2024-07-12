@@ -105,10 +105,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.sim.action_tensor().to_torch().copy_(action_value_tensor)
     
     def _set_discrete_action_space(self) -> None:
-        """Configure the discrete action space."""
+        """Configure a discrete joint action space.
+        action = (acceleration, steering angle, heading angle)
+        """
 
-        self.steer_actions = self.config.steer_actions.to(self.device)
         self.accel_actions = self.config.accel_actions.to(self.device)
+        self.steer_actions = self.config.steer_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
         # Create a mapping from action indices to action values
@@ -131,7 +133,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ).to(self.device)
 
         return Discrete(n=int(len(self.action_key_to_values)))
-
+    
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
 
