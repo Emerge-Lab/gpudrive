@@ -12,8 +12,8 @@ from functools import partial
 from flax import struct
 from typing import Tuple, Optional
 
-from pygpudrive.env.config import EnvConfig
-from pygpudrive.env.env_jax import BaseEnvJax
+from pygpudrive.env.config import EnvConfig, RenderConfig
+from pygpudrive.env.env_jax import GPUDriveJaxEnv
 
 
 @struct.dataclass
@@ -29,10 +29,10 @@ class GPUDriveToJaxMARL(object):
 
     def __init__(
         self,
-        env: BaseEnvJax,
+        env: GPUDriveJaxEnv,
     ) -> None:
         self.env = env
-        self.num_agents = env.config.max_agent_count
+        self.num_agents = env.max_agent_count
         self.observation_spaces = env.observation_space
         self.action_spaces = ...
 
@@ -107,13 +107,20 @@ class GPUDriveToJaxMARL(object):
 
 if __name__ == "__main__":
 
+    MAX_NUM_OBJECTS = 2  # Maximum number of objects in the scene we control
+    NUM_WORLDS = 3  # Number of parallel environments
+    env_config = EnvConfig()
+    render_config = RenderConfig()
+
     env_config = EnvConfig()
 
-    base_env = BaseEnvJax(
+    base_env = GPUDriveJaxEnv(
         config=env_config,
-        num_worlds=10,
-        max_cont_agents=128,
+        num_worlds=NUM_WORLDS,
+        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         data_dir="example_data",
+        device="cpu",
+        render_config=render_config,
     )
 
     jaxmarl_env = GPUDriveToJaxMARL(base_env)
