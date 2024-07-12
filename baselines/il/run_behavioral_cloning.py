@@ -145,7 +145,6 @@ if __name__ == "__main__":
 
             global_step += 1
             
-    
     # Save policy
     if bc_config.save_model:
         torch.save(bc_policy, f"{bc_config.model_path}/bc_policy.pt")

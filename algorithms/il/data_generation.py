@@ -177,5 +177,5 @@ if __name__ == "__main__":
     )
 
     # Save the expert actions and observations
-    torch.save(expert_actions, "expert_actions.pt")
-    torch.save(expert_obs, "expert_obs.pt")
+    #torch.save(expert_actions, "expert_actions.pt")
+    #torch.save(expert_obs, "expert_obs.pt")

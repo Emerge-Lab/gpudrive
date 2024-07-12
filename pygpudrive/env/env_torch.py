@@ -120,9 +120,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             product(self.accel_actions, self.steer_actions, self.head_actions)
         ):
             self.action_key_to_values[action_idx] = [
-                round(accel.item(), 3),
-                round(steer.item(), 3),
-                round(head.item(), 3),
+                accel.item(),
+                steer.item(),
+                head.item(),
             ]
 
             self.values_to_action_key[
