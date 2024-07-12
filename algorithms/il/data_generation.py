@@ -30,6 +30,7 @@ def generate_state_action_pairs(
     discretize_actions=False,
     use_action_indices=False,
     make_video=False,
+    render_index=0,
     save_path="output_video.mp4",
 ):
     """Generate pairs of states and actions from the Waymo Open Dataset.
@@ -44,6 +45,7 @@ def generate_state_action_pairs(
         discretize_actions (bool): Whether to discretize the expert actions.
         use_action_indices (bool): Whether to return action indices instead of action values.
         make_video (bool): Whether to save a video of the expert trajectory.
+        render_index (int): Index of the world to render (must be <= num_worlds).
 
     Returns:
         expert_actions: Expert actions for the controlled agents. An action is a
@@ -67,12 +69,7 @@ def generate_state_action_pairs(
 
     # Get expert actions for full trajectory in all worlds
     expert_actions = env.get_expert_actions()
-    expert_action_indices = torch.zeros(
-        expert_actions.shape[0],
-        expert_actions.shape[1],
-        expert_actions.shape[2],
-        dtype=torch.int32,
-    )
+
     if discretize_actions:
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
@@ -87,8 +84,14 @@ def generate_state_action_pairs(
             grid=env.steer_actions, cont_actions=expert_actions[:, :, :, 1]
         )
 
-        if use_action_indices:
-            # Map action values to joint action index
+        if use_action_indices: # Map action values to joint action index
+            expert_action_indices = torch.zeros(
+                expert_actions.shape[0],
+                expert_actions.shape[1],
+                expert_actions.shape[2],
+                1,
+                dtype=torch.int32,
+            ).to(device)
             for world_idx in range(disc_expert_actions.shape[0]):
                 for agent_idx in range(disc_expert_actions.shape[1]):
                     for time_idx in range(disc_expert_actions.shape[2]):
@@ -104,9 +107,12 @@ def generate_state_action_pairs(
                         expert_action_indices[
                             world_idx, agent_idx, time_idx
                         ] = action_idx
-
-        # Map action values to joint action index
-        expert_actions = disc_expert_actions
+            
+            expert_actions = expert_action_indices
+        
+        else: 
+            # Map action values to joint action index
+            expert_actions = disc_expert_actions
 
     # Storage
     expert_observations_lst = []
@@ -135,7 +141,7 @@ def generate_state_action_pairs(
 
         # Render
         if make_video:
-            frame = env.render(world_render_idx=2)
+            frame = env.render(world_render_idx=render_index)
             frames.append(frame)
 
         if (dead_agent_mask == True).all():
@@ -153,7 +159,7 @@ def generate_state_action_pairs(
 if __name__ == "__main__":
 
     # Set the environment and render configurations
-    env_config = EnvConfig(sample_method="pad_n", use_bicycle_model=True)
+    env_config = EnvConfig(use_bicycle_model=True)
     render_config = RenderConfig()
 
     # Generate expert actions and observations
@@ -161,12 +167,14 @@ if __name__ == "__main__":
         env_config=env_config,
         render_config=render_config,
         max_num_objects=128,
-        num_worlds=10,
+        num_worlds=3,
         data_dir="example_data",
         device="cuda",
-        discretize_actions=True,  # Discretize the expert actions
-        make_video=True,  # Record the trajectories as sanity check
-        save_path="output_video.mp4",
+        discretize_actions=True, # Discretize the expert actions
+        use_action_indices=True, # Map action values to joint action index
+        make_video=True, # Record the trajectories as sanity check
+        render_index=1,
+        save_path="use_discr_actions_fix.mp4",
     )
 
     # Save the expert actions and observations

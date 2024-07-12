@@ -108,7 +108,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Configure a discrete joint action space.
         action = (acceleration, steering angle, heading angle)
         """
-
         self.accel_actions = self.config.accel_actions.to(self.device)
         self.steer_actions = self.config.steer_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
