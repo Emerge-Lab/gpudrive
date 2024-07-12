@@ -20,9 +20,14 @@ class BehavCloningConfig:
 
     # Logging
     wandb_mode: str = "online"
+    wandb_project: str = "il"
 
     # Hyperparameters
     batch_size: int = 512
     epochs: int = 2000
     lr: float = 1e-3
     hidden_size: int = 256
+    
+    # Save policy
+    save_model: bool = True
+    model_path: str = "baselines/il/models"
