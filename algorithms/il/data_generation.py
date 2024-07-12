@@ -2,8 +2,12 @@
 import torch
 import numpy as np
 import imageio
+import logging
+
 from pygpudrive.env.config import EnvConfig, RenderConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
+
+logging.getLogger(__name__)
 
 
 def map_to_closest_discrete_value(grid, cont_actions):
@@ -21,11 +25,7 @@ def map_to_closest_discrete_value(grid, cont_actions):
 
 
 def generate_state_action_pairs(
-    env_config,
-    render_config,
-    max_num_objects,
-    num_worlds,
-    data_dir,
+    env,
     device,
     discretize_actions=False,
     use_action_indices=False,
@@ -36,11 +36,7 @@ def generate_state_action_pairs(
     """Generate pairs of states and actions from the Waymo Open Dataset.
 
     Args:
-        env_config (EnvConfig): Environment configurations.
-        render_config (RenderConfig): Render configurations.
-        max_num_objects (int): Maximum controllable agents per world.
-        num_worlds (int): Number of worlds (envs).
-        data_dir (str): Path to folder with scenarios (Waymo Open Motion Dataset)
+        env (GPUDriveTorchEnv): Initialized environment class.
         device (str): Where to run the simulation (cpu or cuda).
         discretize_actions (bool): Whether to discretize the expert actions.
         use_action_indices (bool): Whether to return action indices instead of action values.
@@ -54,14 +50,8 @@ def generate_state_action_pairs(
     """
     frames = []
 
-    # Make environment with chosen scenarios
-    env = GPUDriveTorchEnv(
-        config=env_config,
-        render_config=render_config,
-        num_worlds=num_worlds,
-        max_cont_agents=max_num_objects,
-        data_dir=data_dir,
-        device=device,
+    logging.info(
+        f"Generating expert actions and observations for {env.num_worlds} worlds \n"
     )
 
     # Reset the environment
@@ -71,6 +61,7 @@ def generate_state_action_pairs(
     expert_actions = env.get_expert_actions()
 
     if discretize_actions:
+        logging.info("Discretizing expert actions... \n")
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
         disc_expert_actions = expert_actions.clone()
@@ -84,7 +75,8 @@ def generate_state_action_pairs(
             grid=env.steer_actions, cont_actions=expert_actions[:, :, :, 1]
         )
 
-        if use_action_indices: # Map action values to joint action index
+        if use_action_indices:  # Map action values to joint action index
+            logging.info("Mapping expert actions to joint action index... \n")
             expert_action_indices = torch.zeros(
                 expert_actions.shape[0],
                 expert_actions.shape[1],
@@ -107,12 +99,14 @@ def generate_state_action_pairs(
                         expert_action_indices[
                             world_idx, agent_idx, time_idx
                         ] = action_idx
-            
+
             expert_actions = expert_action_indices
-        
-        else: 
+
+        else:
             # Map action values to joint action index
             expert_actions = disc_expert_actions
+    else:
+        logging.info("Using continuous expert actions... \n")
 
     # Storage
     expert_observations_lst = []
@@ -162,17 +156,22 @@ if __name__ == "__main__":
     env_config = EnvConfig(use_bicycle_model=True)
     render_config = RenderConfig()
 
-    # Generate expert actions and observations
-    expert_obs, expert_actions = generate_state_action_pairs(
-        env_config=env_config,
+    env = GPUDriveTorchEnv(
+        config=env_config,
         render_config=render_config,
-        max_num_objects=128,
         num_worlds=3,
+        max_cont_agents=128,
         data_dir="example_data",
         device="cuda",
-        discretize_actions=True, # Discretize the expert actions
-        use_action_indices=True, # Map action values to joint action index
-        make_video=True, # Record the trajectories as sanity check
+    )
+
+    # Generate expert actions and observations
+    expert_obs, expert_actions = generate_state_action_pairs(
+        env=env,
+        device="cuda",
+        discretize_actions=True,  # Discretize the expert actions
+        use_action_indices=True,  # Map action values to joint action index
+        make_video=True,  # Record the trajectories as sanity check
         render_index=1,
         save_path="use_discr_actions_fix.mp4",
     )
