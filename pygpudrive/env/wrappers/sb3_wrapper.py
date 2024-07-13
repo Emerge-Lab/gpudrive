@@ -31,21 +31,19 @@ class SB3MultiAgentEnv(VecEnv):
     def __init__(
         self,
         config,
-        num_worlds,
+        scene_config,
         max_cont_agents,
-        data_dir,
         device,
         render_mode="rgb_array",
     ):
         self._env = GPUDriveTorchEnv(
             config=config,
-            num_worlds=num_worlds,
+            scene_config=scene_config,
             max_cont_agents=max_cont_agents,
-            data_dir=data_dir,
             device=device,
         )
         self.config = config
-        self.num_worlds = num_worlds
+        self.num_worlds = scene_config.num_scenes
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
@@ -328,9 +326,8 @@ if __name__ == "__main__":
     # Make environment
     env = SB3MultiAgentEnv(
         config=config,
-        num_worlds=1,
+        scene_config=SceneConfig("formatted_json_v2_no_tl_train", 1),
         max_cont_agents=10,
-        data_dir="formatted_json_v2_no_tl_train",
         device="cpu",
     )
 
