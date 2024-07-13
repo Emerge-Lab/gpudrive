@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -21,13 +21,16 @@ class BehavCloningConfig:
     # Logging
     wandb_mode: str = "online"
     wandb_project: str = "il"
+    log_interval: int = 500
 
     # Hyperparameters
     batch_size: int = 512
-    epochs: int = 2000
+    epochs: int = 1000
     lr: float = 1e-3
     hidden_size: int = 256
-    
+    net_arch: list = field(default_factory=lambda: [64, 128])
+
     # Save policy
     save_model: bool = True
     model_path: str = "baselines/il/models"
+    model_name: str = "human_policy"

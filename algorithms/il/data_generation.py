@@ -111,6 +111,8 @@ def generate_state_action_pairs(
     # Storage
     expert_observations_lst = []
     expert_actions_lst = []
+    expert_next_obs_lst = []
+    expert_dones_lst = []
 
     # Initialize dead agent mask
     dead_agent_mask = ~env.cont_agent_mask.clone()
@@ -123,11 +125,13 @@ def generate_state_action_pairs(
         next_obs = env.get_obs()
         dones = env.get_dones()
 
-        # Unpack and store (obs, action) pairs for controlled agents
+        # Unpack and store (obs, action, next_obs, dones) pairs for controlled agents
         expert_observations_lst.append(obs[~dead_agent_mask, :])
         expert_actions_lst.append(
             expert_actions[~dead_agent_mask][:, time_step, :]
         )
+        expert_next_obs_lst.append(next_obs[~dead_agent_mask, :])
+        expert_dones_lst.append(dones[~dead_agent_mask])
 
         # Update
         obs = next_obs
@@ -144,10 +148,17 @@ def generate_state_action_pairs(
     if make_video:
         imageio.mimwrite(save_path, np.array(frames), fps=30)
 
-    flattened_expert_obs = torch.cat(expert_observations_lst, dim=0)
-    flattened_expert_actions = torch.cat(expert_actions_lst, dim=0)
+    flat_expert_obs = torch.cat(expert_observations_lst, dim=0)
+    flat_expert_actions = torch.cat(expert_actions_lst, dim=0)
+    flat_next_expert_obs = torch.cat(expert_next_obs_lst, dim=0)
+    flat_expert_dones = torch.cat(expert_dones_lst, dim=0)
 
-    return flattened_expert_obs, flattened_expert_actions
+    return (
+        flat_expert_obs,
+        flat_expert_actions,
+        flat_next_expert_obs,
+        flat_expert_dones,
+    )
 
 
 if __name__ == "__main__":
@@ -166,7 +177,12 @@ if __name__ == "__main__":
     )
 
     # Generate expert actions and observations
-    expert_obs, expert_actions = generate_state_action_pairs(
+    (
+        expert_obs,
+        expert_actions,
+        next_expert_obs,
+        expert_dones,
+    ) = generate_state_action_pairs(
         env=env,
         device="cuda",
         discretize_actions=True,  # Discretize the expert actions
@@ -177,5 +193,5 @@ if __name__ == "__main__":
     )
 
     # Save the expert actions and observations
-    #torch.save(expert_actions, "expert_actions.pt")
-    #torch.save(expert_obs, "expert_obs.pt")
+    # torch.save(expert_actions, "expert_actions.pt")
+    # torch.save(expert_obs, "expert_obs.pt")
