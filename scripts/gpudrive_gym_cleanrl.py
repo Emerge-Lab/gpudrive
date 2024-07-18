@@ -2,16 +2,15 @@ import gpudrive
 import gymnasium as gym
 
 from gymnasium.spaces import Box, Discrete
-import pufferlib.pytorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
 import numpy as np
 from gymnasium.wrappers import FlattenObservation, NormalizeObservation
-from stable_baselines3.common.env_checker import check_env
 from sim_utils.creator import SimCreator
 import pufferlib.models
+import pufferlib
 import imageio
 from itertools import product
 
@@ -20,11 +19,6 @@ class GPUDriveEnv(gym.Env):
 
     def __init__(self, params: gpudrive.Parameters = None, action_space_type: str = "discrete"):
         self.sim = SimCreator()
-        self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
-        self.device = self.self_obs_tensor.device
-        self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
-        self.map_obs_tensor = self.sim.map_observation_tensor().to_torch()
-        self.shape_tensor = self.sim.shape_tensor().to_torch()
         self.obs_tensors, self.num_obs_features = self.setup_obs()
 
         self.action_space_type = action_space_type
@@ -37,25 +31,25 @@ class GPUDriveEnv(gym.Env):
             self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions()[2:], dtype=np.float64)
 
         self.num_envs = self.self_obs_tensor.shape[0]
-        self.agents_per_env = self.shape_tensor[:,0]
-        self.total_num_agents = torch.sum(self.agents_per_env)
-        self.env_ids = torch.repeat_interleave(torch.arange(self.num_envs).to(self.self_obs_tensor.device), self.agents_per_env)
+        # self.agents_per_env = self.shape_tensor[:,0]
+        # self.total_num_agents = torch.sum(self.agents_per_env)
+        # self.env_ids = torch.repeat_interleave(torch.arange(self.num_envs).to(self.self_obs_tensor.device), self.agents_per_env)
 
-        self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float64)
-        # self.observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.num_obs_features,), dtype=torch.float32)
-        self.observation_space = gym.spaces.Dict({
-            "self_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[0].shape, dtype=np.float64),
-            "partner_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[1].shape, dtype=np.float64),
-            "map_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[2].shape, dtype=np.float64),
-            "steps_remaining": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[3].shape, dtype=np.float64),
-            "id": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[4].shape, dtype=np.float64),
-        })
+        # self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float64)
+        # # self.observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.num_obs_features,), dtype=torch.float32)
+        # self.observation_space = gym.spaces.Dict({
+        #     "self_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[0].shape, dtype=np.float64),
+        #     "partner_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[1].shape, dtype=np.float64),
+        #     "map_obs": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[2].shape, dtype=np.float64),
+        #     "steps_remaining": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[3].shape, dtype=np.float64),
+        #     "id": gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=self.obs_tensors[4].shape, dtype=np.float64),
+        # })
 
 
 
-        self.Recurrent = None
-        self.unflatten_context = None
-        self.mask_agents = True
+        # self.Recurrent = None
+        # self.unflatten_context = None
+        # self.mask_agents = True
 
     def setup_discrete_actions(self):
         """Configure the discrete action space."""
@@ -151,27 +145,27 @@ class GPUDriveEnv(gym.Env):
         return depth_image
 
     def setup_obs(self):
-        self_obs_tensor = self.sim.self_observation_tensor().to_torch()
-        partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
-        # map_obs_tensor = self.sim.map_observation_tensor().to_torch()
-        agent_map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch()
-        controlled_state_tensor = self.sim.controlled_state_tensor().to_torch()
-        done_tensor = self.sim.done_tensor().to_torch()
-        reward_tensor = self.sim.reward_tensor().to_torch()
-        steps_remaining_tensor = self.sim.steps_remaining_tensor().to_torch()
+        self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
+        self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
+        # self.map_obs_tensor = self.sim.map_observation_tensor().to_torch()
+        self.agent_map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch()
+        self.controlled_state_tensor = self.sim.controlled_state_tensor().to_torch()
+        self.done_tensor = self.sim.done_tensor().to_torch()
+        self.reward_tensor = self.sim.reward_tensor().to_torch()
+        self.steps_remaining_tensor = self.sim.steps_remaining_tensor().to_torch()
 
-        controlled_mask = controlled_state_tensor[:, :, 0] == 1
-        for i in range(done_tensor.shape[0]):
-            if(done_tensor[i].all()):
-                # print("done due to time")
-                self.async_reset()
-            elif(done_tensor[i][controlled_mask[i]].all()):
-                # print("done due to agent")
-                self.async_reset()
+        controlled_mask = self.controlled_state_tensor[:, :, 0] == 1
+        # for i in range(self.done_tensor.shape[0]):
+        #     if(self.done_tensor[i].all()):
+        #         # print("done due to time")
+        #         self.async_reset()
+        #     elif(self.done_tensor[i][controlled_mask[i]].all()):
+        #         # print("done due to agent")
+        #         self.async_reset()
 
         # Add L2 Norm to obs_tensor for each agent at indexs [2,3]
 
-        N, A, O = self_obs_tensor.shape[0:3] # N = num worlds, A = num agents, O = num obs features
+        N, A, O = self.self_obs_tensor.shape[0:3] # N = num worlds, A = num agents, O = num obs features
         batch_size = N * A
 
         # Add in an agent ID tensor
@@ -179,35 +173,35 @@ class GPUDriveEnv(gym.Env):
         if A > 1:
             id_tensor = id_tensor / (A - 1)
 
-        id_tensor = id_tensor.to(device=self_obs_tensor.device)
+        id_tensor = id_tensor.to(device=self.self_obs_tensor.device)
         id_tensor = id_tensor.view(1, A).expand(N, A).reshape(batch_size, 1)
 
         # Flatten map obs tensor of shape (N, R, 4) to (N, 4 * R)
         # map_obs_tensor = map_obs_tensor.view(N, map_obs_tensor.shape[1]*map_obs_tensor.shape[2])
-        map_obs_tensor = agent_map_obs_tensor.view(N, A, -1)
+        map_obs_tensor = self.agent_map_obs_tensor.view(N, A, -1)
         # print("map_obs_tensor", map_obs_tensor.shape)
-        partner_obs_tensor = partner_obs_tensor.view(N, A, -1)
+        self.partner_obs_tensor = self.partner_obs_tensor.view(N, A, -1)
         # map_obs_tensor = map_obs_tensor.repeat(N*A//N, 1)
 
-        obs_tensors = [
-            self_obs_tensor.view(batch_size, *self_obs_tensor.shape[2:]),
-            partner_obs_tensor.view(batch_size, *partner_obs_tensor.shape[2:]),
+        self.obs_tensors = [
+            self.self_obs_tensor.view(batch_size, *self.self_obs_tensor.shape[2:]),
+            self.partner_obs_tensor.view(batch_size, *self.partner_obs_tensor.shape[2:]),
             map_obs_tensor.view(batch_size, *map_obs_tensor.shape[2:]),
-            controlled_state_tensor.view(batch_size, *controlled_state_tensor.shape[2:]),
-            done_tensor.view(batch_size, *done_tensor.shape[2:]),
-            reward_tensor.view(batch_size, *reward_tensor.shape[2:]),
-            steps_remaining_tensor.view(batch_size, *steps_remaining_tensor.shape[2:]),
+            self.controlled_state_tensor.view(batch_size, *self.controlled_state_tensor.shape[2:]),
+            self.done_tensor.view(batch_size, *self.done_tensor.shape[2:]),
+            self.reward_tensor.view(batch_size, *self.reward_tensor.shape[2:]),
+            self.steps_remaining_tensor.view(batch_size, *self.steps_remaining_tensor.shape[2:]),
             id_tensor,
         ]
-        obs_tensors = self.filter_padding_agents(obs_tensors, N, A)
+        # self.obs_tensors = self.filter_padding_agents(obs_tensors, N, A)
 
         num_obs_features = 0
-        for tensor in obs_tensors[:1]:
+        for tensor in self.obs_tensors[:1]:
             num_obs_features += math.prod(tensor.shape[1:])
 
         # print("num_obs_features", num_obs_features)
 
-        return obs_tensors, num_obs_features
+        return self.obs_tensors, num_obs_features
 
     def setup_actions(self):
         action_tensor = self.sim.action_tensor().to_torch()
@@ -402,22 +396,6 @@ class Convolutional1D(nn.Module):
         #     value = self.value_fn(hidden)
         #     return [means, std], value
 
-class Policy(pufferlib.models.Policy):
-    def __init__(self, env):
-        input_size=512
-        hidden_size=512
-        output_size=512
-        framestack=1
-        flat_size=64*7*7
-        super().__init__(
-            env=env,
-            input_size=input_size,
-            hidden_size=hidden_size,
-            output_size=output_size,
-            framestack=framestack,
-            flat_size=flat_size,
-        )
-
 def make_gpudrive(action_space_type: str = "continuous"):
     return GPUDriveEnv(action_space_type=action_space_type)
 
@@ -427,10 +405,11 @@ if __name__ == "__main__":
     # return
     frames = []
     for i in range(91):
-        env_obs, rews, dones, truncateds, infos, env_ids, mask = env.recv()
+        # env_obs, rews, dones, truncateds, infos, env_ids, mask = env.recv()
         env.sim.step()
+        print(env.obs_tensors[0][0], env.self_obs_tensor[0][0])
 
-        print(i, dones[0], env_obs[0])
+        # print(i, dones[0], env_obs[0])
     #     frame = env.render()
     #     frame_np = frame.cpu().numpy()[0][0]
     #     print(frame_np.shape)

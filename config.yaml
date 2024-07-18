@@ -46,7 +46,7 @@ parameters:
   datasetInitOptions: FirstN
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 128
+  maxNumControlledVehicles: 0
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -56,8 +56,8 @@ parameters:
   isStaticAgentControlled: False
 
 sim_manager:
-  exec_mode: CUDA
+  exec_mode: CPU
   gpu_id: 0
   num_worlds: 1
-  json_path: /home/aarav/nocturne_data/formatted_json_v2_no_tl_valid
+  json_path: /Users/aaravpandya/dev/gpudrive/example_data
   enable_batch_renderer: False

@@ -3,7 +3,7 @@ import gpudrive
 
 def SimCreator(config: dict = None) -> gpudrive.SimManager:
     if(config is None):
-        with open("/home/aarav/gpudrive/config.yaml", 'r') as file:
+        with open("config.yaml", 'r') as file:
             config = yaml.safe_load(file)
     # Initialize RewardParams
     reward_params_config = config['reward_params']
