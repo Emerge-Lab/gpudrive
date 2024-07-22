@@ -32,6 +32,7 @@ enum class ExportID : uint32_t {
     ValidState,
     Info,
     ResponseType,
+    Trajectory,
     NumExports
 };
 

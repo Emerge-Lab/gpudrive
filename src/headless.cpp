@@ -93,11 +93,11 @@ int main(int argc, char *argv[])
         printf("Self\n");
         self_printer.print();
 
-        printf("Actions\n");
-        action_printer.print();
+        // printf("Actions\n");
+        // action_printer.print();
 
-        printf("Partner Obs\n");
-        partner_obs_printer.print();
+        // printf("Partner Obs\n");
+        // partner_obs_printer.print();
 
         // printf("Map Obs\n");
         // map_obs_printer.print();

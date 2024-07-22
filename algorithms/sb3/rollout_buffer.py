@@ -29,9 +29,7 @@ class MaskedRolloutBuffer(BaseBuffer):
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         device: Union[torch.device, str] = "auto",
-        storage_device: Union[
-            torch.device, str
-        ] = "cpu",  # TODO(ev) add storage device to config
+        storage_device: Union[torch.device, str] = "cpu",
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
@@ -192,6 +190,7 @@ class MaskedRolloutBuffer(BaseBuffer):
                 "log_probs",
                 "advantages",
                 "returns",
+                "rewards",
             ]
             # Create mask
             self.valid_samples_mask = ~torch.isnan(
@@ -219,6 +218,9 @@ class MaskedRolloutBuffer(BaseBuffer):
         # EDIT_6: Compute total number of samples and create indices
         total_num_samples = self.valid_samples_mask.sum()
         indices = torch.randperm(total_num_samples)
+
+        # if self.__dict__["observations"].max() > 1 or self.__dict__["observations"].min() < -1:
+        #     print("Observations are out of range")
 
         # Return everything, don't create minibatches
         if batch_size is None:

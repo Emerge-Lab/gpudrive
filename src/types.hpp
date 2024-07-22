@@ -36,16 +36,6 @@ enum class EntityType : uint32_t {
     NumTypes,
 };
 
-struct BicycleModel {
-    madrona::math::Vector2 position;
-    float heading;
-    float speed;
-};
-
-const size_t BicycleModelExportSize = 4;
-
-static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
-
 struct VehicleSize {
   float length;
   float width;
@@ -178,8 +168,13 @@ struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
     float headings[consts::kTrajectoryLength];
-    int32_t valids[consts::kTrajectoryLength];
+    float valids[consts::kTrajectoryLength];
+    Action inverseActions[consts::kTrajectoryLength];
 };
+
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+
+static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
 struct Shape {
     int32_t agentEntityCount;
@@ -273,7 +268,6 @@ struct Agent : public madrona::Archetype<
     OtherAgents,
     EntityType,
     
-    BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,

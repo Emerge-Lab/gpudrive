@@ -18,7 +18,6 @@ include_directories(
 # Add your test file(s) to the add_executable command
 add_executable(my_tests
     bicyclemodel.cpp
-    observationTest.cpp
     test_utils.cpp
     CollisionDetectionTests.cpp
     EgocentricRoadObservationTests.cpp

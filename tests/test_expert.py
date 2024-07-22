@@ -18,6 +18,7 @@ def simulation_results():
     params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
     params.maxNumControlledVehicles = 0
     params.IgnoreNonVehicles = True
+    params.isStaticAgentControlled = False
 
     # Now use the 'params' instance when creating SimManager
     sim = gpudrive.SimManager(
@@ -33,9 +34,11 @@ def simulation_results():
 
     done = sim.done_tensor().to_torch()
 
+    ctr = 0
     while not done.all():
         sim.step()
-
+        ctr += 1
+        print(ctr)
     return sim
 
 def test_goal_reaching(simulation_results):

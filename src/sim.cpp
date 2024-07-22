@@ -8,6 +8,7 @@
 #include "sim.hpp"
 #include "utils.hpp"
 #include "knn.hpp"
+#include "dynamics.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -42,7 +43,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
-    registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
@@ -91,6 +91,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Info);
     registry.exportColumn<Agent, ResponseType>(
         (uint32_t)ExportID::ResponseType);
+    registry.exportColumn<Agent, Trajectory>(
+        (uint32_t)ExportID::Trajectory);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -126,7 +128,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 // This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      const BicycleModel &model,
                                       const VehicleSize &size,
                                       const Position &pos,
                                       const Rotation &rot,
@@ -142,9 +143,9 @@ inline void collectObservationsSystem(Engine &ctx,
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
     auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
 
-    self_obs.speed = model.speed;
+    self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
-    auto goalPos = goal.position - model.position;
+    auto goalPos = goal.position - pos.xy();
     self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
@@ -158,13 +159,14 @@ inline void collectObservationsSystem(Engine &ctx,
     {
         Entity other = other_agents.e[agentIdx++];
 
-        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
-        Rotation other_rot = ctx.get<Rotation>(other);
-        VehicleSize other_size = ctx.get<VehicleSize>(other);
+        const Position &other_position = ctx.get<Position>(other);
+        const Velocity &other_velocity = ctx.get<Velocity>(other);
+        const Rotation &other_rot = ctx.get<Rotation>(other);
+        const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        Vector2 relative_pos = (other_position - pos).xy();
         relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
-        float relative_speed = other_bicycle_model.speed; // Design decision: return the speed of the other agent directly
+        float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -186,13 +188,13 @@ inline void collectObservationsSystem(Engine &ctx,
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
-            ctx, rot, model.position, map_obs.obs);
+            ctx, rot, pos.xy(), map_obs.obs);
         return;
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
-    utils::ReferenceFrame referenceFrame(model.position, rot);
+    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
     arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -210,9 +212,21 @@ inline void collectObservationsSystem(Engine &ctx,
     }
 }
 
+
+// Make the agents easier to control by zeroing out their velocity
+// after each step.
+inline void agentZeroVelSystem(Engine &,
+                               Velocity &vel)
+{
+    vel.linear.x = 0;
+    vel.linear.y = 0;
+    vel.linear.z = 0;
+    vel.angular = Vector3::zero();
+}
+
+
 inline void movementSystem(Engine &e,
                            const InterfaceEntity &agent_iface,
-                           BicycleModel &model,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -222,28 +236,22 @@ inline void movementSystem(Engine &e,
                            const CollisionDetectionEvent &collisionEvent,
                            const ResponseType &responseType) {
     
-    if (collisionEvent.hasCollided.load_relaxed())
-    {
-        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            e.get<Done>(agent_iface.e).v = 1;
-            return;
-        }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
-        {
-            e.get<Done>(agent_iface.e).v = 1;
-            position = consts::kPaddingPosition;
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            return;
-        }
-        else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
-        {
-            // Do nothing.
+    if (collisionEvent.hasCollided.load_relaxed()) {
+        switch (e.data().params.collisionBehaviour) {
+            case CollisionBehaviour::AgentStop:
+                e.get<Done>(agent_iface.e).v = 1;
+                agentZeroVelSystem(e, velocity);
+                 break;
+
+            case CollisionBehaviour::AgentRemoved:
+                e.get<Done>(agent_iface.e).v = 1;
+                position = consts::kPaddingPosition;
+                agentZeroVelSystem(e, velocity);
+                break;
+
+            case CollisionBehaviour::Ignore:
+                // Do nothing.
+                break;
         }
     }
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
@@ -251,7 +259,7 @@ inline void movementSystem(Engine &e,
     if(responseType == ResponseType::Static)
     {
         // Do nothing. The agent is static.
-        // Agent can only be static if initAgentsAsStatic is set to true.
+        // Agent can only be static if isStaticAgentControlled is set to true.
         return;
     }
 
@@ -270,81 +278,32 @@ inline void movementSystem(Engine &e,
 
     if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
     {
-        const Action &action = e.get<Action>(agent_iface.e);
-        // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
-
-        // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
-        // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
-        // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change
-        // gradually.
-
-        // TODO(samk): The following constants are configurable in Nocturne but look to
-        // always use the same hard-coded value in practice. Use in-line constants
-        // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
-        const float maxSpeed{std::numeric_limits<float>::max()};
-        const float dt{0.1};
-
-        auto clipSpeed = [maxSpeed](float speed)
+        Action &action = e.get<Action>(agent_iface.e);
+        if(e.data().params.useWayMaxModel)
         {
-            return std::max(std::min(speed, maxSpeed), -maxSpeed);
-        };
-        // TODO(samk): hoist into Vector2::PolarToVector2D
-        auto polarToVector2D = [](float r, float theta)
+            forwardWaymaxModel(action, rotation, position, velocity);
+        }
+        else 
         {
-            return math::Vector2{r * cosf(theta), r * sinf(theta)};
-        };
-
-        // Average speed
-        const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
-        const float tanDelta{tanf(action.steering)};
-        // Assume center of mass lies at the middle of length, then l / L == 0.5.
-        const float beta{std::atan(0.5f * tanDelta)};
-        const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
-        const float w{v * std::cos(beta) * tanDelta / size.length};
-
-        model.position += d * dt;
-        model.heading = utils::AngleAdd(model.heading, w * dt);
-        model.speed = clipSpeed(model.speed + action.acceleration * dt);
-
-        // The BVH machinery requires the components rotation, position, and velocity
-        // to perform calculations. Thus, to reuse the BVH machinery, we need to also
-        // updates these components.
-
+            forwardKinematics(action, size, rotation, position, velocity);
+        }
         // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
-        position = madrona::base::Position({.x = model.position.x, .y = model.position.y, .z = 1});
-        rotation = Quat::angleAxis(model.heading, madrona::math::up);
-        velocity.linear.x = model.speed * cosf(model.heading);
-        velocity.linear.y = model.speed * sinf(model.heading);
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
-        velocity.angular.z = w;
     }
     else
     {
         // Follow expert trajectory
         CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
-        model.position= trajectory.positions[curStepIdx];
-        model.heading = trajectory.headings[curStepIdx];
-        model.speed = trajectory.velocities[curStepIdx].length();
         position.x = trajectory.positions[curStepIdx].x;
         position.y = trajectory.positions[curStepIdx].y;
+        position.z = 1;
         velocity.linear.x = trajectory.velocities[curStepIdx].x;
         velocity.linear.y = trajectory.velocities[curStepIdx].y;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
         rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
     }
 }
 
-
-// Make the agents easier to control by zeroing out their velocity
-// after each step.
-inline void agentZeroVelSystem(Engine &,
-                               Velocity &vel)
-{
-    vel.linear.x = 0;
-    vel.linear.y = 0;
-    vel.linear.z = 0;
-    vel.angular = Vector3::zero();
-}
 
 static inline float distObs(float v)
 {
@@ -424,7 +383,7 @@ inline void lidarSystem(Engine &ctx, Entity e, const InterfaceEntity &agent_ifac
 // so far through the challenge. Continuous reward is provided for any new
 // distance achieved.
 inline void rewardSystem(Engine &ctx,
-                         const BicycleModel &model,
+                         const Position &position,
                          const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
@@ -434,13 +393,13 @@ inline void rewardSystem(Engine &ctx,
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = -dist;
         out_reward.v = reward;
     }
     else if(rewardType == RewardType::OnGoalAchieved)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = (dist < ctx.data().params.rewardParams.distanceToGoalThreshold) ? 1.f : 0.f;
         out_reward.v = reward;
     }
@@ -482,7 +441,7 @@ inline void bonusRewardSystem(Engine &ctx,
 // notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
 inline void stepTrackerSystem(Engine &ctx,
-                              const BicycleModel &model,
+                              const Position &position,
                               const Goal &goal,
                               InterfaceEntity &agent_iface)
 {
@@ -491,17 +450,20 @@ inline void stepTrackerSystem(Engine &ctx,
     Done &done = ctx.get<Done>(agent_iface.e);
     Info &info = ctx.get<Info>(agent_iface.e);
     int32_t num_remaining = --steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
+    if (num_remaining == consts::episodeLen - 1 && done.v != 1)
+    { // Make sure to not reset an agent's done flag
         done.v = 0;
-    } else if (num_remaining == 0) {
+    }
+    else if (num_remaining == 0)
+    {
         done.v = 1;
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1 || info.reachedGoal != 1)
+    if (done.v != 1 || info.reachedGoal != 1)
     {
-        float dist = (model.position - goal.position).length();
-        if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+        float dist = (position.xy() - goal.position).length();
+        if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
         {
             done.v = 1;
             info.reachedGoal = 1;
@@ -678,7 +640,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             InterfaceEntity,
-            BicycleModel,
             VehicleSize,
             Rotation,
             Position,
@@ -704,22 +665,16 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
         {findOverlappingEntities});
 
-    // Improve controllability of agents by setting their velocity to 0
-    // after physics is done.
-    auto agent_zero_vel = builder.addToGraph<
-        ParallelForNode<Engine, agentZeroVelSystem, Velocity>>(
-        {detectCollisions});
-
     // Finalize physics subsystem work
     auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
-        builder, {agent_zero_vel});
+        builder, {detectCollisions});
 
     phys_done = phys::PhysicsSystem::setupCleanupTasks(
-        builder, {agent_zero_vel});
+        builder, {detectCollisions});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
-            BicycleModel,
+            Position,
             Trajectory,
             Goal,
             Progress,
@@ -729,7 +684,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
 
     // Check if the episode is over
     auto done_sys = builder.addToGraph<
-        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, InterfaceEntity>>(
+        ParallelForNode<Engine, stepTrackerSystem, Position, Goal, InterfaceEntity>>(
         {reward_sys});
 
     // Conditionally reset the world if the episode is over
@@ -759,7 +714,6 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
-            BicycleModel,
             VehicleSize,
             Position,
             Rotation,
