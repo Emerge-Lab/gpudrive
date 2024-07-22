@@ -1,7 +1,8 @@
 train:
   seed: 1
   torch_deterministic: True
-  device: cuda
+  device: cpu
+  cpu_offload: True
   total_timesteps: 100_000_000
   learning_rate: 2.5e-3
   num_steps: 90
@@ -19,6 +20,7 @@ train:
   target_kl: ~
 
   num_envs: 8
+  
   envs_per_worker: 1
   envs_per_batch: ~
   env_pool: True
@@ -26,15 +28,16 @@ train:
   data_dir: experiments
   checkpoint_interval: 200
   pool_kernel: [0]
-  batch_size: 16000
-  batch_rows: 1000
+  batch_size: 1024
+  minibatch_size: 512
   bptt_horizon: 1 #8
   vf_clip_coef: 1.0
   compile: False
   compile_mode: reduce-overhead
 
-  action_space_type: discrete
-  
+env_params:
+  action_space_type: continuous
+
 reward_params:
   rewardType: OnGoalAchieved  
   distanceToGoalThreshold: 3.0
@@ -46,7 +49,7 @@ parameters:
   datasetInitOptions: FirstN
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 0
+  maxNumControlledVehicles: 1
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -58,6 +61,6 @@ parameters:
 sim_manager:
   exec_mode: CPU
   gpu_id: 0
-  num_worlds: 1
+  num_worlds: 3
   json_path: /Users/aaravpandya/dev/gpudrive/example_data
   enable_batch_renderer: False

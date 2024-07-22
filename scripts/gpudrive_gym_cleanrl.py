@@ -4,33 +4,39 @@ import gymnasium as gym
 from gymnasium.spaces import Box, Discrete
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import math
 import numpy as np
-from gymnasium.wrappers import FlattenObservation, NormalizeObservation
+from gymnasium.experimental.wrappers import LambdaActionV0
+
 from sim_utils.creator import SimCreator
-import pufferlib.models
-import pufferlib
-import imageio
 from itertools import product
 
 class GPUDriveEnv(gym.Env):
     Recurrent = None
 
-    def __init__(self, params: gpudrive.Parameters = None, action_space_type: str = "discrete"):
-        self.sim = SimCreator()
-        self.obs_tensors, self.num_obs_features = self.setup_obs()
+    def __init__(self, config: dict[str,dict[str,str]] = {}):
+        if len(config) > 0:
+            self.sim, self.config = SimCreator(config)
+        else:
+            self.sim, self.config = SimCreator()
 
-        self.action_space_type = action_space_type
+        self.device = str.lower(self.config.sim_manager.exec_mode)
+        
+        self.setup_obs()
+        self.setup_actions()
 
+        self.async_reset()
+
+        self.num_obs_features = self.concatenated_obs.shape[-1]
+        self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float32)
+        self.observation_space = gym.vector.utils.batch_space(self.single_observation_space, self.batch_size)
+
+        self.action_space_type = config.get('env_params', {}).get('action_space_type', 'continuous')
+        self.single_action_space = gym.spaces.Box(low=-5, high=5, shape=self.batch_action_tensor.shape[1:], dtype=np.float32)
+        self.batched_space = gym.vector.utils.batch_space(self.single_action_space, self.batch_size)
+        self.action_space = self.batched_space
         if self.action_space_type == "discrete":
-            self.action_space = self.setup_discrete_actions()
-            self.single_action_space = self.action_space
-        elif self.action_space_type == "continuous":
-            self.action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions(), dtype=np.float64)
-            self.single_action_space = gym.spaces.Box(low=-1, high=1, shape=self.setup_actions()[2:], dtype=np.float64)
+            self.setup_discrete_actions()
 
-        self.num_envs = self.self_obs_tensor.shape[0]
         # self.agents_per_env = self.shape_tensor[:,0]
         # self.total_num_agents = torch.sum(self.agents_per_env)
         # self.env_ids = torch.repeat_interleave(torch.arange(self.num_envs).to(self.self_obs_tensor.device), self.agents_per_env)
@@ -70,7 +76,8 @@ class GPUDriveEnv(gym.Env):
                 head.item(),
             ]
 
-        return Discrete(n=int(len(self.action_key_to_values)))
+        self.discrete_action_space = Discrete(len(self.action_key_to_values))
+        return
 
     def filter_padding_agents(self, obs_tensors, N, A):
         # Calculate the batch size assuming it's N*A for simplicity here
@@ -88,20 +95,7 @@ class GPUDriveEnv(gym.Env):
         filtered_obs_tensors = [tensor.view(batch_size, -1)[flat_valid_mask].view(-1, tensor.shape[-1]) for tensor in obs_tensors]
 
         return filtered_obs_tensors
-    
-    def apply_discrete_action(self, actions):
-        # Convert the discrete action indices to action values
-        # actions = actions.view(-1)
-        if(isinstance(actions, np.ndarray)):
-            actions = torch.from_numpy(actions)
-        action_value_tensor = torch.zeros(actions.shape[0], 3)
-        for idx, action in enumerate(actions):
-            action_idx = action.item()
-            action_value_tensor[idx, :] = torch.Tensor(
-                    self.action_key_to_values[action_idx]
-                )
-        action_value_tensor.to(actions.device)
-        return action_value_tensor
+
     
     def apply_action(self, actions):
         if self.action_space_type == "discrete":
@@ -146,69 +140,65 @@ class GPUDriveEnv(gym.Env):
 
     def setup_obs(self):
         self.self_obs_tensor = self.sim.self_observation_tensor().to_torch()
-        self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
-        # self.map_obs_tensor = self.sim.map_observation_tensor().to_torch()
-        self.agent_map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch()
+        N, A, O = self.self_obs_tensor.shape[0:3] # N = num worlds, A = num agents, O = num obs features
+        self.num_envs = N
+        self.num_agents = A
+        self.batch_size = N * A
+        self.obs_type = 'lidar' if self.config['parameters']['enableLidar'] else 'classic'
+        if self.obs_type == 'lidar':
+            self.lidar_tensor = self.sim.lidar_tensor().to_torch()
+
+
+            self.obs_tensors = [
+                self.self_obs_tensor.view(self.batch_size, *self.self_obs_tensor.shape[2:]),
+                self.lidar_tensor.view(self.batch_size, -1),
+            ]
+        else:
+            self.partner_obs_tensor = self.sim.partner_observations_tensor().to_torch()
+            self.agent_map_obs_tensor = self.sim.agent_roadmap_tensor().to_torch()
+           
+            map_obs_tensor = self.agent_map_obs_tensor.view(N, A, -1)
+            self.partner_obs_tensor = self.partner_obs_tensor.view(N, A, -1)
+
+            self.obs_tensors = [
+                self.self_obs_tensor.view(self.batch_size, *self.self_obs_tensor.shape[2:]),
+                self.partner_obs_tensor.view(self.batch_size, *self.partner_obs_tensor.shape[2:]),
+                map_obs_tensor.view(self.batch_size, *map_obs_tensor.shape[2:])
+            ]
+
         self.controlled_state_tensor = self.sim.controlled_state_tensor().to_torch()
         self.done_tensor = self.sim.done_tensor().to_torch()
         self.reward_tensor = self.sim.reward_tensor().to_torch()
         self.steps_remaining_tensor = self.sim.steps_remaining_tensor().to_torch()
 
-        controlled_mask = self.controlled_state_tensor[:, :, 0] == 1
-        # for i in range(self.done_tensor.shape[0]):
-        #     if(self.done_tensor[i].all()):
-        #         # print("done due to time")
-        #         self.async_reset()
-        #     elif(self.done_tensor[i][controlled_mask[i]].all()):
-        #         # print("done due to agent")
-        #         self.async_reset()
-
-        # Add L2 Norm to obs_tensor for each agent at indexs [2,3]
-
-        N, A, O = self.self_obs_tensor.shape[0:3] # N = num worlds, A = num agents, O = num obs features
-        batch_size = N * A
-
         # Add in an agent ID tensor
-        id_tensor = torch.arange(A).float()
-        if A > 1:
-            id_tensor = id_tensor / (A - 1)
+        self.id_tensor = torch.arange(N*A, dtype=torch.int64)
+        self.id_tensor = self.id_tensor.to(device=self.self_obs_tensor.device)
+        self.id_tensor = self.id_tensor.view(N, A).expand(N, A).reshape(self.batch_size, 1)
 
-        id_tensor = id_tensor.to(device=self.self_obs_tensor.device)
-        id_tensor = id_tensor.view(1, A).expand(N, A).reshape(batch_size, 1)
+        
+        self.controlled = self.controlled_state_tensor.view(self.batch_size, *self.controlled_state_tensor.shape[2:])
+        self.done = self.done_tensor.view(self.batch_size, *self.done_tensor.shape[2:])
+        self.reward = self.reward_tensor.view(self.batch_size, *self.reward_tensor.shape[2:])
+        self.steps_remaining = self.steps_remaining_tensor.view(self.batch_size, *self.steps_remaining_tensor.shape[2:])
+        self.agent_ids = self.id_tensor
 
-        # Flatten map obs tensor of shape (N, R, 4) to (N, 4 * R)
-        # map_obs_tensor = map_obs_tensor.view(N, map_obs_tensor.shape[1]*map_obs_tensor.shape[2])
-        map_obs_tensor = self.agent_map_obs_tensor.view(N, A, -1)
-        # print("map_obs_tensor", map_obs_tensor.shape)
-        self.partner_obs_tensor = self.partner_obs_tensor.view(N, A, -1)
-        # map_obs_tensor = map_obs_tensor.repeat(N*A//N, 1)
 
-        self.obs_tensors = [
-            self.self_obs_tensor.view(batch_size, *self.self_obs_tensor.shape[2:]),
-            self.partner_obs_tensor.view(batch_size, *self.partner_obs_tensor.shape[2:]),
-            map_obs_tensor.view(batch_size, *map_obs_tensor.shape[2:]),
-            self.controlled_state_tensor.view(batch_size, *self.controlled_state_tensor.shape[2:]),
-            self.done_tensor.view(batch_size, *self.done_tensor.shape[2:]),
-            self.reward_tensor.view(batch_size, *self.reward_tensor.shape[2:]),
-            self.steps_remaining_tensor.view(batch_size, *self.steps_remaining_tensor.shape[2:]),
-            id_tensor,
-        ]
-        # self.obs_tensors = self.filter_padding_agents(obs_tensors, N, A)
-
-        num_obs_features = 0
-        for tensor in self.obs_tensors[:1]:
-            num_obs_features += math.prod(tensor.shape[1:])
-
-        # print("num_obs_features", num_obs_features)
-
-        return self.obs_tensors, num_obs_features
+    @property
+    def concatenated_obs(self):
+        # TODO: Memory copy here. Can we avoid it?
+        return torch.cat(self.obs_tensors, dim=-1)
 
     def setup_actions(self):
-        action_tensor = self.sim.action_tensor().to_torch()
-        return action_tensor.shape
+        self.action_tensor = self.sim.action_tensor().to_torch()
+        self.batch_action_tensor = self.action_tensor.view(self.batch_size, *self.action_tensor.shape[2:])
+        return
 
-    def step(self, action):
-        self.send(action)
+    def step(self, actions):
+        acs = torch.zeros_like(self.batch_action_tensor)
+        acs[self.mask] = actions
+        acs = acs.view(self.num_envs, self.num_agents, *acs.shape[1:])
+        self.send(acs)
         return self.recv()
         # action = torch.tensor(action)
         # self.sim.step()
@@ -230,33 +220,21 @@ class GPUDriveEnv(gym.Env):
         # self.data = [self.reset(i) for i in range(self.num_envs)]
         for i in range(self.num_envs):
             self.sim.reset(i)
+        self.sim.step()
+        self.make_mask()
+        return self.recv()
+    
+    def make_mask(self):
+        controlled_mask = self.controlled == 1
+        done_mask = self.done != 1
 
+        self.mask = torch.clone(torch.squeeze(controlled_mask & done_mask)).detach()
+
+    @torch.no_grad()
     def recv(self):
-        recvs = []
-        next_env_id = []
-        obs, _ = self.setup_obs()
-        env_obs = torch.cat(obs[:1], dim=-1)
-        controlled, dones, rews= obs[3], obs[4], obs[5]
-        truncateds = torch.Tensor([False] * self.total_num_agents).to(dones.device)
-        infos = [{} for _ in range(self.total_num_agents)]
-
-        infos = [i for ii in infos for i in ii]
-        
-        mask = controlled.bool()
-
-        env_ids = torch.arange(self.total_num_agents).to(env_obs.device)
-
-        assert(torch.isnan(env_obs).any() == False)
-        if self.mask_agents:
-            # iterate through environments and get all controlled agents
-                
-            return env_obs, rews, dones, truncateds, infos, env_ids, mask
-
-        return env_obs, rews, dones, truncateds, infos, env_ids
+        return self.concatenated_obs[self.mask], self.reward[self.mask], self.done[self.mask], self.done[self.mask], {}, self.agent_ids[self.mask], self.mask
 
     def send(self, actions):
-        actions = self.apply_action(actions)
-        actions = actions.view(self.self_obs_tensor.shape[0], -1, 3)
         self.sim.action_tensor().to_torch().copy_(actions)
         self.sim.step()
 
@@ -278,136 +256,41 @@ class GPUDriveEnv(gym.Env):
         return params
 
 
-class Convolutional1D(nn.Module):
-    def __init__(self, env, *args, framestack, flat_size,
-            input_size=512, hidden_size=32, output_size=32,
-            channels_last=False, downsample=1, **kwargs):
-        '''The CleanRL default Atari policy: a stack of three convolutions followed by a linear layer
-        
-        Takes framestack as a mandatory keyword arguments. Suggested default is 1 frame
-        with LSTM or 4 frames without.'''
-        super().__init__()
-        # self.num_actions = env.single_action_space.shape[0]
-        self.channels_last = channels_last
-        self.downsample = downsample
-        self.action_space_type = env.action_space_type
-        self.num_features = env.num_obs_features
-        self.device = env.device
+def apply_discrete_action(actions, action_key_to_values):
+    if(isinstance(actions, np.ndarray)):
+        actions = torch.from_numpy(actions)
+    action_value_tensor = torch.zeros(actions.shape[0], 3)
+    for idx, action in enumerate(actions):
+        action_idx = action.item()
+        action_value_tensor[idx, :] = torch.Tensor(
+                action_key_to_values[action_idx]
+            )
+    action_value_tensor.to(actions.device)
+    return action_value_tensor
 
-
-        # self.initial_norm = nn.BatchNorm1d(framestack)
-        self.actor = nn.Sequential(
-            nn.Linear(self.num_features, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, output_size),
-            nn.Tanh(),
-            nn.Linear(output_size, env.action_space.n),
-            nn.Softmax(dim=-1)
-        #     nn.ReLU(),
-        #     nn.BatchNorm1d(2),  # Normalization layer after the first convolution
-        #     pufferlib.pytorch.layer_init(nn.Conv1d(2, 4, 16, stride=1)),
-        #     nn.ReLU(),
-        #     nn.BatchNorm1d(4),  # Normalization layer after the second convolution
-        #     pufferlib.pytorch.layer_init(nn.Conv1d(4, 4, 8, stride=1)),
-        #     # nn.ReLU(),
-        #     # nn.BatchNorm1d(32),  # Normalization layer after the third convolution
-        #     # pufferlib.pytorch.layer_init(nn.Conv1d(32, 64, 64, stride=1)),
-        #     # nn.ReLU(),
-        #     # nn.BatchNorm1d(64),  # Normalization layer after the fourth convolution
-        #     # pufferlib.pytorch.layer_init(nn.Conv1d(64, 64, 32, stride=1)),
-        #     nn.ReLU(),
-        #     nn.BatchNorm1d(4),  # Normalization layer after the fifth convolution
-        #     nn.AdaptiveAvgPool1d(32),
-        #     nn.Flatten(),
-        #     pufferlib.pytorch.layer_init(nn.Linear(4*32, 64)),
-        #     # nn.ReLU(),
-        #     # pufferlib.pytorch.layer_init(nn.Linear(16*1024, 4*1024)),
-        #     nn.ReLU(),
-        #     pufferlib.pytorch.layer_init(nn.Linear(64, hidden_size)),
-        #     nn.BatchNorm1d(hidden_size)  # Normalization before the final linear layer
-        ).to(self.device)
-
-        self.critic = nn.Sequential(
-            nn.Linear(self.num_features, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, 1),
-            nn.Tanh()
-        ).to(self.device)
-
-        # Discrete
-        # if (self.action_space_type == "discrete"):
-        #     self.actor = nn.Linear(output_size, env.action_space.n).to(self.device)
-        # elif (self.action_space_type == "continuous"):
-        #     self.mean = pufferlib.pytorch.layer_init(nn.Linear(output_size, env.single_action_space.shape[0]), std=0.01).to(self.device)
-        #     self.log_std = nn.Parameter(torch.full((env.single_action_space.shape[0],), -2.0)).to(self.device)
-            # self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[0]))
-
-        
-        # self.value_fn = nn.Linear(output_size, 1).to(self.device)
-
-        # continuous
-
-    def encode_observations(self, observations):
-        observations.to(self.device)
-        # if self.channels_last:
-        #     observations = observations.permute(0, 3, 1, 2)
-        # if self.downsample > 1:
-        #     observations = observations[:, :, ::self.downsample, ::self.downsample]
-        # F.normalize(observations, p=2, dim=1)
-        # observations = observations.unsqueeze(1)  # This adds a channel dimension, resulting in [batch_size, 1, length]
-        # observations = self.initial_norm(observations.float())
-        return self.network(observations.float()), None
-
-    def decode_actions(self, flat_hidden, lookup, concat=None):
-        action = self.actor(flat_hidden)
-        value = self.value_fn(flat_hidden)
-        return action, value
-    
-    def forward(self, env_outputs):
-        '''Forward pass for PufferLib compatibility'''
-        action = self.actor(env_outputs)
-        value = self.critic(env_outputs)
-        return action, value
-        # assert(torch.isnan(env_outputs).any() == False)
-        # hidden, lookup = self.encode_observations(env_outputs)
-        # # Discrete
-        # if (self.action_space_type == "discrete"):
-        #     actions, value = self.decode_actions(hidden, lookup)
-        #     return actions, value
-        # elif (self.action_space_type == "continuous"):
-        #     means = self.mean(hidden)
-        #     means = torch.clamp(means, min=-3, max=3)
-        #     log_std = torch.clamp(self.log_std, min=-10, max=-2)
-        #     std = torch.exp(log_std)
-        #     value = self.value_fn(hidden)
-        #     return [means, std], value
-
-def make_gpudrive(action_space_type: str = "continuous"):
-    return GPUDriveEnv(action_space_type=action_space_type)
+def make_gpudrive(config: dict[str,dict[str,str]] = {}):
+    env = GPUDriveEnv(config)
+    if(env.action_space_type == "discrete"):
+        env = LambdaActionV0(
+            env,
+            func=lambda action: apply_discrete_action(action, env.action_key_to_values),
+            action_space=gym.vector.utils.batch_space(env.discrete_action_space, env.batch_size)
+        )
+    return env
 
 if __name__ == "__main__":
-    env = GPUDriveEnv()
+    env = make_gpudrive()
+    env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
     # print(env.sim.self_observation_tensor().to_jax())
     # return
     frames = []
     for i in range(91):
-        # env_obs, rews, dones, truncateds, infos, env_ids, mask = env.recv()
-        env.sim.step()
-        print(env.obs_tensors[0][0], env.self_obs_tensor[0][0])
+        actions = torch.tensor(env.action_space.sample())
+        env.step(actions[mask])
+        env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
+        if(dones.all()):
+            break
+        print(env_obs[0][0], env.sim.self_observation_tensor().to_torch()[0][0])
 
         # print(i, dones[0], env_obs[0])
     #     frame = env.render()

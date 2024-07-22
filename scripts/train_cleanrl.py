@@ -1,180 +1,150 @@
-from pdb import set_trace as T
 import argparse
 import shutil
-import sys
-import os
-
-import importlib
-import inspect
 import yaml
+import os
+from box import Box
 
 import pufferlib
 import pufferlib.utils
+import pufferlib.vector
+import pufferlib.frameworks.cleanrl
+
+from rich_argparse import RichHelpFormatter
+from rich.traceback import install
+from rich.console import Console
 
 import cleanrl
-from cleanrl import rollout
+from gpudrive_gym_cleanrl import GPUDriveEnv, make_gpudrive
+from policies import LinearMLP
 
-from gpudrive_gym import GPUDriveEnv, make_gpudrive, Convolutional1D
-from sim_utils.creator import SimCreator
-   
-def make_policy(env, env_module, args):
-    policy = Convolutional1D(env, framestack=1, flat_size=1024)
-    if args.force_recurrence:
-        policy = env_module.Recurrent(env, policy, **args.recurrent)
-        policy = pufferlib.frameworks.cleanrl.RecurrentPolicy(policy)
-    else:
-        policy = cleanrl.Policy(policy)
-    print(policy)
-    return policy.to(args.train.device)
+def make_policy(env):
+    return LinearMLP(env)
 
-def init_wandb(args, name=None, resume=True):
+
+def init_wandb(args, name, id=None, resume=True):
     #os.environ["WANDB_SILENT"] = "true"
-
     import wandb
-    return wandb.init(
-        id=args.exp_name or wandb.util.generate_id(),
+    wandb.init(
+        id=id or wandb.util.generate_id(),
         project=args.wandb_project,
         entity=args.wandb_entity,
         group=args.wandb_group,
-        name=name or args.config,
+        config={
+            'cleanrl': dict(args.train),
+            'env': dict(args.env),
+            'policy': dict(args.policy),
+            #'recurrent': args.recurrent,
+        },
+        name=name,
         monitor_gym=True,
         save_code=True,
         resume=resume,
     )
+    return wandb
 
-def sweep(args, env_module, make_env):
+def sweep(args, wandb_name, env_module, make_env):
     import wandb
-    sweep_id = wandb.sweep(sweep=args.sweep, project="pufferlib")
+    sweep_id = wandb.sweep(
+        sweep=dict(args.sweep),
+        project="pufferlib",
+    )
 
     def main():
         try:
-            args.exp_name = init_wandb(args, env_module)
-            if hasattr(wandb.config, 'train'):
-                # TODO: Add update method to namespace
-                print(args.train.__dict__)
-                print(wandb.config.train)
-                args.train.__dict__.update(dict(wandb.config.train))
+            args.exp_name = init_wandb(args, wandb_name, id=args.exp_id)
+            # TODO: Add update method to namespace
+            print(wandb.config.train)
+            args.train.__dict__.update(dict(wandb.config.train))
+            args.track = True
             train(args, env_module, make_env)
         except Exception as e:
             import traceback
             traceback.print_exc()
 
-    wandb.agent(sweep_id, main, count=20)
+    wandb.agent(sweep_id, main, count=100)
 
-def get_init_args(fn):
-    if fn is None:
-        return {}
-    sig = inspect.signature(fn)
-    args = {}
-    for name, param in sig.parameters.items():
-        if name in ('self', 'env', 'policy'):
-            continue
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            continue
-        elif param.kind == inspect.Parameter.VAR_KEYWORD:
-            continue
-        else:
-            args[name] = param.default if param.default is not inspect.Parameter.empty else None
-    return args
+def train(args):
+    args.wandb = None
+    if args.track:
+        args.wandb = init_wandb(args, args.exp_id, id=args.exp_id)
 
-def load_from_config():
-    with open('config.yaml') as f:
-        config = yaml.safe_load(f)
 
-    default_keys = 'train'.split()
-    defaults = {key: config.get(key, {}) for key in default_keys}
+    env = make_gpudrive(config)
+    policy = make_policy(env)
 
-    return pufferlib.namespace(**defaults['train'])
-   
+    data = cleanrl.create(config.train, env, policy, wandb=args.wandb)
 
-def train(args, env_module, make_env):
-    print("Training with args", args)
-    if args.backend == 'clean_pufferl':
-        data = cleanrl.create(
-            config=args.train,
-            agent_creator=make_policy,
-            agent_kwargs={'env_module': env_module, 'args': args},
-            env_creator=make_env,
-            env_creator_kwargs={'action_space_type': args.train.action_space_type},
-            exp_name=args.exp_name,
-            track=args.track,
-        )
-
-        while not cleanrl.done_training(data):
+    while data.global_step < config.train.total_timesteps:
+        try:
             cleanrl.evaluate(data)
             cleanrl.train(data)
-            reward = cleanrl.rollout(data.pool, data.agent)
-            if args.track:
-                data.wandb.log({'ep_reward': reward})
-        print('Done training. Saving data...')
-        cleanrl.close(data)
-        print('Run complete')
-    elif args.backend == 'sb3':
-        from stable_baselines3 import PPO
-        from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-        from stable_baselines3.common.env_util import make_vec_env
-        from sb3_contrib import RecurrentPPO
+        except KeyboardInterrupt:
+            clean_pufferl.close(data)
+            os._exit(0)
+        except Exception:
+            Console().print_exception()
+            os._exit(0)
 
-        envs = make_vec_env(lambda: make_env(**args.env),
-            n_envs=args.train.num_envs, seed=args.train.seed, vec_env_cls=DummyVecEnv)
+    clean_pufferl.evaluate(data)
+    clean_pufferl.close(data)
 
-        model = RecurrentPPO("CnnLstmPolicy", envs, verbose=1,
-            n_steps=args.train.batch_rows*args.train.bptt_horizon,
-            batch_size=args.train.batch_size, n_epochs=args.train.update_epochs,
-            gamma=args.train.gamma
-        )
 
-        model.learn(total_timesteps=args.train.total_timesteps)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Parse environment argument', add_help=False)
-    parser.add_argument('--config', type=str, default='config.yaml', help='Configuration in config.yaml to use')
-    parser.add_argument('--backend', type=str, default='clean_pufferl', choices=['clean_pufferl', 'sb3'], help='Backend to use')
-    parser.add_argument('--mode', type=str, default='train', choices='train sweep evaluate'.split())
+    install(show_locals=False) # Rich tracebacks
+    # TODO: Add check against old args like --config to demo
+    parser = argparse.ArgumentParser(
+            description=f':blowfish: PufferLib [bright_cyan]{pufferlib.__version__}[/]'
+        ' demo options. Shows valid args for your env and policy',
+        formatter_class=RichHelpFormatter, add_help=True)
+    parser.add_argument('--baseline', action='store_true', help='Run baseline')
+    parser.add_argument('--mode', type=str, default='train', choices='train eval evaluate sweep autotune baseline profile'.split())
     parser.add_argument('--eval-model-path', type=str, default=None, help='Path to model to evaluate')
-    parser.add_argument('--baseline', action='store_true', help='Baseline run')
     parser.add_argument('--no-render', action='store_true', help='Disable render during evaluate')
-    parser.add_argument('--exp-name', type=str, default=None, help="Resume from experiment")
-    parser.add_argument('--wandb-entity', type=str, default='pandya-aarav-97', help='WandB entity')
-    parser.add_argument('--wandb-project', type=str, default='GPUDrive', help='WandB project')
+    parser.add_argument('--exp-id', '--exp-name', type=str, default=None, help="Resume from experiment")
+    parser.add_argument('--wandb-entity', type=str, default='jsuarez', help='WandB entity')
+    parser.add_argument('--wandb-project', type=str, default='pufferlib', help='WandB project')
     parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
-    parser.add_argument('--track', action='store_true', default=False, help='Track on WandB')
-    parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
-    parser.add_argument('--action_space_type', type=str, default='discrete', choices=['discrete', 'continuous'], help='Action space')
+    parser.add_argument('--track', action='store_true', help='Track on WandB')
 
-    clean_parser = argparse.ArgumentParser(parents=[parser])
-    args = parser.parse_known_args()[0].__dict__
-
-
-    make_env = make_gpudrive
-    args = pufferlib.namespace(**args)
-    args.train = load_from_config()
-    if args.mode == 'sweep':
+    args = parser.parse_args()
+    config = Box(yaml.safe_load(open('config.yaml', 'r')))
+    print(args.exp_id)
+    print(config)
+    if args.baseline:
+        assert args.mode in ('train', 'eval', 'evaluate')
         args.track = True
-    elif args.track:
-        args.exp_name = init_wandb(args).id
-    elif args.baseline:
-        args.track = True
-        run = init_wandb(args, name=args.exp_name, resume=False)
-        if args.mode == 'evaluate':
-            model_name = f'puf-{version}-{args.config}_model:latest'
+        shutil.rmtree(f'experiments/{args.exp_id}', ignore_errors=True)
+        run = init_wandb(args, args.exp_id, resume=False)
+        if args.mode in ('eval', 'evaluate'):
+            model_name = f'{args.exp_id}_model:latest'
             artifact = run.use_artifact(model_name)
             data_dir = artifact.download()
             model_file = max(os.listdir(data_dir))
             args.eval_model_path = os.path.join(data_dir, model_file)
 
     if args.mode == 'train':
-        train(args, GPUDriveEnv, make_env)
-        exit(0)
+        train(args)
+    elif args.mode in ('eval', 'evaluate'):
+        try:
+            clean_pufferl.rollout(
+                make_env,
+                args.env,
+                agent_creator=make_policy,
+                agent_kwargs={'env_module': env_module, 'args': args},
+                model_path=args.eval_model_path,
+                device=args.train.device
+            )
+        except KeyboardInterrupt:
+            os._exit(0)
     elif args.mode == 'sweep':
-        sweep(args, env_module, make_env)
-        exit(0)
-    elif args.mode == 'evaluate':
-        rollout(
-            make_env,
-            args.env,
-            agent_creator=make_policy,
-            agent_kwargs={'env_module': env_module, 'args': args},
-            model_path=args.eval_model_path,
-            device=args.train.device
-        )
+        sweep(args, wandb_name, env_module, make_env)
+    elif args.mode == 'autotune':
+        pufferlib.vector.autotune(make_env, batch_size=args.train.env_batch_size)
+    elif args.mode == 'profile':
+        import cProfile
+        cProfile.run('train(args, env_module, make_env)', 'stats.profile')
+        import pstats
+        from pstats import SortKey
+        p = pstats.Stats('stats.profile')
+        p.sort_stats(SortKey.TIME).print_stats(10)

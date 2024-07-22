@@ -39,7 +39,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
         json_path=sim_manager_config['json_path'],
         params=params
     )
-    return sim
+    return sim, config
 
 if __name__ == "__main__":
     with open("/home/aarav/gpudrive/config.yaml", 'r') as file:
