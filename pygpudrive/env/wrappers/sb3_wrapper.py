@@ -49,7 +49,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
-        self.controlled_agent_mask = self._env.cont_agent_mask
+        self.controlled_agent_mask = self._env.cont_agent_mask.clone()
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
@@ -80,7 +80,6 @@ class SB3MultiAgentEnv(VecEnv):
             fill_value=float("nan"),
         ).to(self.device)
 
-        self.collision_penalty = 0.0
         self.num_episodes = 0
         self.info_dict = {
             "off_road": 0,
@@ -93,7 +92,7 @@ class SB3MultiAgentEnv(VecEnv):
         """Reset all environments' seeds."""
         self._seeds = None
 
-    def reset(self, seed=None):
+    def reset(self, world_idx=None, seed=None):
         """Reset environment and return initial observations.
 
         Returns:
@@ -102,26 +101,27 @@ class SB3MultiAgentEnv(VecEnv):
                 Initial observation.
         """
 
-        # Has shape (num_worlds, max_agent_count , obs_dim)
-        self._env.reset()
-        self._env.step_dynamics(None)
-        obs = self._env.get_obs()
+        if world_idx is None:
+            self._env.reset()
+            obs = self._env.get_obs()
 
-        # Make dead agent mask (True for dead or invalid agents)
-        self.dead_agent_mask = ~self.controlled_agent_mask.clone()
+            # Make dead agent mask (True for dead or invalid agents)
+            self.dead_agent_mask = ~self.controlled_agent_mask.clone()
 
-        # Flatten over num_worlds and max_agent_count
-        obs = obs[self.controlled_agent_mask].reshape(
-            self.num_envs, self.obs_dim
-        )
+            # Flatten over num_worlds and max_agent_count
+            obs = obs[self.controlled_agent_mask].reshape(
+                self.num_envs, self.obs_dim
+            )
 
-        return obs
+            return obs
+        else:
+            self._env.sim.reset(world_idx.item())
 
     def step(self, actions) -> VecEnvStepReturn:
         """
         Returns:
         --------
-            torch.Tensor (max_agent_count * num_worlds, obs_dim): Observations.
+            torch.Tensor (max_agent_count * num_worlds, obs_dim): Next observations.
             torch.Tensor (max_agent_count * num_worlds): Rewards.
             torch.Tensor (max_agent_count * num_worlds): Dones.
             torch.Tensor (max_agent_count * num_worlds, info_dim): Information.
@@ -133,7 +133,8 @@ class SB3MultiAgentEnv(VecEnv):
             agent is done. After that, we return nan for the rewards, infos
             and done for that agent until the end of the episode.
         """
-        # reset the info dict
+
+        # Reset the info dict
         self.info_dict = {}
 
         # Unsqueeze action tensor to a shape the gpudrive env expects
@@ -146,15 +147,7 @@ class SB3MultiAgentEnv(VecEnv):
         done = self._env.get_dones()
         info = self._env.get_infos()
 
-        # Add collision penalty to rewards
-        reward += -abs(self.collision_penalty) * (info[..., 1] + info[..., 2])
-
-        # Get the dones for resets
-        # done = self._env.get_dones()
-        # Reset any of the worlds that are done
-        # First, find the indices of all the done worlds
-        # this is where the done flag for a world equals the sum of
-        # the controlled agent mask for that world
+        # CHECK IF A WORLD IS DONE -> RESET
         done_worlds = torch.where(
             (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
             == self.controlled_agent_mask.sum(dim=1)
@@ -164,10 +157,8 @@ class SB3MultiAgentEnv(VecEnv):
             self._update_info_dict(info, done_worlds)
             for world_idx in done_worlds:
                 self.num_episodes += 1
-                self._env.sim.reset(world_idx.item())
-
-        # now construct obs after the reset
-        obs = self._env.get_obs()
+                self.reset(world_idx=world_idx)
+                # print(f"world {world_idx} is reset")
 
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
@@ -187,14 +178,26 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Now override the dead agent mask for the reset worlds
         if done_worlds.any().item():
-            self.dead_agent_mask[done_worlds] = ~self.controlled_agent_mask[
-                done_worlds
-            ].clone()
-            self.tot_reward_per_episode[done_worlds] = 0
+            for world_idx in done_worlds:
+                self.dead_agent_mask[
+                    world_idx, :
+                ] = ~self.controlled_agent_mask[world_idx, :].clone()
+            self.tot_reward_per_episode[world_idx] = 0
             self.agent_step[done_worlds] = 0
 
+        # Construct the next observation
+        next_obs = self._env.get_obs()
+        self.obs_alive = next_obs[~self.dead_agent_mask]
+
+        # if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
+        #     print(
+        #         f"obs_alive: {self.obs_alive.max()} | min: {self.obs_alive.min()}"
+        #     )
+        #     _ = self._env.get_obs()
+
+        # RETURN NEXT_OBS, REWARD, DONE, INFO
         return (
-            obs[self.controlled_agent_mask]
+            next_obs[self.controlled_agent_mask]
             .reshape(self.num_envs, self.obs_dim)
             .clone(),
             self.buf_rews[self.controlled_agent_mask]
@@ -316,10 +319,6 @@ class SB3MultiAgentEnv(VecEnv):
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
         frames = [self._env.render()]
         return frames
-
-    @property
-    def _tot_controlled_valid_agents_across_worlds(self):
-        return self._env.num_valid_controlled_agents_across_worlds
 
 
 if __name__ == "__main__":

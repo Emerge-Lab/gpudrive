@@ -28,6 +28,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         self.data_dir = data_dir
         self.device = device
         self.render_config = render_config
+        self.episode_len = 90
 
         # Ensure data directory is valid
         self._validate_data_dir()
@@ -40,7 +41,14 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.valid_world_idx, self.valid_agent_idx = jnp.where(
+            self.cont_agent_mask == 1
+        )
+        self.valid_world_idx = self.valid_world_idx.astype(jnp.int32)
+        self.valid_agent_idx = self.valid_agent_idx.astype(jnp.int32)
         self.max_agent_count = self.cont_agent_mask.shape[1]
+
+        # Total number of controlled agents across all worlds
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
@@ -82,16 +90,21 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
-        assert actions.shape == (
-            self.num_worlds,
-            self.max_agent_count,
-        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
+        # Map valid actions to the correct indices
+        # Initialize the array with zeros
+        full_action_arr = jnp.zeros(
+            (self.num_worlds, self.max_agent_count), dtype=actions.dtype
+        )
 
-        # Nan actions will be ignored, but we need to replace them with zeros
-        actions = jnp.nan_to_num(actions, nan=0)
+        # Set the actions at these valid indices
+        full_action_arr = full_action_arr.at[
+            self.valid_world_idx, self.valid_agent_idx
+        ].set(actions)
 
         # Map action indices to action values
-        action_values = self.action_keys_tensor[actions]
+        action_values = self.action_keys_tensor[
+            full_action_arr.astype(jnp.int32)
+        ]
 
         # Feed the actual action values to gpudrive
         self.sim.action_tensor().to_jax().at[:, :, :].set(action_values)

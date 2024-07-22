@@ -3,6 +3,7 @@ import pyrallis
 from typing import Callable
 from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
+from datetime import datetime
 
 from utils.process import generate_valid_files_json
 from algorithms.sb3.ppo.ippo import IPPO
@@ -46,18 +47,25 @@ def train(exp_config: ExperimentConfig):
         device=exp_config.device,
     )
 
+    # SET MINIBATCH SIZE BASED ON ROLLOUT LENGTH
+    exp_config.batch_size = (
+        exp_config.num_worlds * exp_config.n_steps
+    ) // exp_config.num_minibatches
+
     # INIT WANDB
     run_id = None
-    if exp_config.use_wandb:
-        run = wandb.init(
-            project=exp_config.project_name,
-            group=exp_config.group_name,
-            sync_tensorboard=exp_config.sync_tensorboard,
-            tags=exp_config.tags,
-            mode=exp_config.wandb_mode,
-            config={**exp_config.__dict__, **env_config.__dict__},
-        )
-        run_id = run.id
+    datetime_ = datetime.now().strftime("%m_%d_%H_%S")
+    run_id = f"gpudrive_{datetime_}"
+    run = wandb.init(
+        project=exp_config.project_name,
+        name=run_id,
+        id=run_id,
+        group=exp_config.group_name,
+        sync_tensorboard=exp_config.sync_tensorboard,
+        tags=exp_config.tags,
+        mode=exp_config.wandb_mode,
+        config={**exp_config.__dict__, **env_config.__dict__},
+    )
 
     # CALLBACK
     custom_callback = MultiAgentCallback(
@@ -108,7 +116,7 @@ if __name__ == "__main__":
             num_unique_scenes=exp_config.train_on_k_unique_scenes,
             data_dir=exp_config.data_dir,
         )
-        
-    exp_config.actual_num_files = actual_num_files
+
+        exp_config.actual_num_files = actual_num_files
 
     train(exp_config)

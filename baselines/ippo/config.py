@@ -1,6 +1,5 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
-import torch
 
 
 @dataclass
@@ -8,37 +7,33 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET & DEVICE
-    data_dir: str = "formatted_json_v2_no_tl_train"
+    data_dir: str = "maps_10"
     generate_valid_json: bool = False
-    train_on_k_unique_scenes: int = 500  # If generate_valid_json = True, generates a json file with k unique scenarios
+    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
 
-    # BATCH SIZE / NUM WORLDS
-    num_worlds: int = 512
-
+    # NUM ENVIRONMENTS
+    num_worlds: int = 50
     device: str = "cuda"
 
     # RENDERING
-    render: bool = False
+    render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 250
-    track_time_to_solve: bool = False
-    # Start rendering success/failure modes after this many global timesteps
-    log_failure_modes_after: int = None  # Set to None to disable
-    log_success_modes_after: int = None  # Set to None to disable
-    render_n_worlds: int = 5  # Number of worlds to render
+    render_freq: int = 100  # Render every k rollouts
+    render_n_worlds: int = 10  # Number of worlds to render
+
+    track_time_to_solve: bool = True
 
     # LOGGING & WANDB
-    use_wandb: bool = True
     sync_tensorboard: bool = True
     logging_collection_window: int = (
-        100  # how many trajectories we average logs over
+        100  # How many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "gpudrive"
-    group_name = "dc/paper_fig"
+    project_name = "gpudrive_benchmark"
+    group_name = "experiments"
     entity = "_emerge"
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
-    wandb_mode = "online"
+    wandb_mode = "online"  # Options: online, offline, disabled
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
@@ -51,12 +46,12 @@ class ExperimentConfig:
     clip_range: float = 0.2
     vf_coef: float = 0.5
     n_steps: int = 92  # Has to be at least > episode_length = 91
-    batch_size: int = 2048
+    num_minibatches: int = 5 # Used to determine the minibatch size
     verbose: int = 0
-    total_timesteps: int = 1e8
+    total_timesteps: int = 6e7
     ent_coef: float = 0.001
     vf_coef: float = 0.5
-    lr: float = 1e-3
+    lr: float = 3e-4
     n_epochs: int = 5
 
     # NETWORK

@@ -14,7 +14,7 @@ This `config` all environment parameters.
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 ```Python
-env = GPUDriveJaxEnv(
+env = GPUDriveTorchEnv(
     config=config,
     num_worlds=1,
     max_cont_agents=3,

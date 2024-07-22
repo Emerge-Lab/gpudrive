@@ -137,9 +137,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # EGO STATE
         if self.config.ego_state:
-            ego_states = self.sim.self_observation_tensor().to_torch()
+            ego_states_unprocessed = (
+                self.sim.self_observation_tensor().to_torch()
+            )
             if self.config.norm_obs:
-                ego_states = self.normalize_ego_state(ego_states)
+                ego_states = self.normalize_ego_state(ego_states_unprocessed)
         else:
             ego_states = torch.Tensor().to(self.device)
 
@@ -156,18 +158,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 partner_observations = partner_observations.flatten(
                     start_dim=2
                 )
-
         else:
             partner_observations = torch.Tensor().to(self.device)
 
         # ROAD MAP OBSERVATIONS
         if self.config.road_map_obs:
 
-            road_map_observations = self.sim.agent_roadmap_tensor().to_torch()
+            road_map_observations_unprocessed = (
+                self.sim.agent_roadmap_tensor().to_torch()
+            )
 
             if self.config.norm_obs:
                 road_map_observations = self.normalize_and_flatten_map_obs(
-                    road_map_observations
+                    road_map_observations_unprocessed
                 )
             else:
                 road_map_observations = road_map_observations.flatten(
@@ -286,7 +289,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Road line segment length
         obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
 
-        #  Road scale (width and height)
+        # TODO: Road scale (width and height)
         obs[:, :, :, 3] /= self.config.max_road_scale
         # obs[:, :, :, 4] seems already scaled
 
@@ -306,12 +309,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    env_config = EnvConfig()
+    env_config = EnvConfig(sample_method="pad_n")
     render_config = RenderConfig()
 
     TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 50
+    NUM_WORLDS = 45
 
     env = GPUDriveTorchEnv(
         config=env_config,
@@ -340,6 +343,7 @@ if __name__ == "__main__":
         env.step_dynamics(rand_action)
 
         obs = env.get_obs()
+
         reward = env.get_rewards()
         done = env.get_dones()
 
