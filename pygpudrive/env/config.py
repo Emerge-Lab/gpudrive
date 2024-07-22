@@ -1,4 +1,5 @@
 """Configs for GPUDrive Environments."""
+"""Configs for GPUDrive Environments."""
 
 from dataclasses import dataclass
 import numpy as np
@@ -23,14 +24,14 @@ class EnvConfig:
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
     obs_radius: float = 100.0
-    polyline_reduction_threshold: float = 0.1
+    polyline_reduction_threshold: float = 1.0
 
     # Action space (joint discrete)
     steer_actions: torch.Tensor = torch.round(
         torch.linspace(-1.0, 1.0, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-3, 3, 7), decimals=3
+        torch.linspace(-4.0, 4.0, 7), decimals=3
     )
 
     # Collision behavior
@@ -44,11 +45,15 @@ class EnvConfig:
     )
     # The radius around the goal point within which the agent is considered
     # to have reached the goal
-    dist_to_goal_threshold: float = 4.0
+    dist_to_goal_threshold: float = 3.0
 
     # How to sample scenes
     sample_method: str = "pad_n"
 
+    # TODO(dc): should be removed
+    num_controlled_vehicles: int = 128
+    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
+    top_k_roadpoints: int = 200
     # TODO(dc): should be removed
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
