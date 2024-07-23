@@ -136,25 +136,7 @@ Below are the renders for each mode
   </tr>
 </table>
 
-## Sharp Bits
-
-TODO(dc)
-
 ## Citations
 
 If you use GPUDrive in your work, please cite us:
 TODO(dc)
-
-
-The Waymo Open Dataset is discussed in the following publication:
-
-```
-@misc{ettinger2021large,
-      title={Large Scale Interactive Motion Forecasting for Autonomous Driving : The Waymo Open Motion Dataset},
-      author={Scott Ettinger and others},
-      year={2021},
-      eprint={2104.10133},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
-```

@@ -98,7 +98,7 @@ Two versions of the dataset are available:
 - a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
 - the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
 
-The simulator supports initializing scenes from the Nocturne dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The directory should contain a `valid_files.json` with a list of the files to be initialized.
+The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
 
 ## Tests 📈
@@ -114,68 +114,6 @@ To test if the simulator compiled correctly (and python lib did not), try runnin
 cd build
 ./headless CPU 1 1 # Run on CPU , 1 world, 1 step
 ```
-
-
-## Dataset
-
-The `SceneConfig` dataclass in `pygpudrive/env/config.py` is used to configure how scenes are selected from a dataset. It has four attributes:
-
-- `path`: The path to the dataset.
-- `num_scenes`: The number of scenes to select.
-- `discipline`: The method for selecting scenes, defaulting to `SelectionDiscipline.PAD_N`. (See options in Table below)
-- `k_unique_scenes`: Specifies the number of unique scenes to select, if applicable.
-
-| `discipline` | Description |
-|----------|-------------|
-| **first_n** | Takes the first `num_worlds` files. Fails if the number of files is less than `num_worlds`. |
-| **random_n** | Randomly selects `num_worlds` files from the dataset. Fails if the number of files is less than `num_worlds`. |
-| **pad_n** | Initializes as many files as available up to `num_worlds`, then repeats the first file to pad until `num_worlds` files are loaded. Fails if there are more files than `num_worlds`. |
-| **exact_n** | Initializes exactly `num_worlds` files, ensuring that the count matches precisely with no more or less. |
-
-
-## Rendering
-
-Render settings can be changed using the `RenderConfig` in `pygpudrive/env/config.py`.
-
-| `Render Mode` | Description
-|--|--|
-| **PYGAME_ABSOLUTE** | Renders the absolute view of the scene with all the agents. Returns a single frame for a world.
-| **PYGAME_EGOCENTRIC** | Renders the egocentric view for each agent in a scene. Returns `num_agents` frames for each world.
-| **PYGAME_LIDAR** | Renders the Lidar views for an egent in a scene if Lidar is enabled. Returns `num_agents` frames for each world.
-
-Resolution of the frames can be specified using the `resolution` param which takes in a tuple of (W,H).
-
-Below are the renders for each mode
-<table>
-  <tr>
-    <td>
-      <figure>
-        <img src="../../data/absolute.gif" alt="Absolute">
-        <center><figcaption>Absolute</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="../../data/Egocentric.gif" alt="Egocentric">
-        <center><figcaption>Egocentric</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <figure>
-        <img src="../../data/Lidar360.gif" alt="Lidar with 360 FOV">
-        <center><figcaption>Lidar with 360 FOV</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="../../data/Lidar120.gif" alt="Lidar with 120 FOV">
-        <center><figcaption>Lidar with 120 FOV</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-</table>
 
 ## Citations
 
