@@ -47,9 +47,6 @@ class EnvConfig:
     # to have reached the goal
     dist_to_goal_threshold: float = 3.0
 
-    # How to sample scenes
-    sample_method: str = "pad_n"
-
     # TODO(dc): should be removed
     num_controlled_vehicles: int = 128
     road_map_agent_feat_dim: int = num_controlled_vehicles - 1
@@ -108,3 +105,18 @@ class RenderConfig:
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
+
+
+class SelectionDiscipline(Enum):
+    FIRST_N = 0
+    RANDOM_N = 1
+    PAD_N = 2
+    EXACT_N = 3
+    K_UNIQUE_N = 4
+
+@dataclass
+class SceneConfig:
+    path: str
+    num_scenes: int
+    discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
+    k_unique_scenes: int = None

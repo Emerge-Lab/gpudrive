@@ -33,16 +33,15 @@ def run_episode_and_log(env, world_index):
 
 if __name__ == "__main__":
     
-    env_config = EnvConfig(sample_method='first_n')
+    env_config = EnvConfig()
     render_config = RenderConfig(
         render_mode=RenderMode.PYGAME_ABSOLUTE
     )
 
     env = GPUDriveTorchEnv(
         config=env_config,
-        num_worlds=NUM_WORLDS,
+        scene_config=SceneConfig("formatted_json_v2_no_tl_train", NUM_WORLDS, SelectionDiscipline.FIRST_N)
         max_cont_agents=0,  # Step all vehicles in expert-control mode
-        data_dir="formatted_json_v2_no_tl_train",
         device="cuda",
         render_config=render_config,
     )

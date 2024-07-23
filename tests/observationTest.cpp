@@ -25,8 +25,7 @@ protected:
     gpudrive::Manager mgr = gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
-        .numWorlds = num_worlds,
-        .jsonPath = "testJsons",
+        .scenes = {"testJsons/test.json"},
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,

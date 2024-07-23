@@ -4,6 +4,7 @@
 #include <madrona/py/bindings.hpp>
 
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
 
@@ -31,12 +32,6 @@ namespace gpudrive
             .def_rw("distanceToGoalThreshold", &RewardParams::distanceToGoalThreshold)
             .def_rw("distanceToExpertThreshold", &RewardParams::distanceToExpertThreshold);
 
-        nb::enum_<DatasetInitOptions>(m, "DatasetInitOptions")
-            .value("FirstN", DatasetInitOptions::FirstN)
-            .value("RandomN", DatasetInitOptions::RandomN)
-            .value("PadN", DatasetInitOptions::PadN)
-            .value("ExactN", DatasetInitOptions::ExactN);
-
         nb::enum_<FindRoadObservationsWith>(m, "FindRoadObservationsWith")
             .value("KNearestEntitiesWithRadiusFiltering", FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering)
             .value("AllEntitiesWithRadiusFiltering", FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
@@ -46,7 +41,6 @@ namespace gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
-            .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
@@ -81,20 +75,18 @@ namespace gpudrive
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
+		 "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, std::vector<std::string> scenes, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
-                      .numWorlds = (uint32_t)num_worlds,
-                      .jsonPath = jsonPath,
+                      .scenes = scenes,
                       .params = params,
                       .enableBatchRenderer = enable_batch_renderer,
                       .batchRenderViewWidth = batch_render_view_width,
                       .batchRenderViewHeight = batch_render_view_height});},
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
-                nb::arg("num_worlds"),
-                nb::arg("json_path"),
+                nb::arg("scenes"),
                 nb::arg("params"),
                 nb::arg("enable_batch_renderer") = false,
                 nb::arg("batch_render_view_width") = 64,

@@ -13,23 +13,12 @@
 
 using namespace madrona;
 
-[[maybe_unused]] static void
-saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,
-                 int32_t world_idx) {
-  const float *world_base =
-      action_store.data() + world_idx * total_num_steps * 2 * 3;
-
-  std::ofstream f("/tmp/actions", std::ios::binary);
-  f.write((char *)world_base, sizeof(float) * total_num_steps * 2 * 3);
-}
-
-
 int main(int argc, char *argv[])
 {
     using namespace gpudrive;
 
-    if (argc < 4) {
-        fprintf(stderr, "%s TYPE NUM_WORLDS NUM_STEPS [--rand-actions]\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "%s TYPE NUM_STEPS [--rand-actions]\n", argv[0]);
         return -1;
     }
     std::string type(argv[1]);
@@ -44,14 +33,12 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    uint64_t num_worlds = std::stoul(argv[2]);
-    uint64_t num_steps = std::stoul(argv[3]);
-
-    HeapArray<float> action_store(num_worlds * 2 * num_steps * 3);
+    uint64_t num_steps = std::stoul(argv[3]); 
+    uint64_t num_worlds = 16;
 
     bool rand_actions = false;
-    if (argc >= 5) {
-        if (std::string(argv[4]) == "--rand-actions") {
+    if (argc >= 4) {
+        if (std::string(argv[3]) == "--rand-actions") {
             rand_actions = true;
         }
     }
@@ -59,8 +46,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .numWorlds = (uint32_t)num_worlds,
-        .jsonPath = "tests/testJsons",
+        .scenes = {"../maps.16"},
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -138,9 +124,6 @@ int main(int argc, char *argv[])
                     mgr.setAction(j, k, acc, steer, head);
 
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
-                    action_store[base_idx] = acc;
-                    action_store[base_idx + 1] = steer;
-                    action_store[base_idx + 2] = head;
                 }
             }
         }

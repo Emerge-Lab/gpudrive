@@ -73,8 +73,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .numWorlds = num_worlds,
-        .jsonPath = "tests/testJsons",
+        .scenes = {"testJsons/test.json"},
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,

@@ -15,29 +15,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def __init__(
         self,
         config,
-        num_worlds,
+        scene_config,
         max_cont_agents,
-        data_dir,
         device="cuda",
         action_type="discrete",
         render_config: RenderConfig = RenderConfig(),
     ):
         # Initialization of environment configurations
         self.config = config
-        self.num_worlds = num_worlds
+        self.num_worlds = scene_config.num_scenes
         self.max_cont_agents = max_cont_agents
-        self.data_dir = data_dir
         self.device = device
         self.render_config = render_config
-
-        # Ensure data directory is valid
-        self._validate_data_dir()
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
         # Initialize simulator with parameters
-        self.sim = self._initialize_simulator(params)
+        self.sim = self._initialize_simulator(params, scene_config)
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
@@ -308,19 +303,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-
-    env_config = EnvConfig(sample_method="pad_n")
-    render_config = RenderConfig()
-
     TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
     NUM_WORLDS = 45
 
+    env_config = EnvConfig(sample_method="pad_n")
+    render_config = RenderConfig()
+    scene_config = SceneConfig("example_data", NUM_WORLDS)
+
     env = GPUDriveTorchEnv(
         config=env_config,
-        num_worlds=NUM_WORLDS,
+        scene_config=scene_config,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="example_data",
         device="cuda",
         render_config=render_config,
     )

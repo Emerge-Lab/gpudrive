@@ -5,11 +5,9 @@ from dataclasses import dataclass
 @dataclass
 class ExperimentConfig:
     """Configurations for experiments."""
-
     # DATASET & DEVICE
     data_dir: str = "maps_10"
-    generate_valid_json: bool = False
-    train_on_k_unique_scenes: int = 10  # If generate_valid_json = True, generates a json file with k unique scenarios
+    train_on_k_unique_scenes: int = 500  # If set to a non-zero value K, randomly samples K unique scenarios for a total of num_worlds scenes
 
     # NUM ENVIRONMENTS
     num_worlds: int = 50
