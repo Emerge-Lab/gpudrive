@@ -36,11 +36,6 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
-        self.valid_world_idx, self.valid_agent_idx = jnp.where(
-            self.cont_agent_mask == 1
-        )
-        self.valid_world_idx = self.valid_world_idx.astype(jnp.int32)
-        self.valid_agent_idx = self.valid_agent_idx.astype(jnp.int32)
         self.max_agent_count = self.cont_agent_mask.shape[1]
 
         # Total number of controlled agents across all worlds
@@ -85,21 +80,11 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
-        # Map valid actions to the correct indices
-        # Initialize the array with zeros
-        full_action_arr = jnp.zeros(
-            (self.num_worlds, self.max_agent_count), dtype=actions.dtype
-        )
-
-        # Set the actions at these valid indices
-        full_action_arr = full_action_arr.at[
-            self.valid_world_idx, self.valid_agent_idx
-        ].set(actions)
+        # Nan actions will be ignored, but we need to replace them with zeros
+        actions = jnp.nan_to_num(actions, nan=0)
 
         # Map action indices to action values
-        action_values = self.action_keys_tensor[
-            full_action_arr.astype(jnp.int32)
-        ]
+        action_values = self.action_keys_tensor[actions]
 
         # Feed the actual action values to gpudrive
         self.sim.action_tensor().to_jax().at[:, :, :].set(action_values)
@@ -319,25 +304,28 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
+    # CONFIGURE
+    TOTAL_STEPS = 90
+    MAX_NUM_OBJECTS = 128
+    NUM_WORLDS = 50
+
     env_config = EnvConfig()
     render_config = RenderConfig()
-    scene_config = SceneConfig("data", 3)
+    scene_config = SceneConfig(path="data", num_scenes=NUM_WORLDS)
 
-    EPISODE_LEN = 90
-    MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 3
-
+    # MAKE ENV
     env = GPUDriveJaxEnv(
         config=env_config,
-        scene_config=SceneConfig("data", NUM_WORLDS),
+        scene_config=scene_config,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cuda",
         render_config=render_config,
     )
 
+    # RUN
     obs = env.reset()
 
-    for _ in range(EPISODE_LEN):
+    for _ in range(TOTAL_STEPS):
 
         rand_action = jax.random.randint(
             key=jax.random.PRNGKey(0),
@@ -346,9 +334,15 @@ if __name__ == "__main__":
             maxval=env.action_space.n,
         )
 
+        # Step the environment
         env.step_dynamics(rand_action)
 
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-        info = env.get_infos()
+
+    # import imageio
+    # imageio.mimsave("world1.gif", frames_1)
+
+    # run.finish()
+    env.visualizer.destroy()

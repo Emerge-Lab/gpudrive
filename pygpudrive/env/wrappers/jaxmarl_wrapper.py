@@ -12,7 +12,7 @@ from functools import partial
 from flax import struct
 from typing import Tuple, Optional
 
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.env_jax import GPUDriveJaxEnv
 
 
@@ -187,12 +187,16 @@ class GPUDriveToJaxMARL(object):
 if __name__ == "__main__":
 
     env_config = EnvConfig()
+    render_config = RenderConfig()
+    scene_config = SceneConfig(path="data", num_scenes=3)
 
+    # MAKE ENV
     base_env = GPUDriveJaxEnv(
         config=env_config,
-        num_worlds=10,
-        max_cont_agents=128,
-        data_dir="data",
+        scene_config=scene_config,
+        max_cont_agents=128,  # Number of agents to control
+        device="cuda",
+        render_config=render_config,
     )
 
     jaxmarl_env = GPUDriveToJaxMARL(base_env)
