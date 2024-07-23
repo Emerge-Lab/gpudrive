@@ -47,7 +47,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=SceneConfig(
-            "formatted_json_v2_no_tl_train",
+            "data",
             NUM_WORLDS,
             SelectionDiscipline.FIRST_N,
         ),
