@@ -2,6 +2,7 @@ import os
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
+from pygpudrive.env.scene_selector import select_scenes
 import abc
 
 import gpudrive
@@ -87,15 +88,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def _validate_data_dir(self):
-        """Validates that the data directory exists and is not empty.
-
-        Raises:
-            AssertionError: If the data directory does not exist or is empty.
-        """
-        if not os.path.exists(self.data_dir) or not os.listdir(self.data_dir):
-            assert False, "The data directory does not exist or is empty."
-
     def _setup_environment_parameters(self):
         """Sets up various parameters required for the environment simulation.
 
@@ -117,11 +109,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.disableClassicalObs = True
 
         params = self._set_collision_behavior(params)
-        params = self._init_dataset(params, self.data_dir)
         params = self._set_road_reduction_params(params)
         return params
 
-    def _initialize_simulator(self, params):
+    def _initialize_simulator(self, params, scene_config):
         """Initializes the simulation with the specified parameters.
 
         Args:
@@ -141,8 +132,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             sim = gpudrive.SimManager(
                 exec_mode=exec_mode,
                 gpu_id=0,
-                num_worlds=self.num_worlds,
-                json_path=self.data_dir,
+                scenes=select_scenes(scene_config),
                 params=params,
                 enable_batch_renderer=self.render_config
                 and self.render_config.render_mode
@@ -182,29 +172,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.action_space = self._set_discrete_action_space()
         else:
             raise ValueError(f"Action space not supported: {action_type}")
-
-    def _init_dataset(self, params, data_dir):
-        """Initializes the dataset based on sampling method specified in the configuration.
-
-        Args:
-            params (object): Parameters object to update with dataset initialization options.
-            data_dir (str): Path to the directory containing the dataset.
-
-        Returns:
-            object: Updated parameters with dataset initialization options.
-        """
-        if self.config.sample_method == "first_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.sample_method == "random_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.RandomN
-        elif self.config.sample_method == "pad_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
-        elif self.config.sample_method == "exact_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
-
-        self.data_dir = data_dir
-
-        return params
 
     def _set_collision_behavior(self, params):
         """Defines the behavior when a collision occurs.
