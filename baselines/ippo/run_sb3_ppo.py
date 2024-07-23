@@ -1,11 +1,10 @@
 import wandb
 import pyrallis
 from typing import Callable
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from datetime import datetime
 
-from utils.process import generate_valid_files_json
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
@@ -32,7 +31,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
     return func
 
 
-def train(exp_config: ExperimentConfig):
+def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
     """Run PPO training with stable-baselines3."""
 
     # CONFIG
@@ -41,9 +40,8 @@ def train(exp_config: ExperimentConfig):
     # MAKE SB3-COMPATIBLE ENVIRONMENT
     env = SB3MultiAgentEnv(
         config=env_config,
-        num_worlds=exp_config.num_worlds,
+        scene_config=scene_config,
         max_cont_agents=env_config.num_controlled_vehicles,
-        data_dir=exp_config.data_dir,
         device=exp_config.device,
     )
 
@@ -53,7 +51,6 @@ def train(exp_config: ExperimentConfig):
     ) // exp_config.num_minibatches
 
     # INIT WANDB
-    run_id = None
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
     run_id = f"gpudrive_{datetime_}"
     run = wandb.init(
@@ -108,15 +105,11 @@ def train(exp_config: ExperimentConfig):
 
 
 if __name__ == "__main__":
-
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
-    if exp_config.generate_valid_json:
-        actual_num_files = generate_valid_files_json(
-            num_unique_scenes=exp_config.train_on_k_unique_scenes,
-            data_dir=exp_config.data_dir,
-        )
-
-        exp_config.actual_num_files = actual_num_files
-
-    train(exp_config)
+    if exp_config.train_on_k_unique_scenes:
+        scene_config = SceneConfig(exp_config.data_dir, exp_config.num_worlds, SelectionDiscipline.K_UNIQUE_N, exp_config.train_on_k_unique_scenes)
+    else:
+        scene_config = SceneConfig(exp_config.data_dir, exp_config.num_worlds)
+ 
+    train(exp_config, scene_config)
