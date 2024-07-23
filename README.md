@@ -118,9 +118,14 @@ cd build
 
 ## Dataset
 
-How to sample the set of scenarios you want to train on can be set using `sample_method`.
+The `SceneConfig` dataclass in `pygpudrive/env/config.py` is used to configure how scenes are selected from a dataset. It has four attributes:
 
-| `sample_method` | Description |
+- `path`: The path to the dataset.
+- `num_scenes`: The number of scenes to select.
+- `discipline`: The method for selecting scenes, defaulting to `SelectionDiscipline.PAD_N`. (See options in Table below)
+- `k_unique_scenes`: Specifies the number of unique scenes to select, if applicable.
+
+| `discipline` | Description |
 |----------|-------------|
 | **first_n** | Takes the first `num_worlds` files. Fails if the number of files is less than `num_worlds`. |
 | **random_n** | Randomly selects `num_worlds` files from the dataset. Fails if the number of files is less than `num_worlds`. |
@@ -130,7 +135,7 @@ How to sample the set of scenarios you want to train on can be set using `sample
 
 ## Rendering
 
-Render settings can be changed using the `RenderConfig`.
+Render settings can be changed using the `RenderConfig` in `pygpudrive/env/config.py`.
 
 | `Render Mode` | Description
 |--|--|
@@ -171,10 +176,6 @@ Below are the renders for each mode
     </td>
   </tr>
 </table>
-
-## Sharp Bits
-
-TODO(dc)
 
 ## Citations
 

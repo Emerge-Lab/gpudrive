@@ -4,7 +4,7 @@ from gymnasium.spaces import Box, Discrete
 import jax
 import jax.numpy as jnp
 
-from pygpudrive.env.config import EnvConfig, RenderConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 
@@ -321,6 +321,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig()
     render_config = RenderConfig()
+    scene_config = SceneConfig("data", 3)
 
     EPISODE_LEN = 90
     MAX_NUM_OBJECTS = 128
@@ -328,7 +329,7 @@ if __name__ == "__main__":
 
     env = GPUDriveJaxEnv(
         config=env_config,
-        scene_config=SceneConfig("example_data", NUM_WORLDS),
+        scene_config=SceneConfig("data", NUM_WORLDS),
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cuda",
         render_config=render_config,
