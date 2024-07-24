@@ -59,7 +59,7 @@ if (TARGET madrona_mw_gpu)
 endif ()
 
 target_compile_definitions(gpudrive_mgr PRIVATE
-    -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../docs/assets/"
+    -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets/"
 )
 
 madrona_python_module(gpudrive
@@ -76,7 +76,7 @@ if (TARGET madrona_viz)
         madrona_mw_core gpudrive_mgr madrona_viz)
 
     target_compile_definitions(viewer PRIVATE
-        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../docs/assets/"
+        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets/"
     )
 
     if (TARGET madrona_cuda)
