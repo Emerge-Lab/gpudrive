@@ -40,7 +40,8 @@ def sample_continuous_actions(params: List[torch.Tensor], action=None):
     
     # Create a diagonal covariance matrix from std deviation
     covariance_matrix = torch.diag_embed(std ** 2)
-    
+    epsilon = 1e-6
+    covariance_matrix += epsilon * torch.eye(covariance_matrix.size(0), device=covariance_matrix.device)
     # Define the Multivariate Gaussian distribution with the given mean and covariance matrix
     normal_dist = MultivariateNormal(mean, covariance_matrix)
     
