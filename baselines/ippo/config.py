@@ -8,7 +8,7 @@ class ExperimentConfig:
 
     # DATASET & DEVICE
     data_dir: str = "maps_10"
-    train_on_k_unique_scenes = 10  # If set to a non-zero value K, randomly samples K unique scenarios for a total of num_worlds scenes
+    train_on_k_unique_scenes: int = 10  # If set to a non-zero value K, randomly samples K unique scenarios for a total of num_worlds scenes
 
     # NUM ENVIRONMENTS
     num_worlds: int = 50
