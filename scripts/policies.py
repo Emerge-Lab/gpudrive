@@ -3,7 +3,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
+import numpy as np
 
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
 
 def sample_discrete_actions(logits: torch.Tensor, action=None):
     categorical_dist = torch.distributions.Categorical(logits=logits)
@@ -25,9 +30,11 @@ def sample_continuous_actions(params: List[torch.Tensor], action=None):
     mean, log_std = params[0].float(), params[1].float()
     
     # Ensure the tensors are on the same device
-    mean = mean.to(mean.device)
-    log_std = log_std.to(mean.device)
-    
+    mean = mean
+    log_std = log_std
+
+    log_std = torch.clamp(log_std, -100, 0.5)
+
     # Convert log_std to std deviation
     std = torch.exp(log_std)
     
@@ -66,27 +73,28 @@ class LinearMLP(nn.Module):
         self.num_features = env.num_obs_features
         self.device = env.device
 
-        self.actor = self.build_network(env, hidden_size, output_size, is_actor=True).to(self.device)
-        self.critic = self.build_network(env, hidden_size, 1, is_actor=False).to(self.device)
+        self.actor = self.build_network(env, hidden_size, output_size, is_actor=True)
+        self.critic = self.build_network(env, hidden_size, 1, is_actor=False)
 
         if self.action_space_type == "continuous":
-            self.mean = nn.Linear(output_size, env.single_action_space.shape[-1]).to(self.device)
-            self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[-1])).to(self.device)
+            self.mean = layer_init(nn.Linear(output_size, env.single_action_space.shape[-1]), std=0.01)
+            self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[-1]))
 
     def build_network(self, env, hidden_size, output_size, is_actor):
         layers = [
-            nn.Linear(self.num_features, hidden_size),
+            nn.LayerNorm(self.num_features),
+            layer_init(nn.Linear(self.num_features, hidden_size)),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.LayerNorm(hidden_size),
+            layer_init(nn.Linear(hidden_size, hidden_size)),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            nn.Linear(hidden_size, output_size),
+            nn.LayerNorm(hidden_size),
+            layer_init(nn.Linear(hidden_size, output_size)),
             nn.Tanh()
         ]
         if is_actor:
             if self.action_space_type == "discrete":
-                layers.append(nn.Linear(output_size, env.action_space.shape[-1]))
+                layers.append(layer_init(nn.Linear(output_size, env.discrete_action_space.n), std=0.01))
                 layers.append(nn.Softmax(dim=-1))
         return nn.Sequential(*layers)
     
@@ -103,6 +111,7 @@ class LinearMLP(nn.Module):
         return value
 
     def get_action_and_value(self, x, action=None):
+        x = x.to(self.device)
         logits = self.get_actor_logits(x)
         if self.action_space_type == "discrete":
             action, logprob, entropy = sample_discrete_actions(logits, action) # type: ignore

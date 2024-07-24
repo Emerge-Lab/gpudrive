@@ -1,15 +1,13 @@
 train:
   seed: 1
-  torch_deterministic: True
-  device: cpu
-  cpu_offload: True
+  torch_deterministic: False
+  device: cuda
+  cpu_offload: False
   total_timesteps: 100_000_000
   learning_rate: 2.5e-3
-  num_steps: 90
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
-  num_minibatches: 4
   update_epochs: 24
   norm_adv: True
   clip_coef: 0.1
@@ -18,18 +16,13 @@ train:
   vf_coef: 1.0
   max_grad_norm: 0.5
   target_kl: ~
-
-  num_envs: 8
   
-  envs_per_worker: 1
-  envs_per_batch: ~
-  env_pool: True
   verbose: True
   data_dir: experiments
-  checkpoint_interval: 200
+  checkpoint_interval: 100_000_000
   pool_kernel: [0]
-  batch_size: 1024
-  minibatch_size: 512
+  batch_size: 8192
+  minibatch_size: 2048
   bptt_horizon: 1 #8
   vf_clip_coef: 1.0
   compile: False
@@ -44,12 +37,12 @@ reward_params:
   distanceToExpertThreshold: 50.0
 
 parameters:
-  polylineReductionThreshold: 0.5
+  polylineReductionThreshold: 1.0
   observationRadius: 150.0
-  datasetInitOptions: FirstN
+  datasetInitOptions: PadN
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 1
+  maxNumControlledVehicles: 128
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -59,8 +52,8 @@ parameters:
   isStaticAgentControlled: False
 
 sim_manager:
-  exec_mode: CPU
+  exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 3
-  json_path: /Users/aaravpandya/dev/gpudrive/example_data
+  num_worlds: 50
+  json_path: /home/aarav/gpudrive/example_data
   enable_batch_renderer: False

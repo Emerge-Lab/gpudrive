@@ -71,6 +71,7 @@ def train(args):
 
     env = make_gpudrive(config)
     policy = make_policy(env)
+    policy = policy.to(config.train.device)
 
     data = cleanrl.create(config.train, env, policy, wandb=args.wandb)
 

@@ -60,9 +60,9 @@ class GPUDriveEnv(gym.Env):
     def setup_discrete_actions(self):
         """Configure the discrete action space."""
 
-        self.steer_actions = torch.tensor([-0.6, 0, 0.6])
-        self.accel_actions = torch.tensor([-5 ,-3, -1, 0.5, 0.1, 0, 0.1, 0.5, 1, 3, 5])
-        self.head_actions = torch.tensor([0])
+        self.steer_actions = torch.tensor([-0.6, 0, 0.6], device=self.self_obs_tensor.device)
+        self.accel_actions = torch.tensor([-5 ,-3, -1, 0.5, 0.1, 0, 0.1, 0.5, 1, 3, 5], device=self.self_obs_tensor.device)
+        self.head_actions = torch.tensor([0], device = self.self_obs_tensor.device)
 
         # Create a mapping from action indices to action values
         self.action_key_to_values = {}
@@ -70,11 +70,11 @@ class GPUDriveEnv(gym.Env):
         for action_idx, (accel, steer, head) in enumerate(
             product(self.accel_actions, self.steer_actions, self.head_actions)
         ):
-            self.action_key_to_values[action_idx] = [
+            self.action_key_to_values[action_idx] = torch.tensor([
                 accel.item(),
                 steer.item(),
                 head.item(),
-            ]
+            ], device=self.self_obs_tensor.device)
 
         self.discrete_action_space = Discrete(len(self.action_key_to_values))
         return
@@ -95,40 +95,6 @@ class GPUDriveEnv(gym.Env):
         filtered_obs_tensors = [tensor.view(batch_size, -1)[flat_valid_mask].view(-1, tensor.shape[-1]) for tensor in obs_tensors]
 
         return filtered_obs_tensors
-
-    
-    def apply_action(self, actions):
-        if self.action_space_type == "discrete":
-            actions = self.apply_discrete_action(actions)
-
-        N, A = self.self_obs_tensor.shape[0:2]
-        batch_size = N * A
-        action_dim = actions.shape[1]
-        
-        # Create a placeholder tensor for the actions, filled with zeros or an appropriate default value
-        # You may need to adjust the default value based on the nature of your actions
-        
-        padded_actions = torch.zeros(batch_size, action_dim, device=actions.device)
-
-        
-        # Generate the mask for valid agents, similar to the filtering process
-        valid_counts = self.shape_tensor[:, 0]  # Valid agent counts per environment
-        cumulative_counts = torch.arange(A).expand(N, A).to(self.self_obs_tensor.device)  # Matrix of shape (N, A) with repeated range(A)
-        valid_mask = cumulative_counts < valid_counts.unsqueeze(1)  # Mask for valid agents
-        
-        # Flatten the mask to match the batched action shape
-        flat_valid_mask = valid_mask.view(-1)
-        
-        # Compute indices where the valid actions should be inserted
-        valid_indices = flat_valid_mask.nonzero(as_tuple=True)[0]
-        
-        # Insert the filtered actions into the padded actions tensor
-        padded_actions[valid_indices] = actions
-
-        # Reshape padded_actions to match the expected shape for the environment, if necessary
-        # For example, if your environment expects a specific shape, you might need to adjust it accordingly
-
-        return padded_actions
     
     def render(self):
         rgb_image = self.sim.rgb_tensor().to_torch()
@@ -182,7 +148,13 @@ class GPUDriveEnv(gym.Env):
         self.reward = self.reward_tensor.view(self.batch_size, *self.reward_tensor.shape[2:])
         self.steps_remaining = self.steps_remaining_tensor.view(self.batch_size, *self.steps_remaining_tensor.shape[2:])
         self.agent_ids = self.id_tensor
+        self.info_tensor = self.sim.info_tensor().to_torch()
+        self.info = self.info_tensor.view(self.batch_size, *self.info_tensor.shape[2:])
 
+        controlled_mask = self.controlled == 1
+        done_mask = self.done != 1
+        self.mask = torch.clone(torch.squeeze(controlled_mask & done_mask)).detach()
+        self.prev_mask = self.mask
 
     @property
     def concatenated_obs(self):
@@ -196,10 +168,10 @@ class GPUDriveEnv(gym.Env):
 
     def step(self, actions):
         acs = torch.zeros_like(self.batch_action_tensor)
-        acs[self.mask] = actions
+        acs[self.prev_mask] = actions
         acs = acs.view(self.num_envs, self.num_agents, *acs.shape[1:])
         self.send(acs)
-        return self.recv()
+        return
         # action = torch.tensor(action)
         # self.sim.step()
         # obs, _ = self.setup_obs()
@@ -227,12 +199,19 @@ class GPUDriveEnv(gym.Env):
     def make_mask(self):
         controlled_mask = self.controlled == 1
         done_mask = self.done != 1
-
+        self.prev_mask = torch.clone(self.mask)
         self.mask = torch.clone(torch.squeeze(controlled_mask & done_mask)).detach()
+
+    def get_info(self):
+        goal_reach = torch.sum(self.info[self.prev_mask, 3]).item()
+        collisions = torch.sum(self.info[self.prev_mask, :3]).item()
+        return {"goal_reach": goal_reach, "collisions": collisions}
 
     @torch.no_grad()
     def recv(self):
-        return self.concatenated_obs[self.mask], self.reward[self.mask], self.done[self.mask], self.done[self.mask], {}, self.agent_ids[self.mask], self.mask
+        self.make_mask()
+        self.reward[self.prev_mask] = self.reward[self.prev_mask] - torch.sum(self.info[self.prev_mask,:3],dim = 1,keepdim=True)
+        return self.concatenated_obs[self.prev_mask], self.reward[self.prev_mask], self.done[self.prev_mask], self.done[self.prev_mask], [self.get_info()], self.agent_ids[self.prev_mask], self.prev_mask
 
     def send(self, actions):
         self.sim.action_tensor().to_torch().copy_(actions)
@@ -257,15 +236,13 @@ class GPUDriveEnv(gym.Env):
 
 
 def apply_discrete_action(actions, action_key_to_values):
+    device = actions.device
     if(isinstance(actions, np.ndarray)):
         actions = torch.from_numpy(actions)
-    action_value_tensor = torch.zeros(actions.shape[0], 3)
+    action_value_tensor = torch.zeros(actions.shape[0], 3, device=device)
     for idx, action in enumerate(actions):
         action_idx = action.item()
-        action_value_tensor[idx, :] = torch.Tensor(
-                action_key_to_values[action_idx]
-            )
-    action_value_tensor.to(actions.device)
+        action_value_tensor[idx, :] = action_key_to_values[action_idx]
     return action_value_tensor
 
 def make_gpudrive(config: dict[str,dict[str,str]] = {}):

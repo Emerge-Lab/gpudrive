@@ -22,9 +22,9 @@ import pufferlib.pytorch
 torch.set_float32_matmul_precision('high')
 
 # Fast Cython GAE implementation
-import pyximport
-pyximport.install(setup_args={"include_dirs": np.get_include()})
-from c_gae import compute_gae
+# import pyximport
+# pyximport.install(setup_args={"include_dirs": np.get_include()})
+# from c_gae import compute_gae
 
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
@@ -81,16 +81,17 @@ def evaluate(data):
         policy = data.policy
         infos = defaultdict(list)
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
-
+    o, r, d, t, info, env_id, mask = data.vecenv.async_reset()
     while not experience.full:
+        if (d.all() or not mask.any()):
+            o, r, d, t, info, env_id, mask = data.vecenv.async_reset()
         with profile.env, torch.no_grad():
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
-            if (d.all()):
-                o, r, d, t, info, env_id, mask = data.vecenv.async_reset()
+
             env_id = env_id.flatten().cpu().numpy()
 
         with profile.eval_misc:
-            data.global_step += sum(mask)
+            data.global_step += torch.sum(mask)
 
         with profile.eval_forward, torch.no_grad():
             # TODO: In place-update should be faster. Leaking 7% speed max
@@ -98,7 +99,7 @@ def evaluate(data):
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
-                actions, logprob, _, value, (h, c) = policy(o_device, (h, c))
+                actions, logprob, _, value, (h, c) = policy(o, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
             else:
@@ -109,9 +110,7 @@ def evaluate(data):
 
         with profile.eval_misc:
             value = value.flatten()
-            actions = actions
             # mask = torch.as_tensor(mask)# * policy.mask)
-            o = o if config.cpu_offload else o_device
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
             for i in info:
@@ -133,8 +132,25 @@ def evaluate(data):
                 data.stats[k] = np.mean(v)
             except:
                 continue
+        data.stats["done"] = np.sum(experience.dones.cpu().numpy())
 
     return data.stats, infos
+
+def compute_gae(dones, values, rewards, gamma, gae_lambda):
+   '''Fast Cython implementation of Generalized Advantage Estimation (GAE)'''
+   num_steps = int(len(rewards))
+   advantages = torch.zeros((num_steps), device=rewards.device, dtype=torch.float32)
+
+   lastgaelam = 0
+   for t in range(num_steps-1):
+       t_cur = num_steps - 2 - t
+       t_next = num_steps - 1 - t
+       nextnonterminal = 1.0 - dones[t_next]
+       delta = rewards[t_next] + gamma * dones[t_next] * nextnonterminal - values[t_cur]
+       lastgaelam = delta + gamma * gae_lambda * nextnonterminal * lastgaelam
+       advantages[t_cur] = lastgaelam
+
+   return advantages
 
 @pufferlib.utils.profile
 def train(data):
@@ -144,12 +160,11 @@ def train(data):
 
     with profile.train_misc:
         idxs = experience.sort_training_data()
-        dones_np = experience.dones_np[idxs]
-        values_np = experience.values_np[idxs]
-        rewards_np = experience.rewards_np[idxs]
+        # dones_np = experience.dones_np[idxs]
+        # values_np = experience.values_np[idxs]
+        # rewards_np = experience.rewards_np[idxs]
         # TODO: bootstrap between segment bounds
-        advantages_np = compute_gae(dones_np, values_np,
-            rewards_np, config.gamma, config.gae_lambda)
+        advantages_np = compute_gae(experience.dones[idxs], experience.values[idxs], experience.rewards[idxs], config.gamma, config.gae_lambda)
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
@@ -246,10 +261,10 @@ def train(data):
             lrnow = frac * config.learning_rate
             data.optimizer.param_groups[0]["lr"] = lrnow
 
-        y_pred = experience.values_np
+        y_pred = experience.values
         y_true = experience.returns_np
-        var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        var_y = torch.var(y_true)
+        explained_var = torch.nan if var_y == 0 else 1 - torch.var(y_true - y_pred) / var_y
         losses.explained_variance = explained_var
         data.epoch += 1
 
@@ -335,7 +350,7 @@ class Profile:
             return False
 
         self.SPS = (global_step - self.prev_steps) / (uptime - self.uptime)
-        self.prev_steps = global_step
+        self.prev_steps = torch.clone(global_step)
         self.uptime = uptime
 
         self.remaining = (data.config.total_timesteps - global_step) / self.SPS
@@ -369,23 +384,22 @@ class Experience:
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == 'cuda' and cpu_offload
-        obs_device = device if not pin else 'cpu'
         self.obs=torch.zeros(batch_size, *obs_shape, dtype=obs_dtype,
             pin_memory=pin, device=device if not pin else 'cpu')
-        self.actions=torch.zeros(batch_size, *atn_shape, dtype=atn_dtype, pin_memory=pin)
-        self.logprobs=torch.zeros(batch_size, pin_memory=pin)
-        self.rewards=torch.zeros(batch_size, pin_memory=pin)
-        self.dones=torch.zeros(batch_size, pin_memory=pin)
-        self.truncateds=torch.zeros(batch_size, pin_memory=pin)
-        self.values=torch.zeros(batch_size, pin_memory=pin)
+        self.actions=torch.zeros(batch_size, *atn_shape, dtype=atn_dtype, device=device if not pin else 'cpu', pin_memory=pin)
+        self.logprobs=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
+        self.rewards=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
+        self.dones=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
+        self.truncateds=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
+        self.values=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
 
         #self.obs_np = np.asarray(self.obs)
-        self.actions_np = np.asarray(self.actions)
-        self.logprobs_np = np.asarray(self.logprobs)
-        self.rewards_np = np.asarray(self.rewards)
-        self.dones_np = np.asarray(self.dones)
-        self.truncateds_np = np.asarray(self.truncateds)
-        self.values_np = np.asarray(self.values)
+        # self.actions_np = np.asarray(self.actions)
+        # self.logprobs_np = np.asarray(self.logprobs)
+        # self.rewards_np = np.asarray(self.rewards)
+        # self.dones_np = np.asarray(self.dones)
+        # self.truncateds_np = np.asarray(self.truncateds)
+        # self.values_np = np.asarray(self.values)
 
         self.lstm_h = self.lstm_c = None
         if lstm is not None:
@@ -416,20 +430,20 @@ class Experience:
     def full(self):
         return self.ptr >= self.batch_size
 
+    @torch.compile()
     def store(self, obs, value, action, logprob, reward, done, agent_ids, mask):
-        # Mask learner and Ensure indices do not exceed batch size
         ptr = self.ptr
         end = ptr + torch.sum(mask).cpu().detach().numpy()
         end = end if end < self.batch_size else self.batch_size
- 
+
         num_elements = end - ptr
 
         self.obs[ptr:end] = obs[:num_elements]
-        self.values_np[ptr:end] = value.cpu().numpy()[:num_elements]
-        self.actions_np[ptr:end] = action[:num_elements]
-        self.logprobs_np[ptr:end] = logprob.cpu().numpy()[:num_elements]
-        self.rewards_np[ptr:end] = reward.cpu().numpy().squeeze()[:num_elements]
-        self.dones_np[ptr:end] = done.cpu().numpy().squeeze()[:num_elements]
+        self.values[ptr:end] = value[:num_elements]
+        self.actions[ptr:end] = action[:num_elements]
+        self.logprobs[ptr:end] = logprob[:num_elements]
+        self.rewards[ptr:end] = reward[:num_elements].squeeze()
+        self.dones[ptr:end] = done[:num_elements].squeeze()
 
         # Clip agent_ids to the number of elements being processed
         clipped_agent_ids = agent_ids[:num_elements]
@@ -451,8 +465,8 @@ class Experience:
         self.step = 0
         return idxs
 
-    def flatten_batch(self, advantages_np):
-        advantages = torch.from_numpy(advantages_np).to(self.device)
+    def flatten_batch(self, advantages):
+        # advantages = torch.from_numpy(advantages_np).to(self.device)
         b_idxs, b_flat = self.b_idxs, self.b_idxs_flat
         self.b_actions = self.actions.to(self.device, non_blocking=True)
         self.b_logprobs = self.logprobs.to(self.device, non_blocking=True)
@@ -461,7 +475,7 @@ class Experience:
         self.b_advantages = advantages.reshape(self.minibatch_rows,
             self.num_minibatches, self.bptt_horizon).transpose(0, 1).reshape(
             self.num_minibatches, self.minibatch_size)
-        self.returns_np = advantages_np + self.values_np
+        self.returns_np = advantages + self.values
         self.b_obs = self.obs[self.b_idxs_obs]
         self.b_actions = self.b_actions[b_idxs].contiguous()
         self.b_logprobs = self.b_logprobs[b_idxs]
@@ -486,15 +500,9 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            try:
-                self.gpu_util.append(torch.cuda.utilization())
-            except:
-                self.gpu_util.append(0)
+            self.gpu_util.append(torch.cuda.utilization())
             free, total = torch.cuda.mem_get_info()
-            try:
-                self.gpu_mem.append(free / total)
-            except:
-                self.gpu_mem.append(0)
+            self.gpu_mem.append(free / total)
             time.sleep(self.delay)
 
     def stop(self):
@@ -625,10 +633,7 @@ def abbreviate(num):
         return f'{b2}{num/1e12:.1f}{c2}t'
 
 def duration(seconds):
-    try:
-        seconds = int(seconds)
-    except:
-        seconds = 0
+    seconds = int(seconds)
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
