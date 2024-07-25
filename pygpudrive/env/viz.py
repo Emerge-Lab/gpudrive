@@ -13,6 +13,8 @@ BLUE = (0, 191, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
+
+
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
@@ -135,7 +137,7 @@ class PyGameVisualizer:
         else:
             pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
 
-    def draw_circle(self, surf, center, radius, color, thickness=2):
+    def draw_circle(self, surf, center, radius, color, thickness=3):
         for i in range(thickness):
             try:
                 pygame.gfxdraw.aacircle(
@@ -288,7 +290,7 @@ class PyGameVisualizer:
                         thickness=self.render_config.line_thickness,
                     )
 
-                # DRAW ROAD LINES/LANES + crosswalk
+                # DRAW ROAD LINES/LANES
                 else:
                     self.draw_line(
                         surf,
@@ -300,7 +302,7 @@ class PyGameVisualizer:
 
             # DRAW STOP SIGNS
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
-                
+
                 center, width, height, rotation = (
                     map_obj[:2],
                     map_obj[3],
@@ -308,7 +310,7 @@ class PyGameVisualizer:
                     map_obj[5],
                 )
                 if map_obj[-1] == float(gpudrive.EntityType.StopSign):
-                    
+
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
 
@@ -319,12 +321,17 @@ class PyGameVisualizer:
                     box_corners[i] = self.scale_coords(
                         box_corner, world_render_idx
                     )
-                pygame.gfxdraw.aapolygon(
-                    surf, box_corners, self.color_dict[map_obj[-1]]
-                )
-                pygame.gfxdraw.filled_polygon(
-                    surf, box_corners, self.color_dict[map_obj[-1]]
-                )
+                if map_obj[-1] == float(gpudrive.EntityType.SpeedBump):
+                    pygame.gfxdraw.aapolygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
+                else:
+                    pygame.gfxdraw.aapolygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
+                    pygame.gfxdraw.filled_polygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
 
     def init_map(self):
         """Initialize the static map elements."""
