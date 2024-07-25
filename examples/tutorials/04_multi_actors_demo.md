@@ -1,10 +1,10 @@
 ## 4. Controlling road objects
 
-Agents in the simulator can be controlled by any user specified policy. By default, that is, if no actions are specified, all agents will be stepped using the logged human trajectories. This mode is also referred to as log-replay.
+Agents in the simulator can be controlled by any user specified policy. In this tutorial, we show how you can set the behavior of road objects in the scenes.
 
 ### 4.1 Expert control
 
-To illustrate this, here we run an episode without specifying any actions.
+By default, that is, if no actions are specified, agents are stepped using the logged human trajectories. This mode is also referred to as _log-replay_ or _expert-control_. To step agents with the human driving logs, simply set `actions=None`. Here we run an episode without specifying any actions.
 
 ```Python
 actions = None
@@ -23,10 +23,10 @@ for time_step in range(EPISODE_LENGTH):
 
 ```
 
-results in the following behavior:
+This results in the following behavior:
 
 <figure>
-<img src="/home/emerge/gpudrive/videos/multi_actors_demo_expert_controlled.gif" alt="...", width=400>
+<img src="../../videos/multi_actors_demo_expert_controlled.gif" alt="...", width=400>
 </figure>
 
 ### 4.2 Control subset of agents with a policy, the rest with expert-control
