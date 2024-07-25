@@ -16,14 +16,14 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 1
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_1.mp4"
+    VIDEO_PATH = "videos/multi_actors_demo_control_1.gif"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
 
     # Configs
     env_config = EnvConfig(
-        steer_actions=torch.round(torch.linspace(-1.0, 1.0, 3), decimals=3),
-        accel_actions=torch.round(torch.linspace(0, 0, 1), decimals=3),
+        steer_actions=torch.round(torch.linspace(-0.3, 0.3, 3), decimals=3),
+        accel_actions=torch.Tensor([-20]),
     )
     scene_config = SceneConfig(
         path="example_data",
@@ -46,21 +46,22 @@ if __name__ == "__main__":
     frames = []
 
     # STEP THROUGH ENVIRONMENT
-    for _ in range(EPISODE_LENGTH):
-        print("Step:", _)
+    for time_step in range(EPISODE_LENGTH):
+        print(f"Step: {time_step}")
 
         # SELECT ACTIONS
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(MAX_CONTROLLED_AGENTS * NUM_WORLDS)
-                ]
-            ]
-        ).reshape(NUM_WORLDS, MAX_CONTROLLED_AGENTS)
+        actions = None
+        # rand_action = torch.Tensor(
+        #     [
+        #         [
+        #             env.action_space.sample()
+        #             for _ in range(MAX_CONTROLLED_AGENTS * NUM_WORLDS)
+        #         ]
+        #     ]
+        # ).reshape(NUM_WORLDS, MAX_CONTROLLED_AGENTS)
 
         # STEP
-        env.step_dynamics(rand_action)
+        env.step_dynamics(actions)
 
         obs = env.get_obs()
         reward = env.get_rewards()
@@ -71,3 +72,18 @@ if __name__ == "__main__":
         frames.append(frame)
 
     imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=30)
+
+
+actions = None
+for time_step in range(EPISODE_LENGTH):
+    
+    # STEP
+    env.step_dynamics(actions)
+
+    obs = env.get_obs()
+    reward = env.get_rewards()
+    done = env.get_dones()
+
+    # RENDER
+    frame = env.render(world_render_idx=0)
+    frames.append(frame)
