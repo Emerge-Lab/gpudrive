@@ -4,7 +4,7 @@ Agents in the simulator can be controlled by any user specified policy. By defau
 
 ### 4.1 Expert control
 
-To illustrate this, here we run an episode without specifying any actions. 
+To illustrate this, here we run an episode without specifying any actions.
 
 ```Python
 actions = None
@@ -26,9 +26,8 @@ for time_step in range(EPISODE_LENGTH):
 results in the following behavior:
 
 <figure>
-<img src="/home/emerge/gpudrive/videos/multi_actors_demo_expert_controlled.gif" alt="...", width=80%>
+<img src="/home/emerge/gpudrive/videos/multi_actors_demo_expert_controlled.gif" alt="...", width=400>
 </figure>
-
 
 ### 4.2 Control subset of agents with a policy, the rest with expert-control
 
