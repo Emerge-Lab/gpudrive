@@ -4,7 +4,7 @@ Agents in the simulator can be controlled by any user specified policy. In this 
 
 ### 4.1 Expert control
 
-By default, that is, if no actions are specified, agents are stepped using the logged human trajectories. This mode is also referred to as _log-replay_ or _expert-control_. To step agents with the human driving logs, simply set `actions=None`. Here we run an episode without specifying any actions.
+By default, that is, if no actions are specified, agents are stepped using the logged human trajectories. This mode is also referred to as _log-replay_ or _expert-control_. To step agents with the human driving logs, simply set `actions=None`. Here we run an episode without specifying any actions:
 
 ```Python
 actions = None
@@ -26,7 +26,7 @@ for time_step in range(EPISODE_LENGTH):
 This results in the following behavior:
 
 <figure>
-<img src="../../videos/multi_actors_demo_expert_controlled.gif" alt="...", width=400>
+<img src="../../videos/multi_actors_demo_expert_controlled.gif" alt="...", width=600, loop=infinite>
 </figure>
 
 ### 4.2 Control subset of agents with a policy, the rest with expert-control
