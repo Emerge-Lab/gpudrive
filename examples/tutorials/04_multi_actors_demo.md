@@ -25,7 +25,7 @@ for time_step in range(EPISODE_LENGTH):
 
 This results in the following behavior:
 
-<img src="../../videos/multi_actors_demo_expert_controlled.gif" alt="..." width=600 \>
+<img src="../../videos/multi_actors_demo_expert_controlled.gif" alt="..." width=500 \>
 
 ### 4.2 Control subset of agents with a policy, the rest with expert-control
 
