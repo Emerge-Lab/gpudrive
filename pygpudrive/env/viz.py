@@ -6,23 +6,30 @@ import gpudrive
 
 from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
-
+# AGENT COLORS
+PINK = (255, 105, 180)
+GREEN = (124, 252, 0)
+BLUE = (0, 191, 255)
+DODGER_BLUE = (30, 144, 255)
+RED_ORANGE = (255, 69, 0)
+WHITE = (255, 255, 255)
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
-        (255, 105, 180),  # Hot Pink
-        (124, 252, 0),  # Lawn Green
-        (0, 191, 255),  # Deep Sky Blue
-        (30, 144, 255),  # Dodger Blue
-        (255, 69, 0),  # Red-Orange
+        PINK,
+        GREEN,
+        BLUE,
+        DODGER_BLUE,
+        RED_ORANGE,
     ]
+    # ROAD MAP COLORS
     color_dict = {
         float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
         float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
+        float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
         float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
     }
@@ -82,7 +89,7 @@ class PyGameVisualizer:
         ends = centers + offsets
         return starts, ends
 
-    def draw_line(self, surf, start, end, color, thickness=1):
+    def draw_line(self, surf, start, end, color, thickness=1, fill_shape=True):
         c1 = (start[0] + end[0]) / 2
         c2 = (start[1] + end[1]) / 2
         center_L1 = (c1, c2)
@@ -122,8 +129,11 @@ class PyGameVisualizer:
             - (length / 2.0) * np.sin(angle),
         )
 
-        pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
-        pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
+        if fill_shape:
+            pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
+            pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
+        else:
+            pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
 
     def draw_circle(self, surf, center, radius, color, thickness=2):
         for i in range(thickness):
@@ -255,6 +265,7 @@ class PyGameVisualizer:
         return start, end
 
     def draw_map(self, surf, map_info, world_render_idx=0):
+        """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
             if map_obj[-1] == float(gpudrive.EntityType.Padding):
@@ -289,6 +300,7 @@ class PyGameVisualizer:
 
             # DRAW STOP SIGNS
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
+                
                 center, width, height, rotation = (
                     map_obj[:2],
                     map_obj[3],
@@ -296,6 +308,7 @@ class PyGameVisualizer:
                     map_obj[5],
                 )
                 if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+                    
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
 
@@ -547,7 +560,7 @@ class PyGameVisualizer:
                     font = pygame.font.Font(
                         None, 10 * int(self.zoom_scales_x[0])
                     )
-                    text = font.render(str(agent_idx), True, (255, 255, 255))
+                    text = font.render(str(agent_idx), True, WHITE)
                     text_rect = text.get_rect(
                         center=(
                             agent_corners[0][0]
@@ -625,10 +638,10 @@ class PyGameVisualizer:
                     end = self.scale_coords(np.array([x, y]), world_render_idx)
 
                     pygame.gfxdraw.aacircle(
-                        temp_surf, int(end[0]), int(end[1]), 2, (255, 255, 255)
+                        temp_surf, int(end[0]), int(end[1]), 2, WHITE
                     )
                     pygame.gfxdraw.filled_circle(
-                        temp_surf, int(end[0]), int(end[1]), 2, (255, 255, 255)
+                        temp_surf, int(end[0]), int(end[1]), 2, WHITE
                     )
                     num_lidar_plotted += 1
 
