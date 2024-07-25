@@ -13,10 +13,10 @@ class PyGameVisualizer:
     PADDING_PCT = 0.0
     COLOR_LIST = [
         (255, 105, 180),  # Hot Pink
-        (124, 252, 0),    # Lawn Green
-        (0, 191, 255),    # Deep Sky Blue
-        (30, 144, 255),   # Dodger Blue
-        (255, 69, 0),     # Red-Orange
+        (124, 252, 0),  # Lawn Green
+        (0, 191, 255),  # Deep Sky Blue
+        (30, 144, 255),  # Dodger Blue
+        (255, 69, 0),  # Red-Orange
     ]
     color_dict = {
         float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
@@ -81,7 +81,7 @@ class PyGameVisualizer:
         starts = centers - offsets
         ends = centers + offsets
         return starts, ends
-    
+
     def draw_line(self, surf, start, end, color, thickness=1):
         c1 = (start[0] + end[0]) / 2
         c2 = (start[1] + end[1]) / 2
@@ -89,18 +89,42 @@ class PyGameVisualizer:
         length = math.sqrt((start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2)
         angle = math.atan2(start[1] - end[1], start[0] - end[0])
 
-        UL = (center_L1[0] + (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        UR = (center_L1[0] - (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
-        BL = (center_L1[0] + (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        BR = (center_L1[0] - (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+        UL = (
+            center_L1[0]
+            + (length / 2.0) * np.cos(angle)
+            - (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            + (thickness / 2.0) * np.cos(angle)
+            + (length / 2.0) * np.sin(angle),
+        )
+        UR = (
+            center_L1[0]
+            - (length / 2.0) * np.cos(angle)
+            - (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            + (thickness / 2.0) * np.cos(angle)
+            - (length / 2.0) * np.sin(angle),
+        )
+        BL = (
+            center_L1[0]
+            + (length / 2.0) * np.cos(angle)
+            + (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            - (thickness / 2.0) * np.cos(angle)
+            + (length / 2.0) * np.sin(angle),
+        )
+        BR = (
+            center_L1[0]
+            - (length / 2.0) * np.cos(angle)
+            + (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            - (thickness / 2.0) * np.cos(angle)
+            - (length / 2.0) * np.sin(angle),
+        )
 
         pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
         pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
-    
+
     def draw_circle(self, surf, center, radius, color, thickness=2):
         for i in range(thickness):
             try:
@@ -109,7 +133,8 @@ class PyGameVisualizer:
                     int(center[0]),
                     int(center[1]),
                     int(radius) + i,
-                    color)
+                    color,
+                )
             except:
                 continue
 
@@ -338,7 +363,7 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
-                
+
                 self.surf.fill(self.BACKGROUND_COLOR)
                 agent_map_info = (
                     self.sim.agent_roadmap_tensor()
@@ -394,15 +419,17 @@ class PyGameVisualizer:
                 )
 
                 pygame.gfxdraw.aapolygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
                 pygame.gfxdraw.filled_polygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
 
                 self.draw_circle(
                     temp_surf,
                     current_goal_scaled,
                     self.goal_radius * self.zoom_scales_x[world_render_idx],
-                    self.COLOR_LIST[0]
+                    self.COLOR_LIST[0],
                 )
 
                 for agent in partner_agent_info:
@@ -423,9 +450,13 @@ class PyGameVisualizer:
                     ]
 
                     pygame.gfxdraw.aapolygon(
-                        temp_surf, agent_corners, self.COLOR_LIST[1])
+                        temp_surf, agent_corners, self.COLOR_LIST[1]
+                    )
                     pygame.gfxdraw.filled_polygon(
-                        temp_surf, agent_corners, self.COLOR_LIST[1], )
+                        temp_surf,
+                        agent_corners,
+                        self.COLOR_LIST[1],
+                    )
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
@@ -497,9 +528,9 @@ class PyGameVisualizer:
                     goal_pos[agent_idx], world_render_idx
                 )
 
-                mod_idx = agent_idx % len(self.COLOR_LIST)
+                mod_idx = (agent_idx + 1) % len(self.COLOR_LIST)
 
-                # Controlled agents are red
+                # Controlled agents are pink
                 if cont_agent_mask[world_render_idx, agent_idx]:
                     mod_idx = 0
 
@@ -508,19 +539,31 @@ class PyGameVisualizer:
                 if agent_response_types[agent_idx] == 2:
                     color = (128, 128, 128)
 
-                pygame.gfxdraw.aapolygon(
-                    self.surf, agent_corners, color
-                )
-                pygame.gfxdraw.filled_polygon(
-                    self.surf, agent_corners, color
-                )
-            
+                pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
+                pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
+
+                # Draw the agent index close to the agent
+                if self.render_config.draw_obj_idx:
+                    font = pygame.font.Font(
+                        None, 10 * int(self.zoom_scales_x[0])
+                    )
+                    text = font.render(str(agent_idx), True, (255, 255, 255))
+                    text_rect = text.get_rect(
+                        center=(
+                            agent_corners[0][0]
+                            - 2 * int(self.zoom_scales_y[0]),
+                            agent_corners[0][1],
+                        )
+                    )
+                    self.surf.blit(text, text_rect)
+
                 if agent_response_types[agent_idx] != 2:
                     self.draw_circle(
                         self.surf,
                         current_goal_scaled,
-                        self.goal_radius * self.zoom_scales_x[world_render_idx],
-                        color
+                        self.goal_radius
+                        * self.zoom_scales_x[world_render_idx],
+                        color,
                     )
 
             if self.render_config.view_option == PygameOption.HUMAN:
@@ -582,18 +625,10 @@ class PyGameVisualizer:
                     end = self.scale_coords(np.array([x, y]), world_render_idx)
 
                     pygame.gfxdraw.aacircle(
-                        temp_surf,
-                        int(end[0]),
-                        int(end[1]),
-                        2,
-                        (255, 255, 255)
+                        temp_surf, int(end[0]), int(end[1]), 2, (255, 255, 255)
                     )
                     pygame.gfxdraw.filled_circle(
-                        temp_surf,
-                        int(end[0]),
-                        int(end[1]),
-                        2,
-                        (255, 255, 255)
+                        temp_surf, int(end[0]), int(end[1]), 2, (255, 255, 255)
                     )
                     num_lidar_plotted += 1
 
@@ -612,17 +647,18 @@ class PyGameVisualizer:
                 )
 
                 pygame.gfxdraw.aapolygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
-                pygame.gfxdraw.filled_polygon( 
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
-                
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
+                pygame.gfxdraw.filled_polygon(
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
+
                 self.draw_circle(
                     temp_surf,
                     current_goal_scaled,
                     self.goal_radius * self.zoom_scales_x[world_render_idx],
-                    self.COLOR_LIST[0]
+                    self.COLOR_LIST[0],
                 )
-
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
