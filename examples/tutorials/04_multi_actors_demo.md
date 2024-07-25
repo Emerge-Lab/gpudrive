@@ -13,10 +13,6 @@ for time_step in range(EPISODE_LENGTH):
     # STEP
     env.step_dynamics(actions)
 
-    obs = env.get_obs()
-    reward = env.get_rewards()
-    done = env.get_dones()
-
     # RENDER
     frame = env.render(world_render_idx=0)
     frames.append(frame)
