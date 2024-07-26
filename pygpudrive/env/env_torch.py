@@ -80,19 +80,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
-
-        assert actions.shape == (
-            self.num_worlds,
-            self.max_agent_count,
-        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
-
-        # nan actions will be ignored, but we need to replace them with zeros
-        actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
-
-        # Map action indices to action values
-        action_value_tensor = self.action_keys_tensor[actions]
+        
+        if actions.dim() == 2: 
+            # Map action indices to action values if indices are provided
+            actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
+            action_value_tensor = self.action_keys_tensor[actions]
+        elif actions.dim() == 3:
+            if actions.shape[2] == 1:
+                actions = actions.squeeze(dim=2).to(self.device)
+                action_value_tensor = self.action_keys_tensor[actions]
+            elif actions.shape[2] == 3: # Assuming we are given the actual action values (acceleration, steering, heading)
+                action_value_tensor = actions.to(self.device)
+        else:
+            raise ValueError(f"Invalid action shape: {actions.shape}")
 
         # Feed the actual action values to gpudrive
+        # Map provided actions to the right agent indices
+        
         self.sim.action_tensor().to_torch().copy_(action_value_tensor)
 
     def _set_discrete_action_space(self) -> None:
@@ -309,8 +313,9 @@ if __name__ == "__main__":
     NUM_WORLDS = 50
 
     env_config = EnvConfig()
+    env_config = EnvConfig()
     render_config = RenderConfig()
-    scene_config = SceneConfig(path="data", num_scenes=NUM_WORLDS)
+    scene_config = SceneConfig("data", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
