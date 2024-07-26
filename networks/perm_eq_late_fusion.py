@@ -34,8 +34,8 @@ class LateFusionNet(nn.Module):
         self.ro_input_dim = self.config.PARTNER_DIM
         self.rg_input_dim = self.config.ROAD_MAP_DIM
 
-        self.ro_max = self.config.road_map_agent_feat_dim
-        self.rg_max = self.config.top_k_roadpoints
+        self.ro_max = self.config.ROADMAP_AGENT_FEAT_DIM
+        self.rg_max = self.config.TOP_K_ROADPOINTS
 
         # Network architectures
         self.arch_ego_state = self.net_config.ego_state_layers
@@ -272,7 +272,6 @@ if __name__ == "__main__":
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
-        sample_method="pad_n",
     )
 
     exp_config = ExperimentConfig(

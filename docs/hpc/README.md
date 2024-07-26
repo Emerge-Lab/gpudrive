@@ -10,7 +10,7 @@
 6. Install `gpudrive`: `poetry install`
 7. Restart Singularity image: `exit`
 8. Relaunch image: `bash ./hpc/launch.sh`
-9. Check if `gpudrive` is properly installed: 
+9. Check if `gpudrive` is properly installed:
     - (a) launch a Python shell
     - (b) import `gpudrive` by running `import gpudrive`
 

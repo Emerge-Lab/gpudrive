@@ -118,7 +118,7 @@ if __name__ == "__main__":
         num_worlds=50,
         episode_length=90,
         max_num_objects=128,
-        data_dir="example_data",
+        data_dir="data",
     )
 
     # Plot stats

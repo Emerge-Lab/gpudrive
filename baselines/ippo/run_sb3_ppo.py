@@ -41,7 +41,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
     env = SB3MultiAgentEnv(
         config=env_config,
         scene_config=scene_config,
-        max_cont_agents=env_config.num_controlled_vehicles,
+        max_cont_agents=env_config.MAX_CONTROLLED_VEHICLES,
         device=exp_config.device,
     )
 
@@ -108,8 +108,15 @@ if __name__ == "__main__":
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
     if exp_config.train_on_k_unique_scenes:
-        scene_config = SceneConfig(exp_config.data_dir, exp_config.num_worlds, SelectionDiscipline.K_UNIQUE_N, exp_config.train_on_k_unique_scenes)
+        scene_config = SceneConfig(
+            path=exp_config.data_dir,
+            num_scenes=exp_config.num_worlds,
+            discipline=SelectionDiscipline.K_UNIQUE_N,
+            k_unique_scenes=exp_config.train_on_k_unique_scenes,
+        )
     else:
-        scene_config = SceneConfig(exp_config.data_dir, exp_config.num_worlds)
- 
+        scene_config = SceneConfig(
+            path=exp_config.data_dir, num_scenes=exp_config.num_worlds
+        )
+
     train(exp_config, scene_config)
