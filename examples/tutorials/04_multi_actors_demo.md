@@ -11,7 +11,7 @@ frames = []
 
 actions = None
 for time_step in range(EPISODE_LENGTH):
-  
+
     # STEP
     env.step_dynamics(actions)
 

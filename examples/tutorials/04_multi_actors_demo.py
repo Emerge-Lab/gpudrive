@@ -16,7 +16,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 1
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_1.gif"
+    VIDEO_PATH = "videos/multi_actors_demo_control_one_agent.mp4"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
 
@@ -31,7 +31,9 @@ if __name__ == "__main__":
         discipline=SelectionDiscipline.FIRST_N,
         k_unique_scenes=K_UNIQUE_SCENES,
     )
-    render_config = RenderConfig()
+    render_config = RenderConfig(
+        draw_obj_idx=True,
+    )
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
@@ -50,15 +52,14 @@ if __name__ == "__main__":
         print(f"Step: {time_step}")
 
         # SELECT ACTIONS
-        actions = None
-        # rand_action = torch.Tensor(
-        #     [
-        #         [
-        #             env.action_space.sample()
-        #             for _ in range(MAX_CONTROLLED_AGENTS * NUM_WORLDS)
-        #         ]
-        #     ]
-        # ).reshape(NUM_WORLDS, MAX_CONTROLLED_AGENTS)
+        actions = torch.Tensor(
+            [
+                [
+                    env.action_space.sample()
+                    for _ in range(MAX_CONTROLLED_AGENTS * NUM_WORLDS)
+                ]
+            ]
+        ).reshape(NUM_WORLDS, MAX_CONTROLLED_AGENTS)
 
         # STEP
         env.step_dynamics(actions)
@@ -76,7 +77,7 @@ if __name__ == "__main__":
 
 actions = None
 for time_step in range(EPISODE_LENGTH):
-    
+
     # STEP
     env.step_dynamics(actions)
 

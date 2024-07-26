@@ -128,7 +128,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         dataset = select_scenes(scene_config)
-            
+
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
