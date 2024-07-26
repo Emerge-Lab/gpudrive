@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # Configs
     env_config = EnvConfig()
     scene_config = SceneConfig(
-        path="example_data",
+        path="data",
         num_scenes=NUM_WORLDS,
         discipline=SelectionDiscipline.FIRST_N,
         k_unique_scenes=K_UNIQUE_SCENES,
