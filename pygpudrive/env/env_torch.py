@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from itertools import product
 
-from pygpudrive.env.config import *
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 
@@ -225,7 +225,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
 
         # TODO: Fix (there should not be nans in the obs)
-        # BUG: remove nan values?
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
@@ -303,14 +302,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    TOTAL_STEPS = 1000
+
+    # CONFIGURE
+    TOTAL_STEPS = 90
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 45
+    NUM_WORLDS = 50
 
-    env_config = EnvConfig(sample_method="pad_n")
+    env_config = EnvConfig()
     render_config = RenderConfig()
-    scene_config = SceneConfig("example_data", NUM_WORLDS)
+    scene_config = SceneConfig(path="data", num_scenes=NUM_WORLDS)
 
+    # MAKE ENV
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
@@ -319,6 +321,7 @@ if __name__ == "__main__":
         render_config=render_config,
     )
 
+    # RUN
     obs = env.reset()
 
     for _ in range(TOTAL_STEPS):
@@ -340,10 +343,6 @@ if __name__ == "__main__":
 
         reward = env.get_rewards()
         done = env.get_dones()
-
-        if done.any():
-            print("Done")
-            obs = env.reset()
 
     # import imageio
     # imageio.mimsave("world1.gif", frames_1)

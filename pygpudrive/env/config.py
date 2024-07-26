@@ -1,5 +1,4 @@
 """Configs for GPUDrive Environments."""
-"""Configs for GPUDrive Environments."""
 
 from dataclasses import dataclass
 import numpy as np
@@ -17,9 +16,7 @@ class EnvConfig:
     road_map_obs: bool = True  # Road graph
     partner_obs: bool = True  # Partner vehicle info
     norm_obs: bool = True
-    enable_lidar: bool = (
-        False  # TODO(dc): Actually integrate this with the env
-    )
+    enable_lidar: bool = False
 
     # Road observation algorithm
     road_obs_algorithm: str = "linear"
@@ -36,6 +33,7 @@ class EnvConfig:
 
     # Collision behavior
     collision_behavior: str = "remove"  # options: "remove", "stop", "ignore"
+
     # Remove all non vehicles (bicylces, pedestrians) from the scene
     remove_non_vehicles: bool = True
 
@@ -47,14 +45,12 @@ class EnvConfig:
     # to have reached the goal
     dist_to_goal_threshold: float = 3.0
 
-    # TODO(dc): should be removed
-    num_controlled_vehicles: int = 128
-    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
-    top_k_roadpoints: int = 200
-    # TODO(dc): should be removed
-    num_controlled_vehicles: int = 128
-    road_map_agent_feat_dim: int = num_controlled_vehicles - 1
-    top_k_roadpoints: int = 200
+    # Maximum number of controlled vehicles and feature dimensions for network
+    MAX_CONTROLLED_VEHICLES: int = 128
+    ROADMAP_AGENT_FEAT_DIM: int = MAX_CONTROLLED_VEHICLES - 1
+    TOP_K_ROADPOINTS: int = (
+        200  # Number of visible roadpoints from the road graph
+    )
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
@@ -76,6 +72,24 @@ class EnvConfig:
     EGO_STATE_DIM = 6 if ego_state else 0
     PARTNER_DIM = 10 if partner_obs else 0
     ROAD_MAP_DIM = 13 if road_map_obs else 0
+
+
+class SelectionDiscipline(Enum):
+    FIRST_N = 0
+    RANDOM_N = 1
+    PAD_N = 2
+    EXACT_N = 3
+    K_UNIQUE_N = 4
+
+
+@dataclass
+class SceneConfig:
+    """Configurations for selecting scenes from a dataset."""
+
+    path: str
+    num_scenes: int
+    discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
+    k_unique_scenes: int = None
 
 
 class RenderMode(Enum):
@@ -100,23 +114,8 @@ class MadronaOption(Enum):
 class RenderConfig:
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
     view_option: Enum = PygameOption.RGB
-    resolution: Tuple[int, int] = (512, 512) # Quality of the rendered image
-    line_thickness: int = .7 # Thickness of the road lines
+    resolution: Tuple[int, int] = (1000, 1000)  # Quality of the rendered image
+    line_thickness: int = 0.7  # Thickness of the road lines
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
-
-
-class SelectionDiscipline(Enum):
-    FIRST_N = 0
-    RANDOM_N = 1
-    PAD_N = 2
-    EXACT_N = 3
-    K_UNIQUE_N = 4
-
-@dataclass
-class SceneConfig:
-    path: str
-    num_scenes: int
-    discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
-    k_unique_scenes: int = None
