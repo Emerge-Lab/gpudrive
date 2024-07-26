@@ -13,8 +13,6 @@ BLUE = (0, 191, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
-
-
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
@@ -564,9 +562,10 @@ class PyGameVisualizer:
 
                 # Draw the agent index close to the agent
                 if self.render_config.draw_obj_idx:
-                    font = pygame.font.Font(
-                        None, 10 * int(self.zoom_scales_x[0])
+                    scaled_font_size = self.render_config.obj_idx_font_size * int(
+                        self.zoom_scales_x[world_render_idx]
                     )
+                    font = pygame.font.Font(None, scaled_font_size)
                     text = font.render(str(agent_idx), True, WHITE)
                     text_rect = text.get_rect(
                         center=(

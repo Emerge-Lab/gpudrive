@@ -116,7 +116,8 @@ class RenderConfig:
     view_option: Enum = PygameOption.RGB
     resolution: Tuple[int, int] = (1024, 1024)  # Quality of the rendered image
     line_thickness: int = 0.7  # Thickness of the road lines
-    draw_obj_idx: bool = True  # Draw object index on the object
+    draw_obj_idx: bool = False  # Draw object index on the object
+    obj_idx_font_size: int = 9 # Font size of the object index
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
