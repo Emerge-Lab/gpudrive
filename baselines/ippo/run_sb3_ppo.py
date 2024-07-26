@@ -1,13 +1,13 @@
 import wandb
 import pyrallis
 from typing import Callable
-from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
-from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from datetime import datetime
 
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
+from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
+from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
@@ -109,14 +109,12 @@ if __name__ == "__main__":
 
     if exp_config.train_on_k_unique_scenes:
         scene_config = SceneConfig(
-            path=exp_config.data_dir,
-            num_scenes=exp_config.num_worlds,
-            discipline=SelectionDiscipline.K_UNIQUE_N,
-            k_unique_scenes=exp_config.train_on_k_unique_scenes,
+            exp_config.data_dir,
+            exp_config.num_worlds,
+            SelectionDiscipline.K_UNIQUE_N,
+            exp_config.train_on_k_unique_scenes,
         )
     else:
-        scene_config = SceneConfig(
-            path=exp_config.data_dir, num_scenes=exp_config.num_worlds
-        )
+        scene_config = SceneConfig(exp_config.data_dir, exp_config.num_worlds)
 
     train(exp_config, scene_config)

@@ -8,23 +8,24 @@ from pygpudrive.env.config import (
     SelectionDiscipline,
 )
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
+from pygpudrive.agents.random_actor import RandomActor
+from pygpudrive.agents.expert_actor import HumanExpertActor
+from pygpudrive.agents.policy_actor import SB3PolicyActor
+from pygpudrive.agents.core import merge_actions
 
 if __name__ == "__main__":
 
     # Constants
     EPISODE_LENGTH = 90
-    MAX_CONTROLLED_AGENTS = 1
+    MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_one_agent.mp4"
+    VIDEO_PATH = "videos/multi_actors_demo_control_multiple.mp4"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
 
     # Configs
-    env_config = EnvConfig(
-        steer_actions=torch.round(torch.linspace(-0.3, 0.3, 3), decimals=3),
-        accel_actions=torch.Tensor([-20]),
-    )
+    env_config = EnvConfig()
     scene_config = SceneConfig(
         path="example_data",
         num_scenes=NUM_WORLDS,
@@ -44,6 +45,23 @@ if __name__ == "__main__":
         device=DEVICE,
     )
 
+    # CREATE SIM AGENTS
+    obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
+
+    rand_actor = RandomActor(
+        env=env,
+        is_controlled_func=(obj_idx == 0) | (obj_idx == 1),
+    )
+
+    # expert_actor = HumanExpertActor(
+    #     is_controlled_func=(obj_idx > 0),
+    # )
+
+    policy_actor = SB3PolicyActor(
+        is_controlled_func=obj_idx > 1,
+        saved_model_path="models/policy_23066479.zip",
+    )
+
     obs = env.reset()
     frames = []
 
@@ -52,39 +70,32 @@ if __name__ == "__main__":
         print(f"Step: {time_step}")
 
         # SELECT ACTIONS
-        actions = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(MAX_CONTROLLED_AGENTS * NUM_WORLDS)
-                ]
-            ]
-        ).reshape(NUM_WORLDS, MAX_CONTROLLED_AGENTS)
+        rand_actions = rand_actor.select_action()
+        # expert_actions = expert_actor.select_action(obs)
+        rl_agent_actions = policy_actor.select_action(obs)
+
+        # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
+        actions = merge_actions(
+            actions={
+                "pi_rand": rand_actions,
+                "pi_rl": rl_agent_actions,
+                #'pi_expert': expert_actions
+            },
+            actor_ids={
+                "pi_rand": rand_actor.actor_ids,
+                "pi_rl": policy_actor.actor_ids,
+                #'pi_expert': expert_actor.actor_ids,
+            },
+            reference_actor_shape=obj_idx,
+        )
 
         # STEP
-        env.step_dynamics(actions)
+        env.step_dynamics(actions.reshape(1, MAX_CONTROLLED_AGENTS))
 
         obs = env.get_obs()
-        reward = env.get_rewards()
-        done = env.get_dones()
 
         # RENDER
         frame = env.render(world_render_idx=0)
         frames.append(frame)
 
     imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=30)
-
-
-actions = None
-for time_step in range(EPISODE_LENGTH):
-
-    # STEP
-    env.step_dynamics(actions)
-
-    obs = env.get_obs()
-    reward = env.get_rewards()
-    done = env.get_dones()
-
-    # RENDER
-    frame = env.render(world_render_idx=0)
-    frames.append(frame)
