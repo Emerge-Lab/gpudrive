@@ -19,6 +19,8 @@ def select_scenes(config):
 
     all_scenes = sorted(os.listdir(config.path))
     selected_scenes = None
+    if not any(scene.startswith("tfrecord") for scene in all_scenes):
+        raise ValueError("The data directory does not contain any traffic scenes. Maybe you specified a path to the wrong folder?")
 
     def random_sample(k):
         rand = random.Random(0x5CA1AB1E)
@@ -39,14 +41,11 @@ def select_scenes(config):
             assert len(all_scenes) == config.num_scenes
             selected_scenes = all_scenes
         case SelectionDiscipline.K_UNIQUE_N:
-            assert (
-                config.k_unique_scenes > 0
-            ), "K_UNIQUE_N discipline requires specifying positive value for K"
-            selected_scenes = repeat_to_N(
-                random_sample(config.k_unique_scenes)
-            )
+            assert config.k_unique_scenes > 0, "K_UNIQUE_N discipline requires specifying positive value for K"
+            selected_scenes = repeat_to_N(random_sample(config.k_unique_scenes))
 
-    return [
-        os.path.join(os.path.abspath(config.path), selected_scene)
-        for selected_scene in selected_scenes
-    ]
+    if not any(scene.startswith("tfrecord") for scene in selected_scenes):
+        raise ValueError("The selected scenes do not contain traffic scenes. Something went wrong with the scene selection.")
+    
+    return [os.path.join(os.path.abspath(config.path), selected_scene) for selected_scene in selected_scenes]
+        

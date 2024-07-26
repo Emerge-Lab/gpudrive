@@ -127,25 +127,23 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        sim = None
-        try:
-            sim = gpudrive.SimManager(
-                exec_mode=exec_mode,
-                gpu_id=0,
-                scenes=select_scenes(scene_config),
-                params=params,
-                enable_batch_renderer=self.render_config
-                and self.render_config.render_mode
-                in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-                batch_render_view_width=self.render_config.resolution[0]
-                if self.render_config
-                else None,
-                batch_render_view_height=self.render_config.resolution[1]
-                if self.render_config
-                else None,
-            )
-        except:
-            raise ValueError("Error in initializing the simulator")
+        dataset = select_scenes(scene_config)
+            
+        sim = gpudrive.SimManager(
+            exec_mode=exec_mode,
+            gpu_id=0,
+            scenes=dataset,
+            params=params,
+            enable_batch_renderer=self.render_config
+            and self.render_config.render_mode
+            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=self.render_config.resolution[0]
+            if self.render_config
+            else None,
+            batch_render_view_height=self.render_config.resolution[1]
+            if self.render_config
+            else None,
+        )
 
         return sim
 
