@@ -45,7 +45,7 @@ events.out.tfevents.*
 *.slo
 *.lo
 *.o
-*.obj
+
 
 # Precompiled Headers
 *.gch
