@@ -194,7 +194,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def render(self, world_render_idx=0, actor_to_idx=None):
+    def render(self, world_render_idx=0, color_objects_by_actor=None):
         """Renders the environment.
 
         Args:
@@ -214,7 +214,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             return self.visualizer.getRender(
                 world_render_idx=world_render_idx,
                 cont_agent_mask=self.cont_agent_mask,
-                actor_to_idx=actor_to_idx,
+                color_objects_by_actor=color_objects_by_actor,
             )
         elif self.render_config.render_mode in {
             RenderMode.MADRONA_RGB,

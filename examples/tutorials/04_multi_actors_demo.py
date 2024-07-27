@@ -20,7 +20,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_multiple.gif"
+    VIDEO_PATH = "videos/multi_actors_demo_control_3_different.gif"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
     DATA_PATH = "data"
@@ -53,12 +53,12 @@ if __name__ == "__main__":
         env=env, is_controlled_func=(obj_idx == 0)  # | (obj_idx == 1),
     )
 
-    # expert_actor = HumanExpertActor(
-    #     is_controlled_func=(obj_idx > 0),
-    # )
+    expert_actor = HumanExpertActor(
+        is_controlled_func=(obj_idx == 1),
+    )
 
     policy_actor = PolicyActor(
-        is_controlled_func=obj_idx > 0,
+        is_controlled_func=obj_idx > 1,
         saved_model_path="models/policy_23066479.zip",
     )
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
         # SELECT ACTIONS
         rand_actions = rand_actor.select_action()
-        # expert_actions = expert_actor.select_action(obs)
+        expert_actions = expert_actor.select_action(obs)
         rl_agent_actions = policy_actor.select_action(obs)
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
@@ -78,12 +78,12 @@ if __name__ == "__main__":
             actions={
                 "pi_rand": rand_actions,
                 "pi_rl": rl_agent_actions,
-                #'pi_expert': expert_actions
+                "pi_expert": expert_actions,
             },
             actor_ids={
                 "pi_rand": rand_actor.actor_ids,
                 "pi_rl": policy_actor.actor_ids,
-                #'pi_expert': expert_actor.actor_ids,
+                "pi_expert": expert_actor.actor_ids,
             },
             reference_actor_shape=obj_idx,
         )
@@ -97,9 +97,10 @@ if __name__ == "__main__":
         # RENDER
         frame = env.render(
             world_render_idx=0,
-            actor_to_idx={
+            color_objects_by_actor={
                 "rand": rand_actor.actor_ids.tolist(),
                 "policy": policy_actor.actor_ids.tolist(),
+                "expert": expert_actor.actor_ids.tolist(),
             },
         )
         frames.append(frame)

@@ -348,14 +348,14 @@ class PyGameVisualizer:
             self.draw_map(map_surf, map_info, i)
             self.map_surfs.append(map_surf)
 
-    def getRender(self, world_render_idx=0, actor_to_idx=None, **kwargs):
+    def getRender(self, world_render_idx=0, color_objects_by_actor=None, **kwargs):
         if self.render_config.render_mode in {
             RenderMode.PYGAME_ABSOLUTE,
             RenderMode.PYGAME_EGOCENTRIC,
             RenderMode.PYGAME_LIDAR,
         }:
             cont_agent_mask = kwargs.get("cont_agent_mask", None)
-            return self.draw(cont_agent_mask, world_render_idx, actor_to_idx)
+            return self.draw(cont_agent_mask, world_render_idx, color_objects_by_actor)
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
@@ -365,7 +365,7 @@ class PyGameVisualizer:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
 
-    def draw(self, cont_agent_mask, world_render_idx=0, actor_to_idx=None):
+    def draw(self, cont_agent_mask, world_render_idx=0, color_objects_by_actor=None):
         """Render the environment."""
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
@@ -518,8 +518,8 @@ class PyGameVisualizer:
             )
 
             num_agents = self.num_agents[world_render_idx][0]
-            if actor_to_idx is not None:
-                categories = list(actor_to_idx.keys())
+            if color_objects_by_actor is not None:
+                categories = list(color_objects_by_actor.keys())
 
             valid_agent_indices = list(
                 range((agent_response_types == 0).sum())
@@ -528,12 +528,12 @@ class PyGameVisualizer:
             # Draw the agent positions
             for agent_idx in range(num_agents):
 
-                if actor_to_idx is not None:
-                    if agent_idx in actor_to_idx[categories[0]]:
+                if color_objects_by_actor is not None:
+                    if agent_idx in color_objects_by_actor[categories[0]]:
                         mod_idx = 0
-                    elif agent_idx in actor_to_idx[categories[1]]:
+                    elif agent_idx in color_objects_by_actor[categories[1]]:
                         mod_idx = 1
-                    elif agent_idx in actor_to_idx[categories[2]]:
+                    elif agent_idx in color_objects_by_actor[categories[2]]:
                         mod_idx = 2
                     else:
                         mod_idx = 3

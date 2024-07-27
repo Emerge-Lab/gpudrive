@@ -19,13 +19,10 @@ def select_scenes(config):
 
     def random_sample(k):
         rand = random.Random(0x5CA1AB1E)
-        rand = random.Random(0x5CA1AB1E)
         return rand.sample(all_scenes, k)
 
     def repeat_to_N(scenes):
         repeat_count = ceil(config.num_scenes / len(scenes))
-        return (scenes * repeat_count)[: config.num_scenes]
-
         return (scenes * repeat_count)[: config.num_scenes]
 
     match config.discipline:

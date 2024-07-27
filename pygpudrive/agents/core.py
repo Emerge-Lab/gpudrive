@@ -26,10 +26,6 @@ def merge_actions(
             )
 
         actor_indices = actor_ids[actor_name]
-
-        if torch.isnan(actor_indices).all():  # If expert-controlled
-            action_tensor[actor_indices] = torch.nan
-        else:
-            action_tensor[actor_indices] = actions[actor_name].long()
+        action_tensor[actor_indices] = actions[actor_name].long()
 
     return action_tensor
