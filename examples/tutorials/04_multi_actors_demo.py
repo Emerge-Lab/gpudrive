@@ -10,7 +10,7 @@ from pygpudrive.env.config import (
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.agents.random_actor import RandomActor
 from pygpudrive.agents.expert_actor import HumanExpertActor
-from pygpudrive.agents.policy_actor import SB3PolicyActor
+from pygpudrive.agents.policy_actor import PolicyActor
 from pygpudrive.agents.core import merge_actions
 
 if __name__ == "__main__":
@@ -20,14 +20,15 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_multiple.mp4"
+    VIDEO_PATH = "videos/multi_actors_demo_control_multiple.gif"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
+    DATA_PATH = "data"
 
     # Configs
     env_config = EnvConfig()
     scene_config = SceneConfig(
-        path="data",
+        path=DATA_PATH,
         num_scenes=NUM_WORLDS,
         discipline=SelectionDiscipline.FIRST_N,
         k_unique_scenes=K_UNIQUE_SCENES,
@@ -49,16 +50,15 @@ if __name__ == "__main__":
     obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
 
     rand_actor = RandomActor(
-        env=env,
-        is_controlled_func=(obj_idx == 0) | (obj_idx == 1),
+        env=env, is_controlled_func=(obj_idx == 0)  # | (obj_idx == 1),
     )
 
     # expert_actor = HumanExpertActor(
     #     is_controlled_func=(obj_idx > 0),
     # )
 
-    policy_actor = SB3PolicyActor(
-        is_controlled_func=obj_idx > 1,
+    policy_actor = PolicyActor(
+        is_controlled_func=obj_idx > 0,
         saved_model_path="models/policy_23066479.zip",
     )
 
@@ -67,7 +67,6 @@ if __name__ == "__main__":
 
     # STEP THROUGH ENVIRONMENT
     for time_step in range(EPISODE_LENGTH):
-        print(f"Step: {time_step}")
 
         # SELECT ACTIONS
         rand_actions = rand_actor.select_action()
@@ -92,10 +91,18 @@ if __name__ == "__main__":
         # STEP
         env.step_dynamics(actions.reshape(1, MAX_CONTROLLED_AGENTS))
 
+        # GET NEXT OBS
         obs = env.get_obs()
 
         # RENDER
-        frame = env.render(world_render_idx=0)
+        frame = env.render(
+            world_render_idx=0,
+            actor_to_idx={
+                "rand": rand_actor.actor_ids.tolist(),
+                "policy": policy_actor.actor_ids.tolist(),
+            },
+        )
         frames.append(frame)
 
+    print(f"Done. Saving video at {VIDEO_PATH}")
     imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=30)

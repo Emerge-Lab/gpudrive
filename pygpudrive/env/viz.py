@@ -13,6 +13,10 @@ BLUE = (0, 191, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
+
+STATIC_AGENT_ID = 2
+
+
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
@@ -72,9 +76,6 @@ class PyGameVisualizer:
 
             self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
             self.compute_window_settings()
-            # if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
-            #     self.init_map()
-            # self.init_map()
 
     @staticmethod
     def get_all_endpoints(map_info):
@@ -347,14 +348,14 @@ class PyGameVisualizer:
             self.draw_map(map_surf, map_info, i)
             self.map_surfs.append(map_surf)
 
-    def getRender(self, world_render_idx=0, **kwargs):
+    def getRender(self, world_render_idx=0, actor_to_idx=None, **kwargs):
         if self.render_config.render_mode in {
             RenderMode.PYGAME_ABSOLUTE,
             RenderMode.PYGAME_EGOCENTRIC,
             RenderMode.PYGAME_LIDAR,
         }:
             cont_agent_mask = kwargs.get("cont_agent_mask", None)
-            return self.draw(cont_agent_mask, world_render_idx)
+            return self.draw(cont_agent_mask, world_render_idx, actor_to_idx)
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
@@ -364,7 +365,7 @@ class PyGameVisualizer:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
 
-    def draw(self, cont_agent_mask, world_render_idx=0):
+    def draw(self, cont_agent_mask, world_render_idx=0, actor_to_idx=None):
         """Render the environment."""
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
@@ -508,7 +509,7 @@ class PyGameVisualizer:
             goal_pos = agent_info[:, 8:10]  # x, y
             agent_rot = agent_info[:, 7]  # heading
             agent_sizes = agent_info[:, 10:12]  # length, width
-            agent_response_types = (
+            agent_response_types = (  # 0: Valid (can be controlled), 2: Invalid (cannot be controlled)
                 self.sim.response_type_tensor()
                 .to_torch()[world_render_idx, :, :]
                 .cpu()
@@ -517,9 +518,30 @@ class PyGameVisualizer:
             )
 
             num_agents = self.num_agents[world_render_idx][0]
+            if actor_to_idx is not None:
+                categories = list(actor_to_idx.keys())
+
+            valid_agent_indices = list(
+                range((agent_response_types == 0).sum())
+            )
 
             # Draw the agent positions
             for agent_idx in range(num_agents):
+
+                if actor_to_idx is not None:
+                    if agent_idx in actor_to_idx[categories[0]]:
+                        mod_idx = 0
+                    elif agent_idx in actor_to_idx[categories[1]]:
+                        mod_idx = 1
+                    elif agent_idx in actor_to_idx[categories[2]]:
+                        mod_idx = 2
+                    else:
+                        mod_idx = 3
+                else:
+                    mod_idx = agent_idx % len(self.COLOR_LIST)
+
+                color = self.COLOR_LIST[mod_idx]
+
                 info_tensor = self.sim.info_tensor().to_torch()[
                     world_render_idx
                 ]
@@ -546,27 +568,26 @@ class PyGameVisualizer:
                     goal_pos[agent_idx], world_render_idx
                 )
 
-                mod_idx = (agent_idx + 1) % len(self.COLOR_LIST)
-
-                # Controlled agents are pink
-                if cont_agent_mask[world_render_idx, agent_idx]:
-                    mod_idx = 0
-
-                color = self.COLOR_LIST[mod_idx]
-
-                if agent_response_types[agent_idx] == 2:
+                # Agent is static
+                if agent_response_types[agent_idx] == STATIC_AGENT_ID:
                     color = (128, 128, 128)
 
                 pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
                 pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
 
-                # Draw the agent index close to the agent
-                if self.render_config.draw_obj_idx:
-                    scaled_font_size = self.render_config.obj_idx_font_size * int(
-                        self.zoom_scales_x[world_render_idx]
+                # Draw object indices for the controllable agents
+                if (
+                    self.render_config.draw_obj_idx
+                    and agent_response_types[agent_idx] != STATIC_AGENT_ID
+                ):
+                    scaled_font_size = (
+                        self.render_config.obj_idx_font_size
+                        * int(self.zoom_scales_x[world_render_idx])
                     )
                     font = pygame.font.Font(None, scaled_font_size)
-                    text = font.render(str(agent_idx), True, WHITE)
+                    text = font.render(
+                        str(valid_agent_indices.pop(0)), True, WHITE
+                    )
                     text_rect = text.get_rect(
                         center=(
                             agent_corners[0][0]
@@ -576,7 +597,7 @@ class PyGameVisualizer:
                     )
                     self.surf.blit(text, text_rect)
 
-                if agent_response_types[agent_idx] != 2:
+                if agent_response_types[agent_idx] != STATIC_AGENT_ID:
                     self.draw_circle(
                         self.surf,
                         current_goal_scaled,

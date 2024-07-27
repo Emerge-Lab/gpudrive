@@ -3,8 +3,11 @@ from pathlib import Path
 from algorithms.sb3.ppo.ippo import IPPO
 
 
-class SB3PolicyActor:
-    """Policy actor that selects actions based on a learned policy."""
+class PolicyActor:
+    """Policy actor that selects actions based on a learned policy.
+
+    NOTE: Assumes that the policy is a learned policy from the SB3 IPPO algorithm.
+    """
 
     def __init__(
         self,
