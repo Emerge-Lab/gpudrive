@@ -5,7 +5,8 @@ import numpy as np
 import torch
 from itertools import product
 
-from pygpudrive.env.config import *
+import gpudrive
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 
@@ -212,10 +213,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.config.max_rel_goal_coord,
         )
 
-        # Uncommment this to exclude the collision state
-        # (1 if vehicle is in collision, 1 otherwise)
-        # state = state[:, :, :5]
-
         return state
 
     def normalize_and_flatten_partner_obs(self, obs):
@@ -224,8 +221,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             obs: torch.Tensor of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
         """
 
-        # TODO: Fix (there should not be nans in the obs)
-        # BUG: remove nan values?
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
@@ -250,21 +245,52 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         obs[:, :, :, 4] /= self.config.max_veh_len
         obs[:, :, :, 5] /= self.config.max_veh_width
 
-        # Object type
-        shifted_type_obs = obs[:, :, :, 6] - 6
-        one_hot_object_type = torch.nn.functional.one_hot(
-            torch.where(
-                condition=shifted_type_obs >= 0,
-                input=shifted_type_obs,
-                other=0,
-            ).long(),
-            num_classes=4,
-        )
-        # Concatenate the one-hot encoding with the rest of the features
-        obs = torch.concat((obs[:, :, :, :6], one_hot_object_type), dim=-1)
+        # One-hot encode the type of the other visible objects
+        one_hot_encoded_object_types = self.one_hot_encode_object_type(obs[:, :, :, 6])
+        
+        # Concat the one-hot encoding with the rest of the features
+        obs = torch.concat((obs[:, :, :, :6], one_hot_encoded_object_types), dim=-1)
 
         return obs.flatten(start_dim=2)
+    
+    def one_hot_encode_roadpoints(self, roadmap_type_tensor):
 
+        # Set garbage object types to zero
+        road_types = torch.where(
+            (roadmap_type_tensor < self.MIN_OBJ_ENTITY_ENUM) | (roadmap_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
+            0.0,
+            roadmap_type_tensor,
+        ).int()
+        
+        return torch.nn.functional.one_hot(
+                road_types.long(), num_classes=self.ROAD_MAP_OBJECT_TYPES,
+            )
+
+    def one_hot_encode_object_type(self, object_type_tensor):
+        """One-hot encode the object type."""
+        
+        VEHICLE = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Vehicle]
+        PEDESTRIAN = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Pedestrian]
+        CYCLIST = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Cyclist]
+        PADDING = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType._None]
+        
+        # Set garbage object elements to zero
+        object_types = torch.where(
+            (object_type_tensor < self.MIN_OBJ_ENTITY_ENUM) | (object_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
+            0.0,
+            object_type_tensor,
+        ).int()
+    
+        one_hot_object_type = torch.nn.functional.one_hot(
+            torch.where(
+                condition=(object_types == VEHICLE) | (object_types == PEDESTRIAN) | (object_types == CYCLIST) | object_types == PADDING,
+                input=object_types,
+                other=0,
+            ).long(),
+            num_classes=self.ROAD_OBJECT_TYPES,
+        )
+        return one_hot_object_type
+    
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
 
@@ -292,30 +318,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         obs[:, :, :, 5] /= self.config.max_orientation_rad
 
         # Road types: one-hot encode them
-        one_hot_road_type = torch.nn.functional.one_hot(
-            obs[:, :, :, 6].long(), num_classes=7
-        )
-
+        one_hot_road_types = self.one_hot_encode_roadpoints(obs[:, :, :, 6])
+        
         # Concatenate the one-hot encoding with the rest of the features (exclude index 3 and 4)
-        obs = torch.cat((obs[:, :, :, :6], one_hot_road_type), dim=-1)
+        obs = torch.cat((obs[:, :, :, :6], one_hot_road_types), dim=-1)
 
         return obs.flatten(start_dim=2)
-
 
 if __name__ == "__main__":
     TOTAL_STEPS = 1000
     MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 45
+    NUM_WORLDS = 1
 
-    env_config = EnvConfig(sample_method="pad_n")
+    env_config = EnvConfig()
     render_config = RenderConfig()
-    scene_config = SceneConfig("example_data", NUM_WORLDS)
+    scene_config = SceneConfig("data", NUM_WORLDS)
 
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        device="cuda",
+        device="cpu",
         render_config=render_config,
     )
 
