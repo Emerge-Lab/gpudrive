@@ -16,7 +16,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
     def __init__(self):
         super().__init__()
-
+        
     @abc.abstractmethod
     def reset(self):
         """Reset the dynamics to inital state.
@@ -107,9 +107,32 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         if self.config.enable_lidar:
             params.enableLidar = self.config.enable_lidar
             params.disableClassicalObs = True
-
+        
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
+        
+        # Map entity types to integers  
+        self.ENTITY_TYPE_TO_INT = {
+            gpudrive.EntityType._None: 0,
+            gpudrive.EntityType.RoadEdge: 1,
+            gpudrive.EntityType.RoadLine: 2,
+            gpudrive.EntityType.RoadLane: 3,
+            gpudrive.EntityType.CrossWalk: 4,
+            gpudrive.EntityType.SpeedBump: 5,
+            gpudrive.EntityType.StopSign: 6,
+            gpudrive.EntityType.Vehicle: 7,
+            gpudrive.EntityType.Pedestrian: 8,
+            gpudrive.EntityType.Cyclist: 9,
+            gpudrive.EntityType.Padding: 10,
+        }
+        self.MIN_OBJ_ENTITY_ENUM = min(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.MAX_OBJ_ENTITY_ENUM = max(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.ROAD_MAP_OBJECT_TYPES = 7 # (enums 0-6)
+        self.ROAD_OBJECT_TYPES = 4 # (enums 7-10)
+        
+        # Indicates expert actions
+        self.EXPERT_ACTION_VALUE = -10_000
+
         return params
 
     def _initialize_simulator(self, params, scene_config):
