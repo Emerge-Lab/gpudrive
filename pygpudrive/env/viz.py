@@ -348,14 +348,18 @@ class PyGameVisualizer:
             self.draw_map(map_surf, map_info, i)
             self.map_surfs.append(map_surf)
 
-    def getRender(self, world_render_idx=0, color_objects_by_actor=None, **kwargs):
+    def getRender(
+        self, world_render_idx=0, color_objects_by_actor=None, **kwargs
+    ):
         if self.render_config.render_mode in {
             RenderMode.PYGAME_ABSOLUTE,
             RenderMode.PYGAME_EGOCENTRIC,
             RenderMode.PYGAME_LIDAR,
         }:
             cont_agent_mask = kwargs.get("cont_agent_mask", None)
-            return self.draw(cont_agent_mask, world_render_idx, color_objects_by_actor)
+            return self.draw(
+                cont_agent_mask, world_render_idx, color_objects_by_actor
+            )
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
@@ -365,7 +369,9 @@ class PyGameVisualizer:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
 
-    def draw(self, cont_agent_mask, world_render_idx=0, color_objects_by_actor=None):
+    def draw(
+        self, cont_agent_mask, world_render_idx=0, color_objects_by_actor=None
+    ):
         """Render the environment."""
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
@@ -509,7 +515,7 @@ class PyGameVisualizer:
             goal_pos = agent_info[:, 8:10]  # x, y
             agent_rot = agent_info[:, 7]  # heading
             agent_sizes = agent_info[:, 10:12]  # length, width
-            agent_response_types = (  # 0: Valid (can be controlled), 2: Invalid (cannot be controlled)
+            agent_response_types = (  # 0: Valid (can be controlled), 2: Invalid (static vehicles)
                 self.sim.response_type_tensor()
                 .to_torch()[world_render_idx, :, :]
                 .cpu()

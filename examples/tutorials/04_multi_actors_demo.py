@@ -60,6 +60,7 @@ if __name__ == "__main__":
     policy_actor = PolicyActor(
         is_controlled_func=obj_idx > 1,
         saved_model_path="models/policy_23066479.zip",
+        device=DEVICE,
     )
 
     obs = env.reset()
