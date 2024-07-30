@@ -1,4 +1,4 @@
-## Controlling road objects 🕹️ 
+## Controlling road objects 🕹️
 
 In this tutorial, we demonstrate how to control agents in the simulator using user-specified actors.
 
@@ -10,7 +10,7 @@ At the moment, we support three types of actors:
 
 ---
 
-> It is easy to define your own actor! Just make sure it follows the structure of `SimAgentActor` in `pygpudrive/agents/sim_agent.py`.
+> 🤖 **It is easy to define your own actor.** Just make sure it has a `select_action(obs)` method (see `SimAgentActor `in `pygpudrive/agents/sim_agent.py` for the expected structure).
 
 ---
 
@@ -38,7 +38,7 @@ scene_config = SceneConfig(
     k_unique_scenes=K_UNIQUE_SCENES,
 )
 render_config = RenderConfig(
-    draw_obj_idx=True,
+    draw_obj_idx=True, # If True, draws the indices of the vehicles for easy inspection
 )
 
 # Make env
@@ -53,7 +53,9 @@ env = GPUDriveTorchEnv(
 
 ### Example 1: Populate the environment with different actors
 
-Now, we can select the actors to control the vehicles in the scenarios. For example, if we want to control agent `0` with a random actor and the remaining agents with a learned policy stored in `models/*`, we can create the actors as follows:
+Say you have just trained a policy $\pi$ and would like to investigate how well it pairs with agents that take completely random actions. For no particular reason, we let a single object per scene be controlled by the random actor and the remaining of the agents with your *learned policy* (that is stored in `models/*`). 
+
+We can do this as follows:
 
 ```python
 from pygpudrive.agents.random_actor import RandomActor
@@ -65,16 +67,16 @@ obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
 # Define actors
 rand_actor = RandomActor(
     env=env,
-    is_controlled_func=(obj_idx == 0),
+    is_controlled_func=(obj_idx == 0), 
 )
 
 policy_actor = PolicyActor(
-    is_controlled_func=obj_idx > 0,
+    is_controlled_func=obj_idx > 0, # Remainder of the vehicles in a scene
     saved_model_path="models/policy_23066479.zip",
 )
 ```
 
-Now we step through an episode, using the two actors to take actions for the respective actors.
+Now we step through an episode, using the two actors to take actions for the respective vehicles:
 
 ```python
  for time_step in range(EPISODE_LENGTH):
@@ -113,10 +115,14 @@ Now we step through an episode, using the two actors to take actions for the res
     frames.append(frame)
 ```
 
-This generates the following behavior:
+Done! Now let's inspect our agents.
 
 * The pink vehicle with `idx = 0` is controlled by the `RandomActor`
 * The other vehicles in the scene, here `idx = 1 and idx = 2` are controlled by the learned `PolicyActor`
+
+---
+> 🎨 Notice that the vehicles are colored by their actor type, this is done with the `color_objects_by_actor` argument in the `render()` method.
+---
 
 <figure>
 <img src="../../assets/multi_actors_demo_control_multiple.gif" alt="..." width=500>
@@ -124,7 +130,9 @@ This generates the following behavior:
 
 ### Example 2: Evaluation with human drivers
 
-Say I want to evaluate my learned policy with the human drivers and for fun, include a random agent as well. To do this, we define the following experts: 
+This time, say you are rather interested in evaluating your learned policy not just with random but also with _human_ agents.
+
+Now we define three different actors...
 
 ```python
 from pygpudrive.agents.expert_actor import HumanExpertActor
@@ -147,10 +155,9 @@ policy_actor = PolicyActor(
 )
 ```
 
-Now we repeat the procedure above, except with the new actors:
+... and repeat the procedure above, except with the new actors:
 
 ```python
-# STEP THROUGH ENVIRONMENT
 for time_step in range(EPISODE_LENGTH):
 
     # SELECT ACTIONS
