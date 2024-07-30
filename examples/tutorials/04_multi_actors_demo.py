@@ -20,7 +20,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 1
     K_UNIQUE_SCENES = 1
-    VIDEO_PATH = "videos/multi_actors_demo_control_3_different.gif"
+    VIDEO_PATH = "videos/multi_actors_demo_control_rand+policy.gif"
     SCENE_NAME = "example_scene"
     DEVICE = "cuda"
     DATA_PATH = "data"
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         draw_obj_idx=True,
     )
 
-    # MAKE ENV
+    # Make environment
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
@@ -46,19 +46,19 @@ if __name__ == "__main__":
         device=DEVICE,
     )
 
-    # CREATE SIM AGENTS
+    # Create sim agent
     obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
 
     rand_actor = RandomActor(
         env=env, is_controlled_func=(obj_idx == 0)  # | (obj_idx == 1),
     )
 
-    expert_actor = HumanExpertActor(
-        is_controlled_func=(obj_idx == 1),
-    )
+    # expert_actor = HumanExpertActor(
+    #     is_controlled_func=(obj_idx == 1),
+    # )
 
     policy_actor = PolicyActor(
-        is_controlled_func=obj_idx > 1,
+        is_controlled_func=obj_idx > 0,
         saved_model_path="models/policy_23066479.zip",
         device=DEVICE,
     )
@@ -68,10 +68,11 @@ if __name__ == "__main__":
 
     # STEP THROUGH ENVIRONMENT
     for time_step in range(EPISODE_LENGTH):
+        print(f"Step {time_step}/{EPISODE_LENGTH}")
 
         # SELECT ACTIONS
         rand_actions = rand_actor.select_action()
-        expert_actions = expert_actor.select_action(obs)
+        # expert_actions = expert_actor.select_action(obs)
         rl_agent_actions = policy_actor.select_action(obs)
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
@@ -79,12 +80,12 @@ if __name__ == "__main__":
             actions={
                 "pi_rand": rand_actions,
                 "pi_rl": rl_agent_actions,
-                "pi_expert": expert_actions,
+                # "pi_expert": expert_actions,
             },
             actor_ids={
                 "pi_rand": rand_actor.actor_ids,
                 "pi_rl": policy_actor.actor_ids,
-                "pi_expert": expert_actor.actor_ids,
+                # "pi_expert": expert_actor.actor_ids,
             },
             reference_actor_shape=obj_idx,
         )
@@ -101,10 +102,10 @@ if __name__ == "__main__":
             color_objects_by_actor={
                 "rand": rand_actor.actor_ids.tolist(),
                 "policy": policy_actor.actor_ids.tolist(),
-                "expert": expert_actor.actor_ids.tolist(),
+                # "expert": expert_actor.actor_ids.tolist(),
             },
         )
         frames.append(frame)
 
     print(f"Done. Saving video at {VIDEO_PATH}")
-    imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=30)
+    imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=30, loop=0)
