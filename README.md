@@ -10,11 +10,13 @@ For more details, see our [paper]() and the [introduction tutorials](https://git
 <center><figcaption>Three example scenarios from a bird's eye view.</figcaption></center>
 </figure>
 
+
 ## Implemented algorithms 🌱
 
 | Algorithm      | Reference                                                                                                                           | README                                                                           |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
+
 
 ## Installation 🛠️
 
@@ -94,11 +96,12 @@ import gpudrive
 
 ## Getting started 🚀
 
-To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and gymnasium wrappers.
+To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 
 <p align="center">
-  <img src="assets/navigation.png" width="350" title="Getting started">
+  <img src="assets/GPUDrive_docs_flow.png" width="1200" title="Getting started">
 </p>
+
 
 ## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
@@ -130,16 +133,3 @@ cd build
 
 If you use GPUDrive in your work, please cite us:
 TODO(dc)
-
-The Waymo Open Dataset is discussed in the following publication:
-
-```
-@misc{ettinger2021large,
-      title={Large Scale Interactive Motion Forecasting for Autonomous Driving : The Waymo Open Motion Dataset},
-      author={Scott Ettinger and others},
-      year={2021},
-      eprint={2104.10133},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
-```
