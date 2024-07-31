@@ -535,12 +535,10 @@ class PyGameVisualizer:
             for agent_idx in range(num_agents):
 
                 if color_objects_by_actor is not None:
-                    if agent_idx in color_objects_by_actor[categories[0]]:
-                        mod_idx = 0
-                    elif agent_idx in color_objects_by_actor[categories[1]]:
-                        mod_idx = 1
-                    elif agent_idx in color_objects_by_actor[categories[2]]:
-                        mod_idx = 2
+                    for i in range(len(categories)):
+                        if agent_idx in color_objects_by_actor[categories[i]]:
+                            mod_idx = i
+                            break
                     else:
                         mod_idx = 3
                 else:

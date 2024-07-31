@@ -12,12 +12,14 @@ class PolicyActor:
     def __init__(
         self,
         is_controlled_func,
+        valid_agent_indices,
         saved_model_path,
         deterministic=True,
         device="cuda",
     ):
         self.is_controlled_func = is_controlled_func
-        self.actor_ids = torch.where(is_controlled_func)[0]
+        self.is_valid_and_controlled_func = is_controlled_func & valid_agent_indices.squeeze(dim=0)
+        self.actor_ids = torch.where(self.is_valid_and_controlled_func)[0]
         self.device = device
         self.deterministic = deterministic
         self.policy = self.load_model(saved_model_path)
@@ -42,7 +44,7 @@ class PolicyActor:
         obs = self._reshape_observation(obs)
 
         actions = self.policy._predict(
-            obs[self.is_controlled_func, :],
+            obs[self.is_valid_and_controlled_func, :],
             deterministic=self.deterministic,
         )
         return actions

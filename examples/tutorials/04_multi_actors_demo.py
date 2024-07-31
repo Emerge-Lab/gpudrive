@@ -22,7 +22,7 @@ if __name__ == "__main__":
     K_UNIQUE_SCENES = 1
     VIDEO_PATH = "videos/multi_actors_demo_control_rand+policy.gif"
     SCENE_NAME = "example_scene"
-    DEVICE = "cuda"
+    DEVICE = "cpu"
     DATA_PATH = "data"
 
     # Configs
@@ -59,6 +59,7 @@ if __name__ == "__main__":
 
     policy_actor = PolicyActor(
         is_controlled_func=obj_idx > 0,
+        valid_agent_indices=env.cont_agent_mask,
         saved_model_path="models/policy_23066479.zip",
         device=DEVICE,
     )
@@ -88,6 +89,7 @@ if __name__ == "__main__":
                 # "pi_expert": expert_actor.actor_ids,
             },
             reference_actor_shape=obj_idx,
+            device=DEVICE,
         )
 
         # STEP
