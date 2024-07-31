@@ -53,13 +53,13 @@ if __name__ == "__main__":
         env=env, is_controlled_func=(obj_idx == 0)  # | (obj_idx == 1),
     )
 
-    # expert_actor = HumanExpertActor(
-    #     is_controlled_func=(obj_idx == 1),
-    # )
+    expert_actor = HumanExpertActor(
+        is_controlled_func=(obj_idx == 1),
+    )
 
     policy_actor = PolicyActor(
-        is_controlled_func=obj_idx > 0,
-        valid_agent_indices=env.cont_agent_mask,
+        is_controlled_func=obj_idx > 1,
+        valid_agent_mask=env.cont_agent_mask,
         saved_model_path="models/policy_23066479.zip",
         device=DEVICE,
     )
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
         # SELECT ACTIONS
         rand_actions = rand_actor.select_action()
-        # expert_actions = expert_actor.select_action(obs)
+        expert_actions = expert_actor.select_action(obs)
         rl_agent_actions = policy_actor.select_action(obs)
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
@@ -81,12 +81,12 @@ if __name__ == "__main__":
             actions={
                 "pi_rand": rand_actions,
                 "pi_rl": rl_agent_actions,
-                # "pi_expert": expert_actions,
+                "pi_expert": expert_actions,
             },
             actor_ids={
                 "pi_rand": rand_actor.actor_ids,
                 "pi_rl": policy_actor.actor_ids,
-                # "pi_expert": expert_actor.actor_ids,
+                "pi_expert": expert_actor.actor_ids,
             },
             reference_actor_shape=obj_idx,
             device=DEVICE,
@@ -104,7 +104,7 @@ if __name__ == "__main__":
             color_objects_by_actor={
                 "rand": rand_actor.actor_ids.tolist(),
                 "policy": policy_actor.actor_ids.tolist(),
-                # "expert": expert_actor.actor_ids.tolist(),
+                "expert": expert_actor.actor_ids.tolist(),
             },
         )
         frames.append(frame)

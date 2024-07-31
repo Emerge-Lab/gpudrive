@@ -6,22 +6,34 @@ from algorithms.sb3.ppo.ippo import IPPO
 class PolicyActor:
     """Policy actor that selects actions based on a learned policy.
 
-    NOTE: Assumes that the policy is a learned policy from the SB3 IPPO algorithm.
+    This class is compatible with policies trained with stable-baselines 3, such as PPO.
+
+    Args:
+        is_controlled_func (torch.Tensor): Determines which agents are controlled by this actor.
+        valid_agent_mask (torch.Tensor): Mask that determines which agents are valid, and thus controllable, in the environment.
+        saved_model_path (str): Path to the saved model.
+        model_class: Model class to use.
+        deterministic (bool): Whether to use deterministic actions.
+        device (str): Device to run the policy on.
     """
 
     def __init__(
         self,
         is_controlled_func,
-        valid_agent_indices,
+        valid_agent_mask,
         saved_model_path,
+        model_class=IPPO,
         deterministic=True,
         device="cuda",
     ):
         self.is_controlled_func = is_controlled_func
-        self.is_valid_and_controlled_func = is_controlled_func & valid_agent_indices.squeeze(dim=0)
+        self.is_valid_and_controlled_func = (
+            is_controlled_func & valid_agent_mask.squeeze(dim=0)
+        )
         self.actor_ids = torch.where(self.is_valid_and_controlled_func)[0]
         self.device = device
         self.deterministic = deterministic
+        self.model_class = model_class
         self.policy = self.load_model(saved_model_path)
 
     def load_model(self, saved_model_path):
@@ -30,7 +42,7 @@ class PolicyActor:
         if not model_file.is_file():
             raise FileNotFoundError(f"File not found: {saved_model_path}")
         else:
-            policy = IPPO.load(
+            policy = self.model_class.load(
                 path=saved_model_path,
                 device=self.device,
             ).policy
