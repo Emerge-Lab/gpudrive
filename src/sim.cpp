@@ -182,10 +182,8 @@ inline void collectObservationsSystem(Engine &ctx,
             .type = (float)ctx.get<EntityType>(other)
         };
     }
-    while(arrIndex < consts::kMaxAgentCount - 1)
-    {
-        partner_obs.obs[arrIndex].type = (float)EntityType::None;
-        arrIndex++;
+    while(arrIndex < consts::kMaxAgentCount - 1) {
+        partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
 
     const auto alg = ctx.data().params.roadObservationAlgorithm;
@@ -214,12 +212,8 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    while (arrIndex < consts::kMaxAgentMapObservationsCount)
-    {
-        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
-        map_obs.obs[arrIndex].heading = 0.f;
-        map_obs.obs[arrIndex].type = (float)EntityType::None;
-        arrIndex++;
+    while (arrIndex < consts::kMaxAgentMapObservationsCount) {
+        map_obs.obs[arrIndex++] = MapObservation::zero();
     }
 }
 
