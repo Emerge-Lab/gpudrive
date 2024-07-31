@@ -103,6 +103,15 @@ struct MapObservation {
     Scale scale;
     float heading;
     float type;
+
+    static inline MapObservation zero() {
+      return MapObservation {
+	.position = {0, 0},
+	.scale = madrona::math::Diag3x3{0, 0, 0},
+	.heading = 0,
+	.type = static_cast<float>(EntityType::None)
+      };
+    }
 };
 
 const size_t MapObservationExportSize = 7;
@@ -115,6 +124,16 @@ struct PartnerObservation {
     float heading;
     VehicleSize vehicle_size;
     float type;
+
+    static inline PartnerObservation zero() {
+      return PartnerObservation {
+	  .speed = 0,
+	  .position = {0, 0},
+	  .heading = 0,
+	  .vehicle_size = {0, 0},
+          .type = static_cast<float>(EntityType::None)
+      };
+    }
 };
 
 // Egocentric observations of other agents
