@@ -337,7 +337,7 @@ class PyGameVisualizer:
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
             return
-        # self.map_surfs = [self.surf.copy() * self.num  # Create a copy of the main surface to hold the map
+
         self.map_surf.fill(self.BACKGROUND_COLOR)
         self.map_surfs = []
         for i in range(self.num_worlds):
