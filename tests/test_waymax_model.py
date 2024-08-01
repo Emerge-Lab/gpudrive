@@ -12,8 +12,7 @@ def sim_init():
     params = gpudrive.Parameters()
     params.polylineReductionThreshold = 0.5  
     params.observationRadius = 10.0 
-    params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop  
-    params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN  
+    params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
     params.rewardParams = reward_params 
     params.maxNumControlledVehicles = 2 # we are going to use the second vehicle as the controlled vehicle
     params.IgnoreNonVehicles = True
@@ -22,8 +21,7 @@ def sim_init():
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU,
         gpu_id=0,
-        num_worlds=1,
-        json_path="tests/pytest_data",
+        scenes=["tests/pytest_data/test.json"],
         params=params
     )
 
