@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 import tyro
 from torch.distributions.categorical import Categorical
-from gpudrive_gym_cleanrl import GPUDriveEnv
+from gpudrive_gym_cleanrl import GPUDriveEnv, make_gpudrive
 # from torch.utils.tensorboard import SummaryWriter
 
 
@@ -116,7 +116,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
+            layer_init(nn.Linear(64, envs.discrete_action_space.n), std=0.01),
         )
 
     def get_value(self, x):
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
-    envs = GPUDriveEnv()
+    envs = make_gpudrive()
     # assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
     agent = Agent(envs).to(device)
@@ -226,7 +226,7 @@ if __name__ == "__main__":
             logprobs[step] = logprob
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            next_obs, reward, terminations, truncations, infos, env_ids, mask = envs.step(action.cpu().numpy())
+            next_obs, reward, terminations, truncations, infos, env_ids, mask = envs.step(action)
             indices = get_indices_from_mask(mask)
             next_done = terminations[indices]
             reward = reward[indices]

@@ -1,5 +1,6 @@
 import argparse
 import shutil
+import torch
 import yaml
 import os
 from box import Box
@@ -63,6 +64,23 @@ def sweep(args, wandb_name, env_module, make_env):
 
     wandb.agent(sweep_id, main, count=100)
 
+def eval_rollout(env, policy):
+    policy = policy.eval()
+    o, r, d, t, info, env_id, mask = env.async_reset()
+    orig_mask = torch.clone(mask).detach()
+    while not d.all():
+        action, _, _, _ = policy(o)
+        env.step(action)
+        o, r, d, t, info, env_id, mask = env.recv()
+    
+    goal_reach = torch.sum(env.info[orig_mask, 3])
+    goal_reach_pct = goal_reach / torch.sum(orig_mask)
+
+    print(f"ROLLOUT EVAL: {goal_reach_pct}")
+
+    policy = policy.train()
+    
+
 def train(args):
     args.wandb = None
     if args.track:
@@ -79,6 +97,7 @@ def train(args):
         try:
             cleanrl.evaluate(data)
             cleanrl.train(data)
+            eval_rollout(env, policy)
         except KeyboardInterrupt:
             clean_pufferl.close(data)
             os._exit(0)

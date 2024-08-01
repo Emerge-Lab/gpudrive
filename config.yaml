@@ -4,32 +4,32 @@ train:
   device: cuda
   cpu_offload: False
   total_timesteps: 100_000_000
-  learning_rate: 2.5e-3
+  learning_rate: 2.5e-1
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 24
+  update_epochs: 5
   norm_adv: True
   clip_coef: 0.1
-  clip_vloss: false
+  clip_vloss: true
   ent_coef: 0.01
   vf_coef: 1.0
   max_grad_norm: 0.5
-  target_kl: ~
-  
+  target_kl: 0.1
+
   verbose: True
   data_dir: experiments
   checkpoint_interval: 100_000_000
   pool_kernel: [0]
-  batch_size: 8192
-  minibatch_size: 2048
+  batch_size: 92
+  minibatch_size: 92
   bptt_horizon: 1 #8
   vf_clip_coef: 1.0
   compile: False
   compile_mode: reduce-overhead
 
 env_params:
-  action_space_type: continuous
+  action_space_type: discrete
 
 reward_params:
   rewardType: OnGoalAchieved  
@@ -39,10 +39,10 @@ reward_params:
 parameters:
   polylineReductionThreshold: 1.0
   observationRadius: 150.0
-  datasetInitOptions: PadN
+  datasetInitOptions: FirstN
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 128
+  maxNumControlledVehicles: 1
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -54,6 +54,6 @@ parameters:
 sim_manager:
   exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 50
+  num_worlds: 1
   json_path: /home/aarav/gpudrive/example_data
   enable_batch_renderer: False

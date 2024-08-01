@@ -10,6 +10,8 @@ from gymnasium.experimental.wrappers import LambdaActionV0
 from sim_utils.creator import SimCreator
 from itertools import product
 
+from box import Box
+
 class GPUDriveEnv(gym.Env):
     Recurrent = None
 
@@ -18,19 +20,22 @@ class GPUDriveEnv(gym.Env):
             self.sim, self.config = SimCreator(config)
         else:
             self.sim, self.config = SimCreator()
-
+            self.config = Box(self.config)
+            print(self.config)
+        
         self.device = str.lower(self.config.sim_manager.exec_mode)
         
         self.setup_obs()
         self.setup_actions()
 
         self.async_reset()
-
+        
+        self.controlled_num_agents = torch.sum(self.mask).item()
         self.num_obs_features = self.concatenated_obs.shape[-1]
         self.single_observation_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=[self.num_obs_features], dtype=np.float32)
         self.observation_space = gym.vector.utils.batch_space(self.single_observation_space, self.batch_size)
 
-        self.action_space_type = config.get('env_params', {}).get('action_space_type', 'continuous')
+        self.action_space_type = self.config.env_params.action_space_type
         self.single_action_space = gym.spaces.Box(low=-5, high=5, shape=self.batch_action_tensor.shape[1:], dtype=np.float32)
         self.batched_space = gym.vector.utils.batch_space(self.single_action_space, self.batch_size)
         self.action_space = self.batched_space
@@ -171,7 +176,7 @@ class GPUDriveEnv(gym.Env):
         acs[self.prev_mask] = actions
         acs = acs.view(self.num_envs, self.num_agents, *acs.shape[1:])
         self.send(acs)
-        return
+        return self.recv()
         # action = torch.tensor(action)
         # self.sim.step()
         # obs, _ = self.setup_obs()
@@ -210,7 +215,7 @@ class GPUDriveEnv(gym.Env):
     @torch.no_grad()
     def recv(self):
         self.make_mask()
-        self.reward[self.prev_mask] = self.reward[self.prev_mask] - torch.sum(self.info[self.prev_mask,:3],dim = 1,keepdim=True)
+        # self.reward[self.prev_mask] = self.reward[self.prev_mask] - torch.sum(self.info[self.prev_mask,:3],dim = 1,keepdim=True)
         return self.concatenated_obs[self.prev_mask], self.reward[self.prev_mask], self.done[self.prev_mask], self.done[self.prev_mask], [self.get_info()], self.agent_ids[self.prev_mask], self.prev_mask
 
     def send(self, actions):
@@ -257,17 +262,19 @@ def make_gpudrive(config: dict[str,dict[str,str]] = {}):
 
 if __name__ == "__main__":
     env = make_gpudrive()
-    env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
-    # print(env.sim.self_observation_tensor().to_jax())
-    # return
-    frames = []
-    for i in range(91):
-        actions = torch.tensor(env.action_space.sample())
-        env.step(actions[mask])
-        env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
-        if(dones.all()):
-            break
-        print(env_obs[0][0], env.sim.self_observation_tensor().to_torch()[0][0])
+    print(env.action_space_type)
+    print(env.discrete_action_space.n)
+    # env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
+    # # print(env.sim.self_observation_tensor().to_jax())
+    # # return
+    # frames = []
+    # for i in range(91):
+    #     actions = torch.tensor(env.action_space.sample())
+    #     env.step(actions[mask])
+    #     env_obs, rews, dones, truncateds, infos, agent_ids, mask = env.recv()
+    #     if(dones.all()):
+    #         break
+    #     print(env_obs[0][0], env.sim.self_observation_tensor().to_torch()[0][0])
 
         # print(i, dones[0], env_obs[0])
     #     frame = env.render()

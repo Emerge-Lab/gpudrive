@@ -34,7 +34,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f'Model Size: {abbreviate(count_params(policy))} parameters'
-    print_dashboard("GPUDrive", utilization, 0, 0, profile, losses, {}, msg, clear=True)
+    print_dashboard("GPUDrive", vecenv.controlled_num_agents, utilization, 0, 0, profile, losses, {}, msg, clear=True)
 
     vecenv.async_reset(config.seed)
     obs_shape = vecenv.single_observation_space.shape
@@ -270,7 +270,7 @@ def train(data):
 
         done_training = data.global_step >= config.total_timesteps
         if profile.update(data) or done_training:
-            print_dashboard("GPUDrive", data.utilization, data.global_step, data.epoch,
+            print_dashboard("GPUDrive", data.vecenv.controlled_num_agents, data.utilization, data.global_step, data.epoch,
                 profile, data.losses, data.stats, data.msg)
 
             if data.wandb is not None and data.global_step > 0 and time.time() - data.last_log_time > 3.0:
@@ -644,7 +644,7 @@ def fmt_perf(name, time, uptime):
     return f'{c1}{name}', duration(time), f'{b2}{percent:2d}%'
 
 # TODO: Add env name to print_dashboard
-def print_dashboard(env_name, utilization, global_step, epoch,
+def print_dashboard(env_name, num_agents, utilization, global_step, epoch,
         profile, losses, stats, msg, clear=False, max_stats=[0]):
     console = Console()
     if clear:
@@ -681,6 +681,7 @@ def print_dashboard(env_name, utilization, global_step, epoch,
     s.add_row(f'{c2}Epoch', abbreviate(epoch))
     s.add_row(f'{c2}Uptime', duration(profile.uptime))
     s.add_row(f'{c2}Remaining', duration(profile.remaining))
+    s.add_row(f'{c2}Num agents', f'{b2}{num_agents}')
 
     p = Table(box=None, expand=True, show_header=False)
     p.add_column(f"{c1}Performance", justify="left", width=10)
