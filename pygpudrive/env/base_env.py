@@ -130,10 +130,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         self.ROAD_MAP_OBJECT_TYPES = 7 # (enums 0-6)
         self.ROAD_OBJECT_TYPES = 4 # (enums 7-10)
 
-        # Indicates expert actions
-        self.EXPERT_ACTION_VALUE = -10_000
-        
-        
         return params
 
     def _initialize_simulator(self, params, scene_config):

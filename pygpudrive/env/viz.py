@@ -493,7 +493,6 @@ class PyGameVisualizer:
             return render_rgbs
         elif self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
             self.surf.fill(self.BACKGROUND_COLOR)
-            # self.surf.blit(self.map_surfs[world_render_idx], (0, 0))
             map_info = (
                 self.sim.map_observation_tensor()
                 .to_torch()[world_render_idx]

@@ -2,10 +2,9 @@
 
 In this tutorial, we demonstrate how to control agents in the simulator using user-specified actors.
 
-At the moment, we support three types of actors:
+At the moment, we support two types of actors:
 
 * [`RandomActor`](https://github.com/Emerge-Lab/gpudrive/blob/dc/multi_actors_demo/pygpudrive/agents/random_actor.py): Takes random actions from the action space.
-* [`HumanExpertActor`](https://github.com/Emerge-Lab/gpudrive/blob/dc/multi_actors_demo/pygpudrive/agents/expert_actor.py): Operates based on the recorded human driving logs.
 * [`PolicyActor`](https://github.com/Emerge-Lab/gpudrive/blob/dc/multi_actors_demo/pygpudrive/agents/policy_actor.py): Uses a learned policy to take actions.
 
 ---
@@ -14,16 +13,18 @@ At the moment, we support three types of actors:
 
 ---
 
-We show how to use different actors in a scene and resulting behaviors. To reproduce these results, you can play around with the associated python script: `04_multi_actors_demo.py` .
+We show how to use different actors in a scene and resulting behaviors. To reproduce these results, you can play around with the associated python script: `04_multi_actors_demo.py` . For simplicity, we use a single world throughout the tutorial, but you can easily batch evaluation by increasing the `num_worlds` argument.
 
-### Create and configure environment
+### Create and configure environment 
 
-As usual, we first define our environment with the desired settings:
+As usual, we first define our environment with the desired settings.
+
+The environment includes an argument, `max_cont_agents`, which determines the maximum number of vehicles you can control per scenario. The total number of vehicles per scenario can range from 1 to 128. In this case, we'll set it to 3. Any vehicles in the scene that are *not* controlled by you will be driven using human driving logs.
 
 ```python
 # Constants
 EPISODE_LENGTH = 90
-MAX_CONTROLLED_AGENTS = 128
+MAX_CONTROLLED_AGENTS = 3
 NUM_WORLDS = 1
 K_UNIQUE_SCENES = 1
 DEVICE = "cuda"
@@ -53,7 +54,7 @@ env = GPUDriveTorchEnv(
 
 ### Example 1: Populate the environment with different actors
 
-Say you have just trained a policy $\pi$ and would like to investigate how well it pairs with agents that take completely random actions. For no particular reason, we let a single object per scene be controlled by the random actor and the remaining of the agents with your *learned policy* (that is stored in `models/*`). 
+Say you have just trained a policy $\pi$ and would like to investigate how well it pairs with agents that take completely random actions. For no particular reason, we let a single object per scene be controlled by the random actor and the remaining of the agents with your *learned policy* (that is stored in `models/*`).
 
 We can do this as follows:
 
@@ -62,7 +63,7 @@ from pygpudrive.agents.random_actor import RandomActor
 from pygpudrive.agents.policy_actor import PolicyActor
 from pygpudrive.agents.core import merge_actions
 
-obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
+obj_idx = torch.arange(config.k_max_agent_count)
 
 # Define actors
 rand_actor = RandomActor(
@@ -72,7 +73,7 @@ rand_actor = RandomActor(
 
 policy_actor = PolicyActor(
     is_controlled_func=obj_idx > 0, # Remainder of the vehicles in a scene
-    saved_model_path="models/policy_23066479.zip",
+    saved_model_path="models/learned_sb3_policy.zip",
 )
 ```
 
@@ -107,7 +108,7 @@ Now we step through an episode, using the two actors to take actions for the res
     # RENDER
     frame = env.render(
         world_render_idx=0,
-       color_objects_by_actor={
+        color_objects_by_actor={
                 'rand': rand_actor.actor_ids.tolist(),
                 'policy': policy_actor.actor_ids.tolist()
             }
@@ -121,7 +122,9 @@ Done! Now let's inspect our agents.
 * The other vehicles in the scene, here `idx = 1 and idx = 2` are controlled by the learned `PolicyActor`
 
 ---
+
 > 🎨 Notice that the vehicles are colored by their actor type, this is done with the `color_objects_by_actor` argument in the `render()` method.
+
 ---
 
 <figure>
@@ -135,23 +138,27 @@ This time, say you are rather interested in evaluating your learned policy not j
 Now we define three different actors...
 
 ```python
-from pygpudrive.agents.expert_actor import HumanExpertActor
 from pygpudrive.agents.policy_actor import PolicyActor
 from pygpudrive.agents.core import merge_actions
 
-obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
+env = GPUDriveTorchEnv(
+    config=env_config,
+    scene_config=scene_config,
+    render_config=render_config,
+    # We only want to control 2 agents and let the rest of the vehicles be stepped using human replay
+    max_cont_agents=2,
+    device=DEVICE,
+)
+
+obj_idx = torch.arange(config.k_max_agent_count)
 
 rand_actor = RandomActor(
     env=env, is_controlled_func=(obj_idx == 0)
 )
 
-expert_actor = HumanExpertActor(
-    is_controlled_func=(obj_idx == 1),
-)
-
 policy_actor = PolicyActor(
     is_controlled_func=obj_idx > 1,
-    saved_model_path="models/policy_23066479.zip",
+    saved_model_path="models/learned_sb3_policy.zip",
 )
 ```
 
@@ -162,7 +169,6 @@ for time_step in range(EPISODE_LENGTH):
 
     # SELECT ACTIONS
     rand_actions = rand_actor.select_action()
-    expert_actions = expert_actor.select_action(obs)
     rl_agent_actions = policy_actor.select_action(obs)
 
     # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
@@ -170,18 +176,16 @@ for time_step in range(EPISODE_LENGTH):
         actions={
             "pi_rand": rand_actions,
             "pi_rl": rl_agent_actions,
-            "pi_expert": expert_actions,
         },
         actor_ids={
             "pi_rand": rand_actor.actor_ids,
             "pi_rl": policy_actor.actor_ids,
-            "pi_expert": expert_actor.actor_ids,
         },
         reference_actor_shape=obj_idx,
     )
 
     # STEP
-    env.step_dynamics(actions.reshape(1, MAX_CONTROLLED_AGENTS))
+    env.step_dynamics(actions)
 
     # GET NEXT OBS
     obs = env.get_obs()
@@ -191,9 +195,7 @@ for time_step in range(EPISODE_LENGTH):
         world_render_idx=0,
         color_objects_by_actor={
             "rand": rand_actor.actor_ids.tolist(),
-            "policy": policy_actor.actor_ids.tolist(),
-            "expert": expert_actor.actor_ids.tolist(),
-        },
+            "policy": policy_actor.actor_ids.tolist(),        },
     )
     frames.append(frame)
 ```
@@ -201,7 +203,7 @@ for time_step in range(EPISODE_LENGTH):
 Now we can see that:
 
 * The _zigzagging_ pink vehicle with `idx = 0` is controlled by the `RandomActor`
-* The blue vehicle with `idx = 1` follows the human driving log (`HumanExpertActor`)
+* The blue vehicle with `idx = 1` replays logged human driver trajectory
 * The green vehicle with `idx = 2` is controlled by the learned `PolicyActor`
 
 <figure>

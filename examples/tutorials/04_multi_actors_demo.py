@@ -9,7 +9,6 @@ from pygpudrive.env.config import (
 )
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.agents.random_actor import RandomActor
-from pygpudrive.agents.expert_actor import HumanExpertActor
 from pygpudrive.agents.policy_actor import PolicyActor
 from pygpudrive.agents.core import merge_actions
 
@@ -17,15 +16,13 @@ if __name__ == "__main__":
 
     # Constants
     EPISODE_LENGTH = 90
-    MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 3
-    K_UNIQUE_SCENES = 10
-    VIDEO_PATH = (
-        "videos/multi_actors_demo_control_rand+policy_multiple_worlds.gif"
-    )
+    MAX_CONTROLLED_AGENTS = 6 # Number of agents to control per scene
+    NUM_WORLDS = 100
     DEVICE = "cuda"
     DATA_PATH = "data"
-    RENDER_WORLD_IDX = 2  # Scene we want to render
+    TRAINED_POLICY_PATH = "models/learned_sb3_policy.zip"
+    VIDEO_PATH = (f"videos/release/")
+    FPS = 23
 
     # Configs
     env_config = EnvConfig()
@@ -33,7 +30,6 @@ if __name__ == "__main__":
         path=DATA_PATH,
         num_scenes=NUM_WORLDS,
         discipline=SelectionDiscipline.FIRST_N,
-        k_unique_scenes=K_UNIQUE_SCENES,
     )
     render_config = RenderConfig(
         draw_obj_idx=True,
@@ -48,50 +44,43 @@ if __name__ == "__main__":
         device=DEVICE,
     )
 
-    # Create sim agent
-    obj_idx = torch.arange(MAX_CONTROLLED_AGENTS)
+    # Create sim agent 
+    obj_idx = torch.arange(env_config.k_max_agent_count)
 
     # rand_actor = RandomActor(
     #     env=env,
-    #     is_controlled_func=(obj_idx == 0) | (obj_idx == 1),
+    #     is_controlled_func=obj_idx < 3, #(obj_idx == 0) | (obj_idx == 1),
     #     valid_agent_mask=env.cont_agent_mask,
     # )
-
-    expert_actor = HumanExpertActor(
-        is_controlled_func=(obj_idx < 3),
-        valid_agent_mask=env.cont_agent_mask,
-    )
-
+    
     policy_actor = PolicyActor(
-        is_controlled_func=obj_idx >= 3,
+        is_controlled_func=obj_idx >= 0,
         valid_agent_mask=env.cont_agent_mask,
-        saved_model_path="models/policy_23066479.zip",
+        saved_model_path=TRAINED_POLICY_PATH,
         device=DEVICE,
     )
-
+    
     obs = env.reset()
-    frames = []
+    
+    frames_dict = {f'scene_{idx}': [] for idx in range(NUM_WORLDS)}
 
     # STEP THROUGH ENVIRONMENT
     for time_step in range(EPISODE_LENGTH):
         print(f"Step {time_step}/{EPISODE_LENGTH}")
 
         # SELECT ACTIONS
-        # rand_actions = rand_actor.select_action()
-        expert_actions = expert_actor.select_action(obs)
-        rl_agent_actions = policy_actor.select_action(obs)
+        #rand_actions = rand_actor.select_action()
+        policy_actions = policy_actor.select_action(obs)
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
         actions = merge_actions(
             actor_actions_dict={
-                # "pi_rand": rand_actions,
-                "pi_rl": rl_agent_actions,
-                "pi_expert": expert_actions,
+                #"pi_rand": rand_actions,
+                "pi_rl": policy_actions,
             },
             actor_ids_dict={
-                # "pi_rand": rand_actor.actor_ids,
+                #"pi_rand": rand_actor.actor_ids,
                 "pi_rl": policy_actor.actor_ids,
-                "pi_expert": expert_actor.actor_ids,
             },
             reference_action_tensor=env.cont_agent_mask,
             device=DEVICE,
@@ -104,15 +93,21 @@ if __name__ == "__main__":
         obs = env.get_obs()
 
         # RENDER
-        frame = env.render(
-            world_render_idx=RENDER_WORLD_IDX,
-            color_objects_by_actor={
-                # "rand": rand_actor.actor_ids[RENDER_WORLD_IDX].tolist(),
-                "policy": policy_actor.actor_ids[RENDER_WORLD_IDX].tolist(),
-                "expert": expert_actor.actor_ids[RENDER_WORLD_IDX].tolist(),
-            },
-        )
-        frames.append(frame)
-
-    print(f"Done. Saving video at {VIDEO_PATH}")
-    imageio.mimwrite(VIDEO_PATH, np.array(frames), fps=15, loop=0)
+        for world_idx in range(NUM_WORLDS):
+            frame = env.render(
+                world_render_idx=world_idx,
+                color_objects_by_actor={
+                    #"rand": rand_actor.actor_ids[world_idx].tolist(),
+                    "policy": policy_actor.actor_ids[world_idx].tolist(),
+                },
+            )
+            frames_dict[f'scene_{world_idx}'].append(frame)
+    
+    # # # # # # # #
+    # Done. Save videos
+    for scene_name, frames_list in frames_dict.items():
+        frames_arr = np.array(frames_list)
+        save_path = f"{VIDEO_PATH}{scene_name}.gif"
+        print(f"Saving video at {save_path}")
+        imageio.mimwrite(save_path, frames_arr, fps=FPS, loop=0)
+        

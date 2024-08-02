@@ -63,10 +63,14 @@ class PolicyActor:
 
         action_lists = []
         for world_idx in range(len(self.actor_ids)):
-            actions = self.policy._predict(
-                obs[world_idx, self.actor_ids[world_idx], :],
-                deterministic=self.deterministic,
-            )
+            observations =  obs[world_idx, self.actor_ids[world_idx], :]
+            if len(observations) == 0: # Append empty tensor if no agents in this world are controlled
+                actions = torch.tensor([]).to(self.device)
+            else:
+                actions = self.policy._predict(
+                    obs[world_idx, self.actor_ids[world_idx], :],
+                    deterministic=self.deterministic,
+                )
             action_lists.append(actions)
 
         return action_lists
@@ -84,7 +88,6 @@ class PolicyActor:
         """Returns a boolean mask across worlds that indicates which agents
         are valid and controlled by this actor.
         """
-
         num_worlds = valid_agent_mask.shape[0]
 
         is_controlled_func = is_controlled_func.expand((num_worlds, -1))

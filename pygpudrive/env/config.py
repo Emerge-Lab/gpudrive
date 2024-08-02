@@ -55,6 +55,7 @@ class EnvConfig:
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
     # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Normalization constants
     max_speed: int = 100
     max_veh_len: int = 30
     max_veh_width: int = 10
@@ -68,12 +69,14 @@ class EnvConfig:
     max_road_line_segmment_len: int = 100
     max_road_scale: int = 100
 
-    # DON'T CHANGE: Used for network
+    # Feature dimensions
     EGO_STATE_DIM = 6 if ego_state else 0
     PARTNER_DIM = 10 if partner_obs else 0
     ROAD_MAP_DIM = 13 if road_map_obs else 0
-
-
+    
+    # Agent tensor shape set in consts.hpp (kMaxAgentCount)
+    k_max_agent_count: int = 128
+    
 class SelectionDiscipline(Enum):
     FIRST_N = 0
     RANDOM_N = 1

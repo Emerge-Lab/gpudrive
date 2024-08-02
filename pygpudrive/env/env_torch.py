@@ -3,13 +3,14 @@
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
+import copy
 import gpudrive
+import imageio
 from itertools import product
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
-EXPERT_ACTION_VALUE = -10_000
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -82,15 +83,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
-        
-        full_action_arr = torch.zeros_like(self.sim.action_tensor().to_torch())
-        
+   
         if actions.dim() == 2:  # (num_worlds, max_agent_count)
             # Map action indices to action values if indices are provided
             actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
-            
-            valid_action_mask = (actions != EXPERT_ACTION_VALUE).to(self.device)
-            action_value_tensor = self.action_keys_tensor[actions[valid_action_mask]]
+            action_value_tensor = self.action_keys_tensor[actions]
             
         elif actions.dim() == 3:
             if actions.shape[2] == 1:
@@ -104,9 +101,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raise ValueError(f"Invalid action shape: {actions.shape}")
 
         # Feed the actual action values to gpudrive
-        # Map provided actions to the right agent indices
-        full_action_arr[valid_action_mask] = action_value_tensor
-        self.sim.action_tensor().to_torch().copy_(full_action_arr)
+        self.sim.action_tensor().to_torch().copy_(action_value_tensor)
     
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
@@ -368,6 +363,7 @@ if __name__ == "__main__":
 
     # RUN
     obs = env.reset()
+    frames = []
 
     for _ in range(TOTAL_STEPS):
 
@@ -382,7 +378,9 @@ if __name__ == "__main__":
         ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
 
         # Step the environment
-        env.step_dynamics(rand_action)
+        env.step_dynamics(None)
+        
+        frames.append(env.render())
 
         obs = env.get_obs()
 
@@ -390,7 +388,7 @@ if __name__ == "__main__":
         done = env.get_dones()
 
     # import imageio
-    # imageio.mimsave("world1.gif", frames_1)
+    imageio.mimsave("world1.gif", np.array(frames))
 
     # run.finish()
     env.visualizer.destroy()
