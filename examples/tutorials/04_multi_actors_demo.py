@@ -6,6 +6,7 @@ from pygpudrive.env.config import (
     RenderConfig,
     SceneConfig,
     SelectionDiscipline,
+    RenderMode,
 )
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.agents.random_actor import RandomActor
@@ -17,11 +18,11 @@ if __name__ == "__main__":
     # Constants
     EPISODE_LENGTH = 90
     MAX_CONTROLLED_AGENTS = 6 # Number of agents to control per scene
-    NUM_WORLDS = 100
-    DEVICE = "cuda"
+    NUM_WORLDS = 5
+    DEVICE = "cpu"
     DATA_PATH = "data"
     TRAINED_POLICY_PATH = "models/learned_sb3_policy.zip"
-    VIDEO_PATH = (f"videos/release/")
+    VIDEO_PATH = (f"videos/")
     FPS = 23
 
     # Configs
@@ -29,9 +30,10 @@ if __name__ == "__main__":
     scene_config = SceneConfig(
         path=DATA_PATH,
         num_scenes=NUM_WORLDS,
-        discipline=SelectionDiscipline.FIRST_N,
+        discipline=SelectionDiscipline.PAD_N,
     )
     render_config = RenderConfig(
+        render_mode=RenderMode.PYGAME_EGOCENTRIC,
         draw_obj_idx=True,
     )
 

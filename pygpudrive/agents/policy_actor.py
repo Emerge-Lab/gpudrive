@@ -99,20 +99,3 @@ class PolicyActor:
         return is_controlled_func.to(self.device) & valid_agent_mask.to(
             self.device
         )
-
-    # def reshape_observation(self, obs):
-    #     """Verify observation shape"""
-
-    #     if obs.dim() == 1:
-    #         obs = obs.unsqueeze(0)
-    #     elif obs.dim() == 2:
-    #         obs = obs
-    #     elif obs.dim() == 3:
-    #         # Flatten over env x agents
-    #         obs = obs.view(-1, obs.size(-1))
-    #     else:
-    #         raise ValueError(
-    #             f"Expected obs to have 2 dimensions (num_envs x agents, obs_dim), but got {obs.dim()}."
-    #         )
-
-    #     return obs
