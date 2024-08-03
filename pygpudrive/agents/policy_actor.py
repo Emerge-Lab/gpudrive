@@ -63,8 +63,10 @@ class PolicyActor:
 
         action_lists = []
         for world_idx in range(len(self.actor_ids)):
-            observations =  obs[world_idx, self.actor_ids[world_idx], :]
-            if len(observations) == 0: # Append empty tensor if no agents in this world are controlled
+            observations = obs[world_idx, self.actor_ids[world_idx], :]
+            if (
+                len(observations) == 0
+            ):  # Append empty tensor if no agents in this world are controlled
                 actions = torch.tensor([]).to(self.device)
             else:
                 actions = self.policy._predict(
