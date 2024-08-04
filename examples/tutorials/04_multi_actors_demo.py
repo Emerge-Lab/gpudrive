@@ -17,8 +17,8 @@ if __name__ == "__main__":
 
     # Constants
     EPISODE_LENGTH = 90
-    MAX_CONTROLLED_AGENTS = 6  # Number of agents to control per scene
-    NUM_WORLDS = 5
+    MAX_CONTROLLED_AGENTS = 2 # Number of agents to control per scene
+    NUM_WORLDS = 2
     DEVICE = "cpu"
     DATA_PATH = "data"
     TRAINED_POLICY_PATH = "models/learned_sb3_policy.zip"
@@ -33,7 +33,6 @@ if __name__ == "__main__":
         discipline=SelectionDiscipline.PAD_N,
     )
     render_config = RenderConfig(
-        render_mode=RenderMode.PYGAME_EGOCENTRIC,
         draw_obj_idx=True,
     )
 
@@ -49,14 +48,14 @@ if __name__ == "__main__":
     # Create sim agent
     obj_idx = torch.arange(env_config.k_max_agent_count)
 
-    # rand_actor = RandomActor(
-    #     env=env,
-    #     is_controlled_func=obj_idx < 3, #(obj_idx == 0) | (obj_idx == 1),
-    #     valid_agent_mask=env.cont_agent_mask,
-    # )
+    rand_actor = RandomActor(
+        env=env,
+        is_controlled_func=(obj_idx == 0), #(obj_idx == 0) | (obj_idx == 1),
+        valid_agent_mask=env.cont_agent_mask,
+    )
 
     policy_actor = PolicyActor(
-        is_controlled_func=obj_idx >= 0,
+        is_controlled_func=(obj_idx == 1),
         valid_agent_mask=env.cont_agent_mask,
         saved_model_path=TRAINED_POLICY_PATH,
         device=DEVICE,
@@ -71,17 +70,17 @@ if __name__ == "__main__":
         print(f"Step {time_step}/{EPISODE_LENGTH}")
 
         # SELECT ACTIONS
-        # rand_actions = rand_actor.select_action()
+        rand_actions = rand_actor.select_action()
         policy_actions = policy_actor.select_action(obs)
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
         actions = merge_actions(
             actor_actions_dict={
-                # "pi_rand": rand_actions,
+                "pi_rand": rand_actions,
                 "pi_rl": policy_actions,
             },
             actor_ids_dict={
-                # "pi_rand": rand_actor.actor_ids,
+                "pi_rand": rand_actor.actor_ids,
                 "pi_rl": policy_actor.actor_ids,
             },
             reference_action_tensor=env.cont_agent_mask,
@@ -99,7 +98,7 @@ if __name__ == "__main__":
             frame = env.render(
                 world_render_idx=world_idx,
                 color_objects_by_actor={
-                    # "rand": rand_actor.actor_ids[world_idx].tolist(),
+                    "rand": rand_actor.actor_ids[world_idx].tolist(),
                     "policy": policy_actor.actor_ids[world_idx].tolist(),
                 },
             )

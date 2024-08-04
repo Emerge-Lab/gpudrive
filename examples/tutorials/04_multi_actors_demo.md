@@ -15,11 +15,11 @@ At the moment, we support two types of actors:
 
 We show how to use different actors in a scene and resulting behaviors. To reproduce these results, you can play around with the associated python script: `04_multi_actors_demo.py` . For simplicity, we use a single world throughout the tutorial, but you can easily batch evaluation by increasing the `num_worlds` argument.
 
-### Create and configure environment 
+### Create and configure environment
 
 As usual, we first define our environment with the desired settings.
 
-The environment includes an argument, `max_cont_agents`, which determines the maximum number of vehicles you can control per scenario. The total number of vehicles per scenario can range from 1 to 128. In this case, we'll set it to 3. Any vehicles in the scene that are *not* controlled by you will be driven using human driving logs.
+The environment includes an argument, `max_cont_agents`, which determines the maximum number of vehicles to control per scenario. The total number of controllable vehicles per scenario ranges from 1 to 128. In this case, we'll set it to 3. Any vehicles in the scene that are *not* controlled by you will be driven using human driving logs, which is also referred to as human or expert replay.
 
 ```python
 # Constants
@@ -121,6 +121,8 @@ Done! Now let's inspect our agents.
 * The pink vehicle with `idx = 0` is controlled by the `RandomActor`
 * The other vehicles in the scene, here `idx = 1 and idx = 2` are controlled by the learned `PolicyActor`
 
+Since there are only 3 vehicles in this scene and we set `max_cont_agent = 3`, none of the vehicles are controlled through human replay.
+
 ---
 
 > 🎨 Notice that the vehicles are colored by their actor type, this is done with the `color_objects_by_actor` argument in the `render()` method.
@@ -157,7 +159,7 @@ rand_actor = RandomActor(
 )
 
 policy_actor = PolicyActor(
-    is_controlled_func=obj_idx > 1,
+    is_controlled_func=(obj_idx == 1),
     saved_model_path="models/learned_sb3_policy.zip",
 )
 ```
@@ -203,8 +205,8 @@ for time_step in range(EPISODE_LENGTH):
 Now we can see that:
 
 * The _zigzagging_ pink vehicle with `idx = 0` is controlled by the `RandomActor`
-* The blue vehicle with `idx = 1` replays logged human driver trajectory
-* The green vehicle with `idx = 2` is controlled by the learned `PolicyActor`
+* The green vehicle with `idx = 1` is controlled by the learned `PolicyActor`
+* The blue vehicle with `idx = 2` replays logged human driver trajectory
 
 <figure>
 <img src="../../assets/multi_actors_demo_control_3_different.gif" alt="..." width=500>
