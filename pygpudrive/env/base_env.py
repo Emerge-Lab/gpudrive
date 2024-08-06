@@ -110,6 +110,26 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
+        
+        # Map entity types to integers  
+        self.ENTITY_TYPE_TO_INT = {
+            gpudrive.EntityType._None: 0,
+            gpudrive.EntityType.RoadEdge: 1,
+            gpudrive.EntityType.RoadLine: 2,
+            gpudrive.EntityType.RoadLane: 3,
+            gpudrive.EntityType.CrossWalk: 4,
+            gpudrive.EntityType.SpeedBump: 5,
+            gpudrive.EntityType.StopSign: 6,
+            gpudrive.EntityType.Vehicle: 7,
+            gpudrive.EntityType.Pedestrian: 8,
+            gpudrive.EntityType.Cyclist: 9,
+            gpudrive.EntityType.Padding: 10,
+        }
+        self.MIN_OBJ_ENTITY_ENUM = min(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.MAX_OBJ_ENTITY_ENUM = max(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.ROAD_MAP_OBJECT_TYPES = 7 # (enums 0-6)
+        self.ROAD_OBJECT_TYPES = 4 # (enums 7-10)
+
         return params
 
     def _initialize_simulator(self, params, scene_config):
@@ -127,25 +147,23 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        sim = None
-        try:
-            sim = gpudrive.SimManager(
-                exec_mode=exec_mode,
-                gpu_id=0,
-                scenes=select_scenes(scene_config),
-                params=params,
-                enable_batch_renderer=self.render_config
-                and self.render_config.render_mode
-                in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
-                batch_render_view_width=self.render_config.resolution[0]
-                if self.render_config
-                else None,
-                batch_render_view_height=self.render_config.resolution[1]
-                if self.render_config
-                else None,
-            )
-        except:
-            raise ValueError("Error in initializing the simulator")
+        dataset = select_scenes(scene_config)
+
+        sim = gpudrive.SimManager(
+            exec_mode=exec_mode,
+            gpu_id=0,
+            scenes=dataset,
+            params=params,
+            enable_batch_renderer=self.render_config
+            and self.render_config.render_mode
+            in {RenderMode.MADRONA_RGB, RenderMode.MADRONA_DEPTH},
+            batch_render_view_width=self.render_config.resolution[0]
+            if self.render_config
+            else None,
+            batch_render_view_height=self.render_config.resolution[1]
+            if self.render_config
+            else None,
+        )
 
         return sim
 
@@ -196,7 +214,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def render(self, world_render_idx=0):
+    def render(self, world_render_idx=0, color_objects_by_actor=None):
         """Renders the environment.
 
         Args:
@@ -216,6 +234,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             return self.visualizer.getRender(
                 world_render_idx=world_render_idx,
                 cont_agent_mask=self.cont_agent_mask,
+                color_objects_by_actor=color_objects_by_actor,
             )
         elif self.render_config.render_mode in {
             RenderMode.MADRONA_RGB,

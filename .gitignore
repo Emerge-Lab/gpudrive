@@ -32,6 +32,7 @@ hpc/overlay*
 /maps_16
 **/*ppo_model*/
 /wandb*
+/videos/*
 
 # Logging
 /wandb

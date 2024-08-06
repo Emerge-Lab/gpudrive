@@ -6,11 +6,10 @@ from dataclasses import dataclass
 class ExperimentConfig:
     """Configurations for experiments."""
 
-    # DATASET & DEVICE
-    data_dir: str = "maps_10"
-    train_on_k_unique_scenes: int = 10  # If set to a non-zero value K, randomly samples K unique scenarios for a total of num_worlds scenes
+    # DATASET
+    data_dir: str = "data"
 
-    # NUM ENVIRONMENTS
+    # NUM PARALLEL ENVIRONMENTS & DEVICE
     num_worlds: int = 50
     device: str = "cuda"
 
@@ -28,15 +27,15 @@ class ExperimentConfig:
         100  # How many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "gpudrive_benchmark"
-    group_name = "verify"
-    entity = "_emerge"
+    project_name = "multi_actors_demo"
+    group_name = " "
+    entity = " "
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"  # Options: online, offline, disabled
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 500
+    save_policy_freq: int = 50
 
     # HYPERPARAMETERS
     seed: int = 42
