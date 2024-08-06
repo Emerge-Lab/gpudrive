@@ -54,9 +54,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
-        for sim_idx in range(self.num_worlds):
-            self.sim.reset(sim_idx)
-        self.sim.step()  # We require one step to trigger the reset
+        self.sim.reset(list(range(self.num_worlds)))
         return self.get_obs()
 
     def get_dones(self):

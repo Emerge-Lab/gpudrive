@@ -57,8 +57,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerArchetype<PhysicsEntity>();
     registry.registerArchetype<CameraAgent>();
 
-    registry.exportSingleton<WorldReset>(
-        (uint32_t)ExportID::Reset);
+    registry.exportSingleton<WorldReset>((uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
@@ -107,7 +106,7 @@ static inline void initWorld(Engine &ctx)
     generateWorld(ctx);
 }
 
-// This system runs each frame and checks if the code external to the
+// This system runs in TaskGraphID::Reset and checks if the code external to the
 // application has forced a reset by writing to the WorldReset singleton. If a
 // reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
@@ -117,6 +116,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     reset.reset = 0;
+  
     cleanupWorld(ctx);
     initWorld(ctx);
 }
@@ -641,34 +641,15 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.vehicle_size = vehicleSize;
 }
 
-// Build the task graph
-void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
-{
-    TaskGraphBuilder &builder = taskgraph_mgr.init(TaskGraphID::Step);
-
-    // Turn policy actions into movement
-    auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
-        movementSystem,
-            Action,
-            VehicleSize,
-            Rotation,
-            Position,
-            Velocity,
-            ControlledState,
-            EntityType,
-            StepsRemaining,
-            Trajectory,
-            CollisionDetectionEvent,
-            ResponseType,
-            Done
-        >>({});
-
+void setupRestOfTasks(TaskGraphBuilder &builder,
+		      const Sim::Config &cfg,
+		      Span<const TaskGraphNodeID> dependencies) {
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
     auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, {moveSystem});
+        builder, dependencies);
 
     auto findOverlappingEntities =
         phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
@@ -700,29 +681,16 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         ParallelForNode<Engine, stepTrackerSystem, Position, Goal, StepsRemaining, Done, Info>>(
         {reward_sys});
 
-    // Conditionally reset the world if the episode is over
-    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem,
-            WorldReset
-        >>({done_sys});
-
-    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({done_sys});
     (void)clear_tmp;
 
 
 #ifdef MADRONA_GPU_MODE
     // RecycleEntitiesNode is required on the GPU backend in order to reclaim
     // deleted entity IDs.
-    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_sys});
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({done_sys});
     (void)recycle_sys;
 #endif
-
-    // This second BVH build is a limitation of the current taskgraph API.
-    // It's only necessary if the world was reset, but we don't have a way
-    // to conditionally queue taskgraph nodes yet.
-    auto post_reset_broadphase =
-        phys::PhysicsSystem::setupBroadphaseTasks(builder,
-                                                           {reset_sys});
 
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
@@ -739,7 +707,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             AgentMapObservations,
             EntityType,
             CollisionDetectionEvent
-        >>({post_reset_broadphase});
+        >>({clear_tmp});
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
@@ -747,7 +715,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {collect_obs});
 
     if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {reset_sys});
+        RenderingSystem::setupTasks(builder, {done_sys});
     }
 
     TaskGraphNodeID lidar;
@@ -788,6 +756,37 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     (void)lidar;
     (void)collectAbsoluteSelfObservations;
 #endif
+}
+
+static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
+    auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
+        movementSystem,
+            Action,
+            VehicleSize,
+            Rotation,
+            Position,
+            Velocity,
+            ControlledState,
+            EntityType,
+            StepsRemaining,
+            Trajectory,
+            CollisionDetectionEvent,
+            ResponseType,
+            Done
+        >>({});
+
+    setupRestOfTasks(builder, cfg, {moveSystem});
+}
+
+static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
+    auto reset = builder.addToGraph<ParallelForNode<Engine, resetSystem,  WorldReset>>({});
+
+    setupRestOfTasks(builder, cfg, {reset});
+}
+
+void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg) {
+    setupResetTasks(taskgraph_mgr.init(TaskGraphID::Reset), cfg);
+    setupStepTasks(taskgraph_mgr.init(TaskGraphID::Step), cfg);
 }
 
 Sim::Sim(Engine &ctx,
