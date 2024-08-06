@@ -3,7 +3,7 @@ GPUDrive
 
 GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
-For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
+For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 <figure>
 <img src="assets/gpudrive_gif_collage.gif" alt="...">
