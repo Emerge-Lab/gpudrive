@@ -1,6 +1,8 @@
 GPUDrive
 ========
 
+![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584) 
+
 GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
 For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
@@ -145,4 +147,15 @@ The simulator supports initializing scenes from the `Nocturne` dataset. The inpu
 ## Citations
 
 If you use GPUDrive in your work, please cite us:
-TODO(dc)
+```
+@misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
+      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS}, 
+      author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
+      year={2024},
+      eprint={2408.01584},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2408.01584}, 
+}
+```
+
