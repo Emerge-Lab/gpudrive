@@ -95,14 +95,7 @@ The `SceneConfig` dataclass is used to configure how scenes are selected from a 
 - `discipline`: The method for selecting scenes, defaulting to `SelectionDiscipline.PAD_N`. (See options in Table below)
 - `k_unique_scenes`: Specifies the number of unique scenes to select, if applicable.
 
-| `discipline`     | Description                                                                                                                                                                               |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **first_n**  | Takes the first `num_worlds` files. Fails if the number of files is less than `num_worlds`.                                                                                           |
-| **random_n** | Randomly selects `num_worlds` files from the dataset. Fails if the number of files is less than `num_worlds`.                                                                         |
-| **pad_n**    | Initializes as many files as available up to `num_worlds`, then repeats the first file to pad until `num_worlds` files are loaded. Fails if there are more files than `num_worlds`. |
-| **exact_n**  | Initializes exactly `num_worlds` files, ensuring that the count matches precisely with no more or less.                                                                                 |
-
-## Rendering
+## Render
 
 Render settings can be changed using the `RenderConfig`.
 
@@ -146,8 +139,3 @@ Below are the renders for each mode
     </td>
   </tr>
 </table>
-
-## Citations
-
-If you use GPUDrive in your work, please cite us:
-TODO(dc)

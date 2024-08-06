@@ -6,9 +6,10 @@ GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 mill
 For more details, see our [paper]() and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 <figure>
-<img src="assets/gpudrive_gif_collage.gif" alt="...">
-<center><figcaption>Three example scenarios from a bird's eye view.</figcaption></center>
+<img src="assets/GPUDrive_eval_with_humans_control_6.gif" alt="...">
+<center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
+
 
 ## Implemented algorithms 🌱
 
@@ -16,9 +17,10 @@ For more details, see our [paper]() and the [introduction tutorials](https://git
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
 
+
 ## Installation 🛠️
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake, as well as Xcode on macOS or Visual Studio on Windows.
+To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake (>= version 3.22), as well as Xcode on macOS or Visual Studio on Windows.
 
 Once you have the required dependencies, clone the repository (don't forget --recursive!):
 
@@ -46,7 +48,10 @@ cd gpudrive
 
 Then, you can *choose* between two options for building the simulator:
 
-- **Option 1**: Manual Install
+--- 
+
+<details>
+  <summary>Option 1️⃣ : Manual install</summary>
 
 For Linux and macOS, use the following commands:
 
@@ -66,7 +71,13 @@ Next, set up the Python components of the repository with pip:
 pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
 ```
 
-- **Option 2**:  Poetry install
+</details>
+
+---
+
+--- 
+<details>
+  <summary>Option 2️⃣ : Poetry install</summary>
 
 First create a conda environment using `environment.yml`:
 
@@ -86,6 +97,10 @@ Run:
 poetry install
 ```
 
+</details>
+
+---
+
 Test whether the installation was successful by importing the simulator:
 
 ```Python
@@ -94,22 +109,11 @@ import gpudrive
 
 ## Getting started 🚀
 
-To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and gymnasium wrappers.
+To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 
 <p align="center">
-  <img src="assets/navigation.png" width="350" title="Getting started">
+  <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p>
-
-## Dataset `{ 🚦 🚗  🚙  🛣️ }`
-
-### How to download the Waymo Open Motion Dataset
-
-Two versions of the dataset are available:
-
-- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
-- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
-
-The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
 ## Tests 📈
 
@@ -126,20 +130,19 @@ cd build
 ./headless CPU 1 1 # Run on CPU , 1 world, 1 step
 ```
 
+## Dataset `{ 🚦 🚗  🚙  🛣️ }`
+
+### How to download the Waymo Open Motion Dataset
+
+Two versions of the dataset are available:
+
+- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
+- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
+
+The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
+
+
 ## Citations
 
 If you use GPUDrive in your work, please cite us:
 TODO(dc)
-
-The Waymo Open Dataset is discussed in the following publication:
-
-```
-@misc{ettinger2021large,
-      title={Large Scale Interactive Motion Forecasting for Autonomous Driving : The Waymo Open Motion Dataset},
-      author={Scott Ettinger and others},
-      year={2021},
-      eprint={2104.10133},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
-```
