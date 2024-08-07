@@ -238,6 +238,10 @@ class GPUDriveEnv(gym.Env):
         params.observationRadius = observationRadius
         params.rewardParams = reward_params  
         return params
+    
+    def close(self):
+        del self.sim
+        return super().close()
 
 
 def apply_discrete_action(actions, action_key_to_values):
@@ -256,7 +260,7 @@ def make_gpudrive(config: dict[str,dict[str,str]] = {}):
     if(env.action_space_type == "discrete"):
         env = LambdaActionV0(
             env,
-            func=lambda action: apply_discrete_action(action, env.action_key_to_values),
+            func=lambda action: apply_discrete_action(action, env.unwrapped.action_key_to_values),
             action_space=gym.vector.utils.batch_space(env.discrete_action_space, env.batch_size)
         )
     return env

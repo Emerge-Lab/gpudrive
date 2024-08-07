@@ -55,5 +55,5 @@ sim_manager:
   exec_mode: CPU
   gpu_id: 0
   num_worlds: 1
-  json_path: example_data
+  json_path: data
   enable_batch_renderer: False

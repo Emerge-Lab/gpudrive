@@ -34,14 +34,14 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f'Model Size: {abbreviate(count_params(policy))} parameters'
-    print_dashboard("GPUDrive", vecenv.controlled_num_agents, utilization, 0, 0, profile, losses, {}, msg, clear=True)
+    print_dashboard("GPUDrive", vecenv.unwrapped.controlled_num_agents, utilization, 0, 0, profile, losses, {}, msg, clear=True)
 
-    vecenv.async_reset(config.seed)
-    obs_shape = vecenv.single_observation_space.shape
-    obs_dtype = vecenv.single_observation_space.dtype
-    atn_shape = [1] if vecenv.action_space_type == 'discrete' else vecenv.action_space.shape[-1:]
-    atn_dtype = torch.int64 if vecenv.action_space.dtype == np.int64 else torch.float32
-    total_agents = vecenv.num_agents
+    vecenv.unwrapped.async_reset(config.seed)
+    obs_shape = vecenv.unwrapped.single_observation_space.shape
+    obs_dtype = vecenv.unwrapped.single_observation_space.dtype
+    atn_shape = [1] if vecenv.unwrapped.action_space_type == 'discrete' else vecenv.unwrapped.action_space.shape[-1:]
+    atn_dtype = torch.int64 if vecenv.unwrapped.action_space.dtype == np.int64 else torch.float32
+    total_agents = vecenv.unwrapped.num_agents
 
     lstm = policy.lstm if hasattr(policy, 'lstm') else None
     experience = Experience(config.batch_size, config.bptt_horizon,
@@ -81,12 +81,12 @@ def evaluate(data):
         policy = data.policy
         infos = defaultdict(list)
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
-    o, r, d, t, info, env_id, mask = data.vecenv.async_reset()
+    o, r, d, t, info, env_id, mask = data.vecenv.unwrapped.async_reset()
     while not experience.full:
         if (d.all() or not mask.any()):
-            o, r, d, t, info, env_id, mask = data.vecenv.async_reset()
+            o, r, d, t, info, env_id, mask = data.vecenv.unwrapped.async_reset()
         with profile.env, torch.no_grad():
-            o, r, d, t, info, env_id, mask = data.vecenv.recv()
+            o, r, d, t, info, env_id, mask = data.vecenv.unwrapped.recv()
 
             env_id = env_id.flatten().cpu().numpy()
 
@@ -134,6 +134,8 @@ def evaluate(data):
                 continue
         data.stats["done"] = np.sum(experience.dones.cpu().numpy())
 
+        eval_rollout(data.vecenv, data.policy, data.stats)
+
     return data.stats, infos
 
 def compute_gae(dones, values, rewards, gamma, gae_lambda):
@@ -151,6 +153,22 @@ def compute_gae(dones, values, rewards, gamma, gae_lambda):
        advantages[t_cur] = lastgaelam
 
    return advantages
+
+def eval_rollout(env, policy, stats):
+    policy = policy.eval()
+    o, r, d, t, info, env_id, mask = env.unwrapped.async_reset()
+    orig_mask = torch.clone(mask).detach()
+    while not d.all():
+        action, _, _, _ = policy(o)
+        env.unwrapped.step(action)
+        o, r, d, t, info, env_id, mask = env.unwrapped.recv()
+    
+    goal_reach = torch.sum(env.unwrapped.info[orig_mask, 3])
+    goal_reach_pct = goal_reach / torch.sum(orig_mask)
+
+    stats['eval_goal_reach'] = goal_reach_pct
+
+    policy = policy.train()
 
 @pufferlib.utils.profile
 def train(data):
@@ -189,7 +207,7 @@ def train(data):
                     lstm_state = (lstm_state[0].detach(), lstm_state[1].detach())
                 else:
                     _, newlogprob, entropy, newvalue = data.policy(
-                        obs.reshape(-1, *data.vecenv.single_observation_space.shape),
+                        obs.reshape(-1, *data.vecenv.unwrapped.single_observation_space.shape),
                         action=atn,
                     )
 
@@ -270,7 +288,7 @@ def train(data):
 
         done_training = data.global_step >= config.total_timesteps
         if profile.update(data) or done_training:
-            print_dashboard("GPUDrive", data.vecenv.controlled_num_agents, data.utilization, data.global_step, data.epoch,
+            print_dashboard("GPUDrive", data.vecenv.unwrapped.controlled_num_agents, data.utilization, data.global_step, data.epoch,
                 profile, data.losses, data.stats, data.msg)
 
             if data.wandb is not None and data.global_step > 0 and time.time() - data.last_log_time > 3.0:
@@ -290,7 +308,7 @@ def train(data):
             data.msg = f'Checkpoint saved at update {data.epoch}'
 
 def close(data):
-    data.vecenv.close()
+    data.vecenv.unwrapped.close()
     data.utilization.stop()
     config = data.config
     if data.wandb is not None:
@@ -590,7 +608,7 @@ def rollout(env_creator, env_kwargs, agent_creator, agent_kwargs,
             else:
                 action, _, _, _ = agent(ob)
 
-            action = action.cpu().numpy().reshape(env.action_space.shape)
+            action = action.cpu().numpy().reshape(env.unwrapped.action_space.shape)
 
         ob, reward = env.step(action)[:2]
         reward = reward.mean()

@@ -1,5 +1,31 @@
 import yaml
 import gpudrive
+import os
+from pathlib import Path
+
+def select_scenes(dir: str, config: dict = None) -> list:
+    """
+    Selects the scenes from the directory.
+    """
+    # Get the list of all the scenes in the directory with .json extension
+    dir_path = Path(os.path.abspath(dir))
+    scenes = [dir_path / scene for scene in os.listdir(dir) if scene.endswith('.json')]
+    
+    if not scenes:
+        raise Exception("No scenes found in the directory")
+
+    num_worlds = config.get('num_worlds', len(scenes))
+
+    # Adjust the number of scenes to match num_worlds
+    while len(scenes) < num_worlds:
+        scenes.extend(scenes[:num_worlds - len(scenes)])
+    scenes = scenes[:num_worlds]
+
+    # Convert paths to strings
+    scenes = [str(scene) for scene in scenes]
+
+    print(scenes)
+    return scenes
 
 def SimCreator(config: dict = None) -> gpudrive.SimManager:
     if(config is None):
@@ -17,7 +43,6 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params = gpudrive.Parameters()
     params.polylineReductionThreshold = params_config['polylineReductionThreshold']
     params.observationRadius = params_config['observationRadius']
-    params.datasetInitOptions = getattr(gpudrive.DatasetInitOptions, params_config['datasetInitOptions'])
     params.rewardParams = reward_params
     params.collisionBehaviour = getattr(gpudrive.CollisionBehaviour, params_config['collisionBehaviour'])
     params.maxNumControlledVehicles = params_config['maxNumControlledVehicles']
@@ -35,8 +60,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     sim = gpudrive.SimManager(
         exec_mode=getattr(gpudrive.madrona.ExecMode, sim_manager_config['exec_mode']),
         gpu_id=sim_manager_config['gpu_id'],
-        num_worlds=sim_manager_config['num_worlds'],
-        json_path=sim_manager_config['json_path'],
+        scenes=select_scenes(sim_manager_config['json_path'], sim_manager_config),
         params=params
     )
     return sim, config

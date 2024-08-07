@@ -70,8 +70,8 @@ class LinearMLP(nn.Module):
         with LSTM or 4 frames without.'''
         super().__init__()
 
-        self.action_space_type = env.action_space_type
-        self.num_features = env.num_obs_features
+        self.action_space_type = env.unwrapped.action_space_type
+        self.num_features = env.unwrapped.num_obs_features
         self.device = env.device
 
         # self.actor = self.build_network(env, hidden_size, output_size, is_actor=True)
