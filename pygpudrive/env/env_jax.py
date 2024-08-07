@@ -123,6 +123,13 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
             axis=2
         )
 
+    def get_expert_actions(self):
+        """Get expert actions."""
+        expert_actions = (
+            self.sim.expert_trajectory_tensor().to_jax().squeeze(axis=2)
+        )
+        return expert_actions[:, :, 6:9]
+
     def get_obs(self):
         """Get observation: Aggregate multi-modal environment information into
             a single flattened tensor. All information is in the shape of
