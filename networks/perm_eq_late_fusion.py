@@ -34,8 +34,8 @@ class LateFusionNet(nn.Module):
         self.ro_input_dim = self.config.PARTNER_DIM
         self.rg_input_dim = self.config.ROAD_MAP_DIM
 
-        self.ro_max = self.config.road_map_agent_feat_dim
-        self.rg_max = self.config.top_k_roadpoints
+        self.ro_max = self.config.ROADMAP_AGENT_FEAT_DIM
+        self.rg_max = self.config.TOP_K_ROADPOINTS
 
         # Network architectures
         self.arch_ego_state = self.net_config.ego_state_layers
@@ -256,60 +256,3 @@ class LateFusionPolicy(ActorCriticPolicy):
             self.exp_config,
             **self.mlp_config,
         )
-
-
-if __name__ == "__main__":
-    # Import adapted PPO version
-    from algorithms.sb3.ppo.ippo import IPPO
-    from baselines.ippo.config import ExperimentConfig
-
-    # Import the EnvConfig dataclass
-    from pygpudrive.env.config import EnvConfig
-
-    # Load configs
-    env_config = EnvConfig(
-        ego_state=True,
-        road_map_obs=True,
-        partner_obs=True,
-        norm_obs=True,
-        sample_method="pad_n",
-    )
-
-    exp_config = ExperimentConfig(
-        render=True,
-    )
-
-    # Make SB3-compatible environment
-    env = SB3MultiAgentEnv(
-        config=env_config,
-        num_worlds=3,
-        max_cont_agents=2,
-        data_dir="waymo_data",
-        device=exp_config.device,
-    )
-    obs = env.reset()
-    obs = torch.Tensor(obs)[:2]
-
-    model_config = None
-
-    # Test
-    run_id = None
-
-    model = IPPO(
-        env_config=env_config,
-        n_steps=exp_config.n_steps,
-        batch_size=exp_config.batch_size,
-        env=env,
-        seed=exp_config.seed,
-        verbose=exp_config.verbose,
-        device=exp_config.device,
-        tensorboard_log=f"runs/{run_id}"
-        if run_id is not None
-        else None,  # Sync with wandb
-        mlp_class=LateFusionNet,
-        mlp_config=model_config,
-        policy=LateFusionPolicy,
-    )
-
-    model.learn(5000)
-    env.close()

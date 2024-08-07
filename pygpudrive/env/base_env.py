@@ -2,6 +2,7 @@ import os
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
+from pygpudrive.env.scene_selector import select_scenes
 import abc
 
 import gpudrive
@@ -87,15 +88,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def _validate_data_dir(self):
-        """Validates that the data directory exists and is not empty.
-
-        Raises:
-            AssertionError: If the data directory does not exist or is empty.
-        """
-        if not os.path.exists(self.data_dir) or not os.listdir(self.data_dir):
-            assert False, "The data directory does not exist or is empty."
-
     def _setup_environment_parameters(self):
         """Sets up various parameters required for the environment simulation.
 
@@ -117,11 +109,30 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.disableClassicalObs = True
 
         params = self._set_collision_behavior(params)
-        params = self._init_dataset(params, self.data_dir)
         params = self._set_road_reduction_params(params)
+        
+        # Map entity types to integers  
+        self.ENTITY_TYPE_TO_INT = {
+            gpudrive.EntityType._None: 0,
+            gpudrive.EntityType.RoadEdge: 1,
+            gpudrive.EntityType.RoadLine: 2,
+            gpudrive.EntityType.RoadLane: 3,
+            gpudrive.EntityType.CrossWalk: 4,
+            gpudrive.EntityType.SpeedBump: 5,
+            gpudrive.EntityType.StopSign: 6,
+            gpudrive.EntityType.Vehicle: 7,
+            gpudrive.EntityType.Pedestrian: 8,
+            gpudrive.EntityType.Cyclist: 9,
+            gpudrive.EntityType.Padding: 10,
+        }
+        self.MIN_OBJ_ENTITY_ENUM = min(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.MAX_OBJ_ENTITY_ENUM = max(list(self.ENTITY_TYPE_TO_INT.values()))
+        self.ROAD_MAP_OBJECT_TYPES = 7 # (enums 0-6)
+        self.ROAD_OBJECT_TYPES = 4 # (enums 7-10)
+
         return params
 
-    def _initialize_simulator(self, params):
+    def _initialize_simulator(self, params, scene_config):
         """Initializes the simulation with the specified parameters.
 
         Args:
@@ -135,11 +146,13 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             if self.device == "cpu"
             else gpudrive.madrona.ExecMode.CUDA
         )
-        return gpudrive.SimManager(
+
+        dataset = select_scenes(scene_config)
+
+        sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
-            num_worlds=self.num_worlds,
-            json_path=self.data_dir,
+            scenes=dataset,
             params=params,
             enable_batch_renderer=self.render_config
             and self.render_config.render_mode
@@ -151,6 +164,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             if self.render_config
             else None,
         )
+
+        return sim
 
     def _setup_rendering(self):
         """Sets up the rendering mechanism based on the configuration.
@@ -176,29 +191,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         else:
             raise ValueError(f"Action space not supported: {action_type}")
 
-    def _init_dataset(self, params, data_dir):
-        """Initializes the dataset based on sampling method specified in the configuration.
-
-        Args:
-            params (object): Parameters object to update with dataset initialization options.
-            data_dir (str): Path to the directory containing the dataset.
-
-        Returns:
-            object: Updated parameters with dataset initialization options.
-        """
-        if self.config.sample_method == "first_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
-        elif self.config.sample_method == "random_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.RandomN
-        elif self.config.sample_method == "pad_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
-        elif self.config.sample_method == "exact_n":
-            params.datasetInitOptions = gpudrive.DatasetInitOptions.ExactN
-
-        self.data_dir = data_dir
-
-        return params
-
     def _set_collision_behavior(self, params):
         """Defines the behavior when a collision occurs.
 
@@ -222,7 +214,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def render(self, world_render_idx=0):
+    def render(self, world_render_idx=0, color_objects_by_actor=None):
         """Renders the environment.
 
         Args:
@@ -242,6 +234,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             return self.visualizer.getRender(
                 world_render_idx=world_render_idx,
                 cont_agent_mask=self.cont_agent_mask,
+                color_objects_by_actor=color_objects_by_actor,
             )
         elif self.render_config.render_mode in {
             RenderMode.MADRONA_RGB,

@@ -1,12 +1,20 @@
 import pygame
 import pygame.gfxdraw
 import numpy as np
-from pygame.sprite import Sprite
-import os
 import math
 import gpudrive
 
 from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
+
+# AGENT COLORS
+PINK = (255, 105, 180)
+GREEN = (124, 252, 0)
+BLUE = (0, 191, 255)
+DODGER_BLUE = (30, 144, 255)
+RED_ORANGE = (255, 69, 0)
+WHITE = (255, 255, 255)
+
+STATIC_AGENT_ID = 2
 
 
 class PyGameVisualizer:
@@ -14,18 +22,19 @@ class PyGameVisualizer:
     BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
-        (255, 69, 69),  # Red
-        (0, 255, 0),  # Green
-        (0, 0, 255),  # Blue
-        (255, 255, 0),  # Yellow
-        (255, 165, 0),  # Orange
+        PINK,
+        GREEN,
+        BLUE,
+        DODGER_BLUE,
+        RED_ORANGE,
     ]
+    # ROAD MAP COLORS
     color_dict = {
         float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
         float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
         float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.SpeedBump): (255, 127, 80),  # Orange
-        float(gpudrive.EntityType.CrossWalk): (30, 107, 255),  # Blue
+        float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
+        float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
         float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
         float(gpudrive.EntityType.Vehicle): (0, 255, 0),  # Green
         float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
@@ -70,9 +79,6 @@ class PyGameVisualizer:
 
             self.surf = pygame.Surface((self.WINDOW_W, self.WINDOW_H))
             self.compute_window_settings()
-            # if self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
-            #     self.init_map()
-            # self.init_map()
 
     @staticmethod
     def get_all_endpoints(map_info):
@@ -86,27 +92,54 @@ class PyGameVisualizer:
         starts = centers - offsets
         ends = centers + offsets
         return starts, ends
-    
-    def draw_line(self, surf, start, end, color, thickness=2):
+
+    def draw_line(self, surf, start, end, color, thickness=1, fill_shape=True):
         c1 = (start[0] + end[0]) / 2
         c2 = (start[1] + end[1]) / 2
         center_L1 = (c1, c2)
         length = math.sqrt((start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2)
         angle = math.atan2(start[1] - end[1], start[0] - end[0])
 
-        UL = (center_L1[0] + (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        UR = (center_L1[0] - (length/2.) * np.cos(angle) - (thickness/2.) * np.sin(angle),
-            center_L1[1] + (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
-        BL = (center_L1[0] + (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) + (length/2.) * np.sin(angle))
-        BR = (center_L1[0] - (length/2.) * np.cos(angle) + (thickness/2.) * np.sin(angle),
-            center_L1[1] - (thickness/2.) * np.cos(angle) - (length/2.) * np.sin(angle))
+        UL = (
+            center_L1[0]
+            + (length / 2.0) * np.cos(angle)
+            - (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            + (thickness / 2.0) * np.cos(angle)
+            + (length / 2.0) * np.sin(angle),
+        )
+        UR = (
+            center_L1[0]
+            - (length / 2.0) * np.cos(angle)
+            - (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            + (thickness / 2.0) * np.cos(angle)
+            - (length / 2.0) * np.sin(angle),
+        )
+        BL = (
+            center_L1[0]
+            + (length / 2.0) * np.cos(angle)
+            + (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            - (thickness / 2.0) * np.cos(angle)
+            + (length / 2.0) * np.sin(angle),
+        )
+        BR = (
+            center_L1[0]
+            - (length / 2.0) * np.cos(angle)
+            + (thickness / 2.0) * np.sin(angle),
+            center_L1[1]
+            - (thickness / 2.0) * np.cos(angle)
+            - (length / 2.0) * np.sin(angle),
+        )
 
-        pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
-        pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
-    
-    def draw_circle(self, surf, center, radius, color, thickness=2):
+        if fill_shape:
+            pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
+            pygame.gfxdraw.filled_polygon(surf, (UL, UR, BR, BL), color)
+        else:
+            pygame.gfxdraw.aapolygon(surf, (UL, UR, BR, BL), color)
+
+    def draw_circle(self, surf, center, radius, color, thickness=3):
         for i in range(thickness):
             try:
                 pygame.gfxdraw.aacircle(
@@ -114,7 +147,8 @@ class PyGameVisualizer:
                     int(center[0]),
                     int(center[1]),
                     int(radius) + i,
-                    color)
+                    color,
+                )
             except:
                 continue
 
@@ -235,6 +269,7 @@ class PyGameVisualizer:
         return start, end
 
     def draw_map(self, surf, map_info, world_render_idx=0):
+        """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
             if map_obj[-1] == float(gpudrive.EntityType.Padding):
@@ -254,7 +289,7 @@ class PyGameVisualizer:
                         start,
                         end,
                         self.color_dict[map_obj[-1]],
-                        thickness=2
+                        thickness=self.render_config.line_thickness,
                     )
 
                 # DRAW ROAD LINES/LANES
@@ -264,11 +299,12 @@ class PyGameVisualizer:
                         start,
                         end,
                         self.color_dict[map_obj[-1]],
-                        thickness=2
+                        thickness=self.render_config.line_thickness,
                     )
 
             # DRAW STOP SIGNS
             elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
+
                 center, width, height, rotation = (
                     map_obj[:2],
                     map_obj[3],
@@ -276,6 +312,7 @@ class PyGameVisualizer:
                     map_obj[5],
                 )
                 if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
 
@@ -286,19 +323,24 @@ class PyGameVisualizer:
                     box_corners[i] = self.scale_coords(
                         box_corner, world_render_idx
                     )
-                pygame.gfxdraw.aapolygon(
-                    surf, box_corners, self.color_dict[map_obj[-1]]
-                )
-                pygame.gfxdraw.filled_polygon(
-                    surf, box_corners, self.color_dict[map_obj[-1]]
-                )
+                if map_obj[-1] == float(gpudrive.EntityType.SpeedBump):
+                    pygame.gfxdraw.aapolygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
+                else:
+                    pygame.gfxdraw.aapolygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
+                    pygame.gfxdraw.filled_polygon(
+                        surf, box_corners, self.color_dict[map_obj[-1]]
+                    )
 
     def init_map(self):
         """Initialize the static map elements."""
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
             return
-        # self.map_surfs = [self.surf.copy() * self.num  # Create a copy of the main surface to hold the map
+
         self.map_surf.fill(self.BACKGROUND_COLOR)
         self.map_surfs = []
         for i in range(self.num_worlds):
@@ -309,14 +351,18 @@ class PyGameVisualizer:
             self.draw_map(map_surf, map_info, i)
             self.map_surfs.append(map_surf)
 
-    def getRender(self, world_render_idx=0, **kwargs):
+    def getRender(
+        self, world_render_idx=0, color_objects_by_actor=None, **kwargs
+    ):
         if self.render_config.render_mode in {
             RenderMode.PYGAME_ABSOLUTE,
             RenderMode.PYGAME_EGOCENTRIC,
             RenderMode.PYGAME_LIDAR,
         }:
             cont_agent_mask = kwargs.get("cont_agent_mask", None)
-            return self.draw(cont_agent_mask, world_render_idx)
+            return self.draw(
+                cont_agent_mask, world_render_idx, color_objects_by_actor
+            )
         elif self.render_config.render_mode == RenderMode.MADRONA_RGB:
             if self.render_config.view_option == MadronaOption.TOP_DOWN:
                 raise NotImplementedError
@@ -354,7 +400,9 @@ class PyGameVisualizer:
                 self.color_dict[lidar_entity_types[i]]
             )
 
-    def draw(self, cont_agent_mask, world_render_idx=0):
+    def draw(
+        self, cont_agent_mask, world_render_idx=0, color_objects_by_actor=None
+    ):
         """Render the environment."""
 
         if self.render_config.render_mode == RenderMode.PYGAME_EGOCENTRIC:
@@ -371,7 +419,7 @@ class PyGameVisualizer:
                     gpudrive.EntityType._None
                 ):
                     continue
-                
+
                 self.surf.fill(self.BACKGROUND_COLOR)
                 agent_map_info = (
                     self.sim.agent_roadmap_tensor()
@@ -427,15 +475,17 @@ class PyGameVisualizer:
                 )
 
                 pygame.gfxdraw.aapolygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
                 pygame.gfxdraw.filled_polygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
 
                 self.draw_circle(
                     temp_surf,
                     current_goal_scaled,
                     self.goal_radius * self.zoom_scales_x[world_render_idx],
-                    self.COLOR_LIST[0]
+                    self.COLOR_LIST[0],
                 )
 
                 for agent in partner_agent_info:
@@ -457,9 +507,13 @@ class PyGameVisualizer:
                     ]
 
                     pygame.gfxdraw.aapolygon(
-                        temp_surf, agent_corners, self.COLOR_LIST[1])
+                        temp_surf, agent_corners, self.COLOR_LIST[1]
+                    )
                     pygame.gfxdraw.filled_polygon(
-                        temp_surf, agent_corners, self.COLOR_LIST[1], )
+                        temp_surf,
+                        agent_corners,
+                        self.COLOR_LIST[1],
+                    )
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
@@ -471,7 +525,6 @@ class PyGameVisualizer:
             return render_rgbs
         elif self.render_config.render_mode == RenderMode.PYGAME_ABSOLUTE:
             self.surf.fill(self.BACKGROUND_COLOR)
-            # self.surf.blit(self.map_surfs[world_render_idx], (0, 0))
             map_info = (
                 self.sim.map_observation_tensor()
                 .to_torch()[world_render_idx]
@@ -493,7 +546,7 @@ class PyGameVisualizer:
             goal_pos = agent_info[:, 8:10]  # x, y
             agent_rot = agent_info[:, 7]  # heading
             agent_sizes = agent_info[:, 10:12]  # length, width
-            agent_response_types = (
+            agent_response_types = (  # 0: Valid (can be controlled), 2: Invalid (static vehicles)
                 self.sim.response_type_tensor()
                 .to_torch()[world_render_idx, :, :]
                 .cpu()
@@ -502,9 +555,28 @@ class PyGameVisualizer:
             )
 
             num_agents = self.num_agents[world_render_idx][0]
+            if color_objects_by_actor is not None:
+                categories = list(color_objects_by_actor.keys())
+
+            valid_agent_indices = list(
+                range((agent_response_types == 0).sum())
+            )
 
             # Draw the agent positions
             for agent_idx in range(num_agents):
+
+                if color_objects_by_actor is not None:
+                    for i in range(len(categories)):
+                        if agent_idx in color_objects_by_actor[categories[i]]:
+                            mod_idx = i
+                            break
+                    else:
+                        mod_idx = 3
+                else:
+                    mod_idx = agent_idx % len(self.COLOR_LIST)
+
+                color = self.COLOR_LIST[mod_idx]
+
                 info_tensor = self.sim.info_tensor().to_torch()[
                     world_render_idx
                 ]
@@ -531,29 +603,42 @@ class PyGameVisualizer:
                     goal_pos[agent_idx], world_render_idx
                 )
 
-                mod_idx = agent_idx % len(self.COLOR_LIST)
-
-                if cont_agent_mask[world_render_idx, agent_idx]:
-                    mod_idx = 0
-
-                color = self.COLOR_LIST[mod_idx]
-
-                if agent_response_types[agent_idx] == 2:
+                # Agent is static
+                if agent_response_types[agent_idx] == STATIC_AGENT_ID:
                     color = (128, 128, 128)
 
-                pygame.gfxdraw.aapolygon(
-                    self.surf, agent_corners, color
-                )
-                pygame.gfxdraw.filled_polygon(
-                    self.surf, agent_corners, color
-                )
-            
-                if agent_response_types[agent_idx] != 2:
+                pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
+                pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
+
+                # Draw object indices for the controllable agents
+                if (
+                    self.render_config.draw_obj_idx
+                    and agent_response_types[agent_idx] != STATIC_AGENT_ID
+                ):
+                    scaled_font_size = (
+                        self.render_config.obj_idx_font_size
+                        * int(self.zoom_scales_x[world_render_idx])
+                    )
+                    font = pygame.font.Font(None, scaled_font_size)
+                    text = font.render(
+                        str(valid_agent_indices.pop(0)), True, WHITE
+                    )
+                    text_rect = text.get_rect(
+                        center=(
+                            agent_corners[0][0]
+                            - 2 * int(self.zoom_scales_y[0]),
+                            agent_corners[0][1],
+                        )
+                    )
+                    self.surf.blit(text, text_rect)
+
+                if agent_response_types[agent_idx] != STATIC_AGENT_ID:
                     self.draw_circle(
                         self.surf,
                         current_goal_scaled,
-                        self.goal_radius * self.zoom_scales_x[world_render_idx],
-                        color
+                        self.goal_radius
+                        * self.zoom_scales_x[world_render_idx],
+                        color,
                     )
 
             if self.render_config.view_option == PygameOption.HUMAN:
@@ -621,17 +706,18 @@ class PyGameVisualizer:
                 )
 
                 pygame.gfxdraw.aapolygon(
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
-                pygame.gfxdraw.filled_polygon( 
-                    temp_surf, agent_corners, self.COLOR_LIST[0])
-                
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
+                pygame.gfxdraw.filled_polygon(
+                    temp_surf, agent_corners, self.COLOR_LIST[0]
+                )
+
                 self.draw_circle(
                     temp_surf,
                     current_goal_scaled,
                     self.goal_radius * self.zoom_scales_x[world_render_idx],
-                    self.COLOR_LIST[0]
+                    self.COLOR_LIST[0],
                 )
-
 
                 # blit temp surf on self.surf
                 self.surf.blit(temp_surf, (0, 0))
