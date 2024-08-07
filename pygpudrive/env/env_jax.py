@@ -4,7 +4,7 @@ from gymnasium.spaces import Box, Discrete
 import jax
 import jax.numpy as jnp
 
-from pygpudrive.env.config import EnvConfig, RenderConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 
@@ -14,33 +14,31 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
     def __init__(
         self,
         config,
-        num_worlds,
+        scene_config,
         max_cont_agents,
-        data_dir,
         device="cuda",
         action_type="discrete",
         render_config: RenderConfig = RenderConfig(),
     ):
         # Initialization of environment configurations
         self.config = config
-        self.num_worlds = num_worlds
+        self.num_worlds = scene_config.num_scenes
         self.max_cont_agents = max_cont_agents
-        self.data_dir = data_dir
         self.device = device
         self.render_config = render_config
-
-        # Ensure data directory is valid
-        self._validate_data_dir()
+        self.episode_len = 90
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
         # Initialize simulator with parameters
-        self.sim = self._initialize_simulator(params)
+        self.sim = self._initialize_simulator(params, scene_config)
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
+
+        # Total number of controlled agents across all worlds
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
@@ -81,11 +79,6 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
-
-        assert actions.shape == (
-            self.num_worlds,
-            self.max_agent_count,
-        ), """Action tensor must match the shape (num_worlds, max_agent_count)"""
 
         # Nan actions will be ignored, but we need to replace them with zeros
         actions = jnp.nan_to_num(actions, nan=0)
@@ -311,25 +304,28 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
+    # CONFIGURE
+    TOTAL_STEPS = 90
+    MAX_NUM_OBJECTS = 128
+    NUM_WORLDS = 50
+
     env_config = EnvConfig()
     render_config = RenderConfig()
+    scene_config = SceneConfig(path="data", num_scenes=NUM_WORLDS)
 
-    EPISODE_LEN = 90
-    MAX_NUM_OBJECTS = 128
-    NUM_WORLDS = 3
-
+    # MAKE ENV
     env = GPUDriveJaxEnv(
         config=env_config,
-        num_worlds=NUM_WORLDS,
+        scene_config=scene_config,
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-        data_dir="example_data",
         device="cuda",
         render_config=render_config,
     )
 
+    # RUN
     obs = env.reset()
 
-    for _ in range(EPISODE_LEN):
+    for _ in range(TOTAL_STEPS):
 
         rand_action = jax.random.randint(
             key=jax.random.PRNGKey(0),
@@ -338,11 +334,15 @@ if __name__ == "__main__":
             maxval=env.action_space.n,
         )
 
+        # Step the environment
         env.step_dynamics(rand_action)
 
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-        info = env.get_infos()
 
-        print(obs[env.cont_agent_mask].max())
+    # import imageio
+    # imageio.mimsave("world1.gif", frames_1)
+
+    # run.finish()
+    env.visualizer.destroy()

@@ -124,9 +124,7 @@ def evaluate_policy(
 
 if __name__ == "__main__":
 
-    env_config = EnvConfig(
-        sample_method="first_n",
-    )
+    env_config = EnvConfig()
 
     df_eval = evaluate_policy(
         eval_mode="expert-teleport",
