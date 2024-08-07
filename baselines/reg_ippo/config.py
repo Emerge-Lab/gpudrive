@@ -10,11 +10,11 @@ class ExperimentConfig:
     # REGULARIZATION PARAMETER
     reg_weight: float = 0.5
     path_to_human_reg_policy: str = (
-        "/home/emerge/gpudrive/baselines/il/models/human_policy.pt"
+        "/baselines/il/models/human_policy.pt"
     )
 
     # DATASET & DEVICE
-    data_dir: str = "example_data"
+    data_dir: str = "data"
     generate_valid_json: bool = False
     train_on_k_unique_scenes: int = 3  # If generate_valid_json = True, generates a json file with k unique scenarios
 

@@ -5,7 +5,7 @@ from imitation.data.types import Transitions
 from stable_baselines3.common import policies
 
 # GPUDrive
-from pygpudrive.env.config import EnvConfig, RenderConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 from algorithms.il.data_generation import generate_state_action_pairs
@@ -29,18 +29,18 @@ class CustomFeedForwardPolicy(policies.ActorCriticPolicy):
 
 def train_bc(
     env_config,
-    bc_config,
+    scene_config,
     render_config,
+    bc_config,
 ):
     rng = np.random.default_rng()
 
     # Make env
     env = GPUDriveTorchEnv(
         config=env_config,
-        data_dir=bc_config.data_dir,
+        scene_config=scene_config,
+        max_cont_agents=bc_config.max_cont_agents, 
         render_config=render_config,
-        num_worlds=bc_config.num_worlds,
-        max_cont_agents=bc_config.max_cont_agents,
         device=bc_config.device,
     )
 
@@ -98,14 +98,18 @@ def train_bc(
 
 
 if __name__ == "__main__":
+    
+    NUM_WORLDS = 10
 
     # Configurations
     env_config = EnvConfig(use_bicycle_model=True)
     render_config = RenderConfig()
+    scene_config = SceneConfig("data", NUM_WORLDS)
     bc_config = BehavCloningConfig()
 
     train_bc(
         env_config=env_config,
         render_config=render_config,
+        scene_config=scene_config,
         bc_config=bc_config,
     )

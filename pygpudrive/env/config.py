@@ -48,7 +48,6 @@ class EnvConfig:
     # Use bicycle model to infer expert actions
     use_bicycle_model: bool = False
 
-
     # Maximum number of controlled vehicles and feature dimensions for network
     MAX_CONTROLLED_VEHICLES: int = 128
     ROADMAP_AGENT_FEAT_DIM: int = MAX_CONTROLLED_VEHICLES - 1
@@ -78,8 +77,15 @@ class EnvConfig:
     PARTNER_DIM = 10 if partner_obs else 0
     ROAD_MAP_DIM = 13 if road_map_obs else 0
     
-    # Agent tensor shape set in consts.hpp (kMaxAgentCount)
+    # Use bicycle model to infer expert actions
+    use_bicycle_model: bool = False
+    
+    # Constant: Agent tensor shape set in consts.hpp (kMaxAgentCount)
     k_max_agent_count: int = 128
+    # Constant: episode length set in consts.hpp (episodeLen)
+    # This constant cannot be changed as it depends on the length of the 
+    # collected human driving trajectories
+    episode_length: int = 91
     
 class SelectionDiscipline(Enum):
     FIRST_N = 0

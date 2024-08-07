@@ -4,7 +4,7 @@
 ### Overview
 
 <p align="center">
-  <img src="/home/emerge/gpudrive/data/imitation_learning.png" width="650" title="Getting started">
+  <img src="assets/imitation_learning.png" width="650" title="Getting started">
 </p>
 
 ### Extra information

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 class BehavCloningConfig:
 
     # Dataset & device
-    data_dir: str = "example_data"
+    data_dir: str = "data"
     device: str = "cuda"
 
     # Number of scenarios / worlds
@@ -32,5 +32,5 @@ class BehavCloningConfig:
 
     # Save policy
     save_model: bool = True
-    model_path: str = "baselines/il/models"
-    model_name: str = "human_policy"
+    model_path: str = "models/"
+    model_name: str = "bc_policy"

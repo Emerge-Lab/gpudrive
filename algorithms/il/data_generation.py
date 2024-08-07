@@ -4,7 +4,7 @@ import numpy as np
 import imageio
 import logging
 
-from pygpudrive.env.config import EnvConfig, RenderConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 logging.getLogger(__name__)
@@ -162,18 +162,21 @@ def generate_state_action_pairs(
 
 
 if __name__ == "__main__":
+    
+    NUM_WORLDS = 10
+    MAX_NUM_OBJECTS = 128
 
     # Set the environment and render configurations
     env_config = EnvConfig(use_bicycle_model=True)
-    render_config = RenderConfig()
-
+    render_config = RenderConfig(draw_obj_idx=True)
+    scene_config = SceneConfig("data", NUM_WORLDS)
+    
     env = GPUDriveTorchEnv(
         config=env_config,
-        render_config=render_config,
-        num_worlds=3,
-        max_cont_agents=128,
-        data_dir="example_data",
+        scene_config=scene_config,
+        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cuda",
+        render_config=render_config,
     )
 
     # Generate expert actions and observations
@@ -188,10 +191,10 @@ if __name__ == "__main__":
         discretize_actions=True,  # Discretize the expert actions
         use_action_indices=True,  # Map action values to joint action index
         make_video=True,  # Record the trajectories as sanity check
-        render_index=1,
+        render_index=0,
         save_path="use_discr_actions_fix.mp4",
     )
 
-    # Save the expert actions and observations
+    # Uncommment to save the expert actions and observations 
     # torch.save(expert_actions, "expert_actions.pt")
     # torch.save(expert_obs, "expert_obs.pt")
