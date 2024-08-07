@@ -1,10 +1,10 @@
 train:
   seed: 1
   torch_deterministic: False
-  device: cuda
+  device: cpu
   cpu_offload: False
   total_timesteps: 100_000_000
-  learning_rate: 2.5e-1
+  learning_rate: 2.5e-3
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
@@ -15,14 +15,14 @@ train:
   ent_coef: 0.01
   vf_coef: 1.0
   max_grad_norm: 0.5
-  target_kl: 0.1
+  target_kl: ~
 
   verbose: True
   data_dir: experiments
   checkpoint_interval: 100_000_000
   pool_kernel: [0]
-  batch_size: 92
-  minibatch_size: 92
+  batch_size: 1024
+  minibatch_size: 256
   bptt_horizon: 1 #8
   vf_clip_coef: 1.0
   compile: False
@@ -52,8 +52,8 @@ parameters:
   isStaticAgentControlled: False
 
 sim_manager:
-  exec_mode: CUDA
+  exec_mode: CPU
   gpu_id: 0
   num_worlds: 1
-  json_path: /home/aarav/gpudrive/example_data
+  json_path: example_data
   enable_batch_renderer: False

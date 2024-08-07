@@ -440,7 +440,7 @@ class Experience:
 
         self.obs[ptr:end] = obs[:num_elements]
         self.values[ptr:end] = value[:num_elements]
-        self.actions[ptr:end] = action[:num_elements]
+        self.actions[ptr:end] = action[:num_elements, None]
         self.logprobs[ptr:end] = logprob[:num_elements]
         self.rewards[ptr:end] = reward[:num_elements].squeeze()
         self.dones[ptr:end] = done[:num_elements].squeeze()
@@ -500,9 +500,9 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            self.gpu_util.append(torch.cuda.utilization())
+            self.gpu_util.append(0)
             free, total = torch.cuda.mem_get_info()
-            self.gpu_mem.append(free / total)
+            self.gpu_mem.append(0)
             time.sleep(self.delay)
 
     def stop(self):

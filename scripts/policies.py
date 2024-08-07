@@ -74,13 +74,31 @@ class LinearMLP(nn.Module):
         self.num_features = env.num_obs_features
         self.device = env.device
 
-        self.actor = self.build_network(env, hidden_size, output_size, is_actor=True)
-        self.critic = self.build_network(env, hidden_size, 1, is_actor=False)
+        # self.actor = self.build_network(env, hidden_size, output_size, is_actor=True)
+        self.actor = nn.Sequential(
+            nn.LayerNorm(self.num_features),
+            layer_init(nn.Linear(np.array(self.num_features).prod(), 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, env.discrete_action_space.n), std=0.01),
+            # nn.Softmax(dim=-1)
+        )
+        # self.critic = self.build_network(env, hidden_size, 1, is_actor=False)
+        self.critic = nn.Sequential(
+            nn.LayerNorm(self.num_features),
+            layer_init(nn.Linear(self.num_features, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 1), std=1.0),
+        )
 
         if self.action_space_type == "continuous":
             self.mean = layer_init(nn.Linear(output_size, env.single_action_space.shape[-1]), std=0.01)
             self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[-1]))
 
+                
     def build_network(self, env, hidden_size, output_size, is_actor):
         layers = [
             nn.LayerNorm(self.num_features),
@@ -96,7 +114,7 @@ class LinearMLP(nn.Module):
         if is_actor:
             if self.action_space_type == "discrete":
                 layers.append(layer_init(nn.Linear(output_size, env.discrete_action_space.n), std=0.01))
-                layers.append(nn.Softmax(dim=-1))
+                # layers.append(nn.Softmax(dim=-1))
         return nn.Sequential(*layers)
     
     def get_actor_logits(self, x) -> Union[torch.Tensor, List[torch.Tensor]]:

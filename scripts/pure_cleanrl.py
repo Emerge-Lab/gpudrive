@@ -51,7 +51,7 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 4
+    num_minibatches: int = 1
     """the number of mini-batches"""
     update_epochs: int = 4
     """the K epochs to update the policy"""
@@ -188,14 +188,14 @@ if __name__ == "__main__":
 
     agent = Agent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
-
+    
     # ALGO Logic: Storage setup
-    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
-    actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
-    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    obs = torch.zeros((args.batch_size,) + envs.single_observation_space.shape).to(device)
+    actions = torch.zeros((args.batch_size, 1)).to(device)
+    logprobs = torch.zeros((args.batch_size,)).to(device)
+    rewards = torch.zeros((args.batch_size,)).to(device)
+    dones = torch.zeros((args.batch_size,)).to(device)
+    values = torch.zeros((args.batch_size,)).to(device)
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
@@ -227,12 +227,15 @@ if __name__ == "__main__":
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos, env_ids, mask = envs.step(action)
+            if(not mask.any()):
+                next_obs, reward, terminations, truncations, infos, env_ids, mask = envs.reset(seed=args.seed)
             indices = get_indices_from_mask(mask)
             next_done = terminations[indices]
             reward = reward[indices]
             next_obs = next_obs[indices]
 
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
+
+            rewards[step] = reward
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
             if "final_info" in infos:
@@ -262,7 +265,7 @@ if __name__ == "__main__":
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
         b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
+        b_actions = actions.reshape(-1)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)

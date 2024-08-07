@@ -176,7 +176,7 @@ class GPUDriveEnv(gym.Env):
         acs[self.prev_mask] = actions
         acs = acs.view(self.num_envs, self.num_agents, *acs.shape[1:])
         self.send(acs)
-        return self.recv()
+        return
         # action = torch.tensor(action)
         # self.sim.step()
         # obs, _ = self.setup_obs()
@@ -241,6 +241,7 @@ class GPUDriveEnv(gym.Env):
 
 
 def apply_discrete_action(actions, action_key_to_values):
+    actions = torch.as_tensor(actions)
     device = actions.device
     if(isinstance(actions, np.ndarray)):
         actions = torch.from_numpy(actions)
