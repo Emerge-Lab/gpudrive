@@ -141,9 +141,9 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         self._env.step_dynamics(self.actions_tensor)
 
-        reward = self._env.get_rewards()
-        done = self._env.get_dones()
-        info = self._env.get_infos()
+        reward = self._env.get_rewards().clone()
+        done = self._env.get_dones().clone()
+        info = self._env.get_infos().clone()
 
         # CHECK IF A WORLD IS DONE -> RESET
         done_worlds = torch.where(
@@ -153,10 +153,8 @@ class SB3MultiAgentEnv(VecEnv):
 
         if done_worlds.any().item():
             self._update_info_dict(info, done_worlds)
-            for world_idx in done_worlds:
-                self.num_episodes += 1
-                self.reset(world_idx=world_idx)
-                # print(f"world {world_idx} is reset")
+            self.num_episodes += len(done_worlds)
+            self._env.sim.reset(done_worlds.tolist())            
 
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
@@ -257,7 +255,7 @@ class SB3MultiAgentEnv(VecEnv):
         # log the agents that are done but did not receive any reward i.e. truncated
         # TODO(ev) remove hardcoded 91
         self.info_dict["truncated"] = (
-            ((self.agent_step[indices] == 91) * ~self.dead_agent_mask[indices])
+            ((self.agent_step[indices] == 90) * ~self.dead_agent_mask[indices])
             .sum()
             .item()
         )

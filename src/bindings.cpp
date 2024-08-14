@@ -92,8 +92,7 @@ namespace gpudrive
                 nb::arg("batch_render_view_width") = 64,
                 nb::arg("batch_render_view_height") = 64)
             .def("step", &Manager::step)
-            .def("reset", &Manager::triggerReset)
-            .def("reset_tensor", &Manager::resetTensor)
+            .def("reset", &Manager::reset)
             .def("action_tensor", &Manager::actionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)

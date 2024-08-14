@@ -116,7 +116,8 @@ struct Manager::Impl {
 
     inline virtual ~Impl() {}
 
-    virtual void run() = 0;
+    virtual void step() = 0;
+    virtual void reset() = 0;
 
     virtual Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -150,10 +151,9 @@ struct Manager::CPUImpl final : Manager::Impl {
         delete episodeMgr;
     }
 
-    inline virtual void run()
-    {
-        cpuExec.runTaskGraph(TaskGraphID::Step);
-    }
+    inline virtual void step() { cpuExec.runTaskGraph(TaskGraphID::Step); }
+
+    inline virtual void reset() { cpuExec.runTaskGraph(TaskGraphID::Reset); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -168,6 +168,7 @@ struct Manager::CPUImpl final : Manager::Impl {
 struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
     MWCudaLaunchGraph stepGraph;
+    MWCudaLaunchGraph resetGraph;
 
     inline CUDAImpl(const Manager::Config &mgr_cfg,
                    PhysicsLoader &&phys_loader,
@@ -176,24 +177,23 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    Action *action_buffer,
                    MWCudaExecutor &&gpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
-		   Optional<render::RenderManager> &&render_mgr,
+                  Optional<render::RenderManager> &&render_mgr,
                    int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
                ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr), numWorlds),
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
           gpuExec(std::move(gpu_exec)),
-          stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step))
-    {}
+          stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
+          resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
 
     inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
     }
 
-    inline virtual void run()
-    {
-        gpuExec.run(stepGraph);
-    }
+    inline virtual void step() { gpuExec.run(stepGraph); }
+
+    inline virtual void reset() { gpuExec.run(resetGraph); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -564,30 +564,13 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
     }
 }
 
-Manager::Manager(const Config &cfg)
-    : impl_(Impl::init(cfg))
-{
-    // Currently, there is no way to populate the initial set of observations
-    // without stepping the simulations in order to execute the taskgraph.
-    // Therefore, after setup, we step all the simulations with a forced reset
-    // that ensures the first real step will have valid observations at the
-    // start of a fresh episode in order to compute actions.
-    //
-    // This will be improved in the future with support for multiple task
-    // graphs, allowing a small task graph to be executed after initialization.
-    
-    for (int32_t i = 0; i < cfg.scenes.size(); i++) {
-        triggerReset(i);
-    }
-
-    step();
-}
+Manager::Manager(const Config &cfg) : impl_(Impl::init(cfg)) { reset({}); }
 
 Manager::~Manager() {}
 
 void Manager::step()
 {
-    impl_->run();
+    impl_->step();
 
     if (impl_->renderMgr.has_value()) {
         impl_->renderMgr->readECS();
@@ -598,14 +581,20 @@ void Manager::step()
     }
 }
 
-Tensor Manager::resetTensor() const
-{
-    return impl_->exportTensor(ExportID::Reset,
-                               TensorElementType::Int32,
-                               {
-                                   impl_->numWorlds,
-                                   1,
-                               });
+void Manager::reset(std::vector<int32_t> worldsToReset) {
+    for (const auto &worldIdx : worldsToReset) {
+        triggerReset(worldIdx);
+    }
+
+    impl_->reset();
+
+    if (impl_->renderMgr.has_value()) {
+        impl_->renderMgr->readECS();
+    }
+
+    if (impl_->cfg.enableBatchRenderer) {
+        impl_->renderMgr->batchRender();
+    }
 }
 
 Tensor Manager::actionTensor() const

@@ -47,10 +47,10 @@ public:
     MGR_EXPORT ~Manager();
 
     MGR_EXPORT void step();
+    MGR_EXPORT void reset(std::vector<int32_t> worldsToReset);
 
     // These functions export Tensor objects that link the ECS
     // simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
-    MGR_EXPORT madrona::py::Tensor resetTensor() const;
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
