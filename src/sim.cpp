@@ -116,7 +116,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     reset.reset = 0;
-  
+
     cleanupWorld(ctx);
     initWorld(ctx);
 }
@@ -446,7 +446,7 @@ inline void bonusRewardSystem(Engine &ctx,
     }
 }
 
-inline void stepTrackerSystem(Engine &ctx, StepsRemaining& stepsRemaining) {
+inline void stepTrackerSystem(Engine &ctx, StepsRemaining &stepsRemaining) {
     --stepsRemaining.t;
 }
 
@@ -454,11 +454,11 @@ inline void stepTrackerSystem(Engine &ctx, StepsRemaining& stepsRemaining) {
 // notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
 inline void doneSystem(Engine &ctx,
-		       const Position &position,
-		       const Goal &goal,
-		       const StepsRemaining &steps_remaining,
-		       Done &done,
-		       Info &info)
+                      const Position &position,
+                      const Goal &goal,
+                      const StepsRemaining &steps_remaining,
+                      Done &done,
+                      Info &info)
 {
     int32_t num_remaining = steps_remaining.t;
     if (num_remaining == consts::episodeLen - 1 && done.v != 1)
@@ -644,16 +644,15 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.vehicle_size = vehicleSize;
 }
 
-void setupRestOfTasks(TaskGraphBuilder &builder,
-		      const Sim::Config &cfg,
-		      Span<const TaskGraphNodeID> dependencies, 
-		      bool decrementStep) {
+void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
+                      Span<const TaskGraphNodeID> dependencies,
+                      bool decrementStep) {
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
-    auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, dependencies);
+    auto broadphase_setup_sys =
+        phys::PhysicsSystem::setupBroadphaseTasks(builder, dependencies);
 
     auto findOverlappingEntities =
         phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
@@ -681,12 +680,16 @@ void setupRestOfTasks(TaskGraphBuilder &builder,
 
     auto previousSystem = reward_sys;
     if (decrementStep) {
-      previousSystem = builder.addToGraph<ParallelForNode<Engine, stepTrackerSystem, StepsRemaining>>({reward_sys});
+        previousSystem = builder.addToGraph<
+            ParallelForNode<Engine, stepTrackerSystem, StepsRemaining>>(
+            {reward_sys});
     }
 
     // Check if the episode is over
-    auto done_sys = builder.addToGraph<
-      ParallelForNode<Engine, doneSystem, Position, Goal, StepsRemaining, Done, Info>>({previousSystem});
+    auto done_sys =
+        builder.addToGraph<ParallelForNode<Engine, doneSystem, Position, Goal,
+                                           StepsRemaining, Done, Info>>(
+            {previousSystem});
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({done_sys});
     (void)clear_tmp;
@@ -710,7 +713,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder,
             Progress,
             OtherAgents,
             SelfObservation,
-	        PartnerObservations,
+            PartnerObservations,
             AgentMapObservations,
             EntityType,
             CollisionDetectionEvent
@@ -780,13 +783,15 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
             CollisionDetectionEvent,
             ResponseType,
             Done
-        >>({});
+        >>({});  
 
     setupRestOfTasks(builder, cfg, {moveSystem}, true);
 }
 
 static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
-    auto reset = builder.addToGraph<ParallelForNode<Engine, resetSystem,  WorldReset>>({});
+    auto reset =
+        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset>>(
+            {});
 
     setupRestOfTasks(builder, cfg, {reset}, false);
 }

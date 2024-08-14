@@ -151,14 +151,9 @@ struct Manager::CPUImpl final : Manager::Impl {
         delete episodeMgr;
     }
 
-    inline virtual void step()
-    {
-        cpuExec.runTaskGraph(TaskGraphID::Step);
-    }
+    inline virtual void step() { cpuExec.runTaskGraph(TaskGraphID::Step); }
 
-    inline virtual void reset() {
-        cpuExec.runTaskGraph(TaskGraphID::Reset);
-    }
+    inline virtual void reset() { cpuExec.runTaskGraph(TaskGraphID::Reset); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -182,28 +177,23 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    Action *action_buffer,
                    MWCudaExecutor &&gpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
-		   Optional<render::RenderManager> &&render_mgr,
+                  Optional<render::RenderManager> &&render_mgr,
                    int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
                ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr), numWorlds),
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
           gpuExec(std::move(gpu_exec)),
           stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
-	  resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
+          resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
 
     inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
     }
 
-    inline virtual void step()
-    {
-        gpuExec.run(stepGraph);
-    }
+    inline virtual void step() { gpuExec.run(stepGraph); }
 
-    inline virtual void reset() {
-        gpuExec.run(resetGraph);
-    }
+    inline virtual void reset() { gpuExec.run(resetGraph); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -574,9 +564,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
     }
 }
 
-Manager::Manager(const Config &cfg) : impl_(Impl::init(cfg)) {
-    reset({});
-}
+Manager::Manager(const Config &cfg) : impl_(Impl::init(cfg)) { reset({}); }
 
 Manager::~Manager() {}
 
@@ -594,10 +582,10 @@ void Manager::step()
 }
 
 void Manager::reset(std::vector<int32_t> worldsToReset) {
-    for (const auto& worldIdx : worldsToReset) {
+    for (const auto &worldIdx : worldsToReset) {
         triggerReset(worldIdx);
     }
-    
+
     impl_->reset();
 
     if (impl_->renderMgr.has_value()) {
