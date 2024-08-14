@@ -44,6 +44,7 @@ struct VehicleSize {
 struct Goal{
     madrona::math::Vector2 position;
 };
+
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -52,7 +53,6 @@ struct WorldReset {
     int32_t reset;
 };
 
-// TODO(samk): need to wrap elements in std::optional to match Nocturne?
 struct Action {
     float acceleration;
     float steering;
