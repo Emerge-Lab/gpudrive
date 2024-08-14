@@ -16,12 +16,13 @@ from rich.console import Console
 
 import cleanrl
 from gpudrive_gym_cleanrl import GPUDriveEnv, make_gpudrive
-from policies import LinearMLP
+from policies import LinearMLP, MultiHeadLinear
 
 def make_policy(env):
-    return LinearMLP(env)
+    # return LinearMLP(env)
+    return MultiHeadLinear(env)
 
-def init_wandb(args, name, id=None, resume=True):
+def init_wandb(config, name, id=None, resume=True):
     #os.environ["WANDB_SILENT"] = "true"
     import wandb
     wandb.init(
@@ -30,10 +31,7 @@ def init_wandb(args, name, id=None, resume=True):
         entity=args.wandb_entity,
         group=args.wandb_group,
         config={
-            'cleanrl': dict(args.train),
-            'env': dict(args.env),
-            'policy': dict(args.policy),
-            #'recurrent': args.recurrent,
+            'config': dict(config),
         },
         name=name,
         monitor_gym=True,
@@ -63,16 +61,22 @@ def sweep(args, wandb_name, env_module, make_env):
 
     wandb.agent(sweep_id, main, count=100)
     
+def check_for_nan(grad):
+    if torch.isnan(grad).any():
+        print("NaN detected in gradient")
 
 def train(args):
     args.wandb = None
     if args.track:
-        args.wandb = init_wandb(args, args.exp_id, id=args.exp_id)
+        args.wandb = init_wandb(config, args.exp_id, id=args.exp_id)
 
 
     env = make_gpudrive(config)
     policy = make_policy(env)
+    args.wandb.watch(policy)
     print(policy)
+    for name, param in policy.named_parameters():
+        param.register_hook(check_for_nan)
     policy = policy.to(config.train.device)
 
     data = cleanrl.create(config.train, env, policy, wandb=args.wandb)
@@ -104,10 +108,10 @@ if __name__ == '__main__':
     parser.add_argument('--eval-model-path', type=str, default=None, help='Path to model to evaluate')
     parser.add_argument('--no-render', action='store_true', help='Disable render during evaluate')
     parser.add_argument('--exp-id', '--exp-name', type=str, default=None, help="Resume from experiment")
-    parser.add_argument('--wandb-entity', type=str, default='jsuarez', help='WandB entity')
-    parser.add_argument('--wandb-project', type=str, default='pufferlib', help='WandB project')
+    parser.add_argument('--wandb-entity', type=str, default='pandya-aarav-97', help='WandB entity')
+    parser.add_argument('--wandb-project', type=str, default='GPUDriveCleanRL', help='WandB project')
     parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
-    parser.add_argument('--track', action='store_true', help='Track on WandB')
+    parser.add_argument('--track', action='store_true', default=True, help='Track on WandB')
 
     args = parser.parse_args()
     config = Box(yaml.safe_load(open('config.yaml', 'r')))

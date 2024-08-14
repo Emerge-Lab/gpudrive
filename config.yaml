@@ -1,17 +1,17 @@
 train:
   seed: 1
   torch_deterministic: False
-  device: cpu
-  cpu_offload: False
+  device: cuda
+  cpu_offload: True
   total_timesteps: 100_000_000
   learning_rate: 2.5e-3
   anneal_lr: True
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 5
+  update_epochs: 3
   norm_adv: True
   clip_coef: 0.1
-  clip_vloss: true
+  clip_vloss: False
   ent_coef: 0.01
   vf_coef: 1.0
   max_grad_norm: 0.5
@@ -20,16 +20,19 @@ train:
   verbose: True
   data_dir: experiments
   checkpoint_interval: 100_000_000
+  eval_interval: 100
   pool_kernel: [0]
-  batch_size: 1024
-  minibatch_size: 256
+  batch_size: 65536
+  minibatch_size: 16384
   bptt_horizon: 1 #8
   vf_clip_coef: 1.0
   compile: False
   compile_mode: reduce-overhead
 
 env_params:
-  action_space_type: discrete
+  action_space_type: continuous
+  render: True
+  render_mode: pygame_absolute
 
 reward_params:
   rewardType: OnGoalAchieved  
@@ -39,10 +42,9 @@ reward_params:
 parameters:
   polylineReductionThreshold: 1.0
   observationRadius: 150.0
-  datasetInitOptions: FirstN
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 1
+  maxNumControlledVehicles: 128
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -52,8 +54,8 @@ parameters:
   isStaticAgentControlled: False
 
 sim_manager:
-  exec_mode: CPU
+  exec_mode: CUDA
   gpu_id: 0
-  num_worlds: 1
+  num_worlds: 64
   json_path: data
   enable_batch_renderer: False

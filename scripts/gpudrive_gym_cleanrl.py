@@ -7,6 +7,9 @@ import torch.nn as nn
 import numpy as np
 from gymnasium.experimental.wrappers import LambdaActionV0
 
+from pygpudrive.env.viz import PyGameVisualizer
+from pygpudrive.env.config import RenderMode, RenderConfig
+
 from sim_utils.creator import SimCreator
 from itertools import product
 
@@ -23,6 +26,9 @@ class GPUDriveEnv(gym.Env):
             self.config = Box(self.config)
             print(self.config)
         
+        self.render_config = RenderConfig()
+        self.viz = PyGameVisualizer(self.sim, self.render_config, self.config.reward_params.distanceToGoalThreshold)
+
         self.device = str.lower(self.config.sim_manager.exec_mode)
         
         self.setup_obs()
@@ -130,6 +136,10 @@ class GPUDriveEnv(gym.Env):
            
             map_obs_tensor = self.agent_map_obs_tensor.view(N, A, -1)
             self.partner_obs_tensor = self.partner_obs_tensor.view(N, A, -1)
+
+            self.self_obs_shape = np.prod(self.self_obs_tensor.shape[2:])
+            self.partner_obs_shape = np.prod(self.partner_obs_tensor.shape[2:])
+            self.map_obs_shape = np.prod(map_obs_tensor.shape[2:])
 
             self.obs_tensors = [
                 self.self_obs_tensor.view(self.batch_size, *self.self_obs_tensor.shape[2:]),
@@ -243,6 +253,8 @@ class GPUDriveEnv(gym.Env):
         del self.sim
         return super().close()
 
+    def render(self):
+        return self.viz.getRender()
 
 def apply_discrete_action(actions, action_key_to_values):
     actions = torch.as_tensor(actions)

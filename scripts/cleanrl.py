@@ -22,9 +22,9 @@ import pufferlib.pytorch
 torch.set_float32_matmul_precision('high')
 
 # Fast Cython GAE implementation
-# import pyximport
-# pyximport.install(setup_args={"include_dirs": np.get_include()})
-# from c_gae import compute_gae
+import pyximport
+pyximport.install(setup_args={"include_dirs": np.get_include()})
+from c_gae import compute_gae
 
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
@@ -38,7 +38,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     vecenv.unwrapped.async_reset(config.seed)
     obs_shape = vecenv.unwrapped.single_observation_space.shape
-    obs_dtype = vecenv.unwrapped.single_observation_space.dtype
+    obs_dtype = torch.float32
     atn_shape = [1] if vecenv.unwrapped.action_space_type == 'discrete' else vecenv.unwrapped.action_space.shape[-1:]
     atn_dtype = torch.int64 if vecenv.unwrapped.action_space.dtype == np.int64 else torch.float32
     total_agents = vecenv.unwrapped.num_agents
@@ -68,6 +68,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         global_step=0,
         epoch=0,
         stats={},
+        frames=None,
         msg=msg,
         last_log_time=0,
         utilization=utilization,
@@ -111,6 +112,7 @@ def evaluate(data):
         with profile.eval_misc:
             value = value.flatten()
             # mask = torch.as_tensor(mask)# * policy.mask)
+            o = o.cpu() if config.cpu_offload else o
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
             for i in info:
@@ -133,40 +135,45 @@ def evaluate(data):
             except:
                 continue
         data.stats["done"] = np.sum(experience.dones.cpu().numpy())
-
-        eval_rollout(data.vecenv, data.policy, data.stats)
-
+        
+        if(data.epoch % data.config.eval_interval == 0):
+            eval_rollout(data.vecenv, data.policy, data)
     return data.stats, infos
 
-def compute_gae(dones, values, rewards, gamma, gae_lambda):
-   '''Fast Cython implementation of Generalized Advantage Estimation (GAE)'''
-   num_steps = int(len(rewards))
-   advantages = torch.zeros((num_steps), device=rewards.device, dtype=torch.float32)
+# def compute_gae(dones, values, rewards, gamma, gae_lambda):
+#    '''Fast Cython implementation of Generalized Advantage Estimation (GAE)'''
+#    num_steps = int(len(rewards))
+#    advantages = torch.zeros((num_steps), device=rewards.device, dtype=torch.float32)
 
-   lastgaelam = 0
-   for t in range(num_steps-1):
-       t_cur = num_steps - 2 - t
-       t_next = num_steps - 1 - t
-       nextnonterminal = 1.0 - dones[t_next]
-       delta = rewards[t_next] + gamma * dones[t_next] * nextnonterminal - values[t_cur]
-       lastgaelam = delta + gamma * gae_lambda * nextnonterminal * lastgaelam
-       advantages[t_cur] = lastgaelam
+#    lastgaelam = 0
+#    for t in range(num_steps-1):
+#        t_cur = num_steps - 2 - t
+#        t_next = num_steps - 1 - t
+#        nextnonterminal = 1.0 - dones[t_next]
+#        delta = rewards[t_next] + gamma * dones[t_next] * nextnonterminal - values[t_cur]
+#        lastgaelam = delta + gamma * gae_lambda * nextnonterminal * lastgaelam
+#        advantages[t_cur] = lastgaelam
 
-   return advantages
+#    return advantages
 
-def eval_rollout(env, policy, stats):
+def eval_rollout(env, policy, data):
     policy = policy.eval()
     o, r, d, t, info, env_id, mask = env.unwrapped.async_reset()
     orig_mask = torch.clone(mask).detach()
-    while not d.all():
+    frames = []
+    while not d.all() or not mask.any():
         action, _, _, _ = policy(o)
-        env.unwrapped.step(action)
+        env.step(action)
+        frames.append(env.unwrapped.render())
         o, r, d, t, info, env_id, mask = env.unwrapped.recv()
     
+    frames = np.array(frames)
+
     goal_reach = torch.sum(env.unwrapped.info[orig_mask, 3])
     goal_reach_pct = goal_reach / torch.sum(orig_mask)
 
-    stats['eval_goal_reach'] = goal_reach_pct
+    data.stats['eval_goal_reach'] = goal_reach_pct.cpu().numpy()
+    data.frames = frames
 
     policy = policy.train()
 
@@ -178,14 +185,16 @@ def train(data):
 
     with profile.train_misc:
         idxs = experience.sort_training_data()
-        # dones_np = experience.dones_np[idxs]
-        # values_np = experience.values_np[idxs]
-        # rewards_np = experience.rewards_np[idxs]
+        dones_np = experience.dones_np[idxs]
+        values_np = experience.values_np[idxs]
+        rewards_np = experience.rewards_np[idxs]
         # TODO: bootstrap between segment bounds
-        advantages_np = compute_gae(experience.dones[idxs], experience.values[idxs], experience.rewards[idxs], config.gamma, config.gae_lambda)
+        advantages_np = compute_gae(dones_np, values_np,
+            rewards_np, config.gamma, config.gae_lambda)
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
+    total_minibatches = experience.num_minibatches * config.update_epochs
     mean_pg_loss, mean_v_loss, mean_entropy_loss = 0, 0, 0
     mean_old_kl, mean_kl, mean_clipfrac = 0, 0, 0
     for epoch in range(config.update_epochs):
@@ -262,12 +271,12 @@ def train(data):
                     torch.cuda.synchronize()
 
             with profile.train_misc:
-                losses.policy_loss += pg_loss.item() / experience.num_minibatches
-                losses.value_loss += v_loss.item() / experience.num_minibatches
-                losses.entropy += entropy_loss.item() / experience.num_minibatches
-                losses.old_approx_kl += old_approx_kl.item() / experience.num_minibatches
-                losses.approx_kl += approx_kl.item() / experience.num_minibatches
-                losses.clipfrac += clipfrac.item() / experience.num_minibatches
+                losses.policy_loss += pg_loss.item() / total_minibatches
+                losses.value_loss += v_loss.item() / total_minibatches
+                losses.entropy += entropy_loss.item() / total_minibatches
+                losses.old_approx_kl += old_approx_kl.item() / total_minibatches
+                losses.approx_kl += approx_kl.item() / total_minibatches
+                losses.clipfrac += clipfrac.item() / total_minibatches
 
         if config.target_kl is not None:
             if approx_kl > config.target_kl:
@@ -279,44 +288,70 @@ def train(data):
             lrnow = frac * config.learning_rate
             data.optimizer.param_groups[0]["lr"] = lrnow
 
-        y_pred = experience.values
+        y_pred = experience.values_np
         y_true = experience.returns_np
-        var_y = torch.var(y_true)
-        explained_var = torch.nan if var_y == 0 else 1 - torch.var(y_true - y_pred) / var_y
+        var_y = np.var(y_true)
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
         losses.explained_variance = explained_var
         data.epoch += 1
 
         done_training = data.global_step >= config.total_timesteps
-        if profile.update(data) or done_training:
+        # TODO: beter way to get episode return update without clogging dashboard
+        # TODO: make this appear faster
+        if profile.update(data):
+            mean_and_log(data)
             print_dashboard("GPUDrive", data.vecenv.unwrapped.controlled_num_agents, data.utilization, data.global_step, data.epoch,
                 profile, data.losses, data.stats, data.msg)
-
-            if data.wandb is not None and data.global_step > 0 and time.time() - data.last_log_time > 3.0:
-                data.last_log_time = time.time()
-                data.wandb.log({
-                    '0verview/SPS': profile.SPS,
-                    '0verview/agent_steps': data.global_step,
-                    '0verview/epoch': data.epoch,
-                    '0verview/learning_rate': data.optimizer.param_groups[0]["lr"],
-                    **{f'environment/{k}': v for k, v in data.stats.items()},
-                    **{f'losses/{k}': v for k, v in data.losses.items()},
-                    **{f'performance/{k}': v for k, v in data.profile},
-                })
+            data.stats = defaultdict(list)
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
             data.msg = f'Checkpoint saved at update {data.epoch}'
+
+def mean_and_log(data):
+    for k in list(data.stats.keys()):
+        v = data.stats[k]
+        try:
+            v = np.mean(v)
+        except:
+            del data.stats[k]
+
+        data.stats[k] = v
+
+    if data.wandb is None:
+        return
+
+    data.last_log_time = time.time()
+    data.wandb.log({
+        '0verview/SPS': data.profile.SPS,
+        '0verview/agent_steps': data.global_step,
+        '0verview/epoch': data.epoch,
+        '0verview/learning_rate': data.optimizer.param_groups[0]["lr"],
+        **{f'environment/{k}': v for k, v in data.stats.items()},
+        **{f'losses/{k}': v for k, v in data.losses.items()},
+        **{f'performance/{k}': v for k, v in data.profile},
+    })
+    if(data.frames is not None):
+        data.wandb.log({
+                    f"{data.epoch}": data.wandb.Video(
+                        np.moveaxis(data.frames, -1, 1),
+                        fps=15,
+                        format="gif",
+                        caption={"Eval"},
+                    )
+        })
+    data.frames = None
 
 def close(data):
     data.vecenv.unwrapped.close()
     data.utilization.stop()
     config = data.config
     if data.wandb is not None:
-        artifact_name = f"{config.exp_id}_model"
-        artifact = data.wandb.Artifact(artifact_name, type="model")
-        model_path = save_checkpoint(data)
-        artifact.add_file(model_path)
-        data.wandb.run.log_artifact(artifact)
+        # artifact_name = f"{config.exp_id}_model"
+        # artifact = data.wandb.Artifact(artifact_name, type="model")
+        # model_path = save_checkpoint(data)
+        # artifact.add_file(model_path)
+        # data.wandb.run.log_artifact(artifact)
         data.wandb.finish()
 
 class Profile:
@@ -393,6 +428,7 @@ def make_losses():
         explained_variance=0,
     )
 
+
 class Experience:
     '''Flat tensor storage and array views for faster indexing'''
     def __init__(self, batch_size, bptt_horizon, minibatch_size, obs_shape, obs_dtype, atn_shape, atn_dtype,
@@ -400,24 +436,24 @@ class Experience:
         if minibatch_size is None:
             minibatch_size = batch_size
 
-        obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == 'cuda' and cpu_offload
+        obs_device = device if not pin else 'cpu'
         self.obs=torch.zeros(batch_size, *obs_shape, dtype=obs_dtype,
             pin_memory=pin, device=device if not pin else 'cpu')
-        self.actions=torch.zeros(batch_size, *atn_shape, dtype=atn_dtype, device=device if not pin else 'cpu', pin_memory=pin)
-        self.logprobs=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
-        self.rewards=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
-        self.dones=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
-        self.truncateds=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
-        self.values=torch.zeros(batch_size, device=device if not pin else 'cpu', pin_memory=pin)
+        self.actions=torch.zeros(batch_size, *atn_shape, dtype=atn_dtype, pin_memory=pin)
+        self.logprobs=torch.zeros(batch_size, pin_memory=pin)
+        self.rewards=torch.zeros(batch_size, pin_memory=pin)
+        self.dones=torch.zeros(batch_size, pin_memory=pin)
+        self.truncateds=torch.zeros(batch_size, pin_memory=pin)
+        self.values=torch.zeros(batch_size, pin_memory=pin)
 
         #self.obs_np = np.asarray(self.obs)
-        # self.actions_np = np.asarray(self.actions)
-        # self.logprobs_np = np.asarray(self.logprobs)
-        # self.rewards_np = np.asarray(self.rewards)
-        # self.dones_np = np.asarray(self.dones)
-        # self.truncateds_np = np.asarray(self.truncateds)
-        # self.values_np = np.asarray(self.values)
+        self.actions_np = np.asarray(self.actions)
+        self.logprobs_np = np.asarray(self.logprobs)
+        self.rewards_np = np.asarray(self.rewards)
+        self.dones_np = np.asarray(self.dones)
+        self.truncateds_np = np.asarray(self.truncateds)
+        self.values_np = np.asarray(self.values)
 
         self.lstm_h = self.lstm_c = None
         if lstm is not None:
@@ -448,7 +484,6 @@ class Experience:
     def full(self):
         return self.ptr >= self.batch_size
 
-    @torch.compile()
     def store(self, obs, value, action, logprob, reward, done, agent_ids, mask):
         ptr = self.ptr
         end = ptr + torch.sum(mask).cpu().detach().numpy()
@@ -457,17 +492,18 @@ class Experience:
         num_elements = end - ptr
 
         self.obs[ptr:end] = obs[:num_elements]
-        self.values[ptr:end] = value[:num_elements]
-        self.actions[ptr:end] = action[:num_elements, None]
-        self.logprobs[ptr:end] = logprob[:num_elements]
-        self.rewards[ptr:end] = reward[:num_elements].squeeze()
-        self.dones[ptr:end] = done[:num_elements].squeeze()
+        self.values_np[ptr:end] = value.cpu().numpy()[:num_elements]
+        self.actions_np[ptr:end] = action.cpu().numpy()[:num_elements]
+        self.logprobs_np[ptr:end] = logprob.cpu().numpy()[:num_elements]
+        self.rewards_np[ptr:end] = reward.cpu().numpy()[:num_elements].squeeze()
+        self.dones_np[ptr:end] = done.cpu().numpy()[:num_elements].squeeze()
 
         # Clip agent_ids to the number of elements being processed
         clipped_agent_ids = agent_ids[:num_elements]
         self.sort_keys.extend([(agent_id, self.step) for agent_id in clipped_agent_ids])
         self.ptr = end
         self.step += 1
+
 
     def sort_training_data(self):
         idxs = np.asarray(sorted(
@@ -483,8 +519,8 @@ class Experience:
         self.step = 0
         return idxs
 
-    def flatten_batch(self, advantages):
-        # advantages = torch.from_numpy(advantages_np).to(self.device)
+    def flatten_batch(self, advantages_np):
+        advantages = torch.as_tensor(advantages_np).to(self.device)
         b_idxs, b_flat = self.b_idxs, self.b_idxs_flat
         self.b_actions = self.actions.to(self.device, non_blocking=True)
         self.b_logprobs = self.logprobs.to(self.device, non_blocking=True)
@@ -493,7 +529,7 @@ class Experience:
         self.b_advantages = advantages.reshape(self.minibatch_rows,
             self.num_minibatches, self.bptt_horizon).transpose(0, 1).reshape(
             self.num_minibatches, self.minibatch_size)
-        self.returns_np = advantages + self.values
+        self.returns_np = advantages_np + self.values_np
         self.b_obs = self.obs[self.b_idxs_obs]
         self.b_actions = self.b_actions[b_idxs].contiguous()
         self.b_logprobs = self.b_logprobs[b_idxs]

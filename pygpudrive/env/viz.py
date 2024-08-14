@@ -563,8 +563,10 @@ class PyGameVisualizer:
             )
 
             # Draw the agent positions
+            cont_agent = self.sim.controlled_state_tensor().to_torch()
             for agent_idx in range(num_agents):
-
+                if(cont_agent[world_render_idx, agent_idx] == 0):
+                    continue
                 if color_objects_by_actor is not None:
                     for i in range(len(categories)):
                         if agent_idx in color_objects_by_actor[categories[i]]:
