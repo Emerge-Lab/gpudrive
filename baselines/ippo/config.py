@@ -11,15 +11,16 @@ class ExperimentConfig:
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
     num_worlds: int = 50
-    device: str = "cuda"
+    device: str = "cuda"  # or "cpu"
 
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 200  # Render every k rollouts
-    render_n_worlds: int = 10  # Number of worlds to render
+    render_freq: int = 50  # Render every k rollouts
+    render_n_worlds: int = 3  # Number of worlds to render
 
-    track_time_to_solve: bool = True
+    # TRACK THE TIME IT TAKES TO GET TO 95% GOAL RATE
+    track_time_to_solve: bool = False
 
     # LOGGING & WANDB
     sync_tensorboard: bool = True
@@ -27,7 +28,7 @@ class ExperimentConfig:
         100  # How many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "multi_actors_demo"
+    project_name = "my_gpudrive_tests"
     group_name = " "
     entity = " "
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
@@ -35,7 +36,7 @@ class ExperimentConfig:
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 50
+    save_policy_freq: int = 100
 
     # HYPERPARAMETERS
     seed: int = 42
@@ -46,8 +47,8 @@ class ExperimentConfig:
     n_steps: int = 91
     num_minibatches: int = 5  # Used to determine the minibatch size
     verbose: int = 0
-    total_timesteps: int = 6e7
-    ent_coef: float = 0.001
+    total_timesteps: int = 1e7
+    ent_coef: float = 0.00
     vf_coef: float = 0.5
     lr: float = 3e-4
     n_epochs: int = 5
