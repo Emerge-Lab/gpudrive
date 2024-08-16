@@ -32,6 +32,7 @@ hpc/overlay*
 /maps_16
 **/*ppo_model*/
 /wandb*
+/videos/*
 
 # Logging
 /wandb
@@ -45,7 +46,7 @@ events.out.tfevents.*
 *.slo
 *.lo
 *.o
-*.obj
+
 
 # Precompiled Headers
 *.gch
