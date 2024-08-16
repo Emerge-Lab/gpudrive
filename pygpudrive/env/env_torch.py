@@ -49,6 +49,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
+        self.episode_len = self.config.episode_length
 
         # Rendering setup
         self.visualizer = self._setup_rendering()
@@ -102,14 +103,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.sim.action_tensor().to_torch().copy_(action_value_tensor)
     
     def _set_discrete_action_space(self) -> None:
-        """Configure the discrete action space."""
-
-        self.steer_actions = self.config.steer_actions.to(self.device)
+        """Configure a discrete joint action space.
+        action = (acceleration, steering angle, heading angle)
+        """
         self.accel_actions = self.config.accel_actions.to(self.device)
+        self.steer_actions = self.config.steer_actions.to(self.device)
         self.head_actions = torch.tensor([0], device=self.device)
 
-        # Create a mapping from action indices to action values
+        # Map action indices -> action values and vice versa
         self.action_key_to_values = {}
+        self.values_to_action_key = {}
 
         for action_idx, (accel, steer, head) in enumerate(
             product(self.accel_actions, self.steer_actions, self.head_actions)
@@ -120,10 +123,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 head.item(),
             ]
 
+            self.values_to_action_key[
+                round(accel.item(), 3),
+                round(steer.item(), 3),
+                round(head.item(), 3),
+            ] = action_idx
+
         self.action_keys_tensor = torch.tensor(
             [
                 self.action_key_to_values[key]
                 for key in sorted(self.action_key_to_values.keys())
+            ]
+        ).to(self.device)
+
+        self.value_keys_tensor = torch.tensor(
+            [
+                self.values_to_action_key[key]
+                for key in sorted(self.values_to_action_key.keys())
             ]
         ).to(self.device)
 
@@ -191,7 +207,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
-
         return obs_filtered
 
     def get_controlled_agents_mask(self):
@@ -199,6 +214,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
             axis=2
         )
+
+    def get_expert_actions(self):
+        """Get expert actions for the full trajectories across worlds."""
+        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+
+        # Extract the inferred expert actions for the full trajectory
+        inferred_expert_actions = expert_traj[
+            :, :, -3 * self.episode_len :
+        ].reshape(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
+        return inferred_expert_actions
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""

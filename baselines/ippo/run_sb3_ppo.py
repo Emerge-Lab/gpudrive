@@ -3,8 +3,9 @@ import pyrallis
 from typing import Callable
 from datetime import datetime
 
-from algorithms.sb3.ppo.ippo import IPPO
-from algorithms.sb3.callbacks import MultiAgentCallback
+from utils.process import generate_valid_files_json
+from algorithms.rl.sb3.ppo.ippo import IPPO
+from algorithms.rl.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
 from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
