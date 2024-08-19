@@ -1,7 +1,6 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
-
-
+from pygpudrive.env.config import SelectionDiscipline
 @dataclass
 class ExperimentConfig:
     """Configurations for experiments."""
@@ -10,7 +9,10 @@ class ExperimentConfig:
     data_dir: str = "data"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
-    num_worlds: int = 50
+    num_worlds: int = 50 # Number of parallel environments
+    # How to select scenes from the dataset
+    selection_discipline = SelectionDiscipline.PAD_N # K_UNIQUE_N / PAD_N
+    k_unique_scenes: int = None
     device: str = "cuda"  # or "cpu"
 
     # RENDERING

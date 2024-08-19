@@ -160,6 +160,6 @@ If you use GPUDrive in your work, please cite us:
 ```
 
 
-## Contributing 👷‍♀️
+## Contributing and learning benchmark 👷‍♀️
 
-If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)!
+If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`. 
