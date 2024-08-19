@@ -6,7 +6,7 @@ from datetime import datetime
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
-from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
+from pygpudrive.env.config import EnvConfig, SceneConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
 
@@ -105,12 +105,14 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
 
 if __name__ == "__main__":
+    
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
     scene_config = SceneConfig(
         path=exp_config.data_dir, 
         num_scenes=exp_config.num_worlds,
-        discipline=SelectionDiscipline.PAD_N,
+        discipline=exp_config.selection_discipline,
+        k_unique_scenes=exp_config.k_unique_scenes,
     )
 
     train(exp_config, scene_config)
