@@ -20,6 +20,7 @@ add_executable(my_tests
     bicyclemodel.cpp
     test_utils.cpp
     CollisionDetectionTests.cpp
+    observationTest.cpp
     EgocentricRoadObservationTests.cpp
 )
 
