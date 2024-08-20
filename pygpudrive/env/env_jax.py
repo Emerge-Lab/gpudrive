@@ -341,6 +341,4 @@ if __name__ == "__main__":
 
     # import imageio
     # imageio.mimsave("world1.gif", frames_1)
-
-    # run.finish()
-    env.visualizer.destroy()
+    env.close()

@@ -11,6 +11,7 @@ from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
+
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -81,12 +82,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
-   
+
         if actions.dim() == 2:  # (num_worlds, max_agent_count)
             # Map action indices to action values if indices are provided
             actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
             action_value_tensor = self.action_keys_tensor[actions]
-            
+
         elif actions.dim() == 3:
             if actions.shape[2] == 1:
                 actions = actions.squeeze(dim=2).to(self.device)
@@ -100,7 +101,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Feed the actual action values to gpudrive
         self.sim.action_tensor().to_torch().copy_(action_value_tensor)
-    
+
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
 
@@ -135,7 +136,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-     
+
         # EGO STATE
         if self.config.ego_state:
             ego_states_unprocessed = (
@@ -176,8 +177,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     road_map_observations_unprocessed
                 )
             else:
-                road_map_observations = road_map_observations_unprocessed.flatten(
-                    start_dim=2
+                road_map_observations = (
+                    road_map_observations_unprocessed.flatten(start_dim=2)
                 )
         else:
             road_map_observations = torch.Tensor().to(self.device)
@@ -258,10 +259,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         obs[:, :, :, 5] /= self.config.max_veh_width
 
         # One-hot encode the type of the other visible objects
-        one_hot_encoded_object_types = self.one_hot_encode_object_type(obs[:, :, :, 6])
+        one_hot_encoded_object_types = self.one_hot_encode_object_type(
+            obs[:, :, :, 6]
+        )
 
         # Concat the one-hot encoding with the rest of the features
-        obs = torch.concat((obs[:, :, :, :6], one_hot_encoded_object_types), dim=-1)
+        obs = torch.concat(
+            (obs[:, :, :, :6], one_hot_encoded_object_types), dim=-1
+        )
 
         return obs.flatten(start_dim=2)
 
@@ -269,14 +274,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Set garbage object types to zero
         road_types = torch.where(
-            (roadmap_type_tensor < self.MIN_OBJ_ENTITY_ENUM) | (roadmap_type_tensor > self.ROAD_MAP_OBJECT_TYPES),
+            (roadmap_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
+            | (roadmap_type_tensor > self.ROAD_MAP_OBJECT_TYPES),
             0.0,
             roadmap_type_tensor,
         ).int()
 
         return torch.nn.functional.one_hot(
-                road_types.long(), num_classes=self.ROAD_MAP_OBJECT_TYPES,
-            )
+            road_types.long(),
+            num_classes=self.ROAD_MAP_OBJECT_TYPES,
+        )
 
     def one_hot_encode_object_type(self, object_type_tensor):
         """One-hot encode the object type."""
@@ -288,14 +295,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Set garbage object elements to zero
         object_types = torch.where(
-            (object_type_tensor < self.MIN_OBJ_ENTITY_ENUM) | (object_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
+            (object_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
+            | (object_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
             0.0,
             object_type_tensor,
         ).int()
 
         one_hot_object_type = torch.nn.functional.one_hot(
             torch.where(
-                condition=(object_types == VEHICLE) | (object_types == PEDESTRIAN) | (object_types == CYCLIST) | object_types == PADDING,
+                condition=(object_types == VEHICLE)
+                | (object_types == PEDESTRIAN)
+                | (object_types == CYCLIST)
+                | object_types
+                == PADDING,
                 input=object_types,
                 other=0,
             ).long(),
@@ -332,7 +344,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Road types: one-hot encode them
         one_hot_road_types = self.one_hot_encode_roadpoints(obs[:, :, :, 6])
 
-        # Concatenate the one-hot encoding with the rest of the features 
+        # Concatenate the one-hot encoding with the rest of the features
         obs = torch.cat((obs[:, :, :, :6], one_hot_road_types), dim=-1)
 
         return obs.flatten(start_dim=2)
@@ -377,7 +389,7 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(None)
-        
+
         frames.append(env.render())
 
         obs = env.get_obs()
@@ -388,5 +400,4 @@ if __name__ == "__main__":
     # import imageio
     imageio.mimsave("world1.gif", np.array(frames))
 
-    # run.finish()
-    env.visualizer.destroy()
+    env.close()
