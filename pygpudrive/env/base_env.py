@@ -244,7 +244,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
     def close(self):
         """Destroy the simulator and visualizer."""
-        del self.sim()
+        del self.sim
         self.visualizer.destroy()
 
     def normalize_tensor(self, x, min_val, max_val):
