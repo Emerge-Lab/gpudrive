@@ -1,7 +1,6 @@
 from collections import deque
 
 import os
-import logging
 import numpy as np
 import torch
 import wandb
@@ -84,7 +83,6 @@ class MultiAgentCallback(BaseCallback):
         """
         self.start_training = perf_counter()
         self.log_first_to_95 = True
-        self.log_first_to_90 = True
 
     def _on_training_end(self) -> None:
         """
@@ -180,19 +178,6 @@ class MultiAgentCallback(BaseCallback):
                 )
 
             if self.config.track_time_to_solve:
-                if (
-                    sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
-                    >= 0.9
-                    and self.log_first_to_90
-                ):
-                    wandb.log(
-                        {
-                            "Charts/time_to_90": perf_counter()
-                            - self.start_training,
-                            "Charts/steps_to_90": self.num_timesteps,
-                        }
-                    )
-                    self.log_first_to_90 = False
 
                 if (
                     sum(self.perc_goal_achieved) / sum(self.num_agent_rollouts)
@@ -307,5 +292,5 @@ class MultiAgentCallback(BaseCallback):
             wandb.save(self.path, base_path=self.policy_base_path)
 
         print(
-            f"Saved policy on global_step {self.num_timesteps:,} at: \n {self.path}"
+            f"Saved policy on step {self.num_timesteps:,} at: \n {self.path}"
         )
