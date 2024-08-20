@@ -299,7 +299,10 @@ static void createFloorPlane(Engine &ctx)
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
+        Entity agent_iface = ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
+        ctx.get<Done>(agent_iface).v = 1;
+        ctx.get<Reward>(agent_iface).v = 0;
+        ctx.get<Info>(agent_iface) = Info{};
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
