@@ -110,8 +110,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
-        
-        # Map entity types to integers  
+
+        # Map entity types to integers
         self.ENTITY_TYPE_TO_INT = {
             gpudrive.EntityType._None: 0,
             gpudrive.EntityType.RoadEdge: 1,
@@ -241,6 +241,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             RenderMode.MADRONA_DEPTH,
         }:
             return self.visualizer.getRender()
+
+    def close(self):
+        """Destroy the simulator."""
+        del self.sim()
 
     def normalize_tensor(self, x, min_val, max_val):
         """Normalizes an array of values to the range [-1, 1].
