@@ -34,6 +34,7 @@ if __name__ == "__main__":
     )
     render_config = RenderConfig(
         draw_obj_idx=True,
+        color_scheme='light',
     )
 
     # Make environment

@@ -121,6 +121,7 @@ class RenderConfig:
     line_thickness: int = 0.7  # Thickness of the road lines
     draw_obj_idx: bool = False  # Draw object index on the object
     obj_idx_font_size: int = 9  # Font size of the object index
+    color_scheme: str = "light" # Color scheme for the rendering: "light" or "dark"
 
     def __str__(self):
         return f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, Resolution: {self.resolution}"
