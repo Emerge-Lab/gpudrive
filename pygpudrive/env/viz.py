@@ -8,18 +8,18 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 
 # AGENT COLORS
 PINK = (255, 105, 180)
-GREEN = (124, 252, 0)
+GREEN = (113, 228, 0)
 BLUE = (0, 191, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
+CHARCOAL = (22, 28, 32)
 
 STATIC_AGENT_ID = 2
 
 
 class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
-    BACKGROUND_COLOR = (22, 28, 32)  # Charcoal
     PADDING_PCT = 0.0
     COLOR_LIST = [
         PINK,
@@ -28,21 +28,29 @@ class PyGameVisualizer:
         DODGER_BLUE,
         RED_ORANGE,
     ]
-    # ROAD MAP COLORS
-    color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
-        float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
-        float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
-        float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
-        float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
-    }
 
     def __init__(self, sim, render_config, goal_radius):
         self.sim = sim
         self.render_config = render_config
         self.WINDOW_W, self.WINDOW_H = render_config.resolution
         self.goal_radius = goal_radius
+        
+        if self.render_config.color_scheme == "light":
+            self.BACKGROUND_COLOR = WHITE
+            self.vehicle_idx_color = CHARCOAL
+        else:
+            self.BACKGROUND_COLOR = CHARCOAL
+            self.vehicle_idx_color = WHITE
+        
+        # ROAD MAP COLORS
+        self.color_dict = {
+    float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
+            float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
+            float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
+            float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
+            float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
+            float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
+        }
 
         self.num_agents = self.sim.shape_tensor().to_torch().cpu().numpy()
         self.num_worlds = self.sim.shape_tensor().to_torch().shape[0]
@@ -589,7 +597,7 @@ class PyGameVisualizer:
                     )
                     font = pygame.font.Font(None, scaled_font_size)
                     text = font.render(
-                        str(valid_agent_indices.pop(0)), True, WHITE
+                        str(valid_agent_indices.pop(0)), True, self.vehicle_idx_color
                     )
                     text_rect = text.get_rect(
                         center=(
