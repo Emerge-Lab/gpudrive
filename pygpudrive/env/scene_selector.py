@@ -6,17 +6,19 @@ from pygpudrive.env.config import SelectionDiscipline
 
 
 def select_scenes(config):
-    """Selects a number of traffic scenes from the data directory based on the specified discipline.
+    """Selects a number of traffic scenes from the data directory based on
+    the specified discipline.
 
     Args:
-        config: Data configuration object containing the path to the data directory and the selection discipline.
+        config: Data configuration object containing the path to the data
+        directory and the selection discipline.
 
     Raises:
         ValueError: If the data directory does not exist or is empty.
         ValueError: If the data directory does not contain any traffic scenes.
 
     Returns:
-        _type_: _description_
+        list: A list of paths to the selected traffic scenes.
     """
     assert os.path.exists(config.path) and os.listdir(
         config.path
@@ -32,7 +34,8 @@ def select_scenes(config):
     selected_scenes = None
     if not any(scene.startswith("tfrecord") for scene in all_scenes):
         raise ValueError(
-            "The data directory does not contain any traffic scenes. Maybe you specified a path to the wrong folder?"
+            "The data directory does not contain any traffic scenes."
+            "Maybe you specified a path to the wrong folder?"
         )
 
     def random_sample(k):
@@ -67,7 +70,8 @@ def select_scenes(config):
         or len(selected_scenes) == 0
     ):
         raise ValueError(
-            "The selected scene is not a traffic scenario. Something went wrong with the scene selection. Please check your data path."
+            "The selected scene is not a traffic scenario."
+            "Please check your data path."
         )
     scene_paths = [
         os.path.join(os.path.abspath(config.path), selected_scene)
@@ -75,7 +79,8 @@ def select_scenes(config):
     ]
 
     print(
-        f"\n--- Ratio unique scenes / number of worls = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
+        f"\n--- Ratio unique scenes / number of worls = \
+        {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
     )
 
     return scene_paths
