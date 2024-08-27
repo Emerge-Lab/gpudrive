@@ -6,6 +6,18 @@ from pygpudrive.env.config import SelectionDiscipline
 
 
 def select_scenes(config):
+    """Selects a number of traffic scenes from the data directory based on the specified discipline.
+
+    Args:
+        config: Data configuration object containing the path to the data directory and the selection discipline.
+
+    Raises:
+        ValueError: If the data directory does not exist or is empty.
+        ValueError: If the data directory does not contain any traffic scenes.
+
+    Returns:
+        _type_: _description_
+    """
     assert os.path.exists(config.path) and os.listdir(
         config.path
     ), "The data directory does not exist or is empty."
@@ -56,7 +68,7 @@ def select_scenes(config):
         or len(selected_scenes) == 0
     ):
         raise ValueError(
-            "The selected scenes do not contain traffic scenes. Something went wrong with the scene selection."
+            "The selected scene is not a traffic scenario. Something went wrong with the scene selection. Please check your data path."
         )
     scene_paths = [
         os.path.join(os.path.abspath(config.path), selected_scene)
