@@ -9,6 +9,7 @@ from .data_utils import *
 import functools
 import pickle
 
+
 class WaymaxDataset(Dataset):
     """
     Dataset class for Waymax data.
@@ -21,17 +22,17 @@ class WaymaxDataset(Dataset):
     def __init__(
         self,
         data_dir,
-        anchor_path = "data/cluster_64_center_dict.pkl",
+        anchor_path="data/cluster_64_center_dict.pkl",
     ):
-        self.data_list = glob.glob(data_dir+'/*')
+        self.data_list = glob.glob(data_dir + "/*")
         print(f"Found {len(self.data_list)} scenarios")
         self.anchors = pickle.load(open(anchor_path, "rb"))
-        
+
         self.__collate_fn__ = data_collate_fn
 
     def __len__(self):
         return len(self.data_list)
-    
+
     def _process(self, types):
         """
         Process the agent types and convert them into anchor vectors.
@@ -46,16 +47,16 @@ class WaymaxDataset(Dataset):
 
         for i in range(len(types)):
             if types[i] == 1:
-                anchors.append(self.anchors['TYPE_VEHICLE'])
+                anchors.append(self.anchors["TYPE_VEHICLE"])
             elif types[i] == 2:
-                anchors.append(self.anchors['TYPE_PEDESTRIAN'])
+                anchors.append(self.anchors["TYPE_PEDESTRIAN"])
             elif types[i] == 3:
-                anchors.append(self.anchors['TYPE_CYCLIST'])
+                anchors.append(self.anchors["TYPE_CYCLIST"])
             else:
-                anchors.append(np.zeros_like(self.anchors['TYPE_VEHICLE']))
+                anchors.append(np.zeros_like(self.anchors["TYPE_VEHICLE"]))
 
         return np.array(anchors, dtype=np.float32)
-    
+
     def gen_tensor(self, data):
         """
         Generate tensors from the input data.
@@ -66,15 +67,15 @@ class WaymaxDataset(Dataset):
         Returns:
             dict: Dictionary of tensors.
         """
-        
-        agents_history = data['agents_history']
-        agents_interested = data['agents_interested']
-        agents_future = data['agents_future']
-        agents_type = data['agents_type']
-        traffic_light_points = data['traffic_light_points']
-        polylines = data['polylines']
-        polylines_valid = data['polylines_valid']
-        relations = data['relations']
+
+        agents_history = data["agents_history"]
+        agents_interested = data["agents_interested"]
+        agents_future = data["agents_future"]
+        agents_type = data["agents_type"]
+        traffic_light_points = data["traffic_light_points"]
+        polylines = data["polylines"]
+        polylines_valid = data["polylines_valid"]
+        relations = data["relations"]
         anchors = self._process(agents_type)
 
         tensors = {
@@ -86,15 +87,16 @@ class WaymaxDataset(Dataset):
             "polylines": torch.from_numpy(polylines),
             "polylines_valid": torch.from_numpy(polylines_valid),
             "relations": torch.from_numpy(relations),
-            "anchors": torch.from_numpy(anchors)
+            "anchors": torch.from_numpy(anchors),
         }
-        
+
         return tensors
 
     def __getitem__(self, idx):
-        with open(self.data_list[idx], 'rb') as f:
+        with open(self.data_list[idx], "rb") as f:
             data = pickle.load(f)
         return self.gen_tensor(data)
+
 
 class WaymaxTestDataset(WaymaxDataset):
     """
@@ -112,7 +114,7 @@ class WaymaxTestDataset(WaymaxDataset):
     def __init__(
         self,
         data_dir: str,
-        anchor_path = "data/cluster_64_center_dict.pkl",
+        anchor_path="data/cluster_64_center_dict.pkl",
         max_object: int = 16,
         max_map_points: int = 3000,
         max_polylines: int = 256,
@@ -126,10 +128,16 @@ class WaymaxTestDataset(WaymaxDataset):
         self.max_map_points = max_map_points
         self.history_length = history_length
         self.num_points_polyline = num_points_polyline
-        
-        self.base_path =  os.path.dirname(os.path.abspath(self.data_list[0]))
-                
-    def process_scenario(self, scenario_raw, current_index: int = 10, use_log: bool = True, selected_agents=None):
+
+        self.base_path = os.path.dirname(os.path.abspath(self.data_list[0]))
+
+    def process_scenario(
+        self,
+        scenario_raw,
+        current_index: int = 10,
+        use_log: bool = True,
+        selected_agents=None,
+    ):
         """
         Process a scenario and generate tensors.
 
@@ -149,14 +157,14 @@ class WaymaxTestDataset(WaymaxDataset):
             max_polylines=self.max_polylines,
             num_points_polyline=self.num_points_polyline,
             use_log=use_log,
-            selected_agents=selected_agents
+            selected_agents=selected_agents,
         )
-        
-        data_dict['anchors'] = self._process(data_dict['agents_type'])
+
+        data_dict["anchors"] = self._process(data_dict["agents_type"])
 
         return data_dict
-        
-    def reset_agent_length(self,max_object):
+
+    def reset_agent_length(self, max_object):
         """
         Reset the maximum number of objects.
 
@@ -164,8 +172,10 @@ class WaymaxTestDataset(WaymaxDataset):
             max_object (int): Maximum number of objects.
         """
         self.max_object = max_object
-        
-    def get_scenario_by_id(self, scenario_id, current_index: int = 10, use_log: bool = True):
+
+    def get_scenario_by_id(
+        self, scenario_id, current_index: int = 10, use_log: bool = True
+    ):
         """
         Get a scenario by its ID.
 
@@ -178,19 +188,23 @@ class WaymaxTestDataset(WaymaxDataset):
             tuple: Scenario ID, scenario raw data, and tensors.
         """
         file_path = os.path.join(self.base_path, f"scenario_{scenario_id}.pkl")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             data = pickle.load(f)
         try:
-            scenario_raw = data['scenario_raw']
+            scenario_raw = data["scenario_raw"]
         except:
-            print(data.keys())  
+            print(data.keys())
             raise ValueError("scenario_raw not found")
-        
-        data_dict = self.process_scenario(scenario_raw, current_index=current_index, use_log=use_log)
-        
+
+        data_dict = self.process_scenario(
+            scenario_raw, current_index=current_index, use_log=use_log
+        )
+
         return scenario_id, scenario_raw, data_dict
-    
-    def get_scenario_by_index(self, index, current_index: int = 10, use_log: bool = True):
+
+    def get_scenario_by_index(
+        self, index, current_index: int = 10, use_log: bool = True
+    ):
         """
         Get a scenario by its index.
 
@@ -202,18 +216,18 @@ class WaymaxTestDataset(WaymaxDataset):
         Returns:
             tuple: Scenario ID, scenario raw data, and tensors.
         """
-        with open(self.data_list[index], 'rb') as f:
+        with open(self.data_list[index], "rb") as f:
             data = pickle.load(f)
-        
-        scenario_raw = data['scenario_raw']
-        scenario_id = data['scenario_id']
-        
-        data_dict = self.process_scenario(scenario_raw, current_index=current_index, use_log=use_log)
-        
+
+        scenario_raw = data["scenario_raw"]
+        scenario_id = data["scenario_id"]
+
+        data_dict = self.process_scenario(
+            scenario_raw, current_index=current_index, use_log=use_log
+        )
+
         return scenario_id, scenario_raw, data_dict
-    
+
     def __getitem__(self, idx):
         _, _, data_dict = self.get_scenario_by_index(idx)
-        return data_dict       
-    
-    
+        return data_dict
