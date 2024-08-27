@@ -1,9 +1,8 @@
-"""Base Gym Environment that interfaces with the GPU Drive simulator."""
+"""Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
-from gymnasium.spaces import Box, Discrete, Tuple
+from gymnasium.spaces import Box, Discrete
 import numpy as np
 import torch
-import copy
 import gpudrive
 import imageio
 from itertools import product
@@ -58,6 +57,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def reset(self):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
+
+        # If there are warmup steps (by default, init_steps=0),
+        # advance the simulator before returning the first observation
+        self._update_sim_with_warmup(self.config.init_steps)
+
         return self.get_obs()
 
     def get_dones(self):
@@ -72,36 +76,34 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .to(self.device)
         )
 
-    def get_rewards(
-        self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0
-    ):
+    def get_rewards(self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
         - collision
         - goal_achieved
         - off_road
-
-        The importance of each component is determined by the weights.
+        
+        The importance of each component is determined by the weights.    
         """
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().squeeze(dim=2)
-
+        
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
             info_tensor = self.sim.info_tensor().to_torch()
             off_road = info_tensor[:, :, 0].to(torch.float)
-
-            # True if the vehicle collided with another road object
+            
+            # True if the vehicle collided with another road object 
             # (i.e. a cyclist or pedestrian)
             collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
-
+            
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
-
+            
             return weighted_rewards
 
     def step_dynamics(self, actions):
@@ -154,9 +156,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Action space: (dx, dy, dyaw)
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
-            # Following the StateAction struct in types.hpp
-            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
-            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
+            # Action space: (x, y, yaw, velocity x, velocity y)
+            target_action_idx = [0, 1, 3, 4, 5]
+            self.sim.action_tensor().to_torch()[:, :, target_action_idx].copy_(
+                actions
+            )
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -253,7 +257,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return action_space
 
     def get_obs(self):
-        """Get observation: Combine different types of environment information into a single tensor.
+        """Get observation: Combine different types of environment information
+        into a single tensor.
 
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
@@ -336,6 +341,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
+    def _update_sim_with_warmup(self, num_steps=0):
+        """Advances the simulator by num_steps.
+
+        Args:
+            num_steps (int): Number of warmup steps to perform.
+        """
+        if num_steps >= EPISODE_LEN:
+            raise ValueError(
+                "The length of the expert trajectory is 91,"
+                "so num_steps should be less than 91."
+            )
+
+        for _ in range(num_steps):
+            self.sim.step()
+
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
@@ -371,29 +391,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
         """Get expert actions for the full trajectories across worlds."""
-
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
-
-        # Global positions
         positions = expert_traj[:, :, : 2 * self.episode_len].view(
             self.num_worlds, self.max_agent_count, self.episode_len, -1
         )
 
-        # Global velocity
         velocity = expert_traj[
             :, :, 2 * self.episode_len : 4 * self.episode_len
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        headings = expert_traj[
-            :, :, 4 * self.episode_len : 5 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        inferred_expert_actions = expert_traj[
-            :, :, 6 * self.episode_len : 16 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
         if self.config.dynamics_model == "delta_local":
-            inferred_expert_actions = inferred_expert_actions[..., :3]
+            inferred_expert_actions = expert_traj[
+                :, :, -3 * self.episode_len :
+            ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
             )
@@ -431,26 +440,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if debug_world_idx is not None and debug_veh_idx is not None:
             velo2speed = (
                 torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1)
-                / constants.MAX_SPEED
+                / self.config.max_speed
             )
             positions[..., 0] = self.normalize_tensor(
                 positions[..., 0],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
+                self.config.min_rel_goal_coord,
+                self.config.max_rel_goal_coord,
             )
             positions[..., 1] = self.normalize_tensor(
                 positions[..., 1],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
+                self.config.min_rel_goal_coord,
+                self.config.max_rel_goal_coord,
             )
             debug_positions = positions[debug_world_idx, debug_veh_idx]
-
         return inferred_expert_actions, velo2speed, debug_positions
 
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
         Args:
-            obs: torch.Tensor of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
+            obs: torch.Tensor of shape (
+                num_worlds,
+                kMaxAgentCount,
+                kMaxAgentCount - 1,
+                num_features
+            )
         """
 
         # TODO: Fix (there should not be nans in the obs)
@@ -535,6 +548,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return one_hot_object_type
 
+    @property
+    def step_in_episode(self):
+        return (
+            EPISODE_LEN
+            - self.sim.steps_remaining_tensor().to_torch().flatten()[0].item()
+        )
+
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
 
@@ -577,7 +597,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 10
 
-    env_config = EnvConfig(dynamics_model="state")
+    env_config = EnvConfig(init_steps=10)
     render_config = RenderConfig()
     scene_config = SceneConfig("data/examples", NUM_WORLDS)
 
@@ -589,9 +609,6 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
-
-    expert_actions, _, _ = env.get_expert_actions()
-
     # RUN
     obs = env.reset()
     frames = []
