@@ -89,6 +89,50 @@ class EnvConfig:
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
+    # Reward
+    reward_type: str = (
+        "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
+    )
+    # The radius around the goal point within which the agent is considered
+    # to have reached the goal
+    dist_to_goal_threshold: float = 3.0
+
+    # Initialization steps: Number of steps to take before the episode starts
+    init_steps: int = 0
+
+    # Maximum number of controlled vehicles and feature dimensions for network
+    MAX_CONTROLLED_VEHICLES: int = 128
+    ROADMAP_AGENT_FEAT_DIM: int = MAX_CONTROLLED_VEHICLES - 1
+    TOP_K_ROADPOINTS: int = (
+        200  # Number of visible roadpoints from the road graph
+    )
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # # VALUES BELOW ARE ENV CONSTANTS: DO NOT CHANGE # #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Normalization constants
+    max_speed: int = 100
+    max_veh_len: int = 30
+    max_veh_width: int = 10
+    min_rel_goal_coord: int = -1000
+    max_rel_goal_coord: int = 1000
+    min_rel_agent_pos: int = -1000
+    max_rel_agent_pos: int = 1000
+    max_orientation_rad: float = 2 * np.pi
+    min_rm_coord: int = -1000
+    max_rm_coord: int = 1000
+    max_road_line_segmment_len: int = 100
+    max_road_scale: int = 100
+
+    # Feature dimensions
+    EGO_STATE_DIM = 6 if ego_state else 0
+    PARTNER_DIM = 10 if partner_obs else 0
+    ROAD_MAP_DIM = 13 if road_map_obs else 0
+
+    # Agent tensor shape set in consts.hpp (kMaxAgentCount)
+    k_max_agent_count: int = 128
+
+
     # Reward settings
     reward_type: str = (
         "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
