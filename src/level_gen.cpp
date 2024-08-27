@@ -308,7 +308,8 @@ void createPaddingEntities(Engine &ctx) {
 
     for (CountT roadIdx = ctx.data().numRoads;
          roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
-        ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
+        Entity e = ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
+        ctx.get<MapObservation>(e) = MapObservation::zero();
     }
 }
 

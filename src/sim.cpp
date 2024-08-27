@@ -184,6 +184,9 @@ inline void collectObservationsSystem(Engine &ctx,
             .type = (float)ctx.get<EntityType>(other)
         };
     }
+    while(arrIndex < consts::kMaxAgentCount - 1) {
+        partner_obs.obs[arrIndex++] = PartnerObservation::zero();
+    }
 
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
@@ -209,6 +212,9 @@ inline void collectObservationsSystem(Engine &ctx,
         map_obs.obs[arrIndex] = referenceFrame.observationOf(
             roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
         arrIndex++;
+    }
+    while (arrIndex < consts::kMaxAgentMapObservationsCount) {
+        map_obs.obs[arrIndex++] = MapObservation::zero();
     }
 }
 
