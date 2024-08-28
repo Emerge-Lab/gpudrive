@@ -35,7 +35,7 @@ Further configuration details are available in `config.py`.
 
 ---
 
-> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, kMaxAgentCount)`, where `kMaxAgentCount` defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
+> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, maxNumObjects)`, where maxNumObjects defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
 
 ---
 

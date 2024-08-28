@@ -10,6 +10,7 @@ from itertools import product
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
+from pygpudrive.env import constants
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -205,20 +206,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Normalize ego state features."""
 
         # Speed, vehicle length, vehicle width
-        state[:, :, 0] /= self.config.max_speed
-        state[:, :, 1] /= self.config.max_veh_len
-        state[:, :, 2] /= self.config.max_veh_width
+        state[:, :, 0] /= constants.MAX_SPEED
+        state[:, :, 1] /= constants.MAX_VEH_LEN
+        state[:, :, 2] /= constants.MAX_VEH_WIDTH
 
         # Relative goal coordinates
         state[:, :, 3] = self.normalize_tensor(
             state[:, :, 3],
-            self.config.min_rel_goal_coord,
-            self.config.max_rel_goal_coord,
+            constants.MIN_REL_GOAL_COORD,
+            constants.MAX_REL_GOAL_COORD,
         )
         state[:, :, 4] = self.normalize_tensor(
             state[:, :, 4],
-            self.config.min_rel_goal_coord,
-            self.config.max_rel_goal_coord,
+            # do the same
+            constants.MIN_REL_GOAL_COORD,
+            constants.MAX_REL_GOAL_COORD,
         )
 
         # Uncommment this to exclude the collision state
@@ -230,33 +232,33 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
         Args:
-            obs: torch.Tensor of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
+            obs: torch.Tensor of shape (num_worlds, maxNumObjects, maxNumObjects - 1, num_features)
         """
 
         # TODO: Fix (there should not be nans in the obs)
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
-        obs[:, :, :, 0] /= self.config.max_speed
+        obs[:, :, :, 0] /= constants.MAX_SPEED
 
         # Relative position
         obs[:, :, :, 1] = self.normalize_tensor(
             obs[:, :, :, 1],
-            self.config.min_rel_agent_pos,
-            self.config.max_rel_agent_pos,
+            constants.MIN_REL_AGENT_POS,
+            constants.MAX_REL_AGENT_POS,
         )
         obs[:, :, :, 2] = self.normalize_tensor(
             obs[:, :, :, 2],
-            self.config.min_rel_agent_pos,
-            self.config.max_rel_agent_pos,
+            constants.MIN_REL_AGENT_POS,
+            constants.MAX_REL_AGENT_POS,
         )
 
         # Orientation (heading)
-        obs[:, :, :, 3] /= self.config.max_orientation_rad
+        obs[:, :, :, 3] /= constants.MAX_ORIENTATION_RAD
 
         # Vehicle length and width
-        obs[:, :, :, 4] /= self.config.max_veh_len
-        obs[:, :, :, 5] /= self.config.max_veh_width
+        obs[:, :, :, 4] /= constants.MAX_VEH_LEN    
+        obs[:, :, :, 5] /= constants.MAX_VEH_WIDTH
 
         # One-hot encode the type of the other visible objects
         one_hot_encoded_object_types = self.one_hot_encode_object_type(
@@ -321,25 +323,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Road point coordinates
         obs[:, :, :, 0] = self.normalize_tensor(
             obs[:, :, :, 0],
-            self.config.min_rm_coord,
-            self.config.max_rm_coord,
+            constants.MIN_RG_COORD,
+            constants.MAX_RG_COORD,
         )
 
         obs[:, :, :, 1] = self.normalize_tensor(
             obs[:, :, :, 1],
-            self.config.min_rm_coord,
-            self.config.max_rm_coord,
+            constants.MIN_RG_COORD,
+            constants.MAX_RG_COORD,
         )
 
         # Road line segment length
-        obs[:, :, :, 2] /= self.config.max_road_line_segmment_len
+        obs[:, :, :, 2] /= constants.MAX_ROAD_LINE_SEGMENT_LEN
 
         # Road scale (width and height)
-        obs[:, :, :, 3] /= self.config.max_road_scale
+        obs[:, :, :, 3] /= constants.MAX_ROAD_SCALE
         # obs[:, :, :, 4] seems already scaled
 
         # Road point orientation
-        obs[:, :, :, 5] /= self.config.max_orientation_rad
+        obs[:, :, :, 5] /= constants.MAX_ORIENTATION_RAD
 
         # Road types: one-hot encode them
         one_hot_road_types = self.one_hot_encode_roadpoints(obs[:, :, :, 6])
@@ -354,10 +356,9 @@ if __name__ == "__main__":
 
     # CONFIGURE
     TOTAL_STEPS = 90
-    MAX_NUM_OBJECTS = 128
+    MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 50
 
-    env_config = EnvConfig()
     env_config = EnvConfig()
     render_config = RenderConfig()
     scene_config = SceneConfig("data", NUM_WORLDS)
@@ -366,7 +367,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
-        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
+        max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
         device="cuda",
         render_config=render_config,
     )
@@ -382,10 +383,10 @@ if __name__ == "__main__":
             [
                 [
                     env.action_space.sample()
-                    for _ in range(MAX_NUM_OBJECTS * NUM_WORLDS)
+                    for _ in range(env_config.max_num_objects * NUM_WORLDS)
                 ]
             ]
-        ).reshape(NUM_WORLDS, MAX_NUM_OBJECTS)
+        ).reshape(NUM_WORLDS, env_config.max_num_objects)
 
         # Step the environment
         env.step_dynamics(None)
@@ -393,7 +394,6 @@ if __name__ == "__main__":
         frames.append(env.render())
 
         obs = env.get_obs()
-
         reward = env.get_rewards()
         done = env.get_dones()
 

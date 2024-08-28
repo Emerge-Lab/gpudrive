@@ -182,13 +182,13 @@ inline void collectObservationsSystem(Engine &ctx,
             .type = (float)ctx.get<EntityType>(other)
         };
     }
-    while(arrIndex < consts::kMaxAgentCount - 1) {
+    while(arrIndex < consts::maxNumObjects - 1) {
         partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
 
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
-        selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
+        selectKNearestRoadEntities<consts::roadGraphTopK>(
             ctx, rot, pos.xy(), map_obs.obs);
         return;
     }
@@ -197,7 +197,7 @@ inline void collectObservationsSystem(Engine &ctx,
 
     utils::ReferenceFrame referenceFrame(pos.xy(), rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::roadGraphTopK) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
@@ -212,7 +212,7 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    while (arrIndex < consts::kMaxAgentMapObservationsCount) {
+    while (arrIndex < consts::roadGraphTopK) {
         map_obs.obs[arrIndex++] = MapObservation::zero();
     }
 }
@@ -810,12 +810,12 @@ Sim::Sim(Engine &ctx,
 {
     // Below check is used to ensure that the map is not empty due to incorrect WorldInit copy to GPU
     assert(init.map->numObjects);
-    assert(init.map->numRoadSegments <= consts::kMaxRoadEntityCount);
+    assert(init.map->numRoadSegments <= consts::maxNumRgPoints);
 
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
+    auto max_total_entities = consts::maxNumObjects + consts::maxNumRgPoints;
 
     phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,

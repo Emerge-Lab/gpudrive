@@ -13,6 +13,7 @@ import wandb
 # Import env wrapper that makes gym env compatible with stable-baselines3
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 from pygpudrive.env.config import EnvConfig
+from pygpudrive.env import constants
 
 
 class LateFusionNet(nn.Module):
@@ -34,8 +35,8 @@ class LateFusionNet(nn.Module):
         self.ro_input_dim = self.config.PARTNER_DIM
         self.rg_input_dim = self.config.ROAD_MAP_DIM
 
-        self.ro_max = self.config.ROADMAP_AGENT_FEAT_DIM
-        self.rg_max = self.config.TOP_K_ROADPOINTS
+        self.ro_max = self.config.max_num_objects-1
+        self.rg_max = self.config.roadgraph_top_k
 
         # Network architectures
         self.arch_ego_state = self.net_config.ego_state_layers
