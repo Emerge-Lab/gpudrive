@@ -107,6 +107,7 @@ namespace gpudrive
         bool enableLidar = false;
         bool disableClassicalObs = false;
         bool useWayMaxModel = false; // Default: false
+        bool useDeltaModel = false; // Default: false
     };
 
     struct WorldInit

@@ -9,7 +9,7 @@
 #include "utils.hpp"
 #include "knn.hpp"
 #include "dynamics.hpp"
-
+#include "dynamics_delta.hpp"
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
@@ -32,6 +32,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerComponent<Action>();
+    registry.registerComponent<DeltaAction>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
     registry.registerComponent<AgentMapObservations>();
@@ -61,6 +62,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
+    registry.exportColumn<Agent, DeltaAction>(
+        (uint32_t)ExportID::DeltaAction);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
     registry.exportColumn<Agent, AgentMapObservations>(
@@ -233,6 +236,7 @@ inline void agentZeroVelSystem(Engine &,
 
 inline void movementSystem(Engine &e,
                            Action &action,
+                           DeltaAction &dAction,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -294,6 +298,18 @@ inline void movementSystem(Engine &e,
             forwardWaymaxModel(action, rotation, position, velocity);
         }
         else 
+        {
+            forwardKinematics(action, size, rotation, position, velocity);
+        }
+        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
+    }
+    else if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::DELTA)
+    {
+        if(e.data().params.useDeltaModel)
+        {
+            forwardDeltaModel(dAction, rotation, position, velocity);
+        }
+        else
         {
             forwardKinematics(action, size, rotation, position, velocity);
         }
@@ -772,6 +788,7 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             Action,
+            DeltaAction,
             VehicleSize,
             Rotation,
             Position,

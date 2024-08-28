@@ -55,6 +55,7 @@ namespace gpudrive
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
             .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
+            .def_rw("useDeltaModel", &Parameters::useDeltaModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
@@ -101,6 +102,7 @@ namespace gpudrive
             .def("step", &Manager::step)
             .def("reset", &Manager::reset)
             .def("action_tensor", &Manager::actionTensor)
+            .def("delta_action_tensor", &Manager::dActionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)

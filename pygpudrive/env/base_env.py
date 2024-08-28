@@ -100,7 +100,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledVehicles = self.max_cont_agents
         params.isStaticAgentControlled = False
-        params.useWayMaxModel = False
+        params.useWayMaxModel = self.config.use_bicycle_model
+        params.useDeltaModel = self.config.use_delta_model
 
         if self.config.enable_lidar:
             params.enableLidar = self.config.enable_lidar

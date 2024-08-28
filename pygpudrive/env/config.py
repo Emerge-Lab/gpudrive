@@ -34,10 +34,12 @@ class EnvConfig:
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 100.0  # Radius for road observations
     polyline_reduction_threshold: float = 1.0  # Threshold for polyline reduction
-
     # Action space settings (joint discrete)
     steer_actions: torch.Tensor = torch.round(torch.linspace(-1.0, 1.0, 13), decimals=3)
     accel_actions: torch.Tensor = torch.round(torch.linspace(-4.0, 4.0, 7), decimals=3)
+    dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
+    dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
+    dyaw: torch.Tensor = torch.round(torch.linspace(-3.14, 3.14, 20), decimals=3)
 
     # Collision behavior settings
     collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
