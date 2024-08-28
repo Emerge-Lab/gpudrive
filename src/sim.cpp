@@ -216,6 +216,15 @@ inline void collectObservationsSystem(Engine &ctx,
     while (arrIndex < consts::kMaxAgentMapObservationsCount) {
         map_obs.obs[arrIndex++] = MapObservation::zero();
     }
+    // Check if all map_obs roadIdx are zero
+    for(CountT i = roadIdx; i < consts::kMaxAgentMapObservationsCount; i++)
+    {
+        if(map_obs.obs[i].type != static_cast<float>(EntityType::None))
+        {
+            printf("Map observation not set to zero.");
+        }
+    }
+    // printf("Map observation set to zero.");
 }
 
 

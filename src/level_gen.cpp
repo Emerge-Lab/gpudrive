@@ -299,16 +299,30 @@ static void createFloorPlane(Engine &ctx)
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
-        Entity agent_iface = ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
+        Entity &agent_iface = ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
         ctx.get<ControlledState>(agent_iface) = ControlledState{.controlledState = ControlMode::EXPERT};
         ctx.get<Done>(agent_iface).v = 1;
         ctx.get<Reward>(agent_iface).v = 0;
-        ctx.get<Info>(agent_iface) = Info{};
+        ctx.get<Info>(agent_iface) = Info{
+            0, 0, 0, 0, 0
+        };
+        auto &agent_map_obs = ctx.get<AgentMapObservations>(agent_iface);
+        for (CountT i = 0; i < consts::kMaxAgentMapObservationsCount; i++) {
+            agent_map_obs.obs[i] = MapObservation::zero();
+        }
+        auto &self_obs = ctx.get<SelfObservation>(agent_iface);
+        self_obs = SelfObservation::zero();
+
+        auto &partner_obs = ctx.get<PartnerObservations>(agent_iface);
+        for (CountT i = 0; i < consts::kMaxAgentCount-1; i++) {
+            partner_obs.obs[i] = PartnerObservation::zero();
+        }
+
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
          roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
-        Entity e = ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
+        Entity &e = ctx.data().road_ifaces[roadIdx] = ctx.makeEntity<RoadInterface>();
         ctx.get<MapObservation>(e) = MapObservation::zero();
     }
 }

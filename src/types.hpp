@@ -92,6 +92,15 @@ struct SelfObservation {
     VehicleSize vehicle_size;
     Goal goal;
     float collisionState;
+
+    static inline SelfObservation zero() {
+      return SelfObservation {
+            .speed = 0,
+            .vehicle_size = {0, 0},
+            .goal = {.position = {0, 0}},
+            .collisionState = 0
+        };
+    }
 };
 
 const size_t SelfObservationExportSize = 6;
