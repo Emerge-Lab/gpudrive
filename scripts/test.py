@@ -1,5 +1,18 @@
 import gpudrive
 import torch
+import itertools
+
+# Original list
+scenes = [
+    "/home/aarav/gpudrive/data/tfrecord-00001-of-01000_307.json",
+    "/home/aarav/gpudrive/data/tfrecord-00003-of-01000_109.json",
+    "/home/aarav/gpudrive/data/tfrecord-00012-of-01000_389.json"
+]
+
+# Repeat the elements until the list reaches size 50
+scenes_50 = list(itertools.islice(itertools.cycle(scenes), 50))
+
+print(scenes_50)
 
 # Create an instance of RewardParams
 reward_params = gpudrive.RewardParams()
@@ -18,18 +31,11 @@ params.roadObservationAlgorithm = gpudrive.FindRoadObservationsWith.AllEntitiesW
 
 # Now use the 'params' instance when creating SimManager
 sim = gpudrive.SimManager(
-    exec_mode=gpudrive.madrona.ExecMode.CPU,
+    exec_mode=gpudrive.madrona.ExecMode.CUDA,
     gpu_id=0,
-    scenes=["/home/aarav/gpudrive/data/tfrecord-00001-of-01000_307.json", 
-            "/home/aarav/gpudrive/data/tfrecord-00003-of-01000_109.json", 
-            "/home/aarav/gpudrive/data/tfrecord-00012-of-01000_389.json"],
+    scenes=scenes_50,
     params=params
 )
 
-road_tensor = sim.agent_roadmap_tensor().to_torch()
-nan_indices = torch.nonzero(torch.isnan(road_tensor), as_tuple=True)
-for i in range(len(nan_indices[0])):
-    print(f"NaN found at index: ({nan_indices[0][i]}, {nan_indices[1][i]}, {nan_indices[2][i]}, {nan_indices[3][i]})")
-print(torch.isnan(road_tensor).any())
-
-
+controlled = sim.controlled_state_tensor().to_torch()
+print(controlled[0])
