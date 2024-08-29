@@ -17,10 +17,10 @@ class ExperimentConfig:
     
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
-    collision_weight = 0
-    goal_achieved_weight = 1.0
-    off_road_weight = 0
-
+    collision_weight: float = 0.0
+    goal_achieved_weight: float = 1.0
+    off_road_weight: float = 0.0
+    
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
@@ -36,7 +36,7 @@ class ExperimentConfig:
         100  # How many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "my_gpudrive_tests" #"adadrive"
+    project_name = "my_gpudrive_tests"
     group_name = " "
     entity = " "
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]

@@ -2,7 +2,7 @@ import wandb
 import pyrallis
 from typing import Callable
 from datetime import datetime
-
+import dataclasses
 from algorithms.sb3.ppo.ippo import IPPO
 from algorithms.sb3.callbacks import MultiAgentCallback
 from baselines.ippo.config import ExperimentConfig
@@ -34,8 +34,13 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
     """Run PPO training with stable-baselines3."""
 
-    # CONFIG
-    env_config = EnvConfig()
+    # ENVIRONMENT CONFIG
+    env_config = dataclasses.replace(
+        EnvConfig(),
+        collision_weight=exp_config.collision_weight,
+        goal_achieved_weight=exp_config.goal_achieved_weight,
+        off_road_weight=exp_config.off_road_weight,
+    )
 
     # MAKE SB3-COMPATIBLE ENVIRONMENT
     env = SB3MultiAgentEnv(
@@ -53,7 +58,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
     # INIT WANDB
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes"
+    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes_rewards_cw{exp_config.collision_weight}_gw{exp_config.goal_achieved_weight}_ow{exp_config.off_road_weight}"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,

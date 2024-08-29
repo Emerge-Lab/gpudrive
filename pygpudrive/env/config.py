@@ -30,6 +30,12 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
     enable_lidar: bool = False  # Enable LiDAR data in observations
+    
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight: float = 0.0
+    goal_achieved_weight: float = 1.0
+    off_road_weight: float = 0.0
 
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations

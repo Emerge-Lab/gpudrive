@@ -2,12 +2,10 @@
 import logging
 from typing import Optional, Sequence
 import torch
-from typing import Any, Dict, List, Optional, Sequence
 import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnv,
-    VecEnvObs,
     VecEnvStepReturn,
 )
 
@@ -15,7 +13,6 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 # Import the EnvConfig dataclass
-from pygpudrive.env.config import EnvConfig
 
 logging.basicConfig(level=logging.INFO)
 
