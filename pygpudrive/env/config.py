@@ -79,8 +79,15 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
-        "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
+        "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved" / "weighted_combination"
     )
+    
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight = -1.0
+    goal_achieved_weight = 1.0
+    off_road_weight = -1.0
+    
 
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
