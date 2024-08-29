@@ -71,7 +71,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .to(self.device)
         )
 
-    def get_rewards(self):
+    def get_rewards(self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0):
+        """Obtain the rewards for the current step.
+        By default, the reward is a weighted combination of the following components:
+        - collision
+        - goal_achieved
+        - off_road
+        
+        The importance of each component is determined by the weights.    
+        """
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().squeeze(dim=2)
         
@@ -80,14 +88,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             info_tensor = self.sim.info_tensor().to_torch()
             off_road = info_tensor[:, :, 0].to(torch.float)
             
-            # True if the vehicle collided with another road object (cyclist, pedestrian, vehicle)
+            # True if the vehicle collided with another road object 
+            # (i.e. a cyclist or pedestrian)
             collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
             
             weighted_rewards = (
-                self.config.collision_weight * collided
-                + self.config.goal_achieved_weight * goal_achieved
-                + self.config.off_road_weight * off_road
+                collision_weight * collided
+                + goal_achieved_weight * goal_achieved
+                + off_road_weight * off_road
             )
             
             return weighted_rewards

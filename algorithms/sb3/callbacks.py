@@ -27,11 +27,6 @@ class MultiAgentCallback(BaseCallback):
         self.policy_base_path = os.path.join(wandb.run.dir, "policies")
         if self.policy_base_path is not None:
             os.makedirs(self.policy_base_path, exist_ok=True)
-        self.worst_to_best_scene_perf_idx = None
-
-        self.mean_ep_reward_per_agent = deque(
-            maxlen=self.config.logging_collection_window
-        )
         self.perc_goal_achieved = deque(
             maxlen=self.config.logging_collection_window
         )
@@ -47,9 +42,6 @@ class MultiAgentCallback(BaseCallback):
         self.num_agent_rollouts = deque(
             maxlen=self.config.logging_collection_window
         )
-        self.mean_reward_per_episode = deque(
-            maxlen=self.config.logging_collection_window
-        )
         self.perc_truncated = deque(
             maxlen=self.config.logging_collection_window
         )
@@ -62,7 +54,7 @@ class MultiAgentCallback(BaseCallback):
         """Automatically set correct x-axis for metrics."""
         wandb.define_metric("global_step")
         wandb.define_metric(
-            "metrics/mean_ep_reward_per_agent", step_metric="global_step"
+            "metrics/mean_episode_reward_per_agent", step_metric="global_step"
         )
         wandb.define_metric(
             "metrics/perc_goal_achieved", step_metric="global_step"
@@ -74,8 +66,8 @@ class MultiAgentCallback(BaseCallback):
         wandb.define_metric(
             "metrics/perc_non_veh_collision", step_metric="global_step"
         )
-        wandb.define_metric("Charts/obs_max", step_metric="global_step")
-        wandb.define_metric("Charts/obs_min", step_metric="global_step")
+        wandb.define_metric("charts/obs_max", step_metric="global_step")
+        wandb.define_metric("charts/obs_min", step_metric="global_step")
 
     def _on_training_start(self) -> None:
         """
@@ -109,7 +101,7 @@ class MultiAgentCallback(BaseCallback):
         if len(self.locals["env"].info_dict) > 0:
             # total number of agents
             self.num_agent_rollouts.append(
-                self.locals["env"].info_dict["num_finished_agents"]
+                self.locals["env"].info_dict["num_controlled_agents"]
             )
             self.perc_off_road.append(self.locals["env"].info_dict["off_road"])
             self.perc_veh_collisions.append(
@@ -121,27 +113,20 @@ class MultiAgentCallback(BaseCallback):
             self.perc_goal_achieved.append(
                 self.locals["env"].info_dict["goal_achieved"]
             )
-            self.mean_reward_per_episode.append(
-                self.locals["env"].info_dict["mean_reward_per_episode"]
-            )
             self.perc_truncated.append(
                 self.locals["env"].info_dict["truncated"]
             )
-
+            
             self.max_obs.append(self.locals["env"].obs_alive.max().item())
             self.min_obs.append(self.locals["env"].obs_alive.min().item())
 
             if self.step_counter % self.config.log_freq == 0:
-
+                
                 wandb.log(
                     {
                         "metrics/wallclock_time (s)": perf_counter()
                         - self.start_training,
                         "metrics/global_step": self.num_timesteps,
-                        "metrics/mean_ep_reward_per_agent": sum(
-                            self.mean_reward_per_episode
-                        )
-                        / sum(self.num_agent_rollouts),
                         "metrics/perc_off_road": (
                             sum(self.perc_off_road)
                             / sum(self.num_agent_rollouts)
@@ -172,8 +157,8 @@ class MultiAgentCallback(BaseCallback):
 
                 wandb.log(
                     {
-                        "Charts/obs_max": np.array(self.max_obs).max(),
-                        "Charts/obs_min": np.array(self.min_obs).min(),
+                        "charts/obs_max": np.array(self.max_obs).max(),
+                        "charts/obs_min": np.array(self.min_obs).min(),
                     }
                 )
 
@@ -186,9 +171,9 @@ class MultiAgentCallback(BaseCallback):
                 ):
                     wandb.log(
                         {
-                            "Charts/time_to_95": perf_counter()
+                            "charts/time_to_95": perf_counter()
                             - self.start_training,
-                            "Charts/steps_to_95": self.num_timesteps,
+                            "charts/steps_to_95": self.num_timesteps,
                         }
                     )
                     self.log_first_to_95 = False
@@ -197,6 +182,13 @@ class MultiAgentCallback(BaseCallback):
         """
         Triggered before updating the policy.
         """
+        
+        # Get rewards, filter out NaNs from dead agents
+        # This has shape: (num_steps, num_agents x num_worlds)
+        rewards_across_worlds = torch.nan_to_num(self.locals["rollout_buffer"].rewards, nan=0).sum().item()  
+        
+        # Number of times an episode was completed, across all worlds and agents  
+        num_completions_in_rollout = torch.nan_to_num(self.locals["rollout_buffer"].episode_starts).sum()
 
         # Log a number of videos
         if self.config.render:
@@ -214,7 +206,10 @@ class MultiAgentCallback(BaseCallback):
                 self._save_policy_checkpoint()
 
         self.num_rollouts += 1
-        wandb.log({"Charts/num_rollouts": self.num_rollouts})
+        wandb.log({
+            "global_step": self.num_timesteps,
+            "metrics/mean_episode_reward_per_agent": rewards_across_worlds / num_completions_in_rollout,
+        })
 
     def _create_and_log_video(
         self,

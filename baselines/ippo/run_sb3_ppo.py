@@ -53,7 +53,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
     # INIT WANDB
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"gpudrive_{datetime_}"
+    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,

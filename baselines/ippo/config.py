@@ -6,14 +6,20 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET
-    data_dir: str = "data"
+    data_dir: str = "data/examples"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
-    num_worlds: int = 50 # Number of parallel environments
+    num_worlds: int = 50 # Number of parallel environmentss
     # How to select scenes from the dataset
-    selection_discipline = SelectionDiscipline.PAD_N # K_UNIQUE_N / PAD_N
-    k_unique_scenes: int = None
+    selection_discipline = SelectionDiscipline.K_UNIQUE_N # K_UNIQUE_N / PAD_N
+    k_unique_scenes: int = 3
     device: str = "cuda"  # or "cpu"
+    
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight = 0
+    goal_achieved_weight = 1.0
+    off_road_weight = 0
 
     # RENDERING
     render: bool = True
@@ -30,7 +36,7 @@ class ExperimentConfig:
         100  # How many trajectories we average logs over
     )
     log_freq: int = 100
-    project_name = "my_gpudrive_tests"
+    project_name = "my_gpudrive_tests" #"adadrive"
     group_name = " "
     entity = " "
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]

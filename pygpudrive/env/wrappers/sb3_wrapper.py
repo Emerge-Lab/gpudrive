@@ -43,11 +43,12 @@ class SB3MultiAgentEnv(VecEnv):
             device=device,
         )
         self.config = config
-        self.num_worlds = scene_config.num_scenes
+        self.num_worlds = self._env.num_worlds
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
         self.controlled_agent_mask = self._env.cont_agent_mask.clone()
+        self.cont_agents_in_worlds = {f'world_{idx}': value.item() for idx, value in enumerate(self.controlled_agent_mask.sum(axis=1))}
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
@@ -57,9 +58,6 @@ class SB3MultiAgentEnv(VecEnv):
         self.obs_dim = self._env.observation_space.shape[0]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
-        self.tot_reward_per_episode = torch.zeros(
-            (self.num_worlds, self.max_agent_count)
-        ).to(self.device)
         self.agent_step = torch.zeros(
             (self.num_worlds, self.max_agent_count)
         ).to(self.device)
@@ -102,7 +100,7 @@ class SB3MultiAgentEnv(VecEnv):
         if world_idx is None:
             self._env.reset()
             obs = self._env.get_obs()
-
+        
             # Make dead agent mask (True for dead or invalid agents)
             self.dead_agent_mask = ~self.controlled_agent_mask.clone()
 
@@ -150,7 +148,7 @@ class SB3MultiAgentEnv(VecEnv):
             (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
             == self.controlled_agent_mask.sum(dim=1)
         )[0]
-
+              
         if done_worlds.any().item():
             self._update_info_dict(info, done_worlds)
             self.num_episodes += len(done_worlds)
@@ -165,7 +163,6 @@ class SB3MultiAgentEnv(VecEnv):
         )
 
         # Store running total reward across worlds
-        self.tot_reward_per_episode += reward * ~self.dead_agent_mask
         self.agent_step += 1
 
         # Update dead agent mask: Set to True if agent is done before
@@ -178,18 +175,11 @@ class SB3MultiAgentEnv(VecEnv):
                 self.dead_agent_mask[
                     world_idx, :
                 ] = ~self.controlled_agent_mask[world_idx, :].clone()
-            self.tot_reward_per_episode[world_idx] = 0
             self.agent_step[done_worlds] = 0
 
         # Construct the next observation
         next_obs = self._env.get_obs()
         self.obs_alive = next_obs[~self.dead_agent_mask]
-
-        # if self.obs_alive.max() > 1 or self.obs_alive.min() < -1:
-        #     print(
-        #         f"obs_alive: {self.obs_alive.max()} | min: {self.obs_alive.min()}"
-        #     )
-        #     _ = self._env.get_obs()
 
         # RETURN NEXT_OBS, REWARD, DONE, INFO
         return (
@@ -222,7 +212,7 @@ class SB3MultiAgentEnv(VecEnv):
 
         self._seeds = [seed + idx for idx in range(self.num_envs)]
         return self._seeds
-
+    
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""
 
@@ -241,16 +231,9 @@ class SB3MultiAgentEnv(VecEnv):
         self.info_dict["goal_achieved"] = (
             controlled_agent_info[:, 3].sum().item()
         )
-        self.info_dict["num_finished_agents"] = self.controlled_agent_mask[
+        self.info_dict["num_controlled_agents"] = self.controlled_agent_mask[
             indices
         ].sum()
-        self.info_dict["mean_reward_per_episode"] = (
-            self.tot_reward_per_episode[indices][
-                self.controlled_agent_mask[indices]
-            ]
-            .sum()
-            .item()
-        )
 
         # log the agents that are done but did not receive any reward i.e. truncated
         # TODO(ev) remove hardcoded 91
@@ -315,33 +298,3 @@ class SB3MultiAgentEnv(VecEnv):
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
         frames = [self._env.render()]
         return frames
-
-
-if __name__ == "__main__":
-
-    config = EnvConfig()
-
-    # Make environment
-    env = SB3MultiAgentEnv(
-        config=config,
-        scene_config=SceneConfig("formatted_json_v2_no_tl_train", 1),
-        max_cont_agents=10,
-        device="cpu",
-    )
-
-    obs = env.reset()
-    for global_step in range(200):
-
-        print(f"Step: {90 - env._env.steps_remaining[0, 0, 0].item()}")
-
-        # Random actions
-        actions = torch.randint(0, env.action_space.n, (env.num_envs,))
-
-        # Step
-        obs, rew, done, info = env.step(actions)
-
-        print(f"(out step) done: {done} \n")
-
-        print(
-            f"obs: {obs.shape} | rew: {rew.shape} | done: {done.shape} | info: {info.shape} \n"
-        )
