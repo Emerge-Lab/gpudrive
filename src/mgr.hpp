@@ -78,7 +78,7 @@ public:
 
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
-    getShapeTensorFromDeviceMemory(madrona::ExecMode mode, uint32_t numWorlds);
+    getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
 
     madrona::render::RenderManager & getRenderManager();
 
