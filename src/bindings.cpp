@@ -19,6 +19,13 @@ namespace gpudrive
         // like madrona::py::Tensor and madrona::py::PyExecMode.
         madrona::py::setupMadronaSubmodule(m);
 
+        // Add bindings for constants defined in src/consts.hpp
+        m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
+        m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
+        m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("episodeLen") = consts::episodeLen;  
+        m.attr("numLidarSamples") = consts::numLidarSamples; 
+
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
             .value("DistanceBased", RewardType::DistanceBased)
