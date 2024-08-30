@@ -47,7 +47,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
         config=env_config,
         scene_config=scene_config,
         # Control up to all agents in the scene
-        max_cont_agents=env_config.max_num_agents_in_scene, 
+        max_cont_agents=env_config.max_num_agents_in_scene,
         device=exp_config.device,
     )
 
@@ -58,7 +58,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
     # INIT WANDB
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes_rewards_cw{exp_config.collision_weight}_gw{exp_config.goal_achieved_weight}_ow{exp_config.off_road_weight}"
+    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,
@@ -111,11 +111,11 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
 
 if __name__ == "__main__":
-    
+
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
 
     scene_config = SceneConfig(
-        path=exp_config.data_dir, 
+        path=exp_config.data_dir,
         num_scenes=exp_config.num_worlds,
         discipline=exp_config.selection_discipline,
         k_unique_scenes=exp_config.k_unique_scenes,

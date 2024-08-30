@@ -1,26 +1,30 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from dataclasses import dataclass
+import gpudrive
 from pygpudrive.env.config import SelectionDiscipline
+
+
 @dataclass
 class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET
-    data_dir: str = "data/examples"
+    data_dir: str = "data"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
-    num_worlds: int = 50 # Number of parallel environmentss
+    num_worlds: int = 50  # Number of parallel environmentss
+
     # How to select scenes from the dataset
-    selection_discipline = SelectionDiscipline.K_UNIQUE_N # K_UNIQUE_N / PAD_N
+    selection_discipline = SelectionDiscipline.K_UNIQUE_N  # K_UNIQUE_N / PAD_N
     k_unique_scenes: int = 3
     device: str = "cuda"  # or "cpu"
-    
+
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
     collision_weight: float = 0.0
     goal_achieved_weight: float = 1.0
     off_road_weight: float = 0.0
-    
+
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
@@ -41,6 +45,11 @@ class ExperimentConfig:
     entity = " "
     tags = ["IPPO", "LATE_FUSION", "PERM_EQ"]
     wandb_mode = "online"  # Options: online, offline, disabled
+
+    # CONSTANTS
+    episode_len: int = (
+        gpudrive.episodeLen
+    )  # Length of an episode in the simulator
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
