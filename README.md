@@ -125,11 +125,11 @@ To further test the setup, you can run the pytests in the root directory:
 pytest
 ```
 
-To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory. Remember to change the location of the data in `src/headless.cpp` and compiling again before running it.
+To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory.
 
 ```bash
 cd build
-./headless CPU 1 1 # Run on CPU , 1 world, 1 step
+./headless CPU 1 # Run on CPU, 1 step
 ```
 
 ## Dataset `{ 🚦 🚗  🚙  🛣️ }`
