@@ -31,9 +31,9 @@ class LateFusionNet(nn.Module):
         self.net_config = exp_config
 
         # Unpack feature dimensions
-        self.ego_input_dim = self.config.EGO_STATE_DIM
-        self.ro_input_dim = self.config.PARTNER_DIM
-        self.rg_input_dim = self.config.ROAD_MAP_DIM
+        self.ego_input_dim = constants.EGO_FEAT_DIM if self.config.ego_state else 0
+        self.ro_input_dim = constants.PARTNER_FEAT_DIM if self.config.partner_obs else 0
+        self.rg_input_dim = constants.ROAD_GRAPH_FEAT_DIM if self.config.road_map_obs else 0
 
         self.ro_max = self.config.max_num_objects-1
         self.rg_max = self.config.roadgraph_top_k

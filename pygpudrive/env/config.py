@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, Optional
 import torch
+
 import gpudrive
+from pygpudrive.env import constants
 
 @dataclass
 class EnvConfig:
@@ -47,17 +49,11 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
     dist_to_goal_threshold: float = 3.0  # Radius around goal considered as "goal achieved"
 
-    # Feature dimensions (automatically calculated based on configurations)
-    EGO_STATE_DIM: int = 6 if ego_state else 0
-    PARTNER_DIM: int = 10 if partner_obs else 0
-    ROAD_MAP_DIM: int = 13 if road_map_obs else 0
-
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_objects: int = gpudrive.maxNumObjects  # Max number of objects in simulation
     max_num_rg_points: int = gpudrive.maxNumRgPoints  # Max number of road graph points
     roadgraph_top_k: int = gpudrive.roadGraphTopK  # Top-K road graph points
     episode_len: int = gpudrive.episodeLen  # Length of an episode in the simulator
-
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
