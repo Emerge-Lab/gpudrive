@@ -150,7 +150,12 @@ class MultiAgentCallback(BaseCallback):
             self.config.render
             and self.num_rollouts % self.config.render_freq == 0
         ):
-            self._create_and_log_video()
+            for world_idx in range(self.config.render_n_worlds):
+                self._create_and_log_video(
+                    render_world_idx=world_idx,
+                    video_title=f"Global step: {self.num_timesteps:,}",
+                    caption=f"Env: {world_idx}",
+                )
 
         if (
             self.config.save_policy
