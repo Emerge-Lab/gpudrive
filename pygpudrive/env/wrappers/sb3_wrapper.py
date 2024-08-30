@@ -9,10 +9,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnvStepReturn,
 )
 
-# Import base gumenvironment
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-
-# Import the EnvConfig dataclass
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,13 +42,10 @@ class SB3MultiAgentEnv(VecEnv):
         self.num_envs = self._env.cont_agent_mask.sum().item()
         self.device = device
         self.controlled_agent_mask = self._env.cont_agent_mask.clone()
-        self.cont_agents_in_worlds = {f'world_{idx}': value.item() for idx, value in enumerate(self.controlled_agent_mask.sum(axis=1))}
         self.action_space = gym.spaces.Discrete(self._env.action_space.n)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
-        self.log_agg_world_info = False
-        self.aggregate_world_dict = {}
         self.obs_dim = self._env.observation_space.shape[0]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
@@ -74,12 +68,6 @@ class SB3MultiAgentEnv(VecEnv):
         ).to(self.device)
 
         self.num_episodes = 0
-        self.info_dict = {
-            "off_road": 0,
-            "veh_collisions": 0,
-            "non_veh_collision": 0,
-            "goal_achieved": 0,
-        }
 
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
@@ -97,7 +85,7 @@ class SB3MultiAgentEnv(VecEnv):
         if world_idx is None:
             self._env.reset()
             obs = self._env.get_obs()
-        
+
             # Make dead agent mask (True for dead or invalid agents)
             self.dead_agent_mask = ~self.controlled_agent_mask.clone()
 
@@ -114,10 +102,10 @@ class SB3MultiAgentEnv(VecEnv):
         """
         Returns:
         --------
-            torch.Tensor (max_agent_count * num_worlds, obs_dim): Next observations.
+            torch.Tensor (max_agent_count * num_worlds, obs_dim): Next obs.
             torch.Tensor (max_agent_count * num_worlds): Rewards.
             torch.Tensor (max_agent_count * num_worlds): Dones.
-            torch.Tensor (max_agent_count * num_worlds, info_dim): Information.
+            torch.Tensor (max_agent_count * num_worlds, info_dim): Info.
 
         Note:
         -------
@@ -145,11 +133,11 @@ class SB3MultiAgentEnv(VecEnv):
             (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
             == self.controlled_agent_mask.sum(dim=1)
         )[0]
-              
+
         if done_worlds.any().item():
             self._update_info_dict(info, done_worlds)
             self.num_episodes += len(done_worlds)
-            self._env.sim.reset(done_worlds.tolist())            
+            self._env.sim.reset(done_worlds.tolist())
 
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
@@ -209,7 +197,7 @@ class SB3MultiAgentEnv(VecEnv):
 
         self._seeds = [seed + idx for idx in range(self.num_envs)]
         return self._seeds
-    
+
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""
 
@@ -232,43 +220,15 @@ class SB3MultiAgentEnv(VecEnv):
             indices
         ].sum()
 
-        # log the agents that are done but did not receive any reward i.e. truncated
-        # TODO(ev) remove hardcoded 91
+        # Log the agents that are done but did not receive any reward
         self.info_dict["truncated"] = (
-            ((self.agent_step[indices] == 90) * ~self.dead_agent_mask[indices])
+            (
+                (self.agent_step[indices] == self.config.episode_len - 1)
+                * ~self.dead_agent_mask[indices]
+            )
             .sum()
             .item()
         )
-
-        # Store per world info
-        for (
-            world_idx
-        ) in indices:  # max agents, goal achieved, off road, veh collisions
-            if world_idx not in self.aggregate_world_dict:
-
-                cont_agents_in_world = self.controlled_agent_mask[world_idx, :]
-                controlled_agent_info_in_world = info[
-                    world_idx, cont_agents_in_world, :
-                ]
-
-                self.aggregate_world_dict[world_idx.item()] = torch.Tensor(
-                    [
-                        self.controlled_agent_mask[world_idx].sum().item(),
-                        controlled_agent_info_in_world[:, 3].sum().item()
-                        / cont_agents_in_world.sum().item()
-                        + 1e-8,
-                        controlled_agent_info[:, 0].sum().item()
-                        / cont_agents_in_world.sum().item()
-                        + 1e-8,
-                        controlled_agent_info[:, 1].sum().item()
-                        / cont_agents_in_world.sum().item()
-                        + 1e-8,
-                    ]
-                )
-
-        if len(self.aggregate_world_dict) == self.num_worlds:
-            # Log stats
-            self.log_agg_world_info = True
 
     def get_attr(self, attr_name, indices=None):
         raise NotImplementedError()
