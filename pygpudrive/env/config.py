@@ -85,6 +85,7 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
+        "sparse_on_goal_achieved", # Alternatively, "weighted_combination" 
         "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved" / "weighted_combination"
     )
     

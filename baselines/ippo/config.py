@@ -21,6 +21,7 @@ class ExperimentConfig:
 
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
+    reward_type: str = "weighted_combination"
     collision_weight: float = 0.0
     goal_achieved_weight: float = 1.0
     off_road_weight: float = 0.0

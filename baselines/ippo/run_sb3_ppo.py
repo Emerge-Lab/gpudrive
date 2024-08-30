@@ -37,6 +37,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
     # ENVIRONMENT CONFIG
     env_config = dataclasses.replace(
         EnvConfig(),
+        reward_type=exp_config.reward_type,
         collision_weight=exp_config.collision_weight,
         goal_achieved_weight=exp_config.goal_achieved_weight,
         off_road_weight=exp_config.off_road_weight,
