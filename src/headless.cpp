@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-            .maxNumControlledVehicles = 2,
+            .maxNumControlledVehicles = 0,
         }
     });
 
