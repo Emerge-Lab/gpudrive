@@ -33,8 +33,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    uint64_t num_steps = std::stoul(argv[3]); 
-    uint64_t num_worlds = 16;
+    uint64_t num_steps = std::stoul(argv[2]);
+    std::vector<std::string> scenes = {"../data/tfrecord-00001-of-01000_307.json",
+         "../data/tfrecord-00003-of-01000_109.json",
+         "../data/tfrecord-00012-of-01000_389.json"};
+    uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
     if (argc >= 4) {
@@ -46,7 +49,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .scenes = {"../maps.16"},
+        .scenes = scenes,
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -55,7 +58,7 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-            .maxNumControlledVehicles = 0,
+            .maxNumControlledVehicles = 2,
         }
     });
 
@@ -87,7 +90,6 @@ int main(int argc, char *argv[])
 
         // printf("Map Obs\n");
         // map_obs_printer.print();
-        // printf("\n");
 
         // printf("Shape\n");
         // shapePrinter.print();
@@ -109,7 +111,7 @@ int main(int argc, char *argv[])
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+	mgr.getShapeTensorFromDeviceMemory(exec_mode);
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
