@@ -4,9 +4,7 @@ from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.scene_selector import select_scenes
 import abc
-
 import gpudrive
-
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     """Base class for multi-agent environments in GPUDrive.
@@ -20,7 +18,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def reset(self):
         """Reset the dynamics to inital state.
-        Args:
+    Args:
         scenario: Scenario used to generate the initial state.
         rng: Optional random number generator for stochastic environments.
 
