@@ -17,7 +17,7 @@ class EnvConfig:
 
     To modify simulator settings shared with C++, follow these steps:
     1. Navigate to `src/consts.hpp` in the C++ codebase.
-    2. Locate and modify the desired constant definitions (e.g., `maxNumObjects`).
+    2. Locate and modify the desired constant definitions (e.g., `kMaxAgentCount`).
     3. Save the changes to `src/consts.hpp`.
     4. Recompile the simulator to apply changes across both C++ and Python environments.
     """
@@ -50,9 +50,9 @@ class EnvConfig:
     dist_to_goal_threshold: float = 3.0  # Radius around goal considered as "goal achieved"
 
     # C++ and Python shared settings (modifiable via C++ codebase)
-    max_num_objects: int = gpudrive.maxNumObjects  # Max number of objects in simulation
-    max_num_rg_points: int = gpudrive.maxNumRgPoints  # Max number of road graph points
-    roadgraph_top_k: int = gpudrive.roadGraphTopK  # Top-K road graph points
+    max_num_agents_in_scene: int = gpudrive.kMaxAgentCount  # Max number of objects in simulation
+    max_num_rg_points: int = gpudrive.kMaxRoadEntityCount  # Max number of road graph segments
+    roadgraph_top_k: int = gpudrive.kMaxAgentMapObservationsCount  # Top-K road graph segments agents can view
     episode_len: int = gpudrive.episodeLen  # Length of an episode in the simulator
 
 class SelectionDiscipline(Enum):

@@ -122,9 +122,9 @@ struct Sim : public madrona::WorldBase {
     // Agent entity references. This entities live across all episodes
     // and are just reset to the start of the level on reset.
     madrona::CountT numAgents;
-    Entity agents[consts::maxNumObjects];
+    Entity agents[consts::kMaxAgentCount];
     madrona::CountT numRoads;
-    Entity roads[consts::maxNumRgPoints];
+    Entity roads[consts::kMaxRoadEntityCount];
 
     madrona::CountT numControlledVehicles;
 

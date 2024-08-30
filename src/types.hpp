@@ -138,22 +138,22 @@ struct PartnerObservation {
 
 // Egocentric observations of other agents
 struct PartnerObservations {
-    PartnerObservation obs[consts::maxNumObjects - 1];
+    PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
 const size_t PartnerObservationExportSize = 7;
 
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::maxNumObjects - 1) * PartnerObservationExportSize);
+    (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
 struct AgentMapObservations {
-    MapObservation obs[consts::roadGraphTopK];
+    MapObservation obs[consts::kMaxAgentMapObservationsCount];
 };
 
 const size_t AgentMapObservationExportSize = 7;
 
 static_assert(sizeof(AgentMapObservations) ==
-              sizeof(float) * consts::roadGraphTopK *
+              sizeof(float) * consts::kMaxAgentMapObservationsCount *
                   AgentMapObservationExportSize);
 
 struct LidarSample {
@@ -180,7 +180,7 @@ struct Progress {
 // Per-agent component storing Entity IDs of the other agents. Used to
 // build the egocentric observations of their state.
 struct OtherAgents {
-    madrona::Entity e[consts::maxNumObjects - 1];
+    madrona::Entity e[consts::kMaxAgentCount - 1];
 };
 
 struct Trajectory {

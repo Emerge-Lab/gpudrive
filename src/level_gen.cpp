@@ -245,20 +245,20 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         size_t numPoints = roadInit.numPoints;
         for(size_t j = 1; j <= numPoints - 1; j++)
         {
-            if(idx >= consts::maxNumRgPoints)
+            if(idx >= consts::kMaxRoadEntityCount)
                  return;
             ctx.data().roads[idx++] = makeRoadEdge(ctx, roadInit.geometry[j-1], roadInit.geometry[j], roadInit.type);
         }
     } else if (roadInit.type == EntityType::SpeedBump || roadInit.type == EntityType::CrossWalk) {
       assert(roadInit.numPoints >= 4);
       // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
-      if(idx >= consts::maxNumRgPoints)
+      if(idx >= consts::kMaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
     } else if (roadInit.type == EntityType::StopSign ) {
       assert(roadInit.numPoints >= 1);
       // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
-      if(idx >= consts::maxNumRgPoints)
+      if(idx >= consts::kMaxRoadEntityCount)
         return;
       ctx.data().roads[idx++] = makeStopSign(ctx, roadInit.geometry[0]);
     } else {
@@ -326,12 +326,12 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
 
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::maxNumObjects; ++agentIdx) {
+         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         ctx.data().agents[agentIdx] = createAgentPadding(ctx);
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
-         roadIdx < consts::maxNumRgPoints; ++roadIdx) {
+         roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
         ctx.data().roads[roadIdx] = createPhysicsEntityPadding(ctx);
     }
 }
@@ -364,7 +364,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
-        if(agentIdx >= consts::maxNumObjects)
+        if(agentIdx >= consts::kMaxAgentCount)
             break;
         if (ctx.data().params.IgnoreNonVehicles)
         {
@@ -388,7 +388,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     CountT roadIdx = 0;
     for(CountT roadCtr = 0; roadCtr < map->numRoads; roadCtr++)
     {
-        if(roadIdx >= consts::maxNumRgPoints)
+        if(roadIdx >= consts::kMaxRoadEntityCount)
             break;
         const auto &roadInit = map->roads[roadCtr];
         createRoadEntities(ctx, roadInit, roadIdx);
@@ -404,7 +404,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
 
 static void resetPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
-         agentIdx < consts::maxNumObjects; ++agentIdx) {
+         agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity agent = ctx.data().agents[agentIdx];
         ctx.get<Done>(agent).v = 0;
         ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
@@ -414,7 +414,7 @@ static void resetPaddingEntities(Engine &ctx) {
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
-         roadIdx < consts::maxNumRgPoints; ++roadIdx) {
+         roadIdx < consts::kMaxRoadEntityCount; ++roadIdx) {
         Entity road = ctx.data().roads[roadIdx];
         registerRigidBodyEntity(ctx, road, SimObject::Cube);
     }

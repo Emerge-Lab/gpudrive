@@ -232,7 +232,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
         Args:
-            obs: torch.Tensor of shape (num_worlds, maxNumObjects, maxNumObjects - 1, num_features)
+            obs: torch.Tensor of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
         """
 
         # TODO: Fix (there should not be nans in the obs)
@@ -383,10 +383,10 @@ if __name__ == "__main__":
             [
                 [
                     env.action_space.sample()
-                    for _ in range(env_config.max_num_objects * NUM_WORLDS)
+                    for _ in range(env_config.max_num_agents_in_scene * NUM_WORLDS)
                 ]
             ]
-        ).reshape(NUM_WORLDS, env_config.max_num_objects)
+        ).reshape(NUM_WORLDS, env_config.max_num_agents_in_scene)
 
         # Step the environment
         env.step_dynamics(None)

@@ -20,11 +20,11 @@ namespace gpudrive
         madrona::py::setupMadronaSubmodule(m);
 
         // Add bindings for constants defined in src/consts.hpp
-        m.attr("maxNumObjects") = consts::maxNumObjects;
-        m.attr("maxNumRgPoints") = consts::maxNumRgPoints;
-        m.attr("roadGraphTopK") = consts::roadGraphTopK;
-        m.attr("episodeLen") = consts::episodeLen;  // Use fully qualified name
-        m.attr("numLidarSamples") = consts::numLidarSamples;  // Use fully qualified name
+        m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
+        m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
+        m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("episodeLen") = consts::episodeLen;  
+        m.attr("numLidarSamples") = consts::numLidarSamples; 
 
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")

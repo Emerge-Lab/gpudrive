@@ -80,7 +80,7 @@ static inline Optional<render::RenderManager> initRenderManager(
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = static_cast<uint32_t>(mgr_cfg.scenes.size()),
-        .maxViewsPerWorld = consts::maxNumObjects + 1, // FIXME?
+        .maxViewsPerWorld = consts::kMaxAgentCount + 1, // FIXME?
         .maxInstancesPerWorld = 3000,
         .execMode = mgr_cfg.execMode,
         .voxelCfg = {},
@@ -393,7 +393,7 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
                FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
            (algo ==
                 FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
-            roadObservationsCount == consts::roadGraphTopK);
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
 Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) { 
@@ -602,7 +602,7 @@ Tensor Manager::actionTensor() const
     return impl_->exportTensor(ExportID::Action, TensorElementType::Float32,
         {
             impl_->numWorlds,
-            consts::maxNumObjects,
+            consts::kMaxAgentCount,
             3, // Num_actions
         });
 }
@@ -612,7 +612,7 @@ Tensor Manager::rewardTensor() const
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -622,7 +622,7 @@ Tensor Manager::doneTensor() const
     return impl_->exportTensor(ExportID::Done, TensorElementType::Int32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -632,7 +632,7 @@ Tensor Manager::infoTensor() const
     return impl_->exportTensor(ExportID::Info, TensorElementType::Int32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    InfoExportSize
                                });
 }
@@ -643,7 +643,7 @@ Tensor Manager::selfObservationTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    SelfObservationExportSize
 			       });
 }
@@ -654,7 +654,7 @@ Tensor Manager::mapObservationTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumRgPoints,
+                                   consts::kMaxRoadEntityCount,
                                    MapObservationExportSize
                                });
 }
@@ -665,8 +665,8 @@ Tensor Manager::partnerObservationsTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
-                                   consts::maxNumObjects - 1,
+                                   consts::kMaxAgentCount,
+                                   consts::kMaxAgentCount - 1,
                                    PartnerObservationExportSize
                                });
 }
@@ -677,8 +677,8 @@ Tensor Manager::agentMapObservationsTensor() const
                                TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-				   consts::maxNumObjects,
-                                   consts::roadGraphTopK,
+				   consts::kMaxAgentCount,
+                                   consts::kMaxAgentMapObservationsCount,
                                    AgentMapObservationExportSize,
                                });
 
@@ -689,7 +689,7 @@ Tensor Manager::lidarTensor() const
     return impl_->exportTensor(ExportID::Lidar, TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    consts::numLidarSamples,
                                    2,
                                });
@@ -701,7 +701,7 @@ Tensor Manager::stepsRemainingTensor() const
                                TensorElementType::Int32,
                                {
                                    impl_->numWorlds,
-                                   consts::maxNumObjects,
+                                   consts::kMaxAgentCount,
                                    1,
                                });
 }
@@ -713,30 +713,30 @@ Tensor Manager::shapeTensor() const {
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
-                               {impl_->numWorlds, consts::maxNumObjects, 1});
+                               {impl_->numWorlds, consts::kMaxAgentCount, 1});
 }
 
 Tensor Manager::responseTypeTensor() const {
     return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
-                               {impl_->numWorlds, consts::maxNumObjects, 1});
+                               {impl_->numWorlds, consts::kMaxAgentCount, 1});
 }
 
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
-        {impl_->numWorlds, consts::maxNumObjects, AbsoluteSelfObservationExportSize});
+        {impl_->numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
 }
 
 Tensor Manager::validStateTensor() const {
     return impl_->exportTensor(
         ExportID::ValidState, TensorElementType::Int32,
-        {impl_->numWorlds, consts::maxNumObjects, 1});
+        {impl_->numWorlds, consts::kMaxAgentCount, 1});
 }
 
 Tensor Manager::expertTrajectoryTensor() const {
     return impl_->exportTensor(
         ExportID::Trajectory, TensorElementType::Float32,
-        {impl_->numWorlds, consts::maxNumObjects, TrajectoryExportSize});
+        {impl_->numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
 }
 
 void Manager::triggerReset(int32_t world_idx)
@@ -765,7 +765,7 @@ Tensor Manager::rgbTensor() const
 
     return Tensor((void*)rgb_ptr, TensorElementType::UInt8, {
         impl_->numWorlds,
-        consts::maxNumObjects,
+        consts::kMaxAgentCount,
         impl_->cfg.batchRenderViewHeight,
         impl_->cfg.batchRenderViewWidth,
         4,
@@ -778,7 +778,7 @@ Tensor Manager::depthTensor() const
 
     return Tensor((void *)depth_ptr, TensorElementType::Float32, {
         impl_->numWorlds,
-        consts::maxNumObjects,
+        consts::kMaxAgentCount,
         impl_->cfg.batchRenderViewHeight,
         impl_->cfg.batchRenderViewWidth,
         1,
@@ -791,7 +791,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                   .steering = steering,
                   .headAngle = headAngle};
 
-    auto *action_ptr = impl_->agentActionsBuffer + world_idx * consts::maxNumObjects + agent_idx;
+    auto *action_ptr = impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
 
     if (impl_->cfg.execMode == ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT

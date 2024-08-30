@@ -216,7 +216,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
         Args:
-            obs: jnp.array of shape (num_worlds, maxNumObjects, maxNumObjects - 1, num_features)
+            obs: jnp.array of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
         """
 
         # Speed

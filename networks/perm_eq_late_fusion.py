@@ -35,7 +35,7 @@ class LateFusionNet(nn.Module):
         self.ro_input_dim = constants.PARTNER_FEAT_DIM if self.config.partner_obs else 0
         self.rg_input_dim = constants.ROAD_GRAPH_FEAT_DIM if self.config.road_map_obs else 0
 
-        self.ro_max = self.config.max_num_objects-1
+        self.ro_max = self.config.max_num_agents_in_scene-1
         self.rg_max = self.config.roadgraph_top_k
 
         # Network architectures
