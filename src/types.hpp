@@ -240,7 +240,9 @@ static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObs
 
 struct AgentInterface : public madrona::Archetype<
     Action,
-
+    Reward,
+    Done,
+    Info,
     // Observations
     SelfObservation,
     AbsoluteSelfObservation,
@@ -249,15 +251,11 @@ struct AgentInterface : public madrona::Archetype<
     Lidar,
     StepsRemaining,
 
-    ControlledState, //Drive Logic
+    ControlledState //Drive Logic
 
-    // Reward, episode termination
-    Reward,
-    Done,
-    Info
 > {};
 
-struct InterfaceEntity
+struct AgentInterfaceEntity
 {
     madrona::Entity e;
 };
@@ -300,7 +298,7 @@ struct Agent : public madrona::Archetype<
     Goal,
     Trajectory,
     // Interface 
-    InterfaceEntity,
+    AgentInterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
     madrona::render::RenderCamera,

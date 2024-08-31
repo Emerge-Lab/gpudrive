@@ -50,7 +50,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<CollisionDetectionEvent>();
     registry.registerComponent<AbsoluteSelfObservation>();
     registry.registerComponent<Info>();
-    registry.registerComponent<InterfaceEntity>();
+    registry.registerComponent<AgentInterfaceEntity>();
     registry.registerComponent<RoadInterfaceEntity>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -137,7 +137,7 @@ inline void collectObservationsSystem(Engine &ctx,
                                       const OtherAgents &other_agents,
                                       const EntityType& entityType,
 				                      const CollisionDetectionEvent& collisionEvent,
-                                      const InterfaceEntity &agent_iface)
+                                      const AgentInterfaceEntity &agent_iface)
 {
     auto &self_obs = ctx.get<SelfObservation>(agent_iface.e);
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
@@ -241,7 +241,7 @@ inline void agentZeroVelSystem(Engine &,
 
 
 inline void movementSystem(Engine &e,
-                           const InterfaceEntity &agent_iface,
+                           const AgentInterfaceEntity &agent_iface,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -334,7 +334,7 @@ static inline float encodeType(EntityType type)
 // This system is specially optimized in the GPU version:
 // a warp of threads is dispatched for each invocation of the system
 // and each thread in the warp traces one lidar ray for the agent.
-inline void lidarSystem(Engine &ctx, Entity e, const InterfaceEntity &agent_iface,
+inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent_iface,
                         EntityType &entityType) {
     Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
     assert(entityType != EntityType::None);
@@ -402,7 +402,7 @@ inline void rewardSystem(Engine &ctx,
                          const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
-                         const InterfaceEntity &agent_iface)
+                         const AgentInterfaceEntity &agent_iface)
 {
     Reward &out_reward = ctx.get<Reward>(agent_iface.e);
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
@@ -452,7 +452,7 @@ inline void bonusRewardSystem(Engine &ctx,
     }
 }
 
-inline void stepTrackerSystem(Engine &ctx, const InterfaceEntity &agent_iface) {
+inline void stepTrackerSystem(Engine &ctx, const AgentInterfaceEntity &agent_iface) {
     StepsRemaining &stepsRemaining = ctx.get<StepsRemaining>(agent_iface.e);
     --stepsRemaining.t;
 }
@@ -463,7 +463,7 @@ inline void stepTrackerSystem(Engine &ctx, const InterfaceEntity &agent_iface) {
 inline void doneSystem(Engine &ctx,
                       const Position &position,
                       const Goal &goal,
-                      InterfaceEntity &agent_iface)
+                      AgentInterfaceEntity &agent_iface)
 {
     StepsRemaining &steps_remaining = ctx.get<StepsRemaining>(agent_iface.e);
     Done &done = ctx.get<Done>(agent_iface.e);
@@ -495,7 +495,7 @@ void collisionDetectionSystem(Engine &ctx,
 
     auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
     {
-        auto agent_iface = ctx.getCheck<InterfaceEntity>(candidate);
+        auto agent_iface = ctx.getCheck<AgentInterfaceEntity>(candidate);
         if (agent_iface.valid())
         {
             auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlledState;
@@ -574,7 +574,7 @@ void collisionDetectionSystem(Engine &ctx,
         ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
     if (maybeCollisionDetectionEventA.valid()) {
         maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
-        auto agent_iface = ctx.get<InterfaceEntity>(candidateCollision.a).e;
+        auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.a).e;
         if(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)
         {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
@@ -593,7 +593,7 @@ void collisionDetectionSystem(Engine &ctx,
         ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
     if (maybeCollisionDetectionEventB.valid()) {
         maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
-        auto agent_iface = ctx.get<InterfaceEntity>(candidateCollision.b).e;
+        auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.b).e;
         if(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)
         {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
@@ -637,7 +637,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Goal &goal,
                                               const EntityType &entityType,
                                               const VehicleSize &vehicleSize,
-                                              InterfaceEntity &agent_iface) {
+                                              AgentInterfaceEntity &agent_iface) {
     if (entityType == EntityType::Padding) {
         return;
     }
@@ -681,20 +681,20 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
             Trajectory,
             Goal,
             Progress,
-            InterfaceEntity
+            AgentInterfaceEntity
         >>({phys_done});
 
     auto previousSystem = reward_sys;
     if (decrementStep) {
         previousSystem = builder.addToGraph<
-            ParallelForNode<Engine, stepTrackerSystem, InterfaceEntity>>(
+            ParallelForNode<Engine, stepTrackerSystem, AgentInterfaceEntity>>(
             {reward_sys});
     }
 
     // Check if the episode is over
     auto done_sys =
         builder.addToGraph<ParallelForNode<Engine, doneSystem, Position, Goal,
-                                           InterfaceEntity>>(
+                                           AgentInterfaceEntity>>(
             {previousSystem});
 
     auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({done_sys});
@@ -720,12 +720,12 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
             OtherAgents,
             EntityType,
             CollisionDetectionEvent,
-            InterfaceEntity
+            AgentInterfaceEntity
         >>({clear_tmp});
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, EntityType, VehicleSize, InterfaceEntity>>(
+                        Rotation, Goal, EntityType, VehicleSize, AgentInterfaceEntity>>(
         {collect_obs});
 
     if (cfg.renderBridge) {
@@ -747,7 +747,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         lidarSystem,
 #endif
             Entity,
-            InterfaceEntity,
+            AgentInterfaceEntity,
             EntityType
         >>({collectAbsoluteSelfObservations});
     }
@@ -775,7 +775,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
-            InterfaceEntity,
+            AgentInterfaceEntity,
             VehicleSize,
             Rotation,
             Position,

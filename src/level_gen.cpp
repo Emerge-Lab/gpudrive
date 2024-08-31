@@ -22,7 +22,7 @@ static void registerRigidBodyEntity(
 }
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
-    auto agent_iface = ctx.get<InterfaceEntity>(agent).e;
+    auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     auto xCoord = ctx.get<Trajectory>(agent).positions[0].x;
     auto yCoord = ctx.get<Trajectory>(agent).positions[0].y;
     auto xVelocity = ctx.get<Trajectory>(agent).velocities[0].x;
@@ -91,7 +91,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     assert(agentInit.type >= EntityType::Vehicle || agentInit.type == EntityType::None);
     ctx.get<EntityType>(agent) = agentInit.type;
 
-    auto agent_iface = ctx.get<InterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
+    auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
 
@@ -371,7 +371,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         }
         auto agent = createAgent(
             ctx, agentInit);
-        ctx.data().agent_ifaces[agentIdx] = ctx.get<InterfaceEntity>(agent).e;
+        ctx.data().agent_ifaces[agentIdx] = ctx.get<AgentInterfaceEntity>(agent).e;
         ctx.data().agents[agentIdx++] = agent;
     } 
     
