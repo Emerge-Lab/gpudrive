@@ -125,11 +125,11 @@ To further test the setup, you can run the pytests in the root directory:
 pytest
 ```
 
-To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory. Remember to change the location of the data in `src/headless.cpp` and compiling again before running it.
+To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory.
 
 ```bash
 cd build
-./headless CPU 1 1 # Run on CPU , 1 world, 1 step
+./headless CPU 1 # Run on CPU, 1 step
 ```
 
 ## Dataset `{ 🚦 🚗  🚙  🛣️ }`
@@ -163,3 +163,7 @@ If you use GPUDrive in your work, please cite us:
 ## Contributing and learning benchmark 👷‍♀️
 
 If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`. 
+
+## Timeline
+
+[![GPUDrive](https://api.star-history.com/svg?repos=Emerge-Lab/gpudrive&type=Date)](https://star-history.com/#Emerge-Lab/gpudrive&Date)

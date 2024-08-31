@@ -803,8 +803,8 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 }
 
 std::vector<Shape>
-Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
-                                        uint32_t numWorlds) {
+Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode) {
+    const uint32_t numWorlds = impl_->numWorlds;
     const auto &tensor = shapeTensor();
 
     const std::size_t floatsPerShape{2};
