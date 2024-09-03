@@ -208,7 +208,7 @@ struct Shape {
 };
 
 struct ControlledState {
-   bool controlled; // default: 1
+   int32_t controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {

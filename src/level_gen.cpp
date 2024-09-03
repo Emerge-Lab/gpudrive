@@ -110,20 +110,20 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         switch (ctx.data().params.dynamicsModel)
         {
         case DynamicsModel::Waymax:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
             break;
         case DynamicsModel::Delta:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
             break;
         case DynamicsModel::Classic:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
             break;
         ctx.data().numControlledVehicles++;
         }
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlled = false};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlled = 0};
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -311,7 +311,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
     ctx.get<Done>(agent).v = 0;
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-    ctx.get<ControlledState>(agent) = ControlledState{.controlled = false};
+    ctx.get<ControlledState>(agent) = ControlledState{.controlled = 0};
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,
