@@ -92,6 +92,12 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         Returns:
             object: Configured parameters for the simulation.
         """
+        self.dynamics_model = dict(
+            classic = gpudrive.DynamicsModel.Classic,
+            delta = gpudrive.DynamicsModel.Delta,
+            waymax = gpudrive.DynamicsModel.Waymax,
+        )
+
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
@@ -100,8 +106,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledVehicles = self.max_cont_agents
         params.isStaticAgentControlled = False
-        params.useWayMaxModel = self.config.use_bicycle_model
-        params.useDeltaModel = self.config.use_delta_model
+        params.dynamicsModel = self.dynamics_model[self.config.dynamics_model]
 
         if self.config.enable_lidar:
             params.enableLidar = self.config.enable_lidar
@@ -147,7 +152,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         dataset = select_scenes(scene_config)
-
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,

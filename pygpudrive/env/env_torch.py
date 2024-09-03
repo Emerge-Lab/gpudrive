@@ -34,12 +34,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
-        self.useDeltaModel = params.useDeltaModel
-        self.useWayMaxModel = params.useWayMaxModel
-        self.action_type = "delta" if self.useDeltaModel else "bicycle"
+        params.dynamicsModel = self.dynamics_model[config.dynamics_model]
+        if config.dynamics_model == 'delta':
+            self.action_features = "delta"
+        else:
+            self.action_features = "bicycle"
+
         # Initialize simulator with parameters
         self.sim = self._initialize_simulator(params, scene_config)
-
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
@@ -103,14 +105,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raise ValueError(f"Invalid action shape: {actions.shape}")
 
         # Feed the actual action values to gpudrive
-        if self.action_type == 'delta':
+        if self.action_features == 'delta':
             self.sim.delta_action_tensor().to_torch().copy_(action_value_tensor)
         else:
             self.sim.action_tensor().to_torch().copy_(action_value_tensor)
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
-        if self.action_type == 'delta':
+        if self.action_features == 'delta':
             self.dx = self.config.dx.to(self.device)
             self.dy = self.config.dy.to(self.device)
             self.dyaw = self.config.dyaw.to(self.device)
@@ -215,8 +217,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_controlled_agents_mask(self):
         """Get the control mask. Bicycle = 1, DeltaModel = 2"""
-        target_idx = 2 if self.action_type == 'delta' else 1
-        return (self.sim.controlled_state_tensor().to_torch() == target_idx).squeeze(
+        # target_idx = 2 if self.action_features == 'delta' else 1
+        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
             axis=2
         )
 
@@ -257,7 +259,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         velocity = expert_traj[:, :, 2 * self.episode_len:4 * self.episode_len].view(self.num_worlds,
                                                                                      self.max_agent_count,
                                                                                      self.episode_len, -1)
-        if self.action_type == 'delta':
+        if self.action_features == 'delta':
             inferred_expert_actions = expert_traj[:, :, -3 * self.episode_len:].view(self.num_worlds,
                                                                                      self.max_agent_count,
                                                                                      self.episode_len, -1)
@@ -435,7 +437,7 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for _ in range(TOTAL_STEPS):
+    for i in range(TOTAL_STEPS):
 
         # Take a random actions
         rand_action = torch.Tensor(

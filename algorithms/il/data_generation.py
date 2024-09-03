@@ -74,7 +74,7 @@ def generate_state_action_pairs(
     expert_dx, expert_dy, expert_dyaw = None, None, None
     expert_accel, expert_steer = None, None
     if debug_world_idx is not None and debug_veh_idx is not None:
-        if env.useDeltaModel:
+        if env.action_features == 'delta':
             expert_dx = raw_expert_action[debug_world_idx, debug_veh_idx, :, 0]
             expert_dy = raw_expert_action[debug_world_idx, debug_veh_idx, :, 1]
             expert_dyaw = raw_expert_action[debug_world_idx, debug_veh_idx, :, 2]
@@ -89,7 +89,7 @@ def generate_state_action_pairs(
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
         disc_expert_actions = expert_actions.clone()
-        if env.useDeltaModel:
+        if env.action_features == 'delta':
             disc_expert_actions[:, :, :, 0], _ = map_to_closest_discrete_value(
                 grid=env.dx, cont_actions=expert_actions[:, :, :, 0]
             )
@@ -127,7 +127,7 @@ def generate_state_action_pairs(
                                      world_idx, agent_idx, time_idx, :
                                      ].tolist()
                         )
-                        if not env.useDeltaModel:
+                        if not env.action_features == 'delta':
                             action_val_tuple = (action_val_tuple[0], action_val_tuple[1], 0.0)
 
                         action_idx = env.values_to_action_key.get(
@@ -220,7 +220,7 @@ def generate_state_action_pairs(
     flat_expert_dones = torch.cat(expert_dones_lst, dim=0)
     if debug_world_idx is not None:
         '''for plotting '''
-        if env.useDeltaModel:
+        if env.action_features == 'delta':
             fig, axs = plt.subplots(2, 3, figsize=(8, 8))
         else:
             fig, axs = plt.subplots(2, 2, figsize=(8, 8))
@@ -242,7 +242,7 @@ def generate_state_action_pairs(
         axs[0, 1].set_ylabel('Y Position')
         axs[0, 1].legend()
 
-        if env.useDeltaModel:
+        if env.action_features == 'delta':
             # dx plot
             axs[1, 0].plot(expert_dx.numpy(), label='Expert dx', color='b')
             axs[1, 0].plot(disc_expert_actions[debug_world_idx, debug_veh_idx, :, 0].numpy(), label='Simulation dx',
@@ -316,10 +316,7 @@ if __name__ == "__main__":
     # Action space (joint discrete)
     num_dx_values = reversed(range(100, 101, 1))
     num_dy_values = reversed(range(100, 101, 1))
-    num_dyaw_values = reversed(range(100, 501, 100))
-
-    use_delta_model = True if args.dynamics_model == 'delta' else False
-    use_bicycle_model = True if args.dynamics_model == 'bicycle' else False
+    num_dyaw_values = reversed(range(100, 101, 1))
 
     combinations = itertools.product(num_dx_values, num_dy_values, num_dyaw_values)
     render_config = RenderConfig(draw_obj_idx=True)
@@ -327,8 +324,7 @@ if __name__ == "__main__":
     for combi in combinations:
         num_dx, num_dy, num_dyaw = combi
         env_config = EnvConfig(
-            use_delta_model=use_delta_model,
-            use_bicycle_model=use_bicycle_model,
+            dynamics_model=args.dynamics_model,
             steer_actions=torch.round(
                 torch.linspace(-0.3, 0.3, 100), decimals=3
             ),
@@ -350,7 +346,7 @@ if __name__ == "__main__":
             config=env_config,
             scene_config=scene_config,
             max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-            device="cpu",
+            device="cuda",
             render_config=render_config,
         )
         # Generate expert actions and observations
@@ -363,7 +359,7 @@ if __name__ == "__main__":
             collision_rate
         ) = generate_state_action_pairs(
             env=env,
-            device="cpu",
+            device="cuda",
             discretize_actions=True,  # Discretize the expert actions
             use_action_indices=True,  # Map action values to joint action index
             make_video=True,  # Record the trajectories as sanity check
@@ -381,8 +377,8 @@ if __name__ == "__main__":
 
         # Store the results
         num_actions.append(num_action)
-        goal_rates.append(goal_rate)
-        collision_rates.append(collision_rate)
+        goal_rates.append(goal_rate.cpu().numpy())
+        collision_rates.append(collision_rate.cpu().numpy())
 
         # Plot the results
     plt.figure(figsize=(10, 5))
