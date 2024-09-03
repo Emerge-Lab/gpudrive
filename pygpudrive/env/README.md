@@ -12,7 +12,11 @@ Configure the environment using the basic settings in `config`:
 config = EnvConfig()
 ```
 
-This `config` all environment parameters.
+This `config` all environment parameters. In `config`, you can choose the `dynamics_model` which converts action features `e.g. (accel, steer), (dx, dy, dyaw)` and method for expert trajectory moves from [waymax](https://github.com/waymo-research/waymax/blob/main/waymax/dynamics/).
+```Python
+dynamics_model: 'classic' # options: ['classic', 'waymax', 'delta']
+# classic: kinematicsModel, waymax: InvertibleBicycleModel, delta: DeltaLocal 
+```
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 
