@@ -16,8 +16,7 @@ def sim_init():
     params.rewardParams = reward_params 
     params.maxNumControlledVehicles = 2 # we are going to use the second vehicle as the controlled vehicle
     params.IgnoreNonVehicles = True
-    params.useDeltaModel = True
-    params.useWayMaxModel = False
+    params.dynamicsModel = gpudrive.DynamicsModel.Delta
 
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU,
@@ -44,7 +43,9 @@ def test_forward_inverse_delta_dynamics(sim_init):
     vel = traj[2*91:4*91].view(91,2)
     headings = traj[4*91:5*91].view(91,1)
     invDeltaActions = traj[9*91:].view(91,3)
-
+    invActions = traj[6*91:9*91].view(91,3)
+    print('INVdELTAaCTION', invDeltaActions[:2])
+    print('invActions', invActions[:2])
     position = absolute_obs[0,valid_agent_idx,:2]
     heading = absolute_obs[0,valid_agent_idx,7]
     speed = self_obs[0, valid_agent_idx, 0]
