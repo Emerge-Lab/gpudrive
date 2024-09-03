@@ -1,7 +1,6 @@
 #include "level_gen.hpp"
 #include "utils.hpp"
 #include "dynamics.hpp"
-#include "dynamics_delta.hpp"
 #include "init.hpp"
 
 namespace gpudrive {

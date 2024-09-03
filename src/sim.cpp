@@ -9,7 +9,6 @@
 #include "utils.hpp"
 #include "knn.hpp"
 #include "dynamics.hpp"
-#include "dynamics_delta.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
