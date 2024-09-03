@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include "dynamics.hpp"
 #include "dynamics_delta.hpp"
+#include "init.hpp"
 
 namespace gpudrive {
 using namespace madrona;
@@ -73,10 +74,10 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
             continue;
         }
         Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
-        Position pos = Vector3{.x = trajectory.positions[i].x - ctx.data().mean.x, .y = trajectory.positions[i].y - ctx.data().mean.y, .z = 1};
+        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = 1};
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
-        Position targetPos = Vector3{.x = trajectory.positions[i+1].x - ctx.data().mean.x, .y = trajectory.positions[i+1].y - ctx.data().mean.y, .z = 1};
+        Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
         Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
         trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
         trajectory.inverseDeltaActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
@@ -106,19 +107,23 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
-        if (ctx.data().params.useWayMaxModel == true)
+        switch (ctx.data().params.dynamicsModel)
         {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
-        }
-        else
-        {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::DELTA};
-        }
+        case DynamicsModel::Waymax:
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            break;
+        case DynamicsModel::Delta:
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            break;
+        case DynamicsModel::Classic:
+            ctx.get<ControlledState>(agent) = ControlledState{.controlled = true};
+            break;
         ctx.data().numControlledVehicles++;
+        }
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlled = false};
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -306,7 +311,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
     ctx.get<Done>(agent).v = 0;
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-    ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+    ctx.get<ControlledState>(agent) = ControlledState{.controlled = false};
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,

@@ -10,6 +10,7 @@
 #include "knn.hpp"
 #include "dynamics.hpp"
 #include "dynamics_delta.hpp"
+
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
@@ -291,29 +292,21 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
+    if(controlledState.controlled)
     {
-        if(e.data().params.useWayMaxModel)
-        {
-            forwardWaymaxModel(action, rotation, position, velocity);
+        switch (e.data().params.dynamicsModel){
+
+            case DynamicsModel::Waymax:
+               forwardWaymaxModel(action, rotation, position, velocity);
+               break;
+            case DynamicsModel::Delta:
+               forwardDeltaModel(dAction, rotation, position, velocity);
+               break;
+            case DynamicsModel::Classic:
+               forwardKinematics(action, size, rotation, position, velocity);
+               break;
+
         }
-        else 
-        {
-            forwardKinematics(action, size, rotation, position, velocity);
-        }
-        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
-    }
-    else if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::DELTA)
-    {
-        if(e.data().params.useDeltaModel)
-        {
-            forwardDeltaModel(dAction, rotation, position, velocity);
-        }
-        else
-        {
-            forwardKinematics(action, size, rotation, position, velocity);
-        }
-        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
     }
     else
     {
@@ -506,7 +499,7 @@ void collisionDetectionSystem(Engine &ctx,
         auto controlledState = ctx.getCheck<ControlledState>(candidate);
         if (controlledState.valid())
         {
-            if( controlledState.value().controlledState == ControlMode::EXPERT)
+            if( controlledState.value().controlled == false)
             {
                 // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
@@ -516,7 +509,7 @@ void collisionDetectionSystem(Engine &ctx,
                     return true;
                 }
             }
-            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            else if (controlledState.value().controlled == true)
             {
                 // Case: If a controlled agent gets done, we teleport it to the padding position
                 // Hence we need to ignore the collision detection for it.

@@ -54,8 +54,7 @@ namespace gpudrive
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
-            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
-            .def_rw("useDeltaModel", &Parameters::useDeltaModel)
+            .def_rw("dynamicsModel", &Parameters::dynamicsModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
@@ -65,6 +64,11 @@ namespace gpudrive
             .value("AgentStop", CollisionBehaviour::AgentStop)
             .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
             .value("Ignore", CollisionBehaviour::Ignore);
+
+        nb::enum_<DynamicsModel>(m, "DynamicsModel")
+            .value("Classic", DynamicsModel::Classic)
+            .value("Waymax", DynamicsModel::Waymax)
+            .value("Delta", DynamicsModel::Delta);
 
         nb::enum_<EntityType>(m, "EntityType")
             .value("_None", EntityType::None)

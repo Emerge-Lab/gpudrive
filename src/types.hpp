@@ -207,14 +207,8 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-enum class ControlMode {
-   EXPERT,
-   BICYCLE,
-   DELTA
-};
-
 struct ControlledState {
-   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+   bool controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {
