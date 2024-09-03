@@ -55,7 +55,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
-        self.episode_len = self.config.episode_length
+        self.episode_len = self.config.episode_len
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
@@ -432,7 +432,6 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
-
     # RUN
     obs = env.reset()
     frames = []
