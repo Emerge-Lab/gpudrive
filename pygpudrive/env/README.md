@@ -12,11 +12,14 @@ Configure the environment using the basic settings in `config`:
 config = EnvConfig()
 ```
 
-This `config` all environment parameters. In `config`, you can choose the `dynamics_model` which converts action features `e.g. (accel, steer), (dx, dy, dyaw)` and method for expert trajectory moves from [waymax](https://github.com/waymo-research/waymax/blob/main/waymax/dynamics/).
-```Python
-dynamics_model: 'classic' # options: ['classic', 'waymax', 'delta']
-# classic: kinematicsModel, waymax: InvertibleBicycleModel, delta: DeltaLocal 
-```
+This `config` all environment parameters. This `config` contains all environment parameters. One important configuration is the dynamics model, which determines how a successor state is computed (e.g. position, yaw, velocity) of one or more objects given an action (e.g. steering and acceleration). 
+
+The following dynamics models are currently implemented:
+- Classic: A kinematic bicycle model uses the center of gravity as reference point with 2D action (acceleration, steering curvature). It was used for [Nocturne](https://arxiv.org/pdf/2206.09889).
+- InvertibleBicycleModel. A kinematically realistic model using a 2D action (acceleration, steering curvature).  (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics))
+
+- DeltaLocal. A position-based model using a 3D action (dx, dy, dyaw) representing the displacement of an object relative to the current position and orientation. This model does not check for infeasible actions, and large displacements may lead to unrealistic behavior. (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics))
+
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 
