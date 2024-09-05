@@ -1,9 +1,9 @@
 #include "level_gen.hpp"
 #include "utils.hpp"
 #include "dynamics.hpp"
+#include "init.hpp"
 
 namespace gpudrive {
-
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;
@@ -35,6 +35,8 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
     ctx.get<Action>(agent) =
         Action{.acceleration = 0, .steering = 0, .headAngle = 0};
+    ctx.get<DeltaAction>(agent) =
+        DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;
@@ -63,23 +65,28 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     }
 
     for(CountT i = agentInit.numPositions - 2; i >=0; i--)
-    {   
+    {
         if(!trajectory.valids[i] || !trajectory.valids[i+1])
         {
             trajectory.inverseActions[i] = Action{.acceleration = 0, .steering = 0, .headAngle = 0};
+            trajectory.inverseDeltaActions[i] = DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
             continue;
         }
         Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
+        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = 1};
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
+        Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
         Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
-        trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
+        trajectory.inverseActions[i] = inverseBicycleModel(rot, vel, targetRot, targetVel);
+        trajectory.inverseDeltaActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
+
     }
 }
 
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
-    
+
     // The following components do not vary within an episode and so need only
     // be set once
     ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
@@ -91,9 +98,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-
     populateExpertTrajectory(ctx, agent, agentInit);
-
     if(!ctx.data().params.isStaticAgentControlled && (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent).positions[0]).length() < consts::staticThreshold)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
@@ -101,12 +106,12 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::BICYCLE};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
         ctx.data().numControlledVehicles++;
     }
     else
     {
-        ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+        ctx.get<ControlledState>(agent) = ControlledState{.controlled = 0};
     }
 
     // This is not stricly necessary since , but is kept here for consistency
@@ -151,8 +156,8 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
     ctx.get<ResponseType>(road_edge) = ResponseType::Static;
     ctx.get<MapObservation>(road_edge) = MapObservation{.position = ctx.get<Position>(road_edge).xy(),
-                                                        .scale = ctx.get<Scale>(road_edge), 
-                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(road_edge)), 
+                                                        .scale = ctx.get<Scale>(road_edge),
+                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(road_edge)),
                                                         .type = (float)type};
     return road_edge;
 }
@@ -186,7 +191,7 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     for (int i = 1; i < 4; ++i) {
         if (lengths[i] > lengths[maxLength_i])
             maxLength_i = i;
-        if (lengths[i] < lengths[minLength_i]) 
+        if (lengths[i] < lengths[minLength_i])
             minLength_i = i;
     }
 
@@ -224,8 +229,8 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     ctx.get<ResponseType>(speed_bump) = ResponseType::Static;
     ctx.get<MapObservation>(speed_bump) = MapObservation{.position = ctx.get<Position>(speed_bump).xy(),
-                                                         .scale = ctx.get<Scale>(speed_bump), 
-                                                         .heading = utils::quatToYaw(ctx.get<Rotation>(speed_bump)), 
+                                                         .scale = ctx.get<Scale>(speed_bump),
+                                                         .heading = utils::quatToYaw(ctx.get<Rotation>(speed_bump)),
                                                          .type = (float)type};
     return speed_bump;
 }
@@ -243,8 +248,8 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     ctx.get<ResponseType>(stop_sign) = ResponseType::Static;
     ctx.get<MapObservation>(stop_sign) = MapObservation{.position = ctx.get<Position>(stop_sign).xy(),
-                                                        .scale = ctx.get<Scale>(stop_sign), 
-                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(stop_sign)), 
+                                                        .scale = ctx.get<Scale>(stop_sign),
+                                                        .heading = utils::quatToYaw(ctx.get<Rotation>(stop_sign)),
                                                         .type = (float)EntityType::StopSign};
     return stop_sign;
 }
@@ -302,7 +307,7 @@ static inline Entity createAgentPadding(Engine &ctx) {
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
     ctx.get<Done>(agent).v = 0;
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
-    ctx.get<ControlledState>(agent) = ControlledState{.controlledState = ControlMode::EXPERT};
+    ctx.get<ControlledState>(agent) = ControlledState{.controlled = 0};
     ctx.get<PartnerObservations>(agent) = PartnerObservations();
     for (CountT i = 0; i < consts::kMaxAgentMapObservationsCount; i++)
     {
@@ -327,9 +332,9 @@ static inline Entity createPhysicsEntityPadding(Engine &ctx) {
     ctx.get<Velocity>(physicsEntity) = {Vector3::zero(), Vector3::zero()};
     ctx.get<ObjectID>(physicsEntity) = ObjectID{(int32_t)SimObject::Cube};
     ctx.get<ResponseType>(physicsEntity) = ResponseType::Static;
-    ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(), 
+    ctx.get<MapObservation>(physicsEntity) = MapObservation{.position = ctx.get<Position>(physicsEntity).xy(),
                                                             .scale = ctx.get<Scale>(physicsEntity),
-                                                            .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)), 
+                                                            .heading = utils::quatToYaw(ctx.get<Rotation>(physicsEntity)),
                                                             .type = float(EntityType::Padding)};
     ctx.get<EntityType>(physicsEntity) = EntityType::Padding;
 
@@ -393,9 +398,9 @@ void createPersistentEntities(Engine &ctx, Map *map) {
         auto agent = createAgent(
             ctx, agentInit);
         ctx.data().agents[agentIdx++] = agent;
-    } 
-    
-    ctx.data().numAgents = agentIdx; 
+    }
+
+    ctx.data().numAgents = agentIdx;
 
     CountT roadIdx = 0;
     for(CountT roadCtr = 0; roadCtr < map->numRoads; roadCtr++)
@@ -458,7 +463,7 @@ static void resetPersistentEntities(Engine &ctx)
         registerRigidBodyEntity(ctx, road, SimObject::SpeedBump);
       }
     }
-  
+
     for (CountT i = 0; i < ctx.data().numAgents; i++) {
         Entity cur_agent = ctx.data().agents[i];
         OtherAgents &other_agents = ctx.get<OtherAgents>(cur_agent);

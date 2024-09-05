@@ -26,7 +26,7 @@ protected:
             .observationRadius = 100.0,
             .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
             .initOnlyValidAgentsAtFirstStep = false,
-            .useWayMaxModel = false
+            .dynamicsModel = gpudrive::DynamicsModel::Classic
         }
     });
     
