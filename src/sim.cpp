@@ -32,6 +32,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerComponent<Action>();
+    registry.registerComponent<DeltaAction>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
     registry.registerComponent<AgentMapObservations>();
@@ -61,6 +62,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
+    registry.exportColumn<Agent, DeltaAction>(
+        (uint32_t)ExportID::DeltaAction);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
     registry.exportColumn<Agent, AgentMapObservations>(
@@ -233,6 +236,7 @@ inline void agentZeroVelSystem(Engine &,
 
 inline void movementSystem(Engine &e,
                            Action &action,
+                           DeltaAction &dAction,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -287,17 +291,21 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
+    if(controlledState.controlled)
     {
-        if(e.data().params.useWayMaxModel)
-        {
-            forwardWaymaxModel(action, rotation, position, velocity);
+        switch (e.data().params.dynamicsModel){
+
+            case DynamicsModel::InvertibleBicycle:
+               forwardBicycleModel(action, rotation, position, velocity);
+               break;
+            case DynamicsModel::DeltaLocal:
+               forwardDeltaModel(dAction, rotation, position, velocity);
+               break;
+            case DynamicsModel::Classic:
+               forwardKinematics(action, size, rotation, position, velocity);
+               break;
+
         }
-        else 
-        {
-            forwardKinematics(action, size, rotation, position, velocity);
-        }
-        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
     }
     else
     {
@@ -490,7 +498,7 @@ void collisionDetectionSystem(Engine &ctx,
         auto controlledState = ctx.getCheck<ControlledState>(candidate);
         if (controlledState.valid())
         {
-            if( controlledState.value().controlledState == ControlMode::EXPERT)
+            if( controlledState.value().controlled == false)
             {
                 // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
@@ -500,7 +508,7 @@ void collisionDetectionSystem(Engine &ctx,
                     return true;
                 }
             }
-            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            else if (controlledState.value().controlled == true)
             {
                 // Case: If a controlled agent gets done, we teleport it to the padding position
                 // Hence we need to ignore the collision detection for it.
@@ -772,6 +780,7 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             Action,
+            DeltaAction,
             VehicleSize,
             Rotation,
             Position,

@@ -34,10 +34,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
+        params.dynamicsModel = self.dynamics_model[config.dynamics_model]
+        if config.dynamics_model == 'delta_local':
+            self.action_features = "delta_local"
+        else:
+            self.action_features = "bicycle"
 
         # Initialize simulator with parameters
         self.sim = self._initialize_simulator(params, scene_config)
-
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
@@ -51,7 +55,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
-
+        self.episode_len = self.config.episode_len
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
@@ -101,26 +105,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raise ValueError(f"Invalid action shape: {actions.shape}")
 
         # Feed the actual action values to gpudrive
-        self.sim.action_tensor().to_torch().copy_(action_value_tensor)
+        if self.action_features == 'delta':
+            self.sim.delta_action_tensor().to_torch().copy_(action_value_tensor)
+        else:
+            self.sim.action_tensor().to_torch().copy_(action_value_tensor)
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
-
-        self.steer_actions = self.config.steer_actions.to(self.device)
-        self.accel_actions = self.config.accel_actions.to(self.device)
-        self.head_actions = torch.tensor([0], device=self.device)
+        if self.action_features == 'delta_local':
+            self.dx = self.config.dx.to(self.device)
+            self.dy = self.config.dy.to(self.device)
+            self.dyaw = self.config.dyaw.to(self.device)
+            products = product(self.dx, self.dy, self.dyaw)
+        else:
+            self.steer_actions = self.config.steer_actions.to(self.device)
+            self.accel_actions = self.config.accel_actions.to(self.device)
+            self.head_actions = torch.tensor([0], device=self.device)
+            products = product(self.accel_actions, self.steer_actions, self.head_actions)
 
         # Create a mapping from action indices to action values
         self.action_key_to_values = {}
+        self.values_to_action_key = {}
 
-        for action_idx, (accel, steer, head) in enumerate(
-            product(self.accel_actions, self.steer_actions, self.head_actions)
+        for action_idx, (action_1, action_2, action_3) in enumerate(
+            products
         ):
             self.action_key_to_values[action_idx] = [
-                accel.item(),
-                steer.item(),
-                head.item(),
+                action_1.item(),
+                action_2.item(),
+                action_3.item(),
             ]
+            self.values_to_action_key[
+                round(action_1.item(), 3),
+                round(action_2.item(), 3),
+                round(action_3.item(), 3),
+            ] = action_idx
 
         self.action_keys_tensor = torch.tensor(
             [
@@ -197,7 +216,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return obs_filtered
 
     def get_controlled_agents_mask(self):
-        """Get the control mask."""
+        """Get the control mask. Bicycle = 1, DeltaModel = 2"""
+        # target_idx = 2 if self.action_features == 'delta' else 1
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
             axis=2
         )
@@ -228,6 +248,47 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # state = state[:, :, :5]
 
         return state
+
+    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
+        """Get expert actions for the full trajectories across worlds."""
+        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+        positions = expert_traj[:, :, :2 * self.episode_len].view(self.num_worlds,
+                                                                  self.max_agent_count,
+                                                                  self.episode_len, -1)
+
+        velocity = expert_traj[:, :, 2 * self.episode_len:4 * self.episode_len].view(self.num_worlds,
+                                                                                     self.max_agent_count,
+                                                                                     self.episode_len, -1)
+        if self.action_features == 'delta':
+            inferred_expert_actions = expert_traj[:, :, -3 * self.episode_len:].view(self.num_worlds,
+                                                                                     self.max_agent_count,
+                                                                                     self.episode_len, -1)
+            inferred_expert_actions[..., 0] = torch.clamp(inferred_expert_actions[..., 0], -6, 6)
+            inferred_expert_actions[..., 1] = torch.clamp(inferred_expert_actions[..., 1], -6, 6)
+            inferred_expert_actions[..., 2] = torch.clamp(inferred_expert_actions[..., 2], -3.14, 3.14)
+        else:
+            inferred_expert_actions = expert_traj[:, :, -6 * self.episode_len:-3 * self.episode_len].view(
+                self.num_worlds,
+                self.max_agent_count,
+                self.episode_len, -1)
+            inferred_expert_actions[..., 0] = torch.clamp(inferred_expert_actions[..., 0], -6, 6)
+            inferred_expert_actions[..., 1] = torch.clamp(inferred_expert_actions[..., 1], -0.3, 0.3)
+        velo2speed = None
+        debug_positions = None
+        if debug_world_idx is not None and debug_veh_idx is not None:
+            velo2speed = torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1) / self.config.max_speed
+            positions[..., 0] = self.normalize_tensor(
+                positions[..., 0],
+                self.config.min_rel_goal_coord,
+                self.config.max_rel_goal_coord,
+            )
+            positions[..., 1] = self.normalize_tensor(
+                positions[..., 1],
+                self.config.min_rel_goal_coord,
+                self.config.max_rel_goal_coord,
+            )
+            debug_positions = positions[debug_world_idx, debug_veh_idx]
+        return inferred_expert_actions, velo2speed, debug_positions
 
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
@@ -357,7 +418,7 @@ if __name__ == "__main__":
     # CONFIGURE
     TOTAL_STEPS = 90
     MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 50
+    NUM_WORLDS = 10
 
     env_config = EnvConfig()
     render_config = RenderConfig()
@@ -368,15 +429,14 @@ if __name__ == "__main__":
         config=env_config,
         scene_config=scene_config,
         max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
-        device="cuda",
+        device="cpu",
         render_config=render_config,
     )
-
     # RUN
     obs = env.reset()
     frames = []
 
-    for _ in range(TOTAL_STEPS):
+    for i in range(TOTAL_STEPS):
 
         # Take a random actions
         rand_action = torch.Tensor(
