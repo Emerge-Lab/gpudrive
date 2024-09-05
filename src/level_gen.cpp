@@ -78,7 +78,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
         Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
         Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
-        trajectory.inverseActions[i] = inverseWaymaxModel(rot, vel, targetRot, targetVel);
+        trajectory.inverseActions[i] = inverseBicycleModel(rot, vel, targetRot, targetVel);
         trajectory.inverseDeltaActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
 
     }
@@ -106,19 +106,8 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
-        switch (ctx.data().params.dynamicsModel)
-        {
-        case DynamicsModel::Waymax:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
-            break;
-        case DynamicsModel::Delta:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
-            break;
-        case DynamicsModel::Classic:
-            ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
-            break;
+        ctx.get<ControlledState>(agent) = ControlledState{.controlled = 1};
         ctx.data().numControlledVehicles++;
-        }
     }
     else
     {

@@ -90,8 +90,8 @@ namespace gpudrive
     enum class DynamicsModel: uint32_t
     {
         Classic,
-        Waymax,
-        Delta
+        InvertibleBicycle,
+        DeltaLocal
     };
 
     enum class FindRoadObservationsWith {

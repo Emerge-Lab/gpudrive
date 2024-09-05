@@ -49,7 +49,7 @@ namespace gpudrive
         velocity.angular.z = w;
     }
 
-    inline void forwardWaymaxModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
+    inline void forwardBicycleModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering
         action.acceleration = fmaxf(-6.0, fminf(action.acceleration, 6.0));
@@ -114,7 +114,7 @@ namespace gpudrive
 
     }
 
-    inline Action inverseWaymaxModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
+    inline Action inverseBicycleModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
     {
         const float dt{0.1};
 

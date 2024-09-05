@@ -13,7 +13,7 @@ logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser('Select the dynamics model that you use')
-    parser.add_argument('--dynamics-model', '-d', type=str, default='delta')
+    parser.add_argument('--dynamics-model', '-d', type=str, default='delta_local', choices=['delta_local', 'bicycle', 'classic'],)
     args = parser.parse_args()
     return args
 
@@ -34,7 +34,7 @@ def map_to_closest_discrete_value(grid, cont_actions):
 def generate_state_action_pairs(
         env,
         device,
-        discretize_actions=False,
+        action_space_type='discrete',
         use_action_indices=False,
         make_video=False,
         render_index=[0],
@@ -48,7 +48,7 @@ def generate_state_action_pairs(
     Args:
         env (GPUDriveTorchEnv): Initialized environment class.
         device (str): Where to run the simulation (cpu or cuda).
-        discretize_actions (bool): Whether to discretize the expert actions.
+        action_space_type (str): discrete, multi-discrete, continuous
         use_action_indices (bool): Whether to return action indices instead of action values.
         make_video (bool): Whether to save a video of the expert trajectory.
         render_index (int): Index of the world to render (must be <= num_worlds).
@@ -84,7 +84,7 @@ def generate_state_action_pairs(
         # for (pos_x, pos_y), speed in zip(expert_positions, expert_speeds):
         #     print(f'position : ({pos_x}. {pos_y}), speed : {speed}')
 
-    if discretize_actions:
+    if action_space_type == 'discrete':
         logging.info("Discretizing expert actions... \n")
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
@@ -141,6 +141,9 @@ def generate_state_action_pairs(
         else:
             # Map action values to joint action index
             expert_actions = disc_expert_actions
+    elif action_space_type == 'multi_discrete':
+        '''will be update'''
+        pass
     else:
         logging.info("Using continuous expert actions... \n")
 
@@ -304,7 +307,7 @@ if __name__ == "__main__":
     import argparse
     args = parse_args()
     torch.set_printoptions(precision=3, sci_mode=False)
-    NUM_WORLDS = 3
+    NUM_WORLDS = 10
     MAX_NUM_OBJECTS = 128
 
     # Initialize lists to store results
@@ -314,22 +317,22 @@ if __name__ == "__main__":
 
     # Set the environment and render configurations
     # Action space (joint discrete)
-    num_dx_values = reversed(range(100, 101, 1))
+    num_dx_values = reversed(range(60, 301, 50))
     num_dy_values = reversed(range(100, 101, 1))
     num_dyaw_values = reversed(range(100, 101, 1))
 
     combinations = itertools.product(num_dx_values, num_dy_values, num_dyaw_values)
     render_config = RenderConfig(draw_obj_idx=True)
-    scene_config = SceneConfig("data", NUM_WORLDS)
+    scene_config = SceneConfig("/data/formatted_json_v2_no_tl_train/", NUM_WORLDS)
     for combi in combinations:
         num_dx, num_dy, num_dyaw = combi
         env_config = EnvConfig(
             dynamics_model=args.dynamics_model,
             steer_actions=torch.round(
-                torch.linspace(-0.3, 0.3, 100), decimals=3
+                torch.linspace(-0.3, 0.3, 7), decimals=3
             ),
             accel_actions=torch.round(
-                torch.linspace(-6.0, 6.0, 100), decimals=3
+                torch.linspace(-6.0, 6.0, 7), decimals=3
             ),
             dx=torch.round(
                 torch.linspace(-3.0, 3.0, num_dx), decimals=3
@@ -338,7 +341,7 @@ if __name__ == "__main__":
                 torch.linspace(-3.0, 3.0, num_dy), decimals=3
             ),
             dyaw=torch.round(
-                torch.linspace(-1.0, 1.0, num_dyaw), decimals=3
+                torch.linspace(-3.14, 3.14, num_dyaw), decimals=3
             ),
         )
 
@@ -346,7 +349,7 @@ if __name__ == "__main__":
             config=env_config,
             scene_config=scene_config,
             max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
-            device="cuda",
+            device="cpu",
             render_config=render_config,
         )
         # Generate expert actions and observations
@@ -359,11 +362,11 @@ if __name__ == "__main__":
             collision_rate
         ) = generate_state_action_pairs(
             env=env,
-            device="cuda",
-            discretize_actions=True,  # Discretize the expert actions
+            device="cpu",
+            action_space_type='continuous',  # Discretize the expert actions
             use_action_indices=True,  # Map action values to joint action index
             make_video=True,  # Record the trajectories as sanity check
-            render_index=[0, 3],  #start_idx, end_idx
+            render_index=[0, 0],  #start_idx, end_idx
             debug_world_idx=None,
             debug_veh_idx=None,
             save_path="use_discr_actions_fix",
@@ -379,7 +382,7 @@ if __name__ == "__main__":
         num_actions.append(num_action)
         goal_rates.append(goal_rate.cpu().numpy())
         collision_rates.append(collision_rate.cpu().numpy())
-
+        print(f'dx {num_dx} dy {num_dy} dyaw {num_dyaw} Collision rate {collision_rate} Goal RATE {goal_rate}')
         # Plot the results
     plt.figure(figsize=(10, 5))
     plt.plot(num_actions, goal_rates, label='Goal Rate', marker='o')

@@ -94,8 +94,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         self.dynamics_model = dict(
             classic = gpudrive.DynamicsModel.Classic,
-            delta = gpudrive.DynamicsModel.Delta,
-            waymax = gpudrive.DynamicsModel.Waymax,
+            delta_local = gpudrive.DynamicsModel.DeltaLocal,
+            bicycle = gpudrive.DynamicsModel.InvertibleBicycle,
         )
 
         params = gpudrive.Parameters()

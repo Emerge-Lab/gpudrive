@@ -40,7 +40,7 @@ class EnvConfig:
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dyaw: torch.Tensor = torch.round(torch.linspace(-3.14, 3.14, 20), decimals=3)
-    dynamics_model: str = "classic"
+    dynamics_model: str = "classic" # Options: "classic", "bicycle", "delta_local"
     # Collision behavior settings
     collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
 

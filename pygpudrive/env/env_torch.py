@@ -35,8 +35,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Environment parameter setup
         params = self._setup_environment_parameters()
         params.dynamicsModel = self.dynamics_model[config.dynamics_model]
-        if config.dynamics_model == 'delta':
-            self.action_features = "delta"
+        if config.dynamics_model == 'delta_local':
+            self.action_features = "delta_local"
         else:
             self.action_features = "bicycle"
 
@@ -112,7 +112,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
-        if self.action_features == 'delta':
+        if self.action_features == 'delta_local':
             self.dx = self.config.dx.to(self.device)
             self.dy = self.config.dy.to(self.device)
             self.dyaw = self.config.dyaw.to(self.device)
@@ -418,7 +418,7 @@ if __name__ == "__main__":
     # CONFIGURE
     TOTAL_STEPS = 90
     MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 50
+    NUM_WORLDS = 10
 
     env_config = EnvConfig()
     render_config = RenderConfig()

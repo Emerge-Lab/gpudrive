@@ -16,7 +16,7 @@ def sim_init():
     params.rewardParams = reward_params 
     params.maxNumControlledVehicles = 2 # we are going to use the second vehicle as the controlled vehicle
     params.IgnoreNonVehicles = True
-    params.dynamicsModel = gpudrive.DynamicsModel.Waymax
+    params.dynamicsModel = gpudrive.DynamicsModel.InvertibleBicycle
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU,
         gpu_id=0,

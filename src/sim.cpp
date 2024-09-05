@@ -295,10 +295,10 @@ inline void movementSystem(Engine &e,
     {
         switch (e.data().params.dynamicsModel){
 
-            case DynamicsModel::Waymax:
-               forwardWaymaxModel(action, rotation, position, velocity);
+            case DynamicsModel::InvertibleBicycle:
+               forwardBicycleModel(action, rotation, position, velocity);
                break;
-            case DynamicsModel::Delta:
+            case DynamicsModel::DeltaLocal:
                forwardDeltaModel(dAction, rotation, position, velocity);
                break;
             case DynamicsModel::Classic:
