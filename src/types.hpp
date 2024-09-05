@@ -59,6 +59,12 @@ struct Action {
     float headAngle;
 };
 
+struct DeltaAction {
+    float dx;
+    float dy;
+    float dyaw;
+};
+
 // Per-agent reward
 // Exported as an [N * A, 1] float tensor to training code
 struct Reward {
@@ -189,9 +195,10 @@ struct Trajectory {
     float headings[consts::kTrajectoryLength];
     float valids[consts::kTrajectoryLength];
     Action inverseActions[consts::kTrajectoryLength];
+    DeltaAction inverseDeltaActions[consts::kTrajectoryLength];
 };
 
-const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 6 * consts::kTrajectoryLength;
 
 static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
@@ -200,13 +207,8 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-enum class ControlMode {
-   EXPERT,
-   BICYCLE
-};
-
 struct ControlledState {
-   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+   int32_t controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {
@@ -265,7 +267,7 @@ struct Agent : public madrona::Archetype<
 
     // Input
     Action,
-
+    DeltaAction,
     // Observations
     SelfObservation,
     AbsoluteSelfObservation,

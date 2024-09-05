@@ -93,6 +93,7 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
+    DeltaAction *agentdActionsBuffer;
     Optional<RenderGPUState> renderGPUState;
     Optional<render::RenderManager> renderMgr;
     int64_t numWorlds{0};
@@ -102,6 +103,7 @@ struct Manager::Impl {
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
                 Action *action_buffer,
+                DeltaAction *dAction_buffer,
                 Optional<RenderGPUState> &&render_gpu_state,
                 Optional<render::RenderManager> &&render_mgr,
 		int64_t numWorlds) 
@@ -110,6 +112,7 @@ struct Manager::Impl {
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
           agentActionsBuffer(action_buffer),
+          agentdActionsBuffer(dAction_buffer),
           renderGPUState(std::move(render_gpu_state)),
           renderMgr(std::move(render_mgr)),
           numWorlds(numWorlds) {}
@@ -137,11 +140,12 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   DeltaAction *dAction_buffer,
                    TaskGraphT &&cpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
                    Optional<render::RenderManager> &&render_mgr,
 		   int64_t numWorlds)
-        : Impl(mgr_cfg, std::move(phys_loader), ep_mgr, reset_buffer, action_buffer,
+        : Impl(mgr_cfg, std::move(phys_loader), ep_mgr, reset_buffer, action_buffer, dAction_buffer,
                std::move(render_gpu_state), std::move(render_mgr), numWorlds),
           cpuExec(std::move(cpu_exec))
     {}
@@ -175,12 +179,13 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   DeltaAction *dAction_buffer,
                    MWCudaExecutor &&gpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
                   Optional<render::RenderManager> &&render_mgr,
                    int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer,
+               ep_mgr, reset_buffer, action_buffer, dAction_buffer,
                std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
           gpuExec(std::move(gpu_exec)),
           stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
@@ -467,7 +472,8 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
-
+        DeltaAction *agent_dActions_buffer =
+            (DeltaAction *)gpu_exec.getExported((uint32_t)ExportID::DeltaAction);
         madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < numWorlds; i++) {
           auto &init = world_inits[i];
@@ -480,6 +486,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            agent_dActions_buffer,
             std::move(gpu_exec),
             std::move(render_gpu_state),
             std::move(render_mgr),
@@ -540,13 +547,15 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Action *agent_actions_buffer = 
             (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
-
+        DeltaAction *agent_dActions_buffer =
+            (DeltaAction *)cpu_exec.getExported((uint32_t)ExportID::DeltaAction);
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
             std::move(phys_loader),
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            agent_dActions_buffer,
             std::move(cpu_exec),
             std::move(render_gpu_state),
             std::move(render_mgr),
@@ -600,6 +609,16 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
 Tensor Manager::actionTensor() const
 {
     return impl_->exportTensor(ExportID::Action, TensorElementType::Float32,
+        {
+            impl_->numWorlds,
+            consts::kMaxAgentCount,
+            3, // Num_actions
+        });
+}
+
+Tensor Manager::dActionTensor() const
+{
+    return impl_->exportTensor(ExportID::DeltaAction, TensorElementType::Float32,
         {
             impl_->numWorlds,
             consts::kMaxAgentCount,
@@ -799,6 +818,23 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 #endif
     } else {
         *action_ptr = action;
+    }
+}
+
+void Manager::setDeltaAction(int32_t world_idx, int32_t agent_idx,
+                        float dx, float dy, float dyaw) {
+    DeltaAction dAction{.dx = dx,
+                  .dy = dy,
+                  .dyaw = dyaw};
+
+    auto *dAction_ptr = impl_->agentdActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(dAction_ptr, &dAction, sizeof(DeltaAction), cudaMemcpyHostToDevice);
+#endif
+    } else {
+        *dAction_ptr = dAction;
     }
 }
 
