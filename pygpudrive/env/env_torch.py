@@ -105,7 +105,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raise ValueError(f"Invalid action shape: {actions.shape}")
 
         # Feed the actual action values to gpudrive
-        if self.action_features == 'delta':
+        if self.action_features == 'delta_local':
             self.sim.delta_action_tensor().to_torch().copy_(action_value_tensor)
         else:
             self.sim.action_tensor().to_torch().copy_(action_value_tensor)
@@ -259,7 +259,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         velocity = expert_traj[:, :, 2 * self.episode_len:4 * self.episode_len].view(self.num_worlds,
                                                                                      self.max_agent_count,
                                                                                      self.episode_len, -1)
-        if self.action_features == 'delta':
+        if self.action_features == 'delta_local':
             inferred_expert_actions = expert_traj[:, :, -3 * self.episode_len:].view(self.num_worlds,
                                                                                      self.max_agent_count,
                                                                                      self.episode_len, -1)
