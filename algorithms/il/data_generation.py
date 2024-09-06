@@ -74,7 +74,7 @@ def generate_state_action_pairs(
     expert_dx, expert_dy, expert_dyaw = None, None, None
     expert_accel, expert_steer = None, None
     if debug_world_idx is not None and debug_veh_idx is not None:
-        if env.action_features == 'delta':
+        if env.action_features == 'delta_local':
             expert_dx = raw_expert_action[debug_world_idx, debug_veh_idx, :, 0]
             expert_dy = raw_expert_action[debug_world_idx, debug_veh_idx, :, 1]
             expert_dyaw = raw_expert_action[debug_world_idx, debug_veh_idx, :, 2]
@@ -83,13 +83,12 @@ def generate_state_action_pairs(
             expert_steer = raw_expert_action[debug_world_idx, debug_veh_idx, :, 1]
         # for (pos_x, pos_y), speed in zip(expert_positions, expert_speeds):
         #     print(f'position : ({pos_x}. {pos_y}), speed : {speed}')
-
     if action_space_type == 'discrete':
         logging.info("Discretizing expert actions... \n")
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
         disc_expert_actions = expert_actions.clone()
-        if env.action_features == 'delta':
+        if env.action_features == 'delta_local':
             disc_expert_actions[:, :, :, 0], _ = map_to_closest_discrete_value(
                 grid=env.dx, cont_actions=expert_actions[:, :, :, 0]
             )
@@ -127,7 +126,7 @@ def generate_state_action_pairs(
                                      world_idx, agent_idx, time_idx, :
                                      ].tolist()
                         )
-                        if not env.action_features == 'delta':
+                        if not env.action_features == 'delta_local':
                             action_val_tuple = (action_val_tuple[0], action_val_tuple[1], 0.0)
 
                         action_idx = env.values_to_action_key.get(
@@ -223,7 +222,7 @@ def generate_state_action_pairs(
     flat_expert_dones = torch.cat(expert_dones_lst, dim=0)
     if debug_world_idx is not None:
         '''for plotting '''
-        if env.action_features == 'delta':
+        if env.action_features == 'delta_local':
             fig, axs = plt.subplots(2, 3, figsize=(8, 8))
         else:
             fig, axs = plt.subplots(2, 2, figsize=(8, 8))
@@ -245,7 +244,7 @@ def generate_state_action_pairs(
         axs[0, 1].set_ylabel('Y Position')
         axs[0, 1].legend()
 
-        if env.action_features == 'delta':
+        if env.action_features == 'delta_local':
             # dx plot
             axs[1, 0].plot(expert_dx.numpy(), label='Expert dx', color='b')
             axs[1, 0].plot(disc_expert_actions[debug_world_idx, debug_veh_idx, :, 0].numpy(), label='Simulation dx',
@@ -317,9 +316,9 @@ if __name__ == "__main__":
 
     # Set the environment and render configurations
     # Action space (joint discrete)
-    num_dx_values = reversed(range(60, 301, 50))
+    num_dx_values = reversed(range(100, 101, 1))
     num_dy_values = reversed(range(100, 101, 1))
-    num_dyaw_values = reversed(range(100, 101, 1))
+    num_dyaw_values = reversed(range(300, 301, 1))
 
     combinations = itertools.product(num_dx_values, num_dy_values, num_dyaw_values)
     render_config = RenderConfig(draw_obj_idx=True)
@@ -341,7 +340,7 @@ if __name__ == "__main__":
                 torch.linspace(-3.0, 3.0, num_dy), decimals=3
             ),
             dyaw=torch.round(
-                torch.linspace(-3.14, 3.14, num_dyaw), decimals=3
+                torch.linspace(-1.0, 1.0, num_dyaw), decimals=3
             ),
         )
 
@@ -363,7 +362,7 @@ if __name__ == "__main__":
         ) = generate_state_action_pairs(
             env=env,
             device="cpu",
-            action_space_type='continuous',  # Discretize the expert actions
+            action_space_type='discrete',  # Discretize the expert actions
             use_action_indices=True,  # Map action values to joint action index
             make_video=True,  # Record the trajectories as sanity check
             render_index=[0, 0],  #start_idx, end_idx
