@@ -221,8 +221,7 @@ inline void collectObservationsSystem(Engine &ctx,
 // Make the agents easier to control by zeroing out their velocity
 // after each step.
 inline void agentZeroVelSystem(Engine &,
-                               Velocity &vel,
-                               Action &)
+                               Velocity &vel)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -252,13 +251,13 @@ inline void movementSystem(Engine &e,
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
                 done.v = 1;
-                agentZeroVelSystem(e, velocity, action);
+                agentZeroVelSystem(e, velocity);
                 break;
 
             case CollisionBehaviour::AgentRemoved:
                 done.v = 1;
                 position = consts::kPaddingPosition;
-                agentZeroVelSystem(e, velocity, action);
+                agentZeroVelSystem(e, velocity);
                 break;
 
             case CollisionBehaviour::Ignore:

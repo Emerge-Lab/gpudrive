@@ -106,7 +106,6 @@ namespace gpudrive
             .def("step", &Manager::step)
             .def("reset", &Manager::reset)
             .def("action_tensor", &Manager::actionTensor)
-            .def("delta_action_tensor", &Manager::dActionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)

@@ -285,7 +285,6 @@ struct Agent : public madrona::Archetype<
 
     // Input
     Action,
-    DeltaAction,
     // Observations
     SelfObservation,
     AbsoluteSelfObservation,

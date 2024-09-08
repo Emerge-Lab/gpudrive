@@ -41,7 +41,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
             ctx.get<Action>(agent) = Action{.classic = {0, 0, 0}};
             break;
         case DynamicsModel::DeltaLocal:
-            ctx.get<DeltaAction>(agent) = DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
+            ctx.get<Action>(agent) = Action{.delta{.dx = 0, .dy = 0, .dyaw = 0}};
             break;
     }
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
@@ -69,25 +69,50 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = (float)agentInit.valid[i];
+        trajectory.inverseActions[i] = Action{.classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
     }
-
+    if (ctx.data().params.dynamicsModel == DynamicsModel::Classic) {
+        return;
+    }
     for(CountT i = agentInit.numPositions - 2; i >=0; i--)
     {
         if(!trajectory.valids[i] || !trajectory.valids[i+1])
         {
-            trajectory.inverseActions[i] = Action{.acceleration = 0, .steering = 0, .headAngle = 0};
-            trajectory.inverseDeltaActions[i] = DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
-            continue;
+            switch (ctx.data().params.dynamicsModel) {
+                case DynamicsModel::Classic:
+                    break;
+                case DynamicsModel::InvertibleBicycle:
+                    trajectory.inverseActions[i] = Action{.classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
+                    continue;
+                case DynamicsModel::DeltaLocal:
+                    trajectory.inverseActions[i] = Action{.delta = {.dx = 0, .dy = 0, .dyaw = 0}};
+                    continue;
+            }
         }
+
         Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
         Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = 1};
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
-        Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
-        Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
-        trajectory.inverseActions[i] = inverseBicycleModel(rot, vel, targetRot, targetVel);
-        trajectory.inverseDeltaActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
+        switch (ctx.data().params.dynamicsModel) {
+            case DynamicsModel::Classic:
+                // No inverse action model for classic model
+                break;
 
+            case DynamicsModel::InvertibleBicycle: {
+                // Introduce a block scope here to ensure proper variable scoping
+                Velocity targetVel = {Vector3{.x = trajectory.velocities[i+1].x, .y = trajectory.velocities[i+1].y, .z = 0}, Vector3::zero()};
+                trajectory.inverseActions[i] = inverseBicycleModel(rot, vel, targetRot, targetVel);
+                break;
+            }
+
+            case DynamicsModel::DeltaLocal: {
+                // Introduce another block scope here
+                Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
+                trajectory.inverseActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
+                break;
+            }
+        }
     }
 }
 

@@ -148,21 +148,21 @@ namespace gpudrive
 
     }
 
-    inline DeltaAction inverseDeltaModel(const Rotation &rotation, const Position &position, const Rotation &targetRotation, const Position &targetPosition)
+    inline Action inverseDeltaModel(const Rotation &rotation, const Position &position, const Rotation &targetRotation, const Position &targetPosition)
     {
         const float dt{0.1};
 
-        DeltaAction action = {0, 0, 0};
+        Action action{.delta = {0, 0, 0}};
         float yaw = utils::quatToYaw(rotation);
         float target_yaw = utils::quatToYaw(targetRotation);
         // start delta model
             // start DeltaGlobal
-        action.dx = targetPosition.x - position.x;
-        action.dy = targetPosition.y - position.y;
-        action.dyaw = target_yaw - yaw;
+        action.delta.dx = targetPosition.x - position.x;
+        action.delta.dy = targetPosition.y - position.y;
+        action.delta.dyaw = target_yaw - yaw;
 
-        action.dx  = fmaxf(-6.0, fminf(action.dx, 6.0));
-        action.dy = fmaxf(-6.0, fminf(action.dy, 6.0));
+        action.delta.dx  = fmaxf(-6.0, fminf(action.delta.dx, 6.0));
+        action.delta.dy = fmaxf(-6.0, fminf(action.delta.dy, 6.0));
             // end DeltaGlobal
             // start DeltaLocal
 
@@ -172,12 +172,12 @@ namespace gpudrive
         float sin = std::sin(-yaw);
         // x = c * x - s * y
         // y = s * x + c * y
-        float local_dx= action.dx * cos - action.dy * sin;
-        float local_dy = action.dx * sin + action.dy * cos;
+        float local_dx= action.delta.dx * cos - action.delta.dy * sin;
+        float local_dy = action.delta.dx * sin + action.delta.dy * cos;
 
-        action.dx = fmaxf(-6.0, fminf(local_dx, 6.0));
-        action.dy = fmaxf(-6.0, fminf(local_dy, 6.0));
-        action.dyaw = fmaxf(-3.14, fminf(action.dyaw, 3.14));
+        action.delta.dx = fmaxf(-6.0, fminf(local_dx, 6.0));
+        action.delta.dy = fmaxf(-6.0, fminf(local_dy, 6.0));
+        action.delta.dyaw = fmaxf(-3.14, fminf(action.delta.dyaw, 3.14));
             // end DeltaLocal
         // end delta model
 
