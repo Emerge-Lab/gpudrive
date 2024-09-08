@@ -33,10 +33,17 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    ctx.get<Action>(agent) =
-        Action{.acceleration = 0, .steering = 0, .headAngle = 0};
-    ctx.get<DeltaAction>(agent) =
-        DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
+    switch (ctx.data().params.dynamicsModel) {
+        case DynamicsModel::Classic:
+            ctx.get<Action>(agent) = Action{.classic = {0, 0, 0}};
+            break;
+        case DynamicsModel::InvertibleBicycle:
+            ctx.get<Action>(agent) = Action{.classic = {0, 0, 0}};
+            break;
+        case DynamicsModel::DeltaLocal:
+            ctx.get<DeltaAction>(agent) = DeltaAction{.dx = 0, .dy = 0, .dyaw = 0};
+            break;
+    }
     ctx.get<StepsRemaining>(agent).t = consts::episodeLen;
     ctx.get<Done>(agent).v = 0;
     ctx.get<Reward>(agent).v = 0;

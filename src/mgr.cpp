@@ -612,19 +612,10 @@ Tensor Manager::actionTensor() const
         {
             impl_->numWorlds,
             consts::kMaxAgentCount,
-            3, // Num_actions
+            ActionExportSize, // Num_actions
         });
 }
 
-Tensor Manager::dActionTensor() const
-{
-    return impl_->exportTensor(ExportID::DeltaAction, TensorElementType::Float32,
-        {
-            impl_->numWorlds,
-            consts::kMaxAgentCount,
-            3, // Num_actions
-        });
-}
 
 Tensor Manager::rewardTensor() const
 {
@@ -806,9 +797,7 @@ Tensor Manager::depthTensor() const
 
 void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                         float acceleration, float steering, float headAngle) {
-    Action action{.acceleration = acceleration,
-                  .steering = steering,
-                  .headAngle = headAngle};
+    Action action{.classicAction = {acceleration, steering, headAngle}};
 
     auto *action_ptr = impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
 
