@@ -185,4 +185,13 @@ namespace gpudrive
 
     }
 
+    inline void forwardStateModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
+    {        
+        // No clipping happening here. 
+        // This can go out of bounds with invalid actions
+        position = action.state.position;
+        velocity = action.state.velocity;
+
+        rotation = Quat::angleAxis(action.state.yaw, madrona::math::up);
+    }
 }
