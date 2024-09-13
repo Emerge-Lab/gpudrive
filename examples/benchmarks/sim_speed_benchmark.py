@@ -181,6 +181,7 @@ if __name__ == "__main__":
     BATCH_SIZE_LIST = [64]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
+    DATASET_INIT = "first_n" # or "random"
 
     scenes = [os.path.join(DATA_FOLDER, scene) for scene in os.listdir(DATA_FOLDER)]
 
@@ -200,7 +201,10 @@ if __name__ == "__main__":
 
     pbar = tqdm(BATCH_SIZE_LIST, colour="green")
     for idx, batch_size in enumerate(pbar):
-        sampled_scenes = random.sample(scenes, batch_size)
+        if DATASET_INIT == "random":
+            sampled_scenes = random.sample(scenes, batch_size)
+        elif DATASET_INIT == "first_n":
+            sampled_scenes = scenes[:batch_size]
         pbar.set_description(
             f"Profiling gpudrive with batch size {batch_size} using {ACTOR_TYPE}"
         )
