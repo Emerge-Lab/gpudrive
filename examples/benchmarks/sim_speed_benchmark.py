@@ -42,8 +42,6 @@ def make_sim(
         params.maxNumControlledVehicles = MAX_CONT_AGENTS
     elif actor_type == "expert-actor":
         params.maxNumControlledVehicles = 0
-    print(f"Creating simulator with {params.maxNumControlledVehicles} actors")
-    print(scenes)
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU
         if device == "cpu"
@@ -52,7 +50,6 @@ def make_sim(
         scenes=scenes,
         params=params,
     )
-    print("Simulator created")
 
     return sim
 
