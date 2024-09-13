@@ -75,8 +75,6 @@ def run_speed_bench(
     total_agent_frames = 0
     # buffer = []
 
-    print(f"Running speed benchmark with {batch_size} envs")
-
     # Make simulator
     sim = make_sim(
         scenes=sampled_scenes,
