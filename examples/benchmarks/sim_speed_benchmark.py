@@ -1,4 +1,5 @@
 import os
+import random
 import time
 import numpy as np
 import pandas as pd
@@ -12,15 +13,12 @@ from multiprocessing import Process, Queue
 
 import gpudrive
 
-os.environ["MADRONA_MWGPU_KERNEL_CACHE"] = "./gpudrive_cache"
-
 MAX_CONT_AGENTS = 128
 EPISODE_LENGTH = 80
 
 
 def make_sim(
-    data_dir,
-    num_worlds,
+    scenes,
     device,
     actor_type,
 ):
@@ -37,7 +35,6 @@ def make_sim(
     params.polylineReductionThreshold = 0.5
     params.observationRadius = 10.0
     params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentRemoved
-    params.datasetInitOptions = gpudrive.DatasetInitOptions.FirstN
     params.rewardParams = reward_params
     params.IgnoreNonVehicles = True
 
@@ -45,16 +42,17 @@ def make_sim(
         params.maxNumControlledVehicles = MAX_CONT_AGENTS
     elif actor_type == "expert-actor":
         params.maxNumControlledVehicles = 0
-
+    print(f"Creating simulator with {params.maxNumControlledVehicles} actors")
+    print(scenes)
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU
         if device == "cpu"
         else gpudrive.madrona.ExecMode.CUDA,
         gpu_id=0,
-        num_worlds=num_worlds,
-        json_path=data_dir,
+        scenes=scenes,
         params=params,
     )
+    print("Simulator created")
 
     return sim
 
@@ -63,7 +61,7 @@ def run_speed_bench(
     batch_size,
     max_num_objects,
     actor_type,
-    data_dir,
+    sampled_scenes,
     episode_length,
     do_n_resets,
     device,
@@ -80,16 +78,16 @@ def run_speed_bench(
     total_agent_frames = 0
     # buffer = []
 
+    print(f"Running speed benchmark with {batch_size} envs")
+
     # Make simulator
     sim = make_sim(
-        data_dir=data_dir,
-        num_worlds=batch_size,
+        scenes=sampled_scenes,
         device=device,
         actor_type=actor_type,
     )
 
-    for sim_idx in range(batch_size):
-        obs = sim.reset(sim_idx)
+    sim.reset(list(range(batch_size)))
 
     # PROFILE STEPS
     for _ in range(episode_length):
@@ -137,8 +135,7 @@ def run_speed_bench(
     # PROFILE RESETS
     for _ in range(do_n_resets):
         start_reset = time.time()
-        for sim_idx in range(batch_size):
-            obs = sim.reset(sim_idx)
+        sim.reset(list(range(batch_size)))
         end_reset = time.time()
         total_reset_time += end_reset - start_reset
 
@@ -159,7 +156,7 @@ def run_simulation(
     batch_size,
     max_num_objects,
     actor_type,
-    data_dir,
+    scenes,
     episode_length,
     do_n_resets,
     device,
@@ -171,7 +168,7 @@ def run_simulation(
             batch_size,
             max_num_objects,
             actor_type,
-            data_dir,
+            scenes,
             episode_length,
             do_n_resets,
             device,
@@ -185,11 +182,14 @@ def run_simulation(
 
 if __name__ == "__main__":
 
-    DATA_FOLDER = "formatted_json_v2_no_tl_valid"
-    BATCH_SIZE_LIST = [1024]
+    DATA_FOLDER = "/home/aarav/nocturne_data/formatted_json_v2_no_tl_valid"
+    BATCH_SIZE_LIST = [3]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
     DATASET_INIT = "first_n"
+
+    scenes = [os.path.join(DATA_FOLDER, scene) for scene in os.listdir(DATA_FOLDER)]
+
 
     # Get device info
     device_name = GPUtil.getGPUs()[0].name
@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     pbar = tqdm(BATCH_SIZE_LIST, colour="green")
     for idx, batch_size in enumerate(pbar):
-
+        sampled_scenes = random.sample(scenes, batch_size)
         pbar.set_description(
             f"Profiling gpudrive with batch size {batch_size} using {ACTOR_TYPE}"
         )
@@ -215,7 +215,7 @@ if __name__ == "__main__":
             batch_size=batch_size,
             max_num_objects=MAX_CONT_AGENTS,
             actor_type=ACTOR_TYPE,
-            data_dir=DATA_FOLDER,
+            scenes=sampled_scenes,
             episode_length=EPISODE_LENGTH,
             do_n_resets=80,
             device=DEVICE,
