@@ -178,10 +178,9 @@ def run_simulation(
 if __name__ == "__main__":
 
     DATA_FOLDER = "../nocturne_data/formatted_json_v2_no_tl_valid"
-    BATCH_SIZE_LIST = [3]
+    BATCH_SIZE_LIST = [64]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
-    DATASET_INIT = "first_n"
 
     scenes = [os.path.join(DATA_FOLDER, scene) for scene in os.listdir(DATA_FOLDER)]
 
