@@ -36,16 +36,6 @@ enum class EntityType : uint32_t {
     NumTypes,
 };
 
-struct BicycleModel {
-    madrona::math::Vector2 position;
-    float heading;
-    float speed;
-};
-
-const size_t BicycleModelExportSize = 4;
-
-static_assert(sizeof(BicycleModel) == sizeof(float) * BicycleModelExportSize);
-
 struct VehicleSize {
   float length;
   float width;
@@ -54,6 +44,7 @@ struct VehicleSize {
 struct Goal{
     madrona::math::Vector2 position;
 };
+
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -62,11 +53,16 @@ struct WorldReset {
     int32_t reset;
 };
 
-// TODO(samk): need to wrap elements in std::optional to match Nocturne?
 struct Action {
     float acceleration;
     float steering;
     float headAngle;
+};
+
+struct DeltaAction {
+    float dx;
+    float dy;
+    float dyaw;
 };
 
 // Per-agent reward
@@ -113,6 +109,15 @@ struct MapObservation {
     Scale scale;
     float heading;
     float type;
+
+    static inline MapObservation zero() {
+      return MapObservation {
+	.position = {0, 0},
+	.scale = madrona::math::Diag3x3{0, 0, 0},
+	.heading = 0,
+	.type = static_cast<float>(EntityType::None)
+      };
+    }
 };
 
 const size_t MapObservationExportSize = 7;
@@ -125,6 +130,16 @@ struct PartnerObservation {
     float heading;
     VehicleSize vehicle_size;
     float type;
+
+    static inline PartnerObservation zero() {
+      return PartnerObservation {
+	  .speed = 0,
+	  .position = {0, 0},
+	  .heading = 0,
+	  .vehicle_size = {0, 0},
+          .type = static_cast<float>(EntityType::None)
+      };
+    }
 };
 
 // Egocentric observations of other agents
@@ -178,21 +193,22 @@ struct Trajectory {
     madrona::math::Vector2 positions[consts::kTrajectoryLength];
     madrona::math::Vector2 velocities[consts::kTrajectoryLength];
     float headings[consts::kTrajectoryLength];
-    int32_t valids[consts::kTrajectoryLength];
+    float valids[consts::kTrajectoryLength];
+    Action inverseActions[consts::kTrajectoryLength];
+    DeltaAction inverseDeltaActions[consts::kTrajectoryLength];
 };
+
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 6 * consts::kTrajectoryLength;
+
+static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
 struct Shape {
     int32_t agentEntityCount;
     int32_t roadEntityCount;
 };
 
-enum class ControlMode {
-   EXPERT,
-   BICYCLE
-};
-
 struct ControlledState {
-   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+   int32_t controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {
@@ -244,7 +260,6 @@ struct Agent : public madrona::Archetype<
     EntityType,
 
     // gpudrive
-    BicycleModel,
     VehicleSize,
     Goal,
     Trajectory,
@@ -252,7 +267,7 @@ struct Agent : public madrona::Archetype<
 
     // Input
     Action,
-
+    DeltaAction,
     // Observations
     SelfObservation,
     AbsoluteSelfObservation,

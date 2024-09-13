@@ -13,23 +13,12 @@
 
 using namespace madrona;
 
-[[maybe_unused]] static void
-saveWorldActions(const HeapArray<float> &action_store, int32_t total_num_steps,
-                 int32_t world_idx) {
-  const float *world_base =
-      action_store.data() + world_idx * total_num_steps * 2 * 3;
-
-  std::ofstream f("/tmp/actions", std::ios::binary);
-  f.write((char *)world_base, sizeof(float) * total_num_steps * 2 * 3);
-}
-
-
 int main(int argc, char *argv[])
 {
     using namespace gpudrive;
 
-    if (argc < 4) {
-        fprintf(stderr, "%s TYPE NUM_WORLDS NUM_STEPS [--rand-actions]\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "%s TYPE NUM_STEPS [--rand-actions]\n", argv[0]);
         return -1;
     }
     std::string type(argv[1]);
@@ -44,14 +33,15 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    uint64_t num_worlds = std::stoul(argv[2]);
-    uint64_t num_steps = std::stoul(argv[3]);
-
-    HeapArray<float> action_store(num_worlds * 2 * num_steps * 3);
+    uint64_t num_steps = std::stoul(argv[2]);
+    std::vector<std::string> scenes = {"../data/tfrecord-00001-of-01000_307.json",
+         "../data/tfrecord-00003-of-01000_109.json",
+         "../data/tfrecord-00012-of-01000_389.json"};
+    uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
-    if (argc >= 5) {
-        if (std::string(argv[4]) == "--rand-actions") {
+    if (argc >= 4) {
+        if (std::string(argv[3]) == "--rand-actions") {
             rand_actions = true;
         }
     }
@@ -59,8 +49,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .numWorlds = (uint32_t)num_worlds,
-        .jsonPath = "../maps.16",
+        .scenes = scenes,
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -79,7 +68,6 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<float> steer_gen(-0.7,0.7);
 
     auto action_printer = mgr.actionTensor().makePrinter();
-    auto model_printer = mgr.bicycleModelTensor().makePrinter();
     auto self_printer = mgr.selfObservationTensor().makePrinter();
     auto partner_obs_printer = mgr.partnerObservationsTensor().makePrinter();
     auto map_obs_printer = mgr.mapObservationTensor().makePrinter();
@@ -97,15 +85,11 @@ int main(int argc, char *argv[])
         // printf("Actions\n");
         // action_printer.print();
 
-        printf("Model \n");
-        model_printer.print();
-
         // printf("Partner Obs\n");
         // partner_obs_printer.print();
 
         // printf("Map Obs\n");
         // map_obs_printer.print();
-        // printf("\n");
 
         // printf("Shape\n");
         // shapePrinter.print();
@@ -127,7 +111,7 @@ int main(int argc, char *argv[])
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+	mgr.getShapeTensorFromDeviceMemory(exec_mode);
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
@@ -142,9 +126,6 @@ int main(int argc, char *argv[])
                     mgr.setAction(j, k, acc, steer, head);
 
                     int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
-                    action_store[base_idx] = acc;
-                    action_store[base_idx + 1] = steer;
-                    action_store[base_idx + 2] = head;
                 }
             }
         }

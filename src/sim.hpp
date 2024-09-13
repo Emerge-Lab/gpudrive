@@ -17,6 +17,7 @@ class Engine;
 enum class ExportID : uint32_t {
     Reset,
     Action,
+    DeltaAction,
     Reward,
     Done,
     SelfObservation,
@@ -31,6 +32,8 @@ enum class ExportID : uint32_t {
     AbsoluteSelfObservation,
     ValidState,
     Info,
+    ResponseType,
+    Trajectory,
     NumExports
 };
 
@@ -47,6 +50,7 @@ enum class SimObject : uint32_t {
 
 enum class TaskGraphID : uint32_t {
     Step,
+    Reset,
     NumTaskGraphs,
 };
 

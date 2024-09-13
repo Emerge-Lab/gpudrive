@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <vector>
+#include <string>
 
 #include <madrona/py/utils.hpp>
 #include <madrona/exec_mode.hpp>
@@ -29,9 +30,10 @@ public:
     struct Config {
         madrona::ExecMode execMode; // CPU or CUDA
         int gpuID; // Which GPU for CUDA backend?
-        uint32_t numWorlds; // Simulation batch size
-        std::string jsonPath; // Directory path to jsons. Should contain exactly numWorlds files.
+        // TODO(sk): Use nanobind filesystem.h?
+        std::vector<std::string> scenes;
         Parameters params;
+      
 
         // Rendering settings
         bool enableBatchRenderer = false;
@@ -45,11 +47,12 @@ public:
     MGR_EXPORT ~Manager();
 
     MGR_EXPORT void step();
+    MGR_EXPORT void reset(std::vector<int32_t> worldsToReset);
 
     // These functions export Tensor objects that link the ECS
     // simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
-    MGR_EXPORT madrona::py::Tensor resetTensor() const;
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
+    MGR_EXPORT madrona::py::Tensor dActionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
     MGR_EXPORT madrona::py::Tensor selfObservationTensor() const;
@@ -58,12 +61,13 @@ public:
     MGR_EXPORT madrona::py::Tensor agentMapObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
     MGR_EXPORT madrona::py::Tensor stepsRemainingTensor() const;
-    MGR_EXPORT madrona::py::Tensor bicycleModelTensor() const;
     MGR_EXPORT madrona::py::Tensor shapeTensor() const;
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
     MGR_EXPORT madrona::py::Tensor absoluteSelfObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor validStateTensor() const;
     MGR_EXPORT madrona::py::Tensor infoTensor() const;
+    MGR_EXPORT madrona::py::Tensor responseTypeTensor() const;
+    MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
@@ -72,10 +76,12 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
-
+    MGR_EXPORT void setDeltaAction(int32_t world_idx, int32_t agent_idx,
+                              float dx, float dy,
+                              float dyaw);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
-    getShapeTensorFromDeviceMemory(madrona::ExecMode mode, uint32_t numWorlds);
+    getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
 
     madrona::render::RenderManager & getRenderManager();
 

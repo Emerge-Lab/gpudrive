@@ -80,19 +80,18 @@ namespace gpudrive
         float distanceToExpertThreshold;
     };
 
-    enum class DatasetInitOptions : uint32_t
-    {
-        FirstN,
-        RandomN,
-        PadN, // Pad the worlds by repeating the first world.
-        ExactN, // Will fail if N != NumWorlds
-    };
-  
     enum class CollisionBehaviour: uint32_t
     {
         AgentStop,
         AgentRemoved,
         Ignore
+    };
+
+    enum class DynamicsModel: uint32_t
+    {
+        Classic,
+        InvertibleBicycle,
+        DeltaLocal
     };
 
     enum class FindRoadObservationsWith {
@@ -105,14 +104,17 @@ namespace gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         RewardParams rewardParams;
-        DatasetInitOptions datasetInitOptions;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
         bool IgnoreNonVehicles = false; // Default: false
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
+        bool isStaticAgentControlled = false; // Default: false
         bool enableLidar = false;
+        bool disableClassicalObs = false;
+        DynamicsModel dynamicsModel = DynamicsModel::Classic;
+
     };
 
     struct WorldInit

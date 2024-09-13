@@ -8,6 +8,7 @@
 #include "sim.hpp"
 #include "utils.hpp"
 #include "knn.hpp"
+#include "dynamics.hpp"
 
 using namespace madrona;
 using namespace madrona::math;
@@ -31,6 +32,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerComponent<Action>();
+    registry.registerComponent<DeltaAction>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
     registry.registerComponent<AgentMapObservations>();
@@ -42,7 +44,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Lidar>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
-    registry.registerComponent<BicycleModel>();
     registry.registerComponent<VehicleSize>();
     registry.registerComponent<Goal>();
     registry.registerComponent<Trajectory>();
@@ -57,11 +58,12 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerArchetype<PhysicsEntity>();
     registry.registerArchetype<CameraAgent>();
 
-    registry.exportSingleton<WorldReset>(
-        (uint32_t)ExportID::Reset);
+    registry.exportSingleton<WorldReset>((uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
+    registry.exportColumn<Agent, DeltaAction>(
+        (uint32_t)ExportID::DeltaAction);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
     registry.exportColumn<Agent, AgentMapObservations>(
@@ -79,14 +81,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Reward);
     registry.exportColumn<Agent, Done>(
         (uint32_t)ExportID::Done);
-    registry.exportColumn<Agent, BicycleModel>(
-        (uint32_t) ExportID::BicycleModel);
     registry.exportColumn<Agent, ControlledState>(
         (uint32_t) ExportID::ControlledState);
     registry.exportColumn<Agent, AbsoluteSelfObservation>(
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<Agent, Info>(
         (uint32_t)ExportID::Info);
+    registry.exportColumn<Agent, ResponseType>(
+        (uint32_t)ExportID::ResponseType);
+    registry.exportColumn<Agent, Trajectory>(
+        (uint32_t)ExportID::Trajectory);
 }
 
 static inline void cleanupWorld(Engine &ctx) {}
@@ -105,7 +109,7 @@ static inline void initWorld(Engine &ctx)
     generateWorld(ctx);
 }
 
-// This system runs each frame and checks if the code external to the
+// This system runs in TaskGraphID::Reset and checks if the code external to the
 // application has forced a reset by writing to the WorldReset singleton. If a
 // reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
@@ -115,6 +119,7 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     }
 
     reset.reset = 0;
+
     cleanupWorld(ctx);
     initWorld(ctx);
 }
@@ -122,7 +127,6 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 // This system packages all the egocentric observations together
 // for the policy inputs.
 inline void collectObservationsSystem(Engine &ctx,
-                                      const BicycleModel &model,
                                       const VehicleSize &size,
                                       const Position &pos,
                                       const Rotation &rot,
@@ -140,27 +144,30 @@ inline void collectObservationsSystem(Engine &ctx,
         return;
     }
 
-    self_obs.speed = model.speed;
+    self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
-    auto goalPos = goal.position - model.position;
+    auto goalPos = goal.position - pos.xy();
     self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
 
+    if(ctx.data().params.disableClassicalObs)
+        return;
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
     {
         Entity other = other_agents.e[agentIdx++];
 
-        BicycleModel other_bicycle_model = ctx.get<BicycleModel>(other);
-        Rotation other_rot = ctx.get<Rotation>(other);
-        VehicleSize other_size = ctx.get<VehicleSize>(other);
+        const Position &other_position = ctx.get<Position>(other);
+        const Velocity &other_velocity = ctx.get<Velocity>(other);
+        const Rotation &other_rot = ctx.get<Rotation>(other);
+        const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = other_bicycle_model.position - model.position;
+        Vector2 relative_pos = (other_position - pos).xy();
         relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
-        float relative_speed = other_bicycle_model.speed; // Design decision: return the speed of the other agent directly
+        float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
@@ -178,24 +185,22 @@ inline void collectObservationsSystem(Engine &ctx,
             .type = (float)ctx.get<EntityType>(other)
         };
     }
-    while(arrIndex < consts::kMaxAgentCount - 1)
-    {
-        partner_obs.obs[arrIndex].type = (float)EntityType::None;
-        arrIndex++;
+    while(arrIndex < consts::kMaxAgentCount - 1) {
+        partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
 
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
-            ctx, rot, model.position, map_obs.obs);
+            ctx, rot, pos.xy(), map_obs.obs);
         return;
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
-    utils::ReferenceFrame referenceFrame(model.position, rot);
+    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
     arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads) {
+    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
@@ -210,133 +215,8 @@ inline void collectObservationsSystem(Engine &ctx,
         arrIndex++;
     }
 
-    while (arrIndex < consts::kMaxRoadEntityCount)
-    {
-        map_obs.obs[arrIndex].position = Vector2{0.f, 0.f};
-        map_obs.obs[arrIndex].heading = 0.f;
-        map_obs.obs[arrIndex].type = (float)EntityType::None;
-        arrIndex++;
-    }
-}
-
-inline void movementSystem(Engine &e,
-                           Action &action,
-                           BicycleModel &model,
-                           VehicleSize &size,
-                           Rotation &rotation,
-                           Position &position,
-                           Velocity &velocity,
-                           const ControlledState &controlledState,
-                           const EntityType &type,
-                           const StepsRemaining &stepsRemaining,
-                           const Trajectory &trajectory,
-                           const CollisionDetectionEvent &collisionEvent,
-                           const ResponseType &responseType,
-                           Done& done) {
-    if (type == EntityType::Padding) {
-        return;
-    }
-
-    if (collisionEvent.hasCollided.load_relaxed())
-    {
-        if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentStop) {
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            done.v = 1;
-            return;
-       }  else if(e.data().params.collisionBehaviour == CollisionBehaviour::AgentRemoved)
-        {
-            done.v = 1;
-            position = consts::kPaddingPosition;
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
-            return;
-        }
-        else if(e.data().params.collisionBehaviour == CollisionBehaviour::Ignore)
-        {
-            // Do nothing.
-        }
-    }
-
-    if(done.v && responseType != ResponseType::Static)
-    {
-        // Case: Agent has not collided but is done. 
-        // This can only happen if the agent has reached goal or the episode has ended.
-        // In that case we teleport the agent. The agent will not collide with anything.
-        position = consts::kPaddingPosition;
-        velocity.linear.x = 0;
-        velocity.linear.y = 0;
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
-        return;
-    }
-
-    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
-    {
-        // TODO: Handle the case when the agent is not valid. Currently, we are not doing anything.
-
-        // TODO: We are not storing previous action for the agent. Is it the ideal behaviour? Tehnically the actions
-        // need to be iterative. If we dont do this, there could be jumps in the acceleration. For eg, acc can go from
-        // 4m/s^2 to -4m/s^2 in one step. This is not ideal. We need to store the previous action and then use it to change
-        // gradually.
-
-        // TODO(samk): The following constants are configurable in Nocturne but look to
-        // always use the same hard-coded value in practice. Use in-line constants
-        // until the configuration is built out. - These values are correct. They are relative and hence are hardcoded.
-        const float maxSpeed{std::numeric_limits<float>::max()};
-        const float dt{0.1};
-
-        auto clipSpeed = [maxSpeed](float speed)
-        {
-            return std::max(std::min(speed, maxSpeed), -maxSpeed);
-        };
-        // TODO(samk): hoist into Vector2::PolarToVector2D
-        auto polarToVector2D = [](float r, float theta)
-        {
-            return math::Vector2{r * cosf(theta), r * sinf(theta)};
-        };
-
-        // Average speed
-        const float v{clipSpeed(model.speed + 0.5f * action.acceleration * dt)};
-        const float tanDelta{tanf(action.steering)};
-        // Assume center of mass lies at the middle of length, then l / L == 0.5.
-        const float beta{std::atan(0.5f * tanDelta)};
-        const math::Vector2 d{polarToVector2D(v, model.heading + beta)};
-        const float w{v * std::cos(beta) * tanDelta / size.length};
-
-        model.position += d * dt;
-        model.heading = utils::AngleAdd(model.heading, w * dt);
-        model.speed = clipSpeed(model.speed + action.acceleration * dt);
-
-        // The BVH machinery requires the components rotation, position, and velocity
-        // to perform calculations. Thus, to reuse the BVH machinery, we need to also
-        // updates these components.
-
-        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
-        position = madrona::base::Position({.x = model.position.x, .y = model.position.y, .z = 1});
-        rotation = Quat::angleAxis(model.heading, madrona::math::up);
-        velocity.linear.x = model.speed * cosf(model.heading);
-        velocity.linear.y = model.speed * sinf(model.heading);
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
-        velocity.angular.z = w;
-    }
-    else
-    {
-        // Follow expert trajectory
-        CountT curStepIdx = getCurrentStep(stepsRemaining);
-        model.position= trajectory.positions[curStepIdx];
-        model.heading = trajectory.headings[curStepIdx];
-        model.speed = trajectory.velocities[curStepIdx].length();
-        position.x = trajectory.positions[curStepIdx].x;
-        position.y = trajectory.positions[curStepIdx].y;
-        velocity.linear.x = trajectory.velocities[curStepIdx].x;
-        velocity.linear.y = trajectory.velocities[curStepIdx].y;
-        rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
+    while (arrIndex < consts::kMaxAgentMapObservationsCount) {
+        map_obs.obs[arrIndex++] = MapObservation::zero();
     }
 }
 
@@ -352,6 +232,96 @@ inline void agentZeroVelSystem(Engine &,
     vel.linear.z = 0;
     vel.angular = Vector3::zero();
 }
+
+
+inline void movementSystem(Engine &e,
+                           Action &action,
+                           DeltaAction &dAction,
+                           VehicleSize &size,
+                           Rotation &rotation,
+                           Position &position,
+                           Velocity &velocity,
+                           const ControlledState &controlledState,
+                           const EntityType &type,
+                           const StepsRemaining &stepsRemaining,
+                           const Trajectory &trajectory,
+                           const CollisionDetectionEvent &collisionEvent,
+                           const ResponseType &responseType,
+                           Done& done) {
+    if (type == EntityType::Padding) {
+        return;
+    }
+
+    if (collisionEvent.hasCollided.load_relaxed()) {
+        switch (e.data().params.collisionBehaviour) {
+            case CollisionBehaviour::AgentStop:
+                done.v = 1;
+                agentZeroVelSystem(e, velocity, action);
+                break;
+
+            case CollisionBehaviour::AgentRemoved:
+                done.v = 1;
+                position = consts::kPaddingPosition;
+                agentZeroVelSystem(e, velocity, action);
+                break;
+
+            case CollisionBehaviour::Ignore:
+                // Do nothing.
+                break;
+        }
+    }
+
+    if(responseType == ResponseType::Static)
+    {
+        // Do nothing. The agent is static.
+        // Agent can only be static if isStaticAgentControlled is set to true.
+        return;
+    }
+
+    if(done.v)
+    {
+        // Case: Agent has not collided but is done. 
+        // This can only happen if the agent has reached goal or the episode has ended.
+        // In that case we teleport the agent. The agent will not collide with anything.
+        position = consts::kPaddingPosition;
+        velocity.linear.x = 0;
+        velocity.linear.y = 0;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        return;
+    }
+
+    if(controlledState.controlled)
+    {
+        switch (e.data().params.dynamicsModel){
+
+            case DynamicsModel::InvertibleBicycle:
+               forwardBicycleModel(action, rotation, position, velocity);
+               break;
+            case DynamicsModel::DeltaLocal:
+               forwardDeltaModel(dAction, rotation, position, velocity);
+               break;
+            case DynamicsModel::Classic:
+               forwardKinematics(action, size, rotation, position, velocity);
+               break;
+
+        }
+    }
+    else
+    {
+        // Follow expert trajectory
+        CountT curStepIdx = getCurrentStep(stepsRemaining);
+        position.x = trajectory.positions[curStepIdx].x;
+        position.y = trajectory.positions[curStepIdx].y;
+        position.z = 1;
+        velocity.linear.x = trajectory.velocities[curStepIdx].x;
+        velocity.linear.y = trajectory.velocities[curStepIdx].y;
+        velocity.linear.z = 0;
+        velocity.angular = Vector3::zero();
+        rotation = Quat::angleAxis(trajectory.headings[curStepIdx], madrona::math::up);
+    }
+}
+
 
 static inline float distObs(float v)
 {
@@ -430,7 +400,7 @@ inline void lidarSystem(Engine &ctx, Entity e, Lidar &lidar,
 // so far through the challenge. Continuous reward is provided for any new
 // distance achieved.
 inline void rewardSystem(Engine &ctx,
-                         const BicycleModel &model,
+                         const Position &position,
                          const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
@@ -440,13 +410,13 @@ inline void rewardSystem(Engine &ctx,
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = -dist;
         out_reward.v = reward;
     }
     else if(rewardType == RewardType::OnGoalAchieved)
     {
-        float dist = (model.position - goal.position).length();
+        float dist = (position.xy() - goal.position).length();
         float reward = (dist < ctx.data().params.rewardParams.distanceToGoalThreshold) ? 1.f : 0.f;
         out_reward.v = reward;
     }
@@ -484,35 +454,40 @@ inline void bonusRewardSystem(Engine &ctx,
     }
 }
 
+inline void stepTrackerSystem(Engine &ctx, StepsRemaining &stepsRemaining) {
+    --stepsRemaining.t;
+}
+
 // Keep track of the number of steps remaining in the episode and
 // notify training that an episode has completed by
 // setting done = 1 on the final step of the episode
-inline void stepTrackerSystem(Engine &ctx,
-                              const BicycleModel &model,
-                              const Goal &goal,
-                              StepsRemaining &steps_remaining,
-                              Done &done,
-                              Info &info)
+inline void doneSystem(Engine &ctx,
+                      const Position &position,
+                      const Goal &goal,
+                      const StepsRemaining &steps_remaining,
+                      Done &done,
+                      Info &info)
 {
-    // Absolute done is 90 steps.
-    int32_t num_remaining = --steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1 && done.v != 1) { // Make sure to not reset an agent's done flag
+    int32_t num_remaining = steps_remaining.t;
+    if (num_remaining == consts::episodeLen - 1 && done.v != 1)
+    { // Make sure to not reset an agent's done flag
         done.v = 0;
-    } else if (num_remaining == 0) {
+    }
+    else if (num_remaining == 0)
+    {
         done.v = 1;
     }
 
     // An agent can be done early if it reaches the goal
-    if(done.v != 1 || info.reachedGoal != 1)
+    if (done.v != 1 || info.reachedGoal != 1)
     {
-        float dist = (model.position - goal.position).length();
-        if(dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+        float dist = (position.xy() - goal.position).length();
+        if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
         {
             done.v = 1;
             info.reachedGoal = 1;
         }
     }
-
 }
 
 void collisionDetectionSystem(Engine &ctx,
@@ -523,7 +498,7 @@ void collisionDetectionSystem(Engine &ctx,
         auto controlledState = ctx.getCheck<ControlledState>(candidate);
         if (controlledState.valid())
         {
-            if( controlledState.value().controlledState == ControlMode::EXPERT)
+            if( controlledState.value().controlled == false)
             {
                 // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(candidate));
@@ -533,7 +508,7 @@ void collisionDetectionSystem(Engine &ctx,
                     return true;
                 }
             }
-            else if (controlledState.value().controlledState == ControlMode::BICYCLE)
+            else if (controlledState.value().controlled == true)
             {
                 // Case: If a controlled agent gets done, we teleport it to the padding position
                 // Hence we need to ignore the collision detection for it.
@@ -677,35 +652,15 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.vehicle_size = vehicleSize;
 }
 
-// Build the task graph
-void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
-{
-    TaskGraphBuilder &builder = taskgraph_mgr.init(TaskGraphID::Step);
-
-    // Turn policy actions into movement
-    auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
-        movementSystem,
-            Action,
-            BicycleModel,
-            VehicleSize,
-            Rotation,
-            Position,
-            Velocity,
-            ControlledState,
-            EntityType,
-            StepsRemaining,
-            Trajectory,
-            CollisionDetectionEvent,
-            ResponseType,
-            Done
-        >>({});
-
+void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
+                      Span<const TaskGraphNodeID> dependencies,
+                      bool decrementStep) {
     // setupBroadphaseTasks consists of the following sub-tasks:
     // 1. updateLeafPositionsEntry
     // 2. broadphase::updateBVHEntry
     // 3. broadphase::refitEntry
-    auto broadphase_setup_sys = phys::PhysicsSystem::setupBroadphaseTasks(
-        builder, {moveSystem});
+    auto broadphase_setup_sys =
+        phys::PhysicsSystem::setupBroadphaseTasks(builder, dependencies);
 
     auto findOverlappingEntities =
         phys::PhysicsSystem::setupStandaloneBroadphaseOverlapTasks(
@@ -715,62 +670,49 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         ParallelForNode<Engine, collisionDetectionSystem, CandidateCollision>>(
         {findOverlappingEntities});
 
-    // Improve controllability of agents by setting their velocity to 0
-    // after physics is done.
-    auto agent_zero_vel = builder.addToGraph<
-        ParallelForNode<Engine, agentZeroVelSystem, Velocity, Action>>(
-        {detectCollisions});
-
     // Finalize physics subsystem work
     auto phys_done = phys::PhysicsSystem::setupStandaloneBroadphaseCleanupTasks(
-        builder, {agent_zero_vel});
+        builder, {detectCollisions});
 
     phys_done = phys::PhysicsSystem::setupCleanupTasks(
-        builder, {agent_zero_vel});
+        builder, {detectCollisions});
 
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
-            BicycleModel,
+            Position,
             Trajectory,
             Goal,
             Progress,
             Reward
         >>({phys_done});
 
+    auto previousSystem = reward_sys;
+    if (decrementStep) {
+        previousSystem = builder.addToGraph<
+            ParallelForNode<Engine, stepTrackerSystem, StepsRemaining>>(
+            {reward_sys});
+    }
 
     // Check if the episode is over
-    auto done_sys = builder.addToGraph<
-        ParallelForNode<Engine, stepTrackerSystem, BicycleModel, Goal, StepsRemaining, Done, Info>>(
-        {reward_sys});
+    auto done_sys =
+        builder.addToGraph<ParallelForNode<Engine, doneSystem, Position, Goal,
+                                           StepsRemaining, Done, Info>>(
+            {previousSystem});
 
-    // Conditionally reset the world if the episode is over
-    auto reset_sys = builder.addToGraph<ParallelForNode<Engine,
-        resetSystem,
-            WorldReset
-        >>({done_sys});
-
-    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({reset_sys});
+    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({done_sys});
     (void)clear_tmp;
 
 
 #ifdef MADRONA_GPU_MODE
     // RecycleEntitiesNode is required on the GPU backend in order to reclaim
     // deleted entity IDs.
-    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({reset_sys});
+    auto recycle_sys = builder.addToGraph<RecycleEntitiesNode>({done_sys});
     (void)recycle_sys;
 #endif
-
-    // This second BVH build is a limitation of the current taskgraph API.
-    // It's only necessary if the world was reset, but we don't have a way
-    // to conditionally queue taskgraph nodes yet.
-    auto post_reset_broadphase =
-        phys::PhysicsSystem::setupBroadphaseTasks(builder,
-                                                           {reset_sys});
 
     // Finally, collect observations for the next step.
     auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
         collectObservationsSystem,
-            BicycleModel,
             VehicleSize,
             Position,
             Rotation,
@@ -779,11 +721,11 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
             Progress,
             OtherAgents,
             SelfObservation,
-	        PartnerObservations,
+            PartnerObservations,
             AgentMapObservations,
             EntityType,
             CollisionDetectionEvent
-        >>({post_reset_broadphase});
+        >>({clear_tmp});
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
@@ -791,7 +733,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
         {collect_obs});
 
     if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {reset_sys});
+        RenderingSystem::setupTasks(builder, {done_sys});
     }
 
     TaskGraphNodeID lidar;
@@ -832,6 +774,40 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     (void)lidar;
     (void)collectAbsoluteSelfObservations;
 #endif
+}
+
+static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
+    auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
+        movementSystem,
+            Action,
+            DeltaAction,
+            VehicleSize,
+            Rotation,
+            Position,
+            Velocity,
+            ControlledState,
+            EntityType,
+            StepsRemaining,
+            Trajectory,
+            CollisionDetectionEvent,
+            ResponseType,
+            Done
+        >>({});  
+
+    setupRestOfTasks(builder, cfg, {moveSystem}, true);
+}
+
+static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
+    auto reset =
+        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset>>(
+            {});
+
+    setupRestOfTasks(builder, cfg, {reset}, false);
+}
+
+void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg) {
+    setupResetTasks(taskgraph_mgr.init(TaskGraphID::Reset), cfg);
+    setupStepTasks(taskgraph_mgr.init(TaskGraphID::Step), cfg);
 }
 
 Sim::Sim(Engine &ctx,

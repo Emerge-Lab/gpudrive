@@ -7,7 +7,6 @@
 #include <madrona/physics_loader.hpp>
 #include <madrona/tracing.hpp>
 #include <madrona/mw_cpu.hpp>
-#include <nlohmann/json.hpp>
 #include <madrona/render/api.hpp>
 
 #include <array>
@@ -80,7 +79,7 @@ static inline Optional<render::RenderManager> initRenderManager(
         .enableBatchRenderer = mgr_cfg.enableBatchRenderer,
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
-        .numWorlds = mgr_cfg.numWorlds,
+        .numWorlds = static_cast<uint32_t>(mgr_cfg.scenes.size()),
         .maxViewsPerWorld = consts::kMaxAgentCount + 1, // FIXME?
         .maxInstancesPerWorld = 3000,
         .execMode = mgr_cfg.execMode,
@@ -94,28 +93,34 @@ struct Manager::Impl {
     EpisodeManager *episodeMgr;
     WorldReset *worldResetBuffer;
     Action *agentActionsBuffer;
+    DeltaAction *agentdActionsBuffer;
     Optional<RenderGPUState> renderGPUState;
     Optional<render::RenderManager> renderMgr;
+    int64_t numWorlds{0};
 
     inline Impl(const Manager::Config &mgr_cfg,
                 PhysicsLoader &&phys_loader,
                 EpisodeManager *ep_mgr,
                 WorldReset *reset_buffer,
                 Action *action_buffer,
+                DeltaAction *dAction_buffer,
                 Optional<RenderGPUState> &&render_gpu_state,
-                Optional<render::RenderManager> &&render_mgr)
+                Optional<render::RenderManager> &&render_mgr,
+		int64_t numWorlds) 
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
           worldResetBuffer(reset_buffer),
           agentActionsBuffer(action_buffer),
+          agentdActionsBuffer(dAction_buffer),
           renderGPUState(std::move(render_gpu_state)),
-          renderMgr(std::move(render_mgr))
-    {}
+          renderMgr(std::move(render_mgr)),
+          numWorlds(numWorlds) {}
 
     inline virtual ~Impl() {}
 
-    virtual void run() = 0;
+    virtual void step() = 0;
+    virtual void reset() = 0;
 
     virtual Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -135,12 +140,13 @@ struct Manager::CPUImpl final : Manager::Impl {
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   DeltaAction *dAction_buffer,
                    TaskGraphT &&cpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
-                   Optional<render::RenderManager> &&render_mgr)
-        : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr)),
+                   Optional<render::RenderManager> &&render_mgr,
+		   int64_t numWorlds)
+        : Impl(mgr_cfg, std::move(phys_loader), ep_mgr, reset_buffer, action_buffer, dAction_buffer,
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),
           cpuExec(std::move(cpu_exec))
     {}
 
@@ -149,10 +155,9 @@ struct Manager::CPUImpl final : Manager::Impl {
         delete episodeMgr;
     }
 
-    inline virtual void run()
-    {
-        cpuExec.runTaskGraph(TaskGraphID::Step);
-    }
+    inline virtual void step() { cpuExec.runTaskGraph(TaskGraphID::Step); }
+
+    inline virtual void reset() { cpuExec.runTaskGraph(TaskGraphID::Reset); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -167,31 +172,33 @@ struct Manager::CPUImpl final : Manager::Impl {
 struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
     MWCudaLaunchGraph stepGraph;
+    MWCudaLaunchGraph resetGraph;
 
     inline CUDAImpl(const Manager::Config &mgr_cfg,
                    PhysicsLoader &&phys_loader,
                    EpisodeManager *ep_mgr,
                    WorldReset *reset_buffer,
                    Action *action_buffer,
+                   DeltaAction *dAction_buffer,
                    MWCudaExecutor &&gpu_exec,
                    Optional<RenderGPUState> &&render_gpu_state,
-                   Optional<render::RenderManager> &&render_mgr)
+                  Optional<render::RenderManager> &&render_mgr,
+                   int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
-               ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr)),
+               ep_mgr, reset_buffer, action_buffer, dAction_buffer,
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
           gpuExec(std::move(gpu_exec)),
-          stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step))
-    {}
+          stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
+          resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
 
     inline virtual ~CUDAImpl() final
     {
         REQ_CUDA(cudaFree(episodeMgr));
     }
 
-    inline virtual void run()
-    {
-        gpuExec.run(stepGraph);
-    }
+    inline virtual void step() { gpuExec.run(stepGraph); }
+
+    inline virtual void reset() { gpuExec.run(resetGraph); }
 
     virtual inline Tensor exportTensor(ExportID slot,
         TensorElementType type,
@@ -383,61 +390,6 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
-
-static std::vector<std::string> getMapFiles(const Manager::Config &cfg)
-{
-    std::filesystem::path path(cfg.jsonPath);
-    auto validFilesJsonPath = path / "valid_files.json";
-    assert(std::filesystem::exists(validFilesJsonPath));
-    // check if validFiles.json exists
-
-    std::ifstream validFilesJson(validFilesJsonPath);
-    assert(validFilesJson.good());
-
-    nlohmann::json validFiles;
-    validFilesJson >> validFiles;
-
-    std::vector<std::string> mapFiles;
-    for (auto& [key, value] : validFiles.items()) {
-        std::filesystem::path fullPath = path / key;
-        mapFiles.emplace_back(fullPath.string());
-    }
-    assert(mapFiles.size() != 0);
-
-    if(cfg.params.datasetInitOptions == DatasetInitOptions::FirstN)
-    {
-        assert(cfg.numWorlds <= mapFiles.size());
-        mapFiles.resize(cfg.numWorlds);
-    }
-    else if(cfg.params.datasetInitOptions == DatasetInitOptions::RandomN)
-    {
-        assert(cfg.numWorlds <= mapFiles.size());
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle(mapFiles.begin(), mapFiles.end(), g);
-        mapFiles.resize(cfg.numWorlds);
-    }
-    else if(cfg.params.datasetInitOptions == DatasetInitOptions::PadN)
-    {
-        assert(cfg.numWorlds >= mapFiles.size());
-        auto numFiles = mapFiles.size();
-        for(int i = mapFiles.size(); i < cfg.numWorlds; i++)
-        {
-            mapFiles.push_back(mapFiles[i % numFiles]);
-        }
-    }
-    else if(cfg.params.datasetInitOptions == DatasetInitOptions::ExactN)
-    {
-        // Do nothing
-    }
-    else
-    {
-        FATAL("Invalid datasetInitOptions");
-    }
-
-    return mapFiles;
-}
-
 bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
     madrona::CountT roadObservationsCount =
         sizeof(AgentMapObservations) / sizeof(MapObservation);
@@ -446,19 +398,17 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
                FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering ||
            (algo ==
                 FindRoadObservationsWith::AllEntitiesWithRadiusFiltering &&
-            roadObservationsCount == consts::kMaxRoadEntityCount);
+            roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
-Manager::Impl * Manager::Impl::init(
-    const Manager::Config &mgr_cfg)
-{
+Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) { 
     Sim::Config sim_cfg;
     sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
-    std::vector<std::string> mapFiles = getMapFiles(mgr_cfg);
-
     assert(isRoadObservationAlgorithmValid(
         mgr_cfg.params.roadObservationAlgorithm));
+
+    const int64_t numWorlds = mgr_cfg.scenes.size();
 
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
@@ -474,21 +424,19 @@ Manager::Impl * Manager::Impl::init(
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
-        HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
+        HeapArray<WorldInit> world_inits(numWorlds);
 
 
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
         
         int64_t worldIdx{0};
-    
-        for (auto const &mapFile : mapFiles)
-        {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
-                                                           ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, paramsDevicePtr};
+        for (auto const &scene : mgr_cfg.scenes) {
+	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+							  ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
         }
-        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+        assert(worldIdx == numWorlds);
 
         Optional<RenderGPUState> render_gpu_state =
             initRenderGPUState(mgr_cfg);
@@ -510,7 +458,7 @@ Manager::Impl * Manager::Impl::init(
             .numUserConfigBytes = sizeof(Sim::Config),
             .numWorldDataBytes = sizeof(Sim),
             .worldDataAlignment = alignof(Sim),
-            .numWorlds = mgr_cfg.numWorlds,
+            .numWorlds = static_cast<uint32_t>(numWorlds),
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
             .numExportedBuffers = (uint32_t)ExportID::NumExports, 
         }, {
@@ -524,9 +472,10 @@ Manager::Impl * Manager::Impl::init(
 
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
-
+        DeltaAction *agent_dActions_buffer =
+            (DeltaAction *)gpu_exec.getExported((uint32_t)ExportID::DeltaAction);
         madrona::cu::deallocGPU(paramsDevicePtr);
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+        for (int64_t i = 0; i < numWorlds; i++) {
           auto &init = world_inits[i];
           madrona::cu::deallocGPU(init.map);
         }
@@ -537,9 +486,11 @@ Manager::Impl * Manager::Impl::init(
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            agent_dActions_buffer,
             std::move(gpu_exec),
             std::move(render_gpu_state),
-            std::move(render_mgr)
+            std::move(render_mgr),
+	    numWorlds
         };
 
 #else
@@ -554,17 +505,17 @@ Manager::Impl * Manager::Impl::init(
 
         ObjectManager *phys_obj_mgr = &phys_loader.getObjectManager();
 
-        HeapArray<WorldInit> world_inits(mgr_cfg.numWorlds);
+        HeapArray<WorldInit> world_inits(numWorlds);
 
         int64_t worldIdx{0};
     
-        for (auto const &mapFile : mapFiles)
+        for (auto const &scene : mgr_cfg.scenes)
         {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(mapFile,
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
                                                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
         }
-        assert(worldIdx == static_cast<int64_t>(mgr_cfg.numWorlds));
+        assert(worldIdx == numWorlds);
 
 
 
@@ -583,7 +534,7 @@ Manager::Impl * Manager::Impl::init(
 
         CPUImpl::TaskGraphT cpu_exec {
             ThreadPoolExecutor::Config {
-                .numWorlds = mgr_cfg.numWorlds,
+                .numWorlds = static_cast<uint32_t>(mgr_cfg.scenes.size()),
                 .numExportedBuffers = (uint32_t)ExportID::NumExports,
             },
             sim_cfg,
@@ -596,19 +547,22 @@ Manager::Impl * Manager::Impl::init(
 
         Action *agent_actions_buffer = 
             (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
-
+        DeltaAction *agent_dActions_buffer =
+            (DeltaAction *)cpu_exec.getExported((uint32_t)ExportID::DeltaAction);
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
             std::move(phys_loader),
             episode_mgr,
             world_reset_buffer,
             agent_actions_buffer,
+            agent_dActions_buffer,
             std::move(cpu_exec),
             std::move(render_gpu_state),
-            std::move(render_mgr)
+            std::move(render_mgr),
+	    numWorlds
         };
 
-        for (int64_t i = 0; i < (int64_t)mgr_cfg.numWorlds; i++) {
+        for (int64_t i = 0; i < mgr_cfg.scenes.size(); i++) {
           auto &init = world_inits[i];
           delete init.map;
         }
@@ -619,30 +573,13 @@ Manager::Impl * Manager::Impl::init(
     }
 }
 
-Manager::Manager(const Config &cfg)
-    : impl_(Impl::init(cfg))
-{
-    // Currently, there is no way to populate the initial set of observations
-    // without stepping the simulations in order to execute the taskgraph.
-    // Therefore, after setup, we step all the simulations with a forced reset
-    // that ensures the first real step will have valid observations at the
-    // start of a fresh episode in order to compute actions.
-    //
-    // This will be improved in the future with support for multiple task
-    // graphs, allowing a small task graph to be executed after initialization.
-    
-    for (int32_t i = 0; i < (int32_t)cfg.numWorlds; i++) {
-        triggerReset(i);
-    }
-
-    step();
-}
+Manager::Manager(const Config &cfg) : impl_(Impl::init(cfg)) { reset({}); }
 
 Manager::~Manager() {}
 
 void Manager::step()
 {
-    impl_->run();
+    impl_->step();
 
     if (impl_->renderMgr.has_value()) {
         impl_->renderMgr->readECS();
@@ -653,42 +590,47 @@ void Manager::step()
     }
 }
 
-Tensor Manager::resetTensor() const
-{
-    return impl_->exportTensor(ExportID::Reset,
-                               TensorElementType::Int32,
-                               {
-                                   impl_->cfg.numWorlds,
-                                   1,
-                               });
+void Manager::reset(std::vector<int32_t> worldsToReset) {
+    for (const auto &worldIdx : worldsToReset) {
+        triggerReset(worldIdx);
+    }
+
+    impl_->reset();
+
+    if (impl_->renderMgr.has_value()) {
+        impl_->renderMgr->readECS();
+    }
+
+    if (impl_->cfg.enableBatchRenderer) {
+        impl_->renderMgr->batchRender();
+    }
 }
 
 Tensor Manager::actionTensor() const
 {
     return impl_->exportTensor(ExportID::Action, TensorElementType::Float32,
         {
-            impl_->cfg.numWorlds,
+            impl_->numWorlds,
             consts::kMaxAgentCount,
             3, // Num_actions
         });
 }
 
-Tensor Manager::bicycleModelTensor() const
+Tensor Manager::dActionTensor() const
 {
-    return impl_->exportTensor(ExportID::BicycleModel, TensorElementType::Float32,
+    return impl_->exportTensor(ExportID::DeltaAction, TensorElementType::Float32,
         {
-            impl_->cfg.numWorlds,
+            impl_->numWorlds,
             consts::kMaxAgentCount,
-            BicycleModelExportSize, // Number of states for the bicycle model
+            3, // Num_actions
         });
 }
-
 
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    1,
                                });
@@ -698,7 +640,7 @@ Tensor Manager::doneTensor() const
 {
     return impl_->exportTensor(ExportID::Done, TensorElementType::Int32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    1,
                                });
@@ -708,7 +650,7 @@ Tensor Manager::infoTensor() const
 {
     return impl_->exportTensor(ExportID::Info, TensorElementType::Int32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    InfoExportSize
                                });
@@ -719,7 +661,7 @@ Tensor Manager::selfObservationTensor() const
     return impl_->exportTensor(ExportID::SelfObservation,
                                TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    SelfObservationExportSize
 			       });
@@ -730,7 +672,7 @@ Tensor Manager::mapObservationTensor() const
     return impl_->exportTensor(ExportID::MapObservation,
                                TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxRoadEntityCount,
                                    MapObservationExportSize
                                });
@@ -741,7 +683,7 @@ Tensor Manager::partnerObservationsTensor() const
     return impl_->exportTensor(ExportID::PartnerObservations,
                                TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    consts::kMaxAgentCount - 1,
                                    PartnerObservationExportSize
@@ -753,7 +695,7 @@ Tensor Manager::agentMapObservationsTensor() const
     return impl_->exportTensor(ExportID::AgentMapObservations,
                                TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
 				   consts::kMaxAgentCount,
                                    consts::kMaxAgentMapObservationsCount,
                                    AgentMapObservationExportSize,
@@ -765,7 +707,7 @@ Tensor Manager::lidarTensor() const
 {
     return impl_->exportTensor(ExportID::Lidar, TensorElementType::Float32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    consts::numLidarSamples,
                                    2,
@@ -777,7 +719,7 @@ Tensor Manager::stepsRemainingTensor() const
     return impl_->exportTensor(ExportID::StepsRemaining,
                                TensorElementType::Int32,
                                {
-                                   impl_->cfg.numWorlds,
+                                   impl_->numWorlds,
                                    consts::kMaxAgentCount,
                                    1,
                                });
@@ -785,24 +727,35 @@ Tensor Manager::stepsRemainingTensor() const
 
 Tensor Manager::shapeTensor() const {
     return impl_->exportTensor(ExportID::Shape, TensorElementType::Int32,
-                               {impl_->cfg.numWorlds, 2});
+                               {impl_->numWorlds, 2});
 }
 
 Tensor Manager::controlledStateTensor() const {
     return impl_->exportTensor(ExportID::ControlledState, TensorElementType::Int32,
-                               {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+                               {impl_->numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::responseTypeTensor() const {
+    return impl_->exportTensor(ExportID::ResponseType, TensorElementType::Int32,
+                               {impl_->numWorlds, consts::kMaxAgentCount, 1});
 }
 
 Tensor Manager::absoluteSelfObservationTensor() const {
     return impl_->exportTensor(
         ExportID::AbsoluteSelfObservation, TensorElementType::Float32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
+        {impl_->numWorlds, consts::kMaxAgentCount, AbsoluteSelfObservationExportSize});
 }
 
 Tensor Manager::validStateTensor() const {
     return impl_->exportTensor(
         ExportID::ValidState, TensorElementType::Int32,
-        {impl_->cfg.numWorlds, consts::kMaxAgentCount, 1});
+        {impl_->numWorlds, consts::kMaxAgentCount, 1});
+}
+
+Tensor Manager::expertTrajectoryTensor() const {
+    return impl_->exportTensor(
+        ExportID::Trajectory, TensorElementType::Float32,
+        {impl_->numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
 }
 
 void Manager::triggerReset(int32_t world_idx)
@@ -830,7 +783,7 @@ Tensor Manager::rgbTensor() const
     assert(rgb_ptr != nullptr);
 
     return Tensor((void*)rgb_ptr, TensorElementType::UInt8, {
-        impl_->cfg.numWorlds,
+        impl_->numWorlds,
         consts::kMaxAgentCount,
         impl_->cfg.batchRenderViewHeight,
         impl_->cfg.batchRenderViewWidth,
@@ -843,7 +796,7 @@ Tensor Manager::depthTensor() const
     const float *depth_ptr = impl_->renderMgr->batchRendererDepthOut();
 
     return Tensor((void *)depth_ptr, TensorElementType::Float32, {
-        impl_->cfg.numWorlds,
+        impl_->numWorlds,
         consts::kMaxAgentCount,
         impl_->cfg.batchRenderViewHeight,
         impl_->cfg.batchRenderViewWidth,
@@ -868,9 +821,26 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
     }
 }
 
+void Manager::setDeltaAction(int32_t world_idx, int32_t agent_idx,
+                        float dx, float dy, float dyaw) {
+    DeltaAction dAction{.dx = dx,
+                  .dy = dy,
+                  .dyaw = dyaw};
+
+    auto *dAction_ptr = impl_->agentdActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
+
+    if (impl_->cfg.execMode == ExecMode::CUDA) {
+#ifdef MADRONA_CUDA_SUPPORT
+        cudaMemcpy(dAction_ptr, &dAction, sizeof(DeltaAction), cudaMemcpyHostToDevice);
+#endif
+    } else {
+        *dAction_ptr = dAction;
+    }
+}
+
 std::vector<Shape>
-Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode,
-                                        uint32_t numWorlds) {
+Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode) {
+    const uint32_t numWorlds = impl_->numWorlds;
     const auto &tensor = shapeTensor();
 
     const std::size_t floatsPerShape{2};

@@ -4,6 +4,7 @@
 #include <madrona/py/bindings.hpp>
 
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
 
@@ -18,6 +19,13 @@ namespace gpudrive
         // like madrona::py::Tensor and madrona::py::PyExecMode.
         madrona::py::setupMadronaSubmodule(m);
 
+        // Add bindings for constants defined in src/consts.hpp
+        m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
+        m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
+        m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("episodeLen") = consts::episodeLen;  
+        m.attr("numLidarSamples") = consts::numLidarSamples; 
+
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
             .value("DistanceBased", RewardType::DistanceBased)
@@ -31,12 +39,6 @@ namespace gpudrive
             .def_rw("distanceToGoalThreshold", &RewardParams::distanceToGoalThreshold)
             .def_rw("distanceToExpertThreshold", &RewardParams::distanceToExpertThreshold);
 
-        nb::enum_<DatasetInitOptions>(m, "DatasetInitOptions")
-            .value("FirstN", DatasetInitOptions::FirstN)
-            .value("RandomN", DatasetInitOptions::RandomN)
-            .value("PadN", DatasetInitOptions::PadN)
-            .value("ExactN", DatasetInitOptions::ExactN);
-
         nb::enum_<FindRoadObservationsWith>(m, "FindRoadObservationsWith")
             .value("KNearestEntitiesWithRadiusFiltering", FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering)
             .value("AllEntitiesWithRadiusFiltering", FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
@@ -46,20 +48,27 @@ namespace gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
-            .def_rw("datasetInitOptions", &Parameters::datasetInitOptions)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
-            .def_rw("initOnlyValidAgentsAtFirstStep", &Parameters::initOnlyValidAgentsAtFirstStep)
-            .def_rw("enableLidar", &Parameters::enableLidar);
+            .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("dynamicsModel", &Parameters::dynamicsModel)
+            .def_rw("enableLidar", &Parameters::enableLidar)
+            .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
+            .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
             .value("AgentStop", CollisionBehaviour::AgentStop)
             .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
             .value("Ignore", CollisionBehaviour::Ignore);
+
+        nb::enum_<DynamicsModel>(m, "DynamicsModel")
+            .value("Classic", DynamicsModel::Classic)
+            .value("InvertibleBicycle", DynamicsModel::InvertibleBicycle)
+            .value("DeltaLocal", DynamicsModel::DeltaLocal);
 
         nb::enum_<EntityType>(m, "EntityType")
             .value("_None", EntityType::None)
@@ -78,31 +87,28 @@ namespace gpudrive
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
-                "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, int64_t num_worlds, std::string jsonPath, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
+		 "__init__", [](Manager *self, madrona::py::PyExecMode exec_mode, int64_t gpu_id, std::vector<std::string> scenes, Parameters params, bool enable_batch_renderer, uint32_t batch_render_view_width, uint32_t batch_render_view_height)
                 { new (self) Manager(Manager::Config{
                       .execMode = exec_mode,
                       .gpuID = (int)gpu_id,
-                      .numWorlds = (uint32_t)num_worlds,
-                      .jsonPath = jsonPath,
+                      .scenes = scenes,
                       .params = params,
                       .enableBatchRenderer = enable_batch_renderer,
                       .batchRenderViewWidth = batch_render_view_width,
                       .batchRenderViewHeight = batch_render_view_height});},
                 nb::arg("exec_mode"),
                 nb::arg("gpu_id"),
-                nb::arg("num_worlds"),
-                nb::arg("json_path"),
+                nb::arg("scenes"),
                 nb::arg("params"),
                 nb::arg("enable_batch_renderer") = false,
                 nb::arg("batch_render_view_width") = 64,
                 nb::arg("batch_render_view_height") = 64)
             .def("step", &Manager::step)
-            .def("reset", &Manager::triggerReset)
-            .def("reset_tensor", &Manager::resetTensor)
+            .def("reset", &Manager::reset)
             .def("action_tensor", &Manager::actionTensor)
+            .def("delta_action_tensor", &Manager::dActionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)
-            .def("bicycle_model_tensor", &Manager::bicycleModelTensor)
             .def("self_observation_tensor", &Manager::selfObservationTensor)
             .def("map_observation_tensor", &Manager::mapObservationTensor)
             .def("partner_observations_tensor", &Manager::partnerObservationsTensor)
@@ -116,7 +122,9 @@ namespace gpudrive
             .def("valid_state_tensor", &Manager::validStateTensor)
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
-            .def("depth_tensor", &Manager::depthTensor);
+            .def("depth_tensor", &Manager::depthTensor)
+            .def("response_type_tensor", &Manager::responseTypeTensor)
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
     }
 
 }

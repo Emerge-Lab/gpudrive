@@ -1,3 +1,4 @@
+import collections
 import gpudrive
 import pytest
 
@@ -14,17 +15,15 @@ def simulation_results():
     params.polylineReductionThreshold = 0.5  # Set appropriate value
     params.observationRadius = 10.0  # Set appropriate value
     params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop  # Set appropriate value
-    params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN  # Set appropriate value
     params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
     params.maxNumControlledVehicles = 0
     params.IgnoreNonVehicles = True
-
+    params.isStaticAgentControlled = False
     # Now use the 'params' instance when creating SimManager
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU,
         gpu_id=0,
-        num_worlds=1,
-        json_path="tests/pytest_data",
+        scenes=["tests/pytest_data/test.json"],
         params=params,
         enable_batch_renderer=False, # Optional parameter
         batch_render_view_width=1024,

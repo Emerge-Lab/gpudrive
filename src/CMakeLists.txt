@@ -7,6 +7,7 @@ set(SIMULATOR_SRCS
     utils.hpp
     binary_heap.hpp
     knn.hpp
+    dynamics.hpp
 )
 
 add_library(gpudrive_cpu_impl STATIC
@@ -27,7 +28,7 @@ add_library(gpudrive_mgr STATIC
     MapReader.hpp MapReader.cpp
 )
 
-target_link_libraries(gpudrive_mgr 
+target_link_libraries(gpudrive_mgr
     PUBLIC
         madrona_python_utils
     PRIVATE
@@ -58,7 +59,7 @@ if (TARGET madrona_mw_gpu)
 endif ()
 
 target_compile_definitions(gpudrive_mgr PRIVATE
-    -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
+    -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets/"
 )
 
 madrona_python_module(gpudrive
@@ -75,7 +76,7 @@ if (TARGET madrona_viz)
         madrona_mw_core gpudrive_mgr madrona_viz)
 
     target_compile_definitions(viewer PRIVATE
-        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
+        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets/"
     )
 
     if (TARGET madrona_cuda)
