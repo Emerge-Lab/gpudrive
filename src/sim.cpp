@@ -125,24 +125,16 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     initWorld(ctx);
 }
 
-// This system packages all the egocentric observations together
-// for the policy inputs.
-inline void collectObservationsSystem(Engine &ctx,
-                                      const VehicleSize &size,
-                                      const Position &pos,
-                                      const Rotation &rot,
-                                      const Velocity &vel,
-                                      const Goal &goal,
-                                      const Progress &progress,
-                                      const OtherAgents &other_agents,
-                                      const EntityType& entityType,
-				                      const CollisionDetectionEvent& collisionEvent,
-                                      const AgentInterfaceEntity &agent_iface)
+inline void collectSelfObsSystem(Engine &ctx,
+                           const VehicleSize &size,
+                           const Position &pos,
+                           const Rotation &rot,
+                           const Velocity &vel,
+                           const Goal &goal,
+                           const CollisionDetectionEvent& collisionEvent,
+                           const AgentInterfaceEntity &agent_iface)
 {
     auto &self_obs = ctx.get<SelfObservation>(agent_iface.e);
-    auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
-    auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
-
     self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
     auto goalPos = goal.position - pos.xy();
@@ -150,9 +142,18 @@ inline void collectObservationsSystem(Engine &ctx,
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
+}
 
+inline void collectPartnerObsSystem(Engine &ctx,
+                              const Position &pos,
+                              const Rotation &rot,
+                              const OtherAgents &other_agents,
+                              const AgentInterfaceEntity &agent_iface)
+{
     if(ctx.data().params.disableClassicalObs)
         return;
+
+    auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
 
     CountT arrIndex = 0; CountT agentIdx = 0;
     while(agentIdx < ctx.data().numAgents - 1)
@@ -184,10 +185,21 @@ inline void collectObservationsSystem(Engine &ctx,
             .type = (float)ctx.get<EntityType>(other)
         };
     }
-    while(arrIndex < consts::kMaxAgentCount - 1) {
+    while(arrIndex < ctx.data().numAgents - 1) {
         partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
+}
 
+inline void collectMapObservationsSystem(Engine &ctx,
+                                        const Position &pos,
+                                        const Rotation &rot,
+                                        const AgentInterfaceEntity &agent_iface)
+{
+    if(ctx.data().params.disableClassicalObs)
+        return;
+
+    auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
+    
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
@@ -198,7 +210,7 @@ inline void collectObservationsSystem(Engine &ctx,
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
     utils::ReferenceFrame referenceFrame(pos.xy(), rot);
-    arrIndex = 0; CountT roadIdx = 0;
+    CountT arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
         auto roadPos = ctx.get<Position>(road);
@@ -217,7 +229,6 @@ inline void collectObservationsSystem(Engine &ctx,
         map_obs.obs[arrIndex++] = MapObservation::zero();
     }
 }
-
 
 // Make the agents easier to control by zeroing out their velocity
 // after each step.
@@ -700,24 +711,47 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 #endif
 
     // Finally, collect observations for the next step.
-    auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
-        collectObservationsSystem,
-            VehicleSize,
-            Position,
-            Rotation,
-            Velocity,
-            Goal,
-            Progress,
-            OtherAgents,
-            EntityType,
-            CollisionDetectionEvent,
-            AgentInterfaceEntity
-        >>({clear_tmp});
+    // auto collect_obs = builder.addToGraph<ParallelForNode<Engine,
+    //     collectObservationsSystem,
+    //         VehicleSize,
+    //         Position,
+    //         Rotation,
+    //         Velocity,
+    //         Goal,
+    //         Progress,
+    //         OtherAgents,
+    //         EntityType,
+    //         CollisionDetectionEvent,
+    //         AgentInterfaceEntity
+    //     >>({clear_tmp});
+
+    auto collect_self_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectSelfObsSystem,
+        VehicleSize,
+        Position,
+        Rotation,
+        Velocity,
+        Goal,
+        CollisionDetectionEvent,
+        AgentInterfaceEntity>>({clear_tmp});
+
+    auto collect_partner_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectPartnerObsSystem,
+        Position,
+        Rotation,
+        OtherAgents,
+        AgentInterfaceEntity>>({clear_tmp});
+    
+    auto collect_map_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectMapObservationsSystem,
+        Position,
+        Rotation,
+        AgentInterfaceEntity>>({clear_tmp});
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
                         Rotation, Goal, EntityType, VehicleSize, AgentInterfaceEntity>>(
-        {collect_obs});
+        {clear_tmp});
 
     if (cfg.renderBridge) {
         RenderingSystem::setupTasks(builder, {done_sys});
@@ -740,16 +774,16 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
             Entity,
             AgentInterfaceEntity,
             EntityType
-        >>({collectAbsoluteSelfObservations});
+        >>({clear_tmp});
     }
 
 #ifdef MADRONA_GPU_MODE
     TaskGraphNodeID sort_agents;
     if(cfg.enableLidar)
     {
-        sort_agents = queueSortByWorld<Agent>(builder, {lidar});
+        sort_agents = queueSortByWorld<Agent>(builder, {lidar, collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
     } else {
-        sort_agents = queueSortByWorld<Agent>(builder, {collectAbsoluteSelfObservations});
+        sort_agents = queueSortByWorld<Agent>(builder, {collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
     }
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
@@ -759,6 +793,9 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     (void)sort_phys_objects;
 #else
     (void)lidar;
+    (void)collect_self_obs,
+    (void)collect_partner_obs, 
+    (void)collect_map_obs,
     (void)collectAbsoluteSelfObservations;
 #endif
 }
