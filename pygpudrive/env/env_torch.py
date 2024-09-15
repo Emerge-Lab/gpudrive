@@ -112,10 +112,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "delta_local":
             # Action space: (dx, dy, dyaw)
-            self.sim.action_tensor().to_torch()[:, :, 3:6].copy_(actions)
-            # Action space: (pos, yaw, velocity)
-        elif self.config.dynamics_model == "bicycle":
-            self.sim.action_tensor().to_torch()[:, :, 6:].copy_(actions)
+            self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
