@@ -65,12 +65,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.episode_len = self.config.episode_len
 
         # Rendering setup
-        self.vis = MatplotlibVisualizer(
-            sim_object=self.sim,
-            goal_radius=self.config.dist_to_goal_threshold,
-            vis_config=self.render_config,
-            backend=self.backend,
-        )
+        self.visualizer = self._setup_rendering()
+
+        # Storage
+        self.global_sample_dict = {
+            "agents_history": [],
+            "agents_interested": [],
+            "agents_type": [],
+            "agents_future": [],
+            "traffic_light_points": [],
+            "polylines": [],
+            "polylines_valid": [],
+            "relations": [],
+            "agents_id": [],
+        }
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -422,20 +430,65 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
-    def _update_sim_with_warmup(self, num_steps=0):
+    def _update_sim_with_warmup(self, use_log_trajectories=True, num_steps=0):
         """Advances the simulator by num_steps.
 
         Args:
             num_steps (int): Number of warmup steps to perform.
         """
+
         if num_steps >= EPISODE_LEN:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
             )
 
+        # Append initial information
+        # We reset before the warmup steps
+        self.global_sample_dict["agents_history"].append(
+            self.construct_agent_history()
+        )
+        self.global_sample_dict["agents_interested"].append(...)
+        self.global_sample_dict["agents_type"].append(...)
+
         for _ in range(num_steps):
-            self.sim.step()
+            if use_log_trajectories:
+                self.sim.step()  # Use logged trajectories for warmup
+            else:
+                NotImplementedError(
+                    "Warmup without logged trajectories is not implemented."
+                )
+
+            # Store
+            self.global_sample_dict["agents_history"].append(
+                self.update_agent_history()
+            )
+
+    def construct_agent_history(self):
+        """Get the agent history."""
+        global_traj = self.sim.absolute_self_observation_tensor().to_torch()
+        global_traj[~self.cont_agent_mask] = 0.0
+        global_traj = global_traj[:, : self.max_cont_agents, :]
+
+        # x, y, heading, vel_x, vel_y, len, width, height
+        agents_history = torch.cat(
+            [
+                global_traj[:, :, :2],  # x, y
+                global_traj[
+                    :, :, 7:8
+                ],  # TODO(dc): yaw (add dimension to match the shape)
+                torch.zeros_like(
+                    global_traj[:, :, :2]
+                ),  # velocity xy (placeholder)
+                global_traj[:, :, 10:12],  # vehicle length, width
+                torch.zeros_like(
+                    global_traj[:, :, 0:1]
+                ),  # TODO(dc): height placeholder
+            ],
+            dim=-1,
+        )
+
+        return agents_history
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -679,7 +732,7 @@ if __name__ == "__main__":
 
     # CONFIGURE
     TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 32
+    MAX_NUM_OBJECTS = 32
     NUM_WORLDS = 1
 
     env_config = EnvConfig(init_steps=10)
