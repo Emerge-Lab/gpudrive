@@ -42,6 +42,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.device = device
         self.render_config = render_config
         self.backend = backend
+        self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -67,13 +68,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
-    def reset(self):
+    def reset(self, expert_actions=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
 
         # If there are warmup steps (by default, init_steps=0),
         # advance the simulator before returning the first observation
-        self.warmup_trajectory = self._update_sim_with_warmup(num_steps=self.config.init_steps)
+        self.warmup_trajectory = self._update_sim_with_warmup(
+            num_steps=self.config.init_steps,
+        )
 
         return self.get_obs()
 
@@ -89,34 +92,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .to(self.device)
         )
 
-    def get_rewards(self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0):
+    def get_rewards(
+        self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0
+    ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
         - collision
         - goal_achieved
         - off_road
-        
-        The importance of each component is determined by the weights.    
+
+        The importance of each component is determined by the weights.
         """
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().squeeze(dim=2)
-        
+
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
             info_tensor = self.sim.info_tensor().to_torch()
             off_road = info_tensor[:, :, 0].to(torch.float)
-            
-            # True if the vehicle collided with another road object 
+
+            # True if the vehicle collided with another road object
             # (i.e. a cyclist or pedestrian)
             collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
-            
+
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
-            
+
             return weighted_rewards
 
     def step_dynamics(self, actions):
@@ -417,117 +422,139 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
-    def _update_sim_with_warmup(self, use_log_trajectories=True, num_steps=0):
+    def _update_sim_with_warmup(self, use_log=True, num_steps=0):
         """Advances the simulator by num_steps.
 
         Args:
             num_steps (int): Number of warmup steps to perform.
         """
 
+        if use_log:
+            log_trajectory = self.get_expert_actions()
+
         if num_steps >= self.config.episode_len:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
             )
-            
+
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
-            
+
             # Storage
-            agents_history = torch.zeros((self.num_worlds, self.max_cont_agents, num_steps+1, 8)) # (32, 11, 8)
-            # agents_type = torch.zeros((1, self.max_cont_agents)) # (1, 32)
-            # agents_interested = torch.zeros((self.max_cont_agents)) # (1, 32)
-            agents_future = torch.zeros((self.num_worlds, self.max_cont_agents, self.config.episode_len-(num_steps+1), 5)) # (32, 81, 5)
-            # traffic_light_points = torch.zeros((16, 3))
-            # polylines = torch.zeros((self.config.max_num_rg_points, 30, 5)) # (256, 30, 5)
-            # polylines_valid = torch.zeros((self.config.max_num_rg_points,)) # (256,)        
-        
+            agents_history = torch.zeros(
+                (self.num_worlds, self.max_cont_agents, num_steps + 1, 8)
+            )  # (32, 11, 8)
+            agents_future = torch.zeros(
+                (
+                    self.num_worlds,
+                    self.max_cont_agents,
+                    self.config.episode_len - (num_steps + 1),
+                    5,
+                )
+            )  # (32, 81, 5)
+
             # Zeroth step
             agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
-            
+
         for time_step in range(num_steps):
-            if use_log_trajectories:
-                self.sim.step()  # Use logged trajectories for warmup
-            else:
-                NotImplementedError(
-                    "Warmup without logged trajectories is not implemented."
-                )
-            
+
+            # expert_actions[time_step]
+            self.sim.step()  # Step the vehicles with the expert actions
+
             if self.config.enable_vbd:
-                agents_history[:, :, time_step + 1, :], _, _ = self.construct_agent_traj()
+                (
+                    agents_history[:, :, time_step + 1, :],
+                    _,
+                    _,
+                ) = self.construct_agent_traj()
 
         if self.config.enable_vbd:
             # Get the agent trajectories
             _, agents_type, agents_interested = self.construct_agent_traj()
-            
+
             # Global polylines tensor: Shape (256, 30, 5)
             polylines, polylines_valid = self.construct_polylines()
-            
+
             # Empty (16, 3)
             traffic_light_points = torch.zeros((1, 16, 3))
-        
+
             # Controlled agents
             agents_id = torch.nonzero(self.cont_agent_mask[0, :]).permute(1, 0)
-            
+
             # Compute relations at the end
-            relations = calculate_relations(agents_history.squeeze(0), polylines.squeeze(0), traffic_light_points.squeeze(0))
-                
+            relations = calculate_relations(
+                agents_history.squeeze(0),
+                polylines.squeeze(0),
+                traffic_light_points.squeeze(0),
+            )
+
             data_dict = {
-                'agents_history': agents_history,
-                'agents_interested': agents_interested,
-                'agents_type': agents_type.long(),
-                'agents_future': agents_future, 
-                'traffic_light_points': traffic_light_points,
-                'polylines': polylines,
-                'polylines_valid': polylines_valid,
-                'relations': torch.Tensor(relations).unsqueeze(0),
-                'agents_id': agents_id,
-                'anchors': torch.zeros((1, 32, 64, 2)) # Placeholder
-            }        
-            
+                "agents_history": agents_history,
+                "agents_interested": agents_interested,
+                "agents_type": agents_type.long(),
+                "agents_future": agents_future,
+                "traffic_light_points": traffic_light_points,
+                "polylines": polylines,
+                "polylines_valid": polylines_valid,
+                "relations": torch.Tensor(relations).unsqueeze(0),
+                "agents_id": agents_id,
+                "anchors": torch.zeros((1, 32, 64, 2)),  # Placeholder
+            }
+
             return data_dict
         else:
-            return None    
+            return None
 
-            
     def construct_polylines(self):
         """Get the global polylines information."""
-        
+
         # Features: p_x, p_y, heading, traffic_light_state, lane_type
         global_roadmap = self.sim.agent_roadmap_tensor().to_torch()
-        
+
         num_road_points = global_roadmap.shape[2]
-        
+
         polylines = torch.cat(
             [
-                global_roadmap[:, :, :, :2],                     # x, y (3D tensor)
-                global_roadmap[:, :, :, 5:6],                    # heading (unsqueezed to 3D)
-                torch.zeros_like(global_roadmap[:, :, :, 5:6]),  # traffic_light_state (unsqueezed to 3D)
-                global_roadmap[:, :, :, 6:7].long(),             # lane_type (unsqueezed to 3D)
+                global_roadmap[:, :, :, :2],  # x, y (3D tensor)
+                global_roadmap[:, :, :, 5:6],  # heading (unsqueezed to 3D)
+                torch.zeros_like(
+                    global_roadmap[:, :, :, 5:6]
+                ),  # traffic_light_state (unsqueezed to 3D)
+                global_roadmap[
+                    :, :, :, 6:7
+                ].long(),  # lane_type (unsqueezed to 3D)
             ],
-            dim=-1  # Concatenate along the last dimension
+            dim=-1,  # Concatenate along the last dimension
         )
 
         # Throw out garbage values
         condition = (polylines[:, :, :, 4] < 0) | (polylines[:, :, :, 4] > 6)
 
-        polylines[:, :, :, 4] = torch.where(condition, torch.tensor(0, dtype=polylines.dtype), polylines[:, :, :, 4])
+        polylines[:, :, :, 4] = torch.where(
+            condition,
+            torch.tensor(0, dtype=polylines.dtype),
+            polylines[:, :, :, 4],
+        )
 
         # TODO(dc): Map lane type to what vbd expects (ie what is used in waymax)
         # ...
-        
-        #TODO(dc): Find out 30 shape
+
+        # TODO(dc): Find out 30 shape
         polylines = polylines[:, :30, :]
-        
+
         # Condition to check if the value is an integer between 0 and 6
-        condition = (polylines[:, :, :, 4] >= 0) & (polylines[:, :, :, 4] <= 6) & (polylines[:, :, :, 4] == polylines[:, :, :, 4].long().float())
+        condition = (
+            (polylines[:, :, :, 4] >= 0)
+            & (polylines[:, :, :, 4] <= 6)
+            & (polylines[:, :, :, 4] == polylines[:, :, :, 4].long().float())
+        )
 
         # TODO(dc): Create the new tensor, setting 1 where the condition is true, and 0 otherwise
         polylines_valid = torch.ones((self.num_worlds, num_road_points))
 
         return polylines.permute(0, 2, 1, 3), polylines_valid
-        
-        
+
     def construct_agent_traj(self):
         """Get the agent trajectory information."""
         global_traj = self.sim.absolute_self_observation_tensor().to_torch()
@@ -538,9 +565,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         agents_history = torch.cat(
             [
                 global_traj[:, :, :2],  # x, y
-                global_traj[
-                    :, :, 7:8
-                ],  # TODO(dc): yaw (placeholder)
+                global_traj[:, :, 7:8],  # TODO(dc): yaw (placeholder)
                 torch.zeros_like(
                     global_traj[:, :, :2]
                 ),  # velocity xy (placeholder)
@@ -554,11 +579,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Currently, all agents are vehicles, encoding as type 1
         agents_type = torch.zeros([self.num_worlds, self.max_cont_agents])
         agents_type[self.cont_agent_mask] = 1
-        
+
         # 10 if we are controlling the agent, 1 otherwise
         agents_interested = torch.ones([self.num_worlds, self.max_cont_agents])
         agents_interested[self.cont_agent_mask] = 10
-        
+
         return agents_history, agents_type, agents_interested
 
     def get_controlled_agents_mask(self):
@@ -594,16 +619,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
+    def get_expert_actions(self, clip_actions=True):
         """Get expert actions for the full trajectories across worlds."""
-        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
-        positions = expert_traj[:, :, : 2 * self.episode_len].view(
-            self.num_worlds, self.max_agent_count, self.episode_len, -1
+
+        # Get the expert trajectory
+        log_trajectory = (
+            self.sim.expert_trajectory_tensor()
+            .to_torch()
+            .reshape(
+                self.num_worlds,
+                self.max_num_agents_in_scene,
+                self.episode_len,
+                -1,
+            )
         )
 
-        velocity = expert_traj[
-            :, :, 2 * self.episode_len : 4 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
         if self.config.dynamics_model == "delta_local":
             inferred_expert_actions = expert_traj[
                 :, :, -3 * self.episode_len :
@@ -806,7 +836,9 @@ if __name__ == "__main__":
     MAX_NUM_OBJECTS = 32
     NUM_WORLDS = 1
 
-    env_config = EnvConfig(init_steps=10, enable_vbd=True)
+    env_config = EnvConfig(
+        init_steps=10, enable_vbd=True, dynamics_model="delta_local"
+    )
     render_config = RenderConfig()
     scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
 
@@ -818,6 +850,7 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
+
     # RUN
     obs = env.reset()
     frames = []
