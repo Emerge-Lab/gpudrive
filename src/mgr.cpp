@@ -467,7 +467,6 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
-
         madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < numWorlds; i++) {
           auto &init = world_inits[i];
@@ -540,7 +539,6 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Action *agent_actions_buffer = 
             (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
-
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
             std::move(phys_loader),
@@ -603,9 +601,10 @@ Tensor Manager::actionTensor() const
         {
             impl_->numWorlds,
             consts::kMaxAgentCount,
-            3, // Num_actions
+            ActionExportSize, // Num_actions
         });
 }
+
 
 Tensor Manager::rewardTensor() const
 {
@@ -787,9 +786,7 @@ Tensor Manager::depthTensor() const
 
 void Manager::setAction(int32_t world_idx, int32_t agent_idx,
                         float acceleration, float steering, float headAngle) {
-    Action action{.acceleration = acceleration,
-                  .steering = steering,
-                  .headAngle = headAngle};
+    Action action{.classic = {acceleration, steering, headAngle}};
 
     auto *action_ptr = impl_->agentActionsBuffer + world_idx * consts::kMaxAgentCount + agent_idx;
 

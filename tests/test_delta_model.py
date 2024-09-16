@@ -16,7 +16,8 @@ def sim_init():
     params.rewardParams = reward_params 
     params.maxNumControlledVehicles = 2 # we are going to use the second vehicle as the controlled vehicle
     params.IgnoreNonVehicles = True
-    params.dynamicsModel = gpudrive.DynamicsModel.InvertibleBicycle
+    params.dynamicsModel = gpudrive.DynamicsModel.DeltaLocal
+
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU,
         gpu_id=0,
@@ -26,7 +27,7 @@ def sim_init():
 
     return sim
 
-def test_forward_inverse_dynamics(sim_init):
+def test_forward_inverse_delta_dynamics(sim_init):
     sim = sim_init
     
     valid_agent_idx = 1
@@ -46,6 +47,7 @@ def test_forward_inverse_dynamics(sim_init):
     position = absolute_obs[0,valid_agent_idx,:2]
     heading = absolute_obs[0,valid_agent_idx,7]
     speed = self_obs[0, valid_agent_idx, 0]
+
     assert torch.allclose(position, pos[0], atol=1e-2), f"Position mismatch: {position} vs {pos[0]}"
     assert pytest.approx(heading.item(), abs=1e-2) == headings[0].item(), f"Heading mismatch: {heading.item()} vs {headings[0].item()}"
     assert pytest.approx(speed.item(), abs=1e-2) == torch.norm(vel[0]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[0]).item()}"

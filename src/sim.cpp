@@ -293,18 +293,22 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if (type == EntityType::Vehicle && controlledState.controlledState == ControlMode::BICYCLE)
+    if(controlledState.controlled)
     {
         Action &action = e.get<Action>(agent_iface.e);
-        if(e.data().params.useWayMaxModel)
-        {
-            forwardWaymaxModel(action, rotation, position, velocity);
+        switch (e.data().params.dynamicsModel){
+
+            case DynamicsModel::InvertibleBicycle:
+               forwardBicycleModel(action, rotation, position, velocity);
+               break;
+            case DynamicsModel::DeltaLocal:
+               forwardDeltaModel(action, rotation, position, velocity);
+               break;
+            case DynamicsModel::Classic:
+               forwardKinematics(action, size, rotation, position, velocity);
+               break;
+
         }
-        else 
-        {
-            forwardKinematics(action, size, rotation, position, velocity);
-        }
-        // TODO(samk): factor out z-dimension constant and reuse when scaling cubes
     }
     else
     {
@@ -500,9 +504,9 @@ void collisionDetectionSystem(Engine &ctx,
         auto agent_iface = ctx.getCheck<AgentInterfaceEntity>(candidate);
         if (agent_iface.valid())
         {
-            auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlledState;
+            auto controlledState = ctx.get<ControlledState>(agent_iface.value().e).controlled;
             // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
-            if (controlledState == ControlMode::EXPERT)
+            if (controlledState == false)
             {
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(agent_iface.value().e));
                 auto &validState = ctx.get<Trajectory>(candidate).valids[currStep];
@@ -511,7 +515,7 @@ void collisionDetectionSystem(Engine &ctx,
                     return true;
                 }
             }
-            else if (controlledState == ControlMode::BICYCLE)
+            else
             {
                 // Case: If a controlled agent gets done, we teleport it to the padding position
                 // Hence we need to ignore the collision detection for it.

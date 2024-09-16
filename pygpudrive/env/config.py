@@ -8,12 +8,13 @@ import torch
 import gpudrive
 from pygpudrive.env import constants
 
+
 @dataclass
 class EnvConfig:
     """Configuration settings for the GPUDrive gym environment.
 
     This class contains both Python-specific configurations and settings that
-    are shared between Python and C++ components of the simulator. 
+    are shared between Python and C++ components of the simulator.
 
     To modify simulator settings shared with C++, follow these steps:
     1. Navigate to `src/consts.hpp` in the C++ codebase.
@@ -33,30 +34,62 @@ class EnvConfig:
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 100.0  # Radius for road observations
-    polyline_reduction_threshold: float = 1.0  # Threshold for polyline reduction
+    polyline_reduction_threshold: float = (
+        1.0  # Threshold for polyline reduction
+    )
+
+    # Dynamics model
+    dynamics_model: str = (
+        "classic"  # Options: "classic", "bicycle", "delta_local"
+    )
 
     # Action space settings (joint discrete)
-    steer_actions: torch.Tensor = torch.round(torch.linspace(-1.0, 1.0, 13), decimals=3)
-    accel_actions: torch.Tensor = torch.round(torch.linspace(-4.0, 4.0, 7), decimals=3)
+    steer_actions: torch.Tensor = torch.round(
+        torch.linspace(-1.0, 1.0, 13), decimals=3
+    )
+    accel_actions: torch.Tensor = torch.round(
+        torch.linspace(-4.0, 4.0, 7), decimals=3
+    )
+    dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
+    dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
+    dyaw: torch.Tensor = torch.round(
+        torch.linspace(-3.14, 3.14, 20), decimals=3
+    )
 
     # Collision behavior settings
     collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
-    remove_non_vehicles: bool = True  # Remove non-vehicle entities from the scene
+    remove_non_vehicles: bool = (
+        True  # Remove non-vehicle entities from the scene
+    )
 
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
-    dist_to_goal_threshold: float = 3.0  # Radius around goal considered as "goal achieved"
+    reward_type: str = (
+        "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
+    )
+    dist_to_goal_threshold: float = (
+        3.0  # Radius around goal considered as "goal achieved"
+    )
 
     # C++ and Python shared settings (modifiable via C++ codebase)
-    max_num_agents_in_scene: int = gpudrive.kMaxAgentCount  # Max number of objects in simulation
-    max_num_rg_points: int = gpudrive.kMaxRoadEntityCount  # Max number of road graph segments
-    roadgraph_top_k: int = gpudrive.kMaxAgentMapObservationsCount  # Top-K road graph segments agents can view
-    episode_len: int = gpudrive.episodeLen  # Length of an episode in the simulator
+    max_num_agents_in_scene: int = (
+        gpudrive.kMaxAgentCount
+    )  # Max number of objects in simulation
+    max_num_rg_points: int = (
+        gpudrive.kMaxRoadEntityCount
+    )  # Max number of road graph segments
+    roadgraph_top_k: int = (
+        gpudrive.kMaxAgentMapObservationsCount
+    )  # Top-K road graph segments agents can view
+    episode_len: int = (
+        gpudrive.episodeLen
+    )  # Length of an episode in the simulator
+
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
+
     FIRST_N = 0
     RANDOM_N = 1
     PAD_N = 2
@@ -74,6 +107,7 @@ class SceneConfig:
         discipline (SelectionDiscipline): Method for selecting scenes.
         k_unique_scenes (Optional[int]): Number of unique scenes if using K_UNIQUE_N discipline.
     """
+
     path: str
     num_scenes: int
     discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
@@ -82,6 +116,7 @@ class SceneConfig:
 
 class RenderMode(Enum):
     """Enum for specifying rendering mode."""
+
     PYGAME_ABSOLUTE = "pygame_absolute"
     PYGAME_EGOCENTRIC = "pygame_egocentric"
     PYGAME_LIDAR = "pygame_lidar"
@@ -91,12 +126,14 @@ class RenderMode(Enum):
 
 class PygameOption(Enum):
     """Enum for Pygame rendering options."""
+
     HUMAN = "human"
     RGB = "rgb"
 
 
 class MadronaOption(Enum):
     """Enum for Madrona rendering options."""
+
     AGENT_VIEW = "agent_view"
     TOP_DOWN = "top_down"
 
@@ -114,6 +151,7 @@ class RenderConfig:
         obj_idx_font_size (int): Font size for object indices.
         color_scheme (str): Color scheme for the rendering ("light" or "dark").
     """
+
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
     view_option: Enum = PygameOption.RGB
     resolution: Tuple[int, int] = (1024, 1024)
@@ -124,7 +162,9 @@ class RenderConfig:
 
     def __str__(self) -> str:
         """Returns a string representation of the rendering configuration."""
-        return (f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
-                f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
-                f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
-                f"ColorScheme: {self.color_scheme}")
+        return (
+            f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
+            f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
+            f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
+            f"ColorScheme: {self.color_scheme}"
+        )

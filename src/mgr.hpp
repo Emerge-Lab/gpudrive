@@ -75,7 +75,6 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
-
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
