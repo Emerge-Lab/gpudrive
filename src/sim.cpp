@@ -794,12 +794,18 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
-    (void)sort_phys_objects;
+
+    auto sort_agent_ifaces = queueSortByWorld<AgentInterface>(
+        builder, {sort_phys_objects});
+
+    auto sort_road_ifaces = queueSortByWorld<RoadInterface>(
+        builder, {sort_agent_ifaces});
+    (void)sort_road_ifaces;
 #else
     (void)lidar;
-    (void)collect_self_obs,
-    (void)collect_partner_obs, 
-    (void)collect_map_obs,
+    (void)collect_self_obs;
+    (void)collect_partner_obs;
+    (void)collect_map_obs;
     (void)collectAbsoluteSelfObservations;
 #endif
 }
