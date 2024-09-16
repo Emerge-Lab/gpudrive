@@ -18,9 +18,9 @@ class EnvConfig:
 
     To modify simulator settings shared with C++, follow these steps:
     1. Navigate to `src/consts.hpp` in the C++ codebase.
-    2. Locate and modify the desired constant definitions (e.g., `kMaxAgentCount`).
+    2. Locate and modify the constant (e.g., `kMaxAgentCount`).
     3. Save the changes to `src/consts.hpp`.
-    4. Recompile the simulator to apply changes across both C++ and Python environments.
+    4. Recompile the code to apply changes across both C++ and Python.
     """
 
     # Python-specific configurations
@@ -30,6 +30,12 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
     enable_lidar: bool = False  # Enable LiDAR data in observations
+
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight: float = 0.0
+    goal_achieved_weight: float = 1.0
+    off_road_weight: float = 0.0
 
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
@@ -43,7 +49,7 @@ class EnvConfig:
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
 
-    # Action space settings (joint discrete)s
+    # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
         torch.linspace(-1.0, 1.0, 13), decimals=3
@@ -79,8 +85,14 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
-        "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
+        "sparse_on_goal_achieved" # Alternatively, "weighted_combination" 
     )
+    
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight = -1.0
+    goal_achieved_weight = 1.0
+    off_road_weight = -1.0
 
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
@@ -119,7 +131,8 @@ class SceneConfig:
         path (str): Path to the dataset.
         num_scenes (int): Number of scenes to select.
         discipline (SelectionDiscipline): Method for selecting scenes.
-        k_unique_scenes (Optional[int]): Number of unique scenes if using K_UNIQUE_N discipline.
+        k_unique_scenes (Optional[int]): Number of unique scenes if using
+            K_UNIQUE_N discipline.
     """
 
     path: str
@@ -158,12 +171,12 @@ class RenderConfig:
 
     Attributes:
         render_mode (RenderMode): The mode used for rendering the environment.
-        view_option (Enum): Specific rendering view option (e.g., RGB, human view).
+        view_option (Enum): Rendering view option (e.g., RGB, human view).
         resolution (Tuple[int, int]): Resolution of the rendered image.
         line_thickness (int): Thickness of the road lines in the rendering.
         draw_obj_idx (bool): Whether to draw object indices on objects.
         obj_idx_font_size (int): Font size for object indices.
-        color_scheme (str): Color scheme for the rendering ("light" or "dark").
+        color_scheme (str): Color mode for the rendering ("light" or "dark").
     """
 
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE

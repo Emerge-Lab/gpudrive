@@ -5,13 +5,17 @@ from math import ceil
 from pygpudrive.env.config import SelectionDiscipline
 
 
-
 def select_scenes(config):
     assert os.path.exists(config.path) and os.listdir(
         config.path
     ), "The data directory does not exist or is empty."
 
     all_scenes = sorted(os.listdir(config.path))
+    # Remove elements that are not tfrecord files (traffic scenes)
+    all_scenes = [
+        scene for scene in all_scenes if scene.startswith("tfrecord")
+    ]
+
     selected_scenes = None
     if not any(scene.startswith("tfrecord") for scene in all_scenes):
         raise ValueError(
@@ -44,17 +48,20 @@ def select_scenes(config):
             selected_scenes = repeat_to_N(
                 random_sample(config.k_unique_scenes)
             )
-
-    if not any(scene.startswith("tfrecord") for scene in selected_scenes):
+    if (
+        not any(scene.startswith("tfrecord") for scene in selected_scenes)
+        or len(selected_scenes) == 0
+    ):
         raise ValueError(
             "The selected scenes do not contain traffic scenes. Something went wrong with the scene selection."
         )
-
     scene_paths = [
         os.path.join(os.path.abspath(config.path), selected_scene)
         for selected_scene in selected_scenes
-    ] 
-    
-    print(f'\n--- Ratio unique scenes / number of worls = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n')
-        
+    ]
+
+    print(
+        f"\n--- Ratio unique scenes / number of worls = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
+    )
+
     return scene_paths
