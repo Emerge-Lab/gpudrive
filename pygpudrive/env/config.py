@@ -49,7 +49,7 @@ class EnvConfig:
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
 
-    # Action space settings (joint discrete)s
+    # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
         torch.linspace(-1.0, 1.0, 13), decimals=3
@@ -85,8 +85,7 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
-        "sparse_on_goal_achieved", # Alternatively, "weighted_combination" 
-        "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved" / "weighted_combination"
+        "sparse_on_goal_achieved" # Alternatively, "weighted_combination" 
     )
     
     # Set the weights for the reward components
@@ -94,7 +93,6 @@ class EnvConfig:
     collision_weight = -1.0
     goal_achieved_weight = 1.0
     off_road_weight = -1.0
-    
 
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
