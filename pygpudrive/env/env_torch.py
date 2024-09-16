@@ -57,14 +57,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
-    def reset(self, expert_actions=None):
+    def reset(self):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
 
         # If there are warmup steps (by default, init_steps=0),
         # advance the simulator before returning the first observation
-        self.warmup_trajectory = self._update_sim_with_warmup(
+        self.warmup_trajectory = self._update_sim_state_by_log(
             num_steps=self.config.init_steps,
+            render_init=self.render_config.render_init,
         )
 
         return self.get_obs()
@@ -348,21 +349,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
-    def _update_sim_with_warmup(self, use_log=True, num_steps=0):
-        """Advances the simulator by num_steps.
+    def _update_sim_state_by_log(self, num_steps=0, render_init=False):
+        """Advances the simulator by stepping the objects with the inferred human actions.
 
         Args:
             num_steps (int): Number of warmup steps to perform.
         """
-
-        if use_log:
-            log_trajectory = self.get_expert_actions()
 
         if num_steps >= self.config.episode_len:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
             )
+
+        self.inferred_playback_actions = self.get_log_playback_actions()
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -378,15 +378,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     self.config.episode_len - (num_steps + 1),
                     5,
                 )
-            )  # (32, 81, 5)
-
+            )
             # Zeroth step
             agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
 
+        self.init_frames = []
         for time_step in range(num_steps):
 
-            # expert_actions[time_step]
-            self.sim.step()  # Step the vehicles with the expert actions
+            self.step_dynamics(
+                self.inferred_playback_actions[:, :, time_step, :]
+            )
+
+            if render_init:
+                self.init_frames.append(self.render())
 
             if self.config.enable_vbd:
                 (
@@ -545,7 +549,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_expert_actions(self, clip_actions=True):
+    def get_log_playback_actions(self, clip_actions=True):
         """Get expert actions for the full trajectories across worlds."""
 
         # Get the expert trajectory
@@ -759,7 +763,7 @@ if __name__ == "__main__":
     NUM_WORLDS = 1
 
     env_config = EnvConfig(
-        init_steps=10, enable_vbd=True, dynamics_model="delta_local"
+        init_steps=10, enable_vbd=True, dynamics_model="state"
     )
     render_config = RenderConfig()
     scene_config = SceneConfig("data/examples", NUM_WORLDS)
