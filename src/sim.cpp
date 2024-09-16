@@ -32,7 +32,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerComponent<Action>();
-    registry.registerComponent<DeltaAction>();
     registry.registerComponent<SelfObservation>();
     registry.registerComponent<MapObservation>();
     registry.registerComponent<AgentMapObservations>();
@@ -62,8 +61,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
-    registry.exportColumn<Agent, DeltaAction>(
-        (uint32_t)ExportID::DeltaAction);
     registry.exportColumn<Agent, SelfObservation>(
         (uint32_t)ExportID::SelfObservation);
     registry.exportColumn<Agent, AgentMapObservations>(
@@ -224,8 +221,7 @@ inline void collectObservationsSystem(Engine &ctx,
 // Make the agents easier to control by zeroing out their velocity
 // after each step.
 inline void agentZeroVelSystem(Engine &,
-                               Velocity &vel,
-                               Action &)
+                               Velocity &vel)
 {
     vel.linear.x = 0;
     vel.linear.y = 0;
@@ -236,7 +232,6 @@ inline void agentZeroVelSystem(Engine &,
 
 inline void movementSystem(Engine &e,
                            Action &action,
-                           DeltaAction &dAction,
                            VehicleSize &size,
                            Rotation &rotation,
                            Position &position,
@@ -256,13 +251,13 @@ inline void movementSystem(Engine &e,
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
                 done.v = 1;
-                agentZeroVelSystem(e, velocity, action);
+                agentZeroVelSystem(e, velocity);
                 break;
 
             case CollisionBehaviour::AgentRemoved:
                 done.v = 1;
                 position = consts::kPaddingPosition;
-                agentZeroVelSystem(e, velocity, action);
+                agentZeroVelSystem(e, velocity);
                 break;
 
             case CollisionBehaviour::Ignore:
@@ -299,7 +294,7 @@ inline void movementSystem(Engine &e,
                forwardBicycleModel(action, rotation, position, velocity);
                break;
             case DynamicsModel::DeltaLocal:
-               forwardDeltaModel(dAction, rotation, position, velocity);
+               forwardDeltaModel(action, rotation, position, velocity);
                break;
             case DynamicsModel::Classic:
                forwardKinematics(action, size, rotation, position, velocity);
@@ -791,7 +786,6 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
             Action,
-            DeltaAction,
             VehicleSize,
             Rotation,
             Position,
