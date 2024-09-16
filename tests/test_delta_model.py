@@ -33,18 +33,16 @@ def test_forward_inverse_delta_dynamics(sim_init):
     valid_agent_idx = 1
     done_tensor = sim.done_tensor().to_torch()
     expert_trajectory_tensor = sim.expert_trajectory_tensor().to_torch()
-    delta_action_tensor = sim.delta_action_tensor().to_torch()
+    action_tensor = sim.action_tensor().to_torch()
     absolute_obs = sim.absolute_self_observation_tensor().to_torch()
     self_obs = sim.self_observation_tensor().to_torch()
-    delta_actions = torch.zeros_like(delta_action_tensor)
+    actions = torch.zeros_like(action_tensor)
 
     traj = expert_trajectory_tensor[:,valid_agent_idx].squeeze()
     pos = traj[:2*91].view(91,2)
     vel = traj[2*91:4*91].view(91,2)
     headings = traj[4*91:5*91].view(91,1)
-    invDeltaActions = traj[9*91:].view(91,3)
-    invActions = traj[6*91:9*91].view(91,3)
-    print('INVdELTAaCTION', invDeltaActions[:2])
+    invActions = traj[6*91:16*91].view(91,10)
     print('invActions', invActions[:2])
     position = absolute_obs[0,valid_agent_idx,:2]
     heading = absolute_obs[0,valid_agent_idx,7]
@@ -54,8 +52,8 @@ def test_forward_inverse_delta_dynamics(sim_init):
     assert pytest.approx(heading.item(), abs=1e-2) == headings[0].item(), f"Heading mismatch: {heading.item()} vs {headings[0].item()}"
     assert pytest.approx(speed.item(), abs=1e-2) == torch.norm(vel[0]).item(), f"Speed mismatch: {speed.item()} vs {torch.norm(vel[0]).item()}"
 
-    delta_actions[:,valid_agent_idx,:] = invDeltaActions[0]
-    delta_action_tensor.copy_(delta_actions)
+    actions[:,valid_agent_idx,:3] = invActions[0,:3]
+    action_tensor.copy_(actions)
     sim.step()
     
     assert torch.allclose(position, pos[1], atol=2e-2), f"Position mismatch: {position} vs {pos[1]} at step {1}"

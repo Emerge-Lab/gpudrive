@@ -52,7 +52,6 @@ public:
     // These functions export Tensor objects that link the ECS
     // simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
-    MGR_EXPORT madrona::py::Tensor dActionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
     MGR_EXPORT madrona::py::Tensor selfObservationTensor() const;
@@ -76,9 +75,6 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
-    MGR_EXPORT void setDeltaAction(int32_t world_idx, int32_t agent_idx,
-                              float dx, float dy,
-                              float dyaw);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory(madrona::ExecMode mode);

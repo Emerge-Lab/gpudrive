@@ -17,7 +17,6 @@ class Engine;
 enum class ExportID : uint32_t {
     Reset,
     Action,
-    DeltaAction,
     Reward,
     Done,
     SelfObservation,
