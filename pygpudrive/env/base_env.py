@@ -57,7 +57,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved":
+        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
