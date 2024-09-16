@@ -68,7 +68,8 @@ namespace gpudrive
         nb::enum_<DynamicsModel>(m, "DynamicsModel")
             .value("Classic", DynamicsModel::Classic)
             .value("InvertibleBicycle", DynamicsModel::InvertibleBicycle)
-            .value("DeltaLocal", DynamicsModel::DeltaLocal);
+            .value("DeltaLocal", DynamicsModel::DeltaLocal)
+            .value("State", DynamicsModel::State);
 
         nb::enum_<EntityType>(m, "EntityType")
             .value("_None", EntityType::None)

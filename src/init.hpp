@@ -91,7 +91,8 @@ namespace gpudrive
     {
         Classic,
         InvertibleBicycle,
-        DeltaLocal
+        DeltaLocal,
+        State
     };
 
     enum class FindRoadObservationsWith {

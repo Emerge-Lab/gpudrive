@@ -17,8 +17,9 @@ This `config` contains all environment parameters. One important configuration i
 The following dynamics models are currently implemented:
 
 - `Classic`: A kinematic bicycle model uses the center of gravity as reference point with 2D action (acceleration, steering curvature). It was used for [Nocturne](https://arxiv.org/pdf/2206.09889).
-- `InvertibleBicycleModel`. A kinematically realistic model using a 2D action (acceleration, steering curvature).  (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics))
-- `DeltaLocal`. A position-based model using a 3D action (dx, dy, dyaw) representing the displacement of an object relative to the current position and orientation. This model does not check for infeasible actions, and large displacements may lead to unrealistic behavior. (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics))
+- `InvertibleBicycleModel`. A kinematically realistic model using a 2D action: acceleration, steering curvature (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
+- `DeltaLocal`. A position-based model using a 3D action (dx, dy, dyaw) representing the displacement of an object relative to the current position and orientation. This model does not check for infeasible actions, and large displacements may lead to unrealistic behavior (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
+- `StateDynamics`. A position-based model using a 5D action (x, y, yaw, velocity x, velocity y) that directly sets values in the state in global coordinates. This model does not check for infeasible actions (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
 
 For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
 
