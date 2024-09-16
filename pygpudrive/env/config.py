@@ -96,9 +96,9 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
-        "sparse_on_goal_achieved" # Alternatively, "weighted_combination" 
+        "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
     )
-    
+
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
     collision_weight = -1.0
@@ -108,7 +108,7 @@ class EnvConfig:
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
     )
-    
+
     # Integrations: Use VBD model
     enable_vbd: bool = False
 
@@ -200,6 +200,7 @@ class RenderConfig:
     draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
     color_scheme: str = "light"
+    render_init: bool = False
 
     def __str__(self) -> str:
         """Returns a string representation of the rendering configuration."""
