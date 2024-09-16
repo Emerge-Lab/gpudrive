@@ -1,3 +1,4 @@
+# pylint: skip-file
 """Configuration classes and enums for GPUDrive Environments."""
 
 from dataclasses import dataclass
@@ -6,7 +7,6 @@ from typing import Tuple, Optional
 import torch
 
 import gpudrive
-from pygpudrive.env import constants
 
 
 @dataclass
@@ -40,34 +40,48 @@ class EnvConfig:
 
     # Dynamics model
     dynamics_model: str = (
-        "classic"  # Options: "classic", "bicycle", "delta_local"
+        "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
 
-    # Action space settings (joint discrete)
+    # Action space settings (joint discrete)s
+    # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
         torch.linspace(-1.0, 1.0, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 7), decimals=3
     )
+    # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dyaw: torch.Tensor = torch.round(
         torch.linspace(-3.14, 3.14, 20), decimals=3
     )
 
+    # Global action space settings if StateDynamicsModel is used
+    x: torch.Tensor = torch.round(
+        torch.linspace(-100.0, 100.0, 10), decimals=3
+    )
+    y: torch.Tensor = torch.round(
+        torch.linspace(-100.0, 100.0, 10), decimals=3
+    )
+    yaw: torch.Tensor = torch.round(
+        torch.linspace(-3.14, 3.14, 10), decimals=3
+    )
+    vx: torch.Tensor = torch.round(torch.linspace(-10.0, 10.0, 10), decimals=3)
+    vy: torch.Tensor = torch.round(torch.linspace(-10.0, 10.0, 10), decimals=3)
+
     # Collision behavior settings
     collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
-    remove_non_vehicles: bool = (
-        True  # Remove non-vehicle entities from the scene
-    )
+    remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
     # Reward settings
     reward_type: str = (
         "sparse_on_goal_achieved"  # Options: "sparse_on_goal_achieved"
     )
+
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
     )

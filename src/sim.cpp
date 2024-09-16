@@ -288,18 +288,29 @@ inline void movementSystem(Engine &e,
 
     if(controlledState.controlled)
     {
-        switch (e.data().params.dynamicsModel){
+        switch (e.data().params.dynamicsModel)
+        {
 
             case DynamicsModel::InvertibleBicycle:
-               forwardBicycleModel(action, rotation, position, velocity);
-               break;
+            {
+                forwardBicycleModel(action, rotation, position, velocity);
+                break;
+            }
             case DynamicsModel::DeltaLocal:
-               forwardDeltaModel(action, rotation, position, velocity);
-               break;
+            {
+                forwardDeltaModel(action, rotation, position, velocity);
+                break;
+            }
             case DynamicsModel::Classic:
-               forwardKinematics(action, size, rotation, position, velocity);
-               break;
-
+            {
+                forwardKinematics(action, size, rotation, position, velocity);
+                break;
+            }
+            case DynamicsModel::State:
+            {
+                forwardStateModel(action, rotation, position, velocity);
+                break;
+            }
         }
     }
     else
