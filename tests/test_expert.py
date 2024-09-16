@@ -32,11 +32,9 @@ def simulation_results():
 
     done = sim.done_tensor().to_torch()
 
-    ctr = 0
     while not done.all():
         sim.step()
-        ctr += 1
-        print(ctr)
+        
     return sim
 
 def test_goal_reaching(simulation_results):
