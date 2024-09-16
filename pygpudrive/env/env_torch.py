@@ -113,6 +113,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         elif self.config.dynamics_model == "delta_local":
             # Action space: (dx, dy, dyaw)
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
+        elif self.config.dynamics_model == "state":
+            # Action space: (x, y, yaw, velocity x, velocity y)
+            target_action_idx = [0, 1, 3, 4, 5]
+            self.sim.action_tensor().to_torch()[:, :, target_action_idx].copy_(
+                actions
+            )
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -120,6 +126,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space based on dynamics model."""
+        products = None
+
         if self.config.dynamics_model == "delta_local":
             self.dx = self.config.dx.to(self.device)
             self.dy = self.config.dy.to(self.device)
@@ -135,29 +143,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
+        elif self.config.dynamics_model == "state":
+            self.x = self.config.x.to(self.device)
+            self.y = self.config.y.to(self.device)
+            self.yaw = self.config.yaw.to(self.device)
+            self.vx = self.config.vx.to(self.device)
+            self.vy = self.config.vy.to(self.device)
+
+            products = product(self.x, self.y, self.yaw, self.vx, self.vy)
+        else:
+            raise ValueError(
+                f"Invalid dynamics model: {self.config.dynamics_model}"
+            )
 
         # Create a mapping from action indices to action values
         self.action_key_to_values = {}
         self.values_to_action_key = {}
+        if products is not None:
+            for action_idx, actions in enumerate(products):
+                # Ensure actions is a list or tuple of items
+                self.action_key_to_values[action_idx] = [
+                    action.item() for action in actions
+                ]
 
-        for action_idx, (action_1, action_2, action_3) in enumerate(products):
-            self.action_key_to_values[action_idx] = [
-                action_1.item(),
-                action_2.item(),
-                action_3.item(),
-            ]
-            self.values_to_action_key[
-                round(action_1.item(), 3),
-                round(action_2.item(), 3),
-                round(action_3.item(), 3),
-            ] = action_idx
+                # Use a tuple of rounded values as a key
+                rounded_values = tuple(
+                    round(action.item(), 3) for action in actions
+                )
+                self.values_to_action_key[rounded_values] = action_idx
 
-        self.action_keys_tensor = torch.tensor(
-            [
-                self.action_key_to_values[key]
-                for key in sorted(self.action_key_to_values.keys())
-            ]
-        ).to(self.device)
+                self.action_keys_tensor = torch.tensor(
+                    [
+                        self.action_key_to_values[key]
+                        for key in sorted(self.action_key_to_values.keys())
+                    ]
+                ).to(self.device)
 
         return Discrete(n=int(len(self.action_key_to_values)))
 
@@ -442,9 +462,9 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 10
 
-    env_config = EnvConfig()
+    env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
@@ -459,6 +479,7 @@ if __name__ == "__main__":
     frames = []
 
     for i in range(TOTAL_STEPS):
+        print(f"Step: {i}")
 
         # Take a random actions
         rand_action = torch.Tensor(
