@@ -40,7 +40,7 @@ class EnvConfig:
 
     # Dynamics model
     dynamics_model: str = (
-        "state"  # Options: "classic", "bicycle", "delta_local", or "state"
+        "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
 
     # Action space settings (joint discrete)s

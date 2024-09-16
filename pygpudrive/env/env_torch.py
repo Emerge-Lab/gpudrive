@@ -75,7 +75,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.reward_tensor().to_torch().squeeze(dim=2)
 
     def step_dynamics(self, actions):
-
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
@@ -83,21 +82,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
-        if actions.dim() == 2:  # (num_worlds, max_agent_count)
-            # Map action indices to action values if indices are provided
-            actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
-            action_value_tensor = self.action_keys_tensor[actions]
-
-        elif actions.dim() == 3:
-            if actions.shape[2] == 1:
-                actions = actions.squeeze(dim=2).to(self.device)
+        if (
+            self.config.dynamics_model == "classic"
+            or self.config.dynamics_model == "bicycle"
+            or self.config.dynamics_model == "delta_local"
+        ):
+            if actions.dim() == 2:  # (num_worlds, max_agent_count)
+                # Map action indices to action values if indices are provided
+                actions = (
+                    torch.nan_to_num(actions, nan=0).long().to(self.device)
+                )
                 action_value_tensor = self.action_keys_tensor[actions]
-            elif (
-                actions.shape[2] == 3
-            ):  # Assuming we are given the actual action values (acceleration, steering, heading)
-                action_value_tensor = actions.to(self.device)
+
+            elif actions.dim() == 3:
+                if actions.shape[2] == 1:
+                    actions = actions.squeeze(dim=2).to(self.device)
+                    action_value_tensor = self.action_keys_tensor[actions]
+                elif (
+                    actions.shape[2] == 3
+                ):  # Assuming we are given the actual action values (acceleration, steering, heading)
+                    action_value_tensor = actions.to(self.device)
+            else:
+                raise ValueError(f"Invalid action shape: {actions.shape}")
+
         else:
-            raise ValueError(f"Invalid action shape: {actions.shape}")
+            action_value_tensor = actions.to(self.device)
 
         # Feed the action values to gpudrive
         self._copy_actions_to_simulator(action_value_tensor)
@@ -150,7 +159,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.vx = self.config.vx.to(self.device)
             self.vy = self.config.vy.to(self.device)
 
-            products = product(self.x, self.y, self.yaw, self.vx, self.vy)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -160,26 +168,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.action_key_to_values = {}
         self.values_to_action_key = {}
         if products is not None:
-            for action_idx, actions in enumerate(products):
-                # Ensure actions is a list or tuple of items
+            for action_idx, (action_1, action_2, action_3) in enumerate(
+                products
+            ):
                 self.action_key_to_values[action_idx] = [
-                    action.item() for action in actions
+                    action_1.item(),
+                    action_2.item(),
+                    action_3.item(),
                 ]
+                self.values_to_action_key[
+                    round(action_1.item(), 3),
+                    round(action_2.item(), 3),
+                    round(action_3.item(), 3),
+                ] = action_idx
 
-                # Use a tuple of rounded values as a key
-                rounded_values = tuple(
-                    round(action.item(), 3) for action in actions
-                )
-                self.values_to_action_key[rounded_values] = action_idx
+            self.action_keys_tensor = torch.tensor(
+                [
+                    self.action_key_to_values[key]
+                    for key in sorted(self.action_key_to_values.keys())
+                ]
+            ).to(self.device)
 
-                self.action_keys_tensor = torch.tensor(
-                    [
-                        self.action_key_to_values[key]
-                        for key in sorted(self.action_key_to_values.keys())
-                    ]
-                ).to(self.device)
-
-        return Discrete(n=int(len(self.action_key_to_values)))
+            return Discrete(n=int(len(self.action_key_to_values)))
+        else:
+            return Discrete(n=1)
 
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
@@ -462,7 +474,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 10
 
-    env_config = EnvConfig(dynamics_model="state")
+    env_config = EnvConfig(dynamics_model="classic")
     render_config = RenderConfig()
     scene_config = SceneConfig("data/", NUM_WORLDS)
 
