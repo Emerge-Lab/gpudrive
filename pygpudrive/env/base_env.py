@@ -57,7 +57,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved":
+        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
@@ -98,6 +98,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             classic=gpudrive.DynamicsModel.Classic,
             delta_local=gpudrive.DynamicsModel.DeltaLocal,
             bicycle=gpudrive.DynamicsModel.InvertibleBicycle,
+            state=gpudrive.DynamicsModel.State,
         )
 
         params = gpudrive.Parameters()
@@ -111,6 +112,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
         ]
+        if self.config.dynamics_model not in self.dynamics_model_dict:
+            raise ValueError(
+                f"Invalid dynamics model: {self.config.dynamics_model}"
+            )
 
         if self.config.enable_lidar:
             params.enableLidar = self.config.enable_lidar

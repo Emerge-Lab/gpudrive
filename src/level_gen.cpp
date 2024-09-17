@@ -34,16 +34,28 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
-    switch (ctx.data().params.dynamicsModel) {
-        case DynamicsModel::Classic:
-            ctx.get<Action>(agent_iface) = Action{.classic = {0, 0, 0}};
-            break;
-        case DynamicsModel::InvertibleBicycle:
-            ctx.get<Action>(agent_iface) = Action{.classic = {0, 0, 0}};
-            break;
-        case DynamicsModel::DeltaLocal:
-            ctx.get<Action>(agent_iface) = Action{.delta{.dx = 0, .dy = 0, .dyaw = 0}};
-            break;
+    switch (ctx.data().params.dynamicsModel)
+    {
+    case DynamicsModel::Classic:
+    {
+        ctx.get<Action>(agent_iface) = Action{.classic = {0, 0, 0}};
+        break;
+    }
+    case DynamicsModel::InvertibleBicycle:
+    {
+        ctx.get<Action>(agent_iface) = Action{.classic = {0, 0, 0}};
+        break;
+    }
+    case DynamicsModel::DeltaLocal:
+    {
+        ctx.get<Action>(agent_iface) = Action{.delta{.dx = 0, .dy = 0, .dyaw = 0}};
+        break;
+    }
+    case DynamicsModel::State:
+    {
+        ctx.get<Action>(agent_iface) = Action{.state = {.position = Vector3{0, 0, 1}, .yaw = 0, .velocity = {.linear = Vector3::zero(), .angular = Vector3::zero()}}};
+        break;
+    }
     }
     ctx.get<StepsRemaining>(agent_iface).t = consts::episodeLen;
     ctx.get<Done>(agent_iface).v = 0;
@@ -72,7 +84,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         trajectory.valids[i] = (float)agentInit.valid[i];
         trajectory.inverseActions[i] = Action{.classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
     }
-    if (ctx.data().params.dynamicsModel == DynamicsModel::Classic) {
+    if (ctx.data().params.dynamicsModel == DynamicsModel::Classic || ctx.data().params.dynamicsModel == DynamicsModel::State){
         return;
     }
     for(CountT i = agentInit.numPositions - 2; i >=0; i--)
