@@ -23,12 +23,12 @@ static void registerRigidBodyEntity(
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-    auto xCoord = ctx.get<Trajectory>(agent).positions[0].x;
-    auto yCoord = ctx.get<Trajectory>(agent).positions[0].y;
-    auto xVelocity = ctx.get<Trajectory>(agent).velocities[0].x;
-    auto yVelocity = ctx.get<Trajectory>(agent).velocities[0].y;
-    auto speed = ctx.get<Trajectory>(agent).velocities[0].length();
-    auto heading = ctx.get<Trajectory>(agent).headings[0];
+    auto xCoord = ctx.get<Trajectory>(agent_iface).positions[0].x;
+    auto yCoord = ctx.get<Trajectory>(agent_iface).positions[0].y;
+    auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].x;
+    auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].y;
+    auto speed = ctx.get<Trajectory>(agent_iface).velocities[0].length();
+    auto heading = ctx.get<Trajectory>(agent_iface).headings[0];
 
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
@@ -62,6 +62,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     ctx.get<Reward>(agent_iface).v = 0;
     ctx.get<Info>(agent_iface) = Info{};
     ctx.get<Info>(agent_iface).type = (int32_t)ctx.get<EntityType>(agent);
+    ctx.get<ResponseType>(agent_iface) = ctx.get<ResponseType>(agent);
 
     if(ctx.get<ResponseType>(agent) == ResponseType::Static)
     {
@@ -75,7 +76,8 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
 }
 
 static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, const MapObject &agentInit) {
-    auto &trajectory = ctx.get<Trajectory>(agent);
+    const auto &agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
+    auto &trajectory = ctx.get<Trajectory>(agent_iface);
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
         trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
@@ -146,7 +148,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
     populateExpertTrajectory(ctx, agent, agentInit);
-    if(!ctx.data().params.isStaticAgentControlled && (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent).positions[0]).length() < consts::staticThreshold)
+    if(!ctx.data().params.isStaticAgentControlled && (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
@@ -353,6 +355,7 @@ void createPaddingEntities(Engine &ctx) {
         ctx.get<Done>(agent_iface).v = 1;
         ctx.get<Reward>(agent_iface).v = 0;
         ctx.get<Info>(agent_iface) = Info::zero();
+        ctx.get<ResponseType>(agent_iface) = ResponseType::Static;
         auto &agent_map_obs = ctx.get<AgentMapObservations>(agent_iface);
         for (CountT i = 0; i < consts::kMaxAgentMapObservationsCount; i++) {
             agent_map_obs.obs[i] = MapObservation::zero();

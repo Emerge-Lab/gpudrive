@@ -280,7 +280,9 @@ struct AgentInterface : public madrona::Archetype<
     AgentMapObservations,
     Lidar,
     StepsRemaining,
-
+    ResponseType,
+    Trajectory,
+    
     ControlledState //Drive Logic
 
 > {};
@@ -326,7 +328,6 @@ struct Agent : public madrona::Archetype<
     
     VehicleSize,
     Goal,
-    Trajectory,
     // Interface 
     AgentInterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can

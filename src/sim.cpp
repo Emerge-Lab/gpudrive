@@ -88,9 +88,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AbsoluteSelfObservation);
     registry.exportColumn<AgentInterface, Info>(
         (uint32_t)ExportID::Info);
-    registry.exportColumn<Agent, ResponseType>(
+    registry.exportColumn<AgentInterface, ResponseType>(
         (uint32_t)ExportID::ResponseType);
-    registry.exportColumn<Agent, Trajectory>(
+    registry.exportColumn<AgentInterface, Trajectory>(
         (uint32_t)ExportID::Trajectory);
 }
 
@@ -249,7 +249,6 @@ inline void movementSystem(Engine &e,
                            Position &position,
                            Velocity &velocity,
                            const EntityType &type,
-                           const Trajectory &trajectory,
                            const CollisionDetectionEvent &collisionEvent,
                            const ResponseType &responseType) {
     
@@ -324,6 +323,7 @@ inline void movementSystem(Engine &e,
     else
     {
         // Follow expert trajectory
+        const Trajectory &trajectory = e.get<Trajectory>(agent_iface.e);
         CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
         position.x = trajectory.positions[curStepIdx].x;
         position.y = trajectory.positions[curStepIdx].y;
@@ -413,7 +413,6 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 // distance achieved.
 inline void rewardSystem(Engine &ctx,
                          const Position &position,
-                         const Trajectory &trajectory,
                          const Goal &goal,
                          Progress &progress,
                          const AgentInterfaceEntity &agent_iface)
@@ -517,7 +516,7 @@ void collisionDetectionSystem(Engine &ctx,
             if (controlledState == false)
             {
                 auto currStep = getCurrentStep(ctx.get<StepsRemaining>(agent_iface.value().e));
-                auto &validState = ctx.get<Trajectory>(candidate).valids[currStep];
+                auto &validState = ctx.get<Trajectory>(agent_iface.value().e).valids[currStep];
                 if (!validState)
                 {
                     return true;
@@ -688,7 +687,6 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     auto reward_sys = builder.addToGraph<ParallelForNode<Engine,
          rewardSystem,
             Position,
-            Trajectory,
             Goal,
             Progress,
             AgentInterfaceEntity
@@ -823,7 +821,6 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
             Position,
             Velocity,
             EntityType,
-            Trajectory,
             CollisionDetectionEvent,
             ResponseType
         >>({});  
