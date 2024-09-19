@@ -111,7 +111,7 @@ struct Info{
           .collidedWithVehicle = 0,
           .collidedWithNonVehicle = 0,
           .reachedGoal = 0,
-          .type = 0
+          .type = static_cast<int>(EntityType::Padding)
       };
     }
 };
