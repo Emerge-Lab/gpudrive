@@ -173,7 +173,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
 
         float relative_heading = utils::quatToYaw(relative_orientation);
 
-        if(relative_pos.length() > ctx.data().params.observationRadius || ctx.get<EntityType>(other) == EntityType::Padding)
+        if(relative_pos.length() > ctx.data().params.observationRadius)
         {
             continue;
         }
@@ -354,10 +354,7 @@ static inline float encodeType(EntityType type)
 inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent_iface,
                         EntityType &entityType) {
     Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
-    assert(entityType != EntityType::None);
-    if (entityType == EntityType::Padding) {
-        return;
-    }
+
     Vector3 pos = ctx.get<Position>(e);
     Quat rot = ctx.get<Rotation>(e);
     auto &bvh = ctx.singleton<broadphase::BVH>();
@@ -652,12 +649,8 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Position &position,
                                               const Rotation &rotation,
                                               const Goal &goal,
-                                              const EntityType &entityType,
                                               const VehicleSize &vehicleSize,
                                               AgentInterfaceEntity &agent_iface) {
-    if (entityType == EntityType::Padding) {
-        return;
-    }
 
     auto &out = ctx.get<AbsoluteSelfObservation>(agent_iface.e);
     out.position = position;
@@ -765,7 +758,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, EntityType, VehicleSize, AgentInterfaceEntity>>(
+                        Rotation, Goal, VehicleSize, AgentInterfaceEntity>>(
         {clear_tmp});
 
     if (cfg.renderBridge) {

@@ -349,12 +349,10 @@ void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity &agent_iface = ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
-        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = false};
+        ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = 0};
         ctx.get<Done>(agent_iface).v = 1;
         ctx.get<Reward>(agent_iface).v = 0;
-        ctx.get<Info>(agent_iface) = Info{
-            0, 0, 0, 0, 0
-        };
+        ctx.get<Info>(agent_iface) = Info::zero();
         auto &agent_map_obs = ctx.get<AgentMapObservations>(agent_iface);
         for (CountT i = 0; i < consts::kMaxAgentMapObservationsCount; i++) {
             agent_map_obs.obs[i] = MapObservation::zero();

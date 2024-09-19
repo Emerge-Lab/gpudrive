@@ -104,6 +104,16 @@ struct Info{
     int collidedWithNonVehicle;
     int reachedGoal;
     int type;
+
+    static inline Info zero() {
+      return Info {
+          .collidedWithRoad = 0,
+          .collidedWithVehicle = 0,
+          .collidedWithNonVehicle = 0,
+          .reachedGoal = 0,
+          .type = 0
+      };
+    }
 };
 
 const size_t InfoExportSize = 5;
