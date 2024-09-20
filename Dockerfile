@@ -29,6 +29,8 @@ export PYTHONPATH=/opt/miniforge3/bin:\$PYTHONPATH" > /opt/env.sh
 # Clone the gpudrive repository
 RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 
+RUN git checkout ap_docker
+
 # Set the working directory
 WORKDIR /gpudrive
 
