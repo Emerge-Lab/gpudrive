@@ -359,7 +359,7 @@ inline void lidarSystem(Engine &ctx, const Entity &e, Lidar &lidar,
     auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
         // float theta = 2.f * math::pi * (
         //     float(idx) / float(consts::numLidarSamples)); 
-        float head_angle = ctx.get<ControlledState>(e).controlledState == ControlMode::BICYCLE ? action.headAngle : 0.f;
+        float head_angle = ctx.get<ControlledState>(e).controlled ? action.classic.headAngle : 0.f;
         float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1) + head_angle;
         float x = cosf(theta);
         float y = sinf(theta);
