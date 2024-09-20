@@ -11,7 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         libjpeg-dev \
         libpng-dev \
-        wget && \
+        wget \
+        libx11-dev \
+        libxrandr-dev \
+        libxinerama-dev \
+        libxcursor-dev \
+        libxi-dev \
+        mesa-common-dev \
+        libc++1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Miniforge for Conda into /opt/miniforge3
@@ -29,10 +36,11 @@ export PYTHONPATH=/opt/miniforge3/bin:\$PYTHONPATH" > /opt/env.sh
 # Clone the gpudrive repository
 RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 
-RUN git checkout ap_docker
-
 # Set the working directory
 WORKDIR /gpudrive
+
+RUN git fetch --all && git checkout ap_docker
+
 
 # Ensure Conda is available and create the environment
 SHELL ["/bin/bash", "-c"]  # Use bash shell for running conda commands
@@ -41,12 +49,7 @@ RUN source /opt/env.sh && conda env create -f environment.yml
 # Activate the environment and install project dependencies using Poetry
 RUN echo "source /opt/env.sh && conda activate gpudrive" >> ~/.bashrc
 
-ENV PYTHONPATH=/gpudrive:$PYTHONPATH
-
-RUN source /opt/env.sh && conda activate gpudrive && poetry install
-
-# Run tests
-RUN source /opt/env.sh && conda activate gpudrive && pytest
+RUN source /opt/env.sh && conda activate gpudrive
 
 # Automatically start in the /gpudrive directory and activate the conda environment
 CMD ["bash", "-c", "source /opt/env.sh && conda activate gpudrive && cd /gpudrive && exec bash"]
