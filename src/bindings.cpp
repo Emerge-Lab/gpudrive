@@ -19,6 +19,13 @@ namespace gpudrive
         // like madrona::py::Tensor and madrona::py::PyExecMode.
         madrona::py::setupMadronaSubmodule(m);
 
+        // Add bindings for constants defined in src/consts.hpp
+        m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
+        m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
+        m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("episodeLen") = consts::episodeLen;  
+        m.attr("numLidarSamples") = consts::numLidarSamples; 
+
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
             .value("DistanceBased", RewardType::DistanceBased)
@@ -46,8 +53,8 @@ namespace gpudrive
             .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
-            .def_rw("initOnlyValidAgentsAtFirstStep ", &Parameters::initOnlyValidAgentsAtFirstStep)
-            .def_rw("useWayMaxModel", &Parameters::useWayMaxModel)
+            .def_rw("initOnlyValidAgentsAtFirstStep", &Parameters::initOnlyValidAgentsAtFirstStep)
+            .def_rw("dynamicsModel", &Parameters::dynamicsModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
@@ -57,6 +64,12 @@ namespace gpudrive
             .value("AgentStop", CollisionBehaviour::AgentStop)
             .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
             .value("Ignore", CollisionBehaviour::Ignore);
+
+        nb::enum_<DynamicsModel>(m, "DynamicsModel")
+            .value("Classic", DynamicsModel::Classic)
+            .value("InvertibleBicycle", DynamicsModel::InvertibleBicycle)
+            .value("DeltaLocal", DynamicsModel::DeltaLocal)
+            .value("State", DynamicsModel::State);
 
         nb::enum_<EntityType>(m, "EntityType")
             .value("_None", EntityType::None)
@@ -92,8 +105,7 @@ namespace gpudrive
                 nb::arg("batch_render_view_width") = 64,
                 nb::arg("batch_render_view_height") = 64)
             .def("step", &Manager::step)
-            .def("reset", &Manager::triggerReset)
-            .def("reset_tensor", &Manager::resetTensor)
+            .def("reset", &Manager::reset)
             .def("action_tensor", &Manager::actionTensor)
             .def("reward_tensor", &Manager::rewardTensor)
             .def("done_tensor", &Manager::doneTensor)

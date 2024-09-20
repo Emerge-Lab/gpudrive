@@ -44,6 +44,7 @@ struct VehicleSize {
 struct Goal{
     madrona::math::Vector2 position;
 };
+
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -52,12 +53,36 @@ struct WorldReset {
     int32_t reset;
 };
 
-// TODO(samk): need to wrap elements in std::optional to match Nocturne?
-struct Action {
+
+
+struct ClassicAction {
     float acceleration;
     float steering;
     float headAngle;
 };
+
+struct DeltaAction {
+    float dx;
+    float dy;
+    float dyaw;
+};
+
+struct StateAction {
+    Position position; // 3 floats
+    float yaw; // 1 float
+    Velocity velocity;  // 3 floats
+};
+
+union Action
+{
+    ClassicAction classic;
+    DeltaAction delta;
+    StateAction state;
+};
+
+const size_t ActionExportSize = 3 + 1 + 6;
+
+static_assert(sizeof(Action) == sizeof(float) * ActionExportSize);
 
 // Per-agent reward
 // Exported as an [N * A, 1] float tensor to training code
@@ -197,7 +222,7 @@ struct Trajectory {
     Action inverseActions[consts::kTrajectoryLength];
 };
 
-const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
 static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
@@ -206,13 +231,8 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-enum class ControlMode {
-   EXPERT,
-   BICYCLE
-};
-
 struct ControlledState {
-   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+   int32_t controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {
@@ -271,7 +291,6 @@ struct Agent : public madrona::Archetype<
 
     // Input
     Action,
-
     // Observations
     SelfObservation,
     AbsoluteSelfObservation,

@@ -4,7 +4,6 @@ from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.scene_selector import select_scenes
 import abc
-
 import gpudrive
 
 
@@ -21,11 +20,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def reset(self):
         """Reset the dynamics to inital state.
         Args:
-        scenario: Scenario used to generate the initial state.
-        rng: Optional random number generator for stochastic environments.
+            scenario: Scenario used to generate the initial state.
+            rng: Optional random number generator for stochastic environments.
 
-        Returns:
-            The initial observations.
+            Returns:
+                The initial observations.
         """
 
     @abc.abstractmethod
@@ -58,7 +57,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved":
+        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
@@ -94,6 +93,14 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         Returns:
             object: Configured parameters for the simulation.
         """
+        # Dict with supported dynamics models
+        self.dynamics_model_dict = dict(
+            classic=gpudrive.DynamicsModel.Classic,
+            delta_local=gpudrive.DynamicsModel.DeltaLocal,
+            bicycle=gpudrive.DynamicsModel.InvertibleBicycle,
+            state=gpudrive.DynamicsModel.State,
+        )
+
         params = gpudrive.Parameters()
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
@@ -102,16 +109,21 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledVehicles = self.max_cont_agents
         params.isStaticAgentControlled = False
-        params.useWayMaxModel = False
+        params.dynamicsModel = self.dynamics_model_dict[
+            self.config.dynamics_model
+        ]
+        if self.config.dynamics_model not in self.dynamics_model_dict:
+            raise ValueError(
+                f"Invalid dynamics model: {self.config.dynamics_model}"
+            )
 
         if self.config.enable_lidar:
             params.enableLidar = self.config.enable_lidar
             params.disableClassicalObs = True
-
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
-        
-        # Map entity types to integers  
+
+        # Map entity types to integers
         self.ENTITY_TYPE_TO_INT = {
             gpudrive.EntityType._None: 0,
             gpudrive.EntityType.RoadEdge: 1,
@@ -127,8 +139,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         }
         self.MIN_OBJ_ENTITY_ENUM = min(list(self.ENTITY_TYPE_TO_INT.values()))
         self.MAX_OBJ_ENTITY_ENUM = max(list(self.ENTITY_TYPE_TO_INT.values()))
-        self.ROAD_MAP_OBJECT_TYPES = 7 # (enums 0-6)
-        self.ROAD_OBJECT_TYPES = 4 # (enums 7-10)
+        self.ROAD_MAP_OBJECT_TYPES = 7  # (enums 0-6)
+        self.ROAD_OBJECT_TYPES = 4  # (enums 7-10)
 
         return params
 
@@ -148,7 +160,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         dataset = select_scenes(scene_config)
-
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
@@ -241,6 +252,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             RenderMode.MADRONA_DEPTH,
         }:
             return self.visualizer.getRender()
+
+    def close(self):
+        """Destroy the simulator and visualizer."""
+        del self.sim
+        self.visualizer.destroy()
 
     def normalize_tensor(self, x, min_val, max_val):
         """Normalizes an array of values to the range [-1, 1].

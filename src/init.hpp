@@ -87,6 +87,14 @@ namespace gpudrive
         Ignore
     };
 
+    enum class DynamicsModel: uint32_t
+    {
+        Classic,
+        InvertibleBicycle,
+        DeltaLocal,
+        State
+    };
+
     enum class FindRoadObservationsWith {
       KNearestEntitiesWithRadiusFiltering,
       AllEntitiesWithRadiusFiltering
@@ -106,7 +114,8 @@ namespace gpudrive
         bool isStaticAgentControlled = false; // Default: false
         bool enableLidar = false;
         bool disableClassicalObs = false;
-        bool useWayMaxModel = false; // Default: false
+        DynamicsModel dynamicsModel = DynamicsModel::Classic;
+
     };
 
     struct WorldInit

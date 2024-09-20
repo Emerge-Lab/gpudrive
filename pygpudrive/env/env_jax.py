@@ -4,6 +4,7 @@ from gymnasium.spaces import Box, Discrete
 import jax
 import jax.numpy as jnp
 
+from pygpudrive.env import constants
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
@@ -54,9 +55,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
-        for sim_idx in range(self.num_worlds):
-            self.sim.reset(sim_idx)
-        self.sim.step()  # We require one step to trigger the reset
+        self.sim.reset(list(range(self.num_worlds)))
         return self.get_obs()
 
     def get_dones(self):
@@ -187,24 +186,24 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         """Normalize ego state features."""
 
         # Speed, vehicle length, vehicle width
-        state = state.at[:, :, 0].divide(self.config.max_speed)
-        state = state.at[:, :, 1].divide(self.config.max_veh_len)
-        state = state.at[:, :, 2].divide(self.config.max_veh_width)
+        state = state.at[:, :, 0].divide(constants.MAX_SPEED)
+        state = state.at[:, :, 1].divide(constants.MAX_VEH_LEN)
+        state = state.at[:, :, 2].divide(constants.MAX_VEH_WIDTH)
 
         # Relative goal coordinates
         state = state.at[:, :, 3].set(
             self.normalize_tensor(
                 state[:, :, 3],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
+                constants.MIN_REL_GOAL_COORD,
+                constants.MAX_REL_GOAL_COORD,
             )
         )
 
         state = state.at[:, :, 4].set(
             self.normalize_tensor(
                 state[:, :, 4],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
+                constants.MIN_REL_GOAL_COORD,
+                constants.MAX_REL_GOAL_COORD,
             )
         )
 
@@ -221,30 +220,30 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         """
 
         # Speed
-        obs = obs.at[:, :, :, 0].divide(self.config.max_speed)
+        obs = obs.at[:, :, :, 0].divide(constants.MAX_SPEED)
 
         # Relative position
         obs = obs.at[:, :, :, 1].set(
             self.normalize_tensor(
                 obs[:, :, :, 1],
-                self.config.min_rel_agent_pos,
-                self.config.max_rel_agent_pos,
+                constants.MIN_REL_AGENT_POS,
+                constants.MAX_REL_AGENT_POS, 
             )
         )
         obs = obs.at[:, :, :, 2].set(
             self.normalize_tensor(
                 obs[:, :, :, 2],
-                self.config.min_rel_agent_pos,
-                self.config.max_rel_agent_pos,
+                constants.MIN_REL_AGENT_POS
+                constants.MAX_REL_AGENT_POS,
             )
         )
 
         # Orientation (heading)
-        obs = obs.at[:, :, :, 3].divide(self.config.max_orientation_rad)
+        obs = obs.at[:, :, :, 3].divide(constants.MAX_ORIENTATION_RAD)
 
         # Vehicle length and width
-        obs = obs.at[:, :, :, 4].divide(self.config.max_veh_len)
-        obs = obs.at[:, :, :, 5].divide(self.config.max_veh_width)
+        obs = obs.at[:, :, :, 4].divide(constants.MAX_VEH_LEN)
+        obs = obs.at[:, :, :, 5].divide(constants.MAX_VEH_WIDTH)
 
         # Hot-encode object type
         shifted_type_obs = obs[:, :, :, 6] - 6
@@ -270,28 +269,28 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         obs = obs.at[:, :, :, 0].set(
             self.normalize_tensor(
                 obs[:, :, :, 0],
-                self.config.min_rm_coord,
-                self.config.max_rm_coord,
+                constants.MIN_RG_COORD,
+                constants.MAX_RG_COORD,
             )
         )
 
         obs = obs.at[:, :, :, 1].set(
             self.normalize_tensor(
                 obs[:, :, :, 1],
-                self.config.min_rm_coord,
-                self.config.max_rm_coord,
+                constants.MIN_RG_COORD,
+                constants.MAX_RG_COORD,
             )
         )
 
         # Road line segment length
-        obs = obs.at[:, :, :, 2].divide(self.config.max_road_line_segmment_len)
+        obs = obs.at[:, :, :, 2].divide(constants.MAX_ROAD_LINE_SEGMENT_LEN)
 
         # Road scale (width and height)
-        obs = obs.at[:, :, :, 3].divide(self.config.max_road_scale)
-        obs = obs.at[:, :, :, 4].divide(self.config.max_road_scale)
+        obs = obs.at[:, :, :, 3].divide(constants.MAX_ROAD_SCALE)
+        obs = obs.at[:, :, :, 4].divide(constants.MAX_ROAD_SCALE)
 
         # Road point orientation
-        obs = obs.at[:, :, :, 5].divide(self.config.max_orientation_rad)
+        obs = obs.at[:, :, :, 5].divide(constants.MAX_ROAD_SCALE)
 
         # Road types: one-hot encode them
         one_hot_road_type = jax.nn.one_hot(obs[:, :, :, 6], num_classes=7)
@@ -343,6 +342,4 @@ if __name__ == "__main__":
 
     # import imageio
     # imageio.mimsave("world1.gif", frames_1)
-
-    # run.finish()
-    env.visualizer.destroy()
+    env.close()
