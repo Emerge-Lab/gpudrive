@@ -22,4 +22,7 @@ MAX_ROAD_SCALE = 100
 # Feature shape constants
 EGO_FEAT_DIM = 6
 PARTNER_FEAT_DIM = 10
-ROAD_GRAPH_FEAT_DIM = 13  # 7
+ROAD_GRAPH_FEAT_DIM = 7 #13 
+
+# Dataset constants
+LOG_TRAJECTORY_LEN = 91
