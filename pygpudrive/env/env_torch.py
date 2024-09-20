@@ -75,7 +75,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # If there are warmup steps (by default, init_steps=0),
         # advance the simulator before returning the first observation
         self.warmup_trajectory = self._update_sim_state_by_log(
-            num_steps=self.config.init_steps,
+            init_steps=self.config.init_steps,
             render_init=self.render_config.render_init,
         )
 
@@ -162,6 +162,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Feed the action values to gpudrive
         self._copy_actions_to_simulator(action_value_tensor)
+
+    # def _apply_actions(self, actions):
+    #     """Apply the actions to the simulator."""
+
+    #     if actions.dim() == 2:  # (num_worlds, max_agent_count)
+    #         # Map action indices to action values if indices are provided
+    #         actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
+    #         action_value_tensor = self.action_keys_tensor[actions]
+
+    #     elif actions.dim() == 3:
+    #         if actions.shape[2] == 1:
+    #             actions = actions.squeeze(dim=2).to(self.device)
+    #             action_value_tensor = self.action_keys_tensor[actions]
+    #         elif (
+    #             actions.shape[2] == 3
+    #         ):  # Assuming we are given the actual action values (acceleration, steering, heading)
+    #             action_value_tensor = actions.to(self.device)
+    #     else:
+    #         raise ValueError(f"Invalid action shape: {actions.shape}")
+
+    #     # Feed the actual action values to gpudrive
+    #     self.sim.action_tensor().to_torch()[:, :, :3].copy_(action_value_tensor)
 
     def _copy_actions_to_simulator(self, actions):
         """Copy the provived actions to the simulator."""
@@ -423,14 +445,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
-    def _update_sim_state_by_log(self, num_steps=0, render_init=False):
+    def _update_sim_state_by_log(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the inferred human actions.
 
         Args:
-            num_steps (int): Number of warmup steps to perform.
+            init_steps (int): Number of warmup steps to perform.
         """
 
-        if num_steps >= self.config.episode_len:
+        if init_steps >= self.config.episode_len:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
@@ -443,13 +465,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # Storage
             agents_history = torch.zeros(
-                (self.num_worlds, self.max_cont_agents, num_steps + 1, 8)
+                (self.num_worlds, self.max_cont_agents, init_steps + 1, 8)
             )  # (32, 11, 8)
             agents_future = torch.zeros(
                 (
                     self.num_worlds,
                     self.max_cont_agents,
-                    self.config.episode_len - (num_steps + 1),
+                    self.config.episode_len - (init_steps + 1),
                     5,
                 )
             )
@@ -457,21 +479,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
 
         self.init_frames = []
-        for time_step in range(num_steps):
-
+        for time_step in range(init_steps):
             self.step_dynamics(
-                self.inferred_playback_actions[:, :, time_step, :]
+                actions=self.inferred_playback_actions[:, :, time_step, :]
             )
 
-            if render_init:
+            if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
 
-            if self.config.enable_vbd:
-                (
-                    agents_history[:, :, time_step + 1, :],
-                    _,
-                    _,
-                ) = self.construct_agent_traj()
+            (
+                agents_history[:, :, time_step + 1, :],
+                _,
+                _,
+            ) = self.construct_agent_traj()
 
         if self.config.enable_vbd:
             # Get the agent trajectories
@@ -626,14 +646,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def get_log_playback_actions(self, clip_actions=True):
         """Get expert actions for the full trajectories across worlds."""
 
-        # Get the expert trajectory
-        log_trajectory = (
-            self.sim.expert_trajectory_tensor()
-            .to_torch()
-            .reshape(
+        log_trajectory = self.sim.expert_trajectory_tensor().to_torch()
+
+        if self.config.dynamics_model == "delta_local":
+            inferred_actions = log_trajectory[
+                :, :, -3 * constants.LOG_TRAJECTORY_LEN :
+            ].view(
                 self.num_worlds,
-                self.max_num_agents_in_scene,
-                self.episode_len,
+                self.max_agent_count,
+                constants.LOG_TRAJECTORY_LEN,
                 -1,
             )
         )
