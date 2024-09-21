@@ -60,8 +60,9 @@ bool isObservationsValid(gpudrive::Engine &ctx,
   sortedObservations.reserve(roadCount);
 
   for (madrona::CountT roadIdx = 0; roadIdx < roadCount; ++roadIdx) {
+    auto &road_iface = ctx.get<gpudrive::RoadInterfaceEntity>(ctx.data().roads[roadIdx]).e;
     const auto &currentObservation =
-        ctx.get<gpudrive::MapObservation>(ctx.data().roads[roadIdx]);
+        ctx.get<gpudrive::MapObservation>(road_iface);
     sortedObservations.emplace_back(relativeObservation(
         currentObservation, referenceRotation, referencePosition));
   }

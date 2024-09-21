@@ -97,17 +97,17 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
-        // printf("Done\n");
-        // donePrinter.print();
+        printf("Done\n");
+        donePrinter.print();
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
 
-        printf("Agent Map Obs\n");
-        agent_map_obs_printer.print();
+        // printf("Agent Map Obs\n");
+        // agent_map_obs_printer.print();
 
-        printf("Info\n");
-        info_printer.print();
+        // printf("Info\n");
+        // info_printer.print();
     };
 
     auto worldToShape =
@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
     }
     const auto end = std::chrono::steady_clock::now();
     const std::chrono::duration<double> elapsed = end - start;
+    printObs();
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);
