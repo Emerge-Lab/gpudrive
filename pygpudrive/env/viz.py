@@ -289,7 +289,7 @@ class PyGameVisualizer:
         """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
-            if map_obj[-1] == float(gpudrive.EntityType.Padding):
+            if map_obj[-1] == float(gpudrive.EntityType.Padding) or map_obj[-1] == float(gpudrive.EntityType._None):
                 continue
 
             elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):

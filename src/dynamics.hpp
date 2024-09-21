@@ -8,7 +8,7 @@ using namespace madrona::math;
 namespace gpudrive
 {
 
-    inline void forwardKinematics(Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
+    inline void forwardKinematics(const Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
     {
         const float maxSpeed{std::numeric_limits<float>::max()};
         const float dt{0.1};
