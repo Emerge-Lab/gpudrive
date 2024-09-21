@@ -354,6 +354,7 @@ static inline float encodeType(EntityType type)
 inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent_iface,
                         EntityType &entityType) {
     Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
+    const Action &action = ctx.get<Action>(agent_iface.e);
 
     Vector3 pos = ctx.get<Position>(e);
     Quat rot = ctx.get<Rotation>(e);
