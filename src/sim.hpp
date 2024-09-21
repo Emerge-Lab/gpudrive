@@ -126,6 +126,9 @@ struct Sim : public madrona::WorldBase {
     madrona::CountT numRoads;
     Entity roads[consts::kMaxRoadEntityCount];
 
+    Entity agent_ifaces[consts::kMaxAgentCount];
+    Entity road_ifaces[consts::kMaxRoadEntityCount];
+
     madrona::CountT numControlledVehicles;
 
     madrona::math::Vector2 mean;

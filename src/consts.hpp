@@ -3,7 +3,7 @@
 #include <limits>
 #include <madrona/math.hpp>
 #include <madrona/types.hpp>
-
+ 
 namespace gpudrive {
 
 namespace consts {
