@@ -16,7 +16,7 @@ ext-out-dir = "build"
 path = "train_src/gpudrive_learn"
 
 [tool.poetry.build]
-script = "build.py"
+script = "build_gpudrive.py"
 
 [tool.poetry.dependencies]
 python = "^3.11"
