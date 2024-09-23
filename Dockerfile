@@ -52,3 +52,5 @@ RUN source /opt/env.sh && conda activate gpudrive
 
 # Automatically start in the /gpudrive directory and activate the conda environment
 CMD ["bash", "-c", "source /opt/env.sh && conda activate gpudrive && cd /gpudrive && exec bash"]
+
+LABEL org.opencontainers.image.source https://github.com/Emerge-Lab/gpudrive
