@@ -34,7 +34,7 @@ def simulation_results():
 
     while not done.all():
         sim.step()
-
+        
     return sim
 
 def test_goal_reaching(simulation_results):

@@ -76,7 +76,7 @@ protected:
 
         auto shape_tensor = mgr.shapeTensor();
         int32_t *ptr = static_cast<int32_t *>(shape_tensor.devicePtr());
-        num_agents = ptr[0];
+        num_agents = 1;
     }
 };
 
