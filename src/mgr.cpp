@@ -219,13 +219,29 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     render_asset_paths[(size_t)SimObject::SpeedBump] =
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
 
+    // Define the texture paths
+    const char *texture_paths[] = {
+        (std::filesystem::path(DATA_DIR) / "green_grid.png").string().c_str(),
+        (std::filesystem::path(DATA_DIR) / "smile.png").string().c_str()
+    };
+    Span<const char * const> paths(texture_paths, 2);
+
+    imp::AssetImporter asset_importer;
+    // Temporary allocator for image data
+    StackAlloc tmp_alloc;
+
+    Span<imp::SourceTexture> textures = asset_importer.imageImporter().importImages(tmp_alloc, paths);
+    if(textures.size() != paths.size()) {
+        FATAL("Failed to load textures");
+    }
+
     std::array<const char *, (size_t)SimObject::NumObjects> render_asset_cstrs;
     for (size_t i = 0; i < render_asset_paths.size(); i++) {
         render_asset_cstrs[i] = render_asset_paths[i].c_str();
     }
 
     std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk(
+    auto render_assets = asset_importer.importFromDisk(
         render_asset_cstrs, Span<char>(import_err.data(), import_err.size()));
 
     if (!render_assets.has_value()) {
@@ -254,12 +270,7 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
     // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
 
-    render_mgr.loadObjects(render_assets->objects, materials, {
-        { (std::filesystem::path(DATA_DIR) /
-           "green_grid.png").string().c_str() },
-        { (std::filesystem::path(DATA_DIR) /
-           "smile.png").string().c_str() },
-    });
+   render_mgr.loadObjects(render_assets->objects, materials, textures, true);
 
     render_mgr.configureLighting({
         { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{50.0f, 50.0f, 1.0f} }
@@ -286,7 +297,8 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     }
 
     char import_err_buffer[4096];
-    auto imported_src_hulls = imp::ImportedAssets::importFromDisk(
+    imp::AssetImporter asset_importer;
+    auto imported_src_hulls = asset_importer.importFromDisk(
         asset_cstrs, import_err_buffer, true);
 
     if (!imported_src_hulls.has_value()) {
