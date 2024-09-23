@@ -39,8 +39,7 @@ RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 # Set the working directory
 WORKDIR /gpudrive
 
-RUN git fetch --all && git checkout ap_docker
-
+RUN git fetch --all && git checkout main
 
 # Ensure Conda is available and create the environment
 SHELL ["/bin/bash", "-c"]  # Use bash shell for running conda commands
