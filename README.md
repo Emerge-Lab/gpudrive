@@ -101,6 +101,37 @@ poetry install
 
 </details>
 
+<details>
+  <summary>Option 3️⃣ : Docker </summary>
+
+#### Nvidia docker dependency
+  To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+
+#### Pull the image and run the container
+To pull our pre-built Docker image and begin using GPUDrive, execute the following command (you may need to prepend sudo, depending on your Docker setup):
+  ```bash
+  docker pull ghcr.io/emerge-lab/gpudrive:latest
+  ```
+
+After pulling the image, you can create and run a new container using the --gpus all flag (omit this flag if your system does not have a GPU):
+  ```bash
+  sudo docker run --gpus all -it --name gpudrive_container gpudrive
+  ```
+
+The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
+  ```bash
+  poetry install
+  ```
+
+#### Build the image from scratch
+If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
+```bash
+sudo docker buildx build -t gpudrive .
+```
+The subsequent steps to run and manage the container remain the same as outlined above.
+
+</details>
+
 ---
 
 Test whether the installation was successful by importing the simulator:
