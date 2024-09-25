@@ -73,9 +73,7 @@ def generate_state_action_pairs(
 
     # Get expert actions for full trajectory in all worlds
     expert_actions, expert_speeds, expert_positions = env.get_expert_actions()
-    print(f'EXPERT ACTIONS {expert_actions[0, 4]}')
     if action_space_type == "discrete":
-        logging.info("Discretizing expert actions... \n")
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
         disc_expert_actions = expert_actions.clone()
@@ -257,6 +255,7 @@ if __name__ == "__main__":
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cpu",
         render_config=render_config,
+        action_type="continuous"
     )
     # Generate expert actions and observations
     (
@@ -269,7 +268,7 @@ if __name__ == "__main__":
     ) = generate_state_action_pairs(
         env=env,
         device="cpu",
-        action_space_type="discrete",  # Discretize the expert actions
+        action_space_type="continuous",  # Discretize the expert actions
         use_action_indices=True,  # Map action values to joint action index
         make_video=True,  # Record the trajectories as sanity check
         render_index=[0, 1],  # start_idx, end_idx

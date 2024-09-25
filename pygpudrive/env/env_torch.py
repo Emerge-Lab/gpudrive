@@ -1,6 +1,6 @@
 """Base Gym Environment that interfaces with the GPU Drive simulator."""
 
-from gymnasium.spaces import Box, Discrete
+from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 import copy
@@ -220,6 +220,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             return Discrete(n=1)
 
+    def _set_continuous_action_space(self) -> None:
+        """Configure the continuous action space."""
+        if self.config.dynamics_model == 'delta_local':
+            self.dx = self.config.dx.to(self.device)
+            self.dy = self.config.dy.to(self.device)
+            self.dyaw = self.config.dyaw.to(self.device)
+            action_1 = self.dx.clone().cpu().numpy()
+            action_2 = self.dy.clone().cpu().numpy()
+            action_3 = self.dyaw.clone().cpu().numpy()
+        else:
+            self.steer_actions = self.config.steer_actions.to(self.device)
+            self.accel_actions = self.config.accel_actions.to(self.device)
+            self.head_actions = torch.tensor([0], device=self.device)
+            action_1 = self.steer_actions.clone().cpu().numpy()
+            action_2 = self.accel_actions.clone().cpu().numpy()
+            action_3 = self.head_actions.clone().cpu().numpy()
+
+        action_space = Tuple(
+            (Box(action_1.min(), action_1.max(), shape=(1,)),
+             Box(action_2.min(), action_2.max(), shape=(1,)),
+             Box(action_3.min(), action_3.max(), shape=(1,)))
+        )
+        return action_space
+
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
 
@@ -333,8 +357,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                                   ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
         if self.config.dynamics_model == "delta_local":
             inferred_expert_actions = inferred_expert_actions[..., :3]
-            print(f'CONTROLLED AGENT {self.cont_agent_mask[0]}')
-            print(f'EXPERT ACTION {inferred_expert_actions[0, 4]} {inferred_expert_actions.shape}')
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
             )
