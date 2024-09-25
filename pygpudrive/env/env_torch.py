@@ -77,28 +77,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         - collision
         - goal_achieved
         - off_road
-        
-        The importance of each component is determined by the weights.    
+
+        The importance of each component is determined by the weights.
         """
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().squeeze(dim=2)
-        
+
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
             info_tensor = self.sim.info_tensor().to_torch()
             off_road = info_tensor[:, :, 0].to(torch.float)
-            
-            # True if the vehicle collided with another road object 
+
+            # True if the vehicle collided with another road object
             # (i.e. a cyclist or pedestrian)
             collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
-            
+
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
-            
+
             return weighted_rewards
 
     def step_dynamics(self, actions):
@@ -328,10 +328,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         velocity = expert_traj[
             :, :, 2 * self.episode_len : 4 * self.episode_len
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+        inferred_expert_actions = expert_traj[
+                                  :, :, 6 * self.episode_len: 16 * self.episode_len
+                                  ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
         if self.config.dynamics_model == "delta_local":
-            inferred_expert_actions = expert_traj[
-                :, :, -3 * self.episode_len :
-            ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+            inferred_expert_actions = inferred_expert_actions[..., :3]
+            print(f'CONTROLLED AGENT {self.cont_agent_mask[0]}')
+            print(f'EXPERT ACTION {inferred_expert_actions[0, 4]} {inferred_expert_actions.shape}')
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
             )
@@ -342,9 +345,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 inferred_expert_actions[..., 2], -3.14, 3.14
             )
         else:
-            inferred_expert_actions = expert_traj[
-                :, :, -6 * self.episode_len : -3 * self.episode_len
-            ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+            inferred_expert_actions = inferred_expert_actions[..., :3]
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
             )
@@ -356,17 +357,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if debug_world_idx is not None and debug_veh_idx is not None:
             velo2speed = (
                 torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1)
-                / self.config.max_speed
+                / constants.MAX_SPEED
             )
             positions[..., 0] = self.normalize_tensor(
                 positions[..., 0],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
+                constants.MIN_REL_GOAL_COORD,
+                constants.MAX_REL_GOAL_COORD,
             )
             positions[..., 1] = self.normalize_tensor(
                 positions[..., 1],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
+                constants.MIN_REL_GOAL_COORD,
+                constants.MAX_REL_GOAL_COORD,
             )
             debug_positions = positions[debug_world_idx, debug_veh_idx]
         return inferred_expert_actions, velo2speed, debug_positions
