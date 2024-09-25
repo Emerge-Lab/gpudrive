@@ -344,7 +344,7 @@ static inline float distObs(float v)
 
 static inline float encodeType(EntityType type)
 {
-    return (float)type / (float)EntityType::NumTypes;
+    return (float)type;
 }
 
 // Launches consts::numLidarSamples per agent.
@@ -354,6 +354,7 @@ static inline float encodeType(EntityType type)
 inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent_iface,
                         EntityType &entityType) {
     Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
+    const Action &action = ctx.get<Action>(agent_iface.e);
 
     Vector3 pos = ctx.get<Position>(e);
     Quat rot = ctx.get<Rotation>(e);
@@ -362,9 +363,11 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
     Vector3 agent_fwd = rot.rotateVec(math::fwd);
     Vector3 right = rot.rotateVec(math::right);
 
-    auto traceRay = [&](int32_t idx) {
-        float theta = 2.f * math::pi * (
-            float(idx) / float(consts::numLidarSamples)) + math::pi / 2.f;
+    auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
+        // float theta = 2.f * math::pi * (
+        //     float(idx) / float(consts::numLidarSamples)); 
+        float head_angle = ctx.get<ControlledState>(agent_iface.e).controlled ? action.classic.headAngle : 0.f;
+        float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1) + head_angle;
         float x = cosf(theta);
         float y = sinf(theta);
 
@@ -373,20 +376,23 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
         float hit_t;
         Vector3 hit_normal;
         Entity hit_entity =
-            bvh.traceRay(pos + 0.5f * math::up, ray_dir, &hit_t,
-                         &hit_normal, 200.f);
+            bvh.traceRay(pos + offset * math::up, ray_dir, &hit_t,
+                         &hit_normal, consts::lidarDistance);
 
         if (hit_entity == Entity::none()) {
-            lidar.samples[idx] = {
+            samples[idx] = {
                 .depth = 0.f,
                 .encodedType = encodeType(EntityType::None),
+                .position = {0.f, 0.f},
             };
         } else {
             EntityType entity_type = ctx.get<EntityType>(hit_entity);
 
-            lidar.samples[idx] = {
-                .depth = distObs(hit_t),
+            samples[idx] = {
+                .depth = hit_t,
                 .encodedType = encodeType(entity_type),
+                .position = {hit_t * x,
+                             hit_t * y},
             };
         }
     };
@@ -398,12 +404,17 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
     // warp level programming
     int32_t idx = threadIdx.x % 32;
 
-    if (idx < consts::numLidarSamples) {
-        traceRay(idx);
+    while (idx < consts::numLidarSamples) {
+        traceRay(idx, consts::lidarCarOffset, lidar.samplesCars);
+        traceRay(idx, consts::lidarRoadEdgeOffset, lidar.samplesRoadEdges);
+        traceRay(idx, consts::lidarRoadLineOffset, lidar.samplesRoadLines);
+        idx += 32;
     }
 #else
     for (CountT i = 0; i < consts::numLidarSamples; i++) {
-        traceRay(i);
+        traceRay(i, consts::lidarCarOffset, lidar.samplesCars);
+        traceRay(i, consts::lidarRoadEdgeOffset, lidar.samplesRoadEdges);
+        traceRay(i, consts::lidarRoadLineOffset, lidar.samplesRoadLines);
     }
 #endif
 }
