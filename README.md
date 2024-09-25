@@ -113,10 +113,16 @@ To pull our pre-built Docker image and begin using GPUDrive, execute the followi
   docker pull ghcr.io/emerge-lab/gpudrive:latest
   ```
 
-After pulling the image, you can create and run a new container using the --gpus all flag (omit this flag if your system does not have a GPU):
+After pulling the image, you can create and run a new container using the --gpus all flag (omit this flag if your system does not have a GPU, in that case the sim will still be built but can only be run on CPU). This command will create a new container named `gpudrive_container`:
   ```bash
-  sudo docker run --gpus all -it --name gpudrive_container gpudrive
+  docker run --gpus all -it --name gpudrive_container gpudrive
   ```
+
+In case you created the container but exited, to rerun the same container, you can: 
+```bash
+docker start gpudrive_container # make sure the container is started
+docker exec -it gpudrive_container /bin/bash
+```
 
 The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
   ```bash
@@ -126,7 +132,7 @@ The Docker image includes all necessary dependencies, along with Conda and Poetr
 #### Build the image from scratch
 If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
 ```bash
-sudo docker buildx build -t gpudrive .
+docker buildx build -t gpudrive .
 ```
 The subsequent steps to run and manage the container remain the same as outlined above.
 
