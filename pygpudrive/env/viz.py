@@ -56,12 +56,15 @@ class PyGameVisualizer:
         
         # ROAD MAP COLORS
         self.color_dict = {
-    float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
+            float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
             float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
             float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
             float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
             float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
             float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
+            float(gpudrive.EntityType.Vehicle): (0, 255, 0),  # Green
+            float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
+            float(gpudrive.EntityType.Cyclist): (0, 0, 255),  # Blue
         }
 
         self.num_agents = self.sim.shape_tensor().to_torch().cpu().numpy()

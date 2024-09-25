@@ -691,7 +691,7 @@ Tensor Manager::lidarTensor() const
                                    consts::kMaxAgentCount,
                                    3, // Trace lidars on 3 planes
                                    consts::numLidarSamples,
-                                   4
+                                   LidarExportSize / (3 * consts::numLidarSamples), 
                                });
 }
 
