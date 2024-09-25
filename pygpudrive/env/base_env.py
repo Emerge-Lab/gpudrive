@@ -199,6 +199,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         if action_type == "discrete":
             self.action_space = self._set_discrete_action_space()
+        elif action_type == "continuous":
+            self.action_space = self._set_continuous_action_space()
         else:
             raise ValueError(f"Action space not supported: {action_type}")
 
