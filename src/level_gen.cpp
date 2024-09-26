@@ -173,12 +173,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
                 1.5f * math::up);
     }
 
-    ctx.get<PartnerObservations>(agent) = PartnerObservations();
-    for(CountT i = 0; i < consts::kMaxAgentMapObservationsCount; i++)
-    {
-        ctx.get<AgentMapObservations>(agent).obs[i] ={.position = Vector2{.x = 0, .y = 0}, .scale = Diag3x3{.d0 = 0, .d1 = 0, .d2 = 0}, .heading = 0, .type = 0};
-    }
-
     return agent;
 }
 
