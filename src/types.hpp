@@ -213,15 +213,9 @@ struct Lidar {
     LidarSample samplesRoadLines[consts::numLidarSamples];
 };
 
-<<<<<<< HEAD
-const size_t LidarExportSize = 4;
-
-static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize * 3 * consts::numLidarSamples);
-=======
 const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
 
 static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
->>>>>>> main
 // Number of steps remaining in the episode. Allows non-recurrent policies
 // to track the progression of time.
 struct StepsRemaining {
