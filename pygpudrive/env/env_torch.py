@@ -129,7 +129,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_value_tensor = self.action_keys_tensor[actions]
                 elif (
                     actions.shape[2] == 3
-                ):  # Assuming we are given the actual action values (acceleration, steering, heading)
+                ):  # Assuming we are given the actual action values 
+                    # (acceleration, steering, heading)
                     action_value_tensor = actions.to(self.device)
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
@@ -152,11 +153,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Action space: (dx, dy, dyaw)
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
-            # Action space: (x, y, yaw, velocity x, velocity y)
-            target_action_idx = [0, 1, 3, 4, 5]
-            self.sim.action_tensor().to_torch()[:, :, target_action_idx].copy_(
-                actions
-            )
+            # Following the StateAction struct in types.hpp
+            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z)
+            self.sim.action_tensor().to_torch()[:, :, :7].copy_(actions)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -351,13 +350,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
 
+        # Global positions
         positions = expert_traj[:, :, : 2 * self.episode_len].view(
             self.num_worlds, self.max_agent_count, self.episode_len, -1
         )
 
+        # Global velocity
         velocity = expert_traj[
             :, :, 2 * self.episode_len : 4 * self.episode_len
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
+        headings = expert_traj[
+            :, :, 4 * self.episode_len : 5 * self.episode_len
+        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
         inferred_expert_actions = expert_traj[
             :, :, 6 * self.episode_len : 16 * self.episode_len
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
@@ -373,7 +379,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             inferred_expert_actions[..., 2] = torch.clamp(
                 inferred_expert_actions[..., 2], -3.14, 3.14
             )
-        else:
+        elif self.config.dynamics_model == "state":
+            # Extract (x, y, yaw, velocity x, velocity y)
+            inferred_expert_actions = torch.cat(
+                (
+                    positions,  # xy
+                    headings,  # float
+                    velocity,  # xy
+                ),
+                dim=-1,
+            )
+
+        else:  # classic or bicycle
             inferred_expert_actions = inferred_expert_actions[..., :3]
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
@@ -532,7 +549,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 128
     NUM_WORLDS = 10
 
-    env_config = EnvConfig(dynamics_model="classic")
+    env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
     scene_config = SceneConfig("data/", NUM_WORLDS)
 
@@ -544,6 +561,9 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
+
+    expert_actions, _, _ = env.get_expert_actions()
+
     # RUN
     obs = env.reset()
     frames = []
