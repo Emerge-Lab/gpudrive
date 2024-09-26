@@ -70,7 +70,7 @@ struct DeltaAction {
 struct StateAction {
     Position position; // 3 floats
     float yaw; // 1 float
-    Velocity velocity;  // 3 floats
+    Velocity velocity;  // 6 floats
 };
 
 union Action
@@ -288,7 +288,7 @@ struct AgentInterface : public madrona::Archetype<
     StepsRemaining,
     ResponseType,
     Trajectory,
-    
+
     ControlledState //Drive Logic
 
 > {};
@@ -326,15 +326,15 @@ struct Agent : public madrona::Archetype<
     madrona::phys::broadphase::LeafID,
     Velocity,
     CollisionDetectionEvent,
-  
+
     // Internal logic state.
     Progress,
     OtherAgents,
     EntityType,
-    
+
     VehicleSize,
     Goal,
-    // Interface 
+    // Interface
     AgentInterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
@@ -352,7 +352,7 @@ struct RoadInterface : public madrona::Archetype<
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
 struct PhysicsEntity : public madrona::Archetype<
-    Position, 
+    Position,
     Rotation,
     Scale,
     ObjectID,
