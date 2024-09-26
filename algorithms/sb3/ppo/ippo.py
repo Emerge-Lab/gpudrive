@@ -201,7 +201,7 @@ class IPPO(PPO):
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        self.logger.record("Charts/fps", fps)
+        self.logger.record("charts/fps", fps)
 
         with torch.no_grad():
             # Compute value for the last timestep

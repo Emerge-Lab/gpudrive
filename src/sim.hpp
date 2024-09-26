@@ -49,6 +49,7 @@ enum class SimObject : uint32_t {
 
 enum class TaskGraphID : uint32_t {
     Step,
+    Reset,
     NumTaskGraphs,
 };
 
@@ -124,6 +125,9 @@ struct Sim : public madrona::WorldBase {
     Entity agents[consts::kMaxAgentCount];
     madrona::CountT numRoads;
     Entity roads[consts::kMaxRoadEntityCount];
+
+    Entity agent_ifaces[consts::kMaxAgentCount];
+    Entity road_ifaces[consts::kMaxRoadEntityCount];
 
     madrona::CountT numControlledVehicles;
 

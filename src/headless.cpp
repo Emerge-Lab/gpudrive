@@ -33,8 +33,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    uint64_t num_steps = std::stoul(argv[3]); 
-    uint64_t num_worlds = 16;
+    uint64_t num_steps = std::stoul(argv[2]);
+    std::vector<std::string> scenes = {"../data/tfrecord-00001-of-01000_307.json",
+         "../data/tfrecord-00003-of-01000_109.json",
+         "../data/tfrecord-00012-of-01000_389.json"};
+    uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
     if (argc >= 4) {
@@ -46,7 +49,7 @@ int main(int argc, char *argv[])
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .scenes = {"../maps.16"},
+        .scenes = scenes,
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
@@ -87,7 +90,6 @@ int main(int argc, char *argv[])
 
         // printf("Map Obs\n");
         // map_obs_printer.print();
-        // printf("\n");
 
         // printf("Shape\n");
         // shapePrinter.print();
@@ -95,21 +97,21 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
-        // printf("Done\n");
-        // donePrinter.print();
+        printf("Done\n");
+        donePrinter.print();
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
 
-        printf("Agent Map Obs\n");
-        agent_map_obs_printer.print();
+        // printf("Agent Map Obs\n");
+        // agent_map_obs_printer.print();
 
-        printf("Info\n");
-        info_printer.print();
+        // printf("Info\n");
+        // info_printer.print();
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode, num_worlds);
+	mgr.getShapeTensorFromDeviceMemory(exec_mode);
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
@@ -131,6 +133,7 @@ int main(int argc, char *argv[])
     }
     const auto end = std::chrono::steady_clock::now();
     const std::chrono::duration<double> elapsed = end - start;
+    printObs();
 
     float fps = (double)num_steps * (double)num_worlds / elapsed.count();
     printf("FPS %f\n", fps);

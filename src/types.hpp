@@ -44,6 +44,7 @@ struct VehicleSize {
 struct Goal{
     madrona::math::Vector2 position;
 };
+
 // WorldReset is a per-world singleton component that causes the current
 // episode to be terminated and the world regenerated
 // (Singleton components like WorldReset can be accessed via Context::singleton
@@ -52,12 +53,36 @@ struct WorldReset {
     int32_t reset;
 };
 
-// TODO(samk): need to wrap elements in std::optional to match Nocturne?
-struct Action {
+
+
+struct ClassicAction {
     float acceleration;
     float steering;
     float headAngle;
 };
+
+struct DeltaAction {
+    float dx;
+    float dy;
+    float dyaw;
+};
+
+struct StateAction {
+    Position position; // 3 floats
+    float yaw; // 1 float
+    Velocity velocity;  // 3 floats
+};
+
+union Action
+{
+    ClassicAction classic;
+    DeltaAction delta;
+    StateAction state;
+};
+
+const size_t ActionExportSize = 3 + 1 + 6;
+
+static_assert(sizeof(Action) == sizeof(float) * ActionExportSize);
 
 // Per-agent reward
 // Exported as an [N * A, 1] float tensor to training code
@@ -79,6 +104,16 @@ struct Info{
     int collidedWithNonVehicle;
     int reachedGoal;
     int type;
+
+    static inline Info zero() {
+      return Info {
+          .collidedWithRoad = 0,
+          .collidedWithVehicle = 0,
+          .collidedWithNonVehicle = 0,
+          .reachedGoal = 0,
+          .type = static_cast<int>(EntityType::Padding)
+      };
+    }
 };
 
 const size_t InfoExportSize = 5;
@@ -92,6 +127,15 @@ struct SelfObservation {
     VehicleSize vehicle_size;
     Goal goal;
     float collisionState;
+
+    static inline SelfObservation zero() {
+      return SelfObservation {
+            .speed = 0,
+            .vehicle_size = {0, 0},
+            .goal = {.position = {0, 0}},
+            .collisionState = 0
+        };
+    }
 };
 
 const size_t SelfObservationExportSize = 6;
@@ -169,9 +213,15 @@ struct Lidar {
     LidarSample samplesRoadLines[consts::numLidarSamples];
 };
 
+<<<<<<< HEAD
 const size_t LidarExportSize = 4;
 
 static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize * 3 * consts::numLidarSamples);
+=======
+const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
+
+static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
+>>>>>>> main
 // Number of steps remaining in the episode. Allows non-recurrent policies
 // to track the progression of time.
 struct StepsRemaining {
@@ -197,7 +247,7 @@ struct Trajectory {
     Action inverseActions[consts::kTrajectoryLength];
 };
 
-const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + 3 * consts::kTrajectoryLength;
+const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
 static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
@@ -206,13 +256,8 @@ struct Shape {
     int32_t roadEntityCount;
 };
 
-enum class ControlMode {
-   EXPERT,
-   BICYCLE
-};
-
 struct ControlledState {
-   ControlMode controlledState; // 0: controlled by expert, 1: controlled by action inputs. Default: 1
+   int32_t controlled; // default: 1
 };
 
 struct CollisionDetectionEvent {
@@ -231,9 +276,39 @@ struct AbsoluteSelfObservation {
     VehicleSize vehicle_size;
 };
 
-const size_t AbsoluteSelfObservationExportSize =  12; //  3 + 4 + 1 + 2
+const size_t AbsoluteSelfObservationExportSize =  12; // 3 + 4 + 1 + 2 + 2
 
 static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
+struct AgentInterface : public madrona::Archetype<
+    Action,
+    Reward,
+    Done,
+    Info,
+    // Observations
+    SelfObservation,
+    AbsoluteSelfObservation,
+    PartnerObservations,
+    AgentMapObservations,
+    Lidar,
+    StepsRemaining,
+    ResponseType,
+    Trajectory,
+    
+    ControlledState //Drive Logic
+
+> {};
+
+struct AgentInterfaceEntity
+{
+    madrona::Entity e;
+};
+
+// Needed so that the taskgraph doesnt run on InterfaceEntity from roads
+struct RoadInterfaceEntity
+{
+    madrona::Entity e;
+};
 
 /* ECS Archetypes for the game */
 
@@ -262,29 +337,11 @@ struct Agent : public madrona::Archetype<
     Progress,
     OtherAgents,
     EntityType,
-
-    // gpudrive
+    
     VehicleSize,
     Goal,
-    Trajectory,
-    ControlledState,
-
-    // Input
-    Action,
-
-    // Observations
-    SelfObservation,
-    AbsoluteSelfObservation,
-    PartnerObservations,
-    AgentMapObservations,
-    Lidar,
-    StepsRemaining,
-    
-    // Reward, episode termination
-    Reward,
-    Done,
-    Info,
-
+    // Interface 
+    AgentInterfaceEntity,
     // Visualization: In addition to the fly camera, src/viewer.cpp can
     // view the scene from the perspective of entities with this component
     madrona::render::RenderCamera,
@@ -293,6 +350,10 @@ struct Agent : public madrona::Archetype<
     madrona::render::Renderable
 
 > {};
+
+struct RoadInterface : public madrona::Archetype<
+    MapObservation>
+{};
 
 // Generic archetype for entities that need physics but don't have custom
 // logic associated with them.
@@ -304,7 +365,7 @@ struct PhysicsEntity : public madrona::Archetype<
     ResponseType,
     madrona::phys::broadphase::LeafID,
     Velocity,
-    MapObservation,
+    RoadInterfaceEntity,
     EntityType,
     madrona::render::Renderable
 > {};
