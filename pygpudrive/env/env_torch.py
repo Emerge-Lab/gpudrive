@@ -71,7 +71,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .to(self.device)
         )
 
-    def get_rewards(self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0):
+    def get_rewards(
+        self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0
+    ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
         - collision
@@ -222,7 +224,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _set_continuous_action_space(self) -> None:
         """Configure the continuous action space."""
-        if self.config.dynamics_model == 'delta_local':
+        if self.config.dynamics_model == "delta_local":
             self.dx = self.config.dx.to(self.device)
             self.dy = self.config.dy.to(self.device)
             self.dyaw = self.config.dyaw.to(self.device)
@@ -238,9 +240,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             action_3 = self.head_actions.clone().cpu().numpy()
 
         action_space = Tuple(
-            (Box(action_1.min(), action_1.max(), shape=(1,)),
-             Box(action_2.min(), action_2.max(), shape=(1,)),
-             Box(action_3.min(), action_3.max(), shape=(1,)))
+            (
+                Box(action_1.min(), action_1.max(), shape=(1,)),
+                Box(action_2.min(), action_2.max(), shape=(1,)),
+                Box(action_3.min(), action_3.max(), shape=(1,)),
+            )
         )
         return action_space
 
@@ -344,7 +348,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
         """Get expert actions for the full trajectories across worlds."""
+
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+
         positions = expert_traj[:, :, : 2 * self.episode_len].view(
             self.num_worlds, self.max_agent_count, self.episode_len, -1
         )
@@ -353,8 +359,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             :, :, 2 * self.episode_len : 4 * self.episode_len
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
         inferred_expert_actions = expert_traj[
-                                  :, :, 6 * self.episode_len: 16 * self.episode_len
-                                  ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+            :, :, 6 * self.episode_len : 16 * self.episode_len
+        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
         if self.config.dynamics_model == "delta_local":
             inferred_expert_actions = inferred_expert_actions[..., :3]
             inferred_expert_actions[..., 0] = torch.clamp(
@@ -392,6 +399,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 constants.MAX_REL_GOAL_COORD,
             )
             debug_positions = positions[debug_world_idx, debug_veh_idx]
+
         return inferred_expert_actions, velo2speed, debug_positions
 
     def normalize_and_flatten_partner_obs(self, obs):
