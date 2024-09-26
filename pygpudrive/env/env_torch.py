@@ -154,8 +154,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
             # Following the StateAction struct in types.hpp
-            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z)
-            self.sim.action_tensor().to_torch()[:, :, :7].copy_(actions)
+            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
+            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -384,8 +384,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             inferred_expert_actions = torch.cat(
                 (
                     positions,  # xy
-                    headings,  # float
-                    velocity,  # xy
+                    torch.ones((*positions.shape[:-1], 1), device=self.device),
+                    headings,  # float (yaw)
+                    velocity,  # xy velocity
+                    torch.zeros((*positions.shape[:-1], 4), device=self.device)
                 ),
                 dim=-1,
             )
