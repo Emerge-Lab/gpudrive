@@ -153,10 +153,10 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
 
-    if(ctx.data().numControlledVehicles < ctx.data().params.maxNumControlledVehicles && agentInit.type == EntityType::Vehicle && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
+    if(ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents && agentInit.valid[0] && ctx.get<ResponseType>(agent) == ResponseType::Dynamic)
     {
         ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = 1};
-        ctx.data().numControlledVehicles++;
+        ctx.data().numControlledAgents++;
     }
     else
     {
@@ -405,7 +405,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().mean = {0, 0};
     ctx.data().mean.x = map->mean.x;
     ctx.data().mean.y = map->mean.y;
-    ctx.data().numControlledVehicles = 0;
+    ctx.data().numControlledAgents = 0;
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
