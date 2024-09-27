@@ -382,7 +382,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "so num_steps should be less than 91."
             )
 
-        self.inferred_playback_actions = self.get_expert_actions()
+        self.log_playback_traj = self.get_expert_actions()
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -405,7 +405,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.init_frames = []
         for time_step in range(init_steps):
             self.step_dynamics(
-                actions=self.inferred_playback_actions[:, :, time_step, :]
+                actions=self.log_playback_traj[:, :, time_step, :]
             )
 
             if render_init:  # Render the initial frames
@@ -567,7 +567,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
+    def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds."""
 
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
@@ -817,8 +817,6 @@ if __name__ == "__main__":
     # RUN
     obs = env.reset()
     frames = []
-
-    env.inferred_playback_actions()
 
     for i in range(TOTAL_STEPS):
         print(f"Step: {i}")
