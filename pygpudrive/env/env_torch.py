@@ -505,6 +505,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ],
             dim=-1,
         )
+    
+        agents_history[~self.cont_agent_mask, :, :] = 0.0
+        
         return agents_history
     
     def get_controlled_agents_mask(self):
