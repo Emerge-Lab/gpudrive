@@ -1,6 +1,6 @@
 """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
-from gymnasium.spaces import Box, Discrete
+from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 import gpudrive
@@ -163,28 +163,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Feed the action values to gpudrive
         self._copy_actions_to_simulator(action_value_tensor)
 
-    # def _apply_actions(self, actions):
-    #     """Apply the actions to the simulator."""
-
-    #     if actions.dim() == 2:  # (num_worlds, max_agent_count)
-    #         # Map action indices to action values if indices are provided
-    #         actions = torch.nan_to_num(actions, nan=0).long().to(self.device)
-    #         action_value_tensor = self.action_keys_tensor[actions]
-
-    #     elif actions.dim() == 3:
-    #         if actions.shape[2] == 1:
-    #             actions = actions.squeeze(dim=2).to(self.device)
-    #             action_value_tensor = self.action_keys_tensor[actions]
-    #         elif (
-    #             actions.shape[2] == 3
-    #         ):  # Assuming we are given the actual action values (acceleration, steering, heading)
-    #             action_value_tensor = actions.to(self.device)
-    #     else:
-    #         raise ValueError(f"Invalid action shape: {actions.shape}")
-
-    #     # Feed the actual action values to gpudrive
-    #     self.sim.action_tensor().to_torch()[:, :, :3].copy_(action_value_tensor)
-
     def _copy_actions_to_simulator(self, actions):
         """Copy the provived actions to the simulator."""
         if (
@@ -197,11 +175,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Action space: (dx, dy, dyaw)
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
-            # Action space: (x, y, yaw, velocity x, velocity y)
-            target_action_idx = [0, 1, 3, 4, 5]
-            self.sim.action_tensor().to_torch()[:, :, target_action_idx].copy_(
-                actions
-            )
+            # Following the StateAction struct in types.hpp
+            # Need to provide:
+            # (x, y, z, yaw, vel x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
+            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -276,17 +253,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             action_1 = self.dx.clone().cpu().numpy()
             action_2 = self.dy.clone().cpu().numpy()
             action_3 = self.dyaw.clone().cpu().numpy()
-        elif self.config.dynamics_model == "classic":
+        else:
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
             self.head_actions = torch.tensor([0], device=self.device)
             action_1 = self.steer_actions.clone().cpu().numpy()
             action_2 = self.accel_actions.clone().cpu().numpy()
             action_3 = self.head_actions.clone().cpu().numpy()
-        else:
-            raise ValueError(
-                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
-            )
 
         action_space = Tuple(
             (
@@ -458,7 +431,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "so num_steps should be less than 91."
             )
 
-        self.inferred_playback_actions = self.get_log_playback_actions()
+        self.inferred_playback_actions = self.get_expert_actions()
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -643,10 +616,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_log_playback_actions(self, clip_actions=True):
+    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
         """Get expert actions for the full trajectories across worlds."""
 
-        log_trajectory = self.sim.expert_trajectory_tensor().to_torch()
+        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+
+        # Global positions
+        positions = expert_traj[:, :, : 2 * self.episode_len].view(
+            self.num_worlds, self.max_agent_count, self.episode_len, -1
+        )
+
+        # Global velocity
+        velocity = expert_traj[
+            :, :, 2 * self.episode_len : 4 * self.episode_len
+        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
+        headings = expert_traj[
+            :, :, 4 * self.episode_len : 5 * self.episode_len
+        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+
+        inferred_expert_actions = expert_traj[
+            :, :, 6 * self.episode_len : 16 * self.episode_len
+        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
 
         if self.config.dynamics_model == "delta_local":
             inferred_actions = log_trajectory[
