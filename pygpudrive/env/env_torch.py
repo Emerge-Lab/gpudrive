@@ -356,8 +356,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
             )
-
-        self.log_playback_traj = self.get_expert_actions()
+            
+        self.log_playback_traj, vel, pos, yaw = self.get_expert_actions(full_output=True)
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -370,15 +370,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 (
                     self.num_worlds,
                     self.max_cont_agents,
-                    self.config.episode_len - (init_steps + 1),
+                    self.config.episode_len - init_steps,
                     5,
                 )
             )
-            # Zeroth step
-            agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
-
         self.init_frames = []
         for time_step in range(init_steps):
+            
+            # Step
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
             )
@@ -386,16 +385,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
 
-            (
-                agents_history[:, :, time_step + 1, :],
-                _,
-                _,
-            ) = self.construct_agent_traj()
-
         if self.config.enable_vbd:
-            # Get the agent trajectories
-            _, agents_type, agents_interested = self.construct_agent_traj()
 
+            # Get the agents history
+            agents_history = self.construct_agent_history(pos, vel, yaw, init_steps)
+            
+            # Now create the agents future logs
+            agents_future[:, :, :, 0:2] = pos[:, :, init_steps:, :]
+            agents_future[:, :, :, 2] = yaw[:, :, init_steps:, :].squeeze(-1)
+            agents_future[:, :, :, 3:5] = vel[:, :, init_steps:, :]
+            # Set all invalid agent values to zero
+            agents_future[~self.cont_agent_mask, :, :] = 0
+            
+            # Currently, all agents are vehicles, encoding as type 1
+            agents_type = torch.zeros([self.num_worlds, self.max_cont_agents])
+            agents_type[self.cont_agent_mask] = 1
+
+            # 10 if we are controlling the agent, 1 otherwise
+            agents_interested = torch.ones([self.num_worlds, self.max_cont_agents])
+            agents_interested[self.cont_agent_mask] = 10
+            
             # Global polylines tensor: Shape (256, 30, 5)
             polylines, polylines_valid = self.construct_polylines()
 
@@ -478,37 +487,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return polylines.permute(0, 2, 1, 3), polylines_valid
 
-    def construct_agent_traj(self):
-        """Get the agent trajectory information."""
-        global_traj = self.sim.absolute_self_observation_tensor().to_torch()
+    def construct_agent_history(self, pos, vel, yaw, init_steps):
+        """Get the agent trajectory feature information."""
+        global_traj = self.sim.absolute_self_observation_tensor().to_torch().clone()
         global_traj[~self.cont_agent_mask] = 0.0
         global_traj = global_traj[:, : self.max_cont_agents, :]
 
         # x, y, heading, vel_x, vel_y, len, width, height
         agents_history = torch.cat(
             [
-                global_traj[:, :, :2],  # x, y
-                global_traj[:, :, 7:8],  # TODO(dc): yaw (placeholder)
-                torch.zeros_like(
-                    global_traj[:, :, :2]
-                ),  # velocity xy (placeholder)
-                global_traj[:, :, 10:12],  # vehicle length, width
-                torch.zeros_like(
-                    global_traj[:, :, 0:1]
-                ),  # TODO(dc): height (placeholder)
+                pos[:, :, :init_steps+1, :],  # x, y
+                yaw[:, :, :init_steps+1, :],  # heading
+                vel[:, :, :init_steps+1, :],  # vel_x, vel_y
+                global_traj[:, :, 10].unsqueeze(-1).expand(-1, -1, init_steps+1).unsqueeze(-1),  # vehicle len
+                global_traj[:, :, 11].unsqueeze(-1).expand(-1, -1, init_steps+1).unsqueeze(-1),  # vehicle width
+                torch.ones((self.num_worlds, self.max_cont_agents, init_steps+1)).unsqueeze(-1),  # vehicle height
             ],
             dim=-1,
         )
-        # Currently, all agents are vehicles, encoding as type 1
-        agents_type = torch.zeros([self.num_worlds, self.max_cont_agents])
-        agents_type[self.cont_agent_mask] = 1
-
-        # 10 if we are controlling the agent, 1 otherwise
-        agents_interested = torch.ones([self.num_worlds, self.max_cont_agents])
-        agents_interested[self.cont_agent_mask] = 10
-
-        return agents_history, agents_type, agents_interested
-
+        return agents_history
+    
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
@@ -542,7 +540,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_expert_actions(self):
+    def get_expert_actions(self, full_output=False):
         """Get expert actions for the full trajectories across worlds."""
 
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
@@ -590,7 +588,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 inferred_expert_actions[..., 2], -3.14, 3.14
             )
         elif self.config.dynamics_model == "state":
-            # Extract (x, y, yaw, velocity x, velocity y)
+            # Extract (x, y, z, yaw, velocity x, velocity y, z, ang_vel_x, ang_vel_y, ang_vel_z)
             inferred_expert_actions = torch.cat(
                 (
                     positions,  # xy
@@ -642,8 +640,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 num_features
             )
         """
-
-        # TODO: Fix (there should not be nans in the obs)
         obs = torch.nan_to_num(obs, nan=0)
 
         # Speed
