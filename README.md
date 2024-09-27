@@ -117,9 +117,9 @@ To pull our pre-built Docker image and begin using GPUDrive, execute the followi
   docker pull ghcr.io/emerge-lab/gpudrive:latest
   ```
 
-After pulling the image, you can create and run a new container using the --gpus all flag (omit this flag if your system does not have a GPU, in that case the sim will still be built but can only be run on CPU). This command will create a new container named `gpudrive_container`:
+After pulling the image, you can create and run a new container using the `--gpus all` flag (omit this flag if your system does not have a GPU, in that case the sim will still be built but can only be run on CPU). However, currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
   ```bash
-  docker run --gpus all -it --name gpudrive_container gpudrive
+  docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
   ```
 
 In case you created the container but exited, to rerun the same container, you can: 
