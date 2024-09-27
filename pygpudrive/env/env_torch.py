@@ -506,36 +506,44 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def construct_polylines(self):
         """Get the global polylines information."""
 
-        # Features: p_x, p_y, heading, traffic_light_state, lane_type
-        global_roadmap = self.sim.agent_roadmap_tensor().to_torch()
+        # Automatically generate the waymax_types_to_gpudrive mapping using a dictionary comprehension
+        waymax_types_to_gpudrive = {
+            int(entity_type): gpudrive.mapRoadEntityTypeToID(entity_type)
+            for entity_type in [
+                gpudrive.EntityType._None,  # Using _None if None isn't allowed directly
+                gpudrive.EntityType.RoadEdge,
+                gpudrive.EntityType.RoadLine,
+                gpudrive.EntityType.RoadLane,
+                gpudrive.EntityType.CrossWalk,
+                gpudrive.EntityType.SpeedBump,
+                gpudrive.EntityType.StopSign,
+            ]
+        }
 
-        num_road_points = global_roadmap.shape[2]
+        # Features: p_x, p_y, heading, traffic_light_state, lane_type
+        global_road_graph = self.sim.agent_roadmap_tensor().to_torch()
+
+        orig_lane_types = global_road_graph[:, :, :, 6].long()
+        lane_types = torch.zeros_like(orig_lane_types)
+
+        for old_id, new_id in waymax_types_to_gpudrive.items():
+            lane_types[orig_lane_types == old_id] = new_id
+
+        num_road_points = global_road_graph.shape[2]
 
         polylines = torch.cat(
             [
-                global_roadmap[:, :, :, :2],  # x, y (3D tensor)
-                global_roadmap[:, :, :, 5:6],  # heading (unsqueezed to 3D)
+                global_road_graph[:, :, :, :2],  # x, y (3D tensor)
+                global_road_graph[:, :, :, 5:6],  # heading (unsqueezed to 3D)
                 torch.zeros_like(
-                    global_roadmap[:, :, :, 5:6]
+                    global_road_graph[:, :, :, 5:6]
                 ),  # traffic_light_state (unsqueezed to 3D)
-                global_roadmap[
-                    :, :, :, 6:7
-                ].long(),  # lane_type (unsqueezed to 3D)
+                lane_types.long().unsqueeze(
+                    -1
+                ),  # lane_type (unsqueezed to 3D)
             ],
             dim=-1,  # Concatenate along the last dimension
         )
-
-        # Throw out garbage values
-        condition = (polylines[:, :, :, 4] < 0) | (polylines[:, :, :, 4] > 6)
-
-        polylines[:, :, :, 4] = torch.where(
-            condition,
-            torch.tensor(0, dtype=polylines.dtype),
-            polylines[:, :, :, 4],
-        )
-
-        # TODO(dc): Map lane type to what vbd expects (ie what is used in waymax)
-        # ...
 
         # TODO(dc): Find out 30 shape
         polylines = polylines[:, :30, :]
@@ -869,6 +877,8 @@ if __name__ == "__main__":
 
     # RUN
     obs = env.reset()
+
+    env.get_expert_actions()
     frames = []
 
     for t in range(TOTAL_STEPS):

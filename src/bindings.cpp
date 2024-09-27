@@ -23,8 +23,8 @@ namespace gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
-        m.attr("episodeLen") = consts::episodeLen;  
-        m.attr("numLidarSamples") = consts::numLidarSamples; 
+        m.attr("episodeLen") = consts::episodeLen;
+        m.attr("numLidarSamples") = consts::numLidarSamples;
 
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
@@ -71,19 +71,24 @@ namespace gpudrive
             .value("DeltaLocal", DynamicsModel::DeltaLocal)
             .value("State", DynamicsModel::State);
 
-        nb::enum_<EntityType>(m, "EntityType")
-            .value("_None", EntityType::None)
-            .value("RoadEdge", EntityType::RoadEdge)
-            .value("RoadLine", EntityType::RoadLine)
-            .value("RoadLane", EntityType::RoadLane)
-            .value("CrossWalk", EntityType::CrossWalk)
-            .value("SpeedBump", EntityType::SpeedBump)
-            .value("StopSign", EntityType::StopSign)
-            .value("Vehicle", EntityType::Vehicle) 
-            .value("Pedestrian", EntityType::Pedestrian)
-            .value("Cyclist", EntityType::Cyclist)
-            .value("Padding", EntityType::Padding) 
-            .value("NumTypes", EntityType::NumTypes);
+        // Export the EntityType enum as before
+        nb::enum_<gpudrive::EntityType>(m, "EntityType")
+            .value("_None", gpudrive::EntityType::None)
+            .value("RoadEdge", gpudrive::EntityType::RoadEdge)
+            .value("RoadLine", gpudrive::EntityType::RoadLine)
+            .value("RoadLane", gpudrive::EntityType::RoadLane)
+            .value("CrossWalk", gpudrive::EntityType::CrossWalk)
+            .value("SpeedBump", gpudrive::EntityType::SpeedBump)
+            .value("StopSign", gpudrive::EntityType::StopSign)
+            .value("Vehicle", gpudrive::EntityType::Vehicle)
+            .value("Pedestrian", gpudrive::EntityType::Pedestrian)
+            .value("Cyclist", gpudrive::EntityType::Cyclist)
+            .value("Padding", gpudrive::EntityType::Padding)
+            .value("NumTypes", gpudrive::EntityType::NumTypes);
+
+        // Export the mapping functions
+        m.def("mapRoadEntityTypeToID", &gpudrive::mapRoadEntityTypeToID, "Map road entity type to its corresponding ID");
+        m.def("mapObjectEntityTypeToID", &gpudrive::mapObjectEntityTypeToID, "Map object entity type to its corresponding ID");
 
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
