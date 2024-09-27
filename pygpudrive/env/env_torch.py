@@ -336,7 +336,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "so num_steps should be less than 91."
             )
 
-        self.inferred_playback_actions = self.get_expert_actions()
+        self.log_playback_traj = self.get_expert_actions()
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -359,7 +359,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.init_frames = []
         for time_step in range(init_steps):
             self.step_dynamics(
-                actions=self.inferred_playback_actions[:, :, time_step, :]
+                actions=self.log_playback_traj[:, :, time_step, :]
             )
 
             if render_init:  # Render the initial frames
@@ -521,7 +521,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return state
 
-    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
+    def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds."""
 
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
@@ -578,26 +578,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             inferred_expert_actions[..., 1] = torch.clamp(
                 inferred_expert_actions[..., 1], -0.3, 0.3
             )
-        velo2speed = None
-        debug_positions = None
-        if debug_world_idx is not None and debug_veh_idx is not None:
-            velo2speed = (
-                torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1)
-                / constants.MAX_SPEED
-            )
-            positions[..., 0] = self.normalize_tensor(
-                positions[..., 0],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
-            )
-            positions[..., 1] = self.normalize_tensor(
-                positions[..., 1],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
-            )
-            debug_positions = positions[debug_world_idx, debug_veh_idx]
 
-        return inferred_expert_actions, velo2speed, debug_positions
+        return inferred_expert_actions
 
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
@@ -759,8 +741,6 @@ if __name__ == "__main__":
     # RUN
     obs = env.reset()
     frames = []
-
-    env.inferred_playback_actions()
 
     for i in range(TOTAL_STEPS):
         print(f"Step: {i}")
