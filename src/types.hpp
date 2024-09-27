@@ -18,23 +18,97 @@ using madrona::base::ObjectID;
 using madrona::phys::Velocity;
 using madrona::phys::ResponseType;
 
+// Constants for road map ID elements and object types consistent with
+// https://waymo.com/open/data/motion/tfexample.
+constexpr int LANE_UNDEFINED = 0;
+constexpr int LANE_FREEWAY = 1;
+constexpr int LANE_SURFACE_STREET = 2;
+constexpr int LANE_BIKE_LANE = 3;
+// Original definition skips 4.
+constexpr int ROAD_LINE_UNKNOWN = 5;
+constexpr int ROAD_LINE_BROKEN_SINGLE_WHITE = 6;
+constexpr int ROAD_LINE_SOLID_SINGLE_WHITE = 7;
+constexpr int ROAD_LINE_SOLID_DOUBLE_WHITE = 8;
+constexpr int ROAD_LINE_BROKEN_SINGLE_YELLOW = 9;
+constexpr int ROAD_LINE_BROKEN_DOUBLE_YELLOW = 10;
+constexpr int ROAD_LINE_SOLID_SINGLE_YELLOW = 11;
+constexpr int ROAD_LINE_SOLID_DOUBLE_YELLOW = 12;
+constexpr int ROAD_LINE_PASSING_DOUBLE_YELLOW = 13;
+constexpr int ROAD_EDGE_UNKNOWN = 14;
+constexpr int ROAD_EDGE_BOUNDARY = 15;  // Collision boundary
+constexpr int ROAD_EDGE_MEDIAN = 16;    // Collision boundary
+constexpr int STOP_SIGN = 17;
+constexpr int CROSSWALK = 18;
+constexpr int SPEED_BUMP = 19;
+constexpr int UNKNOWN = -1;
+
+// Constants for object types
+constexpr int UNSET = 0;
+constexpr int VEHICLE = 1;
+constexpr int PEDESTRIAN = 2;
+constexpr int CYCLIST = 3;
+constexpr int OTHER = 4;
+
 // This enum is used to track the type of each entity
 // The order of the enum is important and should not be changed
 // The order is {Road types that can be reduced, Road types that cannot be reduced, agent types, other types}
 enum class EntityType : uint32_t {
-    None,
-    RoadEdge,
-    RoadLine,
-    RoadLane,
-    CrossWalk,
-    SpeedBump,
-    StopSign,
-    Vehicle,
-    Pedestrian,
-    Cyclist,
-    Padding,
-    NumTypes,
+    None = 0,
+    RoadEdge = 1,
+    RoadLine = 2,
+    RoadLane = 3,
+    CrossWalk = 4,
+    SpeedBump = 5,
+    StopSign = 6,
+    Vehicle = 7,
+    Pedestrian = 8,
+    Cyclist = 9,
+    Padding = 10,
+    NumTypes = 11,
 };
+
+// Function to map Road entities to corresponding constants. Consistent with:
+// https://waymo.com/open/data/motion/tfexample.
+// Also see:
+// https://github.com/waymo-research/waymax/blob/main/waymax/datatypes/roadgraph.py
+constexpr int mapRoadEntityTypeToID(EntityType entityType) {
+    switch (entityType) {
+        case EntityType::None:
+            return LANE_UNDEFINED;
+        case EntityType::RoadEdge:
+            return ROAD_EDGE_BOUNDARY;
+        case EntityType::RoadLine:
+            return ROAD_LINE_UNKNOWN;
+        case EntityType::RoadLane:
+            return LANE_FREEWAY;
+        case EntityType::CrossWalk:
+            return CROSSWALK;
+        case EntityType::SpeedBump:
+            return SPEED_BUMP;
+        case EntityType::StopSign:
+            return STOP_SIGN;
+        default:
+            return UNKNOWN;  // Default case for unrecognized types
+    }
+}
+
+// Function to map Object entities to corresponding constants
+constexpr int mapObjectEntityTypeToID(EntityType entityType) {
+    switch (entityType) {
+        case EntityType::None:
+            return UNSET;
+        case EntityType::Vehicle:
+            return VEHICLE;
+        case EntityType::Pedestrian:
+            return PEDESTRIAN;
+        case EntityType::Cyclist:
+            return CYCLIST;
+        case EntityType::Padding:
+            return OTHER;
+        default:
+            return UNKNOWN;  // Default case for unrecognized types
+    }
+}
 
 struct AgentID {
     int32_t id;
