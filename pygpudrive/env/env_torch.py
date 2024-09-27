@@ -356,8 +356,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "The length of the expert trajectory is 91,"
                 "so num_steps should be less than 91."
             )
-            
-        self.log_playback_traj, vel, pos, yaw = self.get_expert_actions(full_output=True)
+
+        self.log_playback_traj, vel, pos, yaw = self.get_expert_actions(
+            full_output=True
+        )
 
         if self.config.enable_vbd:
             from vbd.data.data_utils import calculate_relations
@@ -376,7 +378,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
         self.init_frames = []
         for time_step in range(init_steps):
-            
+
             # Step
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
@@ -388,23 +390,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.enable_vbd:
 
             # Get the agents history
-            agents_history = self.construct_agent_history(pos, vel, yaw, init_steps)
-            
+            agents_history = self.construct_agent_history(
+                pos, vel, yaw, init_steps
+            )
+
             # Now create the agents future logs
             agents_future[:, :, :, 0:2] = pos[:, :, init_steps:, :]
             agents_future[:, :, :, 2] = yaw[:, :, init_steps:, :].squeeze(-1)
             agents_future[:, :, :, 3:5] = vel[:, :, init_steps:, :]
             # Set all invalid agent values to zero
             agents_future[~self.cont_agent_mask, :, :] = 0
-            
+
             # Currently, all agents are vehicles, encoding as type 1
             agents_type = torch.zeros([self.num_worlds, self.max_cont_agents])
             agents_type[self.cont_agent_mask] = 1
 
             # 10 if we are controlling the agent, 1 otherwise
-            agents_interested = torch.ones([self.num_worlds, self.max_cont_agents])
+            agents_interested = torch.ones(
+                [self.num_worlds, self.max_cont_agents]
+            )
             agents_interested[self.cont_agent_mask] = 10
-            
+
             # Global polylines tensor: Shape (256, 30, 5)
             polylines, polylines_valid = self.construct_polylines()
 
@@ -441,36 +447,44 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def construct_polylines(self):
         """Get the global polylines information."""
 
-        # Features: p_x, p_y, heading, traffic_light_state, lane_type
-        global_roadmap = self.sim.agent_roadmap_tensor().to_torch()
+        # Automatically generate the waymax_types_to_gpudrive mapping using a dictionary comprehension
+        waymax_types_to_gpudrive = {
+            int(entity_type): gpudrive.mapRoadEntityTypeToID(entity_type)
+            for entity_type in [
+                gpudrive.EntityType._None,  # Using _None if None isn't allowed directly
+                gpudrive.EntityType.RoadEdge,
+                gpudrive.EntityType.RoadLine,
+                gpudrive.EntityType.RoadLane,
+                gpudrive.EntityType.CrossWalk,
+                gpudrive.EntityType.SpeedBump,
+                gpudrive.EntityType.StopSign,
+            ]
+        }
 
-        num_road_points = global_roadmap.shape[2]
+        # Features: p_x, p_y, heading, traffic_light_state, lane_type
+        global_road_graph = self.sim.agent_roadmap_tensor().to_torch()
+
+        orig_lane_types = global_road_graph[:, :, :, 6].long()
+        lane_types = torch.zeros_like(orig_lane_types)
+
+        for old_id, new_id in waymax_types_to_gpudrive.items():
+            lane_types[orig_lane_types == old_id] = new_id
+
+        num_road_points = global_road_graph.shape[2]
 
         polylines = torch.cat(
             [
-                global_roadmap[:, :, :, :2],  # x, y (3D tensor)
-                global_roadmap[:, :, :, 5:6],  # heading (unsqueezed to 3D)
+                global_road_graph[:, :, :, :2],  # x, y (3D tensor)
+                global_road_graph[:, :, :, 5:6],  # heading (unsqueezed to 3D)
                 torch.zeros_like(
-                    global_roadmap[:, :, :, 5:6]
+                    global_road_graph[:, :, :, 5:6]
                 ),  # traffic_light_state (unsqueezed to 3D)
-                global_roadmap[
-                    :, :, :, 6:7
-                ].long(),  # lane_type (unsqueezed to 3D)
+                lane_types.long().unsqueeze(
+                    -1
+                ),  # lane_type (unsqueezed to 3D)
             ],
             dim=-1,  # Concatenate along the last dimension
         )
-
-        # Throw out garbage values
-        condition = (polylines[:, :, :, 4] < 0) | (polylines[:, :, :, 4] > 6)
-
-        polylines[:, :, :, 4] = torch.where(
-            condition,
-            torch.tensor(0, dtype=polylines.dtype),
-            polylines[:, :, :, 4],
-        )
-
-        # TODO(dc): Map lane type to what vbd expects (ie what is used in waymax)
-        # ...
 
         # TODO(dc): Find out 30 shape
         polylines = polylines[:, :30, :]
@@ -489,27 +503,39 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def construct_agent_history(self, pos, vel, yaw, init_steps):
         """Get the agent trajectory feature information."""
-        global_traj = self.sim.absolute_self_observation_tensor().to_torch().clone()
+        global_traj = (
+            self.sim.absolute_self_observation_tensor().to_torch().clone()
+        )
         global_traj[~self.cont_agent_mask] = 0.0
         global_traj = global_traj[:, : self.max_cont_agents, :]
 
         # x, y, heading, vel_x, vel_y, len, width, height
         agents_history = torch.cat(
             [
-                pos[:, :, :init_steps+1, :],  # x, y
-                yaw[:, :, :init_steps+1, :],  # heading
-                vel[:, :, :init_steps+1, :],  # vel_x, vel_y
-                global_traj[:, :, 10].unsqueeze(-1).expand(-1, -1, init_steps+1).unsqueeze(-1),  # vehicle len
-                global_traj[:, :, 11].unsqueeze(-1).expand(-1, -1, init_steps+1).unsqueeze(-1),  # vehicle width
-                torch.ones((self.num_worlds, self.max_cont_agents, init_steps+1)).unsqueeze(-1),  # vehicle height
+                pos[:, :, : init_steps + 1, :],  # x, y
+                yaw[:, :, : init_steps + 1, :],  # heading
+                vel[:, :, : init_steps + 1, :],  # vel_x, vel_y
+                global_traj[:, :, 10]
+                .unsqueeze(-1)
+                .expand(-1, -1, init_steps + 1)
+                .unsqueeze(-1),  # vehicle len
+                global_traj[:, :, 11]
+                .unsqueeze(-1)
+                .expand(-1, -1, init_steps + 1)
+                .unsqueeze(-1),  # vehicle width
+                torch.ones(
+                    (self.num_worlds, self.max_cont_agents, init_steps + 1)
+                ).unsqueeze(
+                    -1
+                ),  # vehicle height
             ],
             dim=-1,
         )
-    
+
         agents_history[~self.cont_agent_mask, :, :] = 0.0
-        
+
         return agents_history
-    
+
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
@@ -790,6 +816,8 @@ if __name__ == "__main__":
 
     # RUN
     obs = env.reset()
+
+    env.get_expert_actions()
     frames = []
 
     for i in range(TOTAL_STEPS):

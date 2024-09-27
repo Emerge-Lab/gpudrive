@@ -37,6 +37,49 @@ namespace gpudrive
         NumTypes,
     };
 
+// Function to map Road entities to corresponding constants. Consistent with:
+// https://waymo.com/open/data/motion/tfexample.
+// Also see:
+// https://github.com/waymo-research/waymax/blob/main/waymax/datatypes/roadgraph.py
+constexpr int mapRoadEntityTypeToID(EntityType entityType) {
+    switch (entityType) {
+        case EntityType::None:
+            return LANE_UNDEFINED;
+        case EntityType::RoadEdge:
+            return ROAD_EDGE_BOUNDARY;
+        case EntityType::RoadLine:
+            return ROAD_LINE_UNKNOWN;
+        case EntityType::RoadLane:
+            return LANE_FREEWAY;
+        case EntityType::CrossWalk:
+            return CROSSWALK;
+        case EntityType::SpeedBump:
+            return SPEED_BUMP;
+        case EntityType::StopSign:
+            return STOP_SIGN;
+        default:
+            return UNKNOWN;  // Default case for unrecognized types
+    }
+}
+
+// Function to map Object entities to corresponding constants
+constexpr int mapObjectEntityTypeToID(EntityType entityType) {
+    switch (entityType) {
+        case EntityType::None:
+            return UNSET;
+        case EntityType::Vehicle:
+            return VEHICLE;
+        case EntityType::Pedestrian:
+            return PEDESTRIAN;
+        case EntityType::Cyclist:
+            return CYCLIST;
+        case EntityType::Padding:
+            return OTHER;
+        default:
+            return UNKNOWN;  // Default case for unrecognized types
+    }
+}
+
 struct AgentID {
     int32_t id;
 };
