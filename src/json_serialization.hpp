@@ -93,6 +93,11 @@ namespace gpudrive
             obj.type = EntityType::Cyclist;
         else
             obj.type = EntityType::None;
+
+	std::string markAsStaticKey = "mark_as_static";
+	if (j.contains("key")) {
+	    from_json(j.at("mark_as_static"), obj.markAsStatic);
+	}
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
