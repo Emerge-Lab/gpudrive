@@ -95,7 +95,7 @@ namespace gpudrive
             obj.type = EntityType::None;
 
 	std::string markAsStaticKey = "mark_as_static";
-	if (j.contains("key")) {
+	if (j.contains(markAsStaticKey)) {
 	    from_json(j.at("mark_as_static"), obj.markAsStatic);
 	}
     }
