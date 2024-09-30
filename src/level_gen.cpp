@@ -150,7 +150,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     populateExpertTrajectory(ctx, agent, agentInit);
 
     auto isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold or agentInit.markAsStatic;
-    if(!ctx.data().params.isStaticAgentControlled && isStatic);
+    if(!ctx.data().params.isStaticAgentControlled && isStatic)
     {
         ctx.get<ResponseType>(agent) = ResponseType::Static;
     }
