@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
-            .maxNumControlledVehicles = 0
+            .maxNumControlledAgents = 0
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),

@@ -14,7 +14,7 @@ def sim_init():
     params.observationRadius = 10.0 
     params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
     params.rewardParams = reward_params 
-    params.maxNumControlledVehicles = 2 # we are going to use the second vehicle as the controlled vehicle
+    params.maxNumControlledAgents = 2 # we are going to use the second vehicle as the controlled vehicle
     params.IgnoreNonVehicles = True
     params.dynamicsModel = gpudrive.DynamicsModel.DeltaLocal
 

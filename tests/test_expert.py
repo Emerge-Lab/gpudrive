@@ -16,7 +16,7 @@ def simulation_results():
     params.observationRadius = 10.0  # Set appropriate value
     params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop  # Set appropriate value
     params.rewardParams = reward_params  # Set the rewardParams attribute to the instance created above
-    params.maxNumControlledVehicles = 0
+    params.maxNumControlledAgents = 0
     params.IgnoreNonVehicles = True
     params.isStaticAgentControlled = False
     # Now use the 'params' instance when creating SimManager

@@ -107,7 +107,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
         params.rewardParams = self._set_reward_params()
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
-        params.maxNumControlledVehicles = self.max_cont_agents
+        params.maxNumControlledAgents = self.max_cont_agents
         params.isStaticAgentControlled = False
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
