@@ -77,22 +77,17 @@ struct Sim : public madrona::WorldBase {
     static void setupTasks(madrona::TaskGraphManager &taskgraph_mgr,
                            const Config &cfg);
 
-   const std::pair<EntityType,EntityType> collisionPairs[20] = {{EntityType::Pedestrian, EntityType::Pedestrian},                                                                                                             
-                                                              {EntityType::Pedestrian, EntityType::RoadEdge},                                                                                                                
-                                                              {EntityType::Pedestrian, EntityType::Cyclist},                                                                                                                 
+   const std::pair<EntityType,EntityType> collisionPairs[20] = {                                                                                                 
+                                                              {EntityType::Pedestrian, EntityType::RoadEdge},                                                                                                          
                                                               {EntityType::Pedestrian, EntityType::RoadLine},                                                                                                                
                                                               {EntityType::Pedestrian, EntityType::RoadLane},                                                                                                                
                                                               {EntityType::Pedestrian, EntityType::CrossWalk},                                                                                                               
-                                                              {EntityType::Pedestrian, EntityType::SpeedBump},                                                                                                               
-                                                              {EntityType::Pedestrian, EntityType::StopSign},                                                                                                                
-                                                              {EntityType::Cyclist, EntityType::Pedestrian},                                                                                                                 
+                                                              {EntityType::Pedestrian, EntityType::SpeedBump},                                                                                                                
                                                               {EntityType::Cyclist, EntityType::RoadEdge},                                                                                                                   
-                                                              {EntityType::Cyclist, EntityType::Cyclist},                                                                                                                    
                                                               {EntityType::Cyclist, EntityType::RoadLine},                                                                                                                   
                                                               {EntityType::Cyclist, EntityType::RoadLane},                                                                                                                   
                                                               {EntityType::Cyclist, EntityType::CrossWalk},                                                                                                                  
-                                                              {EntityType::Cyclist, EntityType::SpeedBump},                                                                                                                  
-                                                              {EntityType::Cyclist, EntityType::StopSign},                                                                                                                   
+                                                              {EntityType::Cyclist, EntityType::SpeedBump},                                                                                                                 
                                                               {EntityType::Vehicle, EntityType::CrossWalk},                                                                                                                  
                                                               {EntityType::Vehicle, EntityType::SpeedBump},                                                                                                                  
                                                               {EntityType::Vehicle, EntityType::RoadLine},                                                                                                                   
@@ -129,7 +124,7 @@ struct Sim : public madrona::WorldBase {
     Entity agent_ifaces[consts::kMaxAgentCount];
     Entity road_ifaces[consts::kMaxRoadEntityCount];
 
-    madrona::CountT numControlledVehicles;
+    madrona::CountT numControlledAgents;
 
     madrona::math::Vector2 mean;
 

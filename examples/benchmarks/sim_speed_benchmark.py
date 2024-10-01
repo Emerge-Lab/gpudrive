@@ -39,9 +39,9 @@ def make_sim(
     params.IgnoreNonVehicles = True
 
     if actor_type == "random":
-        params.maxNumControlledVehicles = MAX_CONT_AGENTS
+        params.maxNumControlledAgents = MAX_CONT_AGENTS
     elif actor_type == "expert-actor":
-        params.maxNumControlledVehicles = 0
+        params.maxNumControlledAgents = 0
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU
         if device == "cpu"
