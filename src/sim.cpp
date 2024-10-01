@@ -493,9 +493,10 @@ inline void doneSystem(Engine &ctx,
     Done &done = ctx.get<Done>(agent_iface.e);
     Info &info = ctx.get<Info>(agent_iface.e);
     int32_t num_remaining = steps_remaining.t;
-    if (num_remaining == consts::episodeLen - 1 && done.v != 1)
+    if (num_remaining == consts::episodeLen && done.v != 1)
     { // Make sure to not reset an agent's done flag
         done.v = 0;
+        return;
     }
     else if (num_remaining == 0)
     {
