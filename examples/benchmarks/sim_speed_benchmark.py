@@ -53,6 +53,13 @@ def make_sim(
 
     return sim
 
+def warmup(sim, batch_size):
+    """Warmup the simulator."""
+
+    for episode_count in range(5):
+        sim.reset(list(range(batch_size)))
+        for _ in range(80):
+            sim.step()
 
 def run_speed_bench(
     batch_size,
@@ -81,6 +88,9 @@ def run_speed_bench(
         device=device,
         actor_type=actor_type,
     )
+
+    # Warmup
+    warmup(sim, batch_size)
 
     sim.reset(list(range(batch_size)))
 
@@ -178,7 +188,7 @@ def run_simulation(
 if __name__ == "__main__":
 
     DATA_FOLDER = "../nocturne_data/formatted_json_v2_no_tl_valid"
-    BATCH_SIZE_LIST = [64]
+    BATCH_SIZE_LIST = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
     DATASET_INIT = "first_n" # or "random"
