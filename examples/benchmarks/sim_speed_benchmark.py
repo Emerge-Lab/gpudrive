@@ -98,7 +98,7 @@ def run_speed_bench(
     for _ in range(episode_length):
 
         rand_actions = torch.randint(
-            0, 9, size=(batch_size, max_num_objects, 3)
+            0, 9, size=(batch_size, max_num_objects, 10)
         )
 
         # Step
@@ -187,7 +187,7 @@ def run_simulation(
 
 if __name__ == "__main__":
 
-    DATA_FOLDER = "../nocturne_data/formatted_json_v2_no_tl_valid"
+    DATA_FOLDER = "../formatted_json_v2_no_tl_train_processed"
     BATCH_SIZE_LIST = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
