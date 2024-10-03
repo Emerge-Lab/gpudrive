@@ -12,13 +12,11 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
 
-
 ## Implemented algorithms 🌱
 
 | Algorithm      | Reference                                                                                                                           | README                                                                           |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
-
 
 ## Installation 🛠️
 
@@ -78,6 +76,7 @@ pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_B
 ---
 
 ---
+
 <details>
   <summary>Option 2️⃣ : Poetry install</summary>
 
@@ -132,6 +131,10 @@ cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
 
+## Pre-trained policy 🏋🏼‍♀️
+
+We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. After cloning the repository, Git LFS will automatically download the policy to the `models/learned_sb3_policy` directory. If you don’t find the file there, you can manually download the LFS files by running `git lfs pull`.
+
 ## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
 ### How to download the Waymo Open Motion Dataset
@@ -143,10 +146,10 @@ Two versions of the dataset are available:
 
 The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
-
 ## Citations
 
 If you use GPUDrive in your work, please cite us:
+
 ```
 @misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
       title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
@@ -159,10 +162,9 @@ If you use GPUDrive in your work, please cite us:
 }
 ```
 
-
 ## Contributing and learning benchmark 👷‍♀️
 
-If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`. 
+If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
 
 ## Timeline
 
