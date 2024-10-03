@@ -11,7 +11,7 @@
 .vscode/tasks.json
 /examples/benchmarks/results/
 /baselines/ippo/logs/*
-data/formatted_json_v2_no_tl_train_processed
+/formatted_json_v2_no_tl_train_processed/*
 *.sif
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
@@ -24,18 +24,13 @@ data/formatted_json_v2_no_tl_train_processed
 
 # Data
 hpc/overlay*
-data/formatted_json_v2_no_tl_train/*
-/maps_*/*
-/formatted_json_v2_no_tl_train
-/formatted_json_v2_no_tl_valid/*
-/waymo_data_new
-/maps_16
-**/*ppo_model*/
-/wandb*
-/videos/*
+data/processed/formatted_json_v2_no_tl_train/*
+data/processed/formatted_json_v2_no_tl_train_processed/*
+data/raw/validation/*
 
 # Logging
 /wandb
+/wandb*
 events.out.tfevents.*
 
 ### C++ ###
