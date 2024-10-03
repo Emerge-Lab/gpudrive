@@ -27,6 +27,7 @@ hpc/overlay*
 data/formatted_json_v2_no_tl_train/*
 /maps_*/*
 */formatted_json_v2_no_tl_train/*
+*/formatted_json_v2_no_tl_train_processed/*
 */formatted_json_v2_no_tl_valid/*
 **/*ppo_model*/
 /wandb*
