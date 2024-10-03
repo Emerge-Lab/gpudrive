@@ -1,7 +1,7 @@
 GPUDrive
 ========
 
-![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+![Python version](https://img.shields.io/badge/Python-3.10-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
 
 GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
@@ -12,13 +12,11 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
 
-
 ## Implemented algorithms 🌱
 
 | Algorithm      | Reference                                                                                                                           | README                                                                           |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
-
 
 ## Installation 🛠️
 
@@ -78,6 +76,7 @@ pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_B
 ---
 
 ---
+
 <details>
   <summary>Option 2️⃣ : Poetry install</summary>
 
@@ -132,21 +131,60 @@ cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
 
-## Dataset `{ 🚦 🚗  🚙  🛣️ }`
+## Dataset
 
-### How to download the Waymo Open Motion Dataset
+### Download the dataset
 
-Two versions of the dataset are available:
+Two versions of the dataset are readily available:
 
 - a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
 - the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
 
-The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
+The simulator supports initializing scenes from the `Nocturne` dataset (TODO: UPDATE). The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
+### Re-building the dataset
+
+To re-build the dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting. This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+
+```
+waymo_open_dataset_motion_v_1_2_1/
+│
+├── uncompressed/
+│   ├── lidar_and_camera/
+│   ├── scenario/
+│   │   ├── testing_interactive/
+│   │   ├── testing/
+│   │   ├── training_20s/
+│   │   ├── training/
+│   │   ├── validation_interactive/
+│   │   └── validation/
+│   └── tf_example/
+```
+
+Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  Register:
+
+```bash
+gcloud auth login
+```
+
+then run this command to download the dataset you prefer. For example, to download the validation dataset:
+
+```bash
+gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
+```
+
+where `data/raw` is your local storage folder.
+
+The last thing we need to do is convert the data to a format that is compatible with the simulator using:
+
+```Python
+python data_utils/process_waymo_files.py --tfrecord_dir=<file_loc> --output_dir=<where to save>
+```
 
 ## Citations
 
 If you use GPUDrive in your work, please cite us:
+
 ```
 @misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
       title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
@@ -159,10 +197,9 @@ If you use GPUDrive in your work, please cite us:
 }
 ```
 
-
 ## Contributing and learning benchmark 👷‍♀️
 
-If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`. 
+If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
 
 ## Timeline
 
