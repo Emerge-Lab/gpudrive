@@ -135,19 +135,22 @@ cd build
 
 ### Download the dataset
 
-We use provide two readily available datasets using GitHub Large File Storage (LFS). To access them, first install Git LFS by running:
+We provide two readily available datasets using GitHub Large File Storage (LFS). To access them, first install Git LFS by running:
+
 ```bash
 git lfs install
 ```
+
 Next, clone the repository as usual. Git LFS will automatically download the dataset when you pull the repository.
 
 The datasets will be available at the locations:
+
 - Validation dataset (150 scenarios): `data/processed/validation`
 - Test dataset (150 scenarios): `data/processed/testing`
 
 ### Re-building the dataset
 
-GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps. 
+GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
 
 1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
