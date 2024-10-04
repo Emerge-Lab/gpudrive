@@ -307,13 +307,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--use_tl",
         default=False,
-        action="store_true",
         help="Boolean value to include/exclude traffic lights",
     )
     parser.add_argument(
         "--id_as_filename",
         default=False,
-        action="store_true",
         help="Use the unique scenario id as the filename",
     )
 
