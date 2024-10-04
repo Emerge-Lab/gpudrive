@@ -26,8 +26,10 @@
 hpc/overlay*
 data/processed/formatted_json_v2_no_tl_train/*
 data/processed/formatted_json_v2_no_tl_train_processed/*
+data/raw/testing/*
 data/raw/validation/*
 data/processed/validation/*
+data/processed/testing/*
 
 # Logging
 /wandb
