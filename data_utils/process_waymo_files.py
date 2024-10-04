@@ -205,15 +205,16 @@ def waymo_to_scenario(
         if road is not None:
             roads.append(road)
 
-    scenario = {
+    scenario_dict = {
         "name": scenario_path.split("/")[-1],
         "scenario_id": scenario_id,
         "objects": objects,
         "roads": roads,
         "tl_states": tl_dict,
     }
+
     with open(scenario_path, "w") as f:
-        json.dump(scenario, f)
+        json.dump(scenario_dict, f)
 
 
 def as_proto_iterator(tf_dataset):
@@ -225,70 +226,38 @@ def as_proto_iterator(tf_dataset):
         yield scene_proto
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert TFRecord files to JSON"
-    )
-    parser.add_argument(
-        "tfrecord_dir", help="Path to the directory containing TFRecord files"
-    )
-    parser.add_argument(
-        "output_dir",
-        help="Directory where JSON files will be saved",
-    )
-    parser.add_argument(
-        "dataset",
-        type=str,
-        help="Dataset to process: train, validation, test, or all",
-    )
-    parser.add_argument(
-        "--use_tl",
-        default=False,
-        help="Boolean value to include/exclude traffic lights",
-    )
-    parser.add_argument(
-        "--id_as_filename",
-        default=False,
-        help="Use the unique scenario id as the filename",
-    )
-
-    args = parser.parse_args()
+def process_data(args):
 
     if args.dataset == "all":
-        # output subdirectories that will be created within output_dir
-        out_subsets = ["validation", "train", "test"]
-        # The scenario dir from waymo has training and validation subdirs,
-        # which is what is expected as tfrecord_dir
-        in_subsets = ["training", "validation", "testing"]
+        datasets = ["training", "validation", "testing"]
     elif args.dataset == "train":
-        out_subsets = ["train"]
-        in_subsets = ["training"]
+        datasets = ["training"]
     elif args.dataset == "validation":
-        in_subsets = ["validation"]
-        out_subsets = ["validation"]
-    elif args.dataset == "test":
-        in_subsets = ["testing"]
-        out_subsets = ["test"]
+        datasets = ["validation"]
+    elif args.dataset == "testing":
+        datasets = ["testing"]
+    else:
+        raise ValueError(
+            "Invalid dataset name. Must be one of: 'all', 'train', 'validation', or 'testing'"
+        )
 
-    print(f"Processing {args.dataset} data")
+    for dataset in datasets:
 
-    for out_subset, in_subset in zip(out_subsets, in_subsets):
-
-        logging.info(f"Processing {in_subset} data")
-
-        input_dir = os.path.join(args.tfrecord_dir, in_subset)
-        output_dir = os.path.join(args.output_dir, out_subset)
+        input_dir = os.path.join(args.tfrecord_dir, dataset)
+        output_dir = os.path.join(args.output_dir, dataset)
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
         filenames = [
-            p
-            for p in Path(input_dir).iterdir()
-            if p.is_file() and "tfrecord" in p.suffix
+            p for p in Path(input_dir).iterdir() if "tfrecord" in p.suffix
         ]
 
         assert len(filenames) > 0, f"No TFRecords found in {input_dir}"
+
+        logging.info(
+            f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
+        )
 
         tfrecord_dataset = tf.data.TFRecordDataset(
             filenames=filenames, compression_type=""
@@ -319,4 +288,35 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser(
+        description="Convert TFRecord files to JSON"
+    )
+    parser.add_argument(
+        "tfrecord_dir", help="Path to the directory containing TFRecord files"
+    )
+    parser.add_argument(
+        "output_dir",
+        help="Directory where JSON files will be saved",
+    )
+    parser.add_argument(
+        "dataset",
+        type=str,
+        help="Dataset to process: training, validation, testing, or all",
+    )
+    parser.add_argument(
+        "--use_tl",
+        default=False,
+        action="store_true",
+        help="Boolean value to include/exclude traffic lights",
+    )
+    parser.add_argument(
+        "--id_as_filename",
+        default=False,
+        action="store_true",
+        help="Use the unique scenario id as the filename",
+    )
+
+    args = parser.parse_args()
+
+    process_data(args)

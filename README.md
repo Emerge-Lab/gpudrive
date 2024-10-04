@@ -135,16 +135,20 @@ cd build
 
 ### Download the dataset
 
-Two versions of the dataset are readily available:
+We use provide two readily available datasets using GitHub Large File Storage (LFS). To access them, first install Git LFS by running:
+```bash
+git lfs install
+```
+Next, clone the repository as usual. Git LFS will automatically download the dataset when you pull the repository.
 
-- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
-- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
+The datasets will be available at the locations:
+- Validation dataset (150 scenarios): `data/processed/validation`
+- Test dataset (150 scenarios): `data/processed/testing`
 
-The simulator supports initializing scenes from the `Nocturne` dataset (TODO: UPDATE). The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
 ### Re-building the dataset
 
-To re-build the dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+Perhaps you want to use the To add more data and or  re-build dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
 ```
 waymo_open_dataset_motion_v_1_2_1/
@@ -173,7 +177,7 @@ gcloud auth login
 gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
 ```
 
-where `data/raw` is your local storage folder.
+where `data/raw` is your local storage folder. Note that this can take a while, depending on the size of the dataset you're downloading.
 
 The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
 
