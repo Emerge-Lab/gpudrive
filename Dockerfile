@@ -1,6 +1,13 @@
 # Base image with CUDA and cuDNN support
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+
+# Create a user with the specified UID and GID
+RUN groupadd -g ${GROUP_ID} gpudrive_group && \
+    useradd -m -u ${USER_ID} -g gpudrive_group -s /bin/bash gpudrive_user
+
 # Install essential packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -18,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxcursor-dev \
         libxi-dev \
         mesa-common-dev \
-        libc++1 && \
+        libc++1 \
+        openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Miniforge for Conda into /opt/miniforge3
@@ -52,5 +60,7 @@ RUN source /opt/env.sh && conda activate gpudrive
 
 # Automatically start in the /gpudrive directory and activate the conda environment
 CMD ["bash", "-c", "source /opt/env.sh && conda activate gpudrive && cd /gpudrive && exec bash"]
+
+USER gpudrive_user
 
 LABEL org.opencontainers.image.source https://github.com/Emerge-Lab/gpudrive
