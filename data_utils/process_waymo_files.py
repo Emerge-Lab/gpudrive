@@ -4,8 +4,9 @@ import json
 import math
 import argparse
 import logging
+from pathlib import Path
 import warnings
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
 import tensorflow as tf
@@ -14,6 +15,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 ERR_VAL = 1e-4
 
@@ -152,19 +154,11 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     }
 
 
-def load_protobuf(protobuf_path: str) -> Iterator[scenario_pb2.Scenario]:
-    """Yield the sharded protobufs from the TFRecord."""
-    dataset = tf.data.TFRecordDataset(protobuf_path, compression_type="")
-    for data in dataset:
-        scenario = scenario_pb2.Scenario()
-        scenario.ParseFromString(bytearray(data.numpy()))
-        yield scenario
-
-
 def waymo_to_scenario(
-    scenario_path: str, protobuf: scenario_pb2.Scenario, no_tl: bool = True
+    scenario_path: str, protobuf: scenario_pb2.Scenario, use_tl: bool = True
 ) -> None:
     """Dump a JSON File containing the protobuf parsed into the right format.
+    See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
 
     Args
     ----
@@ -173,11 +167,11 @@ def waymo_to_scenario(
         no_tl (bool, optional): If true, environments with traffic lights are not dumped.
     """
     # read the protobuf file to get the right state
-
     # write the json file
     # construct the road geometries
     # place the initial position of the vehicles
 
+    # Get unique ID string for a scenario
     scenario_id = protobuf.scenario_id
 
     # Construct the traffic light states
@@ -189,7 +183,7 @@ def waymo_to_scenario(
     for dynamic_map_state in protobuf.dynamic_map_states:
         traffic_light_dict = _init_tl_object(dynamic_map_state)
         # there is a traffic light but we don't want traffic light scenes so just return
-        if no_tl and len(traffic_light_dict) > 0:
+        if not use_tl and len(traffic_light_dict) > 0:
             return
         for id, value in traffic_light_dict.items():
             for key in all_keys:
@@ -213,12 +207,22 @@ def waymo_to_scenario(
 
     scenario = {
         "name": scenario_path.split("/")[-1],
+        "scenario_id": scenario_id,
         "objects": objects,
         "roads": roads,
         "tl_states": tl_dict,
     }
     with open(scenario_path, "w") as f:
         json.dump(scenario, f)
+
+
+def as_proto_iterator(tf_dataset):
+    """Parse the tfrecord dataset into a protobuf format."""
+    for tfrecord in tf_dataset:
+        # Parse the scenario protobuf
+        scene_proto = scenario_pb2.Scenario()
+        scene_proto.ParseFromString(bytes(tfrecord.numpy()))
+        yield scene_proto
 
 
 def main():
@@ -229,47 +233,89 @@ def main():
         "tfrecord_dir", help="Path to the directory containing TFRecord files"
     )
     parser.add_argument(
-        "output_dir", help="Directory where JSON files will be saved"
+        "output_dir",
+        help="Directory where JSON files will be saved",
     )
     parser.add_argument(
-        "--no_tl", default=True, help="Boolean value to exclude traffic lights"
+        "dataset",
+        type=str,
+        help="Dataset to process: train, validation, test, or all",
     )
+    parser.add_argument(
+        "--use_tl",
+        default=False,
+        help="Boolean value to include/exclude traffic lights",
+    )
+    parser.add_argument(
+        "--id_as_filename",
+        default=False,
+        help="Use the unique scenario id as the filename",
+    )
+
     args = parser.parse_args()
 
-    # output subdirectories that will be created within output_dir
-    out_subsets = ["train", "test"]
-    # The scenario dir from waymo has training and validation subdirs, which is what is expected as tfrecord_dir
-    in_subsets = ["training", "validation"]
+    if args.dataset == "all":
+        # output subdirectories that will be created within output_dir
+        out_subsets = ["validation", "train", "test"]
+        # The scenario dir from waymo has training and validation subdirs,
+        # which is what is expected as tfrecord_dir
+        in_subsets = ["training", "validation", "testing"]
+    elif args.dataset == "train":
+        out_subsets = ["train"]
+        in_subsets = ["training"]
+    elif args.dataset == "validation":
+        in_subsets = ["validation"]
+        out_subsets = ["validation"]
+    elif args.dataset == "test":
+        in_subsets = ["testing"]
+        out_subsets = ["test"]
+
+    print(f"Processing {args.dataset} data")
 
     for out_subset, in_subset in zip(out_subsets, in_subsets):
+
+        logging.info(f"Processing {in_subset} data")
+
         input_dir = os.path.join(args.tfrecord_dir, in_subset)
         output_dir = os.path.join(args.output_dir, out_subset)
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        tfrecords = [
-            file for file in os.listdir(input_dir) if ".tfrecord" in file
+        filenames = [
+            p
+            for p in Path(input_dir).iterdir()
+            if p.is_file() and "tfrecord" in p.suffix
         ]
-        print(f"Populating {output_dir}")
 
-        for record in tqdm(
-            tfrecords, desc=f"Processing {in_subset} TFRecords"
+        assert len(filenames) > 0, f"No TFRecords found in {input_dir}"
+
+        tfrecord_dataset = tf.data.TFRecordDataset(
+            filenames=filenames, compression_type=""
+        )
+
+        tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+        # Process the data
+        for file_name, scene_proto in tqdm(
+            zip(filenames, tf_dataset_iter),
+            total=len(filenames),
+            desc="Processing Waymo files",
+            colour="green",
         ):
-            file_prefix = record.split(".")[-1]
 
-            for protobuf in tqdm(
-                load_protobuf(os.path.join(input_dir, record)),
-                desc=f"{record}",
-            ):
-                waymo_to_scenario(
-                    os.path.join(
-                        output_dir, file_prefix + f"_{protobuf.scenario_id}"
-                    ),
-                    protobuf,
-                    args.no_tl,
-                )
-        print("Done!")
+            if args.id_as_filename:
+                file_prefix = str(scene_proto.scenario_id)
+            else:
+                file_prefix = str(file_name).split(".")[-1]
+
+            waymo_to_scenario(
+                scenario_path=os.path.join(output_dir, file_prefix),
+                protobuf=scene_proto,
+                use_tl=args.use_tl,
+            )
+
+        logging.info("Done!")
 
 
 if __name__ == "__main__":
