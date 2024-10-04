@@ -145,10 +145,11 @@ The datasets will be available at the locations:
 - Validation dataset (150 scenarios): `data/processed/validation`
 - Test dataset (150 scenarios): `data/processed/testing`
 
-
 ### Re-building the dataset
 
-Perhaps you want to use the To add more data and or  re-build dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps. 
+
+1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
 ```
 waymo_open_dataset_motion_v_1_2_1/
@@ -165,7 +166,7 @@ waymo_open_dataset_motion_v_1_2_1/
 │   └── tf_example/
 ```
 
-Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
+2. Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
 
 ```bash
 gcloud auth login
@@ -179,7 +180,7 @@ gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/val
 
 where `data/raw` is your local storage folder. Note that this can take a while, depending on the size of the dataset you're downloading.
 
-The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
+3. The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
 
 ```bash
 python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
