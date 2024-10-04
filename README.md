@@ -144,7 +144,7 @@ The simulator supports initializing scenes from the `Nocturne` dataset (TODO: UP
 
 ### Re-building the dataset
 
-To re-build the dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting. This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+To re-build the dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
 ```
 waymo_open_dataset_motion_v_1_2_1/
@@ -161,13 +161,13 @@ waymo_open_dataset_motion_v_1_2_1/
 │   └── tf_example/
 ```
 
-Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  Register:
+Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
 
 ```bash
 gcloud auth login
 ```
 
-then run this command to download the dataset you prefer. For example, to download the validation dataset:
+...then run the command below to download the dataset you prefer. For example, to download the validation dataset:
 
 ```bash
 gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
@@ -175,11 +175,22 @@ gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/val
 
 where `data/raw` is your local storage folder.
 
-The last thing we need to do is convert the data to a format that is compatible with the simulator using:
+The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
 
-```Python
-python data_utils/process_waymo_files.py --tfrecord_dir=<file_loc> --output_dir=<where to save>
+```bash
+python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
 ```
+
+For example, if you want to only process the validation data:
+
+```bash
+python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'
+>>>
+Processing Waymo files: 100%|████████████████████████████████████████████████████████████████| 150/150 [00:05<00:00, 28.18it/s]
+INFO:root:Done!
+```
+
+and that's it!
 
 ## Citations
 
