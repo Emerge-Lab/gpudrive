@@ -305,9 +305,9 @@ def main():
         ):
 
             if args.id_as_filename:
-                file_prefix = str(scene_proto.scenario_id)
+                file_prefix = f"tfrecord-{str(scene_proto.scenario_id)}.json"
             else:
-                file_prefix = str(file_name).split(".")[-1]
+                file_prefix = f"{str(file_name).split('.')[-1]}.json"
 
             waymo_to_scenario(
                 scenario_path=os.path.join(output_dir, file_prefix),
