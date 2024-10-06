@@ -288,7 +288,6 @@ def process_data(args):
                         use_tl=args.use_tl,
                     )
 
-                    logging.info(f"Saved record {scene_count} from file {filename}")
                     scene_count += 1
 
                 except Exception as e:
