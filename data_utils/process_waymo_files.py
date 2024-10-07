@@ -9,9 +9,9 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-import tensorflow as tf
-
+# To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import tensorflow as tf
 
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -259,30 +259,39 @@ def process_data(args):
             f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
         )
 
-        tfrecord_dataset = tf.data.TFRecordDataset(
-            filenames=filenames, compression_type=""
-        )
-
-        tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
-
         # Process the data
-        for file_name, scene_proto in tqdm(
-            zip(filenames, tf_dataset_iter),
+        for filename in tqdm(
+            filenames,
             total=len(filenames),
             desc="Processing Waymo files",
             colour="green",
         ):
+            scene_count = 0
+            file_prefix = f"{str(filename).split('.')[-1]}_"
 
-            if args.id_as_filename:
-                file_prefix = f"tfrecord-{str(scene_proto.scenario_id)}.json"
-            else:
-                file_prefix = f"{str(file_name).split('.')[-1]}.json"
-
-            waymo_to_scenario(
-                scenario_path=os.path.join(output_dir, file_prefix),
-                protobuf=scene_proto,
-                use_tl=args.use_tl,
+            tfrecord_dataset = tf.data.TFRecordDataset(
+                filename,
+                compression_type="",
             )
+            tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+            for scene_proto in tf_dataset_iter:
+                try:
+                    if args.id_as_filename:
+                        file_suffix = f"{str(scene_proto.scenario_id)}.json"
+                    else:
+                        file_suffix = f"{scene_count}.json"
+
+                    waymo_to_scenario(
+                        scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+                        protobuf=scene_proto,
+                        use_tl=args.use_tl,
+                    )
+
+                    scene_count += 1
+
+                except Exception as e:
+                    logging.error(f"Error processing record {scene_count}: {e}")
 
         logging.info("Done!")
 
