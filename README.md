@@ -20,7 +20,12 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 
 ## Installation 🛠️
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake (>= version 3.22), as well as Xcode on macOS or Visual Studio on Windows.
+To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need 
+
+1. CMake >= 3.24
+2. Python >= 3.11
+3. CUDA Toolkit >= 12.2 and <=12.4 (Currently we dont support CUDA versions 12.5+. Please check the ouptut of `nvcc --version` to make sure you are using correct CUDA version.)
+4. For MacOS and Windows, you need to install all the dependencies of XCode and Visual Studio C++ tools resepectively. 
 
 Once you have the required dependencies, clone the repository (don't forget --recursive!):
 
