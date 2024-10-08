@@ -307,7 +307,7 @@ def run_speed_bench(
     state = env.reset(scenario)
     start_step = perf_counter()
     _, state_traj = jax.lax.scan(
-        f=f_scan_step,
+        f=f_scan_step_with_obs_comp,
         init=state,
         xs=None,
         length=episode_length,
