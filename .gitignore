@@ -24,6 +24,16 @@
 
 # Data
 hpc/overlay*
+data/processed/*
+data/raw/*
+data/formatted_json_v2_no_tl_train/*
+/maps_*/*
+*/formatted_json_v2_no_tl_train/*
+*/formatted_json_v2_no_tl_train_processed/*
+*/formatted_json_v2_no_tl_valid/*
+**/*ppo_model*/
+/wandb*
+/videos/*
 data/processed/formatted_json_v2_no_tl_train/*
 data/processed/formatted_json_v2_no_tl_train_processed/*
 data/raw/*

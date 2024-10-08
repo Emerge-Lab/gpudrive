@@ -80,7 +80,7 @@ constexpr int mapRoadEntityTypeToID(EntityType entityType) {
         case EntityType::RoadLine:
             return ROAD_LINE_UNKNOWN;
         case EntityType::RoadLane:
-            return LANE_FREEWAY;
+            return LANE_SURFACE_STREET;
         case EntityType::CrossWalk:
             return CROSSWALK;
         case EntityType::SpeedBump:

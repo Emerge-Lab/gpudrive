@@ -1,5 +1,7 @@
 import torch
-import lightning.pytorch as pl
+#import lightning.pytorch as pl
+import pytorch_lightning as pl
+
 from .modules import Encoder, Denoiser, GoalPredictor
 from .utils import DDPM_Sampler
 from .model_utils import (
