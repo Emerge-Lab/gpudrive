@@ -24,6 +24,8 @@
 
 # Data
 hpc/overlay*
+data/processed/*
+data/raw/*
 data/formatted_json_v2_no_tl_train/*
 /maps_*/*
 */formatted_json_v2_no_tl_train/*
