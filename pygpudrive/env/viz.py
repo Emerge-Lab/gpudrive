@@ -9,7 +9,7 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 # AGENT COLORS
 PINK = (255, 105, 180)
 GREEN = (113, 228, 0)
-BLUE = (0, 191, 255)
+BLUE = (0, 127, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
@@ -22,9 +22,9 @@ class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     PADDING_PCT = 0.0
     COLOR_LIST = [
+        BLUE,
         PINK,
         GREEN,
-        BLUE,
         DODGER_BLUE,
         RED_ORANGE,
     ]
