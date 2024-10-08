@@ -106,7 +106,7 @@ poetry install
 ---
 
 <details>
-  <summary>Option 3️⃣ : Docker </summary>
+  <summary>Option 3️⃣ : Docker (GPU Only) </summary>
 
 #### Nvidia docker dependency
   To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
@@ -117,7 +117,7 @@ To pull our pre-built Docker image and begin using GPUDrive, execute the followi
   docker pull ghcr.io/emerge-lab/gpudrive:latest
   ```
 
-After pulling the image, you can create and run a new container using the `--gpus all` flag (omit this flag if your system does not have a GPU, in that case the sim will still be built but can only be run on CPU). However, currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
+After pulling the image, you can create and run a new container using the `--gpus all` flag. Currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
   ```bash
   docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
   ```
@@ -128,9 +128,14 @@ docker start gpudrive_container # make sure the container is started
 docker exec -it gpudrive_container /bin/bash
 ```
 
+Once in the container, it will look like this:
+```bash
+(gpudrive) root@8caf35a97e4f:/gpudrive#
+```
+
 The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
   ```bash
-  poetry install
+ poetry install
   ```
 
 #### Build the image from scratch
@@ -149,6 +154,12 @@ Test whether the installation was successful by importing the simulator:
 ```Python
 import gpudrive
 ```
+
+To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
+```bash
+export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache 
+```
+Please remember that if you make any changes in C++, you need to delete the cache and recompile. 
 
 ## Getting started 🚀
 
