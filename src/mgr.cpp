@@ -597,7 +597,6 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
 
 void Manager::setMaps(const std::vector<std::string> &maps) {
 
-    printf("Setting maps\n");
     assert(impl_->cfg.scenes.size() == maps.size().size() == maps.size());
     impl_->cfg.scenes = maps;
 
@@ -639,7 +638,6 @@ void Manager::setMaps(const std::vector<std::string> &maps) {
     // Vector of range on integers from 0 to the number of worlds
     std::vector<int32_t> worldIndices(maps.size());
     std::iota(worldIndices.begin(), worldIndices.end(), 0);
-    printf("Resetting\n");
     reset(worldIndices);
 }
 
