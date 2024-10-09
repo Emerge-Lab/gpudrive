@@ -396,8 +396,10 @@ void createCameraEntity(Engine &ctx)
         1.5f * math::up);
 }
 
-void createPersistentEntities(Engine &ctx, Map *map) {
+void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
+
+    const auto& map = ctx.singleton<Map>();
 
     if (ctx.data().enableRender)
     {
@@ -405,22 +407,22 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     }
 
     ctx.data().mean = {0, 0};
-    ctx.data().mean.x = map->mean.x;
-    ctx.data().mean.y = map->mean.y;
+    ctx.data().mean.x = map.mean.x;
+    ctx.data().mean.y = map.mean.y;
     ctx.data().numControlledAgents = 0;
 
     CountT agentIdx = 0;
-    for (CountT agentCtr = 0; agentCtr < map->numObjects; ++agentCtr) {
+    for (CountT agentCtr = 0; agentCtr < map.numObjects; ++agentCtr) {
         if(agentIdx >= consts::kMaxAgentCount)
             break;
         if (ctx.data().params.IgnoreNonVehicles)
         {
-            if (map->objects[agentCtr].type == EntityType::Pedestrian || map->objects[agentCtr].type == EntityType::Cyclist)
+            if (map.objects[agentCtr].type == EntityType::Pedestrian || map.objects[agentCtr].type == EntityType::Cyclist)
             {
                 continue;
             }
         }
-        const auto &agentInit = map->objects[agentCtr];
+        const auto &agentInit = map.objects[agentCtr];
         if (ctx.data().params.initOnlyValidAgentsAtFirstStep && agentInit.valid[0] == false)
         {
             continue;
@@ -434,11 +436,11 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().numAgents = agentIdx;
 
     CountT roadIdx = 0;
-    for(CountT roadCtr = 0; roadCtr < map->numRoads; roadCtr++)
+    for(CountT roadCtr = 0; roadCtr < map.numRoads; roadCtr++)
     {
         if(roadIdx >= consts::kMaxRoadEntityCount)
             break;
-        const auto &roadInit = map->roads[roadCtr];
+        const auto &roadInit = map.roads[roadCtr];
         createRoadEntities(ctx, roadInit, roadIdx);
     }
     ctx.data().numRoads = roadIdx;

@@ -54,6 +54,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<RoadInterfaceEntity>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
+    registry.registerSingleton<Map>();
+    registry.registerSingleton<ResetMap>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -63,6 +65,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 
     registry.exportSingleton<WorldReset>((uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
+    registry.exportSingleton<Map>((uint32_t)ExportID::Map);
+    registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<AgentInterface, SelfObservation>(
@@ -879,8 +883,9 @@ Sim::Sim(Engine &ctx,
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
+    ctx.singleton<Map>() = *(init.map);
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.map);
+    createPersistentEntities(ctx);
 
     // Generate initial world state
     initWorld(ctx);

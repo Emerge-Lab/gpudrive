@@ -33,6 +33,8 @@ enum class ExportID : uint32_t {
     Info,
     ResponseType,
     Trajectory,
+    Map,
+    ResetMap,
     NumExports
 };
 
