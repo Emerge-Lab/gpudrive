@@ -98,7 +98,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Trajectory);
 }
 
-static inline void cleanupWorld(Engine &ctx) {}
+static inline void cleanupWorld(Engine &ctx) {
+    generateWorld(ctx);
+}
 
 static inline void initWorld(Engine &ctx)
 {
@@ -111,21 +113,26 @@ static inline void initWorld(Engine &ctx)
     ctx.data().curEpisodeIdx = episode_idx;
 
     // Defined in src/level_gen.hpp / src/level_gen.cpp
-    generateWorld(ctx);
+    resetWorld(ctx);
 }
 
 // This system runs in TaskGraphID::Reset and checks if the code external to the
 // application has forced a reset by writing to the WorldReset singleton. If a
 // reset is needed, cleanup the existing world and generate a new one.
-inline void resetSystem(Engine &ctx, WorldReset &reset)
+inline void resetSystem(Engine &ctx, WorldReset &reset, ResetMap &resetMap)
 {
-    if (reset.reset == 0) {
-      return;
+    if (reset.reset == 0)
+    {
+        return;
     }
 
     reset.reset = 0;
 
-    cleanupWorld(ctx);
+    if (resetMap.reset == 1)
+    {
+        cleanupWorld(ctx);
+        resetMap.reset = 0;
+    }
     initWorld(ctx);
 }
 
@@ -846,7 +853,7 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
 
 static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto reset =
-        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset>>(
+        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset, ResetMap>>(
             {});
 
     setupRestOfTasks(builder, cfg, {reset}, false);

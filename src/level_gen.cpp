@@ -394,6 +394,8 @@ void createCameraEntity(Engine &ctx)
         camera,
         150.f, 0.001f,
         1.5f * math::up);
+
+    ctx.data().camera_agent = camera;
 }
 
 void createPersistentEntities(Engine &ctx) {
@@ -496,7 +498,45 @@ static void resetPersistentEntities(Engine &ctx)
     }
 }
 
+void destroyWorld(Engine &ctx)
+{
+    for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
+    {
+        Entity agent = ctx.data().agents[idx];
+        ctx.destroyRenderableEntity(agent);
+    }
+    for (CountT idx = 0; idx < ctx.data().numRoads; idx++)
+    {
+        Entity road = ctx.data().roads[idx];
+        ctx.destroyRenderableEntity(road);
+    }
+    if (ctx.data().enableRender)
+    {
+        ctx.destroyRenderableEntity(ctx.data().camera_agent);
+    }
+    for (CountT idx = 0; idx < consts::kMaxAgentCount; ++idx)
+    {
+        Entity agent_iface = ctx.data().agent_ifaces[idx];
+        ctx.destroyEntity(agent_iface);
+    }
+    for (CountT idx = 0; idx < consts::kMaxRoadEntityCount; ++idx)
+    {
+        Entity road_iface = ctx.data().road_ifaces[idx];
+        ctx.destroyEntity(road_iface);
+    }
+    ctx.data().numAgents = 0;
+    ctx.data().numRoads = 0;
+    ctx.data().numControlledAgents = 0;
+    ctx.data().mean = {0, 0};
+}
+
 void generateWorld(Engine &ctx)
+{
+    destroyWorld(ctx);
+    createPersistentEntities(ctx);
+}
+
+void resetWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
 }
