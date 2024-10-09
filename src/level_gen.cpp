@@ -412,6 +412,7 @@ void createPersistentEntities(Engine &ctx) {
     ctx.data().mean.x = map.mean.x;
     ctx.data().mean.y = map.mean.y;
     ctx.data().numControlledAgents = 0;
+    ctx.singleton<ResetMap>().reset = 0;
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map.numObjects; ++agentCtr) {
@@ -530,11 +531,6 @@ void destroyWorld(Engine &ctx)
     ctx.data().mean = {0, 0};
 }
 
-void generateWorld(Engine &ctx)
-{
-    destroyWorld(ctx);
-    createPersistentEntities(ctx);
-}
 
 void resetWorld(Engine &ctx)
 {

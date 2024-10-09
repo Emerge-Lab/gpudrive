@@ -99,7 +99,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 }
 
 static inline void cleanupWorld(Engine &ctx) {
-    generateWorld(ctx);
+    destroyWorld(ctx);
 }
 
 static inline void initWorld(Engine &ctx)
@@ -112,6 +112,13 @@ static inline void initWorld(Engine &ctx)
     ctx.data().rng = RNG::make(episode_idx);
     ctx.data().curEpisodeIdx = episode_idx;
 
+    if(ctx.singleton<ResetMap>().reset == 1)
+    {
+        createPersistentEntities(ctx);
+        ctx.singleton<ResetMap>().reset = 0;
+        phys::PhysicsSystem::reset(ctx);
+    }
+
     // Defined in src/level_gen.hpp / src/level_gen.cpp
     resetWorld(ctx);
 }
@@ -119,7 +126,7 @@ static inline void initWorld(Engine &ctx)
 // This system runs in TaskGraphID::Reset and checks if the code external to the
 // application has forced a reset by writing to the WorldReset singleton. If a
 // reset is needed, cleanup the existing world and generate a new one.
-inline void resetSystem(Engine &ctx, WorldReset &reset, ResetMap &resetMap)
+inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     if (reset.reset == 0)
     {
@@ -128,10 +135,11 @@ inline void resetSystem(Engine &ctx, WorldReset &reset, ResetMap &resetMap)
 
     reset.reset = 0;
 
+    auto resetMap = ctx.singleton<ResetMap>();
+
     if (resetMap.reset == 1)
     {
         cleanupWorld(ctx);
-        resetMap.reset = 0;
     }
     initWorld(ctx);
 }
@@ -853,7 +861,7 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
 
 static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto reset =
-        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset, ResetMap>>(
+        builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset>>(
             {});
 
     setupRestOfTasks(builder, cfg, {reset}, false);
@@ -878,7 +886,8 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    // auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
     phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
