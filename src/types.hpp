@@ -7,361 +7,448 @@
 
 #include "consts.hpp"
 
-namespace gpudrive {
-
-// Include several madrona types into the simulator namespace for convenience
-using madrona::Entity;
-using madrona::base::Position;
-using madrona::base::Rotation;
-using madrona::base::Scale;
-using madrona::base::ObjectID;
-using madrona::phys::Velocity;
-using madrona::phys::ResponseType;
-
-// This enum is used to track the type of each entity
-// The order of the enum is important and should not be changed
-// The order is {Road types that can be reduced, Road types that cannot be reduced, agent types, other types}
-enum class EntityType : uint32_t {
-    None,
-    RoadEdge,
-    RoadLine,
-    RoadLane,
-    CrossWalk,
-    SpeedBump,
-    StopSign,
-    Vehicle,
-    Pedestrian,
-    Cyclist,
-    Padding,
-    NumTypes,
-};
-
-struct VehicleSize {
-  float length;
-  float width;
-};
-
-struct Goal{
-    madrona::math::Vector2 position;
-};
-
-// WorldReset is a per-world singleton component that causes the current
-// episode to be terminated and the world regenerated
-// (Singleton components like WorldReset can be accessed via Context::singleton
-// (eg ctx.singleton<WorldReset>().reset = 1)
-struct WorldReset {
-    int32_t reset;
-};
-
-
-
-struct ClassicAction {
-    float acceleration;
-    float steering;
-    float headAngle;
-};
-
-struct DeltaAction {
-    float dx;
-    float dy;
-    float dyaw;
-};
-
-struct StateAction {
-    Position position; // 3 floats
-    float yaw; // 1 float
-    Velocity velocity;  // 6 floats
-};
-
-union Action
+namespace gpudrive
 {
-    ClassicAction classic;
-    DeltaAction delta;
-    StateAction state;
-};
+    // Include several madrona types into the simulator namespace for convenience
+    using madrona::Entity;
+    using madrona::base::ObjectID;
+    using madrona::base::Position;
+    using madrona::base::Rotation;
+    using madrona::base::Scale;
+    using madrona::phys::ResponseType;
+    using madrona::phys::Velocity;
 
-const size_t ActionExportSize = 3 + 1 + 6;
+    // This enum is used to track the type of each entity
+    // The order of the enum is important and should not be changed
+    // The order is {Road types that can be reduced, Road types that cannot be reduced, agent types, other types}
+    enum class EntityType : uint32_t
+    {
+        None,
+        RoadEdge,
+        RoadLine,
+        RoadLane,
+        CrossWalk,
+        SpeedBump,
+        StopSign,
+        Vehicle,
+        Pedestrian,
+        Cyclist,
+        Padding,
+        NumTypes,
+    };
 
-static_assert(sizeof(Action) == sizeof(float) * ActionExportSize);
+    // Constants computed from train files.
+    constexpr size_t MAX_OBJECTS = 515;
+    constexpr size_t MAX_ROADS = 956;
+    constexpr size_t MAX_POSITIONS = 91;
+    constexpr size_t MAX_GEOMETRY = 1746;
 
-// Per-agent reward
-// Exported as an [N * A, 1] float tensor to training code
-struct Reward {
-    float v;
-};
+    // Cannot use Madrona::math::Vector2 because it is not a POD type.
+    // Getting all zeros if using any madrona types.
+    struct MapVector2
+    {
+        float x;
+        float y;
+    };
 
-// Per-agent component that indicates that the agent's episode is finished
-// This is exported per-agent for simplicity in the training code
-struct Done {
-    // Currently bool components are not supported due to
-    // padding issues, so Done is an int32_t
-    int32_t v;
-};
+    struct MapObject
+    {
+        MapVector2 position[MAX_POSITIONS];
+        float width;
+        float length;
+        float heading[MAX_POSITIONS];
+        MapVector2 velocity[MAX_POSITIONS];
+        bool valid[MAX_POSITIONS];
+        MapVector2 goalPosition;
+        EntityType type;
 
-struct Info{
-    int collidedWithRoad;
-    int collidedWithVehicle;
-    int collidedWithNonVehicle;
-    int reachedGoal;
-    int type;
+        uint32_t numPositions;
+        uint32_t numHeadings;
+        uint32_t numVelocities;
+        uint32_t numValid;
+        MapVector2 mean;
+        bool markAsStatic{false};
+    };
 
-    static inline Info zero() {
-      return Info {
-          .collidedWithRoad = 0,
-          .collidedWithVehicle = 0,
-          .collidedWithNonVehicle = 0,
-          .reachedGoal = 0,
-          .type = static_cast<int>(EntityType::Padding)
-      };
-    }
-};
+    struct MapRoad
+    {
+        // std::array<MapPosition, MAX_POSITIONS> geometry;
+        MapVector2 geometry[MAX_GEOMETRY];
+        EntityType type;
+        uint32_t numPoints;
+        MapVector2 mean;
+    };
 
-const size_t InfoExportSize = 5;
+    struct Map
+    {
+        MapObject objects[MAX_OBJECTS];
+        MapRoad roads[MAX_ROADS];
 
-static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
+        uint32_t numObjects;
+        uint32_t numRoads;
+        uint32_t numRoadSegments;
+        MapVector2 mean;
 
-// Observation state for the current agent.
-// Positions are rescaled to the bounds of the play area to assist training.
-struct SelfObservation {
-    float speed;
-    VehicleSize vehicle_size;
-    Goal goal;
-    float collisionState;
+        // Constructor
+        Map() = default;
+    };
 
-    static inline SelfObservation zero() {
-      return SelfObservation {
-            .speed = 0,
-            .vehicle_size = {0, 0},
-            .goal = {.position = {0, 0}},
-            .collisionState = 0
-        };
-    }
-};
+    struct VehicleSize
+    {
+        float length;
+        float width;
+    };
 
-const size_t SelfObservationExportSize = 6;
+    struct Goal
+    {
+        madrona::math::Vector2 position;
+    };
 
-static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
+    // WorldReset is a per-world singleton component that causes the current
+    // episode to be terminated and the world regenerated
+    // (Singleton components like WorldReset can be accessed via Context::singleton
+    // (eg ctx.singleton<WorldReset>().reset = 1)
+    struct WorldReset
+    {
+        int32_t reset;
+    };
 
-struct MapObservation {
-    madrona::math::Vector2 position;
-    Scale scale;
-    float heading;
-    float type;
+    struct ClassicAction
+    {
+        float acceleration;
+        float steering;
+        float headAngle;
+    };
 
-    static inline MapObservation zero() {
-      return MapObservation {
-	.position = {0, 0},
-	.scale = madrona::math::Diag3x3{0, 0, 0},
-	.heading = 0,
-	.type = static_cast<float>(EntityType::None)
-      };
-    }
-};
+    struct DeltaAction
+    {
+        float dx;
+        float dy;
+        float dyaw;
+    };
 
-const size_t MapObservationExportSize = 7;
+    struct StateAction
+    {
+        Position position; // 3 floats
+        float yaw;         // 1 float
+        Velocity velocity; // 6 floats
+    };
 
-static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
+    union Action
+    {
+        ClassicAction classic;
+        DeltaAction delta;
+        StateAction state;
+    };
 
-struct PartnerObservation {
-    float speed;
-    madrona::math::Vector2 position;
-    float heading;
-    VehicleSize vehicle_size;
-    float type;
+    const size_t ActionExportSize = 3 + 1 + 6;
 
-    static inline PartnerObservation zero() {
-      return PartnerObservation {
-	  .speed = 0,
-	  .position = {0, 0},
-	  .heading = 0,
-	  .vehicle_size = {0, 0},
-          .type = static_cast<float>(EntityType::None)
-      };
-    }
-};
+    static_assert(sizeof(Action) == sizeof(float) * ActionExportSize);
 
-// Egocentric observations of other agents
-struct PartnerObservations {
-    PartnerObservation obs[consts::kMaxAgentCount - 1];
-};
+    // Per-agent reward
+    // Exported as an [N * A, 1] float tensor to training code
+    struct Reward
+    {
+        float v;
+    };
 
-const size_t PartnerObservationExportSize = 7;
+    // Per-agent component that indicates that the agent's episode is finished
+    // This is exported per-agent for simplicity in the training code
+    struct Done
+    {
+        // Currently bool components are not supported due to
+        // padding issues, so Done is an int32_t
+        int32_t v;
+    };
 
-static_assert(sizeof(PartnerObservations) == sizeof(float) *
-    (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
+    struct Info
+    {
+        int collidedWithRoad;
+        int collidedWithVehicle;
+        int collidedWithNonVehicle;
+        int reachedGoal;
+        int type;
 
-struct AgentMapObservations {
-    MapObservation obs[consts::kMaxAgentMapObservationsCount];
-};
+        static inline Info zero()
+        {
+            return Info{
+                .collidedWithRoad = 0,
+                .collidedWithVehicle = 0,
+                .collidedWithNonVehicle = 0,
+                .reachedGoal = 0,
+                .type = static_cast<int>(EntityType::Padding)};
+        }
+    };
 
-const size_t AgentMapObservationExportSize = 7;
+    const size_t InfoExportSize = 5;
 
-static_assert(sizeof(AgentMapObservations) ==
-              sizeof(float) * consts::kMaxAgentMapObservationsCount *
-                  AgentMapObservationExportSize);
+    static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
 
-struct LidarSample {
-    float depth;
-    float encodedType;
-    madrona::math::Vector2 position;
-};
+    // Observation state for the current agent.
+    // Positions are rescaled to the bounds of the play area to assist training.
+    struct SelfObservation
+    {
+        float speed;
+        VehicleSize vehicle_size;
+        Goal goal;
+        float collisionState;
 
-// Linear depth values and entity type in a circle around the agent
-struct Lidar {
-    LidarSample samplesCars[consts::numLidarSamples];
-    LidarSample samplesRoadEdges[consts::numLidarSamples];
-    LidarSample samplesRoadLines[consts::numLidarSamples];
-};
+        static inline SelfObservation zero()
+        {
+            return SelfObservation{
+                .speed = 0,
+                .vehicle_size = {0, 0},
+                .goal = {.position = {0, 0}},
+                .collisionState = 0};
+        }
+    };
 
-const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
+    const size_t SelfObservationExportSize = 6;
 
-static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
-// Number of steps remaining in the episode. Allows non-recurrent policies
-// to track the progression of time.
-struct StepsRemaining {
-    uint32_t t;
-};
+    static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
-// Can be refactored for rewards
-struct Progress {
-    float maxY;
-};
+    struct MapObservation
+    {
+        madrona::math::Vector2 position;
+        Scale scale;
+        float heading;
+        float type;
 
-// Per-agent component storing Entity IDs of the other agents. Used to
-// build the egocentric observations of their state.
-struct OtherAgents {
-    madrona::Entity e[consts::kMaxAgentCount - 1];
-};
+        static inline MapObservation zero()
+        {
+            return MapObservation{
+                .position = {0, 0},
+                .scale = madrona::math::Diag3x3{0, 0, 0},
+                .heading = 0,
+                .type = static_cast<float>(EntityType::None)};
+        }
+    };
 
-struct Trajectory {
-    madrona::math::Vector2 positions[consts::kTrajectoryLength];
-    madrona::math::Vector2 velocities[consts::kTrajectoryLength];
-    float headings[consts::kTrajectoryLength];
-    float valids[consts::kTrajectoryLength];
-    Action inverseActions[consts::kTrajectoryLength];
-};
+    const size_t MapObservationExportSize = 7;
 
-const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
+    static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
-static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
+    struct PartnerObservation
+    {
+        float speed;
+        madrona::math::Vector2 position;
+        float heading;
+        VehicleSize vehicle_size;
+        float type;
 
-struct Shape {
-    int32_t agentEntityCount;
-    int32_t roadEntityCount;
-};
+        static inline PartnerObservation zero()
+        {
+            return PartnerObservation{
+                .speed = 0,
+                .position = {0, 0},
+                .heading = 0,
+                .vehicle_size = {0, 0},
+                .type = static_cast<float>(EntityType::None)};
+        }
+    };
 
-struct ControlledState {
-   int32_t controlled; // default: 1
-};
+    // Egocentric observations of other agents
+    struct PartnerObservations
+    {
+        PartnerObservation obs[consts::kMaxAgentCount - 1];
+    };
 
-struct CollisionDetectionEvent {
-    madrona::AtomicI32 hasCollided{false};
-};
+    const size_t PartnerObservationExportSize = 7;
 
-struct AbsoluteRotation {
-    Rotation rotationAsQuat;
-    float rotationFromAxis;
-};
+    static_assert(sizeof(PartnerObservations) == sizeof(float) *
+                                                     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
-struct AbsoluteSelfObservation {
-    Position position;
-    AbsoluteRotation rotation;
-    Goal goal;
-    VehicleSize vehicle_size;
-};
+    struct AgentMapObservations
+    {
+        MapObservation obs[consts::kMaxAgentMapObservationsCount];
+    };
 
-const size_t AbsoluteSelfObservationExportSize =  12; // 3 + 4 + 1 + 2 + 2
+    const size_t AgentMapObservationExportSize = 7;
 
-static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+    static_assert(sizeof(AgentMapObservations) ==
+                  sizeof(float) * consts::kMaxAgentMapObservationsCount *
+                      AgentMapObservationExportSize);
 
-struct AgentInterface : public madrona::Archetype<
-    Action,
-    Reward,
-    Done,
-    Info,
-    // Observations
-    SelfObservation,
-    AbsoluteSelfObservation,
-    PartnerObservations,
-    AgentMapObservations,
-    Lidar,
-    StepsRemaining,
-    ResponseType,
-    Trajectory,
+    struct LidarSample
+    {
+        float depth;
+        float encodedType;
+        madrona::math::Vector2 position;
+    };
 
-    ControlledState //Drive Logic
+    // Linear depth values and entity type in a circle around the agent
+    struct Lidar
+    {
+        LidarSample samplesCars[consts::numLidarSamples];
+        LidarSample samplesRoadEdges[consts::numLidarSamples];
+        LidarSample samplesRoadLines[consts::numLidarSamples];
+    };
 
-> {};
+    const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
 
-struct AgentInterfaceEntity
-{
-    madrona::Entity e;
-};
+    static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
+    // Number of steps remaining in the episode. Allows non-recurrent policies
+    // to track the progression of time.
+    struct StepsRemaining
+    {
+        uint32_t t;
+    };
 
-// Needed so that the taskgraph doesnt run on InterfaceEntity from roads
-struct RoadInterfaceEntity
-{
-    madrona::Entity e;
-};
+    // Can be refactored for rewards
+    struct Progress
+    {
+        float maxY;
+    };
 
-/* ECS Archetypes for the game */
+    // Per-agent component storing Entity IDs of the other agents. Used to
+    // build the egocentric observations of their state.
+    struct OtherAgents
+    {
+        madrona::Entity e[consts::kMaxAgentCount - 1];
+    };
 
-struct CameraAgent : public madrona::Archetype<
-    Position,
-    Rotation,
-    madrona::render::RenderCamera,
-    madrona::render::Renderable
-> {};
+    struct Trajectory
+    {
+        madrona::math::Vector2 positions[consts::kTrajectoryLength];
+        madrona::math::Vector2 velocities[consts::kTrajectoryLength];
+        float headings[consts::kTrajectoryLength];
+        float valids[consts::kTrajectoryLength];
+        Action inverseActions[consts::kTrajectoryLength];
+    };
 
-// There are 2 Agents in the environment trying to get to the destination
-struct Agent : public madrona::Archetype<
-    // Basic components required for physics. Note that the current physics
-    // implementation requires archetypes to have these components first
-    // in this exact order.
-    Position,
-    Rotation,
-    Scale,
-    ObjectID,
-    ResponseType,
-    madrona::phys::broadphase::LeafID,
-    Velocity,
-    CollisionDetectionEvent,
+    const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
-    // Internal logic state.
-    Progress,
-    OtherAgents,
-    EntityType,
+    static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
-    VehicleSize,
-    Goal,
-    // Interface
-    AgentInterfaceEntity,
-    // Visualization: In addition to the fly camera, src/viewer.cpp can
-    // view the scene from the perspective of entities with this component
-    madrona::render::RenderCamera,
-    // All entities with the Renderable component will be drawn by the
-    // viewer and batch renderer
-    madrona::render::Renderable
+    struct Shape
+    {
+        int32_t agentEntityCount;
+        int32_t roadEntityCount;
+    };
 
-> {};
+    struct ControlledState
+    {
+        int32_t controlled; // default: 1
+    };
 
-struct RoadInterface : public madrona::Archetype<
-    MapObservation>
-{};
+    struct CollisionDetectionEvent
+    {
+        madrona::AtomicI32 hasCollided{false};
+    };
 
-// Generic archetype for entities that need physics but don't have custom
-// logic associated with them.
-struct PhysicsEntity : public madrona::Archetype<
-    Position,
-    Rotation,
-    Scale,
-    ObjectID,
-    ResponseType,
-    madrona::phys::broadphase::LeafID,
-    Velocity,
-    RoadInterfaceEntity,
-    EntityType,
-    madrona::render::Renderable
-> {};
+    struct AbsoluteRotation
+    {
+        Rotation rotationAsQuat;
+        float rotationFromAxis;
+    };
+
+    struct AbsoluteSelfObservation
+    {
+        Position position;
+        AbsoluteRotation rotation;
+        Goal goal;
+        VehicleSize vehicle_size;
+    };
+
+    const size_t AbsoluteSelfObservationExportSize = 12; // 3 + 4 + 1 + 2 + 2
+
+    static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
+    struct AgentInterface : public madrona::Archetype<
+                                Action,
+                                Reward,
+                                Done,
+                                Info,
+                                // Observations
+                                SelfObservation,
+                                AbsoluteSelfObservation,
+                                PartnerObservations,
+                                AgentMapObservations,
+                                Lidar,
+                                StepsRemaining,
+                                ResponseType,
+                                Trajectory,
+
+                                ControlledState // Drive Logic
+
+                                >
+    {
+    };
+
+    struct AgentInterfaceEntity
+    {
+        madrona::Entity e;
+    };
+
+    // Needed so that the taskgraph doesnt run on InterfaceEntity from roads
+    struct RoadInterfaceEntity
+    {
+        madrona::Entity e;
+    };
+
+    /* ECS Archetypes for the game */
+
+    struct CameraAgent : public madrona::Archetype<
+                             Position,
+                             Rotation,
+                             madrona::render::RenderCamera,
+                             madrona::render::Renderable>
+    {
+    };
+
+    // There are 2 Agents in the environment trying to get to the destination
+    struct Agent : public madrona::Archetype<
+                       // Basic components required for physics. Note that the current physics
+                       // implementation requires archetypes to have these components first
+                       // in this exact order.
+                       Position,
+                       Rotation,
+                       Scale,
+                       ObjectID,
+                       ResponseType,
+                       madrona::phys::broadphase::LeafID,
+                       Velocity,
+                       CollisionDetectionEvent,
+
+                       // Internal logic state.
+                       Progress,
+                       OtherAgents,
+                       EntityType,
+
+                       VehicleSize,
+                       Goal,
+                       // Interface
+                       AgentInterfaceEntity,
+                       // Visualization: In addition to the fly camera, src/viewer.cpp can
+                       // view the scene from the perspective of entities with this component
+                       madrona::render::RenderCamera,
+                       // All entities with the Renderable component will be drawn by the
+                       // viewer and batch renderer
+                       madrona::render::Renderable
+
+                       >
+    {
+    };
+
+    struct RoadInterface : public madrona::Archetype<
+                               MapObservation>
+    {
+    };
+
+    // Generic archetype for entities that need physics but don't have custom
+    // logic associated with them.
+    struct PhysicsEntity : public madrona::Archetype<
+                               Position,
+                               Rotation,
+                               Scale,
+                               ObjectID,
+                               ResponseType,
+                               madrona::phys::broadphase::LeafID,
+                               Velocity,
+                               RoadInterfaceEntity,
+                               EntityType,
+                               madrona::render::Renderable>
+    {
+    };
 
 }

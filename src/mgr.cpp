@@ -551,7 +551,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 	    numWorlds
         };
 
-        for (int64_t i = 0; i < mgr_cfg.scenes.size(); i++) {
+        for (size_t i = 0; i < mgr_cfg.scenes.size(); i++) {
           auto &init = world_inits[i];
           delete init.map;
         }
@@ -801,7 +801,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 }
 
 std::vector<Shape>
-Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode) {
+Manager::getShapeTensorFromDeviceMemory() {
     const uint32_t numWorlds = impl_->numWorlds;
     const auto &tensor = shapeTensor();
 
