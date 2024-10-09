@@ -53,7 +53,9 @@ struct WorldReset {
     int32_t reset;
 };
 
-
+struct ResetMap {
+    int32_t reset;
+};
 
 struct ClassicAction {
     float acceleration;
