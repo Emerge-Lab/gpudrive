@@ -15,8 +15,6 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
-        const auto &valid = j.at("valid");
-
         obj.mean = {0,0};
         uint32_t i = 0;
         for (const auto &pos : j.at("position"))
@@ -185,7 +183,7 @@ namespace gpudrive
                 }
                 k++;
             }
-            for (int i = 0; i < new_geometry_points.size(); i++)
+            for (size_t i = 0; i < new_geometry_points.size(); i++)
             {
                 if(i==MAX_GEOMETRY)
                     break;
