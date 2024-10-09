@@ -613,7 +613,7 @@ void Manager::setMaps(const std::vector<std::string> &maps) {
 
 #else
         // Handle the case where CUDA support is not available
-        throw std::runtime_error("CUDA support not enabled");
+        FATAL("Madrona was not compiled with CUDA support");
 #endif
     } else {
         auto &cpu_exec = static_cast<CPUImpl*>(impl_.get())->cpuExec;
