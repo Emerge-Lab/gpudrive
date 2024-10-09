@@ -124,8 +124,6 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-
-                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                 }
             }
         }
