@@ -36,6 +36,10 @@ enum class EntityType : uint32_t {
     NumTypes,
 };
 
+struct AgentID {
+    int32_t id;
+};
+
 struct VehicleSize {
   float length;
   float width;
@@ -127,18 +131,19 @@ struct SelfObservation {
     VehicleSize vehicle_size;
     Goal goal;
     float collisionState;
-
+    float id;
     static inline SelfObservation zero() {
       return SelfObservation {
             .speed = 0,
             .vehicle_size = {0, 0},
             .goal = {.position = {0, 0}},
-            .collisionState = 0
+            .collisionState = 0,
+            .id = -1
         };
     }
 };
 
-const size_t SelfObservationExportSize = 6;
+const size_t SelfObservationExportSize = 7;
 
 static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -168,15 +173,16 @@ struct PartnerObservation {
     float heading;
     VehicleSize vehicle_size;
     float type;
+    float id;
 
     static inline PartnerObservation zero() {
-      return PartnerObservation {
-	  .speed = 0,
-	  .position = {0, 0},
-	  .heading = 0,
-	  .vehicle_size = {0, 0},
-          .type = static_cast<float>(EntityType::None)
-      };
+        return PartnerObservation{
+            .speed = 0,
+            .position = {0, 0},
+            .heading = 0,
+            .vehicle_size = {0, 0},
+            .type = static_cast<float>(EntityType::None),
+            .id = -1};
     }
 };
 
@@ -185,7 +191,7 @@ struct PartnerObservations {
     PartnerObservation obs[consts::kMaxAgentCount - 1];
 };
 
-const size_t PartnerObservationExportSize = 7;
+const size_t PartnerObservationExportSize = 8;
 
 static_assert(sizeof(PartnerObservations) == sizeof(float) *
     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
@@ -288,6 +294,7 @@ struct AgentInterface : public madrona::Archetype<
     StepsRemaining,
     ResponseType,
     Trajectory,
+    AgentID,
 
     ControlledState //Drive Logic
 
