@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
     auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
-        // printf("Self\n");
-        // self_printer.print();
+        printf("Self\n");
+        self_printer.print();
 
         // printf("Actions\n");
         // action_printer.print();

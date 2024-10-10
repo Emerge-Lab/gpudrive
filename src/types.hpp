@@ -138,7 +138,7 @@ struct SelfObservation {
             .vehicle_size = {0, 0},
             .goal = {.position = {0, 0}},
             .collisionState = 0,
-            .id = 0
+            .id = -1
         };
     }
 };
@@ -182,7 +182,7 @@ struct PartnerObservation {
             .heading = 0,
             .vehicle_size = {0, 0},
             .type = static_cast<float>(EntityType::None),
-            .id = 0};
+            .id = -1};
     }
 };
 
