@@ -13,40 +13,41 @@ namespace gpudrive
 
     // Cannot use Madrona::math::Vector2 because it is not a POD type.
     // Getting all zeros if using any madrona types.
-    struct MapVector2
+    struct MapVector3
     {
         float x;
         float y;
+        float z;
     };
 
     struct MapObject
     {
-        MapVector2 position[MAX_POSITIONS];
+        MapVector3 position[MAX_POSITIONS];
         float width;
         float length;
         float heading[MAX_POSITIONS];
-        MapVector2 velocity[MAX_POSITIONS];
+        MapVector3 velocity[MAX_POSITIONS];
         bool valid[MAX_POSITIONS];
-        MapVector2 goalPosition;
+        MapVector3 goalPosition;
         EntityType type;
 
         uint32_t numPositions;
         uint32_t numHeadings;
         uint32_t numVelocities;
         uint32_t numValid;
-        MapVector2 mean;
+        MapVector3 mean;
         bool markAsExpert{false};
     };
 
     struct MapRoad
     {
         // std::array<MapPosition, MAX_POSITIONS> geometry;
-        MapVector2 geometry[MAX_GEOMETRY];
+        MapVector3 geometry[MAX_GEOMETRY];
         uint32_t id;
         MapType mapType;
         EntityType type;
         uint32_t numPoints;
-        MapVector2 mean;
+        MapVector3 mean;
     };
 
     struct Map
@@ -57,7 +58,7 @@ namespace gpudrive
         uint32_t numObjects;
         uint32_t numRoads;
         uint32_t numRoadSegments;
-        MapVector2 mean;
+        MapVector3 mean;
 
         // Constructor
         Map() = default;

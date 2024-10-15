@@ -7,15 +7,16 @@
 
 namespace gpudrive
 {
-    void from_json(const nlohmann::json &j, MapVector2 &p)
+    void from_json(const nlohmann::json &j, MapVector3 &p)
     {
         p.x = j.at("x").get<float>();
         p.y = j.at("y").get<float>();
+        p.z = j.at("z").get<float>();
     }
 
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
-        obj.mean = {0,0};
+        obj.mean = {0,0,0};
         uint32_t i = 0;
         for (const auto &pos : j.at("position"))
         { 
@@ -24,6 +25,7 @@ namespace gpudrive
                 from_json(pos, obj.position[i]);
                 obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
                 obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
+                obj.mean.z += (obj.position[i].z - obj.mean.z)/(i+1);
                 ++i;
             }
             else
@@ -100,7 +102,7 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
     {
-        road.mean = {0,0};
+        road.mean = {0,0,0};
         std::string type = j.at("type");
          if(type == "road_edge")
             road.type = EntityType::RoadEdge;
@@ -118,10 +120,10 @@ namespace gpudrive
             road.type = EntityType::None;
 
         
-        std::vector<MapVector2> geometry_points_;
+        std::vector<MapVector3> geometry_points_;
         for(const auto &point: j.at("geometry"))
         {
-            MapVector2 p;
+            MapVector3 p;
             from_json(point, p);
             geometry_points_.push_back(p);
         }
@@ -154,10 +156,24 @@ namespace gpudrive
                     }
                     if (k_2 >= num_sampled_points)
                         break;
+                    //Using 3D space area calculation
                     auto point1 = geometry_points_[k * sample_every_n_];
                     auto point2 = geometry_points_[k_1 * sample_every_n_];
                     auto point3 = geometry_points_[k_2 * sample_every_n_];
-                    float_t area = 0.5 * std::abs((point1.x - point3.x) * (point2.y - point1.y) - (point1.x - point2.x) * (point3.y - point1.y));
+                    // Vector 1: point1 -> point2
+                    float vx1 = point2.x - point1.x;
+                    float vy1 = point2.y - point1.y;
+                    float vz1 = point2.z - point1.z;
+                    // Vector 2: point1 -> point3
+                    float vx2 = point3.x - point1.x;
+                    float vy2 = point3.y - point1.y;
+                    float vz2 = point3.z - point1.z;
+                    // Cross product to get the normal vector
+                    float nx = vy1 * vz2 - vz1 * vy2;
+                    float ny = vz1 * vx2 - vx1 * vz2;
+                    float nz = vx1 * vy2 - vy1 * vx2;
+                    // Magnitude of the cross product
+                    float_t area = 0.5 * std::sqrt(nx * nx + ny * ny + nz * nz);
                     if (area < polylineReductionThreshold)
                     {                       // If the area is less than the threshold, then we skip the middle point
                         skip[k_1] = true;   // Mark the middle point as skipped
@@ -175,7 +191,7 @@ namespace gpudrive
             k = 0;
             skip[0] = false;
             skip[num_sampled_points - 1] = false;
-            std::vector<MapVector2> new_geometry_points; // This list stores the points that are not skipped
+            std::vector<MapVector3> new_geometry_points; // This list stores the points that are not skipped
             while (k < num_sampled_points)
             {
                 if (!skip[k])
@@ -229,13 +245,14 @@ namespace gpudrive
         {
             road.mean.x += (road.geometry[i].x - road.mean.x)/(i+1);
             road.mean.y += (road.geometry[i].y - road.mean.y)/(i+1);
+            road.mean.z += (road.geometry[i].z - road.mean.z)/(i+1);
         }
 
     }
 
     std::pair<float, float> calc_mean(const nlohmann::json &j)
     {
-        std::pair<float, float> mean = {0, 0};
+        std::pair<float, float> mean = {0, 0, 0};
         int64_t numEntities = 0;
         for (const auto &obj : j["objects"])
         {
@@ -247,9 +264,11 @@ namespace gpudrive
                 numEntities++;
                 float newX = pos["x"];
                 float newY = pos["y"];
+                float newZ = pos["z"];
                 // Update mean incrementally
                 mean.first += (newX - mean.first) / numEntities;
                 mean.second += (newY - mean.second) / numEntities;
+                mean.third += (newZ - mean.third) / numEntities;
             }
         }
         for (const auto &obj : j["roads"])
@@ -259,10 +278,12 @@ namespace gpudrive
                 numEntities++;
                 float newX = point["x"];
                 float newY = point["y"];
+                float newZ = point["z"];
 
                 // Update mean incrementally
                 mean.first += (newX - mean.first) / numEntities;
                 mean.second += (newY - mean.second) / numEntities;
+                mean.third += (newZ - mean.third) / numEntities;
             }
         }
         return mean;
