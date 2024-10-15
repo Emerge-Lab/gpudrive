@@ -33,11 +33,12 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     auto xCoord = ctx.get<Trajectory>(agent_iface).positions[0].x;
     auto yCoord = ctx.get<Trajectory>(agent_iface).positions[0].y;
+    auto zCoord = ctx.get<Trajectory>(agent_iface).positions[0].z;
     auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].x;
     auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].y;
     auto heading = ctx.get<Trajectory>(agent_iface).headings[0];
 
-    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
+    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = zCoord};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     if (ctx.get<ResponseType>(agent) == ResponseType::Static) {
         ctx.get<Velocity>(agent) = Velocity{Vector3::zero(), Vector3::zero()};
@@ -58,7 +59,11 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     auto &trajectory = ctx.get<Trajectory>(agent_iface);
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.position[i].y - ctx.singleton<WorldMeans>().mean.y};
+        trajectory.positions[i] = Vector3{
+            .x = agentInit.position[i].x - ctx.singleton<WorldMeans>().mean.x, 
+            .y = agentInit.position[i].y - ctx.singleton<WorldMeans>().mean.y,
+            .z = agentInit.position[i].z - ctx.singleton<WorldMeans>().mean.z
+            };
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = (float)agentInit.valid[i];
@@ -75,7 +80,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         }
 
         Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
-        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = 1};
+        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = trajectory.positions[i].z};
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
         switch (ctx.data().params.dynamicsModel) {
@@ -91,7 +96,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
             }
 
             case DynamicsModel::DeltaLocal: {
-                Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
+                Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = trajectory.positions[i+1].z};
                 trajectory.inverseActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
                 break;
             }
@@ -126,8 +131,10 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<EntityType>(agent) = agentInit.type;
-    ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y}};
-
+    ctx.get<Goal>(agent)= Goal{.position = Vector3{
+        .x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, 
+        .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y,
+        .z = agentInit.goalPosition.z - ctx.singleton<WorldMeans>().mean.z}};
     populateExpertTrajectory(ctx, agent, agentInit);
 
     //Applying custom rules
@@ -146,18 +153,16 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 }
 
 static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {                    
-    const MapVector2 &p1 = roadInit.geometry[j];
-    const MapVector2 &p2 = roadInit.geometry[j+1]; // This is guaranteed to be within bounds
+    const MapVector3 &p1 = roadInit.geometry[j];
+    const MapVector3 &p2 = roadInit.geometry[j+1]; // This is guaranteed to be within bounds
 
-    float z = 1 + (roadInit.type == EntityType::RoadEdge ? consts::lidarRoadEdgeOffset : consts::lidarRoadLineOffset);
-
-    Vector3 start{.x = p1.x - ctx.singleton<WorldMeans>().mean.x, .y = p1.y - ctx.singleton<WorldMeans>().mean.y, .z = z};
-    Vector3 end{.x = p2.x - ctx.singleton<WorldMeans>().mean.x, .y = p2.y - ctx.singleton<WorldMeans>().mean.y, .z = z};
+    Vector3 start{.x = p1.x - ctx.singleton<WorldMeans>().mean.x, .y = p1.y - ctx.singleton<WorldMeans>().mean.y, .z = p1.z - ctx.singleton<WorldMeans>().mean.z};
+    Vector3 end{.x = p2.x - ctx.singleton<WorldMeans>().mean.x, .y = p2.y - ctx.singleton<WorldMeans>().mean.y, .z = p2.z - ctx.singleton<WorldMeans>().mean.z};
 
     auto road_edge = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<RoadInterfaceEntity>(road_edge).e = ctx.makeEntity<RoadInterface>();
 
-    auto pos = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = z};
+    auto pos = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = (start.z + end.z)/2};
     auto rot = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     auto scale = Diag3x3{.d0 = start.distance(end)/2, .d1 = 0.1, .d2 = 0.1};
     setRoadEntitiesProps(ctx, road_edge, pos, rot, scale, roadInit.type, ObjectID{(int32_t)SimObject::Cube}, ResponseType::Static, roadInit.id, roadInit.mapType);
