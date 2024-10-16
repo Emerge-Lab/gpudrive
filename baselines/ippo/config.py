@@ -1,4 +1,5 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
+from networks.basic_ffn import FFN, FeedForwardPolicy
 from dataclasses import dataclass
 import gpudrive
 from pygpudrive.env.config import SelectionDiscipline
@@ -9,7 +10,7 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET
-    data_dir: str = "data"
+    data_dir: str = "data/examples"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
     num_worlds: int = 50  # Number of parallel environmentss
@@ -54,7 +55,7 @@ class ExperimentConfig:
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 100
+    save_policy_freq: int = 200
 
     # HYPERPARAMETERS
     seed: int = 42
@@ -65,15 +66,15 @@ class ExperimentConfig:
     n_steps: int = 91
     num_minibatches: int = 5  # Used to determine the minibatch size
     verbose: int = 0
-    total_timesteps: int = 1e7
+    total_timesteps: int = 2e7
     ent_coef: float = 0.00
     vf_coef: float = 0.5
     lr: float = 3e-4
     n_epochs: int = 5
 
     # NETWORK
-    mlp_class = LateFusionNet
-    policy = LateFusionPolicy
+    mlp_class = FFN #LateFusionNet
+    policy = FeedForwardPolicy #LateFusionPolicy
     ego_state_layers = [64, 32]
     road_object_layers = [64, 64]
     road_graph_layers = [64, 64]

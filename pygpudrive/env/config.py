@@ -33,7 +33,7 @@ class EnvConfig:
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs, 
     # and partner_obs are invalid. This makes the sim 2x faster
     disable_classic_obs: bool = False  # Disable classic observations 
-    lidar_obs: bool = True  # Use LiDAR in observations
+    lidar_obs: bool = False  # Use LiDAR in observations
 
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
@@ -61,6 +61,8 @@ class EnvConfig:
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 7), decimals=3
     )
+    heading_actions: torch.Tensor = torch.Tensor([0])
+    
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
