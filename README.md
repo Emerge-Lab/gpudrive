@@ -1,7 +1,7 @@
 GPUDrive
 ========
 
-![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+![Python version](https://img.shields.io/badge/Python-3.10-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
 
 GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
@@ -187,14 +187,13 @@ To test if the simulator compiled correctly (and python lib did not), try runnin
 cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
-
 ## Pre-trained policy 🏋🏼‍♀️
 
 We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. After cloning the repository, Git LFS will automatically download the policy to the `models/learned_sb3_policy` directory. If you don’t find the file there, you can manually download the LFS files by running `git lfs pull`.
 
 ## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
-### How to download the Waymo Open Motion Dataset
+### Download the dataset
 
 Two versions of the dataset are available:
 
@@ -202,6 +201,64 @@ Two versions of the dataset are available:
 - the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
 
 The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
+
+### Re-building the dataset
+
+GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
+
+1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+
+```
+waymo_open_dataset_motion_v_1_2_1/
+│
+├── uncompressed/
+│   ├── lidar_and_camera/
+│   ├── scenario/
+│   │   ├── testing_interactive/
+│   │   ├── testing/
+│   │   ├── training_20s/
+│   │   ├── training/
+│   │   ├── validation_interactive/
+│   │   └── validation/
+│   └── tf_example/
+```
+
+2. Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
+
+```bash
+gcloud auth login
+```
+
+...then run the command below to download the dataset you prefer. For example, to download the validation dataset:
+
+```bash
+gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
+```
+
+where `data/raw` is your local storage folder. Note that this can take a while, depending on the size of the dataset you're downloading.
+
+3. The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
+
+```bash
+python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
+```
+
+Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
+
+```bash
+pip install waymo-open-dataset-tf-2-12-0 tqdm
+```
+
+Then for example, if you want to only process the validation data:
+
+```bash
+python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'
+>>>
+Processing Waymo files: 100%|████████████████████████████████████████████████████████████████| 150/150 [00:05<00:00, 28.18it/s]
+INFO:root:Done!
+```
+
+and that's it!
 
 ## Citations
 

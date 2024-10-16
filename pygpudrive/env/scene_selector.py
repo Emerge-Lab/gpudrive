@@ -12,6 +12,7 @@ def select_scenes(config):
 
     all_scenes = sorted(os.listdir(config.path))
     # Remove elements that are not tfrecord files (traffic scenes)
+    # NOTE: This uses the naming convention of the traffic scenes as a filter
     all_scenes = [
         scene for scene in all_scenes if scene.startswith("tfrecord")
     ]
