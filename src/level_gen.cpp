@@ -274,6 +274,7 @@ void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {
         Entity &agent_iface = ctx.data().agent_ifaces[agentIdx] = ctx.makeEntity<AgentInterface>();
+        ctx.get<AgentID>(agent_iface) = AgentID{.id = -1};
         resetAgentInterface(ctx, agent_iface, EntityType::None, ResponseType::Static, 0, 1);
         ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = 0};
         auto &agent_map_obs = ctx.get<AgentMapObservations>(agent_iface);
@@ -349,6 +350,7 @@ void createPersistentEntities(Engine &ctx, Map *map) {
 
         auto agent = createAgent(ctx, agentInit);
         ctx.data().agent_ifaces[agentIdx] = ctx.get<AgentInterfaceEntity>(agent).e;
+        ctx.get<AgentID>(ctx.data().agent_ifaces[agentIdx]) = AgentID{.id = static_cast<int32_t>(agentIdx)};
         ctx.data().agents[agentIdx++] = agent;
     }
     ctx.data().numAgents = agentIdx;

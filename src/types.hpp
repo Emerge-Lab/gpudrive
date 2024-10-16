@@ -37,6 +37,10 @@ namespace gpudrive
         NumTypes,
     };
 
+struct AgentID {
+    int32_t id;
+};
+
     struct VehicleSize
     {
         float length;
@@ -136,18 +140,19 @@ namespace gpudrive
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
-
+    float id;
         static inline SelfObservation zero()
         {
             return SelfObservation{
                 .speed = 0,
                 .vehicle_size = {0, 0},
                 .goal = {.position = {0, 0}},
-                .collisionState = 0};
+                .collisionState = 0,
+            .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 6;
+    const size_t SelfObservationExportSize = 7;
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -179,17 +184,18 @@ namespace gpudrive
         float heading;
         VehicleSize vehicle_size;
         float type;
+    float id;
 
-        static inline PartnerObservation zero()
-        {
-            return PartnerObservation{
-                .speed = 0,
-                .position = {0, 0},
-                .heading = 0,
-                .vehicle_size = {0, 0},
-                .type = static_cast<float>(EntityType::None)};
-        }
-    };
+    static inline PartnerObservation zero() {
+        return PartnerObservation{
+            .speed = 0,
+            .position = {0, 0},
+            .heading = 0,
+            .vehicle_size = {0, 0},
+            .type = static_cast<float>(EntityType::None),
+            .id = -1};
+    }
+};
 
     // Egocentric observations of other agents
     struct PartnerObservations
@@ -197,7 +203,7 @@ namespace gpudrive
         PartnerObservation obs[consts::kMaxAgentCount - 1];
     };
 
-    const size_t PartnerObservationExportSize = 7;
+    const size_t PartnerObservationExportSize = 8;
 
     static_assert(sizeof(PartnerObservations) == sizeof(float) *
                                                      (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
@@ -312,6 +318,7 @@ namespace gpudrive
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
+    AgentID,
 
                                 ControlledState // Drive Logic
 
