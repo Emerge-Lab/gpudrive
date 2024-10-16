@@ -52,6 +52,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Info>();
     registry.registerComponent<AgentInterfaceEntity>();
     registry.registerComponent<RoadInterfaceEntity>();
+    registry.registerComponent<AgentID>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
 
@@ -142,6 +143,7 @@ inline void collectSelfObsSystem(Engine &ctx,
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
+    self_obs.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,
@@ -182,7 +184,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
             .position = relative_pos,
             .heading = relative_heading,
             .vehicle_size = other_size,
-            .type = (float)ctx.get<EntityType>(other)
+            .type = (float)ctx.get<EntityType>(other),
+            .id = (float)ctx.get<AgentID>(ctx.get<AgentInterfaceEntity>(other).e).id
         };
     }
     while(arrIndex < ctx.data().numAgents - 1) {
