@@ -155,8 +155,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
 
 
 def waymo_to_scenario(
-    scenario_path: str, protobuf: scenario_pb2.Scenario, use_tl: bool = True
-) -> None:
+    scenario_path: str, protobuf: scenario_pb2.Scenario) -> None:
     """Dump a JSON File containing the protobuf parsed into the right format.
     See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
 
@@ -182,9 +181,6 @@ def waymo_to_scenario(
     i = 0
     for dynamic_map_state in protobuf.dynamic_map_states:
         traffic_light_dict = _init_tl_object(dynamic_map_state)
-        # there is a traffic light but we don't want traffic light scenes so just return
-        if not use_tl and len(traffic_light_dict) > 0:
-            return
         for id, value in traffic_light_dict.items():
             for key in all_keys:
                 tl_dict[id][key].append(value[key])
@@ -285,7 +281,6 @@ def process_data(args):
                     waymo_to_scenario(
                         scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
                         protobuf=scene_proto,
-                        use_tl=args.use_tl,
                     )
 
                     scene_count += 1
@@ -312,11 +307,6 @@ if __name__ == "__main__":
         "dataset",
         type=str,
         help="Dataset to process: training, validation, testing, or all",
-    )
-    parser.add_argument(
-        "--use_tl",
-        default=False,
-        help="Boolean value to include/exclude traffic lights",
     )
     parser.add_argument(
         "--id_as_filename",
