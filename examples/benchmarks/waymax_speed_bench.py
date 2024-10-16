@@ -83,6 +83,19 @@ def create_random_actor(
         name=f"random_actor",
     )
 
+def warmup(env, scenario, f_scan_step, episode_length=80):
+    for _ in range(5):
+        # Reset the environment with the current scenario
+        state = env.reset(scenario)
+
+        # Step through the episode using jax.lax.scan
+        _, state_traj = jax.lax.scan(
+            f=f_scan_step,
+            init=state,
+            xs=None,
+            length=episode_length,
+        )
+
 
 def run_speed_bench(
     batch_size,
@@ -288,6 +301,9 @@ def run_speed_bench(
     rng = jax.random.PRNGKey(0)
     scenario = next(data_iter)
 
+    #Warmup 
+    warmup(env, scenario, f_scan_step, episode_length=episode_length)
+
     # PROFILE RESETS
     start_reset = perf_counter()
     _, state_traj = jax.lax.scan(
@@ -307,7 +323,7 @@ def run_speed_bench(
     state = env.reset(scenario)
     start_step = perf_counter()
     _, state_traj = jax.lax.scan(
-        f=f_scan_step,
+        f=f_scan_step_with_obs_comp,
         init=state,
         xs=None,
         length=episode_length,

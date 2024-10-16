@@ -129,7 +129,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_value_tensor = self.action_keys_tensor[actions]
                 elif (
                     actions.shape[2] == 3
-                ):  # Assuming we are given the actual action values 
+                ):  # Assuming we are given the actual action values
                     # (acceleration, steering, heading)
                     action_value_tensor = actions.to(self.device)
             else:
@@ -259,6 +259,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_states_unprocessed = (
                 self.sim.self_observation_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            ego_states_unprocessed = ego_states_unprocessed[:, :, :-1]
+
+            # Normalize
             if self.config.norm_obs:
                 ego_states = self.normalize_ego_state(ego_states_unprocessed)
             else:
@@ -271,6 +275,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            partner_observations = partner_observations[:, :, :, :-1]
             if self.config.norm_obs:  # Normalize observations and then flatten
                 partner_observations = self.normalize_and_flatten_partner_obs(
                     partner_observations
@@ -387,7 +393,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     torch.ones((*positions.shape[:-1], 1), device=self.device),
                     headings,  # float (yaw)
                     velocity,  # xy velocity
-                    torch.zeros((*positions.shape[:-1], 4), device=self.device)
+                    torch.zeros(
+                        (*positions.shape[:-1], 4), device=self.device
+                    ),
                 ),
                 dim=-1,
             )
@@ -553,7 +561,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/", NUM_WORLDS)
+    scene_config = SceneConfig("data/examples", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(

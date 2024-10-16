@@ -9,7 +9,7 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET
-    data_dir: str = "data"
+    data_dir: str = "data/examples"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
     num_worlds: int = 50  # Number of parallel environmentss
