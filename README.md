@@ -20,7 +20,12 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 
 ## Installation 🛠️
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake (>= version 3.22), as well as Xcode on macOS or Visual Studio on Windows.
+To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need 
+
+1. CMake >= 3.24
+2. Python >= 3.11
+3. CUDA Toolkit >= 12.2 and <=12.4 (Currently we dont support CUDA versions 12.5+. Please check the ouptut of `nvcc --version` to make sure you are using correct CUDA version.)
+4. For MacOS and Windows, you need to install all the dependencies of XCode and Visual Studio C++ tools resepectively. 
 
 Once you have the required dependencies, clone the repository (don't forget --recursive!):
 
@@ -102,11 +107,63 @@ poetry install
 
 ---
 
+---
+
+<details>
+  <summary>Option 3️⃣ : Docker (GPU Only) </summary>
+
+#### Nvidia docker dependency
+  To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+
+#### Pull the image and run the container
+To pull our pre-built Docker image and begin using GPUDrive, execute the following command (you may need to prepend sudo, depending on your Docker setup):
+  ```bash
+  docker pull ghcr.io/emerge-lab/gpudrive:latest
+  ```
+
+After pulling the image, you can create and run a new container using the `--gpus all` flag. Currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
+  ```bash
+  docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
+  ```
+
+In case you created the container but exited, to rerun the same container, you can: 
+```bash
+docker start gpudrive_container # make sure the container is started
+docker exec -it gpudrive_container /bin/bash
+```
+
+Once in the container, it will look like this:
+```bash
+(gpudrive) root@8caf35a97e4f:/gpudrive#
+```
+
+The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
+  ```bash
+ poetry install
+  ```
+
+#### Build the image from scratch
+If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
+```bash
+docker buildx build -t gpudrive .
+```
+The subsequent steps to run and manage the container remain the same as outlined above.
+
+</details>
+
+---
+
 Test whether the installation was successful by importing the simulator:
 
 ```Python
 import gpudrive
 ```
+
+To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
+```bash
+export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache 
+```
+Please remember that if you make any changes in C++, you need to delete the cache and recompile. 
 
 ## Getting started 🚀
 
@@ -130,8 +187,11 @@ To test if the simulator compiled correctly (and python lib did not), try runnin
 cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
+## Pre-trained policy 🏋🏼‍♀️
 
-## Dataset
+We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. After cloning the repository, Git LFS will automatically download the policy to the `models/learned_sb3_policy` directory. If you don’t find the file there, you can manually download the LFS files by running `git lfs pull`.
+
+## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
 ### Download the dataset
 
@@ -141,7 +201,6 @@ Two versions of the dataset are available:
 - the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
 
 The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
-
 
 ### Re-building the dataset
 
