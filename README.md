@@ -135,18 +135,13 @@ cd build
 
 ### Download the dataset
 
-We provide two readily available datasets using GitHub Large File Storage (LFS). To access them, first install Git LFS by running:
+Two versions of the dataset are available:
 
-```bash
-git lfs install
-```
+- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
+- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
 
-Next, clone the repository as usual. Git LFS will automatically download the dataset when you pull the repository.
+The simulator supports initializing scenes from the `Nocturne` dataset. The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
 
-The datasets will be available at the locations:
-
-- Validation dataset (150 scenarios): `data/processed/validation`
-- Test dataset (150 scenarios): `data/processed/testing`
 
 ### Re-building the dataset
 
@@ -189,7 +184,13 @@ where `data/raw` is your local storage folder. Note that this can take a while, 
 python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
 ```
 
-For example, if you want to only process the validation data:
+Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
+
+```bash
+pip install waymo-open-dataset-tf-2-12-0 tqdm
+```
+
+Then for example, if you want to only process the validation data:
 
 ```bash
 python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'

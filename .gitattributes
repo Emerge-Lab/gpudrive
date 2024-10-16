@@ -1,2 +1,0 @@
-data/processed/validation/* filter=lfs diff=lfs merge=lfs -text
-data/processed/testing/* filter=lfs diff=lfs merge=lfs -text
