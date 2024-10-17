@@ -1,17 +1,16 @@
-```markdown
 ## Running the IPPO Baseline
 
-To run the multi-agent IPPO baseline using stable-baselines 3 (SB3), execute:
+To run the multi-agent IPPO baseline using stable-baselines 3 (SB3):
 
 ```bash
 python baselines/ippo/run_sb3_ppo.py
 ```
 
-## Networks
+## Implemented networks
 
 ### Classic Observations
 
-For classic observations (e.g., `ego_state`), use the permutation equivariant network (recommended). In `baselines/ippo/config.py`, set the following:
+For classic observations (e.g., `ego_state`), there is support for a permutation equivariant network (recommended). In `baselines/ippo/config.py`, set the following:
 
 ```python
 # NETWORK
@@ -20,7 +19,6 @@ policy = LateFusionPolicy
 ```
 
 The default settings for classic observations are:
-
 ```python
 ego_state: bool = True  # Use ego vehicle state
 road_map_obs: bool = True  # Use road graph data
@@ -51,7 +49,7 @@ disable_classic_obs: bool = False  # Keep classic observations
 lidar_obs: bool = True  # Add LiDAR to observations
 ```
 
-In both cases, use the feedforward network from `networks/basic_ffn.py`:
+In both cases, you can use a feedforward network from `networks/basic_ffn.py`:
 ```python
 # NETWORK
 mlp_class = FFN
