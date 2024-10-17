@@ -78,7 +78,7 @@ public:
     MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
-    getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
+    getShapeTensorFromDeviceMemory();
 
     madrona::render::RenderManager & getRenderManager();
 

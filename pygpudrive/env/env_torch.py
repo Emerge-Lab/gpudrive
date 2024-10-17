@@ -177,7 +177,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
-            self.head_actions = torch.tensor([0], device=self.device)
+            self.head_actions = self.config.head_tilt_actions.to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -260,6 +260,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_states_unprocessed = (
                 self.sim.self_observation_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            ego_states_unprocessed = ego_states_unprocessed[:, :, :-1]
+
+            # Normalize
             if self.config.norm_obs:
                 ego_states = self.normalize_ego_state(ego_states_unprocessed)
             else:
@@ -272,6 +276,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            partner_observations = partner_observations[:, :, :, :-1]
             if self.config.norm_obs:  # Normalize observations and then flatten
                 partner_observations = self.normalize_and_flatten_partner_obs(
                     partner_observations
@@ -300,13 +306,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
         else:
             road_map_observations = torch.Tensor().to(self.device)
-
+        
+        # LIDAR OBSERVATIONS
+        if self.config.lidar_obs:
+            lidar_obs = self.sim.lidar_tensor().to_torch().flatten(start_dim=2, end_dim=-1).to(self.device)
+        else:
+            # Create empty lidar observations (num_lidar_samples, 4)
+            lidar_obs = torch.Tensor().to(self.device)
+        
         # Combine the observations
         obs_filtered = torch.cat(
             (
                 ego_states,
                 partner_observations,
                 road_map_observations,
+                lidar_obs, 
             ),
             dim=-1,
         )
@@ -556,7 +570,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/", NUM_WORLDS)
+    scene_config = SceneConfig("data/examples", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(

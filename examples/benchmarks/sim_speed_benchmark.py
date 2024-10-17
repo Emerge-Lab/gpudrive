@@ -21,6 +21,7 @@ def make_sim(
     scenes,
     device,
     actor_type,
+    obs_type="classic"
 ):
     """Make the gpudrive simulator."""
 
@@ -36,7 +37,17 @@ def make_sim(
     params.observationRadius = 10.0
     params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentRemoved
     params.rewardParams = reward_params
-    params.IgnoreNonVehicles = True
+    params.IgnoreNonVehicles = False
+    params.initOnlyValidAgentsAtFirstStep = False
+
+    if obs_type == "lidar":
+        params.enableLidar = True
+        params.disableClassicalObs = True
+    elif obs_type == "classic":
+        params.enableLidar = False
+        params.disableClassicalObs = False
+    else:
+        raise ValueError("Invalid obs_type")
 
     if actor_type == "random":
         params.maxNumControlledAgents = MAX_CONT_AGENTS
@@ -53,6 +64,13 @@ def make_sim(
 
     return sim
 
+def warmup(sim, batch_size):
+    """Warmup the simulator."""
+
+    for episode_count in range(5):
+        sim.reset(list(range(batch_size)))
+        for _ in range(80):
+            sim.step()
 
 def run_speed_bench(
     batch_size,
@@ -62,6 +80,7 @@ def run_speed_bench(
     episode_length,
     do_n_resets,
     device,
+    obs_type,
     q,
 ):
     """
@@ -80,7 +99,11 @@ def run_speed_bench(
         scenes=sampled_scenes,
         device=device,
         actor_type=actor_type,
+        obs_type=obs_type,
     )
+
+    # Warmup
+    warmup(sim, batch_size)
 
     sim.reset(list(range(batch_size)))
 
@@ -88,7 +111,7 @@ def run_speed_bench(
     for _ in range(episode_length):
 
         rand_actions = torch.randint(
-            0, 9, size=(batch_size, max_num_objects, 3)
+            0, 9, size=(batch_size, max_num_objects, 10)
         )
 
         # Step
@@ -155,6 +178,7 @@ def run_simulation(
     episode_length,
     do_n_resets,
     device,
+    obs_type="classic",
 ):
     q = Queue()
     p = Process(
@@ -167,6 +191,7 @@ def run_simulation(
             episode_length,
             do_n_resets,
             device,
+            obs_type,
             q,
         ),
     )
@@ -177,11 +202,12 @@ def run_simulation(
 
 if __name__ == "__main__":
 
-    DATA_FOLDER = "../nocturne_data/formatted_json_v2_no_tl_valid"
-    BATCH_SIZE_LIST = [64]
+    DATA_FOLDER = "../formatted_json_v2_no_tl_train_processed"
+    BATCH_SIZE_LIST = [2, 4, 8, 16, 32, 64, 128, 256, 512]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
     DATASET_INIT = "first_n" # or "random"
+    OBS_TYPE = "lidar" # or "lidar"
 
     scenes = [os.path.join(DATA_FOLDER, scene) for scene in os.listdir(DATA_FOLDER)]
 
@@ -217,6 +243,7 @@ if __name__ == "__main__":
             episode_length=EPISODE_LENGTH,
             do_n_resets=80,
             device=DEVICE,
+            obs_type=OBS_TYPE,
         )
         (
             tot_step_times[idx],
@@ -239,6 +266,7 @@ if __name__ == "__main__":
             "device_name": device_name,
             "device_mem": device_total_memory,
             "actors": ACTOR_TYPE,
+            "obs_type": OBS_TYPE,
             "batch_size (num envs)": BATCH_SIZE_LIST,
             "avg_time_per_reset (ms)": (tot_reset_times / tot_resets) * 1000,
             "avg_time_per_step (ms)": (tot_step_times / tot_steps) * 1000,

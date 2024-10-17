@@ -50,10 +50,13 @@ Further configuration details are available in `config.py`.
 
 ### Discrete (default; `action_type='discrete'`)
 
-Generates a grid of possible steering and acceleration actions:
+Generates a grid of possible actions. The action space depends on the `dynamics_model`.
+
+For example, with the `dynamics_model: str = "classic"` the default is:
 
 ```Python
 # Action space (joint discrete)
+head_tilt_actions: torch.Tensor = torch.Tensor([0])
 steer_actions: torch.Tensor = torch.round(
     torch.linspace(-1.0, 1.0, 13), decimals=3
 )
@@ -75,15 +78,35 @@ ego_state: bool = True  # Indicates ego vehicle state
 road_map_obs: bool = True  # Provides road graph data
 partner_obs: bool = True  # Includes partner vehicle information
 norm_obs: bool = True  # Normalizes observations if true
+lidar_obs: bool = True # Use LiDAR
 ```
 
 | Observation Feature                     | Shape                                                  | Description                                                                                                                 | Features                                                                                                                                                                                                                   |
 | --------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ego_state** 🚘                  | `(max_num_agents_in_scene, 6)`                       | Basic ego information.                                                                                                      | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise)                                                                                                    |
-| **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_agents_in_scene, max_num_objects - 1, 10)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius. | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)` |
+| **ego_state** 🚘                  | `(max_num_agents_in_scene, 7)`                       | Basic ego information.                                                                                                      | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise), agent id                                                                                                    |
+| **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_agents_in_scene, max_num_objects - 1, 11)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius. | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)`, agent id |
 | **road_map_obs** 🛣️ 🛑          | `(max_num_agents_in_scene, top_k_road_points, 13)`   | Information about the road graph  and other static road objects.                                                            | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)`            |
+| **lidar_obs**                     | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)` | LiDAR rays                                                                                                                  | The number of LiDAR points can be set by changing `numLidarSamples` in `src/consts.hpp`. The default is 30 points.                                                                                                     |
 
 Note that all observations are already transformed to be in a relative coordinate frame.
+
+---
+
+> **Using LiDAR only**: If you only want to use the LiDAR data as observation, it is recommended to set `disable_classic_obs = True`. This makes the simulator 2x faster by disabling the construction of the classical observations. To ensure only the LiDAR obs is returned, set all the classical obs flags to false in `pygpudrive/env/config.py`:
+
+```Python
+ego_state: bool = False
+road_map_obs: bool = False
+partner_obs: bool = False  # Include partner vehicle info in observations
+norm_obs: bool = False  # Normalize observations
+
+# NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
+# and partner_obs are invalid. This makes the sim 2x faster
+disable_classic_obs: bool = True  # Disable classic observations
+lidar_obs: bool = True  # Use LiDAR in observations
+```
+
+---
 
 ## Rewards
 

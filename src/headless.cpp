@@ -34,9 +34,9 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"../data/tfrecord-00001-of-01000_307.json",
-         "../data/tfrecord-00003-of-01000_109.json",
-         "../data/tfrecord-00012-of-01000_389.json"};
+    std::vector<std::string> scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json",
+         "../data/processed/examples/tfrecord-00003-of-01000_109.json",
+         "../data/processed/examples/tfrecord-00012-of-01000_389.json"};
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
     auto info_printer = mgr.infoTensor().makePrinter();
 
     auto printObs = [&]() {
-        // printf("Self\n");
-        // self_printer.print();
+        printf("Self\n");
+        self_printer.print();
 
         // printf("Actions\n");
         // action_printer.print();
@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode);
+	mgr.getShapeTensorFromDeviceMemory();
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
@@ -124,8 +124,6 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-
-                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                 }
             }
         }
