@@ -176,7 +176,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
-            self.head_actions = torch.tensor([0], device=self.device)
+            self.head_actions = self.config.head_tilt_actions.to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -305,13 +305,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
         else:
             road_map_observations = torch.Tensor().to(self.device)
-
+        
+        # LIDAR OBSERVATIONS
+        if self.config.lidar_obs:
+            lidar_obs = self.sim.lidar_tensor().to_torch().flatten(start_dim=2, end_dim=-1).to(self.device)
+        else:
+            # Create empty lidar observations (num_lidar_samples, 4)
+            lidar_obs = torch.Tensor().to(self.device)
+        
         # Combine the observations
         obs_filtered = torch.cat(
             (
                 ego_states,
                 partner_observations,
                 road_map_observations,
+                lidar_obs, 
             ),
             dim=-1,
         )

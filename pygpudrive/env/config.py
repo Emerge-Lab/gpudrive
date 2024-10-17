@@ -29,7 +29,11 @@ class EnvConfig:
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
-    enable_lidar: bool = False  # Enable LiDAR data in observations
+    
+    # NOTE: If disable_classic_obs is True, ego_state, road_map_obs, 
+    # and partner_obs are invalid. This makes the sim 2x faster
+    disable_classic_obs: bool = False  # Disable classic observations 
+    lidar_obs: bool = False  # Use LiDAR in observations
 
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
@@ -57,6 +61,8 @@ class EnvConfig:
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 7), decimals=3
     )
+    head_tilt_actions: torch.Tensor = torch.Tensor([0])
+    
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
@@ -105,7 +111,9 @@ class EnvConfig:
     episode_len: int = (
         gpudrive.episodeLen
     )  # Length of an episode in the simulator
-
+    num_lidar_samples: int = (
+        gpudrive.numLidarSamples
+    )
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
