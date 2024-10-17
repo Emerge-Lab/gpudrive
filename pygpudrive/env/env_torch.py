@@ -463,6 +463,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Features: p_x, p_y, heading, traffic_light_state, lane_type
         global_road_graph = self.sim.agent_roadmap_tensor().to_torch()
+        
+        
+        #absolute_map_obs = sim.map_observation_tensor().to_torch()
 
         orig_lane_types = global_road_graph[:, :, :, 6].long()
         lane_types = torch.zeros_like(orig_lane_types)
@@ -593,20 +596,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory[
-                :, :, -3 * constants.LOG_TRAJECTORY_LEN :
-            ].view(
-                self.num_worlds,
-                self.max_agent_count,
-                constants.LOG_TRAJECTORY_LEN,
-                -1,
-            )
-        )
-
-        if self.config.dynamics_model == "delta_local":
-            inferred_expert_actions = expert_traj[
-                :, :, -3 * self.episode_len :
-            ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
+            inferred_expert_actions = inferred_expert_actions[..., :3]
             inferred_expert_actions[..., 0] = torch.clamp(
                 inferred_expert_actions[..., 0], -6, 6
             )
@@ -639,25 +629,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             inferred_expert_actions[..., 1] = torch.clamp(
                 inferred_expert_actions[..., 1], -0.3, 0.3
             )
-        velo2speed = None
-        debug_positions = None
-        if debug_world_idx is not None and debug_veh_idx is not None:
-            velo2speed = (
-                torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1)
-                / self.config.max_speed
-            )
-            positions[..., 0] = self.normalize_tensor(
-                positions[..., 0],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
-            )
-            positions[..., 1] = self.normalize_tensor(
-                positions[..., 1],
-                self.config.min_rel_goal_coord,
-                self.config.max_rel_goal_coord,
-            )
-            debug_positions = positions[debug_world_idx, debug_veh_idx]
-        return inferred_expert_actions, velo2speed, debug_positions
+        if full_output:
+            return inferred_expert_actions, velocity, positions, headings
+        else:
+            return inferred_expert_actions
 
     def normalize_and_flatten_partner_obs(self, obs):
         """Normalize partner state features.
@@ -803,7 +778,7 @@ if __name__ == "__main__":
         init_steps=10, enable_vbd=True, dynamics_model="state"
     )
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
@@ -813,6 +788,8 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
+    
+    log_playback_traj = env.get_expert_actions()
 
     # RUN
     obs = env.reset()
