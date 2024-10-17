@@ -1,4 +1,5 @@
 import os
+from typing import List, Optional
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
@@ -57,7 +58,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
+        if (
+            self.config.reward_type == "sparse_on_goal_achieved"
+            or self.config.reward_type == "weighted_combination"
+        ):
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
@@ -258,6 +262,28 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             RenderMode.MADRONA_DEPTH,
         }:
             return self.visualizer.getRender()
+
+        def resample_scenarios(self, dataset: Optional[List[str]] = None):
+            
+        """Resample the scenes."""
+
+        # Sample a set of scenarios
+        if dataset is None:
+            dataset = select_scenes(self.scene_config)
+
+        print(f"Resampling {len(dataset)} scenarios... This may take a while.")
+
+        # Resample the scenes
+        self.sim.set_maps(dataset)
+
+        print(f"Resampled {len(dataset)} scenarios.")
+
+        # Re-initialize the controlled agents mask
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
     def close(self):
         """Destroy the simulator and visualizer."""

@@ -124,7 +124,8 @@ namespace gpudrive
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor)
             .def("response_type_tensor", &Manager::responseTypeTensor)
-            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor)
+            .def("set_maps", &Manager::setMaps);
     }
 
 }

@@ -309,6 +309,8 @@ void createCameraEntity(Engine &ctx)
         camera,
         150.f, 0.001f,
         1.5f * math::up);
+
+    ctx.data().camera_agent = camera;
 }
 
 static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
@@ -326,8 +328,10 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
     return true;
 }
 
-void createPersistentEntities(Engine &ctx, Map *map) {
+void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
+
+    const auto& map = ctx.singleton<Map>();
 
     if (ctx.data().enableRender)
     {
@@ -335,13 +339,14 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     }
 
     ctx.data().mean = {0, 0};
-    ctx.data().mean.x = map->mean.x;
-    ctx.data().mean.y = map->mean.y;
+    ctx.data().mean.x = map.mean.x;
+    ctx.data().mean.y = map.mean.y;
     ctx.data().numControlledAgents = 0;
+    ctx.singleton<ResetMap>().reset = 0;
 
     CountT agentIdx = 0;
-    for (CountT agentCtr = 0; agentCtr < map->numObjects && agentIdx < consts::kMaxAgentCount; ++agentCtr) {
-        const auto &agentInit = map->objects[agentCtr];
+    for (CountT agentCtr = 0; agentCtr < map.numObjects && agentIdx < consts::kMaxAgentCount; ++agentCtr) {
+        const auto &agentInit = map.objects[agentCtr];
 
         if (not shouldAgentBeCreated(ctx, agentInit))
         {
@@ -356,9 +361,9 @@ void createPersistentEntities(Engine &ctx, Map *map) {
     ctx.data().numAgents = agentIdx;
 
     CountT roadIdx = 0;
-    for(CountT roadCtr = 0; roadCtr < map->numRoads && roadIdx < consts::kMaxRoadEntityCount; roadCtr++)
+    for(CountT roadCtr = 0; roadCtr < map.numRoads && roadIdx < consts::kMaxRoadEntityCount; roadCtr++)
     {
-        const auto &roadInit = map->roads[roadCtr];
+        const auto &roadInit = map.roads[roadCtr];
         createRoadEntities(ctx, roadInit, roadIdx);
     }
     ctx.data().numRoads = roadIdx;
@@ -404,7 +409,40 @@ static void resetPersistentEntities(Engine &ctx)
     }
 }
 
-void generateWorld(Engine &ctx)
+void destroyWorld(Engine &ctx)
+{
+    for (CountT idx = 0; idx < ctx.data().numAgents; ++idx)
+    {
+        Entity agent = ctx.data().agents[idx];
+        ctx.destroyRenderableEntity(agent);
+    }
+    for (CountT idx = 0; idx < ctx.data().numRoads; idx++)
+    {
+        Entity road = ctx.data().roads[idx];
+        ctx.destroyRenderableEntity(road);
+    }
+    if (ctx.data().enableRender)
+    {
+        ctx.destroyRenderableEntity(ctx.data().camera_agent);
+    }
+    for (CountT idx = 0; idx < consts::kMaxAgentCount; ++idx)
+    {
+        Entity agent_iface = ctx.data().agent_ifaces[idx];
+        ctx.destroyEntity(agent_iface);
+    }
+    for (CountT idx = 0; idx < consts::kMaxRoadEntityCount; ++idx)
+    {
+        Entity road_iface = ctx.data().road_ifaces[idx];
+        ctx.destroyEntity(road_iface);
+    }
+    ctx.data().numAgents = 0;
+    ctx.data().numRoads = 0;
+    ctx.data().numControlledAgents = 0;
+    ctx.data().mean = {0, 0};
+}
+
+
+void resetWorld(Engine &ctx)
 {
     resetPersistentEntities(ctx);
 }

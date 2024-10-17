@@ -595,6 +595,62 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
     }
 }
 
+void Manager::setMaps(const std::vector<std::string> &maps)
+{
+    assert(impl_->cfg.scenes.size() == maps.size());
+    impl_->cfg.scenes = maps;
+
+    ResetMap resetmap{
+        1,
+    };
+
+    if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
+    {
+#ifdef MADRONA_CUDA_SUPPORT
+        auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+            Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
+            madrona::cu::deallocGPU(map);
+
+            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+        }
+
+#else
+        // Handle the case where CUDA support is not available
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    }
+    else
+    {
+
+        auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
+
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            // Parse the map string into your MapData structure
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+
+            Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            memcpy(mapDevicePtr, map, sizeof(Map));
+            delete map;
+
+            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+        }
+    }
+
+    // Vector of range on integers from 0 to the number of worlds
+    std::vector<int32_t> worldIndices(maps.size());
+    std::iota(worldIndices.begin(), worldIndices.end(), 0);
+    reset(worldIndices);
+}
+
 Tensor Manager::actionTensor() const
 {
     return impl_->exportTensor(ExportID::Action, TensorElementType::Float32,
