@@ -1,4 +1,5 @@
 import os
+from typing import List, Optional
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
@@ -258,19 +259,20 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         }:
             return self.visualizer.getRender()
 
-    def resample_scenarios(self):
+        def resample_scenarios(self, dataset: Optional[List[str]] = None):
+            
         """Resample the scenes."""
 
-        # Reset all worlds
-        self.sim.reset(list(range(self.num_worlds)))
-
         # Sample a set of scenarios
-        dataset = select_scenes(self.scene_config)
+        if dataset is None:
+            dataset = select_scenes(self.scene_config)
 
         print(f"Resampling {len(dataset)} scenarios... This may take a while.")
 
         # Resample the scenes
         self.sim.set_maps(dataset)
+
+        print(f"Resampled {len(dataset)} scenarios.")
 
         # Re-initialize the controlled agents mask
         self.cont_agent_mask = self.get_controlled_agents_mask()
