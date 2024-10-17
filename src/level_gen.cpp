@@ -25,12 +25,13 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     auto xCoord = ctx.get<Trajectory>(agent_iface).positions[0].x;
     auto yCoord = ctx.get<Trajectory>(agent_iface).positions[0].y;
+    auto zCoord = ctx.get<Trajectory>(agent_iface).positions[0].z;
     auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].x;
     auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].y;
     auto speed = ctx.get<Trajectory>(agent_iface).velocities[0].length();
     auto heading = ctx.get<Trajectory>(agent_iface).headings[0];
 
-    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
+    ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = zCoord};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
     ctx.get<Velocity>(agent) = {
         Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
@@ -80,7 +81,11 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     auto &trajectory = ctx.get<Trajectory>(agent_iface);
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.positions[i] = Vector3{
+            .x = agentInit.position[i].x - ctx.data().mean.x, 
+            .y = agentInit.position[i].y - ctx.data().mean.y,
+            .z = agentInit.position[i].z - ctx.data().mean.z
+            };
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = (float)agentInit.valid[i];
@@ -106,7 +111,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
         }
 
         Rotation rot = Quat::angleAxis(trajectory.headings[i], madrona::math::up);
-        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = 1};
+        Position pos = Vector3{.x = trajectory.positions[i].x, .y = trajectory.positions[i].y, .z = trajectory.positions[i].z};
         Velocity vel = {Vector3{.x = trajectory.velocities[i].x, .y = trajectory.velocities[i].y, .z = 0}, Vector3::zero()};
         Rotation targetRot = Quat::angleAxis(trajectory.headings[i+1], madrona::math::up);
         switch (ctx.data().params.dynamicsModel) {
@@ -123,7 +128,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
 
             case DynamicsModel::DeltaLocal: {
                 // Introduce another block scope here
-                Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = 1};
+                Position targetPos = Vector3{.x = trajectory.positions[i+1].x, .y = trajectory.positions[i+1].y, .z = trajectory.positions[i+1].z};
                 trajectory.inverseActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
                 break;
             }
@@ -146,7 +151,10 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
-    ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
+    ctx.get<Goal>(agent)= Goal{.position = Vector3{
+        .x = agentInit.goalPosition.x - ctx.data().mean.x, 
+        .y = agentInit.goalPosition.y - ctx.data().mean.y,
+        .z = agentInit.goalPosition.z - ctx.data().mean.z}};
     populateExpertTrajectory(ctx, agent, agentInit);
 
     auto isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold or agentInit.markAsStatic;
@@ -178,22 +186,24 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     return agent;
 }
 
-static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
-                           const MapVector2 &p2, const EntityType &type) {
+static Entity makeRoadEdge(Engine &ctx, const MapVector3 &p1,
+                           const MapVector3 &p2, const EntityType &type) {
 
                     
     float x1 = p1.x;
     float y1 = p1.y;
+    float z1 = p1.z;
     float x2 = p2.x;
     float y2 = p2.y;
+    float z2 = p2.z;
 
-    float z = 1 + (type == EntityType::RoadEdge ? consts::lidarRoadEdgeOffset : consts::lidarRoadLineOffset);
+    // float z = 1 + (type == EntityType::RoadEdge ? consts::lidarRoadEdgeOffset : consts::lidarRoadLineOffset);
 
-    Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = z};
-    Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = z};
+    Vector3 start{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = z1};
+    Vector3 end{.x = x2 - ctx.data().mean.x, .y = y2 - ctx.data().mean.y, .z = z2};
     float distance = end.distance(start);
     auto road_edge = ctx.makeRenderableEntity<PhysicsEntity>();
-    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = z};
+    ctx.get<Position>(road_edge) = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = (start.z + end.z)/2};
     ctx.get<Rotation>(road_edge) = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     ctx.get<Scale>(road_edge) = Diag3x3{.d0 = distance/2, .d1 = 0.1, .d2 = 0.1};
     ctx.get<EntityType>(road_edge) = type;
