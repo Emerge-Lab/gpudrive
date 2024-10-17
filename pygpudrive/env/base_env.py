@@ -117,9 +117,13 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 f"Invalid dynamics model: {self.config.dynamics_model}"
             )
 
-        if self.config.enable_lidar:
-            params.enableLidar = self.config.enable_lidar
-            params.disableClassicalObs = True
+        if self.config.lidar_obs:
+            if not self.config.lidar_obs and self.config.disable_classic_obs:
+                raise ValueError("Lidar observations must be enabled if classic observations are disabled.")
+            
+            else:
+                params.enableLidar = self.config.lidar_obs
+                params.disableClassicalObs = self.config.disable_classic_obs
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
 

@@ -233,17 +233,27 @@ class IPPO(PPO):
             n_envs=self.n_envs,
         )
 
-        self.policy = self.policy_class(
-            observation_space=self.observation_space,
-            env_config=self.env_config,
-            exp_config=self.exp_config,
-            action_space=self.action_space,
-            lr_schedule=self.lr_schedule,
-            use_sde=self.use_sde,
-            mlp_class=self.mlp_class,
-            mlp_config=self.mlp_config,
-            **self.policy_kwargs,
-        )
+        if self.mlp_class == LateFusionNet:
+            self.policy = self.policy_class(
+                observation_space=self.observation_space,
+                env_config=self.env_config,
+                exp_config=self.exp_config,
+                action_space=self.action_space,
+                lr_schedule=self.lr_schedule,
+                use_sde=self.use_sde,
+                mlp_class=self.mlp_class,
+                mlp_config=self.mlp_config,
+                **self.policy_kwargs,
+            )
+        else:
+            self.policy = self.policy_class(
+                observation_space=self.observation_space,
+                action_space=self.action_space,
+                lr_schedule=self.lr_schedule,
+                use_sde=self.use_sde,
+                mlp_class=self.mlp_class,
+                **self.policy_kwargs,
+            )
 
         self.policy = self.policy.to(self.device)
 
