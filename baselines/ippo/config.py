@@ -73,8 +73,8 @@ class ExperimentConfig:
     n_epochs: int = 5
 
     # NETWORK
-    mlp_class = FFN #LateFusionNet
-    policy = FeedForwardPolicy #LateFusionPolicy
+    mlp_class = LateFusionNet
+    policy = LateFusionPolicy
     ego_state_layers = [64, 32]
     road_object_layers = [64, 64]
     road_graph_layers = [64, 64]
