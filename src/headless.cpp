@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode);
+	mgr.getShapeTensorFromDeviceMemory();
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
@@ -124,8 +124,6 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-
-                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                 }
             }
         }

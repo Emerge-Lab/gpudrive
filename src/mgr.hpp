@@ -77,7 +77,7 @@ public:
                               float headAngle);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
-    getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
+    getShapeTensorFromDeviceMemory();
 
     madrona::render::RenderManager & getRenderManager();
 

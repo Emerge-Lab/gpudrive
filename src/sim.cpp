@@ -95,7 +95,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Trajectory);
 }
 
-static inline void cleanupWorld(Engine &ctx) {}
+static inline void cleanupWorld(Engine &ctx) {
+    // TODO: Implement cleanup for changing worlds during runtime
+}
 
 static inline void initWorld(Engine &ctx)
 {
@@ -251,7 +253,6 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const EntityType &type,
                            const CollisionDetectionEvent &collisionEvent,
                            const ResponseType &responseType) {
     
@@ -339,12 +340,6 @@ inline void movementSystem(Engine &e,
     }
 }
 
-
-static inline float distObs(float v)
-{
-    return v / consts::worldLength;
-}
-
 static inline float encodeType(EntityType type)
 {
     return (float)type;
@@ -428,7 +423,6 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 inline void rewardSystem(Engine &ctx,
                          const Position &position,
                          const Goal &goal,
-                         Progress &progress,
                          const AgentInterfaceEntity &agent_iface)
 {
     Reward &out_reward = ctx.get<Reward>(agent_iface.e);
@@ -453,30 +447,6 @@ inline void rewardSystem(Engine &ctx,
 
     // Just in case agents do something crazy, clamp total reward
     // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
-}
-
-// Each agent gets a small bonus to it's reward if the other agent has
-// progressed a similar distance, to encourage them to cooperate.
-// This system reads the values of the Progress component written by
-// rewardSystem for other agents, so it must run after.
-inline void bonusRewardSystem(Engine &ctx,
-                              OtherAgents &others,
-                              Progress &progress,
-                              Reward &reward)
-{
-    bool partners_close = true;
-    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
-        Entity other = others.e[i];
-        Progress other_progress = ctx.get<Progress>(other);
-
-        if (fabsf(other_progress.maxY - progress.maxY) > 2.f) {
-            partners_close = false;
-        }
-    }
-
-    if (partners_close && reward.v > 0.f) {
-        reward.v *= 1.25f;
-    }
 }
 
 inline void stepTrackerSystem(Engine &ctx, const AgentInterfaceEntity &agent_iface) {
@@ -703,7 +673,6 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
          rewardSystem,
             Position,
             Goal,
-            Progress,
             AgentInterfaceEntity
         >>({phys_done});
 
@@ -835,7 +804,6 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
             Rotation,
             Position,
             Velocity,
-            EntityType,
             CollisionDetectionEvent,
             ResponseType
         >>({});  
