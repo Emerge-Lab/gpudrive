@@ -27,6 +27,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     ):
         # Initialization of environment configurations
         self.config = config
+        self.scene_config = scene_config
         self.num_worlds = scene_config.num_scenes
         self.max_cont_agents = max_cont_agents
         self.device = device
@@ -129,7 +130,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_value_tensor = self.action_keys_tensor[actions]
                 elif (
                     actions.shape[2] == 3
-                ):  # Assuming we are given the actual action values 
+                ):  # Assuming we are given the actual action values
                     # (acceleration, steering, heading)
                     action_value_tensor = actions.to(self.device)
             else:
@@ -387,7 +388,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     torch.ones((*positions.shape[:-1], 1), device=self.device),
                     headings,  # float (yaw)
                     velocity,  # xy velocity
-                    torch.zeros((*positions.shape[:-1], 4), device=self.device)
+                    torch.zeros(
+                        (*positions.shape[:-1], 4), device=self.device
+                    ),
                 ),
                 dim=-1,
             )
