@@ -176,7 +176,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
-            self.head_actions = self.config.heading_actions.to(self.device)
+            self.head_actions = self.config.head_tilt_actions.to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
