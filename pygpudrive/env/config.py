@@ -135,12 +135,14 @@ class SceneConfig:
         discipline (SelectionDiscipline): Method for selecting scenes.
         k_unique_scenes (Optional[int]): Number of unique scenes if using
             K_UNIQUE_N discipline.
+        seed (Optional[int]): Seed for random scene selection.
     """
 
     path: str
     num_scenes: int
     discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
     k_unique_scenes: Optional[int] = None
+    seed: Optional[int] = None
 
 
 class RenderMode(Enum):
