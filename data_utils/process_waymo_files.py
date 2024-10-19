@@ -16,9 +16,13 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
+<<<<<<< HEAD
 
 from data_utils.datatypes import MapElementIds
 
+=======
+import trimesh
+>>>>>>> d520149 (valid bug fix and mark static support)
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -175,8 +179,9 @@ def _init_object(track: scenario_pb2.Track) -> Optional[Dict[str, Any]]:
     """
     final_valid_index = 0
     for i, state in enumerate(track.states):
-        if state.valid:
-            final_valid_index = i
+        if not state.valid:
+            break
+        final_valid_index = i
 
     obj = _parse_object_state(track.states, track.states[final_valid_index])
     obj["type"] = _WAYMO_OBJECT_STR[track.object_type]
@@ -217,6 +222,21 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     }
 
 
+# Meshes for collision checking
+def _generate_mesh(segments, radius=0.05):
+    cylinders = []
+    for segment in segments:
+        start, end = segment
+        cylinder = trimesh.creation.cylinder(
+            radius=radius, 
+            segment=[start, end]
+        )
+        cylinders.append(cylinder)
+
+    mesh = trimesh.util.concatenate(cylinders)
+    return mesh
+
+
 def waymo_to_scenario(
     scenario_path: str, protobuf: scenario_pb2.Scenario
 ) -> None:
@@ -251,19 +271,44 @@ def waymo_to_scenario(
             tl_dict[id]["time_index"].append(i)
         i += 1
 
+    # Construct the map states 
+    roads = []
+    edge_segments = []
+    for map_feature in protobuf.map_features:
+        road = _init_road(map_feature)
+        if road is not None:
+            roads.append(road)
+            if road["type"] == "road_edge":
+                edge_vertices = [[r["x"], r["y"], r["z"]] for r in road["geometry"]]
+                edge_segments += [[edge_vertices[i], edge_vertices[i+1]] for i in range(len(edge_vertices) - 1)]
+
+    # Construct road edges for collision checking
+    edge_mesh = _generate_mesh(edge_segments)
+    collision_manager = trimesh.collision.CollisionManager()
+    collision_manager.add_object('road_edges', edge_mesh)
+
     # Construct the object states
     objects = []
     for track in protobuf.tracks:
         obj = _init_object(track)
         if obj is not None:
-            objects.append(obj)
-
-    # Construct the map states
-    roads = []
-    for map_feature in protobuf.map_features:
-        road = _init_road(map_feature)
-        if road is not None:
-            roads.append(road)
+            if obj["type"] != "vehicle" or obj["type"] != "cyclist":
+                obj["mark_as_static"] = False
+                objects.append(obj)
+                continue
+            elif False in obj["valid"]:
+                obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"][:obj["valid"].index(False)]]
+            else:
+                obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"]]
+                
+            if len(obj_vertices) <= 1:
+                obj["mark_as_static"] = False
+                objects.append(obj)
+            else:
+                trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
+                trajectory_mesh = _generate_mesh(trajectory_segments)
+                obj["mark_as_static"] = collision_manager.in_collision_single(trajectory_mesh)
+                objects.append(obj)
 
     scenario_dict = {
         "name": scenario_path.split("/")[-1],
@@ -341,7 +386,7 @@ def process_data(args):
                         file_suffix = f"{str(scene_proto.scenario_id)}.json"
                     else:
                         file_suffix = f"{scene_count}.json"
-
+                    scene_count += 1
                     waymo_to_scenario(
                         scenario_path=os.path.join(
                             output_dir, f"{file_prefix}{file_suffix}"
@@ -349,12 +394,14 @@ def process_data(args):
                         protobuf=scene_proto,
                     )
 
-                    scene_count += 1
-
                 except Exception as e:
+<<<<<<< HEAD
                     logging.error(
                         f"Error processing record {scene_count}: {e}"
                     )
+=======
+                    logging.error(f"Error processing {file_prefix} scene {scene_count}: {e}")
+>>>>>>> d520149 (valid bug fix and mark static support)
 
         logging.info("Done!")
 
