@@ -868,7 +868,8 @@ Sim::Sim(Engine &ctx,
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
-    ctx.singleton<Map>() = *(init.map);
+    auto& map = ctx.singleton<Map>() 
+    map = *(init.map);
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
 
