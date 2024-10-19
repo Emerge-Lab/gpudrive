@@ -123,8 +123,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
         if self.config.lidar_obs:
             if not self.config.lidar_obs and self.config.disable_classic_obs:
-                raise ValueError("Lidar observations must be enabled if classic observations are disabled.")
-            
+                raise ValueError(
+                    "Lidar observations must be enabled if classic observations are disabled."
+                )
+
             else:
                 params.enableLidar = self.config.lidar_obs
                 params.disableClassicalObs = self.config.disable_classic_obs
@@ -263,20 +265,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         }:
             return self.visualizer.getRender()
 
-        def resample_scenarios(self, dataset: Optional[List[str]] = None):
-            
+    def reinit_scenarios(self, dataset: List[str]):
         """Resample the scenes."""
-
-        # Sample a set of scenarios
-        if dataset is None:
-            dataset = select_scenes(self.scene_config)
-
-        print(f"Resampling {len(dataset)} scenarios... This may take a while.")
 
         # Resample the scenes
         self.sim.set_maps(dataset)
-
-        print(f"Resampled {len(dataset)} scenarios.")
 
         # Re-initialize the controlled agents mask
         self.cont_agent_mask = self.get_controlled_agents_mask()
