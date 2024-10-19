@@ -1,10 +1,10 @@
-# GPU Drive Multi-Agent Environments
+# GPU Drive Multi-Agent Environment
 
-This repository provides base environments for multi-agent reinforcement learning using `torch` and `jax` in to interface with the `gpudrive` simulator. It follows the `gymnasium` environment standards as closely as possible.
+This repository provides base gymnasium environments for multi-agent reinforcement learning using `torch` and `jax` in to interface with the `gpudrive` simulator. It follows the `gymnasium` environment standards as closely as possible.
 
 ## Quick Start
 
-Begin by downloading traffic scenarios from the [Waymo Open Motion Dataset (WOMDB)](https://github.com/waymo-research/waymo-open-dataset) and save them in a directory. To get started we use the available data in the `data` folder.
+To get started we use the readily available data in the `data/processed/examples` folder. See [here](https://github.com/Emerge-Lab/gpudrive/tree/main?tab=readme-ov-file#dataset-------%EF%B8%8F-) for how to download more data (traffic scenarios).
 
 Configure the environment using the basic settings in `config`:
 
@@ -26,9 +26,9 @@ For example, this creates an environment with one world and a maximum of three c
 ```Python
 env = GPUDriveTorchEnv(
     config=config,
-    num_worlds=1,
-    max_cont_agents=3,
-    data_dir="data",
+    num_worlds=1, # parallelism
+    max_cont_agents=3, # maximum number of agents to control per scene
+    data_dir="data/processed/examples", # Path to data folder
 )
 ```
 
@@ -67,7 +67,7 @@ accel_actions: torch.Tensor = torch.round(
 
 ### Continuous
 
-Not supported currently.
+To use a continuous action space, set `action_type='continuous`
 
 ## Observation Space
 
