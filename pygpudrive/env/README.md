@@ -35,7 +35,7 @@ env = GPUDriveTorchEnv(
 Step the environment using:
 
 ```Python
-env.step_dynamics(action)
+env.step_dynamics(actions)
 
 # Extract info
 obs = env.get_obs()

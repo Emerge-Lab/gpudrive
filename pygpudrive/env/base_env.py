@@ -266,7 +266,13 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             return self.visualizer.getRender()
 
     def reinit_scenarios(self, dataset: List[str]):
-        """Resample the scenes."""
+        """Resample the scenes.
+        Args:
+            dataset (List[str]): List of scene names to resample.
+            
+        Returns:
+            None
+        """
 
         # Resample the scenes
         self.sim.set_maps(dataset)
