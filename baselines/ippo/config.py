@@ -30,7 +30,7 @@ class ExperimentConfig:
     # RESAMPLE TRAFFIC SCENARIOS
     resample_scenarios: bool = True
     resample_criterion: str = "global_step"  # Options: "global_step"
-    resample_freq: int = 100_000  # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
+    resample_freq: int = 2e6  # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
     resample_mode: str = "random"  # Options: "random"
 
     # RENDERING

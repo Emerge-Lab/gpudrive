@@ -242,10 +242,8 @@ class SB3MultiAgentEnv(VecEnv):
 
         # Update controlled agent mask
         self.controlled_agent_mask = self._env.cont_agent_mask.clone()
-        self.max_agent_count = self.controlled_agent_mask.shape[1]
-        self.num_valid_controlled_agents_across_worlds = (
-            self.controlled_agent_mask.sum().item()
-        )
+        self.max_agent_count = self._env.max_agent_count.clone()
+        self.num_valid_controlled_agents_across_worlds = self._env.num_valid_controlled_agents_across_worlds.clone() 
         self.num_envs = self.controlled_agent_mask.sum().item()
 
     def _update_info_dict(self, info, indices) -> None:
