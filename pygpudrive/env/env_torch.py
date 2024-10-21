@@ -27,6 +27,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     ):
         # Initialization of environment configurations
         self.config = config
+        self.scene_config = scene_config
         self.num_worlds = scene_config.num_scenes
         self.max_cont_agents = max_cont_agents
         self.device = device

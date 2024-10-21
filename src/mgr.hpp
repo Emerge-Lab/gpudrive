@@ -75,6 +75,7 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
+    MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory();

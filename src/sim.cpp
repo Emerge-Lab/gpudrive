@@ -55,6 +55,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentID>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
+    registry.registerSingleton<Map>();
+    registry.registerSingleton<ResetMap>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -64,6 +66,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 
     registry.exportSingleton<WorldReset>((uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
+    registry.exportSingleton<Map>((uint32_t)ExportID::Map);
+    registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<AgentInterface, SelfObservation>(
@@ -96,7 +100,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 }
 
 static inline void cleanupWorld(Engine &ctx) {
-    // TODO: Implement cleanup for changing worlds during runtime
+    destroyWorld(ctx);
 }
 
 static inline void initWorld(Engine &ctx)
@@ -109,8 +113,15 @@ static inline void initWorld(Engine &ctx)
     ctx.data().rng = RNG::make(episode_idx);
     ctx.data().curEpisodeIdx = episode_idx;
 
+    if(ctx.singleton<ResetMap>().reset == 1)
+    {
+        createPersistentEntities(ctx);
+        ctx.singleton<ResetMap>().reset = 0;
+        phys::PhysicsSystem::reset(ctx);
+    }
+
     // Defined in src/level_gen.hpp / src/level_gen.cpp
-    generateWorld(ctx);
+    resetWorld(ctx);
 }
 
 // This system runs in TaskGraphID::Reset and checks if the code external to the
@@ -118,13 +129,19 @@ static inline void initWorld(Engine &ctx)
 // reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    if (reset.reset == 0) {
-      return;
+    if (reset.reset == 0)
+    {
+        return;
     }
 
     reset.reset = 0;
 
-    cleanupWorld(ctx);
+    auto resetMap = ctx.singleton<ResetMap>();
+
+    if (resetMap.reset == 1)
+    {
+        cleanupWorld(ctx);
+    }
     initWorld(ctx);
 }
 
@@ -838,7 +855,8 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    // auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
     phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
@@ -850,8 +868,10 @@ Sim::Sim(Engine &ctx,
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
+    auto& map = ctx.singleton<Map>();
+    map = *(init.map);
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.map);
+    createPersistentEntities(ctx);
 
     // Generate initial world state
     initWorld(ctx);

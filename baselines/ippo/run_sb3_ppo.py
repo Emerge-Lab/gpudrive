@@ -47,6 +47,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
     env = SB3MultiAgentEnv(
         config=env_config,
         scene_config=scene_config,
+        exp_config=exp_config,
         # Control up to all agents in the scene
         max_cont_agents=env_config.max_num_agents_in_scene,
         device=exp_config.device,

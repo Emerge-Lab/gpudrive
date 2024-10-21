@@ -61,7 +61,10 @@ struct AgentID {
         int32_t reset;
     };
 
-    struct ClassicAction
+struct ResetMap {
+    int32_t reset;
+};   
+     struct ClassicAction
     {
         float acceleration;
         float steering;

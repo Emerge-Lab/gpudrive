@@ -53,6 +53,7 @@ class IPPO(PPO):
         self.exp_config = exp_config
         self.mlp_class = mlp_class
         self.mlp_config = mlp_config
+        self.resample_counter = 0
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -67,6 +68,33 @@ class IPPO(PPO):
         assert (
             self._last_obs is not None
         ), "No previous observation was provided"
+
+        # Check resampling criterion and resample batch of scenarios if needed
+        if self.env.exp_config.resample_scenarios:
+            if self.env.exp_config.resample_criterion == "global_step":
+                if self.resample_counter >= self.env.exp_config.resample_freq:
+                    print(
+                        f"Resampling {self.env.num_worlds} scenarios at global_step {self.num_timesteps:,}..."
+                    )
+                    # Re-initialize the scenes and controlled agents mask
+                    self.env.resample_scenario_batch()
+                    self.resample_counter = 0
+                    # Get new initial observation
+                    self._last_obs = self.env.reset()
+                    # Update storage shapes
+                    self.n_envs = env.num_valid_controlled_agents_across_worlds
+                    rollout_buffer.n_envs = self.n_envs
+                    self._last_episode_starts = (
+                        self.env._env.get_dones().clone()[
+                            ~self.env.dead_agent_mask
+                        ]
+                    )
+
+            else:
+                raise NotImplementedError(
+                    f"Resampling criterion {self.env.exp_config.resample_criterion} not implemented"
+                )
+
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
 
@@ -165,16 +193,11 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # # (dc) DEBUG
-            # mask = ~torch.isnan(rewards)
-            # if (
-            #     self._last_obs[mask].max() > 1
-            #     or self._last_obs[mask].min() < -1
-            # ):
-            #     logging.error("New observation is out of bounds")
-
             # EDIT_2: Increment the global step by the number of valid samples in rollout step
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
+            self.resample_counter += int(
+                (~rewards.isnan()).float().sum().item()
+            )
             # Give access to local variables
             callback.update_locals(locals())
             if callback.on_step() is False:
@@ -197,7 +220,6 @@ class IPPO(PPO):
             self._last_episode_starts = dones
 
         # # # # # END LOOP # # # # #
-
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time

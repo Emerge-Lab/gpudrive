@@ -34,9 +34,9 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"../data/examples/tfrecord-00001-of-01000_307.json",
-         "../data/examples/tfrecord-00003-of-01000_109.json",
-         "../data/examples/tfrecord-00012-of-01000_389.json"};
+    std::vector<std::string> scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json",
+         "../data/processed/examples/tfrecord-00003-of-01000_109.json",
+         "../data/processed/examples/tfrecord-00012-of-01000_389.json"};
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
