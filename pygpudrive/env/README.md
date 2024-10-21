@@ -35,7 +35,12 @@ env = GPUDriveTorchEnv(
 Step the environment using:
 
 ```Python
-obs, reward, done, info = env.step_dynamics(action)
+env.step_dynamics(actions)
+
+# Extract info
+obs = env.get_obs()
+reward = env.get_rewards()
+done = env.get_dones()
 ```
 
 Further configuration details are available in `config.py`.
@@ -116,7 +121,7 @@ A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` 
 
 Upon initialization, every vehicle starts at the beginning of the expert trajectory.
 
-## Dataset
+## Dataset 
 
 The `SceneConfig` dataclass is used to configure how scenes are selected from a dataset. It has four attributes:
 
@@ -124,6 +129,21 @@ The `SceneConfig` dataclass is used to configure how scenes are selected from a 
 - `num_scenes`: The number of scenes to select.
 - `discipline`: The method for selecting scenes, defaulting to `SelectionDiscipline.PAD_N`. (See options in Table below)
 - `k_unique_scenes`: Specifies the number of unique scenes to select, if applicable.
+
+### Resampling traffic scenarios
+
+The `reinit_scenarios()` method in `pygpudrive/env/base_env.py` reinitializes the simulator with new traffic scenarios as follows:
+
+1. **Scene re-initialization:**
+   This function updates the simulation maps by calling `self.sim.set_maps(dataset)`, replacing the current scenes with those provided `dataset`, which should be a list with paths to traffic scenarios.
+
+2. **Controlled agent mask re-nitialization:**
+   It reinitializes the controlled agents' mask using `self.get_controlled_agents_mask()`, determining which agents are user-controlled (this will change based on the specific traffic scenes used).
+
+3. **Agent count update:**
+   The function updates `self.max_agent_count` to reflect the number of controlled agents and recomputes `self.num_valid_controlled_agents_across_worlds`, indicating the total active controlled agents across all scenarios.
+
+See the `resample_scenario_batch()` method in `pygpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO. 
 
 ## Render
 

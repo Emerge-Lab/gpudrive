@@ -6,6 +6,26 @@ To run the multi-agent IPPO baseline using stable-baselines 3 (SB3):
 python baselines/ippo/run_sb3_ppo.py
 ```
 
+### Resampling the data
+
+The configuration for resampling traffic scenarios includes:
+
+- **`resample_scenarios`**: A boolean that enables or disables traffic scenario resampling when set to `True`.
+
+- **`resample_criterion`**: Set to `"global_step"`, indicating resampling occurs based on the global step count.
+
+- **`resample_freq`**: Specifies resampling frequency at `50,000` steps, recommended to align with `num_worlds * n_steps`.
+
+- **`resample_mode`**: Set to `"random"` for random selection of new scenarios.
+
+```
+# RESAMPLE TRAFFIC SCENARIOS
+resample_scenarios: bool = True
+resample_criterion: str = "global_step" # Options: "global_step"
+resample_freq: int = 100_000 # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
+resample_mode: str = "random" # Options: "random"
+```
+
 ## Implemented networks
 
 ### Classic Observations

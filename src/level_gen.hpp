@@ -6,11 +6,12 @@
 namespace gpudrive
 {
 
-    void createPersistentEntities(Engine &ctx, Map *map);
+    void createPersistentEntities(Engine &ctx);
 
-    // First, destroys any non-persistent state for the current world and then
-    // generates a new play area.
-    void generateWorld(Engine &ctx);
+void resetWorld(Engine &ctx);
+
+// Destroys all entities in the world
+void destroyWorld(Engine &ctx);
 
     static inline Action getZeroAction(DynamicsModel model)
     {
