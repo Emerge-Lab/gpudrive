@@ -52,7 +52,7 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params.enableLidar = params_config['enableLidar']
     params.disableClassicalObs = params_config['disableClassicalObs']
     params.isStaticAgentControlled = params_config['isStaticAgentControlled']
-
+    params.dynamicsModel = getattr(gpudrive.DynamicsModel, params_config['dynamicsModel'])
 
     # Initialize SimManager with parameters from the config
     sim_manager_config = config['sim_manager']

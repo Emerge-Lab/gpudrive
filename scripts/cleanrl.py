@@ -39,7 +39,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     vecenv.unwrapped.async_reset(config.seed)
     obs_shape = vecenv.unwrapped.single_observation_space.shape
     obs_dtype = torch.float32
-    atn_shape = [1] if vecenv.unwrapped.action_space_type == 'discrete' else vecenv.unwrapped.action_space.shape[-1:]
+    atn_shape = [1] if vecenv.unwrapped.action_space_type == 'discrete' else [vecenv.unwrapped.dynamicsModelToActionShape[vecenv.unwrapped.dynamicsModel]]
     atn_dtype = torch.int64 if vecenv.unwrapped.action_space.dtype == np.int64 else torch.float32
     total_agents = vecenv.unwrapped.num_agents
 

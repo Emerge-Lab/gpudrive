@@ -18,6 +18,13 @@ from box import Box
 class GPUDriveEnv(gym.Env):
     Recurrent = None
 
+    dynamicsModelToActionShape = {
+        "Classic": 3,
+        "InvertibleBicycle": 3,
+        "DeltaLocal": 3,
+        "State": 10
+    }
+
     def __init__(self, config: dict[str,dict[str,str]] = {}):
         if len(config) > 0:
             self.sim, self.config = SimCreator(config)
@@ -26,6 +33,8 @@ class GPUDriveEnv(gym.Env):
             self.config = Box(self.config)
             print(self.config)
         
+        self.dynamicsModel = self.config.parameters.dynamicsModel
+
         self.render_config = RenderConfig()
         self.viz = PyGameVisualizer(self.sim, self.render_config, self.config.reward_params.distanceToGoalThreshold)
 
@@ -177,13 +186,14 @@ class GPUDriveEnv(gym.Env):
         return torch.cat(self.obs_tensors, dim=-1)
 
     def setup_actions(self):
+        assert self.dynamicsModel == "Classic", "Only classic dynamics model is supported"
         self.action_tensor = self.sim.action_tensor().to_torch()
         self.batch_action_tensor = self.action_tensor.view(self.batch_size, *self.action_tensor.shape[2:])
         return
 
     def step(self, actions):
         acs = torch.zeros_like(self.batch_action_tensor)
-        acs[self.prev_mask] = actions
+        acs[self.prev_mask, :self.dynamicsModelToActionShape[self.dynamicsModel]] = actions
         acs = acs.view(self.num_envs, self.num_agents, *acs.shape[1:])
         self.send(acs)
         return

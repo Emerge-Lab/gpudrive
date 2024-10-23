@@ -195,8 +195,8 @@ class MultiHeadLinear(nn.Module):
             self.actor = self.build_network(env, hidden_size, hidden_size, is_actor=True)
 
         if self.action_space_type == "continuous":
-            self.mean = layer_init(nn.Linear(output_size, env.single_action_space.shape[-1]), std=0.01)
-            self.log_std = nn.Parameter(torch.zeros(env.single_action_space.shape[-1]))
+            self.mean = layer_init(nn.Linear(output_size, env.dynamicsModelToActionShape[env.dynamicsModel]), std=0.01)
+            self.log_std = nn.Parameter(torch.zeros(env.dynamicsModelToActionShape[env.dynamicsModel]))
 
                 
     def build_network(self, env, hidden_size, output_size, is_actor):

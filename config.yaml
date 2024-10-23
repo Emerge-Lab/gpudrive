@@ -52,6 +52,7 @@ parameters:
   enableLidar: False
   disableClassicalObs: False
   isStaticAgentControlled: False
+  dynamicsModel: Classic
 
 sim_manager:
   exec_mode: CUDA
