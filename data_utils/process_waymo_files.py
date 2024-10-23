@@ -13,16 +13,12 @@ import argparse
 import logging
 from pathlib import Path
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-<<<<<<< HEAD
-
 from data_utils.datatypes import MapElementIds
-
-=======
 import trimesh
->>>>>>> d520149 (valid bug fix and mark static support)
+from multiprocessing import Pool, cpu_count
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -335,6 +331,36 @@ def as_proto_iterator(tf_dataset):
         yield scene_proto
 
 
+def process_file(args):
+    """Process a single TFRecord file."""
+    filename, output_dir, id_as_filename = args
+    tfrecord_dataset = tf.data.TFRecordDataset(filename, compression_type="")
+    tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+    scene_count = 0
+    file_prefix = f"{str(filename).split('.')[-1]}_"
+
+    for scene_proto in tf_dataset_iter:
+        try:
+            file_suffix = f"{str(scene_proto.scenario_id)}.json" if id_as_filename else f"{scene_count}.json"
+            scene_count += 1
+            waymo_to_scenario(
+                scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+                protobuf=scene_proto,
+            )
+        except Exception as e:
+            logging.error(f"Error processing {file_prefix} scene {scene_count}: {e}")
+
+
+def distribute_files(filenames: List[Path], output_dir: str, id_as_filename: bool):
+    """Distribute work across multiple CPUs."""
+    with Pool(cpu_count()) as pool:
+        pool.map(
+            process_file,
+            [(str(filename), output_dir, id_as_filename) for filename in filenames],
+        )
+
+
 def process_data(args):
 
     if args.dataset == "all":
@@ -367,46 +393,8 @@ def process_data(args):
         logging.info(
             f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
         )
-
-        # Process the data
-        for filename in tqdm(
-            filenames,
-            total=len(filenames),
-            desc="Processing Waymo files",
-            colour="green",
-        ):
-            scene_count = 0
-            file_prefix = f"{str(filename).split('.')[-1]}_"
-
-            tfrecord_dataset = tf.data.TFRecordDataset(
-                filename,
-                compression_type="",
-            )
-            tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
-
-            for scene_proto in tf_dataset_iter:
-                try:
-                    if args.id_as_filename:
-                        file_suffix = f"{str(scene_proto.scenario_id)}.json"
-                    else:
-                        file_suffix = f"{scene_count}.json"
-                    scene_count += 1
-                    waymo_to_scenario(
-                        scenario_path=os.path.join(
-                            output_dir, f"{file_prefix}{file_suffix}"
-                        ),
-                        protobuf=scene_proto,
-                    )
-
-                except Exception as e:
-<<<<<<< HEAD
-                    logging.error(
-                        f"Error processing record {scene_count}: {e}"
-                    )
-=======
-                    logging.error(f"Error processing {file_prefix} scene {scene_count}: {e}")
->>>>>>> d520149 (valid bug fix and mark static support)
-
+        # Process the data in parallel
+        distribute_files(filenames, output_dir, args.id_as_filename)
         logging.info("Done!")
 
 
