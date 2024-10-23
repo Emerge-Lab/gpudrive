@@ -87,7 +87,7 @@ namespace gpudrive
         Ignore
     };
 
-    enum class DynamicsModel : uint32_t
+    enum class DynamicsModel: uint32_t
     {
         Classic,
         InvertibleBicycle,

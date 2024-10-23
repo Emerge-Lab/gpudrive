@@ -126,7 +126,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<EntityType>(agent) = agentInit.type;
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
-
     populateExpertTrajectory(ctx, agent, agentInit);
 
     //Applying custom rules
