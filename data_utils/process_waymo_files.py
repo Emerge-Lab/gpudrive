@@ -9,9 +9,9 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-import tensorflow as tf
-
+# To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import tensorflow as tf
 
 warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -155,8 +155,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
 
 
 def waymo_to_scenario(
-    scenario_path: str, protobuf: scenario_pb2.Scenario, use_tl: bool = True
-) -> None:
+    scenario_path: str, protobuf: scenario_pb2.Scenario) -> None:
     """Dump a JSON File containing the protobuf parsed into the right format.
     See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
 
@@ -182,9 +181,6 @@ def waymo_to_scenario(
     i = 0
     for dynamic_map_state in protobuf.dynamic_map_states:
         traffic_light_dict = _init_tl_object(dynamic_map_state)
-        # there is a traffic light but we don't want traffic light scenes so just return
-        if not use_tl and len(traffic_light_dict) > 0:
-            return
         for id, value in traffic_light_dict.items():
             for key in all_keys:
                 tl_dict[id][key].append(value[key])
@@ -205,15 +201,16 @@ def waymo_to_scenario(
         if road is not None:
             roads.append(road)
 
-    scenario = {
+    scenario_dict = {
         "name": scenario_path.split("/")[-1],
         "scenario_id": scenario_id,
         "objects": objects,
         "roads": roads,
         "tl_states": tl_dict,
     }
+
     with open(scenario_path, "w") as f:
-        json.dump(scenario, f)
+        json.dump(scenario_dict, f)
 
 
 def as_proto_iterator(tf_dataset):
@@ -225,7 +222,77 @@ def as_proto_iterator(tf_dataset):
         yield scene_proto
 
 
-def main():
+def process_data(args):
+
+    if args.dataset == "all":
+        datasets = ["training", "validation", "testing"]
+    elif args.dataset == "train":
+        datasets = ["training"]
+    elif args.dataset == "validation":
+        datasets = ["validation"]
+    elif args.dataset == "testing":
+        datasets = ["testing"]
+    else:
+        raise ValueError(
+            "Invalid dataset name. Must be one of: 'all', 'train', 'validation', or 'testing'"
+        )
+
+    for dataset in datasets:
+
+        input_dir = os.path.join(args.tfrecord_dir, dataset)
+        output_dir = os.path.join(args.output_dir, dataset)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        filenames = [
+            p for p in Path(input_dir).iterdir() if "tfrecord" in p.suffix
+        ]
+
+        assert len(filenames) > 0, f"No TFRecords found in {input_dir}"
+
+        logging.info(
+            f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
+        )
+
+        # Process the data
+        for filename in tqdm(
+            filenames,
+            total=len(filenames),
+            desc="Processing Waymo files",
+            colour="green",
+        ):
+            scene_count = 0
+            file_prefix = f"{str(filename).split('.')[-1]}_"
+
+            tfrecord_dataset = tf.data.TFRecordDataset(
+                filename,
+                compression_type="",
+            )
+            tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+            for scene_proto in tf_dataset_iter:
+                try:
+                    if args.id_as_filename:
+                        file_suffix = f"{str(scene_proto.scenario_id)}.json"
+                    else:
+                        file_suffix = f"{scene_count}.json"
+
+                    waymo_to_scenario(
+                        scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+                        protobuf=scene_proto,
+                    )
+
+                    scene_count += 1
+
+                except Exception as e:
+                    logging.error(f"Error processing record {scene_count}: {e}")
+
+        logging.info("Done!")
+
+
+if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(
         description="Convert TFRecord files to JSON"
     )
@@ -239,12 +306,7 @@ def main():
     parser.add_argument(
         "dataset",
         type=str,
-        help="Dataset to process: train, validation, test, or all",
-    )
-    parser.add_argument(
-        "--use_tl",
-        default=False,
-        help="Boolean value to include/exclude traffic lights",
+        help="Dataset to process: training, validation, testing, or all",
     )
     parser.add_argument(
         "--id_as_filename",
@@ -254,69 +316,4 @@ def main():
 
     args = parser.parse_args()
 
-    if args.dataset == "all":
-        # output subdirectories that will be created within output_dir
-        out_subsets = ["validation", "train", "test"]
-        # The scenario dir from waymo has training and validation subdirs,
-        # which is what is expected as tfrecord_dir
-        in_subsets = ["training", "validation", "testing"]
-    elif args.dataset == "train":
-        out_subsets = ["train"]
-        in_subsets = ["training"]
-    elif args.dataset == "validation":
-        in_subsets = ["validation"]
-        out_subsets = ["validation"]
-    elif args.dataset == "test":
-        in_subsets = ["testing"]
-        out_subsets = ["test"]
-
-    print(f"Processing {args.dataset} data")
-
-    for out_subset, in_subset in zip(out_subsets, in_subsets):
-
-        logging.info(f"Processing {in_subset} data")
-
-        input_dir = os.path.join(args.tfrecord_dir, in_subset)
-        output_dir = os.path.join(args.output_dir, out_subset)
-
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        filenames = [
-            p
-            for p in Path(input_dir).iterdir()
-            if p.is_file() and "tfrecord" in p.suffix
-        ]
-
-        assert len(filenames) > 0, f"No TFRecords found in {input_dir}"
-
-        tfrecord_dataset = tf.data.TFRecordDataset(
-            filenames=filenames, compression_type=""
-        )
-
-        tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
-
-        # Process the data
-        for file_name, scene_proto in tqdm(
-            zip(filenames, tf_dataset_iter),
-            total=len(filenames),
-            desc="Processing Waymo files",
-            colour="green",
-        ):
-
-            if args.id_as_filename:
-                file_prefix = f"tfrecord-{str(scene_proto.scenario_id)}.json"
-            else:
-                file_prefix = f"{str(file_name).split('.')[-1]}.json"
-
-            waymo_to_scenario(
-                scenario_path=os.path.join(output_dir, file_prefix),
-                protobuf=scene_proto,
-                use_tl=args.use_tl,
-            )
-
-        logging.info("Done!")
-
-
-if __name__ == "__main__":
-    main()
+    process_data(args)

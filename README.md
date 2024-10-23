@@ -20,7 +20,12 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 
 ## Installation 🛠️
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need a recent version of Python and CMake (>= version 3.22), as well as Xcode on macOS or Visual Studio on Windows.
+To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
+
+1. CMake >= 3.24
+2. Python >= 3.11
+3. CUDA Toolkit >= 12.2 and <=12.4 (Currently we dont support CUDA versions 12.5+. Please check the ouptut of `nvcc --version` to make sure you are using correct CUDA version.)
+4. For MacOS and Windows, you need to install all the dependencies of XCode and Visual Studio C++ tools resepectively.
 
 Once you have the required dependencies, clone the repository (don't forget --recursive!):
 
@@ -102,11 +107,75 @@ poetry install
 
 ---
 
+---
+
+<details>
+  <summary>Option 3️⃣ : Docker (GPU Only) </summary>
+
+#### Nvidia docker dependency
+
+  To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+
+#### Pull the image and run the container
+
+To pull our pre-built Docker image and begin using GPUDrive, execute the following command (you may need to prepend sudo, depending on your Docker setup):
+
+```bash
+  docker pull ghcr.io/emerge-lab/gpudrive:latest
+```
+
+After pulling the image, you can create and run a new container using the `--gpus all` flag. Currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
+
+```bash
+  docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
+```
+
+In case you created the container but exited, to rerun the same container, you can:
+
+```bash
+docker start gpudrive_container # make sure the container is started
+docker exec -it gpudrive_container /bin/bash
+```
+
+Once in the container, it will look like this:
+
+```bash
+(gpudrive) root@8caf35a97e4f:/gpudrive#
+```
+
+The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
+
+```bash
+ poetry install
+```
+
+#### Build the image from scratch
+
+If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
+
+```bash
+docker buildx build -t gpudrive .
+```
+
+The subsequent steps to run and manage the container remain the same as outlined above.
+
+</details>
+
+---
+
 Test whether the installation was successful by importing the simulator:
 
 ```Python
 import gpudrive
 ```
+
+To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
+
+```bash
+export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
+```
+
+Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
 ## Getting started 🚀
 
@@ -131,7 +200,11 @@ cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
 
-## Dataset
+## Pre-trained policy 🏋🏼‍♀️
+
+We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy [here](https://drive.google.com/file/d/1N4KJrt5PG6Pu-ovBQ-zIp0sJH0AQodKq/view?usp=sharing). You can store the policy in ` models`.
+
+## Dataset `{ 🚦 🚗  🚙  🛣️ }`
 
 ### Download the dataset
 
@@ -144,7 +217,9 @@ The simulator supports initializing scenes from the `Nocturne` dataset (TODO: UP
 
 ### Re-building the dataset
 
-To re-build the dataset, first head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
+GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
+
+1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
 ```
 waymo_open_dataset_motion_v_1_2_1/
@@ -161,7 +236,7 @@ waymo_open_dataset_motion_v_1_2_1/
 │   └── tf_example/
 ```
 
-Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
+2. Now, download files from testing, training and/or validation in the **`scenario`** folder. An easy way to do this is through `gsutil`.  First register using:
 
 ```bash
 gcloud auth login
@@ -173,15 +248,21 @@ gcloud auth login
 gsutil -m cp -r gs://waymo_open_dataset_motion_v_1_2_1/uncompressed/scenario/validation/ data/raw
 ```
 
-where `data/raw` is your local storage folder.
+where `data/raw` is your local storage folder. Note that this can take a while, depending on the size of the dataset you're downloading.
 
-The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
+3. The last thing we need to do is convert the raw data to a format that is compatible with the simulator using:
 
 ```bash
 python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<dataset>'
 ```
 
-For example, if you want to only process the validation data:
+Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
+
+```bash
+pip install waymo-open-dataset-tf-2-12-0 tqdm
+```
+
+Then for example, if you want to only process the validation data:
 
 ```bash
 python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'

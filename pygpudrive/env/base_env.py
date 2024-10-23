@@ -1,4 +1,5 @@
 import os
+from typing import List, Optional
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
@@ -57,7 +58,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
+        if (
+            self.config.reward_type == "sparse_on_goal_achieved"
+            or self.config.reward_type == "weighted_combination"
+        ):
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
@@ -117,9 +121,15 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 f"Invalid dynamics model: {self.config.dynamics_model}"
             )
 
-        if self.config.enable_lidar:
-            params.enableLidar = self.config.enable_lidar
-            params.disableClassicalObs = True
+        if self.config.lidar_obs:
+            if not self.config.lidar_obs and self.config.disable_classic_obs:
+                raise ValueError(
+                    "Lidar observations must be enabled if classic observations are disabled."
+                )
+
+            else:
+                params.enableLidar = self.config.lidar_obs
+                params.disableClassicalObs = self.config.disable_classic_obs
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
 
@@ -254,6 +264,25 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             RenderMode.MADRONA_DEPTH,
         }:
             return self.visualizer.getRender()
+
+    def reinit_scenarios(self, dataset: List[str]):
+        """Resample the scenes.
+        Args:
+            dataset (List[str]): List of scene names to resample.
+            
+        Returns:
+            None
+        """
+
+        # Resample the scenes
+        self.sim.set_maps(dataset)
+
+        # Re-initialize the controlled agents mask
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
 
     def close(self):
         """Destroy the simulator and visualizer."""

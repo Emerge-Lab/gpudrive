@@ -1,4 +1,5 @@
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
+from networks.basic_ffn import FFN, FeedForwardPolicy
 from dataclasses import dataclass
 import gpudrive
 from pygpudrive.env.config import SelectionDiscipline
@@ -9,7 +10,7 @@ class ExperimentConfig:
     """Configurations for experiments."""
 
     # DATASET
-    data_dir: str = "data"
+    data_dir: str = "data/processed/examples"
 
     # NUM PARALLEL ENVIRONMENTS & DEVICE
     num_worlds: int = 50  # Number of parallel environmentss
@@ -25,6 +26,12 @@ class ExperimentConfig:
     collision_weight: float = 0.0
     goal_achieved_weight: float = 1.0
     off_road_weight: float = 0.0
+
+    # RESAMPLE TRAFFIC SCENARIOS
+    resample_scenarios: bool = True
+    resample_criterion: str = "global_step"  # Options: "global_step"
+    resample_freq: int = 1e6  # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
+    resample_mode: str = "random"  # Options: "random"
 
     # RENDERING
     render: bool = True
@@ -54,7 +61,7 @@ class ExperimentConfig:
 
     # MODEL CHECKPOINTING
     save_policy: bool = True
-    save_policy_freq: int = 100
+    save_policy_freq: int = 200
 
     # HYPERPARAMETERS
     seed: int = 42
@@ -62,10 +69,10 @@ class ExperimentConfig:
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     vf_coef: float = 0.5
-    n_steps: int = 91
+    n_steps: int = 91  # Number of steps per rollout
     num_minibatches: int = 5  # Used to determine the minibatch size
     verbose: int = 0
-    total_timesteps: int = 1e7
+    total_timesteps: int = 2e7
     ent_coef: float = 0.00
     vf_coef: float = 0.5
     lr: float = 3e-4

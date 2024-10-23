@@ -52,8 +52,11 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<Info>();
     registry.registerComponent<AgentInterfaceEntity>();
     registry.registerComponent<RoadInterfaceEntity>();
+    registry.registerComponent<AgentID>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
+    registry.registerSingleton<Map>();
+    registry.registerSingleton<ResetMap>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -63,6 +66,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 
     registry.exportSingleton<WorldReset>((uint32_t)ExportID::Reset);
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
+    registry.exportSingleton<Map>((uint32_t)ExportID::Map);
+    registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<AgentInterface, SelfObservation>(
@@ -94,7 +99,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Trajectory);
 }
 
-static inline void cleanupWorld(Engine &ctx) {}
+static inline void cleanupWorld(Engine &ctx) {
+    destroyWorld(ctx);
+}
 
 static inline void initWorld(Engine &ctx)
 {
@@ -106,8 +113,15 @@ static inline void initWorld(Engine &ctx)
     ctx.data().rng = RNG::make(episode_idx);
     ctx.data().curEpisodeIdx = episode_idx;
 
+    if(ctx.singleton<ResetMap>().reset == 1)
+    {
+        createPersistentEntities(ctx);
+        ctx.singleton<ResetMap>().reset = 0;
+        phys::PhysicsSystem::reset(ctx);
+    }
+
     // Defined in src/level_gen.hpp / src/level_gen.cpp
-    generateWorld(ctx);
+    resetWorld(ctx);
 }
 
 // This system runs in TaskGraphID::Reset and checks if the code external to the
@@ -115,13 +129,19 @@ static inline void initWorld(Engine &ctx)
 // reset is needed, cleanup the existing world and generate a new one.
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
-    if (reset.reset == 0) {
-      return;
+    if (reset.reset == 0)
+    {
+        return;
     }
 
     reset.reset = 0;
 
-    cleanupWorld(ctx);
+    auto resetMap = ctx.singleton<ResetMap>();
+
+    if (resetMap.reset == 1)
+    {
+        cleanupWorld(ctx);
+    }
     initWorld(ctx);
 }
 
@@ -142,6 +162,7 @@ inline void collectSelfObsSystem(Engine &ctx,
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
+    self_obs.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,
@@ -182,7 +203,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
             .position = relative_pos,
             .heading = relative_heading,
             .vehicle_size = other_size,
-            .type = (float)ctx.get<EntityType>(other)
+            .type = (float)ctx.get<EntityType>(other),
+            .id = (float)ctx.get<AgentID>(ctx.get<AgentInterfaceEntity>(other).e).id
         };
     }
     while(arrIndex < ctx.data().numAgents - 1) {
@@ -248,7 +270,6 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const EntityType &type,
                            const CollisionDetectionEvent &collisionEvent,
                            const ResponseType &responseType) {
     
@@ -336,12 +357,6 @@ inline void movementSystem(Engine &e,
     }
 }
 
-
-static inline float distObs(float v)
-{
-    return v / consts::worldLength;
-}
-
 static inline float encodeType(EntityType type)
 {
     return (float)type;
@@ -425,7 +440,6 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 inline void rewardSystem(Engine &ctx,
                          const Position &position,
                          const Goal &goal,
-                         Progress &progress,
                          const AgentInterfaceEntity &agent_iface)
 {
     Reward &out_reward = ctx.get<Reward>(agent_iface.e);
@@ -452,29 +466,6 @@ inline void rewardSystem(Engine &ctx,
     // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
 }
 
-// Each agent gets a small bonus to it's reward if the other agent has
-// progressed a similar distance, to encourage them to cooperate.
-// This system reads the values of the Progress component written by
-// rewardSystem for other agents, so it must run after.
-inline void bonusRewardSystem(Engine &ctx,
-                              OtherAgents &others,
-                              Progress &progress,
-                              Reward &reward)
-{
-    bool partners_close = true;
-    for (CountT i = 0; i < ctx.data().numAgents - 1; i++) {
-        Entity other = others.e[i];
-        Progress other_progress = ctx.get<Progress>(other);
-
-        if (fabsf(other_progress.maxY - progress.maxY) > 2.f) {
-            partners_close = false;
-        }
-    }
-
-    if (partners_close && reward.v > 0.f) {
-        reward.v *= 1.25f;
-    }
-}
 
 inline void stepTrackerSystem(Engine &ctx, const AgentInterfaceEntity &agent_iface) {
     StepsRemaining &stepsRemaining = ctx.get<StepsRemaining>(agent_iface.e);
@@ -700,7 +691,6 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
          rewardSystem,
             Position,
             Goal,
-            Progress,
             AgentInterfaceEntity
         >>({phys_done});
 
@@ -832,7 +822,6 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
             Rotation,
             Position,
             Velocity,
-            EntityType,
             CollisionDetectionEvent,
             ResponseType
         >>({});  
@@ -867,7 +856,8 @@ Sim::Sim(Engine &ctx,
     // Currently the physics system needs an upper bound on the number of
     // entities that will be stored in the BVH. We plan to fix this in
     // a future release.
-    auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    // auto max_total_entities = init.map->numObjects + init.map->numRoadSegments;
+    auto max_total_entities = consts::kMaxAgentCount + consts::kMaxRoadEntityCount;
 
     phys::PhysicsSystem::init(ctx, init.rigidBodyObjMgr,
         consts::deltaT, consts::numPhysicsSubsteps, -9.8f * math::up,
@@ -879,8 +869,10 @@ Sim::Sim(Engine &ctx,
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
+    auto& map = ctx.singleton<Map>();
+    map = *(init.map);
     // Creates agents, walls, etc.
-    createPersistentEntities(ctx, init.map);
+    createPersistentEntities(ctx);
 
     // Generate initial world state
     initWorld(ctx);

@@ -551,7 +551,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 	    numWorlds
         };
 
-        for (int64_t i = 0; i < mgr_cfg.scenes.size(); i++) {
+        for (size_t i = 0; i < mgr_cfg.scenes.size(); i++) {
           auto &init = world_inits[i];
           delete init.map;
         }
@@ -593,6 +593,62 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
     if (impl_->cfg.enableBatchRenderer) {
         impl_->renderMgr->batchRender();
     }
+}
+
+void Manager::setMaps(const std::vector<std::string> &maps)
+{
+    assert(impl_->cfg.scenes.size() == maps.size());
+    impl_->cfg.scenes = maps;
+
+    ResetMap resetmap{
+        1,
+    };
+
+    if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
+    {
+#ifdef MADRONA_CUDA_SUPPORT
+        auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+            Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
+            madrona::cu::deallocGPU(map);
+
+            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+        }
+
+#else
+        // Handle the case where CUDA support is not available
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    }
+    else
+    {
+
+        auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
+
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            // Parse the map string into your MapData structure
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+
+            Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            memcpy(mapDevicePtr, map, sizeof(Map));
+            delete map;
+
+            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+        }
+    }
+
+    // Vector of range on integers from 0 to the number of worlds
+    std::vector<int32_t> worldIndices(maps.size());
+    std::iota(worldIndices.begin(), worldIndices.end(), 0);
+    reset(worldIndices);
 }
 
 Tensor Manager::actionTensor() const
@@ -801,7 +857,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 }
 
 std::vector<Shape>
-Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode) {
+Manager::getShapeTensorFromDeviceMemory() {
     const uint32_t numWorlds = impl_->numWorlds;
     const auto &tensor = shapeTensor();
 

@@ -2,7 +2,9 @@
 import logging
 from typing import Optional, Sequence
 import torch
+import os
 import gymnasium as gym
+import random
 import numpy as np
 from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnv,
@@ -25,6 +27,7 @@ class SB3MultiAgentEnv(VecEnv):
     def __init__(
         self,
         config,
+        exp_config,
         scene_config,
         max_cont_agents,
         device,
@@ -37,6 +40,13 @@ class SB3MultiAgentEnv(VecEnv):
             device=device,
         )
         self.config = config
+        self.exp_config = exp_config
+        self.all_scene_paths = [
+            os.path.join(self.exp_config.data_dir, scene)
+            for scene in sorted(os.listdir(self.exp_config.data_dir))
+            if scene.startswith("tfrecord")
+        ]
+        self.unique_scene_paths = list(set(self.all_scene_paths))
         self.num_worlds = self._env.num_worlds
         self.max_agent_count = self._env.max_agent_count
         self.num_envs = self._env.cont_agent_mask.sum().item()
@@ -134,7 +144,7 @@ class SB3MultiAgentEnv(VecEnv):
             == self.controlled_agent_mask.sum(dim=1)
         )[0]
 
-        if done_worlds.any().item():
+        if len(done_worlds) > 0:
             self._update_info_dict(info, done_worlds)
             self.num_episodes += len(done_worlds)
             self._env.sim.reset(done_worlds.tolist())
@@ -155,7 +165,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.dead_agent_mask = torch.logical_or(self.dead_agent_mask, done)
 
         # Now override the dead agent mask for the reset worlds
-        if done_worlds.any().item():
+        if len(done_worlds) > 0:
             for world_idx in done_worlds:
                 self.dead_agent_mask[
                     world_idx, :
@@ -197,6 +207,44 @@ class SB3MultiAgentEnv(VecEnv):
 
         self._seeds = [seed + idx for idx in range(self.num_envs)]
         return self._seeds
+
+    def resample_scenario_batch(self):
+        """Swap out the dataset."""
+        if self.exp_config.resample_mode == "random":
+            total_unique = len(self.unique_scene_paths)
+
+            # Check if N is greater than the number of unique scenes
+            if self.num_worlds <= total_unique:
+                dataset = random.sample(
+                    self.unique_scene_paths, self.num_worlds
+                )
+
+            # If N is greater, repeat the unique scenes until we get N scenes
+            dataset = []
+            while len(dataset) < self.num_worlds:
+                dataset.extend(
+                    random.sample(self.unique_scene_paths, total_unique)
+                )
+                if len(dataset) > self.num_worlds:
+                    dataset = dataset[
+                        : self.num_worlds
+                    ]  # Trim the result to N scenes
+        else:
+            raise NotImplementedError(
+                f"Resample mode {self.exp_config.resample_mode} is currently not supported."
+            )
+
+        # Re-initialize the simulator with the new dataset
+        print(
+            f"Re-initializing sim with {len(set(dataset))} {self.exp_config.resample_mode} unique scenes.\n"
+        )
+        self._env.reinit_scenarios(dataset)
+
+        # Update controlled agent mask
+        self.controlled_agent_mask = self._env.cont_agent_mask.clone()
+        self.max_agent_count = self._env.max_agent_count
+        self.num_valid_controlled_agents_across_worlds = self._env.num_valid_controlled_agents_across_worlds
+        self.num_envs = self.controlled_agent_mask.sum().item()
 
     def _update_info_dict(self, info, indices) -> None:
         """Update the info logger."""

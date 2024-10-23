@@ -9,7 +9,7 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 # AGENT COLORS
 PINK = (255, 105, 180)
 GREEN = (113, 228, 0)
-BLUE = (0, 191, 255)
+BLUE = (0, 127, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
@@ -22,24 +22,12 @@ class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     PADDING_PCT = 0.0
     COLOR_LIST = [
+        BLUE,
         PINK,
         GREEN,
-        BLUE,
         DODGER_BLUE,
         RED_ORANGE,
     ]
-    # ROAD MAP COLORS
-    color_dict = {
-        float(gpudrive.EntityType.RoadEdge): (68, 193, 123),  # Green
-        float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
-        float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
-        float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
-        float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
-        float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
-        float(gpudrive.EntityType.Vehicle): (0, 255, 0),  # Green
-        float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
-        float(gpudrive.EntityType.Cyclist): (0, 0, 255),  # Blue
-    }
 
     def __init__(self, sim, render_config, goal_radius):
         self.sim = sim

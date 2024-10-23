@@ -33,6 +33,8 @@ enum class ExportID : uint32_t {
     Info,
     ResponseType,
     Trajectory,
+    Map,
+    ResetMap,
     NumExports
 };
 
@@ -123,6 +125,8 @@ struct Sim : public madrona::WorldBase {
 
     Entity agent_ifaces[consts::kMaxAgentCount];
     Entity road_ifaces[consts::kMaxRoadEntityCount];
+
+    Entity camera_agent;
 
     madrona::CountT numControlledAgents;
 

@@ -27,6 +27,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     ):
         # Initialization of environment configurations
         self.config = config
+        self.scene_config = scene_config
         self.num_worlds = scene_config.num_scenes
         self.max_cont_agents = max_cont_agents
         self.device = device
@@ -129,7 +130,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_value_tensor = self.action_keys_tensor[actions]
                 elif (
                     actions.shape[2] == 3
-                ):  # Assuming we are given the actual action values 
+                ):  # Assuming we are given the actual action values
                     # (acceleration, steering, heading)
                     action_value_tensor = actions.to(self.device)
             else:
@@ -176,7 +177,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
-            self.head_actions = torch.tensor([0], device=self.device)
+            self.head_actions = self.config.head_tilt_actions.to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -230,13 +231,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             action_1 = self.dx.clone().cpu().numpy()
             action_2 = self.dy.clone().cpu().numpy()
             action_3 = self.dyaw.clone().cpu().numpy()
-        else:
+        elif self.config.dynamics_model == "classic":
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
             self.head_actions = torch.tensor([0], device=self.device)
             action_1 = self.steer_actions.clone().cpu().numpy()
             action_2 = self.accel_actions.clone().cpu().numpy()
             action_3 = self.head_actions.clone().cpu().numpy()
+        else:
+            raise ValueError(
+                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
+            )
 
         action_space = Tuple(
             (
@@ -259,6 +264,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_states_unprocessed = (
                 self.sim.self_observation_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            ego_states_unprocessed = ego_states_unprocessed[:, :, :-1]
+
+            # Normalize
             if self.config.norm_obs:
                 ego_states = self.normalize_ego_state(ego_states_unprocessed)
             else:
@@ -271,6 +280,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
             )
+            # Omit vehicle ids (last feature)
+            partner_observations = partner_observations[:, :, :, :-1]
             if self.config.norm_obs:  # Normalize observations and then flatten
                 partner_observations = self.normalize_and_flatten_partner_obs(
                     partner_observations
@@ -300,12 +311,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             road_map_observations = torch.Tensor().to(self.device)
 
+        # LIDAR OBSERVATIONS
+        if self.config.lidar_obs:
+            lidar_obs = (
+                self.sim.lidar_tensor()
+                .to_torch()
+                .flatten(start_dim=2, end_dim=-1)
+                .to(self.device)
+            )
+        else:
+            # Create empty lidar observations (num_lidar_samples, 4)
+            lidar_obs = torch.Tensor().to(self.device)
+
         # Combine the observations
         obs_filtered = torch.cat(
             (
                 ego_states,
                 partner_observations,
                 road_map_observations,
+                lidar_obs,
             ),
             dim=-1,
         )
@@ -387,7 +411,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     torch.ones((*positions.shape[:-1], 1), device=self.device),
                     headings,  # float (yaw)
                     velocity,  # xy velocity
-                    torch.zeros((*positions.shape[:-1], 4), device=self.device)
+                    torch.zeros(
+                        (*positions.shape[:-1], 4), device=self.device
+                    ),
                 ),
                 dim=-1,
             )
@@ -553,7 +579,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/", NUM_WORLDS)
+    scene_config = SceneConfig("data/examples", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
