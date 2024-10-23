@@ -179,9 +179,8 @@ def _init_object(track: scenario_pb2.Track) -> Optional[Dict[str, Any]]:
     """
     final_valid_index = 0
     for i, state in enumerate(track.states):
-        if not state.valid:
-            break
-        final_valid_index = i
+        if state.valid:
+            final_valid_index = i
 
     obj = _parse_object_state(track.states, track.states[final_valid_index])
     obj["type"] = _WAYMO_OBJECT_STR[track.object_type]
@@ -223,7 +222,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
 
 
 # Meshes for collision checking
-def _generate_mesh(segments, radius=0.05):
+def _generate_mesh(segments, radius=0.5):
     cylinders = []
     for segment in segments:
         start, end = segment
@@ -292,20 +291,25 @@ def waymo_to_scenario(
     for track in protobuf.tracks:
         obj = _init_object(track)
         if obj is not None:
-            if obj["type"] != "vehicle" or obj["type"] != "cyclist":
+            if obj['type'] not in ['vehicle', 'cyclist']:
                 obj["mark_as_static"] = False
                 objects.append(obj)
                 continue
             elif False in obj["valid"]:
-                obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"][:obj["valid"].index(False)]]
+                # Create trajectory segments of only valid positions
+                trajectory_segments = []
+                for i in range(len(obj["position"]) - 1):
+                    if obj["valid"][i] and obj["valid"][i + 1]:
+                        trajectory_segments.append([[obj["position"][i]["x"], obj["position"][i]["y"], obj["position"][i]["z"]],
+                                                    [obj["position"][i+1]["x"], obj["position"][i+1]["y"], obj["position"][i+1]["z"]]])
             else:
                 obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"]]
-                
-            if len(obj_vertices) <= 1:
+                trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
+
+            if len(trajectory_segments) == 0:
                 obj["mark_as_static"] = False
                 objects.append(obj)
             else:
-                trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
                 trajectory_mesh = _generate_mesh(trajectory_segments)
                 obj["mark_as_static"] = collision_manager.in_collision_single(trajectory_mesh)
                 objects.append(obj)
