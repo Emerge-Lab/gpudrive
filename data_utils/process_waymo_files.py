@@ -6,9 +6,11 @@ import argparse
 import logging
 from pathlib import Path
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
+import trimesh
+from multiprocessing import Pool, cpu_count
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -154,6 +156,21 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     }
 
 
+# Meshes for collision checking
+def _generate_mesh(segments, radius=0.5):
+    cylinders = []
+    for segment in segments:
+        start, end = segment
+        cylinder = trimesh.creation.cylinder(
+            radius=radius, 
+            segment=[start, end]
+        )
+        cylinders.append(cylinder)
+
+    mesh = trimesh.util.concatenate(cylinders)
+    return mesh
+
+
 def waymo_to_scenario(
     scenario_path: str, protobuf: scenario_pb2.Scenario) -> None:
     """Dump a JSON File containing the protobuf parsed into the right format.
@@ -187,19 +204,49 @@ def waymo_to_scenario(
             tl_dict[id]["time_index"].append(i)
         i += 1
 
+    # Construct the map states 
+    roads = []
+    edge_segments = []
+    for map_feature in protobuf.map_features:
+        road = _init_road(map_feature)
+        if road is not None:
+            roads.append(road)
+            if road["type"] == "road_edge":
+                edge_vertices = [[r["x"], r["y"], r["z"]] for r in road["geometry"]]
+                edge_segments += [[edge_vertices[i], edge_vertices[i+1]] for i in range(len(edge_vertices) - 1)]
+
+    # Construct road edges for collision checking
+    edge_mesh = _generate_mesh(edge_segments)
+    collision_manager = trimesh.collision.CollisionManager()
+    collision_manager.add_object('road_edges', edge_mesh)
+
     # Construct the object states
     objects = []
     for track in protobuf.tracks:
         obj = _init_object(track)
         if obj is not None:
-            objects.append(obj)
+            if obj['type'] not in ['vehicle', 'cyclist']:
+                obj["mark_as_expert"] = False
+                objects.append(obj)
+                continue
+            elif False in obj["valid"]:
+                # Create trajectory segments of only valid positions
+                trajectory_segments = []
+                for i in range(len(obj["position"]) - 1):
+                    if obj["valid"][i] and obj["valid"][i + 1]:
+                        trajectory_segments.append([[obj["position"][i]["x"], obj["position"][i]["y"], obj["position"][i]["z"]],
+                                                    [obj["position"][i+1]["x"], obj["position"][i+1]["y"], obj["position"][i+1]["z"]]])
+            else:
+                obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"]]
+                trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
 
-    # Construct the map states
-    roads = []
-    for map_feature in protobuf.map_features:
-        road = _init_road(map_feature)
-        if road is not None:
-            roads.append(road)
+            if len(trajectory_segments) == 0:
+                obj["mark_as_expert"] = False
+                objects.append(obj)
+            else:
+                trajectory_mesh = _generate_mesh(trajectory_segments)
+                obj["mark_as_expert"] = collision_manager.in_collision_single(trajectory_mesh)
+                objects.append(obj)
 
     scenario_dict = {
         "name": scenario_path.split("/")[-1],
@@ -220,6 +267,36 @@ def as_proto_iterator(tf_dataset):
         scene_proto = scenario_pb2.Scenario()
         scene_proto.ParseFromString(bytes(tfrecord.numpy()))
         yield scene_proto
+
+
+def process_file(args):
+    """Process a single TFRecord file."""
+    filename, output_dir, id_as_filename = args
+    tfrecord_dataset = tf.data.TFRecordDataset(filename, compression_type="")
+    tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+    scene_count = 0
+    file_prefix = f"{str(filename).split('.')[-1]}_"
+
+    for scene_proto in tf_dataset_iter:
+        try:
+            file_suffix = f"{str(scene_proto.scenario_id)}.json" if id_as_filename else f"{scene_count}.json"
+            scene_count += 1
+            waymo_to_scenario(
+                scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+                protobuf=scene_proto,
+            )
+        except Exception as e:
+            logging.error(f"Error processing {file_prefix} scene {scene_count}: {e}")
+
+
+def distribute_files(filenames: List[Path], output_dir: str, id_as_filename: bool):
+    """Distribute work across multiple CPUs."""
+    with Pool(cpu_count()) as pool:
+        pool.map(
+            process_file,
+            [(str(filename), output_dir, id_as_filename) for filename in filenames],
+        )
 
 
 def process_data(args):
@@ -254,40 +331,8 @@ def process_data(args):
         logging.info(
             f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
         )
-
-        # Process the data
-        for filename in tqdm(
-            filenames,
-            total=len(filenames),
-            desc="Processing Waymo files",
-            colour="green",
-        ):
-            scene_count = 0
-            file_prefix = f"{str(filename).split('.')[-1]}_"
-
-            tfrecord_dataset = tf.data.TFRecordDataset(
-                filename,
-                compression_type="",
-            )
-            tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
-
-            for scene_proto in tf_dataset_iter:
-                try:
-                    if args.id_as_filename:
-                        file_suffix = f"{str(scene_proto.scenario_id)}.json"
-                    else:
-                        file_suffix = f"{scene_count}.json"
-
-                    waymo_to_scenario(
-                        scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
-                        protobuf=scene_proto,
-                    )
-
-                    scene_count += 1
-
-                except Exception as e:
-                    logging.error(f"Error processing record {scene_count}: {e}")
-
+        # Process the data in parallel
+        distribute_files(filenames, output_dir, args.id_as_filename)
         logging.info("Done!")
 
 
