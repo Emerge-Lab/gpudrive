@@ -92,9 +92,9 @@ namespace gpudrive
         else
             obj.type = EntityType::None;
 
-	std::string markAsStaticKey = "mark_as_static";
-	if (j.contains(markAsStaticKey)) {
-	    from_json(j.at("mark_as_static"), obj.markAsStatic);
+	std::string markAsExpertKey = "mark_as_expert";
+	if (j.contains(markAsExpertKey)) {
+	    from_json(j.at("mark_as_expert"), obj.markAsExpert);
 	}
     }
 
