@@ -49,7 +49,6 @@ def SimCreator(config: dict = None) -> gpudrive.SimManager:
     params.IgnoreNonVehicles = params_config['IgnoreNonVehicles']
     params.roadObservationAlgorithm = getattr(gpudrive.FindRoadObservationsWith, params_config['roadObservationAlgorithm'])
     params.initOnlyValidAgentsAtFirstStep = params_config['initOnlyValidAgentsAtFirstStep']
-    params.useWayMaxModel = params_config['useWayMaxModel']
     params.enableLidar = params_config['enableLidar']
     params.disableClassicalObs = params_config['disableClassicalObs']
     params.isStaticAgentControlled = params_config['isStaticAgentControlled']
