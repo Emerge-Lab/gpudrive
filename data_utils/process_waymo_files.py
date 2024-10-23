@@ -288,7 +288,7 @@ def waymo_to_scenario(
         obj = _init_object(track)
         if obj is not None:
             if obj['type'] not in ['vehicle', 'cyclist']:
-                obj["mark_as_static"] = False
+                obj["mark_as_expert"] = False
                 objects.append(obj)
                 continue
             elif False in obj["valid"]:
@@ -303,11 +303,11 @@ def waymo_to_scenario(
                 trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
 
             if len(trajectory_segments) == 0:
-                obj["mark_as_static"] = False
+                obj["mark_as_expert"] = False
                 objects.append(obj)
             else:
                 trajectory_mesh = _generate_mesh(trajectory_segments)
-                obj["mark_as_static"] = collision_manager.in_collision_single(trajectory_mesh)
+                obj["mark_as_expert"] = collision_manager.in_collision_single(trajectory_mesh)
                 objects.append(obj)
 
     scenario_dict = {
