@@ -44,7 +44,7 @@ parameters:
   observationRadius: 150.0
   rewardParams: reward_params
   collisionBehaviour: AgentStop
-  maxNumControlledVehicles: 128
+  maxNumControlledAgents: 128
   IgnoreNonVehicles: True
   roadObservationAlgorithm: AllEntitiesWithRadiusFiltering
   initOnlyValidAgentsAtFirstStep: True
@@ -58,5 +58,5 @@ sim_manager:
   exec_mode: CUDA
   gpu_id: 0
   num_worlds: 64
-  json_path: data
+  json_path: data/processed/examples
   enable_batch_renderer: False
