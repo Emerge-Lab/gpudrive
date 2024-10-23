@@ -204,10 +204,9 @@ class GPUDriveEnv(gym.Env):
     
     def async_reset(self, seed = None):
         # seed is ignored. The sim is deterministic.
-        # self.data = [self.reset(i) for i in range(self.num_envs)]
-        for i in range(self.num_envs):
-            self.sim.reset(i)
-        self.sim.step()
+
+        self.sim.reset([i for i in range(self.num_envs)])
+        
         self.make_mask()
         return self.recv()
     
