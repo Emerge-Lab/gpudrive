@@ -262,7 +262,7 @@ Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-datase
 pip install waymo-open-dataset-tf-2-12-0 tqdm
 ```
 
-Then for example, if you want to only process the validation data:
+Then for example, if you want to process the validation data, run:
 
 ```bash
 python data_utils/process_waymo_files.py 'data/raw/' 'data/processed/' 'validation'
@@ -272,6 +272,8 @@ INFO:root:Done!
 ```
 
 and that's it!
+
+> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing the entire validation dataset takes about 2 hours because it involves handling around 75,000 traffic scenarios (150 files, each with 500 scenarios).
 
 ## Citations
 
