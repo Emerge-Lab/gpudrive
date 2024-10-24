@@ -46,3 +46,4 @@
 - mediapy
 - gymnasium
 - pygame
+- pufferlib
