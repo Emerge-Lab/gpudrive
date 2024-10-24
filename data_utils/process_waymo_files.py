@@ -1,3 +1,7 @@
+"""
+Convert Waymo Open Dataset TFRecord files to JSON format.
+See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
+"""
 from collections import defaultdict
 import os
 import json
@@ -9,6 +13,7 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
+
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -134,7 +139,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
         feature != "crosswalk"
         and feature != "speed_bump"
         and feature != "driveway"
-    ):
+    ):  # For road points
         geometry = [
             {"x": p.x, "y": p.y, "z": p.z}
             for p in getattr(
@@ -151,11 +156,13 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     return {
         "geometry": geometry,
         "type": map_feature.WhichOneof("feature_data"),
+        "id": map_feature.id,
     }
 
 
 def waymo_to_scenario(
-    scenario_path: str, protobuf: scenario_pb2.Scenario) -> None:
+    scenario_path: str, protobuf: scenario_pb2.Scenario
+) -> None:
     """Dump a JSON File containing the protobuf parsed into the right format.
     See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
 
@@ -279,14 +286,18 @@ def process_data(args):
                         file_suffix = f"{scene_count}.json"
 
                     waymo_to_scenario(
-                        scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+                        scenario_path=os.path.join(
+                            output_dir, f"{file_prefix}{file_suffix}"
+                        ),
                         protobuf=scene_proto,
                     )
 
                     scene_count += 1
 
                 except Exception as e:
-                    logging.error(f"Error processing record {scene_count}: {e}")
+                    logging.error(
+                        f"Error processing record {scene_count}: {e}"
+                    )
 
         logging.info("Done!")
 
