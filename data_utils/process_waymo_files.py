@@ -1,6 +1,8 @@
 """
 Convert Waymo Open Dataset TFRecord files to JSON format.
-See https://waymo.com/open/data/motion/tfexample for the tfrecord structure.
+See https://waymo.com/open/data/motion/tfexample for the tfrecord structure and 
+https://github.com/waymo-research/waymo-open-dataset/blob/master/src/waymo_open_dataset/protos/map.proto
+for the protos structure.
 """
 from collections import defaultdict
 import os
@@ -13,6 +15,9 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
+
+from data_utils.datatypes import MapElementIds 
+
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -43,6 +48,54 @@ _WAYMO_ROAD_STR = {
     map_pb2.TrafficSignalLaneState.LANE_STATE_FLASHING_CAUTION: "flashing_caution",
 }
 
+_WAYMO_LANE_TYPES = {
+    map_pb2.LaneCenter.TYPE_UNDEFINED: MapElementIds.LANE_UNDEFINED,
+    map_pb2.LaneCenter.TYPE_FREEWAY: MapElementIds.LANE_FREEWAY,
+    map_pb2.LaneCenter.TYPE_SURFACE_STREET: MapElementIds.LANE_SURFACE_STREET,
+    map_pb2.LaneCenter.TYPE_BIKE_LANE: MapElementIds.LANE_BIKE_LANE,
+}
+
+_WAYMO_ROAD_LINE_TYPES = {
+    map_pb2.RoadLine.TYPE_UNKNOWN: MapElementIds.ROAD_LINE_UNKNOWN,
+    map_pb2.RoadLine.TYPE_BROKEN_SINGLE_WHITE: MapElementIds.ROAD_LINE_BROKEN_SINGLE_WHITE,
+    map_pb2.RoadLine.TYPE_SOLID_SINGLE_WHITE: MapElementIds.ROAD_LINE_SOLID_SINGLE_WHITE,
+    map_pb2.RoadLine.TYPE_SOLID_DOUBLE_WHITE: MapElementIds.ROAD_LINE_SOLID_DOUBLE_WHITE,
+    map_pb2.RoadLine.TYPE_BROKEN_SINGLE_YELLOW: MapElementIds.ROAD_LINE_BROKEN_SINGLE_YELLOW,
+    map_pb2.RoadLine.TYPE_BROKEN_DOUBLE_YELLOW: MapElementIds.ROAD_LINE_BROKEN_DOUBLE_YELLOW,
+    map_pb2.RoadLine.TYPE_SOLID_SINGLE_YELLOW: MapElementIds.ROAD_LINE_SOLID_SINGLE_YELLOW,
+    map_pb2.RoadLine.TYPE_SOLID_DOUBLE_YELLOW: MapElementIds.ROAD_LINE_SOLID_DOUBLE_YELLOW,
+    map_pb2.RoadLine.TYPE_PASSING_DOUBLE_YELLOW: MapElementIds.ROAD_LINE_PASSING_DOUBLE_YELLOW,
+}
+
+_WAYMO_ROAD_EDGE_TYPES = {
+    map_pb2.RoadEdge.TYPE_UNKNOWN: MapElementIds.ROAD_EDGE_UNKNOWN,
+    map_pb2.RoadEdge.TYPE_ROAD_EDGE_BOUNDARY: MapElementIds.ROAD_EDGE_BOUNDARY,
+    map_pb2.RoadEdge.TYPE_ROAD_EDGE_MEDIAN: MapElementIds.ROAD_EDGE_MEDIAN,
+}    
+
+def feature_class_to_map_id(map_feature):
+    """
+    Converts the map feature types defined in the proto to the ones 
+    defined in the datatypes.py, to ensure consistency with Waymax.
+    """
+    if map_feature.HasField('lane'):
+        map_element_id = _WAYMO_LANE_TYPES.get(map_feature.lane.type)
+    elif map_feature.HasField('road_line'):
+        map_element_id = _WAYMO_ROAD_LINE_TYPES.get(map_feature.road_line.type)
+    elif map_feature.HasField('road_edge'):
+        map_element_id = _WAYMO_ROAD_EDGE_TYPES.get(map_feature.road_edge.type)
+    elif map_feature.HasField('stop_sign'):
+        map_element_id = MapElementIds.STOP_SIGN
+    elif map_feature.HasField('crosswalk'):
+        map_element_id = MapElementIds.CROSSWALK
+    elif map_feature.HasField('speed_bump'):
+        map_element_id = MapElementIds.SPEED_BUMP
+    elif map_feature.HasField('driveway'):
+        map_element_id = MapElementIds.UNKNOWN #TODO(dc): Add driveway to datatypes.py
+    else:
+        map_element_id = MapElementIds.UNKNOWN
+    
+    return int(map_element_id)
 
 def _parse_object_state(
     states: scenario_pb2.ObjectState, final_state: scenario_pb2.ObjectState
@@ -140,7 +193,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
         and feature != "driveway"
     ):  # For road points
         geometry = [
-            {"x": p.x, "y": p.y, "z": p.z}
+            {"x": p.x, "y": p.y, "z": p.z, "id": map_feature.id}
             for p in getattr(
                 map_feature, map_feature.WhichOneof("feature_data")
             ).polyline
@@ -155,6 +208,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     return {
         "geometry": geometry,
         "type": map_feature.WhichOneof("feature_data"),
+        "map_element_id": feature_class_to_map_id(map_feature),
         "id": map_feature.id,
     }
 
