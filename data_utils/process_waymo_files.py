@@ -13,7 +13,6 @@ import warnings
 from typing import Any, Dict, Optional
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -305,7 +304,8 @@ def process_data(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="Convert TFRecord files to JSON"
+        description="Convert TFRecord files to JSON. \
+            Note: This takes about 45 seconds per tfrecord file (=50 traffic scenes)."
     )
     parser.add_argument(
         "tfrecord_dir", help="Path to the directory containing TFRecord files"
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--id_as_filename",
-        default=False,
+        default=True,
         help="Use the unique scenario id as the filename",
     )
 
