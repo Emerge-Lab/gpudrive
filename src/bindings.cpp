@@ -86,10 +86,6 @@ namespace gpudrive
             .value("Padding", gpudrive::EntityType::Padding)
             .value("NumTypes", gpudrive::EntityType::NumTypes);
 
-        // Export the mapping functions
-        m.def("mapRoadEntityTypeToID", &gpudrive::mapRoadEntityTypeToID, "Map road entity type to its corresponding ID");
-        m.def("mapObjectEntityTypeToID", &gpudrive::mapObjectEntityTypeToID, "Map object entity type to its corresponding ID");
-
         // Bindings for Manager class
         nb::class_<Manager>(m, "SimManager")
             .def(
