@@ -14,6 +14,7 @@ class MapElementIds(enum.IntEnum):
     LANE_FREEWAY = 1
     LANE_SURFACE_STREET = 2
     LANE_BIKE_LANE = 3
+    # Original definition skips 4.
     ROAD_LINE_UNKNOWN = 5
     ROAD_LINE_BROKEN_SINGLE_WHITE = 6
     ROAD_LINE_SOLID_SINGLE_WHITE = 7
@@ -29,5 +30,5 @@ class MapElementIds(enum.IntEnum):
     STOP_SIGN = 17
     CROSSWALK = 18
     SPEED_BUMP = 19
-    DRIVEWAY = 20  # # New in v1.2.0: Driveway entrances, this type does not exist in Waymax yet
+    DRIVEWAY = 20  # New datatype in v1.2.0: Driveway entrances
     UNKNOWN = -1
