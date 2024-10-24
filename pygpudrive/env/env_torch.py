@@ -6,6 +6,7 @@ import torch
 import gpudrive
 import imageio
 from itertools import product
+from data_utils.vbd_scenario_processing import filter_topk_roadgraph_points
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
@@ -836,7 +837,9 @@ if __name__ == "__main__":
     NUM_WORLDS = 1
 
     env_config = EnvConfig(
-        init_steps=10, enable_vbd=True, dynamics_model="state"
+        init_steps=10,
+        enable_vbd=True,
+        dynamics_model="state",
     )
     render_config = RenderConfig()
     scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
@@ -849,11 +852,13 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
-    
+
     log_playback_traj = env.get_expert_actions()
 
     # RUN
     obs = env.reset()
+
+    gpudrive_sample_batch = env.warmup_trajectory
 
     env.get_expert_actions()
     frames = []
