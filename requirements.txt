@@ -47,3 +47,4 @@
 - gymnasium
 - pygame
 - pufferlib
+- pynvml==11.5.3
