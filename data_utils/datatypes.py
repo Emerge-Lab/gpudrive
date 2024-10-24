@@ -9,6 +9,7 @@ class MapElementIds(enum.IntEnum):
     These integers represent the ID of these specific types as defined in:
     https://waymo.com/open/data/motion/tfexample.
     """
+
     LANE_UNDEFINED = 0
     LANE_FREEWAY = 1
     LANE_SURFACE_STREET = 2
@@ -28,5 +29,5 @@ class MapElementIds(enum.IntEnum):
     STOP_SIGN = 17
     CROSSWALK = 18
     SPEED_BUMP = 19
-    DRIVEWAY = 20 # # New in v1.2.0: Driveway entrances, this type does not exist in Waymax yet
+    DRIVEWAY = 20  # # New in v1.2.0: Driveway entrances, this type does not exist in Waymax yet
     UNKNOWN = -1

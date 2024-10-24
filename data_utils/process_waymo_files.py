@@ -93,8 +93,8 @@ def feature_class_to_map_id(map_feature):
     elif map_feature.HasField("speed_bump"):
         map_element_id = MapElementIds.SPEED_BUMP
     # New in WOMD v1.2.0: Driveway entrances
-    elif map_feature.HasField("driveway"): 
-        map_element_id = MapElementIds.DRIVEWAY 
+    elif map_feature.HasField("driveway"):
+        map_element_id = MapElementIds.DRIVEWAY
     else:
         map_element_id = MapElementIds.UNKNOWN
 
