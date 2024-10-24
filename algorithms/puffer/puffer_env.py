@@ -14,7 +14,7 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 
 def env_creator(name="gpudrive"):
-    return lambda: PufferGPUDrive(device="cpu")
+    return PufferGPUDrive(device="cpu") #lambda: PufferGPUDrive(device="cpu") 
 
 
 class PufferGPUDrive:
@@ -94,9 +94,8 @@ class PufferGPUDrive:
         """There is no point in closing the env because
         Madrona doesn't close correctly anyways. You will want
         to cache this copy for later use. Cuda errors if you don't"""
-        pass
-        # self.env.close()
-        # del self.env.sim
+        self.env.close()
+        del self.env.sim
 
     def reset(self, seed=None, options=None):
         self.reward = torch.zeros(self.num_agents, dtype=torch.float32).to(

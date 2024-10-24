@@ -232,6 +232,7 @@ if __name__ == "__main__":
     args["vec"] = pufferlib.namespace(**args["vec"])
     args = pufferlib.namespace(**args)
 
+    
     make_env = env_creator(args.env)
 
     if args.mode == "train":
