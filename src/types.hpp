@@ -448,4 +448,8 @@ struct ResetMap {
     {
     };
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> Revert changes related to road graph type conversion
