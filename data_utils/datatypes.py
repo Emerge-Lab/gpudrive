@@ -1,8 +1,9 @@
 # Const# Constants defined for map drawing parameters.
 import enum
 
+
 class MapElementIds(enum.IntEnum):
-    """Ids for different map elements to be mapped into a tensor to be consistent with 
+    """Ids for different map elements to be mapped into a tensor to be consistent with
     https://github.com/waymo-research/waymax/blob/main/waymax/datatypes/roadgraph.py.
 
     These integers represent the ID of these specific types as defined in:
@@ -27,4 +28,5 @@ class MapElementIds(enum.IntEnum):
     STOP_SIGN = 17
     CROSSWALK = 18
     SPEED_BUMP = 19
+    DRIVEWAY = 20 # # New in v1.2.0: Driveway entrances, this type does not exist in Waymax yet
     UNKNOWN = -1
