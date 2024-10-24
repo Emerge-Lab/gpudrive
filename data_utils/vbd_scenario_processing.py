@@ -57,19 +57,6 @@ def process_scenario():
 def construct_polylines(self, agents_history, agents_interested):
     """Get the global polylines information."""
 
-    # Automatically generate the waymax_types_to_gpudrive mapping using a dictionary comprehension
-    waymax_types_to_gpudrive = {
-        int(entity_type): gpudrive.mapRoadEntityTypeToID(entity_type)
-        for entity_type in [
-            gpudrive.EntityType._None,  # Using _None if None isn't allowed directly
-            gpudrive.EntityType.RoadEdge,
-            gpudrive.EntityType.RoadLine,
-            gpudrive.EntityType.RoadLane,
-            gpudrive.EntityType.CrossWalk,
-            gpudrive.EntityType.SpeedBump,
-            gpudrive.EntityType.StopSign,
-        ]
-    }
     # Have: p_x, p_y, scale, heading, type
     # Need: p_x, p_y, heading, traffic_light_state, lane_type
     global_road_graph = self.sim.map_observation_tensor().to_torch()
