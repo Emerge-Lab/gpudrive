@@ -497,4 +497,8 @@ namespace gpudrive
     {
     };
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> Revert changes related to road graph type conversion
