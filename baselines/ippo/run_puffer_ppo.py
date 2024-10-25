@@ -29,7 +29,7 @@ def make_policy(env, use_rnn):
 def train(args):
     args.wandb = None
     if args.track:
-        args.wandb = init_wandb(args, args.env, id=args.train.exp_id)
+        args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
         args.train.__dict__.update(dict(args.wandb.config.train))
     if args.vec.backend == "native":
         backend = pufferlib.vector.Native

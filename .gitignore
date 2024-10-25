@@ -35,6 +35,7 @@ data/processed/training/*
 /wandb
 /wandb*
 events.out.tfevents.*
+/runs*
 
 ### C++ ###
 # Prerequisites
@@ -115,7 +116,7 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
-#.cache
+.cache
 nosetests.xml
 coverage.xml
 *.cover

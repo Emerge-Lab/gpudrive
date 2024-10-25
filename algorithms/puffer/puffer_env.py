@@ -48,12 +48,7 @@ class PufferGPUDrive(PufferEnv):
             k_unique_scenes=k_unique_scenes,
         )
 
-        env_config = EnvConfig(
-            steer_actions=torch.round(
-                torch.linspace(-1.0, 1.0, 3), decimals=3
-            ),
-            accel_actions=torch.round(torch.linspace(-3, 3, 3), decimals=3),
-        )
+        env_config = EnvConfig()
 
         render_config = RenderConfig(
             draw_obj_idx=True,
