@@ -12,19 +12,25 @@ from pygpudrive.env.config import (
 )
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
+from pufferlib.environment import PufferEnv
+
 
 def env_creator(name="gpudrive"):
-    return PufferGPUDrive(device="cpu") #lambda: PufferGPUDrive(device="cpu") 
+    return lambda: PufferGPUDrive(device="cpu") #lambda: PufferGPUDrive(device="cpu") 
 
 
-class PufferGPUDrive:
+# TODO @NYU: Check max_cont_agents and scenes.
+# I think these are duplicated from config and conflicting
+class PufferGPUDrive(PufferEnv):
     def __init__(
         self,
         device="cuda",
-        max_cont_agents=64,
-        num_worlds=64,
+        max_cont_agents=128,
+        num_worlds=32,
         k_unique_scenes=1,
+        buf=None
     ):
+        assert buf is None, "GPUDrive set up only for --vec native"
         self.device = device
         self.max_cont_agents = max_cont_agents
         self.num_worlds = num_worlds
@@ -62,24 +68,27 @@ class PufferGPUDrive:
         )
 
         self.obs_size = self.env.observation_space.shape[-1]
-        self.action_space = self.env.action_space
-        self.observation_space = self.env.observation_space
-        self.observation_space = gymnasium.spaces.Box(
+        self.single_action_space = self.env.action_space
+        self.single_observation_space = gymnasium.spaces.Box(
             low=0, high=255, shape=(self.obs_size,), dtype=np.float32
         )
-        self.single_observation_space = self.observation_space
-        self.single_action_space = self.action_space
-        self.done = False
-        self.emulated = None
         self.render_mode = "rgb_array"
         self.num_live = []
+        self.num_agents = max_cont_agents * num_worlds
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
-        self.obs = self.env.reset()[self.controlled_agent_mask]
         self.num_controlled = self.controlled_agent_mask.sum().item()
-        self.num_agents = self.obs.shape[0]
-        self.env_id = np.array([i for i in range(self.num_agents)])
-        self.mask = np.ones(self.num_agents, dtype=bool)
+
+        observations = self.env.reset()[self.controlled_agent_mask]
+
+        # This assigns a bunch of buffers to self.
+        # You can't use them because you want torch, not numpy
+        # So I am careful to assign these afterwards
+        super().__init__()
+        self.observations = observations
+        self.num_agents = observations.shape[0]
+
+        self.masks = np.ones(self.num_agents, dtype=bool)
         self.actions = torch.zeros(
             (num_worlds, max_cont_agents), dtype=torch.int64
         ).to(self.device)
@@ -98,13 +107,13 @@ class PufferGPUDrive:
         del self.env.sim
 
     def reset(self, seed=None, options=None):
-        self.reward = torch.zeros(self.num_agents, dtype=torch.float32).to(
+        self.rewards = torch.zeros(self.num_agents, dtype=torch.float32).to(
             self.device
         )
-        self.terminal = torch.zeros(self.num_agents, dtype=torch.bool).to(
+        self.terminals = torch.zeros(self.num_agents, dtype=torch.bool).to(
             self.device
         )
-        self.truncated = torch.zeros(self.num_agents, dtype=torch.bool).to(
+        self.truncations = torch.zeros(self.num_agents, dtype=torch.bool).to(
             self.device
         )
 
@@ -117,15 +126,10 @@ class PufferGPUDrive:
         self.live_agent_mask = torch.ones(
             (self.num_worlds, self.max_cont_agents), dtype=bool
         ).to(self.device)
-        return (
-            self.obs,
-            self.reward,
-            self.terminal,
-            self.truncated,
-            [],
-            self.env_id,
-            self.mask,
-        )
+
+        self.observations[self.observations > 10] = 0
+        self.observations[self.observations < 10] = 0
+        return self.observations, []
 
     def step(self, action):
         action = torch.from_numpy(action).to(self.device)
@@ -139,18 +143,18 @@ class PufferGPUDrive:
         done_worlds = torch.where(
             (terminal.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
             == self.controlled_agent_mask.sum(dim=1)
-        )[0].cpu()
+        )[0].cpu().numpy()
 
         self.episode_returns += reward
         self.episode_lengths += 1
-        self.mask = (
+        self.masks = (
             self.live_agent_mask[self.controlled_agent_mask].cpu().numpy()
         )
         self.live_agent_mask[terminal] = 0
         terminal = terminal[self.controlled_agent_mask]
 
         info = []
-        self.num_live.append(self.mask.sum())
+        self.num_live.append(self.masks.sum())
 
         if len(done_worlds) > 0:
             controlled_mask = self.controlled_agent_mask[done_worlds]
@@ -182,20 +186,19 @@ class PufferGPUDrive:
 
             self.num_live = []
             for idx in done_worlds:
-                self.env.sim.reset(idx)
+                self.env.sim.reset([idx])
                 self.episode_returns[idx] = 0
                 self.episode_lengths[idx] = 0
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
 
-        return (
-            obs,
-            reward,
-            terminal,
-            self.truncated,
-            info,
-            self.env_id,
-            self.mask,
-        )
+        # LOOK INTO THIS. BROKEN DATA
+        obs[obs>10] = 0
+        obs[obs<-10] = 0
+
+        self.observations = obs
+        self.rewards = reward
+        self.terminals = terminal
+        return self.observations, self.rewards, self.terminals, self.truncations, info
 
     def render(self, world_render_idx=0):
         return self.env.render(world_render_idx=world_render_idx)

@@ -34,7 +34,9 @@ def train(args):
     if args.track:
         args.wandb = init_wandb(args, args.env, id=args.train.exp_id)
         args.train.__dict__.update(dict(args.wandb.config.train))
-    if args.vec.backend == "serial":
+    if args.vec.backend == "native":
+        backend = pufferlib.vector.Native
+    elif args.vec.backend == "serial":
         backend = pufferlib.vector.Serial
     elif args.vec.backend == "multiprocessing":
         backend = pufferlib.vector.Multiprocessing
@@ -42,7 +44,7 @@ def train(args):
         backend = pufferlib.vector.Ray
     else:
         raise ValueError(
-            f"Invalid --vec.backend (serial/multiprocessing/ray)."
+            f"Invalid --vec.backend (native/serial/multiprocessing/ray)."
         )
 
     vecenv = pufferlib.vector.make(
@@ -208,12 +210,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--vec.backend",
         type=str,
-        default="multiprocessing",
-        choices="serial multiprocessing ray".split(),
+        default="native",
+        choices="serial multiprocessing ray native".split(),
     )
-    parser.add_argument("--vec.num-envs", type=int, default=8)
-    parser.add_argument("--vec.num-workers", type=int, default=8)
-    parser.add_argument("--vec.env-batch-size", type=int, default=8)
+    parser.add_argument("--vec.num-envs", type=int, default=1)
+    parser.add_argument("--vec.num-workers", type=int, default=1)
+    parser.add_argument("--vec.env-batch-size", type=int, default=1)
     parser.add_argument("--vec.zero-copy", action="store_true")
     parsed = parser.parse_args()
 
