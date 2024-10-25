@@ -4,9 +4,9 @@ from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 import gpudrive
-import imageio
 from itertools import product
-from data_utils.vbd_scenario_processing import filter_topk_roadgraph_points
+
+from data_utils.vbd_data import process_scenario_data
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
@@ -64,7 +64,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # If there are warmup steps (by default, init_steps=0),
         # advance the simulator before returning the first observation
-        self.warmup_trajectory = self._update_sim_state_by_log(
+        self.sample_batch = self.advance_sim_with_log_playback(
             init_steps=self.config.init_steps,
             render_init=self.render_config.render_init,
         )
@@ -260,6 +260,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
+    def get_controlled_agents_mask(self):
+        """Get the control mask."""
+        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
+            axis=2
+        )
+
     def get_obs(self):
         """Get observation: Combine different types of environment information
         into a single tensor.
@@ -369,43 +375,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
-
-    def _update_sim_state_by_log(self, init_steps=0, render_init=False):
-        """Advances the simulator by stepping the objects with the inferred human actions.
+    
+    def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
+        """Advances the simulator by stepping the objects with the logged human trajectories.
 
         Args:
-            init_steps (int): Number of warmup steps to perform.
+            init_steps (int): Number of warmup steps.
         """
 
         if init_steps >= self.config.episode_len:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
-                "so num_steps should be less than 91."
+                f"so init_steps = {init_steps} should be < than 91."
             )
 
-        self.log_playback_traj, vel, pos, yaw = self.get_expert_actions(
+        self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions(
             full_output=True
         )
+        
+        road_graph = self.sim.map_observation_tensor().to_torch()
+        global_agent_observations = self.sim.absolute_self_observation_tensor().to_torch()
 
-        if self.config.enable_vbd:
-            from vbd.data.data_utils import calculate_relations
-
-            # Storage
-            agents_history = torch.zeros(
-                (self.num_worlds, self.max_cont_agents, init_steps + 1, 8)
-            )  # (32, 11, 8)
-            agents_future = torch.zeros(
-                (
-                    self.num_worlds,
-                    self.max_cont_agents,
-                    self.config.episode_len - init_steps,
-                    5,
-                )
-            )
         self.init_frames = []
+        
         for time_step in range(init_steps):
 
-            # Step
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
             )
@@ -413,17 +407,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
 
-        if self.config.enable_vbd:
-
-            process_scenario()
+        if self.config.return_vbd_data:
+            sample_batch = process_scenario_data(
+                num_envs=self.num_worlds,
+                max_controlled_agents=self.max_cont_agents,
+                controlled_agent_mask=self.cont_agent_mask,
+                global_agent_observations=global_agent_observations,
+                road_graph=road_graph,
+                episode_len=self.episode_len,
+                init_steps=init_steps,
+                positions=pos_xy,
+                velocities=vel_xy,
+                yaws=yaw,    
+            )
+            return sample_batch
         else:
             return None
-
-    def get_controlled_agents_mask(self):
-        """Get the control mask."""
-        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
-            axis=2
-        )
 
     def normalize_ego_state(self, state):
         """Normalize ego state features."""
@@ -453,7 +452,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return state
 
     def get_expert_actions(self, full_output=False):
-        """Get expert actions for the full trajectories across worlds."""
+        """Get expert actions for the full trajectories across worlds (scenarios)."""
 
         expert_traj = self.sim.expert_trajectory_tensor().to_torch()
 
@@ -649,20 +648,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    # CONFIGURE
-    TOTAL_STEPS = 90
+    
+    init_steps = 10
     MAX_NUM_OBJECTS = 32
     NUM_WORLDS = 1
 
     env_config = EnvConfig(
-        init_steps=10,
-        enable_vbd=True,
+        init_steps=init_steps,
+        return_vbd_data=True,
         dynamics_model="state",
     )
     render_config = RenderConfig()
     scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
 
-    # MAKE ENV
+    # Make env
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
@@ -671,17 +670,13 @@ if __name__ == "__main__":
         render_config=render_config,
     )
 
-    log_playback_traj = env.get_expert_actions()
-
-    # RUN
     obs = env.reset()
 
-    gpudrive_sample_batch = env.warmup_trajectory
-
-    env.get_expert_actions()
+    sample_batch = env.sample_batch
+    
     frames = []
 
-    for i in range(TOTAL_STEPS):
+    for i in range(env_config.episode_len - init_steps):
         print(f"Step: {i}")
 
         # Take a random actions
@@ -696,7 +691,6 @@ if __name__ == "__main__":
             ]
         ).reshape(NUM_WORLDS, env_config.max_num_agents_in_scene)
 
-        # Step the environment
         env.step_dynamics(rand_action)
 
         frames.append(env.render())
@@ -704,8 +698,5 @@ if __name__ == "__main__":
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-
-    # import imageio
-    imageio.mimsave("world1.gif", np.array(frames))
 
     env.close()
