@@ -335,17 +335,14 @@ def train(data):
                 data.last_log_time = time.time()
                 data.wandb.log(
                     {
-                        "0verview/SPS": profile.SPS,
-                        "0verview/agent_steps": data.global_step,
-                        "0verview/epoch": data.epoch,
-                        "0verview/learning_rate": data.optimizer.param_groups[
-                            0
-                        ]["lr"],
-                        **{
-                            f"environment/{k}": v
-                            for k, v in data.stats.items()
-                        },
-                        **{f"losses/{k}": v for k, v in data.losses.items()},
+                        "performance/SPS": profile.SPS,
+                        "global_step": data.global_step,
+                        "performance/epoch": data.epoch,
+                        "train/learning_rate": data.optimizer.param_groups[0][
+                            "lr"
+                        ],
+                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        **{f"train/{k}": v for k, v in data.losses.items()},
                         **{f"performance/{k}": v for k, v in data.profile},
                     }
                 )

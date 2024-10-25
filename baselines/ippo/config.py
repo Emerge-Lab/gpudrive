@@ -72,7 +72,7 @@ class ExperimentConfig:
     n_steps: int = 91  # Number of steps per rollout
     num_minibatches: int = 5  # Used to determine the minibatch size
     verbose: int = 0
-    total_timesteps: int = 2e7
+    total_timesteps: int = 3e7
     ent_coef: float = 0.00
     vf_coef: float = 0.5
     lr: float = 3e-4

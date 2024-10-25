@@ -92,23 +92,16 @@ class MultiAgentCallback(BaseCallback):
         """Log performance metrics to wandb."""
         total_agents = sum(self.num_agent_rollouts)
         metrics = {
+            "global_step": self.num_timesteps,
             "metrics/wallclock_time (s)": perf_counter() - self.start_training,
-            "metrics/global_step": self.num_timesteps,
-            "metrics/perc_off_road": sum(self.perc_off_road)
-            / total_agents
-            * 100,
+            "metrics/perc_off_road": sum(self.perc_off_road) / total_agents,
             "metrics/perc_veh_collisions": sum(self.perc_veh_collisions)
-            / total_agents
-            * 100,
+            / total_agents,
             "metrics/perc_non_veh_collision": sum(self.perc_non_veh_collision)
-            / total_agents
-            * 100,
+            / total_agents,
             "metrics/perc_goal_achieved": sum(self.perc_goal_achieved)
-            / total_agents
-            * 100,
-            "metrics/perc_truncated": sum(self.perc_truncated)
-            / total_agents
-            * 100,
+            / total_agents,
+            "metrics/perc_truncated": sum(self.perc_truncated) / total_agents,
         }
         wandb.log(metrics)
 
@@ -213,11 +206,11 @@ class MultiAgentCallback(BaseCallback):
         frames = np.array(frames)
         wandb.log(
             {
-                f"{video_title}: {self.num_timesteps:,}": wandb.Video(
+                f"env_idx: {render_world_idx}": wandb.Video(
                     np.moveaxis(frames, -1, 1),
                     fps=15,
-                    format="gif",
-                    caption=caption,
+                    format="mp4",
+                    caption=f"Step {self.num_timesteps:,}",
                 )
             }
         )

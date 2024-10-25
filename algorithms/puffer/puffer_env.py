@@ -25,7 +25,7 @@ class PufferGPUDrive(PufferEnv):
         data_dir,
         device="cuda",
         max_cont_agents=128,
-        num_worlds=32,
+        num_worlds=50,
         k_unique_scenes=1,
         buf=None,
     ):
@@ -162,18 +162,14 @@ class PufferGPUDrive(PufferEnv):
             num_finished_agents = controlled_mask.sum().item()
             info.append(
                 {
-                    "off_road": info_tensor[:, 0].sum().item()
+                    "perc_off_road": info_tensor[:, 0].sum().item()
                     / num_finished_agents,
-                    "veh_collisions": info_tensor[:, 1].sum().item()
+                    "perc_veh_collisions": info_tensor[:, 1].sum().item()
                     / num_finished_agents,
-                    "non_veh_collisions": info_tensor[:, 2].sum().item()
+                    "perc_non_veh_collision": info_tensor[:, 2].sum().item()
                     / num_finished_agents,
-                    "goal_achieved": info_tensor[:, 3].sum().item()
+                    "perc_goal_achieved": info_tensor[:, 3].sum().item()
                     / num_finished_agents,
-                    "num_finished_agents": num_finished_agents,
-                    "episode_length": self.episode_lengths[done_worlds]
-                    .mean()
-                    .item(),
                     "mean_reward_per_episode": self.episode_returns[
                         done_worlds
                     ]
@@ -181,6 +177,10 @@ class PufferGPUDrive(PufferEnv):
                     .item(),
                     "control_density": self.num_controlled / self.num_agents,
                     "data_density": np.mean(self.num_live) / self.num_agents,
+                    "num_finished_agents": num_finished_agents,
+                    "episode_length": self.episode_lengths[done_worlds]
+                    .mean()
+                    .item(),
                 }
             )
 

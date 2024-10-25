@@ -99,6 +99,7 @@ class IPPO(PPO):
         self.policy.set_training_mode(False)
 
         n_steps = 0
+        CASPS = 0
         rollout_buffer.reset()
         # Sample new weights for the state dependent exploration
         if self.use_sde:
@@ -161,7 +162,7 @@ class IPPO(PPO):
                 nn_fps = actions_tmp.shape[0] / (
                     time.perf_counter() - time_actions
                 )
-                self.logger.record("rollout/nn_fps", nn_fps)
+                self.logger.record("performance/network_AFPS", nn_fps)
 
                 # Predict actions, vals and log_probs given obs
                 (
@@ -193,7 +194,8 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of valid samples in rollout step
+            # EDIT_2: Increment the global step by the number of valid samples
+            # (i.e., samples that are from controlled and alive agents
             self.num_timesteps += int((~rewards.isnan()).float().sum().item())
             self.resample_counter += int(
                 (~rewards.isnan()).float().sum().item()
@@ -203,6 +205,7 @@ class IPPO(PPO):
             if callback.on_step() is False:
                 return False
             n_steps += 1
+            CASPS += int(alive_agent_mask.sum().item())
 
             if isinstance(self.action_space, spaces.Discrete):
                 # Reshape in case of discrete action
@@ -223,7 +226,8 @@ class IPPO(PPO):
         total_steps = self.n_envs * n_rollout_steps
         elapsed_time = time.perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        self.logger.record("charts/fps", fps)
+        self.logger.record("performance/rollout_SPS", fps)
+        self.logger.record("performance/rollout_CASPS", CASPS / elapsed_time)
 
         with torch.no_grad():
             # Compute value for the last timestep

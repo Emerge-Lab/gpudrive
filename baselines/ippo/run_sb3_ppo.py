@@ -60,7 +60,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
     # INIT WANDB
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"gpudrive_{datetime_}_{exp_config.k_unique_scenes}scenes"
+    run_id = f"{datetime_}_{exp_config.k_unique_scenes}scenes"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,
@@ -115,6 +115,8 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 if __name__ == "__main__":
 
     exp_config = pyrallis.parse(config_class=ExperimentConfig)
+
+    exp_config.project_name = "pufferlib-integration"
 
     scene_config = SceneConfig(
         path=exp_config.data_dir,
