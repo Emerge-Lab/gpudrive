@@ -23,6 +23,7 @@ pyximport.install(setup_args={"include_dirs": np.get_include()})
 
 from algorithms.puffer.c_gae import compute_gae
 from algorithms.puffer.logging import print_dashboard, abbreviate
+from algorithms.puffer.utils import make_video
 
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
@@ -312,6 +313,8 @@ def train(data):
         data.epoch += 1
 
         done_training = data.global_step >= config.total_timesteps
+
+        # Logging
         if profile.update(data) or done_training:
             print_dashboard(
                 config.env,
@@ -346,6 +349,21 @@ def train(data):
                         **{f"performance/{k}": v for k, v in data.profile},
                     }
                 )
+
+                # TODO(dc): Improve efficiency of video logging
+                for env_idx in range(1):
+                    frames = make_video(data, env_idx=0)
+
+                    data.wandb.log(
+                        {
+                            f"env_idx: {env_idx}": data.wandb.Video(
+                                np.moveaxis(frames, -1, 1),
+                                fps=20,
+                                format="mp4",
+                                caption=f"Step {data.global_step:,}",
+                            )
+                        }
+                    )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
@@ -681,8 +699,6 @@ def rollout(
     driver = env.driver_env
     os.system("clear")
     state = None
-
-    T()
 
     while True:
         render = driver.render()

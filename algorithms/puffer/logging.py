@@ -1,6 +1,7 @@
 import rich
 from rich.console import Console
 from rich.table import Table
+import numpy as np
 
 ROUND_OPEN = rich.box.Box(
     "╭──╮\n" "│  │\n" "│  │\n" "│  │\n" "│  │\n" "│  │\n" "│  │\n" "╰──╯\n"

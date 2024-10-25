@@ -19,8 +19,6 @@ def env_creator(name="gpudrive", data_dir="data/processed/examples"):
     return lambda: PufferGPUDrive(data_dir=data_dir, device="cuda")
 
 
-# TODO @NYU: Check max_cont_agents and scenes.
-# I think these are duplicated from config and conflicting
 class PufferGPUDrive(PufferEnv):
     def __init__(
         self,
@@ -58,7 +56,7 @@ class PufferGPUDrive(PufferEnv):
         )
 
         render_config = RenderConfig(
-            resolution=(512, 512),  # Quality of the rendered images
+            draw_obj_idx=True,
         )
 
         self.env = GPUDriveTorchEnv(
@@ -106,7 +104,6 @@ class PufferGPUDrive(PufferEnv):
         Madrona doesn't close correctly anyways. You will want
         to cache this copy for later use. Cuda errors if you don't"""
         self.env.close()
-        del self.env.sim
 
     def reset(self, seed=None, options=None):
         self.rewards = torch.zeros(self.num_agents, dtype=torch.float32).to(

@@ -1,13 +1,10 @@
 from torch import nn
 import torch
 import torch.nn.functional as F
-
+from pdb import set_trace as T
 from functools import partial
 import pufferlib.models
-
-from pufferlib.models import Default as Policy
-
-Recurrent = pufferlib.models.LSTMWrapper
+import numpy as np
 
 EGO_STATE_DIM = 6
 PARTNER_DIM = 10
@@ -16,6 +13,34 @@ ROAD_MAP_DIM = 13
 MAX_CONTROLLED_VEHICLES = 32
 ROADMAP_AGENT_FEAT_DIM = MAX_CONTROLLED_VEHICLES - 1
 TOP_K_ROADPOINTS = 64  # Number of visible roadpoints from the road graph
+
+
+def make_video(data, env_idx=0):
+    """Make a video of the agent's trajectory."""
+    frames = []
+    env = data.vecenv
+    policy = data.policy
+
+    obs, _ = env.reset()
+
+    with torch.no_grad():
+        for _ in range(env.env.episode_len):
+
+            # Get actions
+            action, _, _, _ = policy(obs)
+            action = action.cpu().numpy()
+
+            # Step
+            obs, _, terminated, truncated, _ = env.step(action)
+
+            # Render
+            frame = env.render(env_idx)
+            frames.append(frame)
+
+            if terminated.all() or truncated.all():
+                break
+
+    return np.array(frames)
 
 
 def unpack_obs(obs_flat):
