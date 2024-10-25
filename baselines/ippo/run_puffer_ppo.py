@@ -1,9 +1,6 @@
-"""The main demo script includes yaml configs for all environments,
-dynamic loading of environments, and other advanced features. If you
-just want to run on a single environment, this is a simpler option."""
-
 from pdb import set_trace as T
 import argparse
+from datetime import datetime
 import os
 
 import torch
@@ -55,9 +52,11 @@ def train(args):
         zero_copy=args.vec.zero_copy,
         backend=backend,
     )
+
     policy = make_policy(vecenv.driver_env, args.use_rnn).to(args.train.device)
 
     args.train.env = args.env
+
     data = clean_pufferl.create(args.train, vecenv, policy, wandb=args.wandb)
     while data.global_step < args.train.total_timesteps:
         try:
@@ -87,7 +86,6 @@ def init_wandb(args, name, id=None, resume=True):
             "vec": dict(args.vec),
         },
         name=name,
-        monitor_gym=True,
         save_code=True,
         resume=resume,
     )
@@ -135,13 +133,18 @@ if __name__ == "__main__":
         formatter_class=RichHelpFormatter,
         add_help=False,
     )
-    parser.add_argument("--env", type=str, default="BreakoutNoFrameskip-v4")
+    parser.add_argument("--env", type=str, default="gpudrive")
+    parser.add_argument(
+        "--data-dir", type=str, default="data/processed/examples"
+    )
+
     parser.add_argument(
         "--mode",
         type=str,
         default="train",
         choices="train eval evaluate sweep autotune baseline profile".split(),
     )
+
     parser.add_argument("--use-rnn", action="store_true")
     parser.add_argument(
         "--eval-model-path",
@@ -173,7 +176,11 @@ if __name__ == "__main__":
     parser.add_argument("--track", action="store_true", help="Track on WandB")
 
     # Train configuration
-    parser.add_argument("--train.exp-id", type=str, default=None)
+    parser.add_argument(
+        "--train.exp-id",
+        type=str,
+        default=datetime.now().strftime("%m_%d_%H_%S"),
+    )
     parser.add_argument("--train.seed", type=int, default=1)
     parser.add_argument("--train.torch-deterministic", action="store_true")
     parser.add_argument("--train.cpu-offload", action="store_true")
@@ -198,7 +205,8 @@ if __name__ == "__main__":
     parser.add_argument("--train.vf-clip-coef", type=float, default=0.1)
     parser.add_argument("--train.max-grad-norm", type=float, default=0.5)
     parser.add_argument("--train.target-kl", type=float, default=None)
-    parser.add_argument("--train.checkpoint-interval", type=int, default=200)
+    parser.add_argument("--train.checkpoint-interval", type=int, default=5000)
+    parser.add_argument("--train.checkpoint-path", type=str, default="./runs")
     parser.add_argument("--train.batch-size", type=int, default=1024)
     parser.add_argument("--train.minibatch-size", type=int, default=512)
     parser.add_argument("--train.bptt-horizon", type=int, default=16)
@@ -206,7 +214,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train.compile-mode", type=str, default="reduce-overhead"
     )
-
     parser.add_argument(
         "--vec.backend",
         type=str,
@@ -232,10 +239,10 @@ if __name__ == "__main__":
 
     args["train"] = pufferlib.namespace(**args["train"])
     args["vec"] = pufferlib.namespace(**args["vec"])
+
     args = pufferlib.namespace(**args)
 
-    
-    make_env = env_creator(args.env)
+    make_env = env_creator(name=args.env, data_dir=args.data_dir)
 
     if args.mode == "train":
         train(args)

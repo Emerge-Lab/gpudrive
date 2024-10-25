@@ -1,6 +1,5 @@
 from pdb import set_trace as T
 import numpy as np
-
 import os
 import random
 import psutil
@@ -141,23 +140,23 @@ def evaluate(data):
     with profile.eval_misc:
         data.stats = {}
 
-        # Moves into models... maybe. Definitely moves.
-        # You could also just return infos and have it in demo
-        if "pokemon_exploration_map" in infos:
-            for pmap in infos["pokemon_exploration_map"]:
-                if not hasattr(data, "pokemon_map"):
-                    import pokemon_red_eval
+        # # Moves into models... maybe. Definitely moves.
+        # # You could also just return infos and have it in demo
+        # if "pokemon_exploration_map" in infos:
+        #     for pmap in infos["pokemon_exploration_map"]:
+        #         if not hasattr(data, "pokemon_map"):
+        #             import pokemon_red_eval
 
-                    data.map_updater = pokemon_red_eval.map_updater()
-                    data.pokemon_map = pmap
+        #             data.map_updater = pokemon_red_eval.map_updater()
+        #             data.pokemon_map = pmap
 
-                data.pokemon_map = np.maximum(data.pokemon_map, pmap)
+        #         data.pokemon_map = np.maximum(data.pokemon_map, pmap)
 
-            if len(infos["pokemon_exploration_map"]) > 0:
-                rendered = data.map_updater(data.pokemon_map)
-                data.stats["Media/exploration_map"] = data.wandb.Image(
-                    rendered
-                )
+        #     if len(infos["pokemon_exploration_map"]) > 0:
+        #         rendered = data.map_updater(data.pokemon_map)
+        #         data.stats["Media/exploration_map"] = data.wandb.Image(
+        #             rendered
+        #         )
 
         for k, v in infos.items():
             if "_map" in k and data.wandb is not None:
@@ -612,8 +611,9 @@ class Utilization(Thread):
 
 
 def save_checkpoint(data):
+
     config = data.config
-    path = os.path.join(config.data_dir, config.exp_id)
+    path = os.path.join(config.checkpoint_path, config.exp_id)
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -636,8 +636,9 @@ def save_checkpoint(data):
 
 
 def try_load_checkpoint(data):
+
     config = data.config
-    path = os.path.join(config.data_dir, config.exp_id)
+    path = os.path.join(config.checkpoint_path, config.exp_id)
     if not os.path.exists(path):
         print("No checkpoints found. Assuming new experiment")
         return
@@ -761,7 +762,6 @@ def fmt_perf(name, time, uptime):
     return f"{c1}{name}", duration(time), f"{b2}{percent:2d}%"
 
 
-# TODO: Add env name to print_dashboard
 def print_dashboard(
     env_name,
     utilization,

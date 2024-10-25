@@ -15,8 +15,8 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pufferlib.environment import PufferEnv
 
 
-def env_creator(name="gpudrive"):
-    return lambda: PufferGPUDrive(device="cpu") #lambda: PufferGPUDrive(device="cpu") 
+def env_creator(name="gpudrive", data_dir="data/processed/examples"):
+    return lambda: PufferGPUDrive(data_dir=data_dir, device="cuda")
 
 
 # TODO @NYU: Check max_cont_agents and scenes.
@@ -24,14 +24,16 @@ def env_creator(name="gpudrive"):
 class PufferGPUDrive(PufferEnv):
     def __init__(
         self,
+        data_dir,
         device="cuda",
         max_cont_agents=128,
         num_worlds=32,
         k_unique_scenes=1,
-        buf=None
+        buf=None,
     ):
         assert buf is None, "GPUDrive set up only for --vec native"
         self.device = device
+        self.data_dir = data_dir
         self.max_cont_agents = max_cont_agents
         self.num_worlds = num_worlds
         self.k_unique_scenes = k_unique_scenes
@@ -42,7 +44,7 @@ class PufferGPUDrive(PufferEnv):
         os.chdir(working_dir)
 
         scene_config = SceneConfig(
-            path="data/processed/examples",
+            path=data_dir,
             num_scenes=num_worlds,
             discipline=SelectionDiscipline.K_UNIQUE_N,
             k_unique_scenes=k_unique_scenes,
@@ -140,10 +142,16 @@ class PufferGPUDrive(PufferEnv):
         reward = self.env.get_rewards()[self.controlled_agent_mask]
         terminal = self.env.get_dones().bool()
 
-        done_worlds = torch.where(
-            (terminal.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
-            == self.controlled_agent_mask.sum(dim=1)
-        )[0].cpu().numpy()
+        done_worlds = (
+            torch.where(
+                (terminal.nan_to_num(0) * self.controlled_agent_mask).sum(
+                    dim=1
+                )
+                == self.controlled_agent_mask.sum(dim=1)
+            )[0]
+            .cpu()
+            .numpy()
+        )
 
         self.episode_returns += reward
         self.episode_lengths += 1
@@ -192,13 +200,19 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
 
         # LOOK INTO THIS. BROKEN DATA
-        obs[obs>10] = 0
-        obs[obs<-10] = 0
+        obs[obs > 10] = 0
+        obs[obs < -10] = 0
 
         self.observations = obs
         self.rewards = reward
         self.terminals = terminal
-        return self.observations, self.rewards, self.terminals, self.truncations, info
+        return (
+            self.observations,
+            self.rewards,
+            self.terminals,
+            self.truncations,
+            info,
+        )
 
     def render(self, world_render_idx=0):
         return self.env.render(world_render_idx=world_render_idx)
