@@ -197,7 +197,7 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
         and feature != "driveway"
     ):  # For road points
         geometry = [
-            {"x": p.x, "y": p.y, "z": p.z, "id": map_feature.id}
+            {"x": p.x, "y": p.y, "z": p.z}
             for p in getattr(
                 map_feature, map_feature.WhichOneof("feature_data")
             ).polyline
