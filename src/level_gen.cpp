@@ -235,7 +235,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
             size_t numPoints = roadInit.numPoints;
             for (size_t j = 1; j <= numPoints - 1; j++)
             {
-                auto road = ctx.data().roads[idx] = makeRoadEdge(ctx, roadInit.geometry[j - 1], roadInit.geometry[j], roadInit.type, roadInit.id[j-1]);
+                auto road = ctx.data().roads[idx] = makeRoadEdge(ctx, roadInit.geometry[j - 1], roadInit.geometry[j], roadInit.type, roadInit.id);
                 ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
                 if (idx >= consts::kMaxRoadEntityCount) return;
             }
@@ -246,7 +246,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         {
             assert(roadInit.numPoints >= 4);
             // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
-            auto road = ctx.data().roads[idx] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type, roadInit.id[0]);
+            auto road = ctx.data().roads[idx] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type, roadInit.id);
             ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
             break;
         }
@@ -254,7 +254,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         {
             assert(roadInit.numPoints >= 1);
             // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
-            auto road = ctx.data().roads[idx] = makeStopSign(ctx, roadInit.geometry[0], roadInit.id[0]);
+            auto road = ctx.data().roads[idx] = makeStopSign(ctx, roadInit.geometry[0], roadInit.id);
             ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
             break;
         }
