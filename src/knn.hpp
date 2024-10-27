@@ -114,7 +114,8 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
         referenceFrame.observationOf(ctx.get<madrona::base::Position>(roads[i]),
                                      ctx.get<madrona::base::Rotation>(roads[i]),
                                      ctx.get<madrona::base::Scale>(roads[i]),
-                                     ctx.get<gpudrive::EntityType>(roads[i]));
+                                     ctx.get<gpudrive::EntityType>(roads[i]),
+                                     static_cast<float>(ctx.get<RoadMapId>(roads[i]).id));
   }
 
   if (roadCount < K) {
@@ -130,7 +131,8 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
         ctx.get<madrona::base::Position>(roads[roadIdx]),
         ctx.get<madrona::base::Rotation>(roads[roadIdx]),
         ctx.get<madrona::base::Scale>(roads[roadIdx]),
-        ctx.get<gpudrive::EntityType>(roads[roadIdx]));
+        ctx.get<gpudrive::EntityType>(roads[roadIdx]),
+        static_cast<float>(ctx.get<RoadMapId>(roads[roadIdx]).id));
 
     const auto &kthNearestObservation = heap[0];
     bool isCurrentObservationCloser =

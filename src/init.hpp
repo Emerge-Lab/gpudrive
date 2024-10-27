@@ -42,6 +42,7 @@ namespace gpudrive
     {
         // std::array<MapPosition, MAX_POSITIONS> geometry;
         MapVector2 geometry[MAX_GEOMETRY];
+        uint32_t id[MAX_GEOMETRY];
         EntityType type;
         uint32_t numPoints;
         MapVector2 mean;

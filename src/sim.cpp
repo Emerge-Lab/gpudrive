@@ -53,6 +53,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentInterfaceEntity>();
     registry.registerComponent<RoadInterfaceEntity>();
     registry.registerComponent<AgentID>();
+    registry.registerComponent<RoadMapId>();
+
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
@@ -244,7 +246,7 @@ inline void collectMapObservationsSystem(Engine &ctx,
         }
 
         map_obs.obs[arrIndex] = referenceFrame.observationOf(
-            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), static_cast<float>(ctx.get<RoadMapId>(road).id));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxAgentMapObservationsCount) {
@@ -651,6 +653,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Rotation &rotation,
                                               const Goal &goal,
                                               const VehicleSize &vehicleSize,
+                                              const RoadMapId &roadMapId,
                                               AgentInterfaceEntity &agent_iface) {
 
     auto &out = ctx.get<AbsoluteSelfObservation>(agent_iface.e);
@@ -659,6 +662,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
     out.vehicle_size = vehicleSize;
+    out.id = static_cast<float>(roadMapId.id);
 }
 
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
@@ -757,7 +761,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, VehicleSize, AgentInterfaceEntity>>(
+                        Rotation, Goal, VehicleSize, RoadMapId, AgentInterfaceEntity>>(
         {clear_tmp});
 
     if (cfg.renderBridge) {

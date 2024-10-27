@@ -44,7 +44,8 @@ void destroyWorld(Engine &ctx);
                                             Scale scale,
                                             EntityType type,
                                             ObjectID objId,
-                                            ResponseType responseType)
+                                            ResponseType responseType, 
+                                            uint32_t roadIdx)
     {
         ctx.get<Position>(road) = pos;
         ctx.get<Rotation>(road) = rot;
@@ -52,6 +53,7 @@ void destroyWorld(Engine &ctx);
         ctx.get<EntityType>(road) = type;
         ctx.get<ObjectID>(road) = objId;
         ctx.get<ResponseType>(road) = responseType;
+        ctx.get<RoadMapId>(road).id = roadIdx;
         ctx.get<MapObservation>(ctx.get<RoadInterfaceEntity>(road).e) = MapObservation{.position = pos.xy(),
                                                                                        .scale = scale,
                                                                                        .heading = utils::quatToYaw(rot),
