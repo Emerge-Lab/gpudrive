@@ -57,7 +57,8 @@ void destroyWorld(Engine &ctx);
         ctx.get<MapObservation>(ctx.get<RoadInterfaceEntity>(road).e) = MapObservation{.position = pos.xy(),
                                                                                        .scale = scale,
                                                                                        .heading = utils::quatToYaw(rot),
-                                                                                       .type = (float)type};
+                                                                                       .type = (float)type,
+                                                                                       .id = static_cast<float>(roadIdx)};
     }
 
 } // namespace gpudrive
