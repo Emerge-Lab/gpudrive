@@ -34,7 +34,9 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"/home/aarav/gpudrive/data/new/tfrecord-00000-of-00150_1e41e4f90a5cae0a.json"};
+    std::vector<std::string> scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json",
+         "../data/processed/examples/tfrecord-00003-of-01000_109.json",
+         "../data/processed/examples/tfrecord-00012-of-01000_389.json"};
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
@@ -53,7 +55,7 @@ int main(int argc, char *argv[])
             .observationRadius = 100.0,
             .rewardParams = {
                 .rewardType = RewardType::DistanceBased,
-                .distanceToGoalThreshold = 2.0,
+                .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
             .maxNumControlledAgents = 0,
@@ -86,8 +88,8 @@ int main(int argc, char *argv[])
         // printf("Partner Obs\n");
         // partner_obs_printer.print();
 
-        printf("Map Obs\n");
-        map_obs_printer.print();
+        // printf("Map Obs\n");
+        // map_obs_printer.print();
 
         // printf("Shape\n");
         // shapePrinter.print();
@@ -101,8 +103,8 @@ int main(int argc, char *argv[])
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
 
-        // printf("Agent Map Obs\n");
-        // agent_map_obs_printer.print();
+        printf("Agent Map Obs\n");
+        agent_map_obs_printer.print();
 
         // printf("Info\n");
         // info_printer.print();
