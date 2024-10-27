@@ -207,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--train.target-kl", type=float, default=None)
     parser.add_argument("--train.checkpoint-interval", type=int, default=5000)
     parser.add_argument("--train.checkpoint-path", type=str, default="./runs")
-    parser.add_argument("--train.batch-size", type=int, default=1024)
+    parser.add_argument("--train.batch-size", type=int, default=512*50)
     parser.add_argument("--train.minibatch-size", type=int, default=512)
     parser.add_argument("--train.bptt-horizon", type=int, default=16)
     parser.add_argument("--train.compile", action="store_true")

@@ -24,8 +24,8 @@ class PufferGPUDrive(PufferEnv):
         self,
         data_dir,
         device="cuda",
-        max_cont_agents=128,
-        num_worlds=50,
+        max_cont_agents=32,
+        num_worlds=32,
         k_unique_scenes=1,
         buf=None,
     ):
@@ -73,6 +73,8 @@ class PufferGPUDrive(PufferEnv):
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_controlled = self.controlled_agent_mask.sum().item()
+        
+        print(f"Mean number controlled agents per scene: {self.num_controlled/num_worlds}")
 
         observations = self.env.reset()[self.controlled_agent_mask]
 
