@@ -252,14 +252,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def get_obs(self):
-        """Get observation: Combine different types of environment information into a single tensor.
-
-        Returns:
-            torch.Tensor: (num_worlds, max_agent_count, num_features)
-        """
-
-        # EGO STATE
+    def _get_ego_state(self):
+        """Get the ego state."""
         if self.config.ego_state:
             ego_states_unprocessed = (
                 self.sim.self_observation_tensor().to_torch()
@@ -274,8 +268,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ego_states = ego_states_unprocessed
         else:
             ego_states = torch.Tensor().to(self.device)
+        return ego_states
 
-        # PARTNER OBSERVATIONS
+    def _get_partner_obs(self):
+        """Get partner observations."""
         if self.config.partner_obs:
             partner_observations = (
                 self.sim.partner_observations_tensor().to_torch()
@@ -292,10 +288,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
         else:
             partner_observations = torch.Tensor().to(self.device)
+        return partner_observations
 
-        # ROAD MAP OBSERVATIONS
+    def _get_road_map_obs(self):
+        """Get road map observations."""
         if self.config.road_map_obs:
-
             road_map_observations_unprocessed = (
                 self.sim.agent_roadmap_tensor().to_torch()
             )
@@ -310,8 +307,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
         else:
             road_map_observations = torch.Tensor().to(self.device)
+        return road_map_observations
 
-        # LIDAR OBSERVATIONS
+    def _get_lidar_obs(self):
+        """Get lidar observations."""
         if self.config.lidar_obs:
             lidar_obs = (
                 self.sim.lidar_tensor()
@@ -322,6 +321,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             # Create empty lidar observations (num_lidar_samples, 4)
             lidar_obs = torch.Tensor().to(self.device)
+        return lidar_obs
+
+    def get_obs(self):
+        """Get observation: Combine different types of environment information into a single tensor.
+
+        Returns:
+            torch.Tensor: (num_worlds, max_agent_count, num_features)
+        """
+
+        # EGO STATE
+        ego_states = self._get_ego_state()
+
+        # PARTNER OBSERVATIONS
+        partner_observations = self._get_partner_obs()
+
+        # ROAD MAP OBSERVATIONS
+        road_map_observations = self._get_road_map_obs()
+
+        # LIDAR OBSERVATIONS
+        lidar_obs = self._get_lidar_obs()
 
         # Combine the observations
         obs_filtered = torch.cat(
