@@ -1,3 +1,4 @@
+from math import ceil
 import os
 import random
 import time
@@ -200,13 +201,17 @@ def run_simulation(
     return q.get()
 
 
+def repeat_to_N(scenes, N):
+    repeat_count = ceil(N / len(scenes))
+    return (scenes * repeat_count)[: N]
+
 if __name__ == "__main__":
 
-    DATA_FOLDER = "../formatted_json_v2_no_tl_train_processed"
-    BATCH_SIZE_LIST = [2, 4, 8, 16, 32, 64, 128, 256, 512]
+    DATA_FOLDER = "/home/aarav/gpudrive/data/processed/examples"
+    BATCH_SIZE_LIST = [50]
     ACTOR_TYPE = "random" # "expert_actor"
     DEVICE = "cuda"
-    DATASET_INIT = "first_n" # or "random"
+    DATASET_INIT = "pad_to_bs" # or "random"
     OBS_TYPE = "lidar" # or "lidar"
 
     scenes = [os.path.join(DATA_FOLDER, scene) for scene in os.listdir(DATA_FOLDER)]
@@ -231,6 +236,8 @@ if __name__ == "__main__":
             sampled_scenes = random.sample(scenes, batch_size)
         elif DATASET_INIT == "first_n":
             sampled_scenes = scenes[:batch_size]
+        elif DATASET_INIT == "pad_to_bs":
+            sampled_scenes = repeat_to_N(scenes, batch_size)
         pbar.set_description(
             f"Profiling gpudrive with batch size {batch_size} using {ACTOR_TYPE}"
         )
