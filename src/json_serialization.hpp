@@ -116,6 +116,7 @@ namespace gpudrive
             road.type = EntityType::StopSign;
         else
             road.type = EntityType::None;
+
         
         std::vector<MapVector2> geometry_points_;
         for(const auto &point: j.at("geometry"))
@@ -200,6 +201,10 @@ namespace gpudrive
                 road.geometry[i] = geometry_points_[i * sample_every_n_]; 
             }
             road.numPoints = num_sampled_points;
+        }
+
+        if (j.contains("id")) {
+            road.id = j.at("id").get<uint32_t>();
         }
 
         for (int i = 0; i < road.numPoints; i++)

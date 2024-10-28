@@ -108,7 +108,7 @@ TEST_F(ObservationsTest, TestObservations) {
                 ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
                 ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
                 ASSERT_EQ(flat_obs[idx+6], roadType);
-                idx += 7;
+                idx += gpudrive::MapObservationExportSize;
                 break;
             }
             else if(roadType == (float)gpudrive::EntityType::StopSign)
@@ -133,7 +133,7 @@ TEST_F(ObservationsTest, TestObservations) {
             ASSERT_NEAR(flat_obs[idx], dx, test_utils::EPSILON);
             ASSERT_NEAR(flat_obs[idx+1], dy, test_utils::EPSILON);
             ASSERT_FLOAT_EQ(flat_obs[idx+6], roadType) << "i = " << i << " j = " << j << " idx = " << idx;
-            idx += 7;
+            idx += gpudrive::MapObservationExportSize;
         }
         if(idx >= flat_obs.size())
         {

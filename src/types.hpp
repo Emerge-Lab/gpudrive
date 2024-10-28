@@ -165,6 +165,7 @@ struct ResetMap {
         Scale scale;
         float heading;
         float type;
+        float id;
 
         static inline MapObservation zero()
         {
@@ -172,11 +173,13 @@ struct ResetMap {
                 .position = {0, 0},
                 .scale = madrona::math::Diag3x3{0, 0, 0},
                 .heading = 0,
-                .type = static_cast<float>(EntityType::None)};
+                .type = static_cast<float>(EntityType::None),
+                .id = -1
+            };       
         }
     };
 
-    const size_t MapObservationExportSize = 7;
+    const size_t MapObservationExportSize = 8;
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -200,6 +203,14 @@ struct ResetMap {
     }
 };
 
+    struct RoadMapId{
+        int32_t id;
+    };
+
+    const size_t RoadMapIdExportSize = 1;
+
+    static_assert(sizeof(RoadMapId) == sizeof(int) * RoadMapIdExportSize);
+
     // Egocentric observations of other agents
     struct PartnerObservations
     {
@@ -216,7 +227,7 @@ struct ResetMap {
         MapObservation obs[consts::kMaxAgentMapObservationsCount];
     };
 
-    const size_t AgentMapObservationExportSize = 7;
+    const size_t AgentMapObservationExportSize = 8;
 
     static_assert(sizeof(AgentMapObservations) ==
                   sizeof(float) * consts::kMaxAgentMapObservationsCount *
@@ -301,9 +312,10 @@ struct ResetMap {
         AbsoluteRotation rotation;
         Goal goal;
         VehicleSize vehicle_size;
+        float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 12; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
@@ -401,6 +413,7 @@ struct ResetMap {
                                Velocity,
                                RoadInterfaceEntity,
                                EntityType,
+                               RoadMapId,
                                madrona::render::Renderable>
     {
     };

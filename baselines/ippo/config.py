@@ -28,7 +28,7 @@ class ExperimentConfig:
     off_road_weight: float = 0.0
 
     # RESAMPLE TRAFFIC SCENARIOS
-    resample_scenarios: bool = True
+    resample_scenarios: bool = False
     resample_criterion: str = "global_step"  # Options: "global_step"
     resample_freq: int = 1e6  # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
     resample_mode: str = "random"  # Options: "random"

@@ -579,7 +579,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(dynamics_model="state")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(

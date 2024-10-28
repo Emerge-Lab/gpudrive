@@ -169,10 +169,10 @@ class PyGameVisualizer:
         for i in range(map_infos.shape[0]):
             map_info = map_infos[i]
             map_info = map_info[
-                map_info[:, -1] != float(gpudrive.EntityType.Padding)
+                map_info[:, 6] != float(gpudrive.EntityType.Padding)
             ]
             roads = map_info[
-                map_info[:, -1] <= float(gpudrive.EntityType.RoadLane)
+                map_info[:, 6] <= float(gpudrive.EntityType.RoadLane)
             ]
             endpoints = PyGameVisualizer.get_all_endpoints(roads)
 
@@ -280,10 +280,10 @@ class PyGameVisualizer:
         """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
-            if map_obj[-1] == float(gpudrive.EntityType.Padding) or map_obj[-1] == float(gpudrive.EntityType._None):
+            if map_obj[6] == float(gpudrive.EntityType.Padding) or map_obj[6] == float(gpudrive.EntityType._None):
                 continue
 
-            elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
+            elif map_obj[6] <= float(gpudrive.EntityType.RoadLane):
                 start, end = PyGameVisualizer.get_endpoints(
                     map_obj[:2], map_obj
                 )
@@ -291,12 +291,12 @@ class PyGameVisualizer:
                 end = self.scale_coords(end, world_render_idx)
 
                 # DRAW ROAD EDGE
-                if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
+                if map_obj[6] == float(gpudrive.EntityType.RoadEdge):
                     self.draw_line(
                         surf,
                         start,
                         end,
-                        self.color_dict[map_obj[-1]],
+                        self.color_dict[map_obj[6]],
                         thickness=self.render_config.line_thickness,
                     )
 
@@ -306,12 +306,12 @@ class PyGameVisualizer:
                         surf,
                         start,
                         end,
-                        self.color_dict[map_obj[-1]],
+                        self.color_dict[map_obj[6]],
                         thickness=self.render_config.line_thickness,
                     )
 
             # DRAW STOP SIGNS
-            elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
+            elif map_obj[6] <= float(gpudrive.EntityType.StopSign):
 
                 center, width, height, rotation = (
                     map_obj[:2],
@@ -319,7 +319,7 @@ class PyGameVisualizer:
                     map_obj[2],
                     map_obj[5],
                 )
-                if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+                if map_obj[6] == float(gpudrive.EntityType.StopSign):
 
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
@@ -331,16 +331,16 @@ class PyGameVisualizer:
                     box_corners[i] = self.scale_coords(
                         box_corner, world_render_idx
                     )
-                if map_obj[-1] == float(gpudrive.EntityType.SpeedBump):
+                if map_obj[6] == float(gpudrive.EntityType.SpeedBump):
                     pygame.gfxdraw.aapolygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
                 else:
                     pygame.gfxdraw.aapolygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
                     pygame.gfxdraw.filled_polygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
 
     def init_map(self):
@@ -421,9 +421,9 @@ class PyGameVisualizer:
                 info_tensor = self.sim.info_tensor().to_torch()[
                     world_render_idx
                 ]
-                if info_tensor[agent_idx, -1] == float(
+                if info_tensor[agent_idx, 6] == float(
                     gpudrive.EntityType.Padding
-                ) or info_tensor[agent_idx, -1] == float(
+                ) or info_tensor[agent_idx, 6] == float(
                     gpudrive.EntityType._None
                 ):
                     continue
@@ -437,8 +437,8 @@ class PyGameVisualizer:
                     .numpy()
                 )
                 agent_map_info = agent_map_info[
-                    (agent_map_info[:, -1] != 0.0)
-                    & (agent_map_info[:, -1] != 10.0)
+                    (agent_map_info[:, 6] != 0.0)
+                    & (agent_map_info[:, 6] != 10.0)
                 ]
 
                 agent_info = (
@@ -500,7 +500,7 @@ class PyGameVisualizer:
                     agent_pos = agent[1:3]
                     agent_rot = agent[3]
                     agent_size = agent[4:6]
-                    agent_type = agent[-1]
+                    agent_type = agent[6]
 
                     agent_corners = PyGameVisualizer.compute_agent_corners(
                         agent_pos,
