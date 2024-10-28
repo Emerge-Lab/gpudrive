@@ -91,7 +91,7 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = (
-        "sparse_on_goal_achieved" # Alternatively, "weighted_combination" 
+        "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
     )
 
     dist_to_goal_threshold: float = (
