@@ -653,7 +653,6 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Rotation &rotation,
                                               const Goal &goal,
                                               const VehicleSize &vehicleSize,
-                                              const RoadMapId &roadMapId,
                                               AgentInterfaceEntity &agent_iface) {
 
     auto &out = ctx.get<AbsoluteSelfObservation>(agent_iface.e);
@@ -662,7 +661,6 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
     out.vehicle_size = vehicleSize;
-    out.id = static_cast<float>(roadMapId.id);
 }
 
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
@@ -761,7 +759,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
-                        Rotation, Goal, VehicleSize, RoadMapId, AgentInterfaceEntity>>(
+                        Rotation, Goal, VehicleSize, AgentInterfaceEntity>>(
         {clear_tmp});
 
     if (cfg.renderBridge) {
