@@ -203,7 +203,9 @@ namespace gpudrive
             road.numPoints = num_sampled_points;
         }
 
-        road.id = j.at("id").get<uint32_t>();
+        if (j.contains("id")) {
+            road.id = j.at("id").get<uint32_t>();
+        }
 
         for (int i = 0; i < road.numPoints; i++)
         {
