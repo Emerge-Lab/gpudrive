@@ -53,6 +53,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentInterfaceEntity>();
     registry.registerComponent<RoadInterfaceEntity>();
     registry.registerComponent<AgentID>();
+    registry.registerComponent<RoadMapId>();
+
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
@@ -244,7 +246,7 @@ inline void collectMapObservationsSystem(Engine &ctx,
         }
 
         map_obs.obs[arrIndex] = referenceFrame.observationOf(
-            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road));
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), static_cast<float>(ctx.get<RoadMapId>(road).id));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxAgentMapObservationsCount) {

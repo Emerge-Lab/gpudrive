@@ -145,7 +145,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
 }
 
 static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
-                           const MapVector2 &p2, const EntityType &type) {                    
+                           const MapVector2 &p2, const EntityType &type, const uint32_t &id) {                    
     float z = 1 + (type == EntityType::RoadEdge ? consts::lidarRoadEdgeOffset : consts::lidarRoadLineOffset);
 
     Vector3 start{.x = p1.x - ctx.data().mean.x, .y = p1.y - ctx.data().mean.y, .z = z};
@@ -157,8 +157,11 @@ static Entity makeRoadEdge(Engine &ctx, const MapVector2 &p1,
     auto pos = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = z};
     auto rot = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
     auto scale = Diag3x3{.d0 = start.distance(end)/2, .d1 = 0.1, .d2 = 0.1};
-    setRoadEntitiesProps(ctx, road_edge, pos, rot, scale, type, ObjectID{(int32_t)SimObject::Cube}, ResponseType::Static);
+    setRoadEntitiesProps(ctx, road_edge, pos, rot, scale, type, ObjectID{(int32_t)SimObject::Cube}, ResponseType::Static, id);
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
+
+    
+
     return road_edge;
 }
 
@@ -167,7 +170,7 @@ float calculateDistance(float x1, float y1, float x2, float y2) {
 }
 
 static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, const MapVector2 &p3,
-                            const MapVector2 &p4, const EntityType &type) {
+                            const MapVector2 &p4, const EntityType &type, const uint32_t &id) {
     MapVector2 points[] = {p1, p2, p3, p4};
 
     // Calculate distances between consecutive points
@@ -200,12 +203,12 @@ static Entity makeCube(Engine &ctx, const MapVector2 &p1, const MapVector2 &p2, 
     auto pos = Vector3{.x = (p1.x + p2.x + p3.x + p4.x)/4 - ctx.data().mean.x, .y = (p1.y + p2.y + p3.y + p4.y)/4 - ctx.data().mean.y, .z = 1 + consts::lidarRoadLineOffset};
     auto rot = Quat::angleAxis(angle, madrona::math::up);
     auto scale = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
-    setRoadEntitiesProps(ctx, speed_bump, pos, rot, scale, type, ObjectID{(int32_t)SimObject::SpeedBump}, ResponseType::Static);
+    setRoadEntitiesProps(ctx, speed_bump, pos, rot, scale, type, ObjectID{(int32_t)SimObject::SpeedBump}, ResponseType::Static, id);
     registerRigidBodyEntity(ctx, speed_bump, SimObject::SpeedBump);
     return speed_bump;
 }
 
-static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
+static Entity makeStopSign(Engine &ctx, const MapVector2 &p1, const uint32_t &id) {
     float x1 = p1.x;
     float y1 = p1.y;
 
@@ -215,7 +218,7 @@ static Entity makeStopSign(Engine &ctx, const MapVector2 &p1) {
     auto pos = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 1};
     auto rot = Quat::angleAxis(0, madrona::math::up);
     auto scale = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 1};
-    setRoadEntitiesProps(ctx, stop_sign, pos, rot, scale, EntityType::StopSign, ObjectID{(int32_t)SimObject::StopSign}, ResponseType::Static);
+    setRoadEntitiesProps(ctx, stop_sign, pos, rot, scale, EntityType::StopSign, ObjectID{(int32_t)SimObject::StopSign}, ResponseType::Static, id);
     registerRigidBodyEntity(ctx, stop_sign, SimObject::StopSign);
     return stop_sign;
 }
@@ -232,7 +235,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
             size_t numPoints = roadInit.numPoints;
             for (size_t j = 1; j <= numPoints - 1; j++)
             {
-                auto road = ctx.data().roads[idx] = makeRoadEdge(ctx, roadInit.geometry[j - 1], roadInit.geometry[j], roadInit.type);
+                auto road = ctx.data().roads[idx] = makeRoadEdge(ctx, roadInit.geometry[j - 1], roadInit.geometry[j], roadInit.type, roadInit.id);
                 ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
                 if (idx >= consts::kMaxRoadEntityCount) return;
             }
@@ -243,7 +246,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         {
             assert(roadInit.numPoints >= 4);
             // TODO: Speed Bump are not guranteed to have 4 points. Need to handle this case.
-            auto road = ctx.data().roads[idx] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type);
+            auto road = ctx.data().roads[idx] = makeCube(ctx, roadInit.geometry[0], roadInit.geometry[1], roadInit.geometry[2], roadInit.geometry[3], roadInit.type, roadInit.id);
             ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
             break;
         }
@@ -251,7 +254,7 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
         {
             assert(roadInit.numPoints >= 1);
             // TODO: Stop Sign are not guranteed to have 1 point. Need to handle this case.
-            auto road = ctx.data().roads[idx] = makeStopSign(ctx, roadInit.geometry[0]);
+            auto road = ctx.data().roads[idx] = makeStopSign(ctx, roadInit.geometry[0], roadInit.id);
             ctx.data().road_ifaces[idx++] = ctx.get<RoadInterfaceEntity>(road).e;
             break;
         }
@@ -266,7 +269,7 @@ static void createFloorPlane(Engine &ctx)
     setRoadEntitiesProps(ctx, ctx.data().floorPlane, Vector3{.x = 0, .y = 0, .z = 0},
                          Quat::angleAxis(0, madrona::math::up),
                          Diag3x3{.d0 = 100, .d1 = 100, .d2 = 0.1},
-                         EntityType::None, ObjectID{(int32_t)SimObject::Plane}, ResponseType::Static);
+                         EntityType::None, ObjectID{(int32_t)SimObject::Plane}, ResponseType::Static, 0);
     registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
 }
 
