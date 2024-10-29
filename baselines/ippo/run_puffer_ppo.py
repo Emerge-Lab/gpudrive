@@ -189,7 +189,7 @@ if __name__ == "__main__":
         default="cuda" if torch.cuda.is_available() else "cpu",
     )
     parser.add_argument(
-        "--train.total-timesteps", type=int, default=20_000_000
+        "--train.total-timesteps", type=int, default=100_000_000
     )
     parser.add_argument("--train.learning-rate", type=float, default=3e-4)
     parser.add_argument("--train.anneal-lr", action="store_false")
