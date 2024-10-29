@@ -424,7 +424,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
-    
+
     def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
@@ -459,7 +459,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
 
         self.init_frames = []
-        
+
         for time_step in range(init_steps):
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
@@ -838,18 +838,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    
     init_steps = 10
     MAX_NUM_OBJECTS = 32
     NUM_WORLDS = 1
 
     env_config = EnvConfig(
-        init_steps=init_steps,
-        return_vbd_data=True,
-        dynamics_model="state",
+        init_steps=init_steps,  # Warmup period
+        return_vbd_data=True,  # Use VBD
+        dynamics_model="state",  # Use state-based dynamics model
+        dist_to_goal_threshold=1e-5,  # Trick to make sure the agents don't disappear when they reach the goal
+        collision_behavior="ignore",  # Ignore collisions
     )
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/validation", NUM_WORLDS)
 
     # Make env
     env = GPUDriveTorchEnv(
@@ -863,7 +864,7 @@ if __name__ == "__main__":
     obs = env.reset()
 
     sample_batch = env.sample_batch
-    
+
     frames = []
 
     for t in range(TOTAL_STEPS):
