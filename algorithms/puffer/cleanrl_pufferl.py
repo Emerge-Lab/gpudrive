@@ -44,6 +44,8 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     total_agents = vecenv.num_agents
 
     lstm = policy.lstm if hasattr(policy, "lstm") else None
+
+    # Rollout buffer
     experience = Experience(
         config.batch_size,
         config.bptt_horizon,
@@ -77,6 +79,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         losses=losses,
         wandb=wandb,
         global_step=0,
+        global_step_pad=0,
         epoch=0,
         stats={},
         msg=msg,
@@ -94,13 +97,17 @@ def evaluate(data):
         infos = defaultdict(list)
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
 
+    # Rollout loop
     while not experience.full:
         with profile.env:
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
+            # Incremented by the number of controlled valid agents
             data.global_step += sum(mask)
+            # Incremented by _all_ entries, including the padding agents
+            data.global_step_pad += data.vecenv.total_agents
 
             o = torch.as_tensor(o)
             o_device = o.to(config.device)
@@ -133,35 +140,17 @@ def evaluate(data):
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     infos[k].append(v)
 
+        # Step the environment
         with profile.env:
             data.vecenv.send(actions)
 
     with profile.eval_misc:
         data.stats = {}
 
-        # # Moves into models... maybe. Definitely moves.
-        # # You could also just return infos and have it in demo
-        # if "pokemon_exploration_map" in infos:
-        #     for pmap in infos["pokemon_exploration_map"]:
-        #         if not hasattr(data, "pokemon_map"):
-        #             import pokemon_red_eval
-
-        #             data.map_updater = pokemon_red_eval.map_updater()
-        #             data.pokemon_map = pmap
-
-        #         data.pokemon_map = np.maximum(data.pokemon_map, pmap)
-
-        #     if len(infos["pokemon_exploration_map"]) > 0:
-        #         rendered = data.map_updater(data.pokemon_map)
-        #         data.stats["Media/exploration_map"] = data.wandb.Image(
-        #             rendered
-        #         )
-
         for k, v in infos.items():
             if "_map" in k and data.wandb is not None:
                 data.stats[f"Media/{k}"] = data.wandb.Image(v[0])
                 continue
-
             try:  # TODO: Better checks on log data types
                 data.stats[k] = np.mean(v)
             except:
@@ -335,7 +324,10 @@ def train(data):
                 data.last_log_time = time.time()
                 data.wandb.log(
                     {
-                        "performance/SPS": profile.SPS,
+                        "performance/controlled_agent_sps": profile.controlled_agent_sps,
+                        "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
+                        "performance/pad_agent_sps": profile.pad_agent_sps,
+                        "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
                         "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "train/learning_rate": data.optimizer.param_groups[0][
@@ -343,7 +335,7 @@ def train(data):
                         ],
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
-                        **{f"performance/{k}": v for k, v in data.profile},
+                        # **{f"performance/{k}": v for k, v in data.profile},
                     }
                 )
 
@@ -381,7 +373,10 @@ def close(data):
 
 
 class Profile:
-    SPS: ... = 0
+    controlled_agent_sps: ... = 0
+    controlled_agent_sps_env: ... = 0
+    pad_agent_sps: ... = 0
+    pad_agent_sps_env: ... = 0
     uptime: ... = 0
     remaining: ... = 0
     eval_time: ... = 0
@@ -402,9 +397,14 @@ class Profile:
         self.learn = pufferlib.utils.Profiler()
         self.train_misc = pufferlib.utils.Profiler()
         self.prev_steps = 0
+        self.prev_steps_pad = 0
+        self.prev_env_elapsed = 0
 
     def __iter__(self):
-        yield "SPS", self.SPS
+        yield "controlled_agent_sps", self.controlled_agent_sps
+        yield "controlled_agent_sps_env", self.controlled_agent_sps_env
+        yield "pad_agent_sps", self.pad_agent_sps
+        yield "pad_agent_sps_env", self.pad_agent_sps_env
         yield "uptime", self.uptime
         yield "remaining", self.remaining
         yield "eval_time", self.eval_time
@@ -422,6 +422,7 @@ class Profile:
 
     def update(self, data, interval_s=1):
         global_step = data.global_step
+        global_step_pad = data.global_step_pad
         if global_step == 0:
             return True
 
@@ -429,11 +430,29 @@ class Profile:
         if uptime - self.uptime < interval_s:
             return False
 
-        self.SPS = (global_step - self.prev_steps) / (uptime - self.uptime)
+        # SPS = delta global step / delta time (s)
+        self.controlled_agent_sps = (global_step - self.prev_steps) / (
+            uptime - self.uptime
+        )
+        self.controlled_agent_sps_env = (global_step - self.prev_steps) / (
+            self.env.elapsed - self.prev_env_elapsed
+        )
+
+        self.pad_agent_sps = (global_step_pad - self.prev_steps_pad) / (
+            uptime - self.uptime
+        )
+        self.pad_agent_sps_env = (global_step_pad - self.prev_steps_pad) / (
+            self.env.elapsed - self.prev_env_elapsed
+        )
+
         self.prev_steps = global_step
+        self.prev_steps_pad = global_step_pad
+        self.prev_env_elapsed = self.env.elapsed
         self.uptime = uptime
 
-        self.remaining = (data.config.total_timesteps - global_step) / self.SPS
+        self.remaining = (
+            data.config.total_timesteps - global_step
+        ) / self.controlled_agent_sps
         self.eval_time = data._timers["evaluate"].elapsed
         self.eval_forward_time = self.eval_forward.elapsed
         self.env_time = self.env.elapsed

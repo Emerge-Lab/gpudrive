@@ -1,5 +1,5 @@
 import logging
-import time
+from time import perf_counter
 import wandb
 import torch
 from torch.nn import functional as F
@@ -54,6 +54,10 @@ class IPPO(PPO):
         self.mlp_class = mlp_class
         self.mlp_config = mlp_config
         self.resample_counter = 0
+        self.start = perf_counter()
+        self.prev_steps = 0
+        self.prev_steps_pad = 0
+        self.prev_env_elapsed = 0
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -224,10 +228,9 @@ class IPPO(PPO):
 
         # # # # # END LOOP # # # # #
         total_steps = self.n_envs * n_rollout_steps
-        elapsed_time = time.perf_counter() - time_rollout
+        elapsed_time = perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        self.logger.record("performance/rollout_SPS", fps)
-        self.logger.record("performance/rollout_CASPS", CASPS / elapsed_time)
+        self.logger.record("performance/controlled_agent_sps_rollout", fps)
 
         with torch.no_grad():
             # Compute value for the last timestep
@@ -445,3 +448,69 @@ class IPPO(PPO):
         self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
+
+    def learn(
+        self,
+        total_timesteps,
+        callback,
+        log_interval,
+        tb_log_name,
+        reset_num_timesteps,
+        progress_bar,
+    ):
+        iteration = 0
+
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps,
+            callback,
+            reset_num_timesteps,
+            tb_log_name,
+            progress_bar,
+        )
+
+        callback.on_training_start(locals(), globals())
+
+        assert self.env is not None
+
+        while self.num_timesteps < total_timesteps:
+            continue_training = self.collect_rollouts(
+                self.env,
+                callback,
+                self.rollout_buffer,
+                n_rollout_steps=self.n_steps,
+            )
+
+            if not continue_training:
+                break
+
+            iteration += 1
+            self._update_current_progress_remaining(
+                self.num_timesteps, total_timesteps
+            )
+
+            # Display training infos
+            if log_interval is not None and iteration % log_interval == 0:
+                assert self.ep_info_buffer is not None
+                self._dump_logs(iteration)
+
+            self.train()
+
+            # Profile the training loop
+            global_step = self.num_timesteps
+            uptime = perf_counter() - self.start
+            controlled_agent_sps = (global_step - self.prev_steps) / (
+                uptime - self.uptime
+            )
+
+            # Log
+            self.logger.record(
+                "performance/controlled_agent_sps", controlled_agent_sps
+            )
+
+            # Update
+            self.uptime = uptime
+            self.global_step_prev = global_step
+
+        callback.on_training_end()
+
+        return self

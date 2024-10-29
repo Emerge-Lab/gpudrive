@@ -1,3 +1,4 @@
+from pdb import set_trace as T
 import os
 import numpy as np
 from pathlib import Path
@@ -73,8 +74,10 @@ class PufferGPUDrive(PufferEnv):
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_controlled = self.controlled_agent_mask.sum().item()
-        
-        print(f"Mean number controlled agents per scene: {self.num_controlled/num_worlds}")
+
+        print(
+            f"Mean number controlled agents per scene: {self.num_controlled/num_worlds}"
+        )
 
         observations = self.env.reset()[self.controlled_agent_mask]
 
@@ -112,6 +115,8 @@ class PufferGPUDrive(PufferEnv):
         self.truncations = torch.zeros(self.num_agents, dtype=torch.bool).to(
             self.device
         )
+
+        # T()
 
         self.episode_returns = torch.zeros(
             self.num_agents, dtype=torch.float32
@@ -178,7 +183,7 @@ class PufferGPUDrive(PufferEnv):
                     .mean()
                     .item(),
                     "control_density": self.num_controlled / self.num_agents,
-                    "data_density": np.mean(self.num_live) / self.num_agents,
+                    "alive_density": np.mean(self.num_live) / self.num_agents,
                     "num_finished_agents": num_finished_agents,
                     "episode_length": self.episode_lengths[done_worlds]
                     .mean()

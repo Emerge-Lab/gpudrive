@@ -44,6 +44,7 @@ def train(args):
             f"Invalid --vec.backend (native/serial/multiprocessing/ray)."
         )
 
+    # Make vectorized environment
     vecenv = pufferlib.vector.make(
         make_env,
         num_envs=args.vec.num_envs,
@@ -53,10 +54,12 @@ def train(args):
         backend=backend,
     )
 
+    # Make policy
     policy = make_policy(vecenv.driver_env, args.use_rnn).to(args.train.device)
 
     args.train.env = args.env
 
+    # Training loop
     data = clean_pufferl.create(args.train, vecenv, policy, wandb=args.wandb)
     while data.global_step < args.train.total_timesteps:
         try:
