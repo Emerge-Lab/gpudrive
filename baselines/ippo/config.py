@@ -36,7 +36,7 @@ class ExperimentConfig:
     # RENDERING
     render: bool = True
     render_mode: str = "rgb_array"
-    render_freq: int = 50  # Render every k rollouts
+    render_freq: int = 500  # Render every k rollouts
     render_n_worlds: int = 3  # Number of worlds to render
 
     # TRACK THE TIME IT TAKES TO GET TO 95% GOAL RATE
@@ -68,13 +68,13 @@ class ExperimentConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_range: float = 0.2
+    clip_range_vf: float = None
     vf_coef: float = 0.5
     n_steps: int = 91  # Number of steps per rollout
     num_minibatches: int = 5  # Used to determine the minibatch size
     verbose: int = 0
     total_timesteps: int = 3e7
-    ent_coef: float = 0.00
-    vf_coef: float = 0.5
+    ent_coef: float = 0.0001
     lr: float = 3e-4
     n_epochs: int = 5
 

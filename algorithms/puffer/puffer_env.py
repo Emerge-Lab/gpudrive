@@ -26,7 +26,7 @@ class PufferGPUDrive(PufferEnv):
         data_dir,
         device="cuda",
         max_cont_agents=32,
-        num_worlds=32,
+        num_worlds=50,
         k_unique_scenes=1,
         buf=None,
     ):
@@ -177,7 +177,7 @@ class PufferGPUDrive(PufferEnv):
                     / num_finished_agents,
                     "perc_goal_achieved": info_tensor[:, 3].sum().item()
                     / num_finished_agents,
-                    "mean_reward_per_episode": self.episode_returns[
+                    "mean_episode_reward_per_agent": self.episode_returns[
                         done_worlds
                     ]
                     .mean()

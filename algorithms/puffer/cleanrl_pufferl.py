@@ -339,20 +339,21 @@ def train(data):
                     }
                 )
 
-                # TODO(dc): Improve efficiency of video logging
-                for env_idx in range(1):
-                    frames = make_video(data, env_idx=0)
+                if config.render and data.epoch % config.render_interval == 0:
+                    for env_idx in range(1):
+                        # TODO(dc): Improve efficiency and extend to multiple envs
+                        frames = make_video(data, env_idx=0)
 
-                    data.wandb.log(
-                        {
-                            f"env_idx: {env_idx}": data.wandb.Video(
-                                np.moveaxis(frames, -1, 1),
-                                fps=20,
-                                format="mp4",
-                                caption=f"Step {data.global_step:,}",
-                            )
-                        }
-                    )
+                        data.wandb.log(
+                            {
+                                f"env_idx: {env_idx}": data.wandb.Video(
+                                    np.moveaxis(frames, -1, 1),
+                                    fps=20,
+                                    format="mp4",
+                                    caption=f"Step {data.global_step:,}",
+                                )
+                            }
+                        )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
