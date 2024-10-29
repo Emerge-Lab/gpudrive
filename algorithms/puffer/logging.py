@@ -93,7 +93,7 @@ def print_dashboard(
     s.add_column(f"{c1}Value", justify="right", vertical="top", width=8)
     s.add_row(f"{c2}Environment", f"{b2}{env_name}")
     s.add_row(f"{c2}Agent Steps", abbreviate(global_step))
-    s.add_row(f"{c2}CASPS", abbreviate(profile.controlled_agent_sps))
+    s.add_row(f"{c2}SPS", abbreviate(profile.controlled_agent_sps))
     s.add_row(f"{c2}Epoch", abbreviate(epoch))
     s.add_row(f"{c2}Uptime", duration(profile.uptime))
     s.add_row(f"{c2}Remaining", duration(profile.remaining))
