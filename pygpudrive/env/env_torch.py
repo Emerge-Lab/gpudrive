@@ -375,7 +375,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         return obs_filtered
-    
+
     def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
@@ -392,12 +392,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions(
             full_output=True
         )
-        
-        road_graph = self.sim.map_observation_tensor().to_torch()
-        global_agent_observations = self.sim.absolute_self_observation_tensor().to_torch()
+
+        global_road_graph = self.sim.map_observation_tensor().to_torch()
+        local_road_graph = self.sim.agent_roadmap_tensor().to_torch()
+        global_agent_observations = (
+            self.sim.absolute_self_observation_tensor().to_torch()
+        )
 
         self.init_frames = []
-        
+
         for time_step in range(init_steps):
 
             self.step_dynamics(
@@ -413,12 +416,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 max_controlled_agents=self.max_cont_agents,
                 controlled_agent_mask=self.cont_agent_mask,
                 global_agent_observations=global_agent_observations,
-                road_graph=road_graph,
+                global_road_graph=global_road_graph,
+                local_road_graph=local_road_graph,
                 episode_len=self.episode_len,
                 init_steps=init_steps,
                 positions=pos_xy,
                 velocities=vel_xy,
-                yaws=yaw,    
+                yaws=yaw,
             )
             return sample_batch
         else:
@@ -648,18 +652,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    
     init_steps = 10
     MAX_NUM_OBJECTS = 32
     NUM_WORLDS = 1
 
     env_config = EnvConfig(
-        init_steps=init_steps,
-        return_vbd_data=True,
-        dynamics_model="state",
+        init_steps=init_steps,  # Warmup period
+        return_vbd_data=True,  # Use VBD
+        dynamics_model="state",  # Use state-based dynamics model
+        dist_to_goal_threshold=1e-5,  # Trick to make sure the agents don't disappear when they reach the goal
+        collision_behavior="ignore",  # Ignore collisions
     )
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/validation", NUM_WORLDS)
 
     # Make env
     env = GPUDriveTorchEnv(
@@ -673,7 +678,7 @@ if __name__ == "__main__":
     obs = env.reset()
 
     sample_batch = env.sample_batch
-    
+
     frames = []
 
     for i in range(env_config.episode_len - init_steps):
