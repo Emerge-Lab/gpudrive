@@ -388,10 +388,9 @@ def process_file(args):
     # Read the records in batches
     mem_info = psutil.virtual_memory()
     available_memory = mem_info.available / (1024**3)
-    usable_memory = int(available_memory)
-    # 10 scenes take 1 Gb approx
-    batch_size = 10 * usable_memory
-    batch_size = 300 
+    usable_memory = int(available_memory * 0.9)
+    # 10 scenes take 1 Gb at max
+    batch_size = 12 * usable_memory
     tfrecord_dataset = tf.data.TFRecordDataset(filename, compression_type="")
     tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
 
