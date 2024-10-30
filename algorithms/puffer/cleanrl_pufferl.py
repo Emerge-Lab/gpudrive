@@ -105,7 +105,9 @@ def evaluate(data):
 
         with profile.eval_misc:
             # Incremented by the number of controlled valid agents
-            data.global_step += data.vecenv.controlled_agent_mask.sum().item()
+            data.global_step += sum(
+                mask
+            )  # data.vecenv.controlled_agent_mask.sum().item()
             # Incremented by _all_ entries, including the padding agents
             data.global_step_pad += data.vecenv.total_agents
 

@@ -105,7 +105,6 @@ class IPPO(PPO):
         self.policy.set_training_mode(False)
 
         n_steps = 0
-        CASPS = 0
         rollout_buffer.reset()
         # Sample new weights for the state dependent exploration
         if self.use_sde:
@@ -200,7 +199,9 @@ class IPPO(PPO):
 
             # EDIT_2: Increment the global step by the number of valid samples
             # (i.e., samples that are from controlled and alive agents
-            self.num_timesteps += self.env.controlled_agent_mask.sum().item()
+            self.num_timesteps += int(
+                alive_agent_mask.sum().item()
+            )  # self.env.controlled_agent_mask.sum().item()
             self.global_step_pad += (
                 self.env.num_worlds * self.env.max_agent_count
             )
@@ -213,7 +214,6 @@ class IPPO(PPO):
             if callback.on_step() is False:
                 return False
             n_steps += 1
-            CASPS += int(alive_agent_mask.sum().item())
 
             if isinstance(self.action_space, spaces.Discrete):
                 # Reshape in case of discrete action

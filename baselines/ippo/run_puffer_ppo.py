@@ -180,7 +180,7 @@ if __name__ == "__main__":
         type=str,
         default=datetime.now().strftime("%m_%d_%H_%S"),
     )
-    parser.add_argument("--train.seed", type=int, default=1)
+    parser.add_argument("--train.seed", type=int, default=42)
     parser.add_argument("--train.torch-deterministic", action="store_true")
     parser.add_argument("--train.cpu-offload", action="store_true")
     parser.add_argument(
@@ -197,9 +197,9 @@ if __name__ == "__main__":
     parser.add_argument("--train.gae-lambda", type=float, default=0.95)
     parser.add_argument("--train.update-epochs", type=int, default=5)
     parser.add_argument("--train.norm-adv", action="store_true")
-    parser.add_argument("--train.clip-coef", type=float, default=0.1)
+    parser.add_argument("--train.clip-coef", type=float, default=0.2)
     parser.add_argument(
-        "--train.clip-vloss", action="store_true"
+        "--train.clip-vloss", type=bool, default=False
     )  # No clipping on the VF by default
     # parser.add_argument("--train.vf-clip-coef", type=float, default=0.366)
     parser.add_argument("--train.ent-coef", type=float, default=0.0001)
@@ -212,15 +212,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train.render-interval",
         type=int,
-        default=5000,
+        default=1000,
         help="Frequency to render the environment in epochs",
     )
     parser.add_argument(
-        "--train.batch-size", type=int, default=100_000
+        "--train.batch-size", type=int, default=20_000
     )  # Number of steps per rollout
-    parser.add_argument("--train.minibatch-size", type=int, default=20_000)
+    # parser.add_argument("--train.num-minibatches", type=int, default=5)
+    parser.add_argument("--train.minibatch-size", type=int, default=5000)
     parser.add_argument(
-        "--train.bptt-horizon", type=int, default=16
+        "--train.bptt-horizon", type=int, default=50
     )  # Not used
     parser.add_argument("--train.compile", action="store_true")
     parser.add_argument(
