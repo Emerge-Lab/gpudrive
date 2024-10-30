@@ -321,9 +321,9 @@ def train(data):
             if (
                 data.wandb is not None
                 and data.global_step > 0
-                and time.time() - data.last_log_time > 3.0
+                and time.perf_counter() - data.last_log_time > 3.0
             ):
-                data.last_log_time = time.time()
+                data.last_log_time = time.perf_counter()
                 data.wandb.log(
                     {
                         "performance/controlled_agent_sps": profile.controlled_agent_sps,
@@ -332,6 +332,7 @@ def train(data):
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
                         "global_step": data.global_step,
                         "performance/epoch": data.epoch,
+                        "performance/uptime": profile.uptime,
                         "train/learning_rate": data.optimizer.param_groups[0][
                             "lr"
                         ],
@@ -392,7 +393,7 @@ class Profile:
     train_misc_time: ... = 0
 
     def __init__(self):
-        self.start = time.time()
+        self.start = time.perf_counter()
         self.env = pufferlib.utils.Profiler()
         self.eval_forward = pufferlib.utils.Profiler()
         self.eval_misc = pufferlib.utils.Profiler()
@@ -429,7 +430,7 @@ class Profile:
         if global_step == 0:
             return True
 
-        uptime = time.time() - self.start
+        uptime = time.perf_counter() - self.start
         if uptime - self.uptime < interval_s:
             return False
 

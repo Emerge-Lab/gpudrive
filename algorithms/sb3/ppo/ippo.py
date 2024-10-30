@@ -516,6 +516,7 @@ class IPPO(PPO):
                 "performance/controlled_agent_sps", controlled_agent_sps
             )
             self.logger.record("performance/pad_agent_sps", pad_agent_sps)
+            self.logger.record("performance/uptime", uptime)
 
             # Update
             self.uptime = uptime

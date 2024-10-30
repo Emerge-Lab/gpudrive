@@ -3,14 +3,14 @@
 #include <limits>
 #include <madrona/math.hpp>
 #include <madrona/types.hpp>
- 
+
 namespace gpudrive {
 
 namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 32;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 64;
 
 inline constexpr bool useEstimatedYaw = true;
 

@@ -2,17 +2,9 @@ from torch import nn
 import torch
 import torch.nn.functional as F
 from pdb import set_trace as T
-from functools import partial
 import pufferlib.models
 import numpy as np
-
-EGO_STATE_DIM = 6
-PARTNER_DIM = 10
-ROAD_MAP_DIM = 13
-
-MAX_CONTROLLED_VEHICLES = 32
-ROADMAP_AGENT_FEAT_DIM = MAX_CONTROLLED_VEHICLES - 1
-TOP_K_ROADPOINTS = 64  # Number of visible roadpoints from the road graph
+from pygpudrive.env import constants
 
 
 def make_video(data, env_idx=0):
@@ -43,7 +35,7 @@ def make_video(data, env_idx=0):
     return np.array(frames)
 
 
-def unpack_obs(obs_flat):
+def unpack_obs(obs_flat, env):
     """
     Unpack the flattened observation into the ego state and visible state.
     Args:
@@ -51,48 +43,68 @@ def unpack_obs(obs_flat):
     Return:
         ego_state, road_objects, stop_signs, road_graph (torch.Tensor).
     """
+    top_k_road_points = env.env.config.roadgraph_top_k
+
     # Unpack ego and visible state
-    ego_state = obs_flat[:, :EGO_STATE_DIM]
-    vis_state = obs_flat[:, EGO_STATE_DIM:]
+    ego_state = obs_flat[:, : constants.EGO_FEAT_DIM]
+    vis_state = obs_flat[:, constants.EGO_FEAT_DIM :]
+
     # Visible state object order: road_objects, road_points
     # Find the ends of each section
-    ro_end_idx = PARTNER_DIM * ROADMAP_AGENT_FEAT_DIM
-    rg_end_idx = ro_end_idx + (ROAD_MAP_DIM * TOP_K_ROADPOINTS)
+    ro_end_idx = constants.PARTNER_FEAT_DIM * constants.ROAD_GRAPH_FEAT_DIM
+    rg_end_idx = ro_end_idx + (
+        constants.ROAD_GRAPH_FEAT_DIM * top_k_road_points
+    )
 
     # Unflatten and reshape to (batch_size, num_objects, object_dim)
     road_objects = (vis_state[:, :ro_end_idx]).reshape(
-        -1, ROADMAP_AGENT_FEAT_DIM, PARTNER_DIM
+        -1, constants.ROAD_GRAPH_FEAT_DIM, constants.PARTNER_FEAT_DIM
     )
     road_graph = (vis_state[:, ro_end_idx:rg_end_idx]).reshape(
         -1,
-        TOP_K_ROADPOINTS,
-        ROAD_MAP_DIM,
+        top_k_road_points,
+        constants.ROAD_GRAPH_FEAT_DIM,
     )
     return ego_state, road_objects, road_graph
 
 
 class Policy(nn.Module):
-    def __init__(self, env, input_size=64, hidden_size=128, **kwargs):
+    def __init__(
+        self, env, input_size=64, hidden_size=128, act_func="tanh", **kwargs
+    ):
         super().__init__()
+        self.env = env
+        self.act_func = (
+            torch.nn.Tanh() if act_func == "tanh" else torch.nn.ReLU()
+        )
+
         self.ego_embed = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Linear(EGO_STATE_DIM, input_size)),
-            torch.nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Linear(constants.EGO_FEAT_DIM, input_size)
+            ),
+            nn.LayerNorm(input_size),
+            self.act_func,
             pufferlib.pytorch.layer_init(nn.Linear(input_size, input_size)),
         )
 
         self.partner_embed = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Linear(PARTNER_DIM, input_size)),
-            torch.nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Linear(constants.PARTNER_FEAT_DIM, input_size)
+            ),
+            self.act_func,
             pufferlib.pytorch.layer_init(nn.Linear(input_size, input_size)),
         )
 
         self.road_map_embed = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Linear(ROAD_MAP_DIM, input_size)),
-            torch.nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Linear(constants.ROAD_GRAPH_FEAT_DIM, input_size)
+            ),
+            nn.LayerNorm(input_size),
+            self.act_func,
             pufferlib.pytorch.layer_init(nn.Linear(input_size, input_size)),
         )
 
-        self.proj = pufferlib.pytorch.layer_init(
+        self.shared_embed = pufferlib.pytorch.layer_init(
             nn.Linear(3 * input_size, hidden_size)
         )
 
@@ -109,12 +121,16 @@ class Policy(nn.Module):
         return actions, value
 
     def encode_observations(self, observations):
-        ego_state, road_objects, road_graph = unpack_obs(observations)
+        ego_state, road_objects, road_graph = unpack_obs(
+            observations, self.env
+        )
         ego_embed = self.ego_embed(ego_state)
+
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
-        return self.proj(embed), None
+
+        return self.shared_embed(embed), None
 
     def decode_actions(self, flat_hidden, lookup, concat=None):
         action = self.actor(flat_hidden)
