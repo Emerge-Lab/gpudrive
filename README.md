@@ -273,7 +273,7 @@ INFO:root:Done!
 
 and that's it!
 
-> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing the entire validation dataset takes about 2 hours because it involves handling around 75,000 traffic scenarios (150 files, each with 500 scenarios).
+> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 100 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
 
 ## Citations
 
