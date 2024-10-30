@@ -17,7 +17,7 @@ import warnings
 from typing import Any, Dict, Optional, List
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-from data_utils.datatypes import MapElementIds
+from datatypes import MapElementIds
 import trimesh
 from multiprocessing import Pool, cpu_count
 import numpy as np
@@ -294,6 +294,9 @@ def waymo_to_scenario(
     i = 0
     for dynamic_map_state in protobuf.dynamic_map_states:
         traffic_light_dict = _init_tl_object(dynamic_map_state)
+        # there is a traffic light but we don't want traffic light scenes so just return
+        if len(traffic_light_dict) > 0:
+            return
         for id, value in traffic_light_dict.items():
             for key in all_keys:
                 tl_dict[id][key].append(value[key])
