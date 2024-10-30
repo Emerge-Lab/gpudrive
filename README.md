@@ -259,7 +259,7 @@ python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<da
 Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
 
 ```bash
-pip install waymo-open-dataset-tf-2-12-0 tqdm trimesh[easy] python-fcl
+pip install waymo-open-dataset-tf-2-12-0 trimesh[easy] python-fcl
 ```
 
 Then for example, if you want to process the validation data, run:
