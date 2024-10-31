@@ -425,6 +425,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
+    def get_controlled_agents_mask(self):
+        """Get the control mask."""
+        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
+            axis=2
+        )
+
     def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
