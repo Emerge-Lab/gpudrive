@@ -116,6 +116,51 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
         return Discrete(n=int(len(self.action_key_to_values)))
 
+    def _get_ego_state(self):
+        """Get the ego state."""
+        if self.config.ego_state:
+            ego_states = self.sim.self_observation_tensor().to_jax()
+            if self.config.norm_obs:
+                ego_states = self.normalize_ego_state(ego_states)
+        else:
+            ego_states = jnp.array()
+        return ego_states
+
+    def _get_partner_obs(self):
+        """Get the partner observation."""
+        if self.config.partner_obs:
+            partner_observations = (
+                self.sim.partner_observations_tensor().to_jax()
+            )
+            if self.config.norm_obs:
+                partner_observations = self.normalize_and_flatten_partner_obs(
+                    partner_observations
+                )
+            else:
+                partner_observations = partner_observations.flatten(
+                    start_dim=2
+                )
+        else:
+            partner_observations = jnp.array()
+        return partner_observations
+
+    def _get_road_map_obs(self):
+        """Get the road map observation."""
+        if self.config.road_map_obs:
+            road_map_observations = self.sim.agent_roadmap_tensor().to_jax()
+
+            if self.config.norm_obs:
+                road_map_observations = self.normalize_and_flatten_map_obs(
+                    road_map_observations
+                )
+            else:
+                road_map_observations = road_map_observations.flatten(
+                    start_dim=2
+                )
+        else:
+            road_map_observations = jnp.array()
+        return road_map_observations
+
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (self.sim.controlled_state_tensor().to_jax() == 1).squeeze(
@@ -132,44 +177,13 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         """
 
         # EGO STATE
-        if self.config.ego_state:
-            ego_states = self.sim.self_observation_tensor().to_jax()
-            if self.config.norm_obs:
-                ego_states = self.normalize_ego_state(ego_states)
-        else:
-            ego_states = jnp.array()
+        ego_states = self._get_ego_state()
 
         # PARTNER OBSERVATION
-        if self.config.partner_obs:
-            partner_observations = (
-                self.sim.partner_observations_tensor().to_jax()
-            )
-            if self.config.norm_obs:
-                partner_observations = self.normalize_and_flatten_partner_obs(
-                    partner_observations
-                )
-            else:
-                partner_observations = partner_observations.flatten(
-                    start_dim=2
-                )
-        else:
-            partner_observations = jnp.array()
+        partner_observations = self._get_partner_obs()
 
         # ROAD MAP OBSERVATION
-        if self.config.road_map_obs:
-
-            road_map_observations = self.sim.agent_roadmap_tensor().to_jax()
-
-            if self.config.norm_obs:
-                road_map_observations = self.normalize_and_flatten_map_obs(
-                    road_map_observations
-                )
-            else:
-                road_map_observations = road_map_observations.flatten(
-                    start_dim=2
-                )
-        else:
-            road_map_observations = jnp.array()
+        road_map_observations = self._get_road_map_obs()
 
         # Combine the observations
         obs_filtered = jnp.concatenate(
@@ -233,7 +247,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         obs = obs.at[:, :, :, 2].set(
             self.normalize_tensor(
                 obs[:, :, :, 2],
-                constants.MIN_REL_AGENT_POS
+                constants.MIN_REL_AGENT_POS,
                 constants.MAX_REL_AGENT_POS,
             )
         )
