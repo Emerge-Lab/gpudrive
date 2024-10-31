@@ -90,7 +90,7 @@ struct AgentID {
 
 struct ResetMap {
     int32_t reset;
-};   
+};
      struct ClassicAction
     {
         float acceleration;
@@ -204,7 +204,7 @@ struct ResetMap {
                 .type = static_cast<float>(EntityType::None),
                 .id = -1,
                 .mapType = static_cast<float>(MapType::UNKNOWN)
-            };       
+            };
         }
     };
 
