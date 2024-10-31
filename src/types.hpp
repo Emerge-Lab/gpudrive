@@ -221,7 +221,7 @@ namespace gpudrive
                 .type = static_cast<float>(EntityType::None),
                 .id = -1,
                 .mapType = static_cast<float>(MapType::UNKNOWN)
-            };       
+            };
         }
     };
 
