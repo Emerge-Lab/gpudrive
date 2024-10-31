@@ -210,7 +210,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
             .id = (float)ctx.get<AgentID>(ctx.get<AgentInterfaceEntity>(other).e).id
         };
     }
-    while(arrIndex < ctx.data().numAgents - 1) {
+    while(arrIndex < consts::kMaxAgentCount - 1) {
         partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
 }
