@@ -33,12 +33,13 @@ public:
   gpudrive::MapObservation
   observationOf(const madrona::math::Vector3 &position,
                 const madrona::base::Rotation &rotation, const Scale &scale,
-                gpudrive::EntityType type, float id) const {
+                gpudrive::EntityType type, float id, MapType mapType = MapType::UNKNOWN) const {
     return gpudrive::MapObservation{.position = relative(position),
                                     .scale = scale,
                                     .heading = relative(rotation),
                                     .type = static_cast<float>(type),
-                                    .id = static_cast<float>(id)};
+                                    .id = static_cast<float>(id),
+                                    .mapType = static_cast<float>(mapType)};
   }
 
   float distanceTo(const madrona::math::Vector3 &position) const {

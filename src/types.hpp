@@ -37,6 +37,33 @@ namespace gpudrive
         NumTypes,
     };
 
+    enum class MapType : int32_t
+    {
+        LANE_UNDEFINED = 0,
+        LANE_FREEWAY = 1,
+        LANE_SURFACE_STREET = 2,
+        LANE_BIKE_LANE = 3,
+        // Original definition skips 4
+        ROAD_LINE_UNKNOWN = 5,
+        ROAD_LINE_BROKEN_SINGLE_WHITE = 6,
+        ROAD_LINE_SOLID_SINGLE_WHITE = 7,
+        ROAD_LINE_SOLID_DOUBLE_WHITE = 8,
+        ROAD_LINE_BROKEN_SINGLE_YELLOW = 9,
+        ROAD_LINE_BROKEN_DOUBLE_YELLOW = 10,
+        ROAD_LINE_SOLID_SINGLE_YELLOW = 11,
+        ROAD_LINE_SOLID_DOUBLE_YELLOW = 12,
+        ROAD_LINE_PASSING_DOUBLE_YELLOW = 13,
+        ROAD_EDGE_UNKNOWN = 14,
+        ROAD_EDGE_BOUNDARY = 15,
+        ROAD_EDGE_MEDIAN = 16,
+        STOP_SIGN = 17,
+        CROSSWALK = 18,
+        SPEED_BUMP = 19,
+        DRIVEWAY = 20,  // New datatype in v1.2.0: Driveway entrances
+        UNKNOWN = -1,
+        NUM_TYPES = 21,
+    };
+
 struct AgentID {
     int32_t id;
 };
@@ -166,6 +193,7 @@ struct ResetMap {
         float heading;
         float type;
         float id;
+        float mapType;
 
         static inline MapObservation zero()
         {
@@ -174,12 +202,13 @@ struct ResetMap {
                 .scale = madrona::math::Diag3x3{0, 0, 0},
                 .heading = 0,
                 .type = static_cast<float>(EntityType::None),
-                .id = -1
+                .id = -1,
+                .mapType = static_cast<float>(MapType::UNKNOWN)
             };       
         }
     };
 
-    const size_t MapObservationExportSize = 8;
+    const size_t MapObservationExportSize = 9;
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -227,7 +256,7 @@ struct ResetMap {
         MapObservation obs[consts::kMaxAgentMapObservationsCount];
     };
 
-    const size_t AgentMapObservationExportSize = 8;
+    const size_t AgentMapObservationExportSize = MapObservationExportSize;
 
     static_assert(sizeof(AgentMapObservations) ==
                   sizeof(float) * consts::kMaxAgentMapObservationsCount *
@@ -414,6 +443,7 @@ struct ResetMap {
                                RoadInterfaceEntity,
                                EntityType,
                                RoadMapId,
+                               MapType,
                                madrona::render::Renderable>
     {
     };

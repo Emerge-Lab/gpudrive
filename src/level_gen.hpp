@@ -45,7 +45,8 @@ void destroyWorld(Engine &ctx);
                                             EntityType type,
                                             ObjectID objId,
                                             ResponseType responseType, 
-                                            uint32_t roadIdx)
+                                            uint32_t roadIdx,
+                                            MapType mapType)
     {
         ctx.get<Position>(road) = pos;
         ctx.get<Rotation>(road) = rot;
@@ -54,11 +55,13 @@ void destroyWorld(Engine &ctx);
         ctx.get<ObjectID>(road) = objId;
         ctx.get<ResponseType>(road) = responseType;
         ctx.get<RoadMapId>(road).id = roadIdx;
+        ctx.get<MapType>(road) = mapType;
         ctx.get<MapObservation>(ctx.get<RoadInterfaceEntity>(road).e) = MapObservation{.position = pos.xy(),
                                                                                        .scale = scale,
                                                                                        .heading = utils::quatToYaw(rot),
                                                                                        .type = (float)type,
-                                                                                       .id = static_cast<float>(roadIdx)};
+                                                                                       .id = static_cast<float>(roadIdx),
+                                                                                       .mapType = static_cast<float>(mapType)};
     }
 
 } // namespace gpudrive
