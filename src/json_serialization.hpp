@@ -207,6 +207,24 @@ namespace gpudrive
             road.id = j.at("id").get<uint32_t>();
         }
 
+        if (j.contains("map_element_id"))
+        {
+            auto mapElementId = j.at("map_element_id").get<int32_t>();
+
+            if(mapElementId == 4 or mapElementId >= static_cast<int32_t>(MapType::NUM_TYPES) or mapElementId < -1)
+            {
+                road.mapType = MapType::UNKNOWN;
+            }
+            else
+            {
+                road.mapType = static_cast<MapType>(mapElementId);
+            }
+        }
+        else
+        {
+            road.mapType = MapType::UNKNOWN;
+        }
+
         for (int i = 0; i < road.numPoints; i++)
         {
             road.mean.x += (road.geometry[i].x - road.mean.x)/(i+1);
