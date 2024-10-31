@@ -19,6 +19,7 @@ def process_scenario_data(
     max_polylines=256,
     num_points_polyline=30,
 ):
+    """Process the scenario data for Versatile Behavior Diffusion."""
 
     agents_history = construct_agent_history(
         init_steps=init_steps,
@@ -181,7 +182,7 @@ def construct_polylines(
             p_y = global_road_graph[env_idx, selected_road_point_idx, 1]
             heading = global_road_graph[env_idx, selected_road_point_idx, 5]
             lane_type = global_road_graph[
-                env_idx, selected_road_point_idx, 6
+                env_idx, selected_road_point_idx, 8
             ].long()
             traffic_light_state = torch.zeros_like(lane_type)
 
