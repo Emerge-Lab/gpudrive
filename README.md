@@ -12,11 +12,14 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
 
-## Implemented algorithms 🌱
+## Integrations ⚙️
 
-| Algorithm      | Reference                                                                                                                           | README                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
+
+| What | Reference | README | End-to-End Training Speed |
+|--------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|----------------------------|
+| **IPPO** implementation with [Stable Baselines 3](https://github.com/DLR-RM/stable-baselines3/tree/master) | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) | X steps/sec |
+| **IPPO** implementation with [Pufferlib](https://github.com/PufferAI/PufferLib) 🐡 | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |  X agent steps/sec |
+
 
 ## Installation 🛠️
 
@@ -51,7 +54,7 @@ cd gpudrive
 
 ---
 
-Then, you can *choose* between two options for building the simulator:
+Then, you can *choose* between 3 options for building the simulator:
 
 ---
 

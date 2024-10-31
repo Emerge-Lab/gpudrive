@@ -1,4 +1,8 @@
-## Running the IPPO Baseline
+# IPPO Baselines
+
+
+
+## Implem
 
 To run the multi-agent IPPO baseline using stable-baselines 3 (SB3):
 
@@ -11,11 +15,8 @@ python baselines/ippo/run_sb3_ppo.py
 The configuration for resampling traffic scenarios includes:
 
 - **`resample_scenarios`**: A boolean that enables or disables traffic scenario resampling when set to `True`.
-
 - **`resample_criterion`**: Set to `"global_step"`, indicating resampling occurs based on the global step count.
-
 - **`resample_freq`**: Specifies resampling frequency at `50,000` steps, recommended to align with `num_worlds * n_steps`.
-
 - **`resample_mode`**: Set to `"random"` for random selection of new scenarios.
 
 ```
@@ -39,6 +40,7 @@ policy = LateFusionPolicy
 ```
 
 The default settings for classic observations are:
+
 ```python
 ego_state: bool = True  # Use ego vehicle state
 road_map_obs: bool = True  # Use road graph data
@@ -60,6 +62,7 @@ lidar_obs: bool = True  # Use LiDAR in observations
 ```
 
 You can also **mix** classic and LiDAR observations by setting:
+
 ```python
 ego_state: bool = True  # Include ego vehicle state in observations
 road_map_obs: bool = True  # Include road graph in observations
@@ -70,6 +73,7 @@ lidar_obs: bool = True  # Add LiDAR to observations
 ```
 
 In both cases, you can use a feedforward network from `networks/basic_ffn.py`:
+
 ```python
 # NETWORK
 mlp_class = FFN

@@ -1,6 +1,6 @@
 import torch
 from pathlib import Path
-from algorithms.sb3.ppo.ippo import IPPO
+from integrations.sb3.ppo.ippo import IPPO
 
 
 class PolicyActor:
