@@ -15,9 +15,9 @@ from rich.traceback import install
 
 install(show_locals=False)
 
-import integrations.puffer.cleanrl_pufferl as clean_pufferl
-from integrations.puffer.puffer_env import env_creator
-from integrations.puffer.utils import Policy
+import integrations.rl.puffer.cleanrl_pufferl as clean_pufferl
+from integrations.rl.puffer.puffer_env import env_creator
+from integrations.rl.puffer.utils import Policy
 
 
 def make_policy(env, use_rnn):

@@ -25,7 +25,7 @@ class PufferGPUDrive(PufferEnv):
         self,
         data_dir,
         device="cuda",
-        max_cont_agents=32,
+        max_cont_agents=50,
         num_worlds=50,
         k_unique_scenes=1,
         buf=None,

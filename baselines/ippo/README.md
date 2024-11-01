@@ -1,13 +1,23 @@
-# IPPO Baselines
+# IPPO implementation details
 
+## PufferLib IPPO
 
+Run:
 
-## Implem
+```
+python baselines/ippo/ippo_pufferlib.py --track --data-dir 'data/processed/'
+```
 
-To run the multi-agent IPPO baseline using stable-baselines 3 (SB3):
+### Resampling the data
 
-```bash
-python baselines/ippo/run_sb3_ppo.py
+#TODO(dc)
+
+## Stable baselines 3
+
+Run:
+
+```
+python baselines/ippo/ippo_sb3.py
 ```
 
 ### Resampling the data

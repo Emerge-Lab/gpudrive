@@ -21,9 +21,9 @@ import pyximport
 
 pyximport.install(setup_args={"include_dirs": np.get_include()})
 
-from integrations.puffer.c_gae import compute_gae
-from integrations.puffer.logging import print_dashboard, abbreviate
-from integrations.puffer.utils import make_video
+from integrations.rl.puffer.c_gae import compute_gae
+from integrations.rl.puffer.logging import print_dashboard, abbreviate
+from integrations.rl.puffer.utils import make_video
 
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
