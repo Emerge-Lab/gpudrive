@@ -24,8 +24,8 @@
 hpc/overlay*
 data/raw/*
 data/processed/validation/*
-data/processed/testing/*
-data/processed/training/*
+data/processed/train/*
+data/processed/test/*
 
 # Logging
 /wandb
