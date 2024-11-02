@@ -169,11 +169,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        dataset = select_scenes(scene_config)
+        self.dataset = select_scenes(scene_config)
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
-            scenes=dataset,
+            scenes=self.dataset,
             params=params,
             enable_batch_renderer=self.render_config
             and self.render_config.render_mode
@@ -269,7 +269,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """Resample the scenes.
         Args:
             dataset (List[str]): List of scene names to resample.
-            
+
         Returns:
             None
         """

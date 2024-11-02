@@ -2,10 +2,10 @@
 
 ## PufferLib IPPO
 
-Run:
+To launch a run on a single scenario with 50 parallel environments and track it with wandb:
 
-```
-python baselines/ippo/ippo_pufferlib.py --track --data-dir 'data/processed/'
+```bash
+python baselines/ippo/ippo_pufferlib.py --track --data-dir 'data/processed/examples' --num-worlds 50 --k-unique-scenes 1 --wandb-group 'animation'
 ```
 
 ### Resampling the data

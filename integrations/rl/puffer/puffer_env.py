@@ -16,8 +16,21 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pufferlib.environment import PufferEnv
 
 
-def env_creator(name="gpudrive", data_dir="data/processed/examples"):
-    return lambda: PufferGPUDrive(data_dir=data_dir, device="cuda")
+def env_creator(
+    name="gpudrive",
+    data_dir="data/gpudrive/examples",
+    device="cuda",
+    max_cont_agents=50,
+    num_worlds=50,
+    k_unique_scenes=1,
+):
+    return lambda: PufferGPUDrive(
+        data_dir=data_dir,
+        device=device,
+        max_cont_agents=max_cont_agents,
+        num_worlds=num_worlds,
+        k_unique_scenes=k_unique_scenes,
+    )
 
 
 class PufferGPUDrive(PufferEnv):
@@ -115,8 +128,6 @@ class PufferGPUDrive(PufferEnv):
         self.truncations = torch.zeros(self.num_agents, dtype=torch.bool).to(
             self.device
         )
-
-        # T()
 
         self.episode_returns = torch.zeros(
             self.num_agents, dtype=torch.float32

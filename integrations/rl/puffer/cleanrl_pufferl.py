@@ -25,6 +25,13 @@ from integrations.rl.puffer.c_gae import compute_gae
 from integrations.rl.puffer.logging import print_dashboard, abbreviate
 from integrations.rl.puffer.utils import make_video
 
+# TEMP
+global_steps_list = []
+perc_collisions_list = []
+perc_offroad_list = []
+perc_goal_achieved_list = []
+time_list = []
+
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
     seed_everything(config.seed, config.torch_deterministic)
@@ -338,11 +345,41 @@ def train(data):
                         ],
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
-                        # **{f"performance/{k}": v for k, v in data.profile},
                     }
                 )
+                # TEMP: Save profile data
+                try:
+                    global_steps_list.append(data.global_step.copy())
+                    perc_collisions_list.append(
+                        data.stats["perc_veh_collisions"].copy()
+                    )
+                    perc_offroad_list.append(
+                        data.stats["perc_off_road"].copy()
+                    )
+                    perc_goal_achieved_list.append(
+                        data.stats["perc_goal_achieved"].copy()
+                    )
+                    time_list.append(profile.uptime)
+                except:
+                    pass
 
-                if config.render and data.epoch % config.render_interval == 0:
+                # Save as numpy arrays
+                if data.global_step > 12e6:
+                    np.save("global_steps.npy", np.array(global_steps_list))
+                    np.save(
+                        "perc_collisions.npy", np.array(perc_collisions_list)
+                    )
+                    np.save("perc_offroad.npy", np.array(perc_offroad_list))
+                    np.save(
+                        "perc_goal_achieved.npy",
+                        np.array(perc_goal_achieved_list),
+                    )
+                    np.save("wallclock_time.npy", np.array(time_list))
+
+                if (
+                    config.render
+                    and ((data.epoch - 1) % config.render_interval) == 0
+                ):
                     for env_idx in range(1):
                         # TODO(dc): Improve efficiency and extend to multiple envs
                         frames = make_video(data, env_idx=0)
@@ -353,14 +390,15 @@ def train(data):
                                     np.moveaxis(frames, -1, 1),
                                     fps=20,
                                     format="mp4",
-                                    caption=f"Step {data.global_step:,}",
+                                    caption=f"global step: {data.global_step:,}",
                                 )
                             }
                         )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
-            save_checkpoint(data)
-            data.msg = f"Checkpoint saved at update {data.epoch}"
+            pass
+            # save_checkpoint(data)
+            # data.msg = f"Checkpoint saved at update {data.epoch}"
 
 
 def close(data):
