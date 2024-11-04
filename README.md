@@ -259,7 +259,7 @@ python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<da
 Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
 
 ```bash
-pip install waymo-open-dataset-tf-2-12-0 tqdm
+pip install waymo-open-dataset-tf-2-12-0 trimesh[easy] python-fcl
 ```
 
 Then for example, if you want to process the validation data, run:
@@ -273,7 +273,7 @@ INFO:root:Done!
 
 and that's it!
 
-> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing the entire validation dataset takes about 2 hours because it involves handling around 75,000 traffic scenarios (150 files, each with 500 scenarios).
+> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 250 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
 
 ## Citations
 

@@ -99,17 +99,18 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     }
 }
 
-static inline bool isAgentStatic(Engine &ctx, Entity agent, bool markAsStatic = false) {
+static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-    bool isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold or markAsStatic;
+    bool isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold;
     return !ctx.data().params.isStaticAgentControlled and isStatic;
 }
 
-static inline bool isAgentControllable(Engine &ctx, Entity agent) {
+static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExpert = false) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
            ctx.get<Trajectory>(agent_iface).valids[0] &&
-           ctx.get<ResponseType>(agent) == ResponseType::Dynamic;
+           ctx.get<ResponseType>(agent) == ResponseType::Dynamic &&
+           !markAsExpert;
 }
 
 static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
@@ -130,8 +131,8 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     populateExpertTrajectory(ctx, agent, agentInit);
 
     //Applying custom rules
-    ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent, agentInit.markAsStatic) ? ResponseType::Static : ResponseType::Dynamic;
-    ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent)};
+    ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent) ? ResponseType::Static : ResponseType::Dynamic;
+    ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent, agentInit.markAsExpert)};
     ctx.data().numControlledAgents += ctx.get<ControlledState>(agent_iface).controlled;
 
     if (ctx.data().enableRender) {
