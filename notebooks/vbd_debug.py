@@ -33,10 +33,10 @@ from vbd.sim_agent.sim_actor import VBDTest, sample_to_action
 from vbd.model.utils import set_seed
 
 
-DATA_DIR = "data/processed"  # Base data path
+DATA_DIR = "data/processed/waymax"  # Base data path
 CKPT_DIR = "data/checkpoints"  # Base checkpoint path
 
-SCENARIO_ID = "ab2a72c63f8fd589"  # Debugging scenario we use
+SCENARIO_ID = "11671609ebfa3185"  # Debugging scenario we use
 CKPT_PATH = "vbd/weights/epoch=18.ckpt"
 
 FPS = 20
@@ -68,7 +68,7 @@ waymax_env = WaymaxEnvironment(
 )
 
 scenario_path = os.path.join(DATA_DIR, SCENARIO_ID + ".pkl")
-with open(f"{DATA_DIR}/waymax/scenario_{SCENARIO_ID}.pkl", "rb") as f:
+with open(f"{DATA_DIR}/waymax_scenario_{SCENARIO_ID}.pkl", "rb") as f:
     scenario = pickle.load(f)
 
 # Create "dataset" (need for utils)
