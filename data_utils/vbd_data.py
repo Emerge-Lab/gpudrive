@@ -249,3 +249,10 @@ def construct_polylines(
             )
 
     return polylines, polylines_valid
+
+
+
+def sample_to_action():
+    """Todo: Implement this function.
+    """
+    pass
