@@ -519,7 +519,9 @@ class VBDTest(VBD):
         return denoiser_output, x_t_prev, guide_history
 
     ################### Denoising ###################
-    def step_denoiser(self, x_t: torch.Tensor, c: dict, t: int):
+    def step_denoiser(
+        self, x_t: torch.Tensor, c: dict, t: int, global_frame: bool = True
+    ):
         """
         Perform a denoising step to sample x_{t-1} ~ P[x_{t-1} | x_t, D(x_t, c, t)].
 
@@ -538,7 +540,10 @@ class VBDTest(VBD):
 
         # Denoise to reconstruct x_0 ~ D(x_t, c, t)
         denoiser_output = self.forward_denoiser(
-            encoder_outputs=c, noised_actions_normalized=x_t, diffusion_step=t
+            encoder_outputs=c,
+            noised_actions_normalized=x_t,
+            diffusion_step=t,
+            global_frame=global_frame,
         )
 
         x_0 = denoiser_output["denoised_actions_normalized"]
@@ -554,7 +559,13 @@ class VBDTest(VBD):
 
     @torch.no_grad()
     def sample_denoiser(
-        self, batch, num_samples=1, x_t=None, use_tqdm=True, **kwargs
+        self,
+        batch,
+        num_samples=1,
+        x_t=None,
+        use_tqdm=True,
+        global_frame=True,
+        **kwargs
     ):
         """
         Perform denoising inference on the given batch of data.
@@ -626,6 +637,7 @@ class VBDTest(VBD):
                     x_t=x_t,
                     c=encoder_outputs,
                     t=t,
+                    global_frame=global_frame,
                 )
                 guide = None
 
