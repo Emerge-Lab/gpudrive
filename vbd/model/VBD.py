@@ -1,5 +1,6 @@
 import torch
-#import lightning.pytorch as pl
+
+# import lightning.pytorch as pl
 import pytorch_lightning as pl
 
 from .modules import Encoder, Denoiser, GoalPredictor
@@ -155,7 +156,11 @@ class VBD(pl.LightningModule):
         return output_dict
 
     def forward_denoiser(
-        self, encoder_outputs, noised_actions_normalized, diffusion_step
+        self,
+        encoder_outputs,
+        noised_actions_normalized,
+        diffusion_step,
+        global_frame=True,
     ):
         """
         Forward pass of the denoiser module.
@@ -185,7 +190,7 @@ class VBD(pl.LightningModule):
             current_states,
             denoised_actions,
             action_len=self.denoiser._action_len,
-            global_frame=True,
+            global_frame=global_frame,
         )
 
         return {
