@@ -115,7 +115,7 @@ class EnvConfig:
         3.0  # Radius around goal considered as "goal achieved"
     )
 
-    # Integrations: Use pre-trained Versatile Behavior Diffusion model
+    # Integrations: Enable pre-trained Versatile Behavior Diffusion model
     return_vbd_data: bool = False
 
     # C++ and Python shared settings (modifiable via C++ codebase)

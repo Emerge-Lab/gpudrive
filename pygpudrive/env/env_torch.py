@@ -473,31 +473,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
+                
 
-            (
-                agents_history[:, :, time_step + 1, :],
-                _,
-                _,
-            ) = self.construct_agent_traj()
-
-        if self.config.enable_vbd:
-            # Get the agent trajectories
-            _, agents_type, agents_interested = self.construct_agent_traj()
-
-            # Global polylines tensor: Shape (256, 30, 5)
-            polylines, polylines_valid = self.construct_polylines()
-
-            # Empty (16, 3)
-            traffic_light_points = torch.zeros((1, 16, 3))
-
-            # Controlled agents
-            agents_id = torch.nonzero(self.cont_agent_mask[0, :]).permute(1, 0)
-
-            # Compute relations at the end
-            relations = calculate_relations(
-                agents_history.squeeze(0),
-                polylines.squeeze(0),
-                traffic_light_points.squeeze(0),
+        if self.config.return_vbd_data:
+            sample_batch = process_scenario_data(
+                num_envs=self.num_worlds,
+                max_controlled_agents=self.max_cont_agents,
+                controlled_agent_mask=self.cont_agent_mask,
+                global_agent_observations=global_agent_observations,
+                global_road_graph=global_road_graph,
+                local_road_graph=local_road_graph,
+                episode_len=self.episode_len,
+                init_steps=init_steps,
+                positions=pos_xy,
+                velocities=vel_xy,
+                yaws=yaw,
+                raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             )
 
             data_dict = {
