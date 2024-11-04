@@ -134,7 +134,7 @@ class EnvConfig:
     num_lidar_samples: int = gpudrive.numLidarSamples
 
 
-    #Param to init all objects:
+    # Param to init all objects:
     init_all_objects: bool = False
 
 class SelectionDiscipline(Enum):

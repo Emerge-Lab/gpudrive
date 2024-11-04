@@ -473,7 +473,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
-                
 
         if self.config.return_vbd_data:
             sample_batch = process_scenario_data(

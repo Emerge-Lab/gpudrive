@@ -48,10 +48,16 @@ def process_scenario_data(
 
     # Type of agents: 0 for None, 1 for Vehicle, 2 for Pedestrian, 3 for Cyclist
     agents_type = torch.zeros([num_envs, max_controlled_agents]).long()
-    agents_type[raw_agent_types == int(gpudrive.EntityType.Vehicle)] = 1 # Vehicle
-    agents_type[raw_agent_types == int(gpudrive.EntityType.Pedestrian)] = 2 # Pedestrian
-    agents_type[raw_agent_types == int(gpudrive.EntityType.Cyclist)] = 3 # Cyclist
-    
+    agents_type[
+        raw_agent_types == int(gpudrive.EntityType.Vehicle)
+    ] = 1  # Vehicle
+    agents_type[
+        raw_agent_types == int(gpudrive.EntityType.Pedestrian)
+    ] = 2  # Pedestrian
+    agents_type[
+        raw_agent_types == int(gpudrive.EntityType.Cyclist)
+    ] = 3  # Cyclist
+
     # 10 if we are controlling the agent, 1 otherwise
     agents_interested = torch.ones([num_envs, max_controlled_agents])
     agents_interested[controlled_agent_mask] = 10
