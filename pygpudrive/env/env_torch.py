@@ -415,6 +415,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
+                
 
         if self.config.return_vbd_data:
             sample_batch = process_scenario_data(
@@ -429,6 +430,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 positions=pos_xy,
                 velocities=vel_xy,
                 yaws=yaw,
+                raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             )
             return sample_batch
         else:
