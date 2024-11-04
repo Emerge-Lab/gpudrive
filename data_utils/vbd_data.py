@@ -1,6 +1,7 @@
 """Functions used for processing roadgraph data and other features for VBD."""
 import torch
 
+import gpudrive
 from vbd.data.data_utils import calculate_relations
 
 
@@ -16,11 +17,13 @@ def process_scenario_data(
     positions,
     velocities,
     yaws,
+    raw_agent_types,
     max_polylines=256,
     num_points_polyline=30,
 ):
     """Process the scenario data for Versatile Behavior Diffusion."""
 
+    # History of agents (init_steps + 1)
     agents_history = construct_agent_history(
         init_steps=init_steps,
         controlled_agent_mask=controlled_agent_mask,
@@ -43,10 +46,12 @@ def process_scenario_data(
     # Set all invalid agent values to zero
     agents_future[~controlled_agent_mask, :, :] = 0
 
-    # Currently, all agents are vehicles, encoding as type 1
-    agents_type = torch.zeros([num_envs, max_controlled_agents])
-    agents_type[controlled_agent_mask] = 1
-
+    # Type of agents: 0 for None, 1 for Vehicle, 2 for Pedestrian, 3 for Cyclist
+    agents_type = torch.zeros([num_envs, max_controlled_agents]).long()
+    agents_type[raw_agent_types == int(gpudrive.EntityType.Vehicle)] = 1 # Vehicle
+    agents_type[raw_agent_types == int(gpudrive.EntityType.Pedestrian)] = 2 # Pedestrian
+    agents_type[raw_agent_types == int(gpudrive.EntityType.Cyclist)] = 3 # Cyclist
+    
     # 10 if we are controlling the agent, 1 otherwise
     agents_interested = torch.ones([num_envs, max_controlled_agents])
     agents_interested[controlled_agent_mask] = 10
@@ -84,7 +89,7 @@ def process_scenario_data(
         "polylines_valid": polylines_valid.unsqueeze(0),
         "relations": torch.Tensor(relations).unsqueeze(0),
         "agents_id": agents_id,
-        "anchors": torch.zeros((1, 32, 64, 2)),  # Placeholder
+        "anchors": torch.zeros((1, 32, 64, 2)),  # Placeholder, not used
     }
 
     return data_dict
