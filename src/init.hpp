@@ -35,7 +35,7 @@ namespace gpudrive
         uint32_t numVelocities;
         uint32_t numValid;
         MapVector2 mean;
-        bool markAsStatic{false};
+        bool markAsExpert{false};
     };
 
     struct MapRoad
