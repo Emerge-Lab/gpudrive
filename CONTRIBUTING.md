@@ -47,12 +47,14 @@ Maybe you made some changes and want to make sure learning is working as intende
 - **Step 2**: Run this out of the box, the only thing you might want to change is the "device" (if you encounter problems, please report the 🐛!):
 
 ```Python
-python baselines/ippo/run_sb3_ppo.py --device='cuda'
+python baselines/ippo/ippo_sb3.py
 ```
 
 This should kick off a run that takes about **15-20 minutes to complete on a single gpu**. We’re using [Independent PPO](https://arxiv.org/abs/2103.01955) (IPPO) to train a number of agents distributed across 3 traffic scenarios. For an example of what a "healthy" run looks like, I ran the script above with these exact settings in  `baselines/ippo/config.py`  on  `08/19/2024` and created a wandb report with ***complete logs*** and ***videos:***
 
 $$
+
+
 $$
 
 <details>
@@ -61,15 +63,19 @@ $$
 ---
 
 Sometimes 3 scenarios is not enough to test your code. If you want to run your test with more scenarios:
-1. Download a subset of the Waymo Open Motion Dataset [here](https://github.com/Emerge-Lab/gpudrive/tree/main?tab=readme-ov-file#dataset-------%EF%B8%8F-)
-2. Update `selection_discipline = SelectionDiscipline.K_UNIQUE_N` in `baselines/ippo/config.py`
+
+1. Download the dataset (see README)
+2. Update `selection_discipline = SelectionDiscipline.K_UNIQUE_N` in `baselines/ippo/config/ippo_ff_sb3.yaml`
 
 For example, to use 10 different scenarios, we can run:
+
 ```bash
-python baselines/ippo/run_sb3_ppo.py --data_dir='<your_data_path>' --render_n_worlds=10 --k_unique_scenes=10 --total_timesteps=15_000_000
+python baselines/ippo/ippo_sb3.py --data_dir='<your_data_path>' --render_n_worlds=10 --k_unique_scenes=10 --total_timesteps=15_000_000
 ```
+
 This will kick off a run on 10 randomly sampled scenes and render all 10 of them.
----
+---------------------------------------------------------------------------------
+
 </details>
 
 ---

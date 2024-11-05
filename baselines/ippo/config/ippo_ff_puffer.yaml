@@ -1,0 +1,60 @@
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: "data/processed/examples" # Dataset
+
+environment: # Overrides default environment configs (see pygpudrive/env/config.py)
+  name: "gpudrive"
+  num_worlds: 50 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
+  max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  normalize_obs: true
+  reward_type: "sparse_on_goal_achieved"
+  dynamics_model: "classic"
+
+wandb:
+  entity: ""
+  project: "gpudrive"
+  group: "my_group"
+  mode: "online" # Options: online, offline, disabled
+  tags: ["ppo", "ff", "single_scene"]
+
+train:
+  exp_id: null  # Set dynamically in the script if needed
+  seed: 42
+  cpu_offload: false
+  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  torch_deterministic: false
+  total_timesteps: 2_000_0000
+  batch_size: 25_000
+  minibatch_size: 5_000
+  learning_rate: 3e-4
+  anneal_lr: false
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 5
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0001
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: null
+  checkpoint_interval: 5000
+  checkpoint_path: "./runs"
+  render: true
+  render_interval: 1000
+  bptt_horizon: 50
+  compile: false
+  compile_mode: "reduce-overhead"
+
+vec:
+  backend: "native" # Only native is currently supported
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false
