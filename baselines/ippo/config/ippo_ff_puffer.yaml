@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training" # Dataset
+data_dir: "data/processed/examples" # Dataset
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -30,7 +30,7 @@ train:
   device: "cuda"  # Dynamically set to cuda if available, else cpu
   torch_deterministic: false
   total_timesteps: 2_000_0000
-  batch_size: 25_000
+  batch_size: 25_000f
   minibatch_size: 5_000
   learning_rate: 3e-4
   anneal_lr: false
