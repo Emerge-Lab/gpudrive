@@ -112,8 +112,8 @@ def generate_state_action_pairs(
                         action_val_tuple = tuple(
                             round(x, 3)
                             for x in disc_expert_actions[
-                                     world_idx, agent_idx, time_idx, :
-                                     ].tolist()
+                                world_idx, agent_idx, time_idx, :
+                            ].tolist()
                         )
                         if not env.config.dynamics_model == "delta_local":
                             action_val_tuple = (
@@ -187,11 +187,11 @@ def generate_state_action_pairs(
     valid_collision_mask = collision_mask & alive_agent_mask
     valid_goal_mask = goal_mask & alive_agent_mask
     collision_rate = (
-            valid_collision_mask.sum().float() / alive_agent_mask.sum().float()
+        valid_collision_mask.sum().float() / alive_agent_mask.sum().float()
     )
     goal_rate = valid_goal_mask.sum().float() / alive_agent_mask.sum().float()
 
-    print(f'Collision {collision_rate} Goal {goal_rate}')
+    print(f"Collision {collision_rate} Goal {goal_rate}")
 
     if make_video:
         for render in range(render_index[0], render_index[1]):
@@ -238,12 +238,8 @@ if __name__ == "__main__":
     )
     env_config = EnvConfig(
         dynamics_model=args.dynamics_model,
-        steer_actions=torch.round(
-            torch.linspace(-0.3, 0.3, 7), decimals=3
-        ),
-        accel_actions=torch.round(
-            torch.linspace(-6.0, 6.0, 7), decimals=3
-        ),
+        steer_actions=torch.round(torch.linspace(-0.3, 0.3, 7), decimals=3),
+        accel_actions=torch.round(torch.linspace(-6.0, 6.0, 7), decimals=3),
         dx=torch.round(torch.linspace(-3.0, 3.0, 100), decimals=3),
         dy=torch.round(torch.linspace(-3.0, 3.0, 100), decimals=3),
         dyaw=torch.round(torch.linspace(-1.0, 1.0, 300), decimals=3),
@@ -255,7 +251,7 @@ if __name__ == "__main__":
         max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cpu",
         render_config=render_config,
-        action_type="continuous"
+        action_type="continuous",
     )
     # Generate expert actions and observations
     (

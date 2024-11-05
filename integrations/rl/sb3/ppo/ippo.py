@@ -1,5 +1,5 @@
 import logging
-import time
+from time import perf_counter
 import wandb
 import torch
 from torch.nn import functional as F
@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 
 # Import masked rollout buffer class
-from algorithms.sb3.rollout_buffer import MaskedRolloutBuffer
+from integrations.rl.sb3.rollout_buffer import MaskedRolloutBuffer
 from networks.perm_eq_late_fusion import LateFusionNet
 
 # From stable baselines
@@ -54,6 +54,12 @@ class IPPO(PPO):
         self.mlp_class = mlp_class
         self.mlp_config = mlp_config
         self.resample_counter = 0
+        self.start = perf_counter()
+        self.uptime = 0
+        self.prev_steps = 0
+        self.prev_steps_pad = 0
+        self.prev_env_elapsed = 0
+        self.global_step_pad = 0
         super().__init__(*args, **kwargs)
 
     def collect_rollouts(
@@ -106,7 +112,7 @@ class IPPO(PPO):
 
         callback.on_rollout_start()
 
-        time_rollout = time.perf_counter()
+        time_rollout = perf_counter()
 
         while n_steps < n_rollout_steps:
             if (
@@ -154,14 +160,12 @@ class IPPO(PPO):
                 ].reshape(-1, obs_tensor.shape[-1])
 
                 # Predict actions, vals and log_probs given obs
-                time_actions = time.perf_counter()
+                time_actions = perf_counter()
                 actions_tmp, values_tmp, log_prob_tmp = self.policy(
                     obs_tensor_alive
                 )
-                nn_fps = actions_tmp.shape[0] / (
-                    time.perf_counter() - time_actions
-                )
-                self.logger.record("rollout/nn_fps", nn_fps)
+                nn_fps = actions_tmp.shape[0] / (perf_counter() - time_actions)
+                # self.logger.record("performance/network_AFPS", nn_fps)
 
                 # Predict actions, vals and log_probs given obs
                 (
@@ -193,8 +197,15 @@ class IPPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # EDIT_2: Increment the global step by the number of valid samples in rollout step
-            self.num_timesteps += int((~rewards.isnan()).float().sum().item())
+            # EDIT_2: Increment the global step by the number of valid samples
+            # (i.e., samples that are from controlled and alive agents
+            self.num_timesteps += int(
+                alive_agent_mask.sum().item()
+            )  # self.env.controlled_agent_mask.sum().item()
+            self.global_step_pad += (
+                self.env.num_worlds * self.env.max_agent_count
+            )
+
             self.resample_counter += int(
                 (~rewards.isnan()).float().sum().item()
             )
@@ -221,9 +232,9 @@ class IPPO(PPO):
 
         # # # # # END LOOP # # # # #
         total_steps = self.n_envs * n_rollout_steps
-        elapsed_time = time.perf_counter() - time_rollout
+        elapsed_time = perf_counter() - time_rollout
         fps = total_steps / elapsed_time
-        self.logger.record("charts/fps", fps)
+        self.logger.record("performance/controlled_agent_sps_rollout", fps)
 
         with torch.no_grad():
             # Compute value for the last timestep
@@ -423,13 +434,13 @@ class IPPO(PPO):
         )
 
         # Logs
-        self.logger.record("train/explained_var", explained_var.item())
-        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
+        self.logger.record("train/explained_variance", explained_var.item())
+        self.logger.record("train/entropy", np.mean(entropy_losses))
         self.logger.record("train/advantages", advantages.mean().item())
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+        self.logger.record("train/policy_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
-        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/clipfrac", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
         if hasattr(self.policy, "log_std"):
             self.logger.record(
@@ -441,3 +452,77 @@ class IPPO(PPO):
         self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
+
+    def learn(
+        self,
+        total_timesteps,
+        callback=None,
+        log_interval=1,
+        tb_log_name="PPO",
+        reset_num_timesteps=True,
+        progress_bar=False,
+    ):
+        iteration = 0
+
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps,
+            callback,
+            reset_num_timesteps,
+            tb_log_name,
+            progress_bar,
+        )
+
+        callback.on_training_start(locals(), globals())
+
+        assert self.env is not None
+
+        while self.num_timesteps < total_timesteps:
+            continue_training = self.collect_rollouts(
+                self.env,
+                callback,
+                self.rollout_buffer,
+                n_rollout_steps=self.n_steps,
+            )
+
+            if not continue_training:
+                break
+
+            iteration += 1
+            self._update_current_progress_remaining(
+                self.num_timesteps, total_timesteps
+            )
+
+            # Display training infos
+            if log_interval is not None and iteration % log_interval == 0:
+                assert self.ep_info_buffer is not None
+                self._dump_logs(iteration)
+
+            self.train()
+
+            # Profile the training loop
+            global_step = self.num_timesteps
+            global_step_pad = self.global_step_pad
+
+            uptime = perf_counter() - self.start
+            controlled_agent_sps = (global_step - self.prev_steps) / (
+                uptime - self.uptime
+            )
+            pad_agent_sps = (global_step_pad - self.prev_steps_pad) / (
+                uptime - self.uptime
+            )
+
+            # Log
+            self.logger.record(
+                "performance/controlled_agent_sps", controlled_agent_sps
+            )
+            self.logger.record("performance/pad_agent_sps", pad_agent_sps)
+            self.logger.record("performance/uptime", uptime)
+
+            # Update
+            self.uptime = uptime
+            self.prev_steps = global_step
+            self.prev_steps_pad = global_step_pad
+
+        callback.on_training_end()
+
+        return self

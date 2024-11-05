@@ -7,7 +7,7 @@ import torch
 from torch.nn import functional as F
 from gymnasium import spaces
 
-from algorithms.sb3.ppo.ippo import IPPO
+from integrations.sb3.ppo.ippo import IPPO
 
 logging.getLogger(__name__)
 
