@@ -5,6 +5,7 @@
 ### Dependencies
 
 This implementation is compatible with the `gpudrive` branch of [PufferLib](https://github.com/PufferAI/PufferLib/tree/gpudrive/pufferlib/environments/gpudrive). To install, run:
+
 ```
 pip install git+https://github.com/PufferAI/PufferLib.git@gpudrive
 ```
@@ -20,12 +21,12 @@ python baselines/ippo/ippo_pufferlib.py
 - Configs are in `baselines/ippo/config/ippo_ff_puffer.yaml`
 - A small feedforward network is implemented in `integrations/rl/puffer/utils.py`
 
-
 ## Stable baselines 3 implementation
 
 ### Example
 
 - Launch a run:
+
 ```
 python baselines/ippo/ippo_sb3.py
 ```

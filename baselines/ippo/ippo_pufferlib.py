@@ -31,23 +31,25 @@ def load_config(config_path):
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
     config["train"]["exp_id"] = config["train"]["exp_id"] or datetime_
-    config["train"]["device"] = (config["train"]["device"] if torch.cuda.is_available() else "cpu")
+    config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
+    if torch.cuda.is_available():
+        config["train"]["device"] = "cuda"  # Set to 'cuda' if available
     # fmt: on
     return pufferlib.namespace(**config)
 
 
 def make_policy(env):
+    """Create a policy based on the environment."""
     return pufferlib.frameworks.cleanrl.Policy(Policy(env))
 
 
 def train(args):
     """Main training loop for the PPO agent."""
-
     args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
     args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
-        # Note: Only native backend is supported with GPUDrive
+        # Note: Only native backend is currently supported with GPUDrive
         "native": pufferlib.vector.Native,
         "serial": pufferlib.vector.Serial,
         "multiprocessing": pufferlib.vector.Multiprocessing,
@@ -78,9 +80,10 @@ def train(args):
         except KeyboardInterrupt:
             ppo.close(data)
             os._exit(0)
-        except Exception:
+        except Exception as e:
+            print(f"An error occurred: {e}")  # Log the error
             Console().print_exception()
-            os._exit(0)
+            os._exit(1)  # Exit with a non-zero status to indicate an error
 
     ppo.evaluate(data)
     ppo.close(data)

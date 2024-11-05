@@ -8,7 +8,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   name: "gpudrive"
   num_worlds: 50 # Number of parallel environments
   k_unique_scenes: 1 # Number of unique scenes to sample from
-  max_controlled_agents: 32 # Maximum number of agents controlled by the model
+  max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -30,7 +30,7 @@ train:
   device: "cuda"  # Dynamically set to cuda if available, else cpu
   torch_deterministic: false
   total_timesteps: 2_000_0000
-  batch_size: 25_000f
+  batch_size: 25_000
   minibatch_size: 5_000
   learning_rate: 3e-4
   anneal_lr: false
