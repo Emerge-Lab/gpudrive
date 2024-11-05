@@ -1,7 +1,7 @@
 env: "gpudrive"
 data_dir: "data/processed/training"
 num_worlds: 50
-k_unique_scenes: 1
+k_unique_scenes: 10
 max_cont_agents: 32
 mode: "train"
 use_rnn: false
@@ -10,9 +10,10 @@ baseline: false
 
 wandb:
   entity: ""
-  project: "pufferlib-integration"
-  group: "my_project"
-  track: true
+  project: "gpudrive"
+  group: "my_group"
+  mode: "online" # Options: online, offline, disabled
+  tags: ["ppo", "ff", "single_scene"]
 
 train:
   exp_id: null  # Set dynamically in the script if needed

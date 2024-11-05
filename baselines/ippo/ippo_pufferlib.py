@@ -9,9 +9,11 @@ from datetime import datetime
 import torch
 import wandb
 from box import Box
+
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
 from integrations.rl.puffer.utils import Policy
+
 import pufferlib
 import pufferlib.vector
 import pufferlib.frameworks.cleanrl
@@ -37,9 +39,9 @@ def make_policy(env):
 
 def train(args):
     """Main training loop for the PPO agent."""
-    if args.wandb.track:
-        args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
-        args.train.__dict__.update(dict(args.wandb.config.train))
+
+    args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
+    args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
         "native": pufferlib.vector.Native,
@@ -47,6 +49,7 @@ def train(args):
         "multiprocessing": pufferlib.vector.Multiprocessing,
         "ray": pufferlib.vector.Ray,
     }
+
     backend = backend_mapping.get(args.vec.backend)
     if not backend:
         raise ValueError("Invalid --vec.backend.")
@@ -85,6 +88,8 @@ def init_wandb(args, name, id=None, resume=True):
         project=args.wandb.project,
         entity=args.wandb.entity,
         group=args.wandb.group,
+        mode=args.wandb.mode,
+        tags=args.wandb.tags,
         config={"train": dict(args.train), "vec": dict(args.vec)},
         name=name,
         save_code=True,
@@ -112,8 +117,6 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
         ),
         project=project,
     )
-
-    args.track = True
     wandb.agent(sweep_id, lambda: train(args), count=100)
 
 

@@ -75,7 +75,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         policy = torch.compile(policy, mode=config.compile_mode)
 
     optimizer = torch.optim.Adam(
-        policy.parameters(), lr=config.learning_rate, eps=1e-5
+        policy.parameters(), lr=float(config.learning_rate), eps=1e-5
     )
 
     return pufferlib.namespace(
@@ -383,7 +383,7 @@ def train(data):
                     and ((data.epoch - 1) % config.render_interval) == 0
                 ):
                     for env_idx in range(1):
-                        # TODO(dc): Improve efficiency and extend to multiple envs
+                        # TODO: Improve efficiency and extend to multiple envs
                         frames = make_video(data, env_idx=0)
 
                         data.wandb.log(
@@ -520,7 +520,7 @@ def make_losses():
 
 
 class Experience:
-    """Flat tensor storage and array views for faster indexing"""
+    """Flat tensor storage (buffer) and array views for faster indexing."""
 
     def __init__(
         self,
