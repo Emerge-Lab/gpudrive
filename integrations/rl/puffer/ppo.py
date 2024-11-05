@@ -349,7 +349,7 @@ def train(data):
                     }
                 )
 
-                # TEMP
+                # TEMP TODO(dc): Remove after making animation
                 # try:
                 #     global_steps_list.append(data.global_step.copy())
                 #     perc_collisions_list.append(
