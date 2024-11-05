@@ -1,4 +1,3 @@
-from pdb import set_trace as T
 import os
 import numpy as np
 from pathlib import Path
@@ -87,10 +86,6 @@ class PufferGPUDrive(PufferEnv):
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_controlled = self.controlled_agent_mask.sum().item()
-
-        print(
-            f"Mean number controlled agents per scene: {self.num_controlled/num_worlds}"
-        )
 
         observations = self.env.reset()[self.controlled_agent_mask]
 
@@ -209,7 +204,7 @@ class PufferGPUDrive(PufferEnv):
                 self.episode_lengths[idx] = 0
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
 
-        # LOOK INTO THIS. BROKEN DATA
+        # TODO: LOOK INTO THIS
         obs[obs > 10] = 0
         obs[obs < -10] = 0
 

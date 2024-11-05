@@ -47,7 +47,6 @@ train:
 
 vec:
   backend: "native" # Only native is currently supported
-  num_envs: 1 # Only native is currently supported
   num_workers: 1
   env_batch_size: 1
   zero_copy: false

@@ -22,14 +22,12 @@ from rich.console import Console
 
 def load_config(config_path):
     """Load the configuration file."""
+    # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-    config["train"]["exp_id"] = config["train"][
-        "exp_id"
-    ] or datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["device"] = (
-        config["train"]["device"] if torch.cuda.is_available() else "cpu"
-    )
+    config["train"]["exp_id"] = config["train"]["exp_id"] or datetime.now().strftime("%m_%d_%H_%M_%S")
+    config["train"]["device"] = (config["train"]["device"] if torch.cuda.is_available() else "cpu")
+    # fmt: on
     return pufferlib.namespace(**config)
 
 
@@ -44,8 +42,9 @@ def train(args):
     args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
+        # Only native backend is supported with GPUDrive
         "native": pufferlib.vector.Native,
-        "serial": pufferlib.vector.Serial,  # Only native backend is supported with GPUDrive
+        "serial": pufferlib.vector.Serial,  
         "multiprocessing": pufferlib.vector.Multiprocessing,
         "ray": pufferlib.vector.Ray,
     }
@@ -56,7 +55,7 @@ def train(args):
 
     vecenv = pufferlib.vector.make(
         make_env,
-        num_envs=args.vec.num_envs,
+        num_envs=1,  # GPUDrive is already batched
         num_workers=args.vec.num_workers,
         batch_size=args.vec.env_batch_size,
         zero_copy=args.vec.zero_copy,
