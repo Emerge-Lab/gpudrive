@@ -1,5 +1,6 @@
-"""This implementation is adapted from the CleanRL PPO implementation in PufferLib (Joseph Suarez) at
-https://github.com/PufferAI/PufferLib/blob/dev/clean_pufferl.py
+"""
+This implementation is adapted from the CleanRL PPO implementation in PufferLib by Joseph Suarez.
+The original code can be found at: https://github.com/PufferAI/PufferLib/blob/dev/clean_pufferl.py.
 """
 from pdb import set_trace as T
 import numpy as np
@@ -188,8 +189,6 @@ def train(data):
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
-    mean_pg_loss, mean_v_loss, mean_entropy_loss = 0, 0, 0
-    mean_old_kl, mean_kl, mean_clipfrac = 0, 0, 0
     for epoch in range(config.update_epochs):
         lstm_state = None
         for mb in range(experience.num_minibatches):
@@ -349,7 +348,8 @@ def train(data):
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
-                # # TEMP: Save profile data
+
+                # TEMP
                 # try:
                 #     global_steps_list.append(data.global_step.copy())
                 #     perc_collisions_list.append(
@@ -398,9 +398,8 @@ def train(data):
                         )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
-            pass
-            # save_checkpoint(data)
-            # data.msg = f"Checkpoint saved at update {data.epoch}"
+            save_checkpoint(data)
+            data.msg = f"Checkpoint saved at update {data.epoch}"
 
 
 def close(data):
@@ -541,7 +540,6 @@ class Experience:
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == "cuda" and cpu_offload
-        obs_device = device if not pin else "cpu"
         self.obs = torch.zeros(
             batch_size,
             *obs_shape,
