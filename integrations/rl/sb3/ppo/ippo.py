@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env import VecEnv
 from torch import nn
 
 # Import masked rollout buffer class
-from integrations.sb3.rollout_buffer import MaskedRolloutBuffer
+from integrations.rl.sb3.rollout_buffer import MaskedRolloutBuffer
 from networks.perm_eq_late_fusion import LateFusionNet
 
 # From stable baselines

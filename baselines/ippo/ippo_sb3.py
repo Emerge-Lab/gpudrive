@@ -1,64 +1,66 @@
 import wandb
-import pyrallis
+import yaml
+from box import Box 
 from typing import Callable
 from datetime import datetime
 import dataclasses
 from integrations.rl.sb3.ppo.ippo import IPPO
 from integrations.rl.sb3.callbacks import MultiAgentCallback
-from baselines.ippo.config import ExperimentConfig
 from pygpudrive.env.config import EnvConfig, SceneConfig
 from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
+from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
+from networks.basic_ffn import FFN, FeedForwardPolicy
+from pygpudrive.env.config import SelectionDiscipline
+
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
-    """
-    Linear learning rate schedule.
-
-    :param initial_value: Initial learning rate.
-    :return: schedule that computes
-      current learning rate depending on remaining progress
-    """
-
+    """Linear learning rate schedule."""
     def func(progress_remaining: float) -> float:
-        """
-        Progress will decrease from 1 (beginning) to 0.
-
-        :param progress_remaining:
-        :return: current learning rate
-        """
         return progress_remaining * initial_value
-
     return func
 
 
-def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
+def load_config(config_path):
+    """Load the configuration file."""
+    with open(config_path, "r") as f:
+        return Box(yaml.safe_load(f))
+
+def train(exp_config: Box, scene_config: SceneConfig):
     """Run PPO training with stable-baselines3."""
 
-    # ENVIRONMENT CONFIG
     env_config = dataclasses.replace(
         EnvConfig(),
         reward_type=exp_config.reward_type,
         collision_weight=exp_config.collision_weight,
         goal_achieved_weight=exp_config.goal_achieved_weight,
         off_road_weight=exp_config.off_road_weight,
+        episode_len=exp_config.episode_len,
     )
-
-    # MAKE SB3-COMPATIBLE ENVIRONMENT
+    
+    # Select model
+    if exp_config.mlp_class == "late_fusion":
+        exp_config.mlp_class = LateFusionNet
+        exp_config.policy = LateFusionPolicy
+    elif exp_config.mlp_class == "feed_forward":
+        exp_config.mlp_class = FFN
+        exp_config.policy = FeedForwardPolicy
+    else:
+        raise NotImplementedError(f"Unsupported MLP class: {exp_config.mlp_class}")
+    
+    # Make environment
     env = SB3MultiAgentEnv(
         config=env_config,
         scene_config=scene_config,
         exp_config=exp_config,
-        # Control up to all agents in the scene
         max_cont_agents=env_config.max_num_agents_in_scene,
         device=exp_config.device,
     )
-
-    # SET MINIBATCH SIZE BASED ON ROLLOUT LENGTH
+    
     exp_config.batch_size = (
         exp_config.num_worlds * exp_config.n_steps
     ) // exp_config.num_minibatches
 
-    # INIT WANDB
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
     run_id = f"{datetime_}_{exp_config.k_unique_scenes}scenes"
     run = wandb.init(
@@ -69,16 +71,14 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
         sync_tensorboard=exp_config.sync_tensorboard,
         tags=exp_config.tags,
         mode=exp_config.wandb_mode,
-        config={**exp_config.__dict__, **env_config.__dict__},
+        config={**exp_config, **env_config.__dict__},
     )
 
-    # CALLBACK
     custom_callback = MultiAgentCallback(
         config=exp_config,
         wandb_run=run if run_id is not None else None,
     )
 
-    # INITIALIZE IPPO
     model = IPPO(
         n_steps=exp_config.n_steps,
         batch_size=exp_config.batch_size,
@@ -86,9 +86,7 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
         seed=exp_config.seed,
         verbose=exp_config.verbose,
         device=exp_config.device,
-        tensorboard_log=f"runs/{run_id}"
-        if run_id is not None
-        else None,  # Sync with wandb
+        tensorboard_log=f"runs/{run_id}" if run_id is not None else None,
         mlp_class=exp_config.mlp_class,
         policy=exp_config.policy,
         gamma=exp_config.gamma,
@@ -102,7 +100,6 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
         exp_config=exp_config,
     )
 
-    # LEARN
     model.learn(
         total_timesteps=exp_config.total_timesteps,
         callback=custom_callback,
@@ -114,14 +111,12 @@ def train(exp_config: ExperimentConfig, scene_config: SceneConfig):
 
 if __name__ == "__main__":
 
-    exp_config = pyrallis.parse(config_class=ExperimentConfig)
-
-    exp_config.project_name = "pufferlib-integration"
+    exp_config = load_config("baselines/ippo/config/ippo_ff_sb3.yaml")
 
     scene_config = SceneConfig(
         path=exp_config.data_dir,
         num_scenes=exp_config.num_worlds,
-        discipline=exp_config.selection_discipline,
+        discipline=SelectionDiscipline.K_UNIQUE_N if exp_config.selection_discipline == "K_UNIQUE_N" else SelectionDiscipline.PAD_N,
         k_unique_scenes=exp_config.k_unique_scenes,
     )
 
