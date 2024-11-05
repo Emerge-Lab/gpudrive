@@ -15,22 +15,25 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 from pufferlib.environment import PufferEnv
 
+
 def env_creator(
-    data_dir, 
+    data_dir,
     environment_config,
     device="cuda",
 ):
     return lambda: PufferGPUDrive(
-        data_dir=data_dir, 
+        data_dir=data_dir,
         device=device,
         config=environment_config,
     )
 
+
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
+
     def __init__(self, data_dir, device, config, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
-    
+
         self.data_dir = data_dir
         self.device = device
         self.config = config
@@ -50,9 +53,9 @@ class PufferGPUDrive(PufferEnv):
             k_unique_scenes=self.k_unique_scenes,
         )
 
-        # Override any default environment settings 
+        # Override any default environment settings
         env_config = dataclasses.replace(
-            EnvConfig(),    
+            EnvConfig(),
             ego_state=config.ego_state,
             road_map_obs=config.road_map_obs,
             partner_obs=config.partner_obs,

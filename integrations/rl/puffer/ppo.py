@@ -756,8 +756,8 @@ def rollout(
         agent = agent_creator(env, **agent_kwargs).to(device)
     else:
         # Load the agent's state dictionary instead of the full object
-        agent = agent_creator(env, **agent_kwargs).to(device) 
-        agent.load_state_dict(torch.load(model_path, map_location=device))  
+        agent = agent_creator(env, **agent_kwargs).to(device)
+        agent.load_state_dict(torch.load(model_path, map_location=device))
 
     ob, info = env.reset()
     driver = env.driver_env

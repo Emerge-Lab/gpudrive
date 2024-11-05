@@ -32,7 +32,7 @@ python baselines/ippo/ippo_sb3.py
 
 - Configurations are found in `baselines/ippo/config/ippo_ff_sb3.yaml`
 
-### Details 
+### Details
 
 #### Resampling the data
 

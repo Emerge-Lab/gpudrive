@@ -28,7 +28,7 @@ def load_config(config_path):
     # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-    
+
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
     config["train"]["exp_id"] = config["train"]["exp_id"] or datetime_
     config["train"]["device"] = (config["train"]["device"] if torch.cuda.is_available() else "cpu")
@@ -49,7 +49,7 @@ def train(args):
     backend_mapping = {
         # Note: Only native backend is supported with GPUDrive
         "native": pufferlib.vector.Native,
-        "serial": pufferlib.vector.Serial,  
+        "serial": pufferlib.vector.Serial,
         "multiprocessing": pufferlib.vector.Multiprocessing,
         "ray": pufferlib.vector.Ray,
     }
@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     make_env = env_creator(
         data_dir=config.data_dir,
-        environment_config=config.environment, 
+        environment_config=config.environment,
         device=config.train.device,
     )
 
