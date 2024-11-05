@@ -1,0 +1,52 @@
+env: "gpudrive"
+data_dir: "data/processed/training"
+num_worlds: 50
+k_unique_scenes: 1
+max_cont_agents: 32
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+
+wandb:
+  entity: ""
+  project: "pufferlib-integration"
+  group: "my_project"
+  track: true
+
+train:
+  exp_id: null  # Set dynamically in the script if needed
+  seed: 42
+  cpu_offload: false
+  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  torch_deterministic: false
+  total_timesteps: 2_000_0000
+  batch_size: 25_000
+  minibatch_size: 5_000
+  learning_rate: 3e-4
+  anneal_lr: false
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 5
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0001
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: null
+  checkpoint_interval: 5000
+  checkpoint_path: "./runs"
+  render: true
+  render_interval: 1000
+  bptt_horizon: 50
+  compile: false
+  compile_mode: "reduce-overhead"
+
+vec:
+  backend: "native" # Only native is currently supported
+  num_envs: 1 # Only native is currently supported
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false
