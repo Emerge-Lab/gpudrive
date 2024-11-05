@@ -1,36 +1,40 @@
-# IPPO implementation details
+# Using IPPO in GPUDrive
 
 ## PufferLib implementation
 
+### Dependencies
 
-### Launch
-To launch a run on a single scenario with 50 parallel environments and track it with wandb:
-
-```bash
-python baselines/ippo/ippo_pufferlib.py --track --data-dir 'data/processed/examples' --num-worlds 50 --k-unique-scenes 1 --wandb-group 'your_group'
+This implementation is compatible with the `gpudrive` branch of [PufferLib](https://github.com/PufferAI/PufferLib/tree/gpudrive/pufferlib/environments/gpudrive). To install, run:
+```
+pip install git+https://github.com/PufferAI/PufferLib.git@gpudrive
 ```
 
-### Details
+### Example
 
+- Launch a run:
 
+```bash
+python baselines/ippo/ippo_pufferlib.py
+```
 
-### Resampling the data
+- Configs are in `baselines/ippo/config/ippo_ff_puffer.yaml`
+- A small feedforward network is implemented in `integrations/rl/puffer/utils.py`
 
-#TODO(dc)
 
 ## Stable baselines 3 implementation
 
-### Launch
+### Example
 
-Run:
-
+- Launch a run:
 ```
 python baselines/ippo/ippo_sb3.py
 ```
 
-Configurations are found in `baselines/ippo/config.py`
+- Configurations are found in `baselines/ippo/config/ippo_ff_sb3.yaml`
 
-### Resampling the data
+### Details 
+
+#### Resampling the data
 
 The configuration for resampling traffic scenarios includes:
 
@@ -47,9 +51,9 @@ resample_freq: int = 100_000 # Resample every k steps (recommended to be a multi
 resample_mode: str = "random" # Options: "random"
 ```
 
-## Implemented networks
+#### Implemented networks
 
-### Classic Observations
+- Classic Observations
 
 For classic observations (e.g., `ego_state`), there is support for a permutation equivariant network (recommended). In `baselines/ippo/config.py`, set the following:
 
@@ -68,7 +72,7 @@ partner_obs: bool = True  # Include partner vehicle information
 norm_obs: bool = True  # Normalize observations
 ```
 
-### LiDAR Observations
+- LiDAR Observations
 
 For only LiDAR-based observations, set the following options:
 

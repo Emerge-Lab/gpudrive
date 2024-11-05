@@ -2,6 +2,7 @@ import os
 import numpy as np
 from pathlib import Path
 import torch
+import dataclasses
 import gymnasium
 
 from pygpudrive.env.config import (
@@ -14,41 +15,29 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 
 from pufferlib.environment import PufferEnv
 
-
 def env_creator(
-    name="gpudrive",
-    data_dir="data/gpudrive/examples",
+    data_dir, 
+    environment_config,
     device="cuda",
-    max_cont_agents=50,
-    num_worlds=50,
-    k_unique_scenes=1,
 ):
     return lambda: PufferGPUDrive(
-        data_dir=data_dir,
+        data_dir=data_dir, 
         device=device,
-        max_cont_agents=max_cont_agents,
-        num_worlds=num_worlds,
-        k_unique_scenes=k_unique_scenes,
+        config=environment_config,
     )
 
-
 class PufferGPUDrive(PufferEnv):
-    def __init__(
-        self,
-        data_dir,
-        device="cuda",
-        max_cont_agents=50,
-        num_worlds=50,
-        k_unique_scenes=1,
-        buf=None,
-    ):
+    """GPUDrive wrapper for PufferEnv."""
+    def __init__(self, data_dir, device, config, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
-        self.device = device
+    
         self.data_dir = data_dir
-        self.max_cont_agents = max_cont_agents
-        self.num_worlds = num_worlds
-        self.k_unique_scenes = k_unique_scenes
-        self.total_agents = max_cont_agents * num_worlds
+        self.device = device
+        self.config = config
+        self.max_cont_agents = config.max_controlled_agents
+        self.num_worlds = config.num_worlds
+        self.k_unique_scenes = config.k_unique_scenes
+        self.total_agents = self.max_cont_agents * self.num_worlds
 
         # Set working directory to the base directory 'gpudrive'
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
@@ -56,12 +45,21 @@ class PufferGPUDrive(PufferEnv):
 
         scene_config = SceneConfig(
             path=data_dir,
-            num_scenes=num_worlds,
+            num_scenes=self.num_worlds,
             discipline=SelectionDiscipline.K_UNIQUE_N,
-            k_unique_scenes=k_unique_scenes,
+            k_unique_scenes=self.k_unique_scenes,
         )
 
-        env_config = EnvConfig()
+        # Override any default environment settings 
+        env_config = dataclasses.replace(
+            EnvConfig(),    
+            ego_state=config.ego_state,
+            road_map_obs=config.road_map_obs,
+            partner_obs=config.partner_obs,
+            reward_type=config.reward_type,
+            norm_obs=config.normalize_obs,
+            dynamics_model=config.dynamics_model,
+        )
 
         render_config = RenderConfig(
             draw_obj_idx=True,
@@ -71,7 +69,7 @@ class PufferGPUDrive(PufferEnv):
             config=env_config,
             scene_config=scene_config,
             render_config=render_config,
-            max_cont_agents=max_cont_agents,
+            max_cont_agents=self.max_cont_agents,
             device=device,
         )
 
@@ -82,7 +80,7 @@ class PufferGPUDrive(PufferEnv):
         )
         self.render_mode = "rgb_array"
         self.num_live = []
-        self.num_agents = max_cont_agents * num_worlds
+        self.num_agents = self.max_cont_agents * self.num_worlds
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_controlled = self.controlled_agent_mask.sum().item()
@@ -98,7 +96,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.masks = np.ones(self.num_agents, dtype=bool)
         self.actions = torch.zeros(
-            (num_worlds, max_cont_agents), dtype=torch.int64
+            (self.num_worlds, self.max_cont_agents), dtype=torch.int64
         ).to(self.device)
 
     def _obs_and_mask(self, obs):
@@ -204,7 +202,7 @@ class PufferGPUDrive(PufferEnv):
                 self.episode_lengths[idx] = 0
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
 
-        # TODO: LOOK INTO THIS
+        # TODO: Look in
         obs[obs > 10] = 0
         obs[obs < -10] = 0
 

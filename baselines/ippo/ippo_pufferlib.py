@@ -1,6 +1,9 @@
 """
-This implementation is adapted from the demo in PufferLib by Joseph Suarez.
-The original code can be found at: https://github.com/PufferAI/PufferLib/blob/dev/demo.py.
+This implementation is adapted from the demo in PufferLib by Joseph Suarez,
+which in turn is adapted from Costa Huang's CleanRL PPO + LSTM implementation.
+Links
+- PufferLib: https://github.com/PufferAI/PufferLib/blob/dev/demo.py
+- Cleanrl: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo.py
 """
 
 import os
@@ -25,7 +28,9 @@ def load_config(config_path):
     # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-    config["train"]["exp_id"] = config["train"]["exp_id"] or datetime.now().strftime("%m_%d_%H_%M_%S")
+    
+    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
+    config["train"]["exp_id"] = config["train"]["exp_id"] or datetime_
     config["train"]["device"] = (config["train"]["device"] if torch.cuda.is_available() else "cpu")
     # fmt: on
     return pufferlib.namespace(**config)
@@ -42,7 +47,7 @@ def train(args):
     args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
-        # Only native backend is supported with GPUDrive
+        # Note: Only native backend is supported with GPUDrive
         "native": pufferlib.vector.Native,
         "serial": pufferlib.vector.Serial,  
         "multiprocessing": pufferlib.vector.Multiprocessing,
@@ -63,7 +68,7 @@ def train(args):
     )
 
     policy = make_policy(vecenv.driver_env).to(args.train.device)
-    args.train.env = args.env
+    args.train.env = args.environment.name
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)
     while data.global_step < args.train.total_timesteps:
@@ -121,14 +126,12 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 
 if __name__ == "__main__":
 
-    config = load_config("baselines/ippo/config/ippo_ff_single_scene.yaml")
+    config = load_config("baselines/ippo/config/ippo_ff_puffer.yaml")
 
     make_env = env_creator(
-        name=config.env,
         data_dir=config.data_dir,
-        num_worlds=config.num_worlds,
-        max_cont_agents=config.max_cont_agents,
-        k_unique_scenes=config.k_unique_scenes,
+        environment_config=config.environment, 
+        device=config.train.device,
     )
 
     if config.mode == "train":

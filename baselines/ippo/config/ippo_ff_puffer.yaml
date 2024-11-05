@@ -1,12 +1,20 @@
-env: "gpudrive"
-data_dir: "data/processed/training"
-num_worlds: 50
-k_unique_scenes: 10
-max_cont_agents: 32
 mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
+data_dir: "data/processed/training" # Dataset
+
+environment: # Overrides default environment configs (see pygpudrive/env/config.py)
+  name: "gpudrive"
+  num_worlds: 50 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
+  max_controlled_agents: 32 # Maximum number of agents controlled by the model
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  normalize_obs: true
+  reward_type: "sparse_on_goal_achieved"
+  dynamics_model: "classic"
 
 wandb:
   entity: ""

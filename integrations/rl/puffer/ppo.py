@@ -1,7 +1,11 @@
 """
-This implementation is adapted from the CleanRL PPO implementation in PufferLib by Joseph Suarez.
-The original code can be found at: https://github.com/PufferAI/PufferLib/blob/dev/clean_pufferl.py.
+This implementation is adapted from the demo in PufferLib by Joseph Suarez,
+which in turn is adapted from Costa Huang's CleanRL PPO + LSTM implementation.
+Links
+- PufferLib: https://github.com/PufferAI/PufferLib/blob/dev/demo.py
+- Cleanrl: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo.py
 """
+
 from pdb import set_trace as T
 import numpy as np
 import os
@@ -751,7 +755,9 @@ def rollout(
     if model_path is None:
         agent = agent_creator(env, **agent_kwargs).to(device)
     else:
-        agent = torch.load(model_path, map_location=device)
+        # Load the agent's state dictionary instead of the full object
+        agent = agent_creator(env, **agent_kwargs).to(device) 
+        agent.load_state_dict(torch.load(model_path, map_location=device))  
 
     ob, info = env.reset()
     driver = env.driver_env
