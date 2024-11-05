@@ -1,3 +1,6 @@
+"""This implementation is adapted from the CleanRL PPO implementation in PufferLib (Joseph Suarez) at
+https://github.com/PufferAI/PufferLib/blob/dev/clean_pufferl.py
+"""
 from pdb import set_trace as T
 import numpy as np
 import os
@@ -25,7 +28,6 @@ from integrations.rl.puffer.c_gae import compute_gae
 from integrations.rl.puffer.logging import print_dashboard, abbreviate
 from integrations.rl.puffer.utils import make_video
 
-# TEMP
 global_steps_list = []
 perc_collisions_list = []
 perc_offroad_list = []
@@ -347,34 +349,34 @@ def train(data):
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
-                # TEMP: Save profile data
-                try:
-                    global_steps_list.append(data.global_step.copy())
-                    perc_collisions_list.append(
-                        data.stats["perc_veh_collisions"].copy()
-                    )
-                    perc_offroad_list.append(
-                        data.stats["perc_off_road"].copy()
-                    )
-                    perc_goal_achieved_list.append(
-                        data.stats["perc_goal_achieved"].copy()
-                    )
-                    time_list.append(profile.uptime)
-                except:
-                    pass
+                # # TEMP: Save profile data
+                # try:
+                #     global_steps_list.append(data.global_step.copy())
+                #     perc_collisions_list.append(
+                #         data.stats["perc_veh_collisions"].copy()
+                #     )
+                #     perc_offroad_list.append(
+                #         data.stats["perc_off_road"].copy()
+                #     )
+                #     perc_goal_achieved_list.append(
+                #         data.stats["perc_goal_achieved"].copy()
+                #     )
+                #     time_list.append(profile.uptime)
+                # except:
+                #     pass
 
-                # Save as numpy arrays
-                if data.global_step > 12e6:
-                    np.save("global_steps.npy", np.array(global_steps_list))
-                    np.save(
-                        "perc_collisions.npy", np.array(perc_collisions_list)
-                    )
-                    np.save("perc_offroad.npy", np.array(perc_offroad_list))
-                    np.save(
-                        "perc_goal_achieved.npy",
-                        np.array(perc_goal_achieved_list),
-                    )
-                    np.save("wallclock_time.npy", np.array(time_list))
+                # # Save as numpy arrays
+                # if data.global_step > 12e6:
+                #     np.save("global_steps.npy", np.array(global_steps_list))
+                #     np.save(
+                #         "perc_collisions.npy", np.array(perc_collisions_list)
+                #     )
+                #     np.save("perc_offroad.npy", np.array(perc_offroad_list))
+                #     np.save(
+                #         "perc_goal_achieved.npy",
+                #         np.array(perc_goal_achieved_list),
+                #     )
+                #     np.save("wallclock_time.npy", np.array(time_list))
 
                 if (
                     config.render
