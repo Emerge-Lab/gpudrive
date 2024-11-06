@@ -24,7 +24,7 @@
 hpc/overlay*
 data/raw/*
 data/processed/validation/*
-data/processed/train/*
+data/processed/training/*
 data/processed/test/*
 
 # Logging
