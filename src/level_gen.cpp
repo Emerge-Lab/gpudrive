@@ -171,13 +171,13 @@ static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
     return road_edge;
 }
 
-float calculateDistance(float x1, float y1, float x2, float y2) {
-    return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+float calculateDistance(float x1, float y1, float z1, float x2, float y2, float z2) {
+    return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2) + pow(z2 - z1, 2));
 }
 
 static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
 
-    MapVector2 points[] = {
+    MapVector3 points[] = {
         roadInit.geometry[0],
         roadInit.geometry[1],
         roadInit.geometry[2],
@@ -188,9 +188,9 @@ static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
     float lengths[4];
     for (int i = 0; i < 4; ++i)
     {
-        MapVector2 &p_start = points[i];
-        MapVector2 &p_end = points[(i + 1) % 4]; // Wrap around to the first point
-        lengths[i] = calculateDistance(p_start.x, p_start.y, p_end.x, p_end.y);
+        MapVector3 &p_start = points[i];
+        MapVector3 &p_end = points[(i + 1) % 4]; // Wrap around to the first point
+        lengths[i] = calculateDistance(p_start.x, p_start.y, p_start.z, p_end.x, p_end.y, p_end.z);
     }
 
     int maxLength_i = 0;
@@ -202,8 +202,8 @@ static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
             minLength_i = i;
     }
 
-    MapVector2 &start = points[maxLength_i];
-    MapVector2 &end = points[(maxLength_i + 1) % 4];
+    MapVector3 &start = points[maxLength_i];
+    MapVector3 &end = points[(maxLength_i + 1) % 4];
 
     // Calculate rotation angle (assuming longer side is used to calculate angle)
     float angle = atan2(end.y - start.y, end.x - start.x);
@@ -213,13 +213,15 @@ static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
 
     float sum_x = 0.0f;
     float sum_y = 0.0f;
+    float sum_z = 0.0f;
 
     for (const auto& point : points) {
         sum_x += point.x;
         sum_y += point.y;
+        sum_z += point.z;
     }
 
-    auto pos = Vector3{.x = sum_x/4 - ctx.singleton<WorldMeans>().mean.x, .y = sum_y/4 - ctx.singleton<WorldMeans>().mean.y, .z = 1 + consts::lidarRoadLineOffset};
+    auto pos = Vector3{.x = sum_x/4 - ctx.singleton<WorldMeans>().mean.x, .y = sum_y/4 - ctx.singleton<WorldMeans>().mean.y, .z = sum_z/4 - ctx.singleton<WorldMeans>().mean.z};
     auto rot = Quat::angleAxis(angle, madrona::math::up);
     auto scale = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     setRoadEntitiesProps(ctx, speed_bump, pos, rot, scale, roadInit.type, ObjectID{(int32_t)SimObject::SpeedBump}, ResponseType::Static, roadInit.id, roadInit.mapType);
@@ -230,11 +232,12 @@ static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
 static Entity makeStopSign(Engine &ctx, const MapRoad &roadInit) {
     float x1 = roadInit.geometry[0].x;
     float y1 = roadInit.geometry[0].y;
+    float z1 = roadInit.geometry[0].z;
 
     auto stop_sign = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<RoadInterfaceEntity>(stop_sign).e = ctx.makeEntity<RoadInterface>();
     
-    auto pos = Vector3{.x = x1 - ctx.singleton<WorldMeans>().mean.x, .y = y1 - ctx.singleton<WorldMeans>().mean.y, .z = 1};
+    auto pos = Vector3{.x = x1 - ctx.singleton<WorldMeans>().mean.x, .y = y1 - ctx.singleton<WorldMeans>().mean.y, .z = z1 - ctx.singleton<WorldMeans>().mean.z};
     auto rot = Quat::angleAxis(0, madrona::math::up);
     auto scale = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 1};
     setRoadEntitiesProps(ctx, stop_sign, pos, rot, scale, EntityType::StopSign, ObjectID{(int32_t)SimObject::StopSign}, ResponseType::Static, roadInit.id, roadInit.mapType);
