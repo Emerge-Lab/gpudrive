@@ -277,7 +277,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             axis=2
         )
 
-    def get_obs(self):
+    def _get_ego_state(self):
         """Get observation: Combine different types of environment information
         into a single tensor.
 
