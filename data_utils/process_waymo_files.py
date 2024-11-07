@@ -132,10 +132,10 @@ def _parse_object_state(
         "width": final_state.width,
         "length": final_state.length,
         "height": final_state.height,
-        "heading": [
-            wrap_yaws(state.heading) if state.valid else ERR_VAL
+        "heading": [ # In radians between [-pi, pi]
+            state.heading if state.valid else ERR_VAL
             for state in states
-        ],
+        ], 
         "velocity": [
             {"x": state.velocity_x, "y": state.velocity_y}
             if state.valid
