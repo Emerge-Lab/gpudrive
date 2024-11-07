@@ -846,7 +846,7 @@ if __name__ == "__main__":
         collision_behavior="ignore",  # Ignore collisions
     )
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/validation", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
 
     # Make env
     env = GPUDriveTorchEnv(
