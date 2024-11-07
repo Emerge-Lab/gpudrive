@@ -1,4 +1,4 @@
-from vbd import waymax_visualization as visualization
+from integrations.models.vbd import waymax_visualization as visualization
 import mediapy
 import numpy as np
 from matplotlib import pyplot as plt
