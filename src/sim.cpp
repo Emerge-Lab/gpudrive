@@ -1,3 +1,4 @@
+#include <iostream>
 #include <algorithm>
 #include <limits>
 #include <madrona/mw_gpu_entry.hpp>
