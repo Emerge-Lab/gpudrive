@@ -11,9 +11,9 @@ from waymax.agents import actor_core
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-from vbd.waymax_visualization import utils
-from vbd.waymax_visualization import color
-from vbd.waymax_visualization import viz as visualization
+from integrations.models.vbd.waymax_visualization import utils
+from integrations.models.vbd.waymax_visualization import color
+from integrations.models.vbd.waymax_visualization import viz as visualization
 from waymax import config as _config
 from typing import Any, Optional
 

@@ -2,7 +2,7 @@
 import torch
 import numpy as np
 import gpudrive
-from vbd.data.data_utils import calculate_relations
+from integrations.models.vbd.data.data_utils import calculate_relations
 
 
 def convert_yaw(yaw_tensor):

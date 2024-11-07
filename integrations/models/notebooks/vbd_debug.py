@@ -26,11 +26,14 @@ while working_dir.name != "gpudrive":
 os.chdir(working_dir)
 
 # VBD dependencies
-from vbd.sim_agent.waymax_env import WaymaxEnvironment
-from vbd.data.dataset import WaymaxTestDataset
-from vbd.waymax_visualization.plotting import plot_state
-from vbd.sim_agent.sim_actor import VBDTest, sample_to_action
-from vbd.model.utils import set_seed
+from integrations.models.vbd.sim_agent.waymax_env import WaymaxEnvironment
+from integrations.models.vbd.data.dataset import WaymaxTestDataset
+from integrations.models.vbd.waymax_visualization.plotting import plot_state
+from integrations.models.vbd.sim_agent.sim_actor import (
+    VBDTest,
+    sample_to_action,
+)
+from integrations.models.vbd.model.utils import set_seed
 
 
 DATA_DIR = "data/processed/waymax"  # Base data path
