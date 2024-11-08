@@ -8,7 +8,7 @@ namespace gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 70;
+inline constexpr madrona::CountT kMaxAgentCount = 32;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 15000;
 inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 256;
 
