@@ -13,7 +13,8 @@ import logging
 import psutil
 from pathlib import Path
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from pdb import set_trace as T
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
 from datatypes import MapElementIds
@@ -133,7 +134,7 @@ def _parse_object_state(
         "length": final_state.length,
         "height": final_state.height,
         "heading": [ # In radians between [-pi, pi]
-            state.heading if state.valid else ERR_VAL
+            (state.heading + np.pi) % (2 * np.pi) - np.pi if state.valid else ERR_VAL
             for state in states
         ], 
         "velocity": [
