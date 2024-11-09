@@ -469,6 +469,7 @@ inline void rewardSystem(Engine &ctx,
     // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
 }
 
+
 inline void stepTrackerSystem(Engine &ctx, const AgentInterfaceEntity &agent_iface) {
     StepsRemaining &stepsRemaining = ctx.get<StepsRemaining>(agent_iface.e);
     --stepsRemaining.t;

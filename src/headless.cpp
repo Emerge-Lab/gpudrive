@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
-        // printf("Done\n");
-        // donePrinter.print();
+        printf("Done\n");
+        donePrinter.print();
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
