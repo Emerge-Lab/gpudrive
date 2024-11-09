@@ -305,6 +305,8 @@ void createPaddingEntities(Engine &ctx) {
         for (CountT i = 0; i < consts::kMaxAgentCount-1; i++) {
             partner_obs.obs[i] = PartnerObservation::zero();
         }
+        
+        Trajectory::zero(ctx.get<Trajectory>(agent_iface));
 
     }
 
