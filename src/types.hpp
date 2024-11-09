@@ -128,7 +128,7 @@ namespace gpudrive
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
-
+        
         static inline Action zero()
         {
             return Action{
