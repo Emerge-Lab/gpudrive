@@ -64,9 +64,9 @@ namespace gpudrive
         NUM_TYPES = 21,
     };
 
-struct AgentID {
-    int32_t id;
-};
+    struct AgentID {
+        int32_t id;
+    };
 
     struct VehicleSize
     {
@@ -185,7 +185,7 @@ struct AgentID {
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
-    float id;
+        float id;
         static inline SelfObservation zero()
         {
             return SelfObservation{
@@ -389,7 +389,7 @@ struct AgentID {
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
-    AgentID,
+                                AgentID,
 
                                 ControlledState // Drive Logic
 

@@ -34,6 +34,7 @@ namespace gpudrive
         uint32_t numHeadings;
         uint32_t numVelocities;
         uint32_t numValid;
+        uint32_t id;
         MapVector2 mean;
         bool markAsExpert{false};
     };
