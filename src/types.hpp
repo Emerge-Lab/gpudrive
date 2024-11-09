@@ -126,6 +126,12 @@ struct AgentID {
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
+
+        static inline Action zero()
+        {
+            return Action{
+                .classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
+        }
     };
 
     const size_t ActionExportSize = 3 + 1 + 6;
@@ -316,6 +322,18 @@ struct AgentID {
         float headings[consts::kTrajectoryLength];
         float valids[consts::kTrajectoryLength];
         Action inverseActions[consts::kTrajectoryLength];
+
+        static inline void zero(Trajectory& traj)
+        {
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            {
+                traj.positions[i] = {0, 0};
+                traj.velocities[i] = {0, 0};
+                traj.headings[i] = 0;
+                traj.valids[i] = 0;
+                traj.inverseActions[i] = Action::zero();
+            }
+        }
     };
 
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
