@@ -712,6 +712,7 @@ def save_checkpoint(data):
     os.rename(state_path + ".tmp", state_path)
     return model_path
 
+
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
 
