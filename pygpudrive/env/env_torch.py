@@ -88,7 +88,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch()
+            info_tensor = self.sim.info_tensor().to_torch().clone()
             off_road = info_tensor[:, :, 0].to(torch.float)
 
             # True if the vehicle collided with another road object

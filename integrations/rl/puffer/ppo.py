@@ -373,11 +373,16 @@ def train(data):
                     # Save as numpy arrays
                     if data.global_step >= data.config.total_timesteps:
                         print("Saving training metrics...")
-                        np.save("global_steps.npy", np.array(global_steps_list))
                         np.save(
-                            "perc_collisions.npy", np.array(perc_collisions_list)
+                            "global_steps.npy", np.array(global_steps_list)
                         )
-                        np.save("perc_offroad.npy", np.array(perc_offroad_list))
+                        np.save(
+                            "perc_collisions.npy",
+                            np.array(perc_collisions_list),
+                        )
+                        np.save(
+                            "perc_offroad.npy", np.array(perc_offroad_list)
+                        )
                         np.save(
                             "perc_goal_achieved.npy",
                             np.array(perc_goal_achieved_list),
