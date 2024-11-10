@@ -59,9 +59,14 @@ class PufferGPUDrive(PufferEnv):
             ego_state=config.ego_state,
             road_map_obs=config.road_map_obs,
             partner_obs=config.partner_obs,
-            reward_type=config.reward_type,
             norm_obs=config.normalize_obs,
             dynamics_model=config.dynamics_model,
+            reward_type=config.reward_type,
+            collision_weight=config.collision_weight,
+            goal_achieved_weight=config.goal_achieved_weight,
+            off_road_weight=config.off_road_weight,
+            dist_to_goal_threshold=config.dist_to_goal_threshold,
+            collision_behavior=config.collision_behavior,
         )
 
         render_config = RenderConfig(
