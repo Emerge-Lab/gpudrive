@@ -20,6 +20,9 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   goal_achieved_weight: 1.0
   off_road_weight: 0.0 # Set to < 0.0 to discourage off-road driving
   collision_behavior: "remove" # Options: "remove", "stop", "ignore"
+  obs_radius: 100.0  # Radius for road observations
+  polyline_reduction_threshold: 1.0 # Threshold for polyline reduction
+  remove_non_vehicles: false # Remove cyclists and pedestrians
 
 wandb:
   entity: ""

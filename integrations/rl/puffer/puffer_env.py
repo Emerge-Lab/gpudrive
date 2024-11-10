@@ -67,6 +67,9 @@ class PufferGPUDrive(PufferEnv):
             off_road_weight=config.off_road_weight,
             dist_to_goal_threshold=config.dist_to_goal_threshold,
             collision_behavior=config.collision_behavior,
+            obs_radius=config.obs_radius,
+            polyline_reduction_threshold=config.polyline_reduction_threshold,
+            remove_non_vehicles=config.remove_non_vehicles,
         )
 
         render_config = RenderConfig(
