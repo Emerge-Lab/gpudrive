@@ -386,15 +386,15 @@ def train(data):
                     config.render
                     and ((data.epoch - 1) % config.render_interval) == 0
                 ):
-                    for env_idx in range(1):
-                        # TODO: Improve efficiency and extend to multiple envs
-                        frames = make_video(data, env_idx=0)
+                    for env_idx in range(data.config.render_k_scenarios):
+                        # TODO(dc): Improve efficiency and extend to multiple envs
+                        frames = make_video(data, env_idx=env_idx)
 
                         data.wandb.log(
                             {
                                 f"env_idx: {env_idx}": data.wandb.Video(
                                     np.moveaxis(frames, -1, 1),
-                                    fps=20,
+                                    fps=data.config.render_fps,
                                     format="mp4",
                                     caption=f"global step: {data.global_step:,}",
                                 )
