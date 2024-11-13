@@ -62,7 +62,7 @@ class GlobalRoadGraphPoints:
         self.segment_width = roadgraph_tensor[:, :, 3]
         self.segment_height = roadgraph_tensor[:, :, 4]
         self.orientation = roadgraph_tensor[:, :, 5]
-        # Skipping the map element type for now.
+        # Skipping the map element type for now (redundant with the map type).
         self.id = roadgraph_tensor[:, :, 7]
         self.type = roadgraph_tensor[:, :, 8]
 

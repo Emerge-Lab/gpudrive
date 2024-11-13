@@ -69,8 +69,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
 
     def get_infos(self):
-        return self.to_tensor(
-            (self.sim.info_tensor())
+        return (
+            self.sim.info_tensor()
+            .to_torch()
             .squeeze(dim=2)
             .to(torch.float)
             .to(self.device)
