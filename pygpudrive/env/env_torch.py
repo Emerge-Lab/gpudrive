@@ -13,6 +13,7 @@ from pygpudrive.env.base_env import GPUDriveGymEnv
 from pygpudrive.env import constants
 
 from pygpudrive.datatypes.observation import EgoState, PartnerObs
+from pygpudrive.datatypes.trajectory import LogTrajectory
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -68,9 +69,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
 
     def get_infos(self):
-        return self.to_tensor(
-            (self.sim.info_tensor())
-            .squeeze(dim=2)
+        return self.to_tensor((self.sim.info_tensor()).squeeze(dim=2)
             .to(torch.float)
             .to(self.device)
         )
@@ -263,56 +262,44 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.ego_state:
             ego_state = EgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
-                backend=self.backend,
+                backend=self.backend
             )
             if self.config.norm_obs:
                 ego_state.normalize()
 
-            return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 2, 0)
-                .to(self.device)
-            )
+            return torch.stack([
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]).permute(1, 2, 0).to(self.device)
         else:
             return torch.Tensor().to(self.device)
+
 
     def _get_partner_obs(self):
         """Get partner observations."""
         if self.config.partner_obs:
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
-                backend=self.backend,
+                backend=self.backend
             )
 
             if self.config.norm_obs:
                 partner_obs.normalize()
                 partner_obs.one_hot_encode_agent_types()
 
-            return (
-                torch.concat(
-                    [
-                        partner_obs.speed,
-                        partner_obs.rel_pos_x,
-                        partner_obs.rel_pos_y,
-                        partner_obs.orientation,
-                        partner_obs.vehicle_length,
-                        partner_obs.vehicle_width,
-                        partner_obs.agent_type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
+            return torch.concat([
+                partner_obs.speed,
+                partner_obs.rel_pos_x,
+                partner_obs.rel_pos_y,
+                partner_obs.orientation,
+                partner_obs.vehicle_length,
+                partner_obs.vehicle_width,
+                partner_obs.agent_type,
+            ], dim=-1).flatten(start_dim=2).to(self.device)
 
         else:
             return torch.Tensor().to(self.device)
@@ -388,83 +375,64 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             axis=2
         )
 
-    def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
-        """Get expert actions for the full trajectories across worlds."""
+    def get_expert_actions(self):
+        """Get expert actions for the full trajectories across worlds.
+        
+        Returns:
+            expert_actions: Inferred or logged actions for the agents.
+            expert_speeds: Speeds from the logged trajectories.
+            expert_positions: Positions from the logged trajectories.
+            expert_yaws: Heading from the logged trajectories.
+        """
 
-        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
-
-        # Global positions
-        positions = expert_traj[:, :, : 2 * self.episode_len].view(
-            self.num_worlds, self.max_agent_count, self.episode_len, -1
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
         )
 
-        # Global velocity
-        velocity = expert_traj[
-            :, :, 2 * self.episode_len : 4 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        headings = expert_traj[
-            :, :, 4 * self.episode_len : 5 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        inferred_expert_actions = expert_traj[
-            :, :, 6 * self.episode_len : 16 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
         if self.config.dynamics_model == "delta_local":
-            inferred_expert_actions = inferred_expert_actions[..., :3]
-            inferred_expert_actions[..., 0] = torch.clamp(
-                inferred_expert_actions[..., 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[:, :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
             )
-            inferred_expert_actions[..., 1] = torch.clamp(
-                inferred_expert_actions[..., 1], -6, 6
+            inferred_actions[..., 1] = torch.clamp(
+                inferred_actions[..., 1], -6, 6
             )
-            inferred_expert_actions[..., 2] = torch.clamp(
-                inferred_expert_actions[..., 2], -3.14, 3.14
+            inferred_actions[..., 2] = torch.clamp(
+                inferred_actions[..., 2], -torch.pi, torch.pi
             )
         elif self.config.dynamics_model == "state":
             # Extract (x, y, yaw, velocity x, velocity y)
-            inferred_expert_actions = torch.cat(
+            inferred_actions = torch.cat(
                 (
-                    positions,  # xy
-                    torch.ones((*positions.shape[:-1], 1), device=self.device),
-                    headings,  # float (yaw)
-                    velocity,  # xy velocity
+                    log_trajectory.pos_xy, 
+                    torch.ones((*log_trajectory.pos_xy.shape[:-1], 1), device=self.device),
+                    log_trajectory.yaw,  
+                    log_trajectory.vel_xy,  
                     torch.zeros(
-                        (*positions.shape[:-1], 4), device=self.device
+                        (*log_trajectory.pos_xy.shape[:-1], 4), device=self.device
                     ),
                 ),
                 dim=-1,
             )
+        elif self.config.dynamics_model == "classic" or self.config.dynamics_model == "bicycle":
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
+            )
+            inferred_actions[..., 1] = torch.clamp(
+                inferred_actions[..., 1], -0.3, 0.3
+            )
 
-        else:  # classic or bicycle
-            inferred_expert_actions = inferred_expert_actions[..., :3]
-            inferred_expert_actions[..., 0] = torch.clamp(
-                inferred_expert_actions[..., 0], -6, 6
-            )
-            inferred_expert_actions[..., 1] = torch.clamp(
-                inferred_expert_actions[..., 1], -0.3, 0.3
-            )
-        velo2speed = None
-        debug_positions = None
-        if debug_world_idx is not None and debug_veh_idx is not None:
-            velo2speed = (
-                torch.norm(velocity[debug_world_idx, debug_veh_idx], dim=-1)
-                / constants.MAX_SPEED
-            )
-            positions[..., 0] = self.normalize_tensor(
-                positions[..., 0],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
-            )
-            positions[..., 1] = self.normalize_tensor(
-                positions[..., 1],
-                constants.MIN_REL_GOAL_COORD,
-                constants.MAX_REL_GOAL_COORD,
-            )
-            debug_positions = positions[debug_world_idx, debug_veh_idx]
+        return (
+            inferred_actions, 
+            log_trajectory.pos_xy, 
+            log_trajectory.vel_xy, 
+            log_trajectory.yaw,
+        )
 
-        return inferred_expert_actions, velo2speed, debug_positions
 
     def one_hot_encode_roadpoints(self, roadmap_type_tensor):
 
