@@ -5,23 +5,19 @@ import gpudrive
 from integrations.models.vbd.data.data_utils import calculate_relations
 
 
-def convert_yaw(yaw_tensor):
+def restore_mean(x, y, mean_x, mean_y):
     """
-    Convert yaw values from [0, 2π] (GPUDrive) range to [-π, π] range (Waymax).
+    In GPUDrive, everything is centered at zero by subtracting the mean.
+    This function reapplies the mean to go back to the original coordinates.
+    The mean (xyz) is exported per world as world_means_tensor.
 
-    Parameters:
-        yaw_tensor (torch.Tensor): A tensor containing yaw values in radians.
-
-    Returns:
-        torch.Tensor: A tensor with yaw values converted to [-π, π] range.
+    Args:
+        x (torch.Tensor): x coordinates
+        y (torch.Tensor): y coordinates
+        mean_x (torch.Tensor): mean of x coordinates. Shape: (num_worlds, 1)
+        mean_y (torch.Tensor): mean of y coordinates. Shape: (num_worlds, 1)
     """
-    # Ensure the tensor is in the correct range
-    yaw_tensor = yaw_tensor % (2 * torch.pi)
-
-    # Convert to the range [-π, π]
-    yaw_tensor[yaw_tensor > torch.pi] -= 2 * torch.pi
-
-    return yaw_tensor
+    return x + mean_x, y + mean_y
 
 
 def process_scenario_data(
@@ -59,10 +55,8 @@ def process_scenario_data(
         (num_envs, max_controlled_agents, episode_len - init_steps, 5)
     )
 
-    converted_yaw = convert_yaw(yaws)
-
     agents_future[:, :, :, 0:2] = positions[:, :, init_steps:, :]
-    agents_future[:, :, :, 2] = converted_yaw[:, :, init_steps:, :].squeeze(-1)
+    agents_future[:, :, :, 2] = yaws[:, :, init_steps:, :].squeeze(-1)
     agents_future[:, :, :, 3:5] = velocities[:, :, init_steps:, :]
 
     # Set all invalid agent values to zero
@@ -139,13 +133,11 @@ def construct_agent_history(
     global_traj[~controlled_agent_mask] = 0.0
     global_traj = global_traj[:, :max_cont_agents, :]
 
-    converted_yaw = convert_yaw(yaw)
-
     # x, y, heading, vel_x, vel_y, len, width, height
     agents_history = torch.cat(
         [
             pos_xy[:, :, : init_steps + 1, :],  # x, y
-            converted_yaw[:, :, : init_steps + 1, :],  # heading
+            yaw[:, :, : init_steps + 1, :],  # heading
             vel_xy[:, :, : init_steps + 1, :],  # vel_x, vel_y
             global_traj[:, :, 10]
             .unsqueeze(-1)
