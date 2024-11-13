@@ -676,8 +676,7 @@ Tensor Manager::worldMeansTensor() const
     return impl_->exportTensor(ExportID::WorldMeans, TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::kMaxAgentCount,
-                                   1,
+                                   WorldMeansExportSize,
                                });
 }
 
