@@ -34,7 +34,7 @@ class EgoState:
     ):
         """Creates an EgoState from a tensor."""
         if backend == "torch":
-            return cls(self_obs_tensor.to_torch())  # Pass the entire tensor
+            return cls(self_obs_tensor.to_torch())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 

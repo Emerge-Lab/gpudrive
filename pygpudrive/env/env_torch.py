@@ -3,7 +3,6 @@
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
-import copy
 import gpudrive
 import imageio
 from itertools import product
@@ -14,6 +13,10 @@ from pygpudrive.env import constants
 
 from pygpudrive.datatypes.observation import EgoState, PartnerObs
 from pygpudrive.datatypes.trajectory import LogTrajectory
+from pygpudrive.datatypes.roadgraph import (
+    LocalRoadGraphPoints,
+    GlobalRoadGraphPoints,
+)
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -43,6 +46,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Initialize simulator with parameters
         self.sim = self._initialize_simulator(params, scene_config)
+
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
@@ -69,7 +73,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
 
     def get_infos(self):
-        return self.to_tensor((self.sim.info_tensor()).squeeze(dim=2)
+        return self.to_tensor(
+            (self.sim.info_tensor())
+            .squeeze(dim=2)
             .to(torch.float)
             .to(self.device)
         )
@@ -262,44 +268,56 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.ego_state:
             ego_state = EgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
-                backend=self.backend
+                backend=self.backend,
             )
             if self.config.norm_obs:
                 ego_state.normalize()
 
-            return torch.stack([
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]).permute(1, 2, 0).to(self.device)
+            return (
+                torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                )
+                .permute(1, 2, 0)
+                .to(self.device)
+            )
         else:
             return torch.Tensor().to(self.device)
-
 
     def _get_partner_obs(self):
         """Get partner observations."""
         if self.config.partner_obs:
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
-                backend=self.backend
+                backend=self.backend,
             )
 
             if self.config.norm_obs:
                 partner_obs.normalize()
                 partner_obs.one_hot_encode_agent_types()
 
-            return torch.concat([
-                partner_obs.speed,
-                partner_obs.rel_pos_x,
-                partner_obs.rel_pos_y,
-                partner_obs.orientation,
-                partner_obs.vehicle_length,
-                partner_obs.vehicle_width,
-                partner_obs.agent_type,
-            ], dim=-1).flatten(start_dim=2).to(self.device)
+            return (
+                torch.concat(
+                    [
+                        partner_obs.speed,
+                        partner_obs.rel_pos_x,
+                        partner_obs.rel_pos_y,
+                        partner_obs.orientation,
+                        partner_obs.vehicle_length,
+                        partner_obs.vehicle_width,
+                        partner_obs.agent_type,
+                    ],
+                    dim=-1,
+                )
+                .flatten(start_dim=2)
+                .to(self.device)
+            )
 
         else:
             return torch.Tensor().to(self.device)
@@ -307,21 +325,33 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _get_road_map_obs(self):
         """Get road map observations."""
         if self.config.road_map_obs:
-            road_map_observations_unprocessed = (
-                self.sim.agent_roadmap_tensor().to_torch()
+            roadgraph = LocalRoadGraphPoints.from_tensor(
+                local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
+                backend="torch",
+            )
+            if self.config.norm_obs:
+                roadgraph.normalize()
+                roadgraph.one_hot_encode_road_point_types()
+
+            return (
+                torch.cat(
+                    [
+                        roadgraph.x.unsqueeze(-1),
+                        roadgraph.y.unsqueeze(-1),
+                        roadgraph.segment_length.unsqueeze(-1),
+                        roadgraph.segment_width.unsqueeze(-1),
+                        roadgraph.segment_height.unsqueeze(-1),
+                        roadgraph.orientation.unsqueeze(-1),
+                        roadgraph.type,
+                    ],
+                    dim=-1,
+                )
+                .flatten(start_dim=2)
+                .to(self.device)
             )
 
-            if self.config.norm_obs:
-                road_map_observations = self.normalize_and_flatten_map_obs(
-                    road_map_observations_unprocessed
-                )
-            else:
-                road_map_observations = (
-                    road_map_observations_unprocessed.flatten(start_dim=2)
-                )
         else:
-            road_map_observations = torch.Tensor().to(self.device)
-        return road_map_observations
+            return torch.Tensor().to(self.device)
 
     def _get_lidar_obs(self):
         """Get lidar observations."""
@@ -344,19 +374,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
 
-        # EGO STATE
         ego_states = self._get_ego_state()
 
-        # PARTNER OBSERVATIONS
         partner_observations = self._get_partner_obs()
 
-        # ROAD MAP OBSERVATIONS
         road_map_observations = self._get_road_map_obs()
 
-        # LIDAR OBSERVATIONS
         lidar_obs = self._get_lidar_obs()
 
-        # Combine the observations
         obs_filtered = torch.cat(
             (
                 ego_states,
@@ -377,7 +402,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
-        
+
         Returns:
             expert_actions: Inferred or logged actions for the agents.
             expert_speeds: Speeds from the logged trajectories.
@@ -407,17 +432,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Extract (x, y, yaw, velocity x, velocity y)
             inferred_actions = torch.cat(
                 (
-                    log_trajectory.pos_xy, 
-                    torch.ones((*log_trajectory.pos_xy.shape[:-1], 1), device=self.device),
-                    log_trajectory.yaw,  
-                    log_trajectory.vel_xy,  
+                    log_trajectory.pos_xy,
+                    torch.ones(
+                        (*log_trajectory.pos_xy.shape[:-1], 1),
+                        device=self.device,
+                    ),
+                    log_trajectory.yaw,
+                    log_trajectory.vel_xy,
                     torch.zeros(
-                        (*log_trajectory.pos_xy.shape[:-1], 4), device=self.device
+                        (*log_trajectory.pos_xy.shape[:-1], 4),
+                        device=self.device,
                     ),
                 ),
                 dim=-1,
             )
-        elif self.config.dynamics_model == "classic" or self.config.dynamics_model == "bicycle":
+        elif (
+            self.config.dynamics_model == "classic"
+            or self.config.dynamics_model == "bicycle"
+        ):
             inferred_actions = log_trajectory.inferred_actions[..., :3]
             inferred_actions[..., 0] = torch.clamp(
                 inferred_actions[..., 0], -6, 6
@@ -427,61 +459,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         return (
-            inferred_actions, 
-            log_trajectory.pos_xy, 
-            log_trajectory.vel_xy, 
+            inferred_actions,
+            log_trajectory.pos_xy,
+            log_trajectory.vel_xy,
             log_trajectory.yaw,
         )
-
-
-    def one_hot_encode_roadpoints(self, roadmap_type_tensor):
-
-        # Set garbage object types to zero
-        road_types = torch.where(
-            (roadmap_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
-            | (roadmap_type_tensor > self.ROAD_MAP_OBJECT_TYPES),
-            0.0,
-            roadmap_type_tensor,
-        ).int()
-
-        return torch.nn.functional.one_hot(
-            road_types.long(),
-            num_classes=self.ROAD_MAP_OBJECT_TYPES,
-        )
-
-    def normalize_and_flatten_map_obs(self, obs):
-        """Normalize map observation features."""
-
-        # Road point coordinates
-        obs[:, :, :, 0] = self.normalize_tensor(
-            obs[:, :, :, 0],
-            constants.MIN_RG_COORD,
-            constants.MAX_RG_COORD,
-        )
-
-        obs[:, :, :, 1] = self.normalize_tensor(
-            obs[:, :, :, 1],
-            constants.MIN_RG_COORD,
-            constants.MAX_RG_COORD,
-        )
-
-        # Road line segment length
-        obs[:, :, :, 2] /= constants.MAX_ROAD_LINE_SEGMENT_LEN
-
-        # Road scale (width and height)
-        obs[:, :, :, 3] /= constants.MAX_ROAD_SCALE
-        # obs[:, :, :, 4] seems already scaled
-
-        # Road point orientation
-        obs[:, :, :, 5] /= constants.MAX_ORIENTATION_RAD
-
-        # Road types: one-hot encode them
-        one_hot_road_types = self.one_hot_encode_roadpoints(obs[:, :, :, 6])
-
-        # Concatenate the one-hot encoding with the rest of the features
-        obs = torch.cat((obs[:, :, :, :6], one_hot_road_types), dim=-1)
-
-        return obs.flatten(start_dim=2)
 
 
 if __name__ == "__main__":

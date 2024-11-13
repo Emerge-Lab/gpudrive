@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 import torch
 import enum
-from utils.geometry import
+import gpudrive
+from pygpudrive.utils.geometry import normalize_min_max
+from pygpudrive.env import constants
+
 
 class MapElementIds(enum.IntEnum):
     """Ids for different map elements to be mapped into a tensor to be consistent with
@@ -36,92 +39,134 @@ class MapElementIds(enum.IntEnum):
 
 
 @dataclass
-class AgentRoadGraphPoints: # RoadGraphPoints in local reference frame for each agent
-    x: torch.Tensor
-    y: torch.Tensor
-    segment_length: torch.Tensor
-    scale_width: torch.Tensor
-    scale_height: torch.Tensor
-    orientation: torch.Tensor
-    road_type: torch.Tensor
-    ids: torch.Tensor
+class GlobalRoadGraphPoints:
+    """A class to represent global road graph points. All information is
+    global but demeaned, that is, centered at zero. Shape: ()
+
+    Attributes:
+        x: x-coordinate of the road point.
+        y: y-coordinate of the road point.
+        segment_length: Length of the road segment.
+        segment_width: Scale of the road segment.
+        segment_heigth: Height of the road segment.
+        orientation: Orientation of the road segment.
+        type: Type of road point (e.g., intersection, straight road).
+        id: Unique identifier of the road point (road id).
+    """
+
+    def __init__(self, roadgraph_tensor: torch.Tensor):
+        """Initializes the global road graph points with a tensor."""
+        self.x = roadgraph_tensor[:, :, 0]
+        self.y = roadgraph_tensor[:, :, 1]
+        self.segment_length = roadgraph_tensor[:, :, 2]
+        self.segment_width = roadgraph_tensor[:, :, 3]
+        self.segment_height = roadgraph_tensor[:, :, 4]
+        self.orientation = roadgraph_tensor[:, :, 5]
+        # Skipping the map element type for now.
+        self.id = roadgraph_tensor[:, :, 7]
+        self.type = roadgraph_tensor[:, :, 8]
 
     @classmethod
-    def from_tensor(cls, tensor):
-        return cls(
-            x=tensor[:, :, :, 0],
-            y=tensor[:, :, :, 1],
-            segment_length=tensor[:, :, :, 2],
-            scale_width=tensor[:, :, :, 3],
-            scale_height=tensor[:, :, :, 4],
-            orientation=tensor[:, :, :, 5],
-            road_type=tensor[:, :, :, 6],
+    def from_tensor(
+        cls, roadgraph_tensor: gpudrive.madrona.Tensor, backend="torch"
+    ):
+        """Creates a GlobalRoadGraphPoints instance from a tensor."""
+        if backend == "torch":
+            return cls(roadgraph_tensor.to_torch())
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    def normalize(self):
+        """Normalizes the road graph points to [-1, 1]."""
+        self.x = normalize_min_max(
+            self.x,
+            min_val=constants.MIN_RG_COORD,
+            max_val=constants.MAX_RG_COORD,
         )
-
-    def as_tensor(self):
-        return torch.stack(
-            [self.x, self.y, self.segment_length, self.scale_width,
-             self.scale_height, self.orientation, self.road_type],
-            dim=-1,
+        self.y = normalize_min_max(
+            self.y,
+            min_val=constants.MIN_RG_COORD,
+            max_val=constants.MAX_RG_COORD,
         )
+        self.segment_length = self.segment_length / constants.MAX_ROAD_SCALE
+        self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
+        self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
+        self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
+        self.id = self.id
 
-    @property
-    def shape(self) -> tuple[int, ...]:
-        """Shape of the road graph tensor."""
-        return self.x.shape
+    def one_hot_encode_road_point_types(self):
+        """One-hot encodes the type of road point."""
+        self.type = torch.nn.functional.one_hot(self.type, num_classes=21)
 
-    @property
-    def x(self) -> torch.Tensor:
-        """x location for all points."""
-        return torch.stack(self.x)
-
-    @property
-    def y(self) -> torch.Tensor:
-        """y location for all points."""
-        return torch.stack(self.y)
+    def restore_mean(self, mean_x, mean_y):
+        """Reapplies the mean to revert back to the original coordinates."""
+        self.x += mean_x
+        self.y += mean_y
 
 
 @dataclass
-class GlobalRoadGraphPoints: # RoadGraphPoints in global reference frame for each agent
-    x: torch.Tensor
-    y: torch.Tensor
-    segment_length: torch.Tensor
-    scale_width: torch.Tensor
-    scale_height: torch.Tensor
-    orientation: torch.Tensor
-    road_type: torch.Tensor
-    ids: torch.Tensor
+class LocalRoadGraphPoints:
+    """A class to represent local (relative) road graph points. Takes in
+    `agent_roadmap_tensor`. Shape: (num_worlds, num_agents, num_road_points, 9).
+    Note that num_road_points is set in src/consts.hpp and indicates the K
+    closest road points to each agent (`kMaxAgentMapObservationsCount`). The
+    selection of these points is configured using `road_obs_algorithm`.
+
+    Attributes:
+        x: x-coordinate of the road point relative to each agent.
+        y: y-coordinate of the road point relative to each agent.
+        segment_length: Length of the road segment.
+        segment_width: Scale of the road segment.
+        segment_heigth: Height of the road segment.
+        orientation: Orientation of the road segment.
+        id: Unique identifier of the road point (road id).
+        type: Type of road point (e.g., edge, lane).
+    """
+
+    def __init__(self, local_roadgraph_tensor: torch.Tensor):
+        """Initializes the global road graph points with a tensor."""
+        self.x = local_roadgraph_tensor[:, :, :, 0]
+        self.y = local_roadgraph_tensor[:, :, :, 1]
+        self.segment_length = local_roadgraph_tensor[:, :, :, 2]
+        self.segment_width = local_roadgraph_tensor[:, :, :, 3]
+        self.segment_height = local_roadgraph_tensor[:, :, :, 4]
+        self.orientation = local_roadgraph_tensor[:, :, :, 5]
+        self.id = local_roadgraph_tensor[:, :, :, 7]
+        # TODO: Use map type instead of enum (8 instead of 6)
+        self.type = local_roadgraph_tensor[:, :, :, 6].long()
 
     @classmethod
-    def from_tensor(cls, tensor):
-        return cls(
-            x=tensor[:, :, :, 0],
-            y=tensor[:, :, :, 1],
-            segment_length=tensor[:, :, :, 2],
-            scale_width=tensor[:, :, :, 3],
-            scale_height=tensor[:, :, :, 4],
-            orientation=tensor[:, :, :, 5],
-            road_type=tensor[:, :, :, 6],
-        )
+    def from_tensor(
+        cls, local_roadgraph_tensor: gpudrive.madrona.Tensor, backend="torch"
+    ):
+        """Creates a GlobalRoadGraphPoints instance from a tensor."""
+        if backend == "torch":
+            return cls(local_roadgraph_tensor.to_torch())
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
 
-    def as_tensor(self):
-        return torch.stack(
-            [self.x, self.y, self.segment_length, self.scale_width,
-             self.scale_height, self.orientation, self.road_type],
-            dim=-1,
+    def normalize(self):
+        """Normalizes the road graph points to [-1, 1]."""
+        self.x = normalize_min_max(
+            self.x,
+            min_val=constants.MIN_RG_COORD,
+            max_val=constants.MAX_RG_COORD,
         )
+        self.y = normalize_min_max(
+            self.y,
+            min_val=constants.MIN_RG_COORD,
+            max_val=constants.MAX_RG_COORD,
+        )
+        self.segment_length = self.segment_length / constants.MAX_ROAD_SCALE
+        self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
+        self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
+        self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
+        self.id = self.id
 
-    @property
-    def shape(self) -> tuple[int, ...]:
-        """Shape of the road graph tensor."""
+    def one_hot_encode_road_point_types(self):
+        """One-hot encodes the type of road point."""
+        self.type = torch.nn.functional.one_hot(self.type, num_classes=7)
+
+    def shape(self):
+        """Returns the shape of the local road graph tensor."""
         return self.x.shape
-
-    @property
-    def x(self) -> torch.Tensor:
-        """x location for all points."""
-        return torch.stack(self.x)
-
-    @property
-    def y(self) -> torch.Tensor:
-        """y location for all points."""
-        return torch.stack(self.y)
