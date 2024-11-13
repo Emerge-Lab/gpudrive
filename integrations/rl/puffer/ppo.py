@@ -386,15 +386,15 @@ def train(data):
                     config.render
                     and ((data.epoch - 1) % config.render_interval) == 0
                 ):
-                    for env_idx in range(1):
-                        # TODO: Improve efficiency and extend to multiple envs
-                        frames = make_video(data, env_idx=0)
+                    for env_idx in range(data.config.render_k_scenarios):
+                        # TODO(dc): Improve efficiency and extend to multiple envs
+                        frames = make_video(data, env_idx=env_idx)
 
                         data.wandb.log(
                             {
                                 f"env_idx: {env_idx}": data.wandb.Video(
                                     np.moveaxis(frames, -1, 1),
-                                    fps=20,
+                                    fps=data.config.render_fps,
                                     format="mp4",
                                     caption=f"global step: {data.global_step:,}",
                                 )
@@ -697,7 +697,7 @@ def save_checkpoint(data):
 
     model_name = f"model_{data.epoch:06d}.pt"
     model_path = os.path.join(path, model_name)
-    torch.save(data.uncompiled_policy, model_path)
+    torch.save(data.uncompiled_policy.state_dict(), model_path)
 
     state = {
         "optimizer_state_dict": data.optimizer.state_dict(),
@@ -711,24 +711,6 @@ def save_checkpoint(data):
     torch.save(state, state_path + ".tmp")
     os.rename(state_path + ".tmp", state_path)
     return model_path
-
-
-def try_load_checkpoint(data):
-
-    config = data.config
-    path = os.path.join(config.checkpoint_path, config.exp_id)
-    if not os.path.exists(path):
-        print("No checkpoints found. Assuming new experiment")
-        return
-
-    trainer_path = os.path.join(path, "trainer_state.pt")
-    resume_state = torch.load(trainer_path)
-    data.global_step = resume_state["global_step"]
-    data.epoch = resume_state["update"]
-    model_path = os.path.join(path, resume_state["model_name"])
-    data.uncompiled_policy.load_state_dict(torch.load(model_path).state_dict())
-    data.optimizer.load_state_dict(resume_state["optimizer_state_dict"])
-    print(f'Loaded checkpoint {resume_state["model_name"]}')
 
 
 def count_params(policy):

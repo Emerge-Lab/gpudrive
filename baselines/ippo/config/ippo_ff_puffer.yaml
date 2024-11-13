@@ -45,10 +45,12 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  checkpoint_interval: 5000
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
   render: true
-  render_interval: 1000
+  render_interval: 500
+  render_k_scenarios: 1 # Number of scenarios to render
+  render_fps: 20
   bptt_horizon: 50
   compile: false
   compile_mode: "reduce-overhead"
