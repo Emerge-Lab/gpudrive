@@ -104,7 +104,7 @@ struct Manager::Impl {
                 Action *action_buffer,
                 Optional<RenderGPUState> &&render_gpu_state,
                 Optional<render::RenderManager> &&render_mgr,
-		int64_t numWorlds) 
+		int64_t numWorlds)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
@@ -181,7 +181,7 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
                ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),
           gpuExec(std::move(gpu_exec)),
           stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
           resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
@@ -396,7 +396,7 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
             roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
-Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) { 
+Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
     Sim::Config sim_cfg;
     sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
@@ -410,7 +410,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 #ifdef MADRONA_CUDA_SUPPORT
         CUcontext cu_ctx = MWCudaExecutor::initCUDA(mgr_cfg.gpuID);
 
-        EpisodeManager *episode_mgr = 
+        EpisodeManager *episode_mgr =
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
 
@@ -424,7 +424,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
-        
+
         int64_t worldIdx{0};
         for (auto const &scene : mgr_cfg.scenes) {
 	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
@@ -455,17 +455,17 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             .worldDataAlignment = alignof(Sim),
             .numWorlds = static_cast<uint32_t>(numWorlds),
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
-            .numExportedBuffers = (uint32_t)ExportID::NumExports, 
+            .numExportedBuffers = (uint32_t)ExportID::NumExports,
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
         }, cu_ctx);
 
-        WorldReset *world_reset_buffer = 
+        WorldReset *world_reset_buffer =
             (WorldReset *)gpu_exec.getExported((uint32_t)ExportID::Reset);
 
-        Action *agent_actions_buffer = 
+        Action *agent_actions_buffer =
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
         madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < numWorlds; i++) {
@@ -500,7 +500,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         HeapArray<WorldInit> world_inits(numWorlds);
 
         int64_t worldIdx{0};
-    
+
         for (auto const &scene : mgr_cfg.scenes)
         {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
@@ -534,10 +534,10 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             (uint32_t)TaskGraphID::NumTaskGraphs,
         };
 
-        WorldReset *world_reset_buffer = 
+        WorldReset *world_reset_buffer =
             (WorldReset *)cpu_exec.getExported((uint32_t)ExportID::Reset);
 
-        Action *agent_actions_buffer = 
+        Action *agent_actions_buffer =
             (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
@@ -665,10 +665,11 @@ Tensor Manager::actionTensor() const
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
-                               {
-                                   impl_->numWorlds,
-                                   WorldMeansExportSize,
-                               });
+                            {
+                                impl_->numWorlds,
+                                consts::kMaxAgentCount,
+                                1,
+                            });
 }
 
 Tensor Manager::worldMeansTensor() const
@@ -755,7 +756,7 @@ Tensor Manager::lidarTensor() const
                                    consts::kMaxAgentCount,
                                    3, // Trace lidars on 3 planes
                                    consts::numLidarSamples,
-                                   LidarExportSize / (3 * consts::numLidarSamples), 
+                                   LidarExportSize / (3 * consts::numLidarSamples),
                                });
 }
 

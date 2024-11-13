@@ -72,7 +72,7 @@ def generate_state_action_pairs(
     obs = env.reset()
 
     # Get expert actions for full trajectory in all worlds
-    expert_actions, expert_speeds, expert_positions = env.get_expert_actions()
+    expert_actions, expert_speeds, expert_positions, expert_yaws = env.get_expert_actions()
     if action_space_type == "discrete":
         # Discretize the expert actions: map every value to the closest
         # value in the action grid.
