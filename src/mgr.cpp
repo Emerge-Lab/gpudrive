@@ -667,8 +667,16 @@ Tensor Manager::rewardTensor() const
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::kMaxAgentCount,
-                                   1,
+                                   WorldMeansExportSize,
+                               });
+}
+
+Tensor Manager::worldMeansTensor() const
+{
+    return impl_->exportTensor(ExportID::WorldMeans, TensorElementType::Float32,
+                               {
+                                   impl_->numWorlds,
+                                   WorldMeansExportSize,
                                });
 }
 

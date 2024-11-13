@@ -88,10 +88,19 @@ struct AgentID {
         int32_t reset;
     };
 
-struct ResetMap {
-    int32_t reset;
-};   
-     struct ClassicAction
+    struct ResetMap {
+        int32_t reset;
+    };   
+
+    struct WorldMeans {
+        madrona::math::Vector3 mean; // TODO: Z is 0 for now, but can be used for 3D in future
+    };
+
+    const size_t WorldMeansExportSize = 3;
+
+    static_assert(sizeof(WorldMeans) == sizeof(float) * WorldMeansExportSize);
+
+    struct ClassicAction
     {
         float acceleration;
         float steering;

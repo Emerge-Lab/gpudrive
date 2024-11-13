@@ -58,7 +58,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     auto &trajectory = ctx.get<Trajectory>(agent_iface);
     for(CountT i = 0; i < agentInit.numPositions; i++)
     {
-        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.data().mean.x, .y = agentInit.position[i].y - ctx.data().mean.y};
+        trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.position[i].y - ctx.singleton<WorldMeans>().mean.y};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
         trajectory.headings[i] = toRadians(agentInit.heading[i]);
         trajectory.valids[i] = (float)agentInit.valid[i];
@@ -126,7 +126,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<EntityType>(agent) = agentInit.type;
-    ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.data().mean.x, .y = agentInit.goalPosition.y - ctx.data().mean.y}};
+    ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y}};
 
     populateExpertTrajectory(ctx, agent, agentInit);
 
@@ -151,8 +151,8 @@ static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
 
     float z = 1 + (roadInit.type == EntityType::RoadEdge ? consts::lidarRoadEdgeOffset : consts::lidarRoadLineOffset);
 
-    Vector3 start{.x = p1.x - ctx.data().mean.x, .y = p1.y - ctx.data().mean.y, .z = z};
-    Vector3 end{.x = p2.x - ctx.data().mean.x, .y = p2.y - ctx.data().mean.y, .z = z};
+    Vector3 start{.x = p1.x - ctx.singleton<WorldMeans>().mean.x, .y = p1.y - ctx.singleton<WorldMeans>().mean.y, .z = z};
+    Vector3 end{.x = p2.x - ctx.singleton<WorldMeans>().mean.x, .y = p2.y - ctx.singleton<WorldMeans>().mean.y, .z = z};
 
     auto road_edge = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<RoadInterfaceEntity>(road_edge).e = ctx.makeEntity<RoadInterface>();
@@ -214,7 +214,7 @@ static Entity makeCube(Engine &ctx, const MapRoad &roadInit) {
         sum_y += point.y;
     }
 
-    auto pos = Vector3{.x = sum_x/4 - ctx.data().mean.x, .y = sum_y/4 - ctx.data().mean.y, .z = 1 + consts::lidarRoadLineOffset};
+    auto pos = Vector3{.x = sum_x/4 - ctx.singleton<WorldMeans>().mean.x, .y = sum_y/4 - ctx.singleton<WorldMeans>().mean.y, .z = 1 + consts::lidarRoadLineOffset};
     auto rot = Quat::angleAxis(angle, madrona::math::up);
     auto scale = Diag3x3{.d0 = lengths[maxLength_i]/2, .d1 = lengths[minLength_i]/2, .d2 = 0.1};
     setRoadEntitiesProps(ctx, speed_bump, pos, rot, scale, roadInit.type, ObjectID{(int32_t)SimObject::SpeedBump}, ResponseType::Static, roadInit.id, roadInit.mapType);
@@ -229,7 +229,7 @@ static Entity makeStopSign(Engine &ctx, const MapRoad &roadInit) {
     auto stop_sign = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<RoadInterfaceEntity>(stop_sign).e = ctx.makeEntity<RoadInterface>();
     
-    auto pos = Vector3{.x = x1 - ctx.data().mean.x, .y = y1 - ctx.data().mean.y, .z = 1};
+    auto pos = Vector3{.x = x1 - ctx.singleton<WorldMeans>().mean.x, .y = y1 - ctx.singleton<WorldMeans>().mean.y, .z = 1};
     auto rot = Quat::angleAxis(0, madrona::math::up);
     auto scale = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 1};
     setRoadEntitiesProps(ctx, stop_sign, pos, rot, scale, EntityType::StopSign, ObjectID{(int32_t)SimObject::StopSign}, ResponseType::Static, roadInit.id, roadInit.mapType);
@@ -355,11 +355,11 @@ void createPersistentEntities(Engine &ctx) {
         createCameraEntity(ctx);
     }
 
-    ctx.data().mean = {0, 0};
-    ctx.data().mean.x = map.mean.x;
-    ctx.data().mean.y = map.mean.y;
     ctx.data().numControlledAgents = 0;
     ctx.singleton<ResetMap>().reset = 0;
+
+    auto& means = ctx.singleton<WorldMeans>().mean;
+    means = {map.mean.x, map.mean.y, 0}; // TODO: Add z to the map
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map.numObjects && agentIdx < consts::kMaxAgentCount; ++agentCtr) {
@@ -455,7 +455,7 @@ void destroyWorld(Engine &ctx)
     ctx.data().numAgents = 0;
     ctx.data().numRoads = 0;
     ctx.data().numControlledAgents = 0;
-    ctx.data().mean = {0, 0};
+    ctx.singleton<WorldMeans>().mean = Vector3::zero();
 }
 
 
