@@ -9,14 +9,10 @@ from itertools import product
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-from pygpudrive.env import constants
 
-from pygpudrive.datatypes.observation import EgoState, PartnerObs
+from pygpudrive.datatypes.observation import EgoState, PartnerObs, LidarObs
 from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import (
-    LocalRoadGraphPoints,
-    GlobalRoadGraphPoints,
-)
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -327,8 +323,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.road_map_obs:
             roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
-                backend="torch",
+                backend=self.backend,
             )
+
             if self.config.norm_obs:
                 roadgraph.normalize()
                 roadgraph.one_hot_encode_road_point_types()
@@ -357,15 +354,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Get lidar observations."""
         if self.config.lidar_obs:
             lidar_obs = (
-                self.sim.lidar_tensor()
-                .to_torch()
+                LidarObs.from_tensor(
+                    lidar_tensor=self.sim.lidar_tensor(),
+                    backend=self.backend,
+                )
                 .flatten(start_dim=2, end_dim=-1)
                 .to(self.device)
             )
+
+            return lidar_obs
         else:
-            # Create empty lidar observations (num_lidar_samples, 4)
-            lidar_obs = torch.Tensor().to(self.device)
-        return lidar_obs
+            return torch.Tensor().to(self.device)
 
     def get_obs(self):
         """Get observation: Combine different types of environment information into a single tensor.
@@ -485,8 +484,6 @@ if __name__ == "__main__":
         device="cpu",
         render_config=render_config,
     )
-
-    expert_actions, _, _ = env.get_expert_actions()
 
     # RUN
     obs = env.reset()

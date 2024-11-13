@@ -170,3 +170,9 @@ class LocalRoadGraphPoints:
     def shape(self):
         """Returns the shape of the local road graph tensor."""
         return self.x.shape
+
+
+# glob_roadgraph = GlobalRoadGraphPoints.from_tensor(
+#     roadgraph_tensor=self.sim.map_observation_tensor(),
+#     backend=self.backend,
+# )

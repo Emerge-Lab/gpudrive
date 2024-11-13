@@ -146,5 +146,14 @@ class PartnerObs:
 
 @dataclass
 class LidarObs:
-    # TODO: Implement this class
-    pass
+    def __init__(self, lidar_tensor: torch.Tensor):
+        self.lidar = lidar_tensor
+
+    @classmethod
+    def from_tensor(
+        cls, lidar_tensor: gpudrive.madrona.Tensor, backend="torch"
+    ):
+        if backend == "torch":
+            return cls(lidar_tensor.to_torch())
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
