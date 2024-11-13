@@ -35,6 +35,7 @@ enum class ExportID : uint32_t {
     Trajectory,
     Map,
     ResetMap,
+    WorldMeans,
     NumExports
 };
 
@@ -129,8 +130,6 @@ struct Sim : public madrona::WorldBase {
     Entity camera_agent;
 
     madrona::CountT numControlledAgents;
-
-    madrona::math::Vector2 mean;
 
     Parameters params;
 
