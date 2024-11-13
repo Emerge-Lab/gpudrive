@@ -12,6 +12,8 @@ from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 from pygpudrive.env import constants
 
+from pygpudrive.datatypes.observation import EgoState, PartnerObs
+
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -24,6 +26,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         device="cuda",
         action_type="discrete",
         render_config: RenderConfig = RenderConfig(),
+        backend="torch",
     ):
         # Initialization of environment configurations
         self.config = config
@@ -32,6 +35,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.max_cont_agents = max_cont_agents
         self.device = device
         self.render_config = render_config
+        self.backend = backend
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -64,9 +68,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
 
     def get_infos(self):
-        return (
-            self.sim.info_tensor()
-            .to_torch()
+        return self.to_tensor(
+            (self.sim.info_tensor())
             .squeeze(dim=2)
             .to(torch.float)
             .to(self.device)
@@ -252,43 +255,67 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self):
-        """Get the ego state."""
+    def _get_ego_state(self) -> torch.Tensor:
+        """Get the ego state.
+        Returns:
+            Shape: (num_worlds, max_agents, num_features)
+        """
         if self.config.ego_state:
-            ego_states_unprocessed = (
-                self.sim.self_observation_tensor().to_torch()
+            ego_state = EgoState.from_tensor(
+                self_obs_tensor=self.sim.self_observation_tensor(),
+                backend=self.backend,
             )
-            # Omit vehicle ids (last feature)
-            ego_states_unprocessed = ego_states_unprocessed[:, :, :-1]
-
-            # Normalize
             if self.config.norm_obs:
-                ego_states = self.normalize_ego_state(ego_states_unprocessed)
-            else:
-                ego_states = ego_states_unprocessed
+                ego_state.normalize()
+
+            return (
+                torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                )
+                .permute(1, 2, 0)
+                .to(self.device)
+            )
         else:
-            ego_states = torch.Tensor().to(self.device)
-        return ego_states
+            return torch.Tensor().to(self.device)
 
     def _get_partner_obs(self):
         """Get partner observations."""
         if self.config.partner_obs:
-            partner_observations = (
-                self.sim.partner_observations_tensor().to_torch()
+            partner_obs = PartnerObs.from_tensor(
+                partner_obs_tensor=self.sim.partner_observations_tensor(),
+                backend=self.backend,
             )
-            # Omit vehicle ids (last feature)
-            partner_observations = partner_observations[:, :, :, :-1]
-            if self.config.norm_obs:  # Normalize observations and then flatten
-                partner_observations = self.normalize_and_flatten_partner_obs(
-                    partner_observations
+
+            if self.config.norm_obs:
+                partner_obs.normalize()
+                partner_obs.one_hot_encode_agent_types()
+
+            return (
+                torch.concat(
+                    [
+                        partner_obs.speed,
+                        partner_obs.rel_pos_x,
+                        partner_obs.rel_pos_y,
+                        partner_obs.orientation,
+                        partner_obs.vehicle_length,
+                        partner_obs.vehicle_width,
+                        partner_obs.agent_type,
+                    ],
+                    dim=-1,
                 )
-            else:  # Flatten along the last two dimensions
-                partner_observations = partner_observations.flatten(
-                    start_dim=2
-                )
+                .flatten(start_dim=2)
+                .to(self.device)
+            )
+
         else:
-            partner_observations = torch.Tensor().to(self.device)
-        return partner_observations
+            return torch.Tensor().to(self.device)
 
     def _get_road_map_obs(self):
         """Get road map observations."""
@@ -360,33 +387,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
             axis=2
         )
-
-    def normalize_ego_state(self, state):
-        """Normalize ego state features."""
-
-        # Speed, vehicle length, vehicle width
-        state[:, :, 0] /= constants.MAX_SPEED
-        state[:, :, 1] /= constants.MAX_VEH_LEN
-        state[:, :, 2] /= constants.MAX_VEH_WIDTH
-
-        # Relative goal coordinates
-        state[:, :, 3] = self.normalize_tensor(
-            state[:, :, 3],
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
-        )
-        state[:, :, 4] = self.normalize_tensor(
-            state[:, :, 4],
-            # do the same
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
-        )
-
-        # Uncommment this to exclude the collision state
-        # (1 if vehicle is in collision, 1 otherwise)
-        # state = state[:, :, :5]
-
-        return state
 
     def get_expert_actions(self, debug_world_idx=None, debug_veh_idx=None):
         """Get expert actions for the full trajectories across worlds."""
@@ -466,49 +466,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return inferred_expert_actions, velo2speed, debug_positions
 
-    def normalize_and_flatten_partner_obs(self, obs):
-        """Normalize partner state features.
-        Args:
-            obs: torch.Tensor of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
-        """
-
-        # TODO: Fix (there should not be nans in the obs)
-        obs = torch.nan_to_num(obs, nan=0)
-
-        # Speed
-        obs[:, :, :, 0] /= constants.MAX_SPEED
-
-        # Relative position
-        obs[:, :, :, 1] = self.normalize_tensor(
-            obs[:, :, :, 1],
-            constants.MIN_REL_AGENT_POS,
-            constants.MAX_REL_AGENT_POS,
-        )
-        obs[:, :, :, 2] = self.normalize_tensor(
-            obs[:, :, :, 2],
-            constants.MIN_REL_AGENT_POS,
-            constants.MAX_REL_AGENT_POS,
-        )
-
-        # Orientation (heading)
-        obs[:, :, :, 3] /= constants.MAX_ORIENTATION_RAD
-
-        # Vehicle length and width
-        obs[:, :, :, 4] /= constants.MAX_VEH_LEN
-        obs[:, :, :, 5] /= constants.MAX_VEH_WIDTH
-
-        # One-hot encode the type of the other visible objects
-        one_hot_encoded_object_types = self.one_hot_encode_object_type(
-            obs[:, :, :, 6]
-        )
-
-        # Concat the one-hot encoding with the rest of the features
-        obs = torch.concat(
-            (obs[:, :, :, :6], one_hot_encoded_object_types), dim=-1
-        )
-
-        return obs.flatten(start_dim=2)
-
     def one_hot_encode_roadpoints(self, roadmap_type_tensor):
 
         # Set garbage object types to zero
@@ -523,36 +480,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             road_types.long(),
             num_classes=self.ROAD_MAP_OBJECT_TYPES,
         )
-
-    def one_hot_encode_object_type(self, object_type_tensor):
-        """One-hot encode the object type."""
-
-        VEHICLE = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Vehicle]
-        PEDESTRIAN = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Pedestrian]
-        CYCLIST = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Cyclist]
-        PADDING = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType._None]
-
-        # Set garbage object elements to zero
-        object_types = torch.where(
-            (object_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
-            | (object_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
-            0.0,
-            object_type_tensor,
-        ).int()
-
-        one_hot_object_type = torch.nn.functional.one_hot(
-            torch.where(
-                condition=(object_types == VEHICLE)
-                | (object_types == PEDESTRIAN)
-                | (object_types == CYCLIST)
-                | object_types
-                == PADDING,
-                input=object_types,
-                other=0,
-            ).long(),
-            num_classes=self.ROAD_OBJECT_TYPES,
-        )
-        return one_hot_object_type
 
     def normalize_and_flatten_map_obs(self, obs):
         """Normalize map observation features."""
