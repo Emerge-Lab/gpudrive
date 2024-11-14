@@ -76,11 +76,9 @@ def process_scenario_data(
     # Global polylines tensor: Shape (256, 30, 5)
     polylines, polylines_valid = construct_polylines(
         global_road_graph,
-        local_road_graph,
         num_envs,
-        controlled_agent_mask,
-        max_polylines,
-        num_points_polyline,
+        max_polylines=max_polylines,
+        num_points_polyline=num_points_polyline,
     )
 
     # Empty (16, 3)
@@ -142,34 +140,20 @@ def construct_agent_history(
 
 def construct_polylines(
     global_road_graph,
-    local_road_graph,
     num_envs,
-    controlled_agent_mask,
-    max_polylines,
-    num_points_polyline,
+    max_polylines=256,
+    num_points_polyline=30,
 ):
     """Get the global polylines information."""
 
     # Obtain the K road graph IDs closest to the controlled agents
     nearby_road_graph_ids = []
-    valid_rg_id_mask = (local_road_graph[:, :, :, 7] != -1) & (
-        local_road_graph[:, :, :, 7] != 0
-    )
-    close_and_valid_mask = valid_rg_id_mask & controlled_agent_mask.unsqueeze(
-        -1
-    ).expand(-1, -1, max_polylines)
-
-    for env_idx in range(num_envs):
-        local_road_ids_env = local_road_graph[env_idx, :, :, 7].long()
-        # Store the road object IDs that are valid and close to controlled agents
-        valid_and_close_road_ids = local_road_ids_env[
-            close_and_valid_mask[env_idx, :]
-        ].unique()
-        nearby_road_graph_ids.append(valid_and_close_road_ids.tolist())
-
-    # Sort the road graph IDs
-    # TODO(dc): Is this necessary? Think our road graph is already sorted
-    sorted_map_ids = nearby_road_graph_ids
+    
+    # TODO(KJ): Use the k-nearest neighbors function to get the closest road graph IDs
+    # See datatypes/roadgraph.py for indexing the road graph
+    
+    # TODO(KJ): Sort the road graph IDs
+    sorted_map_ids = ... 
 
     # get shared map polylines
     # polyline feature: x, y, heading, traffic_light, type
