@@ -24,14 +24,12 @@ def process_scenario_data(
     num_envs,
     max_controlled_agents,
     controlled_agent_mask,
-    global_agent_observations,
+    global_agent_obs,
     global_road_graph,
     local_road_graph,
+    log_trajectory,
     init_steps,
     episode_len,
-    positions,
-    velocities,
-    yaws,
     raw_agent_types,
     max_polylines=256,
     num_points_polyline=30,
@@ -44,20 +42,17 @@ def process_scenario_data(
         controlled_agent_mask=controlled_agent_mask,
         max_cont_agents=max_controlled_agents,
         num_envs=num_envs,
-        global_agent_observations=global_agent_observations,
-        pos_xy=positions,
-        vel_xy=velocities,
-        yaw=yaws,
+        global_agent_obs=global_agent_obs,
+        log_trajectory=log_trajectory,
     )
 
     # Now create the agents future logs
     agents_future = torch.zeros(
         (num_envs, max_controlled_agents, episode_len - init_steps, 5)
     )
-
-    agents_future[:, :, :, 0:2] = positions[:, :, init_steps:, :]
-    agents_future[:, :, :, 2] = yaws[:, :, init_steps:, :].squeeze(-1)
-    agents_future[:, :, :, 3:5] = velocities[:, :, init_steps:, :]
+    agents_future[:, :, :, 0:2] = log_trajectory.pos_xy[:, :, init_steps:, :]
+    agents_future[:, :, :, 2] = log_trajectory.yaws[:, :, init_steps:, :].squeeze(-1)
+    agents_future[:, :, :, 3:5] = log_trajectory.vel_xy[:, :, init_steps:, :]
 
     # Set all invalid agent values to zero
     agents_future[~controlled_agent_mask, :, :] = 0
@@ -122,38 +117,24 @@ def construct_agent_history(
     controlled_agent_mask,
     max_cont_agents,
     num_envs,
-    global_agent_observations,
-    pos_xy,
-    vel_xy,
-    yaw,
+    global_agent_obs,
+    log_trajectory,
 ):
     """Get the agent trajectory feature information."""
 
-    global_traj = global_agent_observations
-    global_traj[~controlled_agent_mask] = 0.0
-    global_traj = global_traj[:, :max_cont_agents, :]
-
-    # x, y, heading, vel_x, vel_y, len, width, height
     agents_history = torch.cat(
         [
-            pos_xy[:, :, : init_steps + 1, :],  # x, y
-            yaw[:, :, : init_steps + 1, :],  # heading
-            vel_xy[:, :, : init_steps + 1, :],  # vel_x, vel_y
-            global_traj[:, :, 10]
-            .unsqueeze(-1)
-            .expand(-1, -1, init_steps + 1)
-            .unsqueeze(-1),  # vehicle len
-            global_traj[:, :, 11]
-            .unsqueeze(-1)
-            .expand(-1, -1, init_steps + 1)
-            .unsqueeze(-1),  # vehicle width
-            torch.ones((num_envs, max_cont_agents, init_steps + 1)).unsqueeze(
-                -1
-            ),  # vehicle height
+            log_trajectory.pos_xy[:, :, : init_steps + 1, :],  
+            log_trajectory.yaw[:, :, : init_steps + 1, :],
+            log_trajectory.vel_xy[:, :, : init_steps + 1, :], 
+            global_agent_obs.vehicle_length.unsqueeze(-1).expand(-1, -1, init_steps + 1).unsqueeze(-1),
+            global_agent_obs.vehicle_width.unsqueeze(-1).expand(-1, -1, init_steps + 1).unsqueeze(-1),
+            torch.ones((num_envs, max_cont_agents, init_steps + 1)).unsqueeze(-1),
         ],
         dim=-1,
     )
-
+    
+    # Zero out the agents that are not controlled
     agents_history[~controlled_agent_mask, :, :] = 0.0
 
     return agents_history
@@ -192,7 +173,6 @@ def construct_polylines(
 
     # get shared map polylines
     # polyline feature: x, y, heading, traffic_light, type
-    # TODO(dc): Vectorize for multiple environments
     for env_idx in range(num_envs):
         polylines = []
         sorted_map_ids_env = sorted_map_ids[env_idx]

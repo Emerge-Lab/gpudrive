@@ -41,14 +41,15 @@ class MapElementIds(enum.IntEnum):
 @dataclass
 class GlobalRoadGraphPoints:
     """A class to represent global road graph points. All information is
-    global but demeaned, that is, centered at zero.
+    global but demeaned, that is, centered at zero. Takes in 
+    map_observation_tensor of shape (num_worlds, num_road_points, 9).
 
     Attributes:
         x: x-coordinate of the road point.
         y: y-coordinate of the road point.
         segment_length: Length of the road segment.
         segment_width: Scale of the road segment.
-        segment_heigth: Height of the road segment.
+        segment_height: Height of the road segment.
         orientation: Orientation of the road segment.
         type: Type of road point (e.g., intersection, straight road).
         id: Unique identifier of the road point (road id).
@@ -121,7 +122,7 @@ class LocalRoadGraphPoints:
         y: y-coordinate of the road point relative to each agent.
         segment_length: Length of the road segment.
         segment_width: Scale of the road segment.
-        segment_heigth: Height of the road segment.
+        segment_height: Height of the road segment.
         orientation: Orientation of the road segment.
         id: Unique identifier of the road point (road id).
         type: Type of road point (e.g., edge, lane).

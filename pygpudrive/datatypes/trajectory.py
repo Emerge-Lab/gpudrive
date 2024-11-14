@@ -38,3 +38,4 @@ class LogTrajectory:
             return cls(expert_traj_tensor.to_torch(), num_worlds, max_agents)  # Pass the entire tensor
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
+        
