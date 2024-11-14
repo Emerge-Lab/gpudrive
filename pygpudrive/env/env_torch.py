@@ -437,7 +437,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Args:
             init_steps (int): Number of warmup steps.
         """
-
         if init_steps >= self.config.episode_len:
             raise ValueError(
                 "The length of the expert trajectory is 91,"
@@ -454,7 +453,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         local_road_graph = LocalRoadGraphPoints.from_tensor(
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
-
+        )
 
         global_agent_observations = (
             self.sim.absolute_self_observation_tensor().to_torch()
