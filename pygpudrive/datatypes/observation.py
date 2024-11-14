@@ -5,8 +5,8 @@ from pygpudrive.utils.geometry import normalize_min_max
 import gpudrive
 
 
-class EgoState:
-    """A class to represent the ego state of the agent.
+class LocalEgoState:
+    """A class to represent the ego state of the agent in relative coordinates.
 
     Attributes:
         speed: Speed of the agent in relative coordinates.
@@ -61,6 +61,56 @@ class EgoState:
         """Shape (num_worlds, num_agents) of the ego state tensor."""
         return self.speed.shape
 
+
+class GlobalEgoState:
+    """A class to represent the ego state of the agent in global coordinates.
+    Taken from abs_self_obs_tensor. Shape: (num_worlds, max_agents, 13).
+
+    Attributes:
+        pos_x: Global x-coordinate of the agent.
+        pos_y: Global y-coordinate of the agent.
+        rotation_quaternions: Rotation of the agent (TODO).
+        rotation_from_axis_angle: Rotation of the agent (TODO).
+        goal_x: Global x-coordinate of the goal.
+        goal_y: Global y-coordinate of the goal.
+        vehicle_length: Length of the agent's bounding box.
+        vehicle_width: Width of the agent's bounding box.
+        id: Unique identifier of the agent.
+    """
+
+    def __init__(self, abs_self_obs_tensor: torch.Tensor):
+        """Initializes the ego state with an observation tensor."""
+        self.pos_x = abs_self_obs_tensor[:, :, 0]
+        self.pos_y = abs_self_obs_tensor[:, :, 1]
+        self.pos_z = abs_self_obs_tensor[:, :, 2]
+        self.rotation_quaternions = abs_self_obs_tensor[:, :, 3:6]
+        self.rotation_from_axis_angle = abs_self_obs_tensor[:, :, 7]
+        self.goal_x = abs_self_obs_tensor[:, :, 8]
+        self.goal_y = abs_self_obs_tensor[:, :, 9]
+        self.vehicle_length = abs_self_obs_tensor[:, :, 10]
+        self.vehicle_width = abs_self_obs_tensor[:, :, 11]
+        self.id = abs_self_obs_tensor[:, :, 12]
+        
+    @classmethod
+    def from_tensor(
+        cls, abs_self_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
+    ):
+        """Creates an EgoState from a tensor."""
+        if backend == "torch":
+            return cls(abs_self_obs_tensor.to_torch())
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape (num_worlds, num_agents) of the ego state tensor."""
+        return self.pos_x.shape
+    
+    def restore_mean(self, mean_x, mean_y):
+        """Reapplies the mean to revert back to the original coordinates."""
+        self.pos_x += mean_x
+        self.pos_y += mean_y
+        
 
 @dataclass
 class PartnerObs:
@@ -157,3 +207,4 @@ class LidarObs:
             return cls(lidar_tensor.to_torch())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
+

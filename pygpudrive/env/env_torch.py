@@ -11,7 +11,7 @@ from data_utils.vbd_data import process_scenario_data
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
-from pygpudrive.datatypes.observation import EgoState, PartnerObs, LidarObs
+from pygpudrive.datatypes.observation import LocalEgoState, GlobalEgoState, PartnerObs, LidarObs
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
 
@@ -270,7 +270,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             Shape: (num_worlds, max_agents, num_features)
         """
         if self.config.ego_state:
-            ego_state = EgoState.from_tensor(
+            ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
             )
@@ -407,23 +407,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             axis=2
         )
 
-    def get_expert_actions(self):
-        """Get expert actions for the full trajectories across worlds.
-
-        Returns:
-            expert_actions: Inferred or logged actions for the agents.
-            expert_speeds: Speeds from the logged trajectories.
-            expert_positions: Positions from the logged trajectories.
-            expert_yaws: Heading from the logged trajectories.
-        """
-
-        log_trajectory = LogTrajectory.from_tensor(
-            self.sim.expert_trajectory_tensor(),
-            self.num_worlds,
-            self.max_agent_count,
-            backend=self.backend,
-        )
-
     def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
@@ -435,26 +418,40 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "The length of the expert trajectory is 91,"
                 f"so init_steps = {init_steps} should be < than 91."
             )
+            
+        self.init_frames = []
 
-        self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions()
-
-        global_road_graph = GlobalRoadGraphPoints.from_tensor(
-            global_roadgraph_tensor=self.sim.map_observation_tensor(),
+        self.log_playback_traj, _, _, _ = self.get_expert_actions()
+        
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2]
+        
+        # Get the logged trajectory
+        #Q(KJ): Do we still have to revert the mean here?
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
             backend=self.backend,
         )
-
+        
         local_road_graph = LocalRoadGraphPoints.from_tensor(
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
         )
-
-
-
-        global_agent_observations = (
-            self.sim.absolute_self_observation_tensor().to_torch()
+        
+        # Get global road graph and restore the mean
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
         )
-
-        self.init_frames = []
+        global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        
+        # Get global agent observations and restore the mean
+        global_agent_obs = GlobalEgoState.from_tensor(
+            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
+            backend=self.backend,
+        )
+        global_agent_obs.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
 
         for time_step in range(init_steps):
 
@@ -470,14 +467,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 num_envs=self.num_worlds,
                 max_controlled_agents=self.max_cont_agents,
                 controlled_agent_mask=self.cont_agent_mask,
-                global_agent_observations=global_agent_observations,
+                global_agent_obs=global_agent_obs,
                 global_road_graph=global_road_graph,
                 local_road_graph=local_road_graph,
+                log_trajectory=log_trajectory,
                 episode_len=self.episode_len,
                 init_steps=init_steps,
-                positions=pos_xy,
-                velocities=vel_xy,
-                yaws=yaw,
                 raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             )
             return sample_batch
