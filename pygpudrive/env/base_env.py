@@ -6,16 +6,23 @@ from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.scene_selector import select_scenes
 import abc
 import gpudrive
+import torch
+import jax.numpy as jnp
 
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
-    """Base class for multi-agent environments in GPUDrive.
-
-    Provides common methods for setting up the simulator and handling output.
-    """
-
-    def __init__(self):
+    def __init__(self, backend="torch"):
         super().__init__()
+        self.backend = backend
+        if self.backend not in ["torch", "jax"]:
+            raise ValueError("Unsupported backend; use 'torch' or 'jax'")
+
+    def to_tensor(self, x):
+        """Convert simulator data to the correct tensor type for the specified backend."""
+        if self.backend == "torch":
+            return x.to_torch()
+        elif self.backend == "jax":
+            return x.to_jax()
 
     @abc.abstractmethod
     def reset(self):

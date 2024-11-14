@@ -76,27 +76,7 @@ def generate_state_action_pairs(
     obs = env.reset()
 
     # Get expert actions for full trajectory in all worlds
-    expert_actions = env.get_log_playback_actions()
-    raw_expert_action = expert_actions.clone()
-
-    expert_dx, expert_dy, expert_dyaw = None, None, None
-    expert_accel, expert_steer = None, None
-    if debug_world_idx is not None and debug_veh_idx is not None:
-        if env.config.dynamics_model == "delta_local":
-            expert_dx = raw_expert_action[debug_world_idx, debug_veh_idx, :, 0]
-            expert_dy = raw_expert_action[debug_world_idx, debug_veh_idx, :, 1]
-            expert_dyaw = raw_expert_action[
-                debug_world_idx, debug_veh_idx, :, 2
-            ]
-        else:
-            expert_accel = raw_expert_action[
-                debug_world_idx, debug_veh_idx, :, 0
-            ]
-            expert_steer = raw_expert_action[
-                debug_world_idx, debug_veh_idx, :, 1
-            ]
-        # for (pos_x, pos_y), speed in zip(expert_positions, expert_speeds):
-        #     print(f'position : ({pos_x}. {pos_y}), speed : {speed}')
+    expert_actions, expert_speeds, expert_positions, expert_yaws = env.get_expert_actions()
     if action_space_type == "discrete":
         logging.info("Discretizing expert actions... \n")
         # Discretize the expert actions: map every value to the closest
