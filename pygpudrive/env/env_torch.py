@@ -17,7 +17,7 @@ from pygpudrive.datatypes.observation import (
     LidarObs,
 )
 from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 
@@ -444,25 +444,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 f"so init_steps = {init_steps} should be < than 91."
             )
 
-        self.log_playback_traj = self.get_expert_actions()
+        self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions()
 
-        if self.config.enable_vbd:
-            from vbd.data.data_utils import calculate_relations
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            global_roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
+        )
 
-            # Storage
-            agents_history = torch.zeros(
-                (self.num_worlds, self.max_cont_agents, init_steps + 1, 8)
-            )  # (32, 11, 8)
-            agents_future = torch.zeros(
-                (
-                    self.num_worlds,
-                    self.max_cont_agents,
-                    self.config.episode_len - (init_steps + 1),
-                    5,
-                )
-            )
-            # Zeroth step
-            agents_history[:, :, 0, :], _, _ = self.construct_agent_traj()
+        local_road_graph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
+            backend=self.backend,
+
+
+        global_agent_observations = (
+            self.sim.absolute_self_observation_tensor().to_torch()
+        )
 
         self.init_frames = []
 
@@ -507,152 +503,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             return None
 
-    def construct_polylines(self):
-        """Get the global polylines information."""
-
-        # Automatically generate the waymax_types_to_gpudrive mapping using a dictionary comprehension
-        waymax_types_to_gpudrive = {
-            int(entity_type): gpudrive.mapRoadEntityTypeToID(entity_type)
-            for entity_type in [
-                gpudrive.EntityType._None,  # Using _None if None isn't allowed directly
-                gpudrive.EntityType.RoadEdge,
-                gpudrive.EntityType.RoadLine,
-                gpudrive.EntityType.RoadLane,
-                gpudrive.EntityType.CrossWalk,
-                gpudrive.EntityType.SpeedBump,
-                gpudrive.EntityType.StopSign,
-            ]
-        }
-
-        # Features: p_x, p_y, heading, traffic_light_state, lane_type
-        global_road_graph = self.sim.agent_roadmap_tensor().to_torch()
-        
-        
-        #absolute_map_obs = sim.map_observation_tensor().to_torch()
-
-        orig_lane_types = global_road_graph[:, :, :, 6].long()
-        lane_types = torch.zeros_like(orig_lane_types)
-
-        for old_id, new_id in waymax_types_to_gpudrive.items():
-            lane_types[orig_lane_types == old_id] = new_id
-
-        num_road_points = global_road_graph.shape[2]
-
-        polylines = torch.cat(
-            [
-                global_road_graph[:, :, :, :2],  # x, y (3D tensor)
-                global_road_graph[:, :, :, 5:6],  # heading (unsqueezed to 3D)
-                torch.zeros_like(
-                    global_road_graph[:, :, :, 5:6]
-                ),  # traffic_light_state (unsqueezed to 3D)
-                lane_types.long().unsqueeze(
-                    -1
-                ),  # lane_type (unsqueezed to 3D)
-            ],
-            dim=-1,  # Concatenate along the last dimension
-        )
-
-        # TODO(dc): Find out 30 shape
-        polylines = polylines[:, :30, :]
-
-        # Condition to check if the value is an integer between 0 and 6
-        condition = (
-            (polylines[:, :, :, 4] >= 0)
-            & (polylines[:, :, :, 4] <= 6)
-            & (polylines[:, :, :, 4] == polylines[:, :, :, 4].long().float())
-        )
-
-        # TODO(dc): Create the new tensor, setting 1 where the condition is true, and 0 otherwise
-        polylines_valid = torch.ones((self.num_worlds, num_road_points))
-
-        return polylines.permute(0, 2, 1, 3), polylines_valid
-
-    def construct_agent_traj(self):
-        """Get the agent trajectory information."""
-        global_traj = self.sim.absolute_self_observation_tensor().to_torch()
-        global_traj[~self.cont_agent_mask] = 0.0
-        global_traj = global_traj[:, : self.max_cont_agents, :]
-
-        # x, y, heading, vel_x, vel_y, len, width, height
-        agents_history = torch.cat(
-            [
-                global_traj[:, :, :2],  # x, y
-                global_traj[:, :, 7:8],  # TODO(dc): yaw (placeholder)
-                torch.zeros_like(
-                    global_traj[:, :, :2]
-                ),  # velocity xy (placeholder)
-                global_traj[:, :, 10:12],  # vehicle length, width
-                torch.zeros_like(
-                    global_traj[:, :, 0:1]
-                ),  # TODO(dc): height (placeholder)
-            ],
-            dim=-1,
-        )
-        # Currently, all agents are vehicles, encoding as type 1
-        agents_type = torch.zeros([self.num_worlds, self.max_cont_agents])
-        agents_type[self.cont_agent_mask] = 1
-
-        # 10 if we are controlling the agent, 1 otherwise
-        agents_interested = torch.ones([self.num_worlds, self.max_cont_agents])
-        agents_interested[self.cont_agent_mask] = 10
-
-        return agents_history, agents_type, agents_interested
-
-    def get_controlled_agents_mask(self):
-        """Get the control mask."""
-        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
-            axis=2
-        )
-
-    def normalize_ego_state(self, state):
-        """Normalize ego state features."""
-
-        # Speed, vehicle length, vehicle width
-        state[:, :, 0] /= constants.MAX_SPEED
-        state[:, :, 1] /= constants.MAX_VEH_LEN
-        state[:, :, 2] /= constants.MAX_VEH_WIDTH
-
-        # Relative goal coordinates
-        state[:, :, 3] = self.normalize_tensor(
-            state[:, :, 3],
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
-        )
-        state[:, :, 4] = self.normalize_tensor(
-            state[:, :, 4],
-            # do the same
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
-        )
-
-        # Uncommment this to exclude the collision state
-        # (1 if vehicle is in collision, 1 otherwise)
-        # state = state[:, :, :5]
-
-        return state
-
     def get_expert_actions(self):
-        """Get expert actions for the full trajectories across worlds."""
+        """Get expert actions for the full trajectories across worlds.
 
-        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
+        Returns:
+            expert_actions: Inferred or logged actions for the agents.
+            expert_speeds: Speeds from the logged trajectories.
+            expert_positions: Positions from the logged trajectories.
+            expert_yaws: Heading from the logged trajectories.
+        """
 
-        # Global positions
-        positions = expert_traj[:, :, : 2 * self.episode_len].view(
-            self.num_worlds, self.max_agent_count, self.episode_len, -1
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
         )
-
-        # Global velocity
-        velocity = expert_traj[
-            :, :, 2 * self.episode_len : 4 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        headings = expert_traj[
-            :, :, 4 * self.episode_len : 5 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        inferred_expert_actions = expert_traj[
-            :, :, 6 * self.episode_len : 16 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
 
         if self.config.dynamics_model == "delta_local":
             inferred_expert_actions = inferred_expert_actions[..., :3]
