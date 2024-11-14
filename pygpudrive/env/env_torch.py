@@ -354,15 +354,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _get_lidar_obs(self):
         """Get lidar observations."""
         if self.config.lidar_obs:
-            lidar_obs = (
-                LidarObs.from_tensor(
-                    lidar_tensor=self.sim.lidar_tensor(),
-                    backend=self.backend,
-                )
-                .flatten(start_dim=2, end_dim=-1)
-                .to(self.device)
-            )
-
+            lidar_obs = self.sim.lidar_tensor().to_torch().flatten(start_dim=2, end_dim=-1).to(self.device)
+        
             return lidar_obs
         else:
             return torch.Tensor().to(self.device)

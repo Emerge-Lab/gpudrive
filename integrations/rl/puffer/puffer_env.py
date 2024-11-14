@@ -59,9 +59,19 @@ class PufferGPUDrive(PufferEnv):
             ego_state=config.ego_state,
             road_map_obs=config.road_map_obs,
             partner_obs=config.partner_obs,
+            lidar_obs=config.lidar_obs,
+            disable_classic_obs=config.disable_classic_obs,
             reward_type=config.reward_type,
             norm_obs=config.normalize_obs,
             dynamics_model=config.dynamics_model,
+            collision_weight=config.collision_weight,
+            goal_achieved_weight=config.goal_achieved_weight,
+            off_road_weight=config.off_road_weight,
+            dist_to_goal_threshold=config.dist_to_goal_threshold,
+            collision_behavior=config.collision_behavior,
+            obs_radius=config.obs_radius,
+            polyline_reduction_threshold=config.polyline_reduction_threshold,
+            remove_non_vehicles=config.remove_non_vehicles,
         )
 
         render_config = RenderConfig(

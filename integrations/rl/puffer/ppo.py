@@ -353,35 +353,41 @@ def train(data):
                     }
                 )
 
-                # TEMP TODO(dc): Remove after making animation
-                # try:
-                #     global_steps_list.append(data.global_step.copy())
-                #     perc_collisions_list.append(
-                #         data.stats["perc_veh_collisions"].copy()
-                #     )
-                #     perc_offroad_list.append(
-                #         data.stats["perc_off_road"].copy()
-                #     )
-                #     perc_goal_achieved_list.append(
-                #         data.stats["perc_goal_achieved"].copy()
-                #     )
-                #     time_list.append(profile.uptime)
-                # except:
-                #     pass
+            if data.config.store_metrics:
+                # Can be used to make animations or making figures wo wandb
+                try:
+                    global_steps_list.append(data.global_step.copy())
+                    perc_collisions_list.append(
+                        data.stats["perc_veh_collisions"].copy()
+                    )
+                    perc_offroad_list.append(
+                        data.stats["perc_off_road"].copy()
+                    )
+                    perc_goal_achieved_list.append(
+                        data.stats["perc_goal_achieved"].copy()
+                    )
+                    time_list.append(profile.uptime)
+                except:
+                    pass
 
-                # # Save as numpy arrays
-                # if data.global_step > 12e6:
-                #     np.save("global_steps.npy", np.array(global_steps_list))
-                #     np.save(
-                #         "perc_collisions.npy", np.array(perc_collisions_list)
-                #     )
-                #     np.save("perc_offroad.npy", np.array(perc_offroad_list))
-                #     np.save(
-                #         "perc_goal_achieved.npy",
-                #         np.array(perc_goal_achieved_list),
-                #     )
-                #     np.save("wallclock_time.npy", np.array(time_list))
-
+                # Save as numpy arrays
+                if data.global_step >= data.config.total_timesteps:
+                    print("Saving training metrics...")
+                    np.save(
+                        "global_steps.npy", np.array(global_steps_list)
+                    )
+                    np.save(
+                        "perc_collisions.npy",
+                        np.array(perc_collisions_list),
+                    )
+                    np.save(
+                        "perc_offroad.npy", np.array(perc_offroad_list)
+                    )
+                    np.save(
+                        "perc_goal_achieved.npy",
+                        np.array(perc_goal_achieved_list),
+                    )
+                    np.save("wallclock_time.npy", np.array(time_list))
                 if (
                     config.render
                     and ((data.epoch - 1) % config.render_interval) == 0
