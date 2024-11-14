@@ -13,7 +13,7 @@ from pygpudrive.env.base_env import GPUDriveGymEnv
 
 from pygpudrive.datatypes.observation import EgoState, PartnerObs, LidarObs
 from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -437,12 +437,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 f"so init_steps = {init_steps} should be < than 91."
             )
 
-        self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions(
-            full_output=True
+        self.log_playback_traj, vel_xy, pos_xy, yaw = self.get_expert_actions()
+
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            global_roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
         )
 
-        global_road_graph = self.sim.map_observation_tensor().to_torch()
-        local_road_graph = self.sim.agent_roadmap_tensor().to_torch()
+        local_road_graph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
+            backend=self.backend,
+
+
+
+
         global_agent_observations = (
             self.sim.absolute_self_observation_tensor().to_torch()
         )
@@ -477,55 +485,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             return None
 
-    def normalize_ego_state(self, state):
-        """Normalize ego state features."""
+    def get_expert_actions(self):
+        """Get expert actions for the full trajectories across worlds.
 
-        # Speed, vehicle length, vehicle width
-        state[:, :, 0] /= constants.MAX_SPEED
-        state[:, :, 1] /= constants.MAX_VEH_LEN
-        state[:, :, 2] /= constants.MAX_VEH_WIDTH
+        Returns:
+            expert_actions: Inferred or logged actions for the agents.
+            expert_speeds: Speeds from the logged trajectories.
+            expert_positions: Positions from the logged trajectories.
+            expert_yaws: Heading from the logged trajectories.
+        """
 
-        # Relative goal coordinates
-        state[:, :, 3] = self.normalize_tensor(
-            state[:, :, 3],
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
         )
-        state[:, :, 4] = self.normalize_tensor(
-            state[:, :, 4],
-            # do the same
-            constants.MIN_REL_GOAL_COORD,
-            constants.MAX_REL_GOAL_COORD,
-        )
-
-        # Uncommment this to exclude the collision state
-        # (1 if vehicle is in collision, 1 otherwise)
-        # state = state[:, :, :5]
-
-        return state
-
-    def get_expert_actions(self, full_output=False):
-        """Get expert actions for the full trajectories across worlds (scenarios)."""
-
-        expert_traj = self.sim.expert_trajectory_tensor().to_torch()
-
-        # Global positions
-        positions = expert_traj[:, :, : 2 * self.episode_len].view(
-            self.num_worlds, self.max_agent_count, self.episode_len, -1
-        )
-
-        # Global velocity
-        velocity = expert_traj[
-            :, :, 2 * self.episode_len : 4 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        headings = expert_traj[
-            :, :, 4 * self.episode_len : 5 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
-
-        inferred_expert_actions = expert_traj[
-            :, :, 6 * self.episode_len : 16 * self.episode_len
-        ].view(self.num_worlds, self.max_agent_count, self.episode_len, -1)
 
         if self.config.dynamics_model == "delta_local":
             inferred_actions = log_trajectory.inferred_actions[:, :3]
