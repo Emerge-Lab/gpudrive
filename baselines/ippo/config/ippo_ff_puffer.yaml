@@ -18,7 +18,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "gpudrive"
+  project: "figs_rebuttal"
   group: "my_group"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff", "single_scene"]
@@ -29,7 +29,7 @@ train:
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
   torch_deterministic: false
-  total_timesteps: 2_000_0000
+  total_timesteps: 10_000_000
   batch_size: 25_000
   minibatch_size: 5_000
   learning_rate: 3e-4

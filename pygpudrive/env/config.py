@@ -59,7 +59,7 @@ class EnvConfig:
         torch.linspace(-1.0, 1.0, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 7), decimals=3
+        torch.linspace(-4.0, 4.0, 13), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
     
