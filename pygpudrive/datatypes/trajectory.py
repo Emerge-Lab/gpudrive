@@ -35,7 +35,11 @@ class LogTrajectory:
     def from_tensor(cls, expert_traj_tensor: gpudrive.madrona.Tensor, num_worlds: int, max_agents: int, backend="torch"):
         """Creates an LogTrajectory from a tensor."""
         if backend == "torch":
-            return cls(expert_traj_tensor.to_torch(), num_worlds, max_agents)  # Pass the entire tensor
+            return cls(expert_traj_tensor.to_torch().clone(), num_worlds, max_agents)  # Pass the entire tensor
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
         
+    def restore_mean(self, mean_x, mean_y):
+        """Reapplies the mean to revert back to the original coordinates."""
+        self.pos_xy[:, :, :, 0] += mean_x
+        self.pos_xy[:, :, :, 1] += mean_y
