@@ -130,14 +130,14 @@ def process_scenario_data(
     )
 
     data_dict = {
-        "agents_history": agents_history,
-        "agents_interested": agents_interested,
-        "agents_type": agents_type.long(),
-        "agents_future": agents_future,
-        "traffic_light_points": traffic_light_points,
-        "polylines": polylines,
-        "polylines_valid": polylines_valid,
-        "relations": torch.Tensor(relations),
+        "agents_history": agents_history.unsqueeze(0),
+        "agents_interested": agents_interested.unsqueeze(0),
+        "agents_type": agents_type.long().unsqueeze(0),
+        "agents_future": agents_future.unsqueeze(0),
+        "traffic_light_points": traffic_light_points.unsqueeze(0),
+        "polylines": torch.from_numpy(polylines).unsqueeze(0),
+        "polylines_valid": torch.from_numpy(polylines_valid).unsqueeze(0),
+        "relations": torch.Tensor(relations).unsqueeze(0),
         "agents_id": agents_id,
         "anchors": torch.zeros((1, 32, 64, 2)),  # Placeholder, not used
     }
