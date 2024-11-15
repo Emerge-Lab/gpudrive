@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import numpy as np
 import torch
 import enum
 import gpudrive
@@ -59,13 +60,14 @@ class GlobalRoadGraphPoints:
         """Initializes the global road graph points with a tensor."""
         self.x = roadgraph_tensor[:, :, 0]
         self.y = roadgraph_tensor[:, :, 1]
+        self.xy = torch.stack((self.x, self.y), dim=-1)
         self.segment_length = roadgraph_tensor[:, :, 2]
         self.segment_width = roadgraph_tensor[:, :, 3]
         self.segment_height = roadgraph_tensor[:, :, 4]
         self.orientation = roadgraph_tensor[:, :, 5]
-        # Skipping the map element type for now (redundant with the map type).
         self.id = roadgraph_tensor[:, :, 7]
         self.type = roadgraph_tensor[:, :, 8]
+        self.num_points = roadgraph_tensor.shape[1]
 
     @classmethod
     def from_tensor(
@@ -73,7 +75,7 @@ class GlobalRoadGraphPoints:
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(roadgraph_tensor.to_torch())
+            return cls(roadgraph_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -103,6 +105,11 @@ class GlobalRoadGraphPoints:
         """Reapplies the mean to revert back to the original coordinates."""
         self.x += mean_x
         self.y += mean_y
+
+    def restore_xy(self):
+        """Shifts x, y from the midpoint to the starting point of a segment, along the heading angle."""
+        self.x -= self.segment_length * np.cos(self.orientation)
+        self.y -= self.segment_length * np.sin(self.orientation)
 
 
 @dataclass
@@ -142,7 +149,7 @@ class LocalRoadGraphPoints:
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(local_roadgraph_tensor.to_torch())
+            return cls(local_roadgraph_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 

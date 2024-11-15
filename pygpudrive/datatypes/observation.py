@@ -34,7 +34,7 @@ class LocalEgoState:
     ):
         """Creates an EgoState from a tensor."""
         if backend == "torch":
-            return cls(self_obs_tensor.to_torch())
+            return cls(self_obs_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -97,7 +97,7 @@ class GlobalEgoState:
     ):
         """Creates an EgoState from a tensor."""
         if backend == "torch":
-            return cls(abs_self_obs_tensor.to_torch())
+            return cls(abs_self_obs_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -145,7 +145,7 @@ class PartnerObs:
     ):
         """Creates an EgoState from a tensor."""
         if backend == "torch":
-            return cls(partner_obs_tensor.to_torch())
+            return cls(partner_obs_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -204,7 +204,7 @@ class LidarObs:
         cls, lidar_tensor: gpudrive.madrona.Tensor, backend="torch"
     ):
         if backend == "torch":
-            return cls(lidar_tensor.to_torch())
+            return cls(lidar_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
