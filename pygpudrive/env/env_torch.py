@@ -442,6 +442,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "The length of the expert trajectory is 91,"
                 f"so init_steps = {init_steps} should be < than 91."
             )
+        elif self.config.return_vbd_data and self.num_worlds > 1:
+            raise ValueError(
+                f"VBD expects only a single world, given {self.num_worlds}."
+            )
             
         self.init_frames = []
 
@@ -450,18 +454,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         means_xy = self.sim.world_means_tensor().to_torch()[:, :2]
         
         # Get the logged trajectory
-        #Q(KJ): Do we still have to revert the mean here?
+        #Q(KJ): Do we still have to revert the mean here? Yes we do
         log_trajectory = LogTrajectory.from_tensor(
             self.sim.expert_trajectory_tensor(),
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
         )
-        
-        local_road_graph = LocalRoadGraphPoints.from_tensor(
-            local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
-            backend=self.backend,
-        )
+        log_trajectory.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
         
         # Get global road graph and restore the mean
         global_road_graph = GlobalRoadGraphPoints.from_tensor(
@@ -469,6 +469,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
         )
         global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_road_graph.restore_xy()
         
         # Get global agent observations and restore the mean
         global_agent_obs = GlobalEgoState.from_tensor(
@@ -487,16 +488,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if self.config.return_vbd_data:
             sample_batch = process_scenario_data(
-                num_envs=self.num_worlds,
                 max_controlled_agents=self.max_cont_agents,
-                controlled_agent_mask=self.cont_agent_mask,
+                controlled_agent_mask=self.cont_agent_mask[0],
                 global_agent_obs=global_agent_obs,
                 global_road_graph=global_road_graph,
-                local_road_graph=local_road_graph,
                 log_trajectory=log_trajectory,
                 episode_len=self.episode_len,
                 init_steps=init_steps,
-                raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
+                raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
             )
 
             data_dict = {
