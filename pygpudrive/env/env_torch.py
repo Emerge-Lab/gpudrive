@@ -1,18 +1,19 @@
-"""Base Gym Environment that interfaces with the GPU Drive simulator."""
+"""Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 import gpudrive
-import imageio
 from itertools import product
+
+from data_utils.vbd_data import process_scenario_data
 
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
-from pygpudrive.datatypes.observation import EgoState, PartnerObs, LidarObs
+from pygpudrive.datatypes.observation import LocalEgoState, GlobalEgoState, PartnerObs, LidarObs
 from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -57,12 +58,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
+
         # Rendering setup
         self.visualizer = self._setup_rendering()
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
+
+        # If there are warmup steps (by default, init_steps=0),
+        # advance the simulator before returning the first observation
+        self.sample_batch = self.advance_sim_with_log_playback(
+            init_steps=self.config.init_steps,
+            render_init=self.render_config.render_init,
+        )
+
         return self.get_obs()
 
     def get_dones(self):
@@ -160,7 +170,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
             # Following the StateAction struct in types.hpp
-            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
+            # Need to provide:
+            # (x, y, z, yaw, vel x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
             self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
         else:
             raise ValueError(
@@ -236,17 +247,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             action_1 = self.dx.clone().cpu().numpy()
             action_2 = self.dy.clone().cpu().numpy()
             action_3 = self.dyaw.clone().cpu().numpy()
-        elif self.config.dynamics_model == "classic":
+        else:
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
             self.head_actions = torch.tensor([0], device=self.device)
             action_1 = self.steer_actions.clone().cpu().numpy()
             action_2 = self.accel_actions.clone().cpu().numpy()
             action_3 = self.head_actions.clone().cpu().numpy()
-        else:
-            raise ValueError(
-                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
-            )
 
         action_space = Tuple(
             (
@@ -263,7 +270,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             Shape: (num_worlds, max_agents, num_features)
         """
         if self.config.ego_state:
-            ego_state = EgoState.from_tensor(
+            ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
             )
@@ -400,6 +407,77 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             axis=2
         )
 
+    def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
+        """Advances the simulator by stepping the objects with the logged human trajectories.
+
+        Args:
+            init_steps (int): Number of warmup steps.
+        """
+        if init_steps >= self.config.episode_len:
+            raise ValueError(
+                "The length of the expert trajectory is 91,"
+                f"so init_steps = {init_steps} should be < than 91."
+            )
+        elif self.config.return_vbd_data and self.num_worlds > 1:
+            raise ValueError(
+                f"VBD expects only a single world, given {self.num_worlds}."
+            )
+            
+        self.init_frames = []
+
+        self.log_playback_traj, _, _, _ = self.get_expert_actions()
+        
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2]
+        
+        # Get the logged trajectory
+        #Q(KJ): Do we still have to revert the mean here? Yes we do
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
+        log_trajectory.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        
+        # Get global road graph and restore the mean
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
+        )
+        global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_road_graph.restore_xy()
+        
+        # Get global agent observations and restore the mean
+        global_agent_obs = GlobalEgoState.from_tensor(
+            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
+            backend=self.backend,
+        )
+        global_agent_obs.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+
+        for time_step in range(init_steps):
+
+            self.step_dynamics(
+                actions=self.log_playback_traj[:, :, time_step, :]
+            )
+
+            if render_init:  # Render the initial frames
+                self.init_frames.append(self.render())
+
+        if self.config.return_vbd_data:
+            sample_batch = process_scenario_data(
+                max_controlled_agents=self.max_cont_agents,
+                controlled_agent_mask=self.cont_agent_mask[0],
+                global_agent_obs=global_agent_obs,
+                global_road_graph=global_road_graph,
+                log_trajectory=log_trajectory,
+                episode_len=self.episode_len,
+                init_steps=init_steps,
+                raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
+            )
+            return sample_batch
+        else:
+            return None
+
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
@@ -468,29 +546,37 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    # CONFIGURE
-    TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 10
+    init_steps = 10
+    MAX_NUM_OBJECTS = 32
+    NUM_WORLDS = 1
 
-    env_config = EnvConfig(dynamics_model="state")
+    env_config = EnvConfig(
+        init_steps=init_steps,  # Warmup period
+        return_vbd_data=True,  # Use VBD
+        dynamics_model="state",  # Use state-based dynamics model
+        dist_to_goal_threshold=1e-5,  # Trick to make sure the agents don't disappear when they reach the goal
+        collision_behavior="ignore",  # Ignore collisions
+    )
     render_config = RenderConfig()
     scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
 
-    # MAKE ENV
+    # Make env
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
-        max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
+        max_cont_agents=MAX_NUM_OBJECTS,  # Number of agents to control
         device="cpu",
         render_config=render_config,
     )
 
     # RUN
     obs = env.reset()
+
+    sample_batch = env.sample_batch
+
     frames = []
 
-    for i in range(TOTAL_STEPS):
+    for i in range(env_config.episode_len - init_steps):
         print(f"Step: {i}")
 
         # Take a random actions
@@ -505,7 +591,6 @@ if __name__ == "__main__":
             ]
         ).reshape(NUM_WORLDS, env_config.max_num_agents_in_scene)
 
-        # Step the environment
         env.step_dynamics(rand_action)
 
         frames.append(env.render())
@@ -513,8 +598,5 @@ if __name__ == "__main__":
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-
-    # import imageio
-    imageio.mimsave("world1.gif", np.array(frames))
 
     env.close()

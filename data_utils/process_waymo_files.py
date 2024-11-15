@@ -15,6 +15,7 @@ import psutil
 from pathlib import Path
 import warnings
 from typing import Any, Dict, Optional, List
+from pdb import set_trace as T
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
 from datatypes import MapElementIds
@@ -126,10 +127,10 @@ def _parse_object_state(
         "width": final_state.width,
         "length": final_state.length,
         "height": final_state.height,
-        "heading": [
-            math.degrees(state.heading) if state.valid else ERR_VAL
+        "heading": [ # In radians between [-pi, pi]
+            (state.heading + np.pi) % (2 * np.pi) - np.pi if state.valid else ERR_VAL
             for state in states
-        ],  # Use rad here?
+        ], 
         "velocity": [
             {"x": state.velocity_x, "y": state.velocity_y}
             if state.valid
@@ -182,6 +183,7 @@ def _init_object(track: scenario_pb2.Track) -> Optional[Dict[str, Any]]:
 
     obj = _parse_object_state(track.states, track.states[final_valid_index])
     obj["type"] = _WAYMO_OBJECT_STR[track.object_type]
+    obj["id"] = track.id
     return obj
 
 

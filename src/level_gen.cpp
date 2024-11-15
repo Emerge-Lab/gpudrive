@@ -60,7 +60,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     {
         trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.position[i].y - ctx.singleton<WorldMeans>().mean.y};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.headings[i] = agentInit.heading[i];
         trajectory.valids[i] = (float)agentInit.valid[i];
         trajectory.inverseActions[i] = getZeroAction(ctx.data().params.dynamicsModel);
     }

@@ -29,10 +29,10 @@ class EnvConfig:
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
-    
-    # NOTE: If disable_classic_obs is True, ego_state, road_map_obs, 
+
+    # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
     # and partner_obs are invalid. This makes the sim 2x faster
-    disable_classic_obs: bool = False  # Disable classic observations 
+    disable_classic_obs: bool = False  # Disable classic observations
     lidar_obs: bool = False  # Use LiDAR in observations
 
     # Set the weights for the reward components
@@ -62,7 +62,7 @@ class EnvConfig:
         torch.linspace(-4.0, 4.0, 7), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
-    
+
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
     dy: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
@@ -89,14 +89,34 @@ class EnvConfig:
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
+    # Reward
+    reward_type: str = (
+        "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
+    )
+    # The radius around the goal point within which the agent is considered
+    # to have reached the goal
+    dist_to_goal_threshold: float = 3.0
+
+    # Initialization steps: Number of steps to take before the episode starts
+    init_steps: int = 0
+
     # Reward settings
     reward_type: str = (
         "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
     )
 
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight = -1.0
+    goal_achieved_weight = 1.0
+    off_road_weight = -1.0
+
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
     )
+
+    # Integrations: Enable pre-trained Versatile Behavior Diffusion model
+    return_vbd_data: bool = False
 
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_agents_in_scene: int = (
@@ -111,9 +131,8 @@ class EnvConfig:
     episode_len: int = (
         gpudrive.episodeLen
     )  # Length of an episode in the simulator
-    num_lidar_samples: int = (
-        gpudrive.numLidarSamples
-    )
+    num_lidar_samples: int = gpudrive.numLidarSamples
+
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
@@ -190,6 +209,7 @@ class RenderConfig:
     draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
     color_scheme: str = "light"
+    render_init: bool = False
 
     def __str__(self) -> str:
         """Returns a string representation of the rendering configuration."""
