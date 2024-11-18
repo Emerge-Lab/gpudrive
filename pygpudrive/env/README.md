@@ -47,7 +47,7 @@ Further configuration details are available in `config.py`.
 
 ---
 
-> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, kMaxAgentCount)`, where kMaxAgentCount defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
+> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, max_agents_in_scene)`, where kMaxAgentCount defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
 
 ---
 
@@ -76,7 +76,7 @@ To use a continuous action space, set `action_type='continuous`
 
 ## Observation Space
 
-Key observation flags include:
+In short, key observation flags include:
 
 ```
 ego_state: bool = True  # Indicates ego vehicle state
@@ -93,9 +93,18 @@ lidar_obs: bool = True # Use LiDAR
 | **road_map_obs** 🛣️ 🛑          | `(max_num_agents_in_scene, top_k_road_points, 13)`   | Information about the road graph  and other static road objects.                                                            | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)`            |
 | **lidar_obs**                     | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)` | LiDAR rays                                                                                                                  | The number of LiDAR points can be set by changing `numLidarSamples` in `src/consts.hpp`. The default is 30 points.                                                                                                     |
 
-Note that all observations are already transformed to be in a relative coordinate frame.
-
 ---
+
+### Data structures
+
+See the observation and roadgraph data structures at:
+- **Agent observations**: [`pygpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/observation.py)
+- **Roadgraph**: [`pygpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/roadgraph.py).
+
+These datastructures are used in `env_torch.py`.
+
+
+### Note about LiDAR
 
 > **Using LiDAR only**: If you only want to use the LiDAR data as observation, it is recommended to set `disable_classic_obs = True`. This makes the simulator 2x faster by disabling the construction of the classical observations. To ensure only the LiDAR obs is returned, set all the classical obs flags to false in `pygpudrive/env/config.py`:
 
@@ -111,8 +120,6 @@ disable_classic_obs: bool = True  # Disable classic observations
 lidar_obs: bool = True  # Use LiDAR in observations
 ```
 
----
-
 ## Rewards
 
 A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` from the goal, marking the end of the expert trajectory for that vehicle.
@@ -121,7 +128,7 @@ A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` 
 
 Upon initialization, every vehicle starts at the beginning of the expert trajectory.
 
-## Dataset 
+## Dataset
 
 The `SceneConfig` dataclass is used to configure how scenes are selected from a dataset. It has four attributes:
 
@@ -143,7 +150,7 @@ The `reinit_scenarios()` method in `pygpudrive/env/base_env.py` reinitializes th
 3. **Agent count update:**
    The function updates `self.max_agent_count` to reflect the number of controlled agents and recomputes `self.num_valid_controlled_agents_across_worlds`, indicating the total active controlled agents across all scenarios.
 
-See the `resample_scenario_batch()` method in `pygpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO. 
+See the `resample_scenario_batch()` method in `pygpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO.
 
 ## Render
 
