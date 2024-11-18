@@ -5,8 +5,10 @@ from pygpudrive.utils.geometry import normalize_min_max
 import gpudrive
 
 
-class EgoState:
-    """A class to represent the ego state of the agent.
+class LocalEgoState:
+    """A class to represent the ego state of the agent in relative coordinates.
+    Initialized from agent_roadmap_tensor (src/bindings). For details, see
+    `agentMapObservations` in src/types.hpp.
 
     Attributes:
         speed: Speed of the agent in relative coordinates.
@@ -32,9 +34,9 @@ class EgoState:
     def from_tensor(
         cls, self_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
     ):
-        """Creates an EgoState from a tensor."""
+        """Creates an LocalEgoState from the agent_observation_tensor."""
         if backend == "torch":
-            return cls(self_obs_tensor.to_torch())
+            return cls(self_obs_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -62,6 +64,58 @@ class EgoState:
         return self.speed.shape
 
 
+class GlobalEgoState:
+    """A class to represent the ego state of the agent in global coordinates.
+    Initialized from abs_self_obs_tensor (src/bindings). For details, see
+    `AbsoluteSelfObservation` in src/types.hpp. Shape: (num_worlds, max_agents, 13).
+
+    Attributes:
+        pos_x: Global x-coordinate of the agent.
+        pos_y: Global y-coordinate of the agent.
+        rotation_as_quaternion (4D float): Represents a quaternion, a 3D rotation.
+        rotation_from_axis (1D float): Represents the angular distance
+        from the x-axis (2D rotation).
+        goal_x: Global x-coordinate of the goal.
+        goal_y: Global y-coordinate of the goal.
+        vehicle_length: Length of the agent's bounding box.
+        vehicle_width: Width of the agent's bounding box.
+        id: Unique identifier of the agent.
+    """
+
+    def __init__(self, abs_self_obs_tensor: torch.Tensor):
+        """Initializes the ego state with an observation tensor."""
+        self.pos_x = abs_self_obs_tensor[:, :, 0]
+        self.pos_y = abs_self_obs_tensor[:, :, 1]
+        self.pos_z = abs_self_obs_tensor[:, :, 2]
+        self.rotation_as_quaternion = abs_self_obs_tensor[:, :, 3:6]
+        self.rotation_from_axis_angle = abs_self_obs_tensor[:, :, 7]
+        self.goal_x = abs_self_obs_tensor[:, :, 8]
+        self.goal_y = abs_self_obs_tensor[:, :, 9]
+        self.vehicle_length = abs_self_obs_tensor[:, :, 10]
+        self.vehicle_width = abs_self_obs_tensor[:, :, 11]
+        self.id = abs_self_obs_tensor[:, :, 12]
+
+    @classmethod
+    def from_tensor(
+        cls, abs_self_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
+    ):
+        """Creates an GlobalEgoState from a tensor."""
+        if backend == "torch":
+            return cls(abs_self_obs_tensor.to_torch().clone())
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape (num_worlds, num_agents) of the ego state tensor."""
+        return self.pos_x.shape
+
+    def restore_mean(self, mean_x, mean_y):
+        """Reapplies the mean to revert back to the original coordinates."""
+        self.pos_x += mean_x
+        self.pos_y += mean_y
+
+
 @dataclass
 class PartnerObs:
     speed: torch.Tensor
@@ -75,7 +129,9 @@ class PartnerObs:
 
     """
     A dataclass that represents information about other agents in the
-    scenario, as viewed from the perspective of the ego agent.
+    scenario, as viewed from the perspective of the ego agent
+    (in relative coordinates). Initialized from partner_obs_tensor (src/bindings). For details, see
+    `PartnerObservations` in src/types.hpp.
     """
 
     def __init__(self, partner_obs_tensor: torch.Tensor):
@@ -93,9 +149,9 @@ class PartnerObs:
     def from_tensor(
         cls, partner_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
     ):
-        """Creates an EgoState from a tensor."""
+        """Creates an PartnerObs from a tensor."""
         if backend == "torch":
-            return cls(partner_obs_tensor.to_torch())
+            return cls(partner_obs_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -122,8 +178,8 @@ class PartnerObs:
         """One-hot encodes the agent types. This operation increases the
         number of features by 3.
         """
-        # TODO: Fix type in GPUDrive directly
         self.agent_type = self.agent_type.squeeze(-1)
+        # Map to classes 0-3
         self.agent_type[
             self.agent_type == int(gpudrive.EntityType.Vehicle)
         ] = 1
@@ -146,14 +202,31 @@ class PartnerObs:
 
 @dataclass
 class LidarObs:
+    """Dataclass representing the scenario view through LiDAR sensors.
+        - Shape: (num_worlds, num_agents, 3, num_lidar_points, 4).
+        - Axis 2 represents the agent samples, road edge samples, and road line samples.
+        - Axis 3 represents the lidar points per type, which can be configured in src/consts.hpp as `numLidarSamples`.
+        - Axis 4 represents the depth, type and x, y, values of the lidar points.
+    Initialized from lidar_tensor (src/bindings).
+    For details, see `LidarObservations` in src/types.hpp.
+    """
+
     def __init__(self, lidar_tensor: torch.Tensor):
-        self.lidar = lidar_tensor
+        self.all_lidar_samples = lidar_tensor
+        self.agent_samples = lidar_tensor[:, :, 0, :, :]
+        self.road_edge_samples = lidar_tensor[:, :, 1, :, :]
+        self.road_line_samples = lidar_tensor[:, :, 2, :, :]
 
     @classmethod
     def from_tensor(
         cls, lidar_tensor: gpudrive.madrona.Tensor, backend="torch"
     ):
         if backend == "torch":
-            return cls(lidar_tensor.to_torch())
+            return cls(lidar_tensor.to_torch().clone())
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape: (num_worlds, num_agents, 3, num_lidar_points, 4)."""
+        return self.all_lidar_samples.shape

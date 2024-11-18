@@ -180,7 +180,9 @@ Please remember that if you make any changes in C++, you need to delete the cach
 
 ## 🚀 Getting started
 
-To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+To get started, see these entry points:
+- Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
 <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
