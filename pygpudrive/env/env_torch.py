@@ -10,7 +10,11 @@ from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
-from pygpudrive.datatypes.observation import EgoState, PartnerObs, LidarObs
+from pygpudrive.datatypes.observation import (
+    LocalEgoState,
+    PartnerObs,
+    LidarObs,
+)
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
@@ -263,7 +267,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             Shape: (num_worlds, max_agents, num_features)
         """
         if self.config.ego_state:
-            ego_state = EgoState.from_tensor(
+            ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
             )
@@ -354,16 +358,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _get_lidar_obs(self):
         """Get lidar observations."""
         if self.config.lidar_obs:
-            lidar_obs = (
-                LidarObs.from_tensor(
-                    lidar_tensor=self.sim.lidar_tensor(),
-                    backend=self.backend,
-                )
-                .flatten(start_dim=2, end_dim=-1)
-                .to(self.device)
+            lidar = LidarObs.from_tensor(
+                lidar_tensor=self.sim.lidar_tensor(),
+                backend=self.backend,
             )
 
-            return lidar_obs
+            return (
+                torch.cat(
+                    [
+                        lidar.agent_samples,
+                        lidar.road_edge_samples,
+                        lidar.road_line_samples,
+                    ],
+                    dim=-1,
+                )
+                .flatten(dim=2)
+                .to(self.device)
+            )
         else:
             return torch.Tensor().to(self.device)
 

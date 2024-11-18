@@ -41,7 +41,7 @@ class MapElementIds(enum.IntEnum):
 @dataclass
 class GlobalRoadGraphPoints:
     """A class to represent global road graph points. All information is
-    global but demeaned, that is, centered at zero. Shape: ()
+    global but demeaned, that is, centered at zero.
 
     Attributes:
         x: x-coordinate of the road point.
@@ -109,7 +109,7 @@ class LocalRoadGraphPoints:
     """A class to represent local (relative) road graph points. Takes in
     `agent_roadmap_tensor`. Shape: (num_worlds, num_agents, num_road_points, 9).
     Note that num_road_points is set in src/consts.hpp and indicates the K
-    closest road points to each agent (`kMaxAgentMapObservationsCount`). The
+    closest road points to each agent (`kMaxAgentMapObservationsCount` in src/consts.hpp). The
     selection of these points is configured using `road_obs_algorithm`.
 
     Attributes:
@@ -170,9 +170,3 @@ class LocalRoadGraphPoints:
     def shape(self):
         """Returns the shape of the local road graph tensor."""
         return self.x.shape
-
-
-# glob_roadgraph = GlobalRoadGraphPoints.from_tensor(
-#     roadgraph_tensor=self.sim.map_observation_tensor(),
-#     backend=self.backend,
-# )
