@@ -13,7 +13,10 @@ BLUE = (0, 127, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
-CHARCOAL = (22, 28, 32)
+CHARCOAL = (22, 28, 32) 
+BLACK = (3, 3, 3)
+GRAY_DARKER = (84, 82, 82)
+YELLOW = (232, 232, 9)
 
 STATIC_AGENT_ID = 2
 
@@ -44,8 +47,8 @@ class PyGameVisualizer:
         
         # ROAD MAP COLORS
         self.color_dict = {
-            float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
-            float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
+            float(gpudrive.EntityType.RoadEdge): BLACK if self.render_config.color_scheme == "dark" else (47,79,79),
+            float(gpudrive.EntityType.RoadLine): GRAY_DARKER,  # Yellow
             float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
             float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
             float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
@@ -331,10 +334,94 @@ class PyGameVisualizer:
                     box_corners[i] = self.scale_coords(
                         box_corner, world_render_idx
                     )
+                # if map_obj[6] == float(gpudrive.EntityType.SpeedBump):
+                #     pygame.gfxdraw.aapolygon(
+                #         surf, box_corners, self.color_dict[map_obj[6]]
+                #     )
+                #     #to draw stripes
+                #     scaled_width = box_corners[1]-box_corners[0]
+                #     scaled_heigth = box_corners[2] - box_corners[3]
+                #     scaled_dashed_length = scaled_width/4
+                #     for i in range(0, 2):
+                #         box_corners[0] = tuple(np.add(box_corner[0]) + (scaled_dashed_length,0) )  
+                #         box_corners[1] = box_corners[0] + scaled_dashed_length
+                #         box_corners[2]                       
+                #         pygame.gfxdraw.filled_polygon(
+                #            surf, box_corners, self.color_dict[map_obj[6]]
+                #         )
                 if map_obj[6] == float(gpudrive.EntityType.SpeedBump):
+                    # Draw the outer rectangle (the speed bump)
                     pygame.gfxdraw.aapolygon(
-                        surf, box_corners, self.color_dict[map_obj[6]]
+                        surf, box_corners, BLACK #self.color_dict[map_obj[6]]
                     )
+                    # pygame.gfxdraw.filled_polygon(
+                    #     surf, box_corners, BLACK
+                    # )
+
+                     # Compute the top edge length (between box_corners[0] and box_corners[1])
+                    top_edge_length = math.sqrt(
+                        (box_corners[1][0] - box_corners[0][0]) ** 2 +
+                        (box_corners[1][1] - box_corners[0][1]) ** 2
+                    )
+
+                    # Compute the height using the vertical difference (between box_corners[0] and box_corners[3])
+                    effective_height = math.sqrt(
+                        (box_corners[3][0] - box_corners[0][0]) ** 2 +
+                        (box_corners[3][1] - box_corners[0][1]) ** 2
+                    )
+
+                    # Stripe properties
+                    num_stripes = 4  # Number of stripes
+                    stripe_width = top_edge_length / num_stripes  
+
+                    # Vector along the top edge (unit vector)
+                    top_edge_vector = (
+                        (box_corners[1][0] - box_corners[0][0]) / top_edge_length,
+                        (box_corners[1][1] - box_corners[0][1]) / top_edge_length,
+                    )
+
+                    height_vector = (
+                        (box_corners[3][0] - box_corners[0][0]) / effective_height,
+                        (box_corners[3][1] - box_corners[0][1]) / effective_height,
+                    )
+
+                    # Draw each stripe
+                    for i in range(num_stripes):
+                        # Start and end points of each stripe along the top edge
+                        stripe_start = (
+                            box_corners[0][0] + i * stripe_width * top_edge_vector[0],
+                            box_corners[0][1] + i * stripe_width * top_edge_vector[1],
+                        )
+                        stripe_end = (
+                            stripe_start[0] + stripe_width * top_edge_vector[0],
+                            stripe_start[1] + stripe_width * top_edge_vector[1],
+                        )
+
+                        stripe_corners = [
+                            stripe_start,
+                            stripe_end,
+                            (
+                                stripe_end[0] + effective_height * height_vector[0],
+                                stripe_end[1] + effective_height * height_vector[1],
+                            ),
+                            (
+                                stripe_start[0] + effective_height * height_vector[0],
+                                stripe_start[1] + effective_height * height_vector[1],
+                            ),
+                        ]
+
+                        # Draw the stripe
+                        pygame.gfxdraw.aapolygon(surf, stripe_corners, BLACK)
+                        stripe_color = BLACK if i % 2 == 0 else YELLOW
+                        pygame.gfxdraw.filled_polygon(surf, stripe_corners, stripe_color)
+
+                  
+                        # pygame.gfxdraw.filled_polygon(
+                        #     surf, box_corners, PINK
+                        # )
+
+
+                    
                 else:
                     pygame.gfxdraw.aapolygon(
                         surf, box_corners, self.color_dict[map_obj[6]]
