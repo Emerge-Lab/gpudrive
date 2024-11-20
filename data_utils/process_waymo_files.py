@@ -11,14 +11,16 @@ import json
 import math
 import argparse
 import logging
+import psutil
 from pathlib import Path
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
-
-from data_utils.datatypes import MapElementIds
-
+from datatypes import MapElementIds
+import trimesh
+from multiprocessing import Pool, cpu_count
+import numpy as np
 # To filter out warnings before tensorflow is imported
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -217,6 +219,53 @@ def _init_road(map_feature: map_pb2.MapFeature) -> Optional[Dict[str, Any]]:
     }
 
 
+# Meshes for collision checking
+def _filter_small_segments(segments, min_length=1e-6):
+    """Filter out segments that are too short."""
+    valid_segments = []
+    for segment in segments:
+        start, end = segment
+        length = np.linalg.norm(np.array(end) - np.array(start))
+        if length >= min_length:
+            valid_segments.append(segment)
+    return valid_segments
+
+
+def _generate_mesh(segments, height=2.0, width=0.2):
+    segments = np.array(segments, dtype=np.float64)
+    starts, ends = segments[:, 0, :], segments[:, 1, :]
+    directions = ends - starts
+    lengths = np.linalg.norm(directions, axis=1, keepdims=True)
+    unit_directions = directions / lengths
+    
+    # Create the base box mesh with the height along the z-axis
+    base_box = trimesh.creation.box(extents=[1.0, width, height])
+    base_box.apply_translation([0.5, 0, 0])  # Align box's origin to its start
+    z_axis = np.array([0, 0, 1])
+    angles = np.arctan2(unit_directions[:, 1], unit_directions[:, 0])  # Rotation in the XY plane
+
+    rectangles = []
+    lengths = lengths.flatten()
+
+    for i, (start, length, angle) in enumerate(zip(starts, lengths, angles)):
+        # Copy the base box and scale to match segment length
+        scaled_box = base_box.copy()
+        scaled_box.apply_scale([length, 1.0, 1.0])
+        
+        # Apply rotation around the z-axis
+        rotation_matrix = trimesh.transformations.rotation_matrix(angle, z_axis)
+        scaled_box.apply_transform(rotation_matrix)
+        
+        # Translate the box to the segment's starting point
+        scaled_box.apply_translation(start)
+
+        rectangles.append(scaled_box)
+
+    # Concatenate all boxes into a single mesh
+    mesh = trimesh.util.concatenate(rectangles)
+    return mesh
+
+
 def waymo_to_scenario(
     scenario_path: str, protobuf: scenario_pb2.Scenario
 ) -> None:
@@ -245,25 +294,60 @@ def waymo_to_scenario(
     i = 0
     for dynamic_map_state in protobuf.dynamic_map_states:
         traffic_light_dict = _init_tl_object(dynamic_map_state)
+        # there is a traffic light but we don't want traffic light scenes so just return
+        if len(traffic_light_dict) > 0:
+            return
         for id, value in traffic_light_dict.items():
             for key in all_keys:
                 tl_dict[id][key].append(value[key])
             tl_dict[id]["time_index"].append(i)
         i += 1
 
+    # Construct the map states 
+    roads = []
+    edge_segments = []
+    for map_feature in protobuf.map_features:
+        road = _init_road(map_feature)
+        if road is not None:
+            roads.append(road)
+            if road["type"] == "road_edge":
+                edge_vertices = [[r["x"], r["y"], r["z"]] for r in road["geometry"]]
+                edge_segments += [[edge_vertices[i], edge_vertices[i+1]] for i in range(len(edge_vertices) - 1)]
+
+    # Construct road edges for collision checking
+    edge_segments = _filter_small_segments(edge_segments)
+    edge_mesh = _generate_mesh(edge_segments)
+    collision_manager = trimesh.collision.CollisionManager()
+    collision_manager.add_object('road_edges', edge_mesh)
+
     # Construct the object states
     objects = []
     for track in protobuf.tracks:
         obj = _init_object(track)
         if obj is not None:
-            objects.append(obj)
+            if obj['type'] not in ['vehicle', 'cyclist']:
+                obj["mark_as_expert"] = False
+                objects.append(obj)
+                continue
+            elif False in obj["valid"]:
+                # Create trajectory segments of only valid positions
+                trajectory_segments = []
+                for i in range(len(obj["position"]) - 1):
+                    if obj["valid"][i] and obj["valid"][i + 1]:
+                        trajectory_segments.append([[obj["position"][i]["x"], obj["position"][i]["y"], obj["position"][i]["z"]],
+                                                    [obj["position"][i+1]["x"], obj["position"][i+1]["y"], obj["position"][i+1]["z"]]])
+            else:
+                obj_vertices = [[pos["x"], pos["y"], pos["z"]] for pos in obj["position"]]
+                trajectory_segments = [[obj_vertices[i], obj_vertices[i+1]] for i in range(len(obj_vertices) - 1)]
 
-    # Construct the map states
-    roads = []
-    for map_feature in protobuf.map_features:
-        road = _init_road(map_feature)
-        if road is not None:
-            roads.append(road)
+            trajectory_segments = _filter_small_segments(trajectory_segments)
+            if len(trajectory_segments) == 0:
+                obj["mark_as_expert"] = False
+                objects.append(obj)
+            else:
+                trajectory_mesh = _generate_mesh(trajectory_segments)
+                obj["mark_as_expert"] = collision_manager.in_collision_single(trajectory_mesh)
+                objects.append(obj)
 
     scenario_dict = {
         "name": scenario_path.split("/")[-1],
@@ -284,6 +368,58 @@ def as_proto_iterator(tf_dataset):
         scene_proto = scenario_pb2.Scenario()
         scene_proto.ParseFromString(bytes(tfrecord.numpy()))
         yield scene_proto
+
+
+def process_scene(args):
+    scene_proto, output_dir, file_prefix, scene_count, id_as_filename = args
+    try:
+        scenario_id = scene_proto.scenario_id
+        file_suffix = f"{scenario_id}.json" if id_as_filename else f"{scene_count}.json"
+        waymo_to_scenario(
+            scenario_path=os.path.join(output_dir, f"{file_prefix}{file_suffix}"),
+            protobuf=scene_proto,
+        )
+    except Exception as e:
+        logging.error(f"Error processing scene {file_prefix}{scene_count}: {e}")
+
+
+# Scenario-level parallelization
+def process_file(args):
+    """Process a single TFRecord file."""
+    filename, output_dir, id_as_filename, num_workers = args
+
+    # Read the records in batches
+    mem_info = psutil.virtual_memory()
+    available_memory = mem_info.available / (1024**3)
+    usable_memory = int(available_memory * 0.9)
+    # 10 scenes take 1 Gb at max
+    batch_size = 12 * usable_memory
+    tfrecord_dataset = tf.data.TFRecordDataset(filename, compression_type="")
+    tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
+
+    scene_count = 0
+    file_prefix = f"{str(filename).split('.')[-1]}_"
+    scene_batch = []
+
+    for scene_proto in tf_dataset_iter:
+        scene_batch.append((scene_proto, scene_count))
+        scene_count +=1
+        if len(scene_batch) == batch_size:
+            # Process the batch
+            with Pool(num_workers) as pool:
+                pool.map(
+                    process_scene,
+                    [(scene_proto, output_dir, file_prefix, count, id_as_filename) for scene_proto, count in scene_batch],
+                )
+            scene_batch = []
+
+    # Process any remaining scenes
+    if scene_batch:
+        with Pool(num_workers) as pool:
+            pool.map(
+                process_scene,
+                [(scene_proto, output_dir, file_prefix, count, id_as_filename) for scene_proto, count in scene_batch],
+            )
 
 
 def process_data(args):
@@ -318,44 +454,9 @@ def process_data(args):
         logging.info(
             f"Processing {dataset} data. Found {len(filenames)} files. \n \n"
         )
-
-        # Process the data
-        for filename in tqdm(
-            filenames,
-            total=len(filenames),
-            desc="Processing Waymo files",
-            colour="green",
-        ):
-            scene_count = 0
-            file_prefix = f"{str(filename).split('.')[-1]}_"
-
-            tfrecord_dataset = tf.data.TFRecordDataset(
-                filename,
-                compression_type="",
-            )
-            tf_dataset_iter = as_proto_iterator(tfrecord_dataset)
-
-            for scene_proto in tf_dataset_iter:
-                try:
-                    if args.id_as_filename:
-                        file_suffix = f"{str(scene_proto.scenario_id)}.json"
-                    else:
-                        file_suffix = f"{scene_count}.json"
-
-                    waymo_to_scenario(
-                        scenario_path=os.path.join(
-                            output_dir, f"{file_prefix}{file_suffix}"
-                        ),
-                        protobuf=scene_proto,
-                    )
-
-                    scene_count += 1
-
-                except Exception as e:
-                    logging.error(
-                        f"Error processing record {scene_count}: {e}"
-                    )
-
+        # Process the files one at a time
+        for filename in tqdm(filenames, unit="file"):
+            process_file((str(filename), output_dir, args.id_as_filename, args.num_workers))
         logging.info("Done!")
 
 
@@ -379,8 +480,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--id_as_filename",
-        default=True,
+        default=False,
+        action='store_true',
         help="Use the unique scenario id as the filename",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=cpu_count(),
+        help="Number of worker processes to use",
     )
 
     args = parser.parse_args()

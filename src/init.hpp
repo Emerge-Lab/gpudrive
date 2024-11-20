@@ -35,7 +35,7 @@ namespace gpudrive
         uint32_t numVelocities;
         uint32_t numValid;
         MapVector2 mean;
-        bool markAsStatic{false};
+        bool markAsExpert{false};
     };
 
     struct MapRoad
@@ -43,6 +43,7 @@ namespace gpudrive
         // std::array<MapPosition, MAX_POSITIONS> geometry;
         MapVector2 geometry[MAX_GEOMETRY];
         uint32_t id;
+        MapType mapType;
         EntityType type;
         uint32_t numPoints;
         MapVector2 mean;

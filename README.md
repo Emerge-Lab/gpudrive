@@ -12,13 +12,14 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
 
-## Implemented algorithms 🌱
+## ⚙️ Integrations
 
-| Algorithm      | Reference                                                                                                                           | README                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br />(`agent steps per second`) |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
 
-## Installation 🛠️
+## 🛠️ Installation
 
 To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
 
@@ -51,7 +52,7 @@ cd gpudrive
 
 ---
 
-Then, you can *choose* between two options for building the simulator:
+Then, you can *choose* between 3 options for building the simulator:
 
 ---
 
@@ -177,15 +178,17 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
-## Getting started 🚀
+## 🚀 Getting started
 
-To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+To get started, see these entry points:
+- Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
 <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p>
 
-## Tests 📈
+## 📈 Tests
 
 To further test the setup, you can run the pytests in the root directory:
 
@@ -200,11 +203,11 @@ cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
 
-## Pre-trained policy 🏋🏼‍♀️
+## 🏋🏼‍♀️ Pre-trained policy
 
 We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy [here](https://drive.google.com/file/d/1N4KJrt5PG6Pu-ovBQ-zIp0sJH0AQodKq/view?usp=sharing). You can store the policy in ` models`.
 
-## Dataset `{ 🚦 🚗  🚙  🛣️ }`
+## 📂 Dataset
 
 ### Download the dataset
 
@@ -259,7 +262,7 @@ python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<da
 Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
 
 ```bash
-pip install waymo-open-dataset-tf-2-12-0 tqdm
+pip install waymo-open-dataset-tf-2-12-0 trimesh[easy] python-fcl
 ```
 
 Then for example, if you want to process the validation data, run:
@@ -273,9 +276,9 @@ INFO:root:Done!
 
 and that's it!
 
-> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing the entire validation dataset takes about 2 hours because it involves handling around 75,000 traffic scenarios (150 files, each with 500 scenarios).
+> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 250 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
 
-## Citations
+## 📜 Citations
 
 If you use GPUDrive in your work, please cite us:
 
@@ -291,7 +294,7 @@ If you use GPUDrive in your work, please cite us:
 }
 ```
 
-## Contributing and learning benchmark 👷‍♀️
+## Contributing and learning benchmark
 
 If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
 

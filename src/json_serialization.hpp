@@ -92,9 +92,9 @@ namespace gpudrive
         else
             obj.type = EntityType::None;
 
-	std::string markAsStaticKey = "mark_as_static";
-	if (j.contains(markAsStaticKey)) {
-	    from_json(j.at("mark_as_static"), obj.markAsStatic);
+	std::string markAsExpertKey = "mark_as_expert";
+	if (j.contains(markAsExpertKey)) {
+	    from_json(j.at("mark_as_expert"), obj.markAsExpert);
 	}
     }
 
@@ -205,6 +205,24 @@ namespace gpudrive
 
         if (j.contains("id")) {
             road.id = j.at("id").get<uint32_t>();
+        }
+
+        if (j.contains("map_element_id"))
+        {
+            auto mapElementId = j.at("map_element_id").get<int32_t>();
+
+            if(mapElementId == 4 or mapElementId >= static_cast<int32_t>(MapType::NUM_TYPES) or mapElementId < -1)
+            {
+                road.mapType = MapType::UNKNOWN;
+            }
+            else
+            {
+                road.mapType = static_cast<MapType>(mapElementId);
+            }
+        }
+        else
+        {
+            road.mapType = MapType::UNKNOWN;
         }
 
         for (int i = 0; i < road.numPoints; i++)

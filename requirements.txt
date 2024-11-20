@@ -46,3 +46,5 @@
 - mediapy
 - gymnasium
 - pygame
+- pynvml==11.5.3
+- python-box==7.2.0
