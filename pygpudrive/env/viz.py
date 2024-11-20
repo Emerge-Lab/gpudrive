@@ -17,6 +17,7 @@ CHARCOAL = (22, 28, 32)
 BLACK = (0, 0, 0)
 GRAY_DARKER = (84, 82, 82)
 GRAY_LIGHTER = (112, 107, 107)
+BLUE_GREEN = (117,181,197) #same as the one in waymax controlled agent
 YELLOW = (255,217,0)
 
 STATIC_AGENT_ID = 2
@@ -599,7 +600,7 @@ class PyGameVisualizer:
 
                     pygame.gfxdraw.aapolygon(
                         temp_surf, agent_corners, self.COLOR_LIST[1]
-                    )
+                    ) 
                     pygame.gfxdraw.filled_polygon(
                         temp_surf,
                         agent_corners,
@@ -666,7 +667,8 @@ class PyGameVisualizer:
                 else:
                     mod_idx = agent_idx % len(self.COLOR_LIST)
 
-                color = self.COLOR_LIST[mod_idx]
+                # color = self.COLOR_LIST[mod_idx]
+                color = BLUE_GREEN
 
                 info_tensor = self.sim.info_tensor().to_torch()[
                     world_render_idx
@@ -699,7 +701,8 @@ class PyGameVisualizer:
                     color = (128, 128, 128)
 
                 pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
-                pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
+                # pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
+                # pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
 
                 # Draw object indices for the controllable agents
                 if (
