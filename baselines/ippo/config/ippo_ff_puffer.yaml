@@ -2,12 +2,12 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/examples" # Dataset
+data_dir: "data/processed/training" # Dataset
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 50 # Number of parallel environments
-  k_unique_scenes: 1 # Number of unique scenes to sample from
+  k_unique_scenes: 5 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -49,7 +49,7 @@ train:
   checkpoint_path: "./runs"
   render: true
   render_interval: 500
-  render_k_scenarios: 1 # Number of scenarios to render
+  render_k_scenarios: 5 # Number of scenarios to render
   render_fps: 20
   bptt_horizon: 50
   compile: false

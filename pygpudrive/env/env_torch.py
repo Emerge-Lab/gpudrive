@@ -429,15 +429,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory.inferred_actions[:, :3]
-            inferred_actions[..., 0] = torch.clamp(
-                inferred_actions[..., 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[:, :, :, :3]
+            inferred_actions[:, :, :, 0] = torch.clamp(
+                inferred_actions[:, :, :, 0], -6, 6
             )
-            inferred_actions[..., 1] = torch.clamp(
-                inferred_actions[..., 1], -6, 6
+            inferred_actions[:, :, :, 1] = torch.clamp(
+                inferred_actions[:, :, :, 1], -6, 6
             )
-            inferred_actions[..., 2] = torch.clamp(
-                inferred_actions[..., 2], -torch.pi, torch.pi
+            inferred_actions[:, :, :, 2] = torch.clamp(
+                inferred_actions[:, :, :, 2], -torch.pi, torch.pi
             )
         elif self.config.dynamics_model == "state":
             # Extract (x, y, yaw, velocity x, velocity y)
@@ -461,12 +461,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
         ):
-            inferred_actions = log_trajectory.inferred_actions[..., :3]
-            inferred_actions[..., 0] = torch.clamp(
-                inferred_actions[..., 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[:, :, :, :3]
+            inferred_actions[:, :, :, 0] = torch.clamp(
+                inferred_actions[:, :, :, 0], -6, 6
             )
-            inferred_actions[..., 1] = torch.clamp(
-                inferred_actions[..., 1], -0.3, 0.3
+            inferred_actions[:, :, :, 1] = torch.clamp(
+                inferred_actions[:, :, :, 1], -0.3, 0.3
             )
 
         return (
@@ -481,12 +481,12 @@ if __name__ == "__main__":
 
     # CONFIGURE
     TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 10
+    MAX_CONTROLLED_AGENTS = 32
+    NUM_WORLDS = 1
 
-    env_config = EnvConfig(dynamics_model="state")
+    env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
@@ -501,23 +501,13 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for i in range(TOTAL_STEPS):
-        print(f"Step: {i}")
+    expert_actions, _, _, _ = env.get_expert_actions()
 
-        # Take a random actions
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(
-                        env_config.max_num_agents_in_scene * NUM_WORLDS
-                    )
-                ]
-            ]
-        ).reshape(NUM_WORLDS, env_config.max_num_agents_in_scene)
+    for t in range(TOTAL_STEPS):
+        print(f"Step: {t}")
 
         # Step the environment
-        env.step_dynamics(rand_action)
+        env.step_dynamics(expert_actions[:, :, t, :])
 
         frames.append(env.render())
 
