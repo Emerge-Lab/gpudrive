@@ -11,7 +11,16 @@ from pygpudrive.env.config import (
     SceneConfig,
     SelectionDiscipline,
 )
+from pygpudrive.datatypes.observation import (
+    LocalEgoState,
+    PartnerObs,
+    LidarObs,
+)
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
+from pygpudrive.visualize.core import plot_agent_observation
+from pygpudrive.visualize.utils import img_from_fig
 
 from pufferlib.environment import PufferEnv
 
@@ -62,6 +71,7 @@ class PufferGPUDrive(PufferEnv):
             reward_type=config.reward_type,
             norm_obs=config.normalize_obs,
             dynamics_model=config.dynamics_model,
+            collision_behavior=config.collision_behavior,
         )
 
         render_config = RenderConfig(
@@ -137,6 +147,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.observations[self.observations > 10] = 0
         self.observations[self.observations < 10] = 0
+
         return self.observations, []
 
     def step(self, action):
@@ -220,5 +231,48 @@ class PufferGPUDrive(PufferEnv):
             info,
         )
 
-    def render(self, world_render_idx=0):
-        return self.env.render(world_render_idx=world_render_idx)
+    def render_agent_observations(self, env_idx, time_step):
+        """Render a single observation."""
+        agent_ids = torch.where(self.controlled_agent_mask[env_idx, :])[
+            0
+        ].cpu()
+
+        ego_state = LocalEgoState.from_tensor(
+            self_obs_tensor=self.env.sim.self_observation_tensor(),
+            backend=self.env.backend,
+            device="cpu",
+        )
+
+        local_roadgraph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
+            backend=self.env.backend,
+            device="cpu",
+        )
+
+        partner_obs = PartnerObs.from_tensor(
+            partner_obs_tensor=self.env.sim.partner_observations_tensor(),
+            backend=self.env.backend,
+            device="cpu",
+        )
+
+        img_arrays = []
+
+        for agent_id in agent_ids:
+
+            observation_fig, _ = plot_agent_observation(
+                env_idx=env_idx,
+                agent_idx=agent_id.item(),
+                observation_roadgraph=local_roadgraph,
+                observation_ego=ego_state,
+                observation_partner=partner_obs,
+                time_step=time_step,
+            )
+
+            img_arrays.append(img_from_fig(observation_fig))
+
+        return np.array(img_arrays)
+
+    def render_simulator_state(self, env_idx):
+        """Render the simulator state from a bird's eye view."""
+        simulator_state_array = self.env.render(env_idx)
+        return simulator_state_array

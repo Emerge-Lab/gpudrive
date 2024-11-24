@@ -19,15 +19,15 @@ resample_mode: "random"  # Options: "random"
 render: true
 render_mode: "rgb_array"
 render_freq: 50  # Render every k rollouts
-render_k_scenarios: 10  # Number of scenarios to render
+render_n_worlds: 10  # Number of scenarios to render
 
 track_time_to_solve: false
 
 sync_tensorboard: true
 logging_collection_window: 100  # How many trajectories we average logs over
 log_freq: 100
-project_name: "gpudrive_rl_debug"
-group_name: " "
+project_name: "gpudrive"
+group_name: "debug"
 entity: " "
 tags:
   - "IPPO"
@@ -49,7 +49,7 @@ vf_coef: 0.5
 n_steps: 91  # Number of steps per rollout
 num_minibatches: 5  # Used to determine the minibatch size
 verbose: 0
-total_timesteps: 30_000_00000
+total_timesteps: 30_000_0000
 ent_coef: 0.0001
 lr: 0.0003
 n_epochs: 5

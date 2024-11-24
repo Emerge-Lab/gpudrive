@@ -7,7 +7,7 @@ data_dir: "data/processed/training" # Dataset
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 50 # Number of parallel environments
-  k_unique_scenes: 5 # Number of unique scenes to sample from
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -15,11 +15,12 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   normalize_obs: true
   reward_type: "sparse_on_goal_achieved"
   dynamics_model: "classic"
+  collision_behavior: "remove"
 
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "my_group"
+  group: "debug"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff", "single_scene"]
 
@@ -47,13 +48,17 @@ train:
   target_kl: null
   checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
-  render: true
-  render_interval: 500
-  render_k_scenarios: 5 # Number of scenarios to render
-  render_fps: 20
   bptt_horizon: 50
   compile: false
   compile_mode: "reduce-overhead"
+  # Rendering configs
+  render: true # Determines whether to render the environment
+  render_interval: 100 # Render every k rollouts
+  render_k_scenarios: 1 # Number of scenarios to render
+  render_agent_obs: true # Debugging tool, plot what an agent is seing
+  render_simulator_state: true # Plot the simulator state from bird's eye view
+  render_fps: 20
+  render_format: "mp4" # Options: gif, mp4
 
 vec:
   backend: "native" # Only native is currently supported

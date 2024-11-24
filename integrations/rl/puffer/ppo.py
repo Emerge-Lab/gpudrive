@@ -94,6 +94,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         wandb=wandb,
         global_step=0,
         global_step_pad=0,
+        num_rollouts=0,
         epoch=0,
         stats={},
         msg=msg,
@@ -104,6 +105,22 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
 @pufferlib.utils.profile
 def evaluate(data):
+    data.num_rollouts += 1
+
+    # Rendering storage
+    already_rendered_during_rollout = {
+        f"env_{i}": False for i in range(data.config.render_k_scenarios)
+    }
+    rendering_in_process = {
+        f"env_{i}": False for i in range(data.config.render_k_scenarios)
+    }
+    agent_frames_dict = {
+        f"env_{i}": [] for i in range(data.config.render_k_scenarios)
+    }
+    simulator_state_dict = {
+        f"env_{i}": [] for i in range(data.config.render_k_scenarios)
+    }
+
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
@@ -118,11 +135,7 @@ def evaluate(data):
             env_id = env_id.tolist()
 
         with profile.eval_misc:
-            # Incremented by the number of controlled valid agents
-            data.global_step += sum(
-                mask
-            )  # data.vecenv.controlled_agent_mask.sum().item()
-            # Incremented by _all_ entries, including the padding agents
+            data.global_step += sum(mask)
             data.global_step_pad += data.vecenv.total_agents
 
             o = torch.as_tensor(o)
@@ -131,8 +144,6 @@ def evaluate(data):
             d = torch.as_tensor(d)
 
         with profile.eval_forward, torch.no_grad():
-            # TODO: In place-update should be faster. Leaking 7% speed max
-            # Also should be using a cuda tensor to index
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
@@ -148,13 +159,117 @@ def evaluate(data):
         with profile.eval_misc:
             value = value.flatten()
             actions = actions.cpu().numpy()
-            mask = torch.as_tensor(mask)  # * policy.mask)
+            mask = torch.as_tensor(mask)
             o = o if config.cpu_offload else o_device
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     infos[k].append(v)
+
+        # Render during rollouts
+        if (
+            config.render
+            and (data.num_rollouts - 1) % config.render_interval == 0
+        ):
+
+            # Check if any are not rendered yet
+            if all(already_rendered_during_rollout.values()):
+                continue
+
+            else:
+                for env_idx in range(data.config.render_k_scenarios):
+                    if (
+                        data.vecenv.episode_lengths[env_idx] == 0
+                        and not already_rendered_during_rollout[
+                            f"env_{env_idx}"
+                        ]
+                    ):
+                        rendering_in_process[f"env_{env_idx}"] = True
+
+                    # Render scene
+                    if rendering_in_process[f"env_{env_idx}"]:
+                        if data.config.render_agent_obs:
+                            agent_observations = (
+                                data.vecenv.render_agent_observations(
+                                    env_idx=env_idx,
+                                    time_step=int(
+                                        data.vecenv.episode_lengths[env_idx]
+                                    ),
+                                )
+                            )
+                            agent_frames_dict[f"env_{env_idx}"].append(
+                                agent_observations
+                            )
+                        if data.config.render_simulator_state:
+                            simulator_state = (
+                                data.vecenv.render_simulator_state(env_idx)
+                            )
+                            simulator_state_dict[f"env_{env_idx}"].append(
+                                simulator_state
+                            )
+
+                    # Stop if episode has ended and mark as rendered
+                    if (
+                        d[env_idx].item()
+                        and rendering_in_process[f"env_{env_idx}"]
+                    ):
+                        rendering_in_process[f"env_{env_idx}"] = False
+                        already_rendered_during_rollout[
+                            f"env_{env_idx}"
+                        ] = True
+
+                        # Render simulator state
+                        if data.config.render_simulator_state:
+                            frames_array = np.array(
+                                simulator_state_dict[f"env_{env_idx}"]
+                            )
+                            data.wandb.log(
+                                {
+                                    f"Video/State/env_{env_idx}": data.wandb.Video(
+                                        np.moveaxis(frames_array, -1, 1),
+                                        fps=data.config.render_fps,
+                                        format=data.config.render_format,
+                                        caption=f"global step: {data.global_step:,}",
+                                    )
+                                }
+                            )
+                            del simulator_state_dict[f"env_{env_idx}"][:]
+
+                        if data.config.render_agent_obs:
+                            num_agents = agent_frames_dict[f"env_{env_idx}"][
+                                0
+                            ].shape[0]
+                            # Render agent observations
+                            for agent_idx in range(num_agents):
+                                # Stack the frames for this agent along time axis
+                                agent_frames = np.stack(
+                                    [
+                                        image[agent_idx]
+                                        for image in agent_frames_dict[
+                                            f"env_{env_idx}"
+                                        ]
+                                    ],
+                                    axis=0,
+                                )
+                                agent_frames = np.transpose(
+                                    agent_frames, (0, 3, 1, 2)
+                                )
+                                # Shape: (time_steps, img_width, img_height, 3)
+                                print(
+                                    f"global step: {data.global_step} -- rendering env {env_idx}; r = {data.num_rollouts}"
+                                )
+                                data.wandb.log(
+                                    {
+                                        f"Video/Observation/env_{env_idx}_agent_{agent_idx}": data.wandb.Video(
+                                            agent_frames,
+                                            fps=data.config.render_fps,
+                                            format=data.config.render_format,
+                                            caption=f"global step: {data.global_step:,}",
+                                        )
+                                    }
+                                )
+                            del agent_frames_dict[f"env_{env_idx}"][:]
 
         # Step the environment
         with profile.env:
@@ -164,9 +279,6 @@ def evaluate(data):
         data.stats = {}
 
         for k, v in infos.items():
-            if "_map" in k and data.wandb is not None:
-                data.stats[f"Media/{k}"] = data.wandb.Image(v[0])
-                continue
             try:  # TODO: Better checks on log data types
                 data.stats[k] = np.mean(v)
             except:
@@ -352,54 +464,6 @@ def train(data):
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
-
-                # TEMP TODO(dc): Remove after making animation
-                # try:
-                #     global_steps_list.append(data.global_step.copy())
-                #     perc_collisions_list.append(
-                #         data.stats["perc_veh_collisions"].copy()
-                #     )
-                #     perc_offroad_list.append(
-                #         data.stats["perc_off_road"].copy()
-                #     )
-                #     perc_goal_achieved_list.append(
-                #         data.stats["perc_goal_achieved"].copy()
-                #     )
-                #     time_list.append(profile.uptime)
-                # except:
-                #     pass
-
-                # # Save as numpy arrays
-                # if data.global_step > 12e6:
-                #     np.save("global_steps.npy", np.array(global_steps_list))
-                #     np.save(
-                #         "perc_collisions.npy", np.array(perc_collisions_list)
-                #     )
-                #     np.save("perc_offroad.npy", np.array(perc_offroad_list))
-                #     np.save(
-                #         "perc_goal_achieved.npy",
-                #         np.array(perc_goal_achieved_list),
-                #     )
-                #     np.save("wallclock_time.npy", np.array(time_list))
-
-                if (
-                    config.render
-                    and ((data.epoch - 1) % config.render_interval) == 0
-                ):
-                    for env_idx in range(data.config.render_k_scenarios):
-                        # TODO(dc): Improve efficiency and extend to multiple envs
-                        frames = make_video(data, env_idx=env_idx)
-
-                        data.wandb.log(
-                            {
-                                f"env_idx: {env_idx}": data.wandb.Video(
-                                    np.moveaxis(frames, -1, 1),
-                                    fps=data.config.render_fps,
-                                    format="mp4",
-                                    caption=f"global step: {data.global_step:,}",
-                                )
-                            }
-                        )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
