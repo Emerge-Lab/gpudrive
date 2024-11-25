@@ -383,6 +383,22 @@ def waymo_to_scenario(
                     trajectory_mesh
                 )
                 objects.append(obj)
+    
+    # Parse metadata
+    sdc_track_index = protobuf.sdc_track_index
+    objects_of_interest = list(protobuf.objects_of_interest)
+    tracks_to_predict = [
+    {
+        "track_index": track.track_index,
+        "difficulty": track.difficulty
+    }
+    for track in protobuf.tracks_to_predict
+]
+    metadata = {
+        "sdc_track_index" : sdc_track_index,
+        "objects_of_interest" : objects_of_interest,
+        "tracks_to_predict" : tracks_to_predict
+    }
 
     scenario_dict = {
         "name": scenario_path.split("/")[-1],
@@ -390,6 +406,7 @@ def waymo_to_scenario(
         "objects": objects,
         "roads": roads,
         "tl_states": tl_dict,
+        "metadata": metadata
     }
 
     with open(scenario_path, "w") as f:
