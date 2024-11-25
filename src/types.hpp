@@ -72,6 +72,7 @@ struct AgentID {
     {
         float length;
         float width;
+        float height;
     };
 
     struct Goal
@@ -184,14 +185,14 @@ struct AgentID {
         {
             return SelfObservation{
                 .speed = 0,
-                .vehicle_size = {0, 0},
+                .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
             .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 7;
+    const size_t SelfObservationExportSize = 8;
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -235,7 +236,7 @@ struct AgentID {
             .speed = 0,
             .position = {0, 0},
             .heading = 0,
-            .vehicle_size = {0, 0},
+            .vehicle_size = {0, 0, 0},
             .type = static_cast<float>(EntityType::None),
             .id = -1};
     }
@@ -255,7 +256,7 @@ struct AgentID {
         PartnerObservation obs[consts::kMaxAgentCount - 1];
     };
 
-    const size_t PartnerObservationExportSize = 8;
+    const size_t PartnerObservationExportSize = 9;
 
     static_assert(sizeof(PartnerObservations) == sizeof(float) *
                                                      (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
@@ -353,7 +354,7 @@ struct AgentID {
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 4 + 1 + 2 + 2 ??
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
