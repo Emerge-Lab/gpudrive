@@ -13,8 +13,16 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   road_map_obs: true
   partner_obs: true
   normalize_obs: true
-  reward_type: "sparse_on_goal_achieved"
   dynamics_model: "classic"
+  dist_to_goal_threshold: 4.0 # Radius within which the agent is considered to have reached the goal
+  reward_type: "sparse_on_goal_achieved" # Options: sparse_on_goal_achieved, weighted_combination
+  collision_weight: 0.0 # Set to < 0.0 to discourage agent collisions
+  goal_achieved_weight: 1.0
+  off_road_weight: 0.0 # Set to < 0.0 to discourage off-road driving
+  collision_behavior: "remove" # Options: "remove", "stop", "ignore"
+  obs_radius: 100.0  # Radius for road observations
+  polyline_reduction_threshold: 1.0 # Threshold for polyline reduction
+  remove_non_vehicles: false # Remove cyclists and pedestrians
 
 wandb:
   entity: ""
@@ -54,6 +62,7 @@ train:
   bptt_horizon: 50
   compile: false
   compile_mode: "reduce-overhead"
+  store_metrics: false
 
 vec:
   backend: "native" # Only native is currently supported
