@@ -30,7 +30,7 @@ def load_config(config_path):
         config = Box(yaml.safe_load(f))
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["exp_id"] = config["train"]["exp_id"] or datetime_
+    config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__{datetime_}'
     config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available

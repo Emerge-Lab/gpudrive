@@ -415,7 +415,7 @@ def train(data):
     with profile.train_misc:
         if config.anneal_lr:
             frac = 1.0 - data.global_step / config.total_timesteps
-            lrnow = frac * config.learning_rate
+            lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
 
         y_pred = experience.values_np

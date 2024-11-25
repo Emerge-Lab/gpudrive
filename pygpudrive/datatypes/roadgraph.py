@@ -132,7 +132,7 @@ class LocalRoadGraphPoints:
         self.segment_height = local_roadgraph_tensor[:, :, :, 4]
         self.orientation = local_roadgraph_tensor[:, :, :, 5]
         self.id = local_roadgraph_tensor[:, :, :, 7]
-        # TODO: Use map type instead of enum (8 instead of 6)
+        # TODO(dc): Use map type instead of enum (8 instead of 6)
         self.type = local_roadgraph_tensor[:, :, :, 6].long()
 
     @classmethod
