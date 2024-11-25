@@ -35,7 +35,7 @@ def wrap_yaws(yaws):
     return (yaws + np.pi) % (2 * np.pi) - np.pi
 
 
-ERR_VAL = 1e-4
+ERR_VAL = -1e4
 
 _WAYMO_OBJECT_STR = {
     scenario_pb2.Track.TYPE_UNSET: "unset",
