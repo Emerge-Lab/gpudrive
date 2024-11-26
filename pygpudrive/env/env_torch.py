@@ -372,7 +372,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ],
                     dim=-1,
                 )
-                .flatten(dim=2)
+                .flatten(start_dim=2)
                 .to(self.device)
             )
         else:
