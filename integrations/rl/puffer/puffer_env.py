@@ -46,10 +46,11 @@ class PufferGPUDrive(PufferEnv):
         self.data_dir = data_dir
         self.device = device
         self.config = config
-        self.max_cont_agents = config.max_controlled_agents
+        self.max_cont_agents_per_env = config.max_controlled_agents
         self.num_worlds = config.num_worlds
         self.k_unique_scenes = config.k_unique_scenes
-        self.total_agents = self.max_cont_agents * self.num_worlds
+        # Total number of agents across envs, including padding
+        self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
         # Set working directory to the base directory 'gpudrive'
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
@@ -72,6 +73,9 @@ class PufferGPUDrive(PufferEnv):
             norm_obs=config.normalize_obs,
             dynamics_model=config.dynamics_model,
             collision_behavior=config.collision_behavior,
+            dist_to_goal_threshold=config.dist_to_goal_threshold,
+            polyline_reduction_threshold=config.polyline_reduction_threshold,
+            remove_non_vehicles=config.remove_non_vehicles,
         )
 
         render_config = RenderConfig(
@@ -82,7 +86,7 @@ class PufferGPUDrive(PufferEnv):
             config=env_config,
             scene_config=scene_config,
             render_config=render_config,
-            max_cont_agents=self.max_cont_agents,
+            max_cont_agents=self.max_cont_agents_per_env,
             device=device,
         )
 
@@ -93,23 +97,22 @@ class PufferGPUDrive(PufferEnv):
         )
         self.render_mode = "rgb_array"
         self.num_live = []
-        self.num_agents = self.max_cont_agents * self.num_worlds
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
-        self.num_controlled = self.controlled_agent_mask.sum().item()
+        # Number of controlled agents across all worlds
+        self.num_agents = self.controlled_agent_mask.sum().item()
 
-        observations = self.env.reset()[self.controlled_agent_mask]
+        # Reset the environment and get the initial observations
+        self.observations = self.env.reset()[self.controlled_agent_mask]
 
         # This assigns a bunch of buffers to self.
         # You can't use them because you want torch, not numpy
         # So I am careful to assign these afterwards
         super().__init__()
-        self.observations = observations
-        self.num_agents = observations.shape[0]
 
         self.masks = np.ones(self.num_agents, dtype=bool)
         self.actions = torch.zeros(
-            (self.num_worlds, self.max_cont_agents), dtype=torch.int64
+            (self.num_worlds, self.max_cont_agents_per_env), dtype=torch.int64
         ).to(self.device)
 
     def _obs_and_mask(self, obs):
@@ -142,23 +145,36 @@ class PufferGPUDrive(PufferEnv):
             self.num_agents, dtype=torch.float32
         ).to(self.device)
         self.live_agent_mask = torch.ones(
-            (self.num_worlds, self.max_cont_agents), dtype=bool
+            (self.num_worlds, self.max_cont_agents_per_env), dtype=bool
         ).to(self.device)
-
-        self.observations[self.observations > 10] = 0
-        self.observations[self.observations < 10] = 0
 
         return self.observations, []
 
     def step(self, action):
+        """
+        Step the environment with the given actions. Note that we reset worlds
+        asynchronously when they are done.
+        Args:
+            action: A numpy array of actions for the controlled agents. Shape:
+                (num_worlds, max_cont_agents_per_env)
+        """
+
+        # (0) Set the action for the controlled agents
         action = torch.from_numpy(action).to(self.device)
         self.actions[self.controlled_agent_mask] = action
-        self.env.step_dynamics(self.actions)
 
-        obs = self.env.get_obs()[self.controlled_agent_mask]
+        # (1) Step the simulator with controlled agents actions
+        self.env.step_dynamics(self.actions)
+        next_obs = self.env.get_obs()[self.controlled_agent_mask]
+
+        # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards()[self.controlled_agent_mask]
         terminal = self.env.get_dones().bool()
 
+        self.episode_returns += reward
+        self.episode_lengths += 1  # Increment timestep
+
+        # (3) Check if any worlds are done
         done_worlds = (
             torch.where(
                 (terminal.nan_to_num(0) * self.controlled_agent_mask).sum(
@@ -170,11 +186,13 @@ class PufferGPUDrive(PufferEnv):
             .numpy()
         )
 
-        self.episode_returns += reward
-        self.episode_lengths += 1
-        self.masks = (
+        # (4) Use previous live agent mask as mask
+        self.masks = (  # Flattend mask: (num_worlds * max_cont_agents_per_env)
             self.live_agent_mask[self.controlled_agent_mask].cpu().numpy()
         )
+
+        # (5) Set the mask to False for _agents_ that are terminated for the next step
+        # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
         terminal = terminal[self.controlled_agent_mask]
 
@@ -182,8 +200,14 @@ class PufferGPUDrive(PufferEnv):
         self.num_live.append(self.masks.sum())
 
         if len(done_worlds) > 0:
-            controlled_mask = self.controlled_agent_mask[done_worlds]
-            info_tensor = self.env.get_infos()[done_worlds][controlled_mask]
+
+            # Log episode statistics
+            controlled_mask = self.controlled_agent_mask[
+                done_worlds, :
+            ].clone()
+            info_tensor = self.env.get_infos()[done_worlds, :, :][
+                controlled_mask
+            ]
             num_finished_agents = controlled_mask.sum().item()
             info.append(
                 {
@@ -195,32 +219,38 @@ class PufferGPUDrive(PufferEnv):
                     / num_finished_agents,
                     "perc_goal_achieved": info_tensor[:, 3].sum().item()
                     / num_finished_agents,
+                    "sum_goal_achieved": info_tensor[:, 3].sum().item(),
+                    "num_controlled_agents": num_finished_agents,
                     "mean_episode_reward_per_agent": self.episode_returns[
                         done_worlds
                     ]
                     .mean()
                     .item(),
-                    "control_density": self.num_controlled / self.num_agents,
+                    "control_density": (
+                        self.num_agents / self.controlled_agent_mask.numel()
+                    ),
                     "alive_density": np.mean(self.num_live) / self.num_agents,
-                    "num_finished_agents": num_finished_agents,
                     "episode_length": self.episode_lengths[done_worlds]
                     .mean()
                     .item(),
                 }
             )
-
             self.num_live = []
+
+            # Asynchronously reset the done worlds and empty storage
             for idx in done_worlds:
                 self.env.sim.reset([idx])
                 self.episode_returns[idx] = 0
                 self.episode_lengths[idx] = 0
+                # Reset the live agent mask so that the next alive mask will mark
+                # all agents as alive for the next step
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
 
-        # TODO: Look in
-        obs[obs > 10] = 0
-        obs[obs < -10] = 0
+        # (6) Get the next observations. Note that we do this after resetting
+        # the worlds so that we always return a fresh observation
+        # next_obs = self.env.get_obs()[self.controlled_agent_mask]
 
-        self.observations = obs
+        self.observations = next_obs
         self.rewards = reward
         self.terminals = terminal
         return (
