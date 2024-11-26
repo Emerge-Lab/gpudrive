@@ -36,6 +36,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
         goal_achieved_weight=exp_config.goal_achieved_weight,
         off_road_weight=exp_config.off_road_weight,
         episode_len=exp_config.episode_len,
+        remove_non_vehicles=exp_config.remove_non_vehicles,
     )
     
     # Select model
@@ -62,7 +63,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
     ) // exp_config.num_minibatches
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"{datetime_}_{exp_config.k_unique_scenes}scenes"
+    run_id = f"SB3_{datetime_}_{exp_config.k_unique_scenes}scenes"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,
