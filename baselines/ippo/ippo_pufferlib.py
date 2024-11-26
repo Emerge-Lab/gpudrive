@@ -70,6 +70,7 @@ def train(args):
     )
 
     policy = make_policy(vecenv.driver_env).to(args.train.device)
+    
     args.train.env = args.environment.name
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)

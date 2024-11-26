@@ -1,6 +1,6 @@
 import wandb
 import yaml
-from box import Box 
+from box import Box
 from typing import Callable
 from datetime import datetime
 import dataclasses
@@ -16,8 +16,10 @@ from pygpudrive.env.config import SelectionDiscipline
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
     """Linear learning rate schedule."""
+
     def func(progress_remaining: float) -> float:
         return progress_remaining * initial_value
+
     return func
 
 
@@ -25,6 +27,7 @@ def load_config(config_path):
     """Load the configuration file."""
     with open(config_path, "r") as f:
         return Box(yaml.safe_load(f))
+
 
 def train(exp_config: Box, scene_config: SceneConfig):
     """Run PPO training with stable-baselines3."""
@@ -38,7 +41,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
         episode_len=exp_config.episode_len,
         remove_non_vehicles=exp_config.remove_non_vehicles,
     )
-    
+
     # Select model
     if exp_config.mlp_class == "late_fusion":
         exp_config.mlp_class = LateFusionNet
@@ -47,8 +50,10 @@ def train(exp_config: Box, scene_config: SceneConfig):
         exp_config.mlp_class = FFN
         exp_config.policy = FeedForwardPolicy
     else:
-        raise NotImplementedError(f"Unsupported MLP class: {exp_config.mlp_class}")
-    
+        raise NotImplementedError(
+            f"Unsupported MLP class: {exp_config.mlp_class}"
+        )
+
     # Make environment
     env = SB3MultiAgentEnv(
         config=env_config,
@@ -57,7 +62,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
         max_cont_agents=env_config.max_num_agents_in_scene,
         device=exp_config.device,
     )
-    
+
     exp_config.batch_size = (
         exp_config.num_worlds * exp_config.n_steps
     ) // exp_config.num_minibatches
@@ -117,7 +122,9 @@ if __name__ == "__main__":
     scene_config = SceneConfig(
         path=exp_config.data_dir,
         num_scenes=exp_config.num_worlds,
-        discipline=SelectionDiscipline.K_UNIQUE_N if exp_config.selection_discipline == "K_UNIQUE_N" else SelectionDiscipline.PAD_N,
+        discipline=SelectionDiscipline.K_UNIQUE_N
+        if exp_config.selection_discipline == "K_UNIQUE_N"
+        else SelectionDiscipline.PAD_N,
         k_unique_scenes=exp_config.k_unique_scenes,
     )
 
