@@ -166,6 +166,53 @@ class PyGameVisualizer:
             except:
                 continue
 
+    def draw_rectangle(self, surf, corners, color, thickness=4):
+        ''' draws thick rectangle similar to draw_circle method '''
+        for i in range(thickness):
+            # Calculate an outward offset for each corner
+            adjusted_corners = []
+            for j, (x, y) in enumerate(corners):
+                # Get the next and previous corners for direction vectors
+                next_corner = corners[(j + 1) % len(corners)]
+                prev_corner = corners[j - 1]
+
+                # Calculate outward normal vector
+                edge1 = (x - prev_corner[0], y - prev_corner[1])  # Vector to previous corner
+                edge2 = (next_corner[0] - x, next_corner[1] - y)  # Vector to next corner
+
+                # Normalize edge1 and edge2
+                norm_edge1 = np.sqrt(edge1[0]**2 + edge1[1]**2)
+                norm_edge2 = np.sqrt(edge2[0]**2 + edge2[1]**2)
+
+                if norm_edge1 == 0 or norm_edge2 == 0:  # Avoid division by zero
+                    continue
+
+                edge1 = (edge1[0] / norm_edge1, edge1[1] / norm_edge1)
+                edge2 = (edge2[0] / norm_edge2, edge2[1] / norm_edge2)
+
+                # Calculate the bisector of edge1 and edge2 (outward direction)
+                bisector = (
+                    -(edge1[1] + edge2[1]),  # Perpendicular outward vector x
+                    (edge1[0] + edge2[0]),   # Perpendicular outward vector y
+                )
+
+                # Normalize the bisector
+                norm_bisector = np.sqrt(bisector[0]**2 + bisector[1]**2)
+                bisector = (bisector[0] / norm_bisector, bisector[1] / norm_bisector)
+
+                # Apply the outward offset for the current corner
+                adjusted_corners.append((
+                    x + i * bisector[0], 
+                    y + i * bisector[1]
+                ))
+
+            # Draw the adjusted rectangle outline
+            try:
+                pygame.gfxdraw.aapolygon(self.surf, adjusted_corners, color)
+            except Exception as e:
+                print(f"Error drawing rectangle: {e}")
+                
+
     def compute_window_settings(self, map_infos=None):
         if map_infos is None:
             map_infos = (
@@ -700,9 +747,9 @@ class PyGameVisualizer:
                 if agent_response_types[agent_idx] == STATIC_AGENT_ID:
                     color = (128, 128, 128)
 
-                pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
-                # pygame.gfxdraw.aapolygon(self.surf, agent_corners, color)
-                # pygame.gfxdraw.filled_polygon(self.surf, agent_corners, color)
+                # draws thick rectangles for the agents
+                self.draw_rectangle(self.surf, agent_corners, color, 4)
+                
 
                 # Draw object indices for the controllable agents
                 if (
