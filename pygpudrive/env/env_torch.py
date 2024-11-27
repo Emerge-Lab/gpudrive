@@ -82,7 +82,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def get_rewards(
-        self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0
+        self, collision_weight=-.001, goal_achieved_weight=1.0, off_road_weight=-.001
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
