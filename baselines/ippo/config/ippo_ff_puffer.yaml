@@ -2,38 +2,39 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/formatted_json_v2_no_tl_valid" #"data/processed/training" # Dataset
+data_dir: "data/processed/examples" #"data/data_old_debug" #"data/data_old_debug" #"data/processed/training" # Dataset
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 5 # Number of unique scenes to sample from
+  k_unique_scenes: 20 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   normalize_obs: true
+  remove_non_vehicles: false
+  use_lidar_obs: false # automatically turns of the other observation types
   reward_type: "sparse_on_goal_achieved"
   dynamics_model: "classic"
   collision_behavior: "remove"
   dist_to_goal_threshold: 5.0
-  polyline_reduction_threshold: 1.0  # Rate at which to sample points from the polyline (0 is all, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
-  
+  polyline_reduction_threshold: 0.15 # Rate at which to sample points from the polyline (0 is all, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
 
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "debug"
+  group: "algorithm_logic"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff", "single_scene"]
 
 train:
-  exp_id: Puffer_5_scenes_old_dataset  # Set dynamically in the script if needed
+  exp_id: Puffer  # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
   torch_deterministic: false
-  total_timesteps: 5_000_0000
+  total_timesteps: 50_000_000
   batch_size: 25_000
   minibatch_size: 5_000
   learning_rate: 3e-4

@@ -10,7 +10,7 @@ namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 32;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 6000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 256;
 
 inline constexpr bool useEstimatedYaw = true;
 
@@ -34,7 +34,7 @@ inline constexpr float slackReward = -0.005f;
 inline constexpr int32_t episodeLen = 91;
 
 // Number of lidar samples, arranged in circle around agent
-inline constexpr madrona::CountT numLidarSamples = 30;
+inline constexpr madrona::CountT numLidarSamples = 50;
 
 // These offsets define the offset in the z-axis to throw the lidar rays
 // Different objects are on different heights in the world so as to show in the lidar rays

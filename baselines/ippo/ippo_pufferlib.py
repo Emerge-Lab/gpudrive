@@ -15,7 +15,7 @@ from box import Box
 
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
-from integrations.rl.puffer.utils import Policy
+from integrations.rl.puffer.utils import Policy, LiDARPolicy
 
 import pufferlib
 import pufferlib.vector
@@ -70,7 +70,7 @@ def train(args):
     )
 
     policy = make_policy(vecenv.driver_env).to(args.train.device)
-    
+
     args.train.env = args.environment.name
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)
