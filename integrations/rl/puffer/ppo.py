@@ -131,6 +131,7 @@ def evaluate(data):
     # Rollout loop
     while not experience.full:
         with profile.env:
+            # Receive data from current timestep
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
 
@@ -156,11 +157,19 @@ def evaluate(data):
             if config.device == "cuda":
                 torch.cuda.synchronize()
 
+        # Step the environment
+        with profile.env:
+            actions = actions.cpu().numpy()
+            data.vecenv.send(actions)
+            
         with profile.eval_misc:
             value = value.flatten()
-            actions = actions.cpu().numpy()
             mask = torch.as_tensor(mask)
             o = o if config.cpu_offload else o_device
+            
+            #print(f'done: {d}')
+            #print(f'mask: {mask} \n')
+            
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
             for i in info:
@@ -270,10 +279,6 @@ def evaluate(data):
                                     }
                                 )
                             del agent_frames_dict[f"env_{env_idx}"][:]
-
-        # Step the environment
-        with profile.env:
-            data.vecenv.send(actions)
 
     with profile.eval_misc:
         data.stats = {}
@@ -670,6 +675,13 @@ class Experience:
         end = ptr + len(indices)
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
+          
+        # Note: these should be filtered out 
+        # if self.obs[ptr:end].max() > 1.5:
+        #     print("obs max", self.obs[ptr:end].max())
+        #     print("obs min", self.obs[ptr:end].min())
+        #     print(f"{torch.where(obs > 1.5)[0]}")
+        
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
         self.actions_np[ptr:end] = action[indices]
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]
@@ -678,7 +690,7 @@ class Experience:
         self.sort_keys.extend([(env_id[i], self.step) for i in indices])
         self.ptr = end
         self.step += 1
-
+        
     def sort_training_data(self):
         idxs = np.asarray(
             sorted(range(len(self.sort_keys)), key=self.sort_keys.__getitem__)
@@ -724,7 +736,7 @@ class Experience:
         self.b_dones = self.b_dones[b_idxs]
         self.b_values = self.b_values[b_flat]
         self.b_returns = self.b_advantages + self.b_values
-
+    
 
 class Utilization(Thread):
     def __init__(self, delay=1, maxlen=20):

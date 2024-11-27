@@ -76,6 +76,8 @@ class PufferGPUDrive(PufferEnv):
             dist_to_goal_threshold=config.dist_to_goal_threshold,
             polyline_reduction_threshold=config.polyline_reduction_threshold,
             remove_non_vehicles=config.remove_non_vehicles,
+            lidar_obs=config.use_lidar_obs,
+            disable_classic_obs=True if config.use_lidar_obs else False,
         )
 
         render_config = RenderConfig(
@@ -165,8 +167,6 @@ class PufferGPUDrive(PufferEnv):
 
         # (1) Step the simulator with controlled agents actions
         self.env.step_dynamics(self.actions)
-        next_obs = self.env.get_obs()[self.controlled_agent_mask]
-
         # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards()[self.controlled_agent_mask]
         terminal = self.env.get_dones().bool()
@@ -194,13 +194,21 @@ class PufferGPUDrive(PufferEnv):
         # (5) Set the mask to False for _agents_ that are terminated for the next step
         # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
-        terminal = terminal[self.controlled_agent_mask]
 
         info = []
         self.num_live.append(self.masks.sum())
 
         if len(done_worlds) > 0:
+            
+            from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
+            local_roadgraph = LocalRoadGraphPoints.from_tensor(
+                local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
+                backend="torch",
+                device="cuda"
+            )
+            rg_sparsity = (local_roadgraph.type[self.controlled_agent_mask] == 0).sum()/local_roadgraph.type[self.controlled_agent_mask].numel()
+            
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
                 done_worlds, :
@@ -233,6 +241,7 @@ class PufferGPUDrive(PufferEnv):
                     "episode_length": self.episode_lengths[done_worlds]
                     .mean()
                     .item(),
+                    "rg_sparsity": rg_sparsity.item(),
                 }
             )
             self.num_live = []
@@ -245,10 +254,15 @@ class PufferGPUDrive(PufferEnv):
                 # Reset the live agent mask so that the next alive mask will mark
                 # all agents as alive for the next step
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
-
+                # Reset terminals for reset envs
+                #terminal[idx, :] = self.env.get_dones()[idx, :].bool() 
+        
+        # Flatten
+        terminal = terminal[self.controlled_agent_mask]
+        
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
-        # next_obs = self.env.get_obs()[self.controlled_agent_mask]
+        next_obs = self.env.get_obs()[self.controlled_agent_mask]
 
         self.observations = next_obs
         self.rewards = reward

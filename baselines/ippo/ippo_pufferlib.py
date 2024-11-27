@@ -98,7 +98,12 @@ def init_wandb(args, name, id=None, resume=True):
         group=args.wandb.group,
         mode=args.wandb.mode,
         tags=args.wandb.tags,
-        config={"train": dict(args.train), "vec": dict(args.vec)},
+        config={
+            "environment": dict(args.environment),
+            "train": dict(args.train), 
+            "vec": dict(args.vec),  
+            "network": dict(args.network)
+        },
         name=name,
         save_code=True,
         resume=resume,

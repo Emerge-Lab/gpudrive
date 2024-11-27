@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/validation" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples" #"data/data_old_debug" #"data/data_old_debug" #"data/processed/training" # Dataset
+data_dir: "data/formatted_json_v2_no_tl_valid" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples" #"data/data_old_debug" #"data/data_old_debug" #"data/processed/training" # Dataset
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -33,7 +33,7 @@ wandb:
 ## Minibatch size 1/16 of batch size, eg. 16_000
 
 train:
-  exp_id: Puffer  # Set dynamically in the script if needed
+  exp_id: Puffer_old_data  # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
