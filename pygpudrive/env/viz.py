@@ -715,6 +715,8 @@ class PyGameVisualizer:
                     mod_idx = agent_idx % len(self.COLOR_LIST)
 
                 # color = self.COLOR_LIST[mod_idx]
+                # NOTE: to add for controlled state or not
+                # if self.render_config.color_by_controlled_state: 
                 color = BLUE_GREEN
 
                 info_tensor = self.sim.info_tensor().to_torch()[

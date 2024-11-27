@@ -179,8 +179,10 @@ class RenderConfig:
         resolution (Tuple[int, int]): Resolution of the rendered image.
         line_thickness (int): Thickness of the road lines in the rendering.
         draw_obj_idx (bool): Whether to draw object indices on objects.
+        color_by_controlled_state: Whether to color objects if they're controlled or not
         obj_idx_font_size (int): Font size for object indices.
         color_scheme (str): Color mode for the rendering ("light" or "dark").
+
     """
 
     render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
@@ -188,6 +190,7 @@ class RenderConfig:
     resolution: Tuple[int, int] = (1024, 1024)
     line_thickness: int = 0.7
     draw_obj_idx: bool = False
+    color_by_controlled_state: bool = False
     obj_idx_font_size: int = 9
     color_scheme: str = "light"
 
@@ -196,6 +199,6 @@ class RenderConfig:
         return (
             f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
             f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
-            f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
+            f"DrawObjectIdx: {self.draw_obj_idx}, ColorByControlledState: {self.color_by_controlled_state}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
             f"ColorScheme: {self.color_scheme}"
         )
