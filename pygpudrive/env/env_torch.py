@@ -82,7 +82,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def get_rewards(
-        self, collision_weight=-.001, goal_achieved_weight=1.0, off_road_weight=-.001
+        self,
+        collision_weight=-0.001,
+        goal_achieved_weight=1.0,
+        off_road_weight=-0.001,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -215,9 +218,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_3.item(),
                 ]
                 self.values_to_action_key[
-                    round(action_1.item(), 3),
-                    round(action_2.item(), 3),
-                    round(action_3.item(), 3),
+                    round(action_1.item(), 5),
+                    round(action_2.item(), 5),
+                    round(action_3.item(), 5),
                 ] = action_idx
 
             self.action_keys_tensor = torch.tensor(

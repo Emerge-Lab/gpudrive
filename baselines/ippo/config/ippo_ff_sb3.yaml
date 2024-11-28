@@ -20,7 +20,7 @@ resample_mode: "random"  # Options: "random"
 render: true
 render_mode: "rgb_array"
 render_freq: 50  # Render every k rollouts
-render_n_worlds: 1  # Number of scenarios to render
+render_n_worlds: 10  # Number of scenarios to render
 
 track_time_to_solve: false
 

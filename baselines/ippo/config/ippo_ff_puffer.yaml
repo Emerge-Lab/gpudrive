@@ -2,18 +2,18 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/formatted_json_v2_no_tl_valid" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples" #"data/data_old_debug" #"data/data_old_debug" #"data/processed/training" # Dataset
+data_dir: "data/processed/validation" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples" #"data/data_old_debug" #"data/data_old_debug" #"data/processed/training" # Dataset
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 50 # Number of unique scenes to sample from
+  num_worlds: 10 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   normalize_obs: true
-  remove_non_vehicles: false
+  remove_non_vehicles: true
   use_lidar_obs: false # automatically turns of the other observation types
   reward_type: "weighted_combination"
   dynamics_model: "classic"
@@ -24,7 +24,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "algorithm_logic"
+  group: "vis_failures"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff", "single_scene"]
 
@@ -33,7 +33,7 @@ wandb:
 ## Minibatch size 1/16 of batch size, eg. 16_000
 
 train:
-  exp_id: Puffer_old_data  # Set dynamically in the script if needed
+  exp_id: Puffer_new_data  # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
@@ -54,18 +54,18 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  checkpoint_interval: 500 # Save policy every k iterations
+  checkpoint_interval: 100 # Save policy every k iterations
   checkpoint_path: "./runs"
   bptt_horizon: 2
   compile: false
   compile_mode: "reduce-overhead"
   # Rendering configs
-  render: false # Determines whether to render the environment
-  render_interval: 100 # Render every k rollouts
-  render_k_scenarios: 10 # Number of scenarios to render
+  render: true # Determines whether to render the environment
+  render_interval: 2 # Render every k rollouts
+  render_k_scenarios: 1 # Number of scenarios to render
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_simulator_state: true # Plot the simulator state from bird's eye view
-  render_fps: 20
+  render_fps: 17 # Frames per second
   render_format: "mp4" # Options: gif, mp4
 
 vec:

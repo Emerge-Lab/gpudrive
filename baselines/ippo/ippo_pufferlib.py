@@ -12,7 +12,6 @@ from datetime import datetime
 import torch
 import wandb
 from box import Box
-
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
 from integrations.rl.puffer.utils import Policy, LiDARPolicy
@@ -100,9 +99,8 @@ def init_wandb(args, name, id=None, resume=True):
         tags=args.wandb.tags,
         config={
             "environment": dict(args.environment),
-            "train": dict(args.train), 
-            "vec": dict(args.vec),  
-            "network": dict(args.network)
+            "train": dict(args.train),
+            "vec": dict(args.vec),
         },
         name=name,
         save_code=True,
@@ -140,6 +138,7 @@ if __name__ == "__main__":
     make_env = env_creator(
         data_dir=config.data_dir,
         environment_config=config.environment,
+        train_config=config.train,
         device=config.train.device,
     )
 
