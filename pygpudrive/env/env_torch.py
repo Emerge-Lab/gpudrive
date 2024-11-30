@@ -18,6 +18,8 @@ from pygpudrive.datatypes.observation import (
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
+from pygpudrive.visualize.core import MatplotlibVisualizer
+
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -61,8 +63,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
+
         # Rendering setup
-        self.visualizer = self._setup_rendering()
+        self.vis = MatplotlibVisualizer(
+            sim_object=self.sim,
+            vis_config=self.render_config,
+            backend=self.backend,
+        )
 
     def reset(self):
         """Reset the worlds and return the initial observations."""

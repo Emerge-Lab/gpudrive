@@ -64,15 +64,19 @@ class GlobalRoadGraphPoints:
         self.orientation = roadgraph_tensor[:, :, 5]
         # Skipping the map element type for now (redundant with the map type).
         self.id = roadgraph_tensor[:, :, 7]
-        self.type = roadgraph_tensor[:, :, 8]
+        # TODO: Use map type instead of enum (8 instead of 6)
+        self.type = roadgraph_tensor[:, :, 6]
 
     @classmethod
     def from_tensor(
-        cls, roadgraph_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        roadgraph_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(roadgraph_tensor.to_torch())
+            return cls(roadgraph_tensor.to_torch().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
