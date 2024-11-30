@@ -153,6 +153,7 @@ def evaluate(data):
             config.render
             and (data.num_rollouts - 1) % config.render_interval == 0
         ):
+
             data.vecenv.render(
                 wandb_obj=data.wandb, global_step=data.global_step
             )
@@ -684,62 +685,6 @@ def save_checkpoint(data):
 
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
-
-
-def rollout(
-    env_creator,
-    env_kwargs,
-    agent_creator,
-    agent_kwargs,
-    model_path=None,
-    device="cuda",
-):
-    # We are just using Serial vecenv to give a consistent
-    # single-agent/multi-agent API for evaluation
-    try:
-        env = pufferlib.vector.make(
-            env_creator, env_kwargs={"render_mode": "rgb_array", **env_kwargs}
-        )
-    except:
-        env = pufferlib.vector.make(env_creator, env_kwargs=env_kwargs)
-
-    if model_path is None:
-        agent = agent_creator(env, **agent_kwargs).to(device)
-    else:
-        # Load the agent's state dictionary instead of the full object
-        agent = agent_creator(env, **agent_kwargs).to(device)
-        agent.load_state_dict(torch.load(model_path, map_location=device))
-
-    ob, info = env.reset()
-    driver = env.driver_env
-    os.system("clear")
-    state = None
-
-    while True:
-        render = driver.render()
-        if driver.render_mode == "ansi":
-            print("\033[0;0H" + render + "\n")
-            time.sleep(0.6)
-        elif driver.render_mode == "rgb_array":
-            import cv2
-
-            render = cv2.cvtColor(render, cv2.COLOR_RGB2BGR)
-            cv2.imshow("frame", render)
-            cv2.waitKey(1)
-            time.sleep(1 / 24)
-
-        with torch.no_grad():
-            ob = torch.from_numpy(ob).to(device)
-            if hasattr(agent, "lstm"):
-                action, _, _, _, state = agent(ob, state)
-            else:
-                action, _, _, _ = agent(ob)
-
-            action = action.cpu().numpy().reshape(env.action_space.shape)
-
-        ob, reward = env.step(action)[:2]
-        reward = reward.mean()
-        print(f"Reward: {reward:.4f}")
 
 
 def seed_everything(seed, torch_deterministic):
