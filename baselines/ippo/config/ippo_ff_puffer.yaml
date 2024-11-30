@@ -19,7 +19,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   dynamics_model: "classic"
   collision_behavior: "remove"
   dist_to_goal_threshold: 5.0
-  polyline_reduction_threshold: 0.01 # Rate at which to sample points from the polyline (0 is all, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
+  polyline_reduction_threshold: 0.05 # Rate at which to sample points from the polyline (0 is all, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
 
 wandb:
   entity: ""
@@ -60,12 +60,12 @@ train:
   compile: false
   compile_mode: "reduce-overhead"
   # Rendering configs
-  render: false # Determines whether to render the environment
-  render_interval: 200 # Render every k rollouts
-  render_k_scenarios: 3 # Number of scenarios to render
+  render: true # Determines whether to render the environment
+  render_interval: 2 # Render every k iterations 
+  render_k_scenarios: 1 # Number of scenarios to render
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_simulator_state: true # Plot the simulator state from bird's eye view
-  render_fps: 17 # Frames per second
+  render_fps: 20 # Frames per second
   render_format: "mp4" # Options: gif, mp4
 
 vec:

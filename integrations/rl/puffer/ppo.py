@@ -105,11 +105,11 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
+    #TODO: Improve
+    data.vecenv.wandb_obj = data.wandb
+    data.vecenv.was_rendered_in_rollout = False
+    data.vecenv.global_step = data.global_step
     data.num_rollouts += 1
-    # TODO: Find better place
-    data.vecenv.clear_render_buffer()
-
-    print(f"Rollout {data.num_rollouts}")
 
     config, profile, experience = data.config, data.profile, data.experience
 
@@ -120,6 +120,8 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
+        
+        print(f"Step {data.global_step}")
 
         with profile.env:
             # Receive data from current timestep
@@ -148,19 +150,19 @@ def evaluate(data):
             if config.device == "cuda":
                 torch.cuda.synchronize()
 
-        # Render rollout
-        if (
-            config.render
-            and (data.num_rollouts - 1) % config.render_interval == 0
-        ):
-
-            data.vecenv.render(
-                wandb_obj=data.wandb, global_step=data.global_step
-            )
+        
+        # if ( # Render 
+        #     config.render
+        #     and (data.num_rollouts - 1) % config.render_interval == 0
+        # ):
+        #     data.vecenv.render(
+        #         wandb_obj=data.wandb, global_step=data.global_step
+        #     )
 
         with profile.env:
             actions = actions.cpu().numpy()
-            # Step the environment
+            
+            # Step the environment and reset if done
             data.vecenv.send(actions)
 
         with profile.eval_misc:
@@ -182,6 +184,9 @@ def evaluate(data):
                 data.stats[k] = np.mean(v)
             except:
                 continue
+        
+        # TODO: Only do if render buffer is not empty
+        data.vecenv.clear_render_buffer()
 
     return data.stats, infos
 

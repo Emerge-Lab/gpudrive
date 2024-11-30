@@ -55,6 +55,8 @@ class PufferGPUDrive(PufferEnv):
         self.k_unique_scenes = config.k_unique_scenes
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
+        
+        self.frames = []
 
         # Initialize rendering buffers
         self.clear_render_buffer()
@@ -123,6 +125,10 @@ class PufferGPUDrive(PufferEnv):
         self.actions = torch.zeros(
             (self.num_worlds, self.max_cont_agents_per_env), dtype=torch.int64
         ).to(self.device)
+        self.rendering_in_progress = False
+        self.was_rendered_in_rollout = False
+        self.wandb_obj = None
+        self.global_step = 0
 
     def _obs_and_mask(self, obs):
         # self.buf.masks[:] = self.env.cont_agent_mask.numpy().ravel() * self.live_agent_mask
@@ -180,6 +186,14 @@ class PufferGPUDrive(PufferEnv):
 
         # (1) Step the simulator with controlled agents actions
         self.env.step_dynamics(self.actions)
+        
+        # Render
+        env_idx = 0
+        if self.episode_lengths[env_idx, :][0] == 0 and not self.was_rendered_in_rollout:
+            self.rendering_in_progress = True
+            print(f'Start rendering for env_{env_idx}...')
+        if self.rendering_in_progress:
+            self.frames.append(self.env.render(env_idx))
 
         # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards()[self.controlled_agent_mask]
@@ -214,7 +228,23 @@ class PufferGPUDrive(PufferEnv):
         self.num_live.append(self.masks.sum())
 
         if len(done_worlds) > 0:
-
+            
+            if env_idx in done_worlds and self.rendering_in_progress:
+                # Log the episde
+                print(f'Logging video for env_{env_idx}...')
+                frames_array = np.array(self.frames)
+                self.wandb_obj.log({
+                    "State/env": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),  # Adjust channel axis for WandB
+                        fps=self.train_config.render_fps,
+                        format=self.train_config.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                })
+                self.frames = []
+                self.rendering_in_progress = False
+                self.was_rendered_in_rollout = True
+                
             local_roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
                 backend="torch",
@@ -296,107 +326,102 @@ class PufferGPUDrive(PufferEnv):
 
     def render(self, wandb_obj=None, global_step=None):
         """Render logic for making videos of agent behaviors during rollout.
-
-        Args:
-            env_idx (_type_): _description_
+        
+        - Start rendering an environment when the episode begins (episode length = 0)
+        - Stop rendering when all controlled agents are done 
+        - Only render each environment once during a rollout
         """
+        
+        print(f'rendered = {self.already_rendered_during_rollout[f"env_{0}"]}')
+        print(f'dones = {self.env.get_dones()[0, :][self.controlled_agent_mask[0]]}')
+        
+        for env_idx in range(self.train_config.render_k_scenarios):
+            if self.already_rendered_during_rollout[f"env_{env_idx}"]:
+                continue  # Skip if already rendered in this rollout
 
-        # Check if render buffers are not full
-        if not all(self.already_rendered_during_rollout.values()):
+            begin_episode = torch.all(self.episode_lengths[env_idx, :] == 0)
+            # agents_not_done = torch.all(
+            #    self.render_terminals[env_idx, :][self.controlled_agent_mask[env_idx]] == 0
+            # )
 
-            for env_idx in range(self.train_config.render_k_scenarios):
-                if (
-                    all(self.episode_lengths[0, :]) == 0
-                    and not self.already_rendered_during_rollout[
-                        f"env_{env_idx}"
-                    ]
-                ):
-                    self.rendering_in_process[f"env_{env_idx}"] = True
-                    print(f"start env_{env_idx}...")
+            # Start rendering for an environment
+            if begin_episode and not self.rendering_in_process[f"env_{env_idx}"]:
+                self.rendering_in_process[f"env_{env_idx}"] = True
+                print(f"Start rendering env_{env_idx}...")
 
-                if self.rendering_in_process[f"env_{env_idx}"]:
-                    # Render simulator state
-                    if self.train_config.render_simulator_state:
-                        print("Rendering simulator state")
-                        simulator_state = self.render_simulator_state(env_idx)
-                        self.simulator_state_dict[f"env_{env_idx}"].append(
-                            simulator_state
-                        )
-                    # Render agent observations
-                    if self.train_config.render_agent_obs:
-                        print("Rendering agent observations")
-                        agent_observations = self.render_agent_observations(
-                            env_idx=env_idx,
-                            time_step=int(
-                                int(self.episode_lengths[env_idx, :][0])
-                            ),
-                        )
-                        self.agent_frames_dict[f"env_{env_idx}"].append(
-                            agent_observations
-                        )
+            # Continue rendering if already in process
+            if self.rendering_in_process[f"env_{env_idx}"]:
+                # Render simulator state
+                if self.train_config.render_simulator_state:
+                    print(f"t = {int(self.episode_lengths[env_idx, :][0])}: Rendering simulator state env_{env_idx}")
+                    simulator_state = self.render_simulator_state(env_idx)
+                    self.simulator_state_dict[f"env_{env_idx}"].append(simulator_state)
 
-                if (
-                    all(self.render_terminals[env_idx, :])
-                    and self.rendering_in_process[f"env_{env_idx}"]
-                ):
-                    # Stop if episode has ended and render
-                    print(f"end rendering env_{env_idx}...")
+                # Render agent observations
+                if self.train_config.render_agent_obs:
+                    print(f"Rendering agent observations for env_{env_idx}")
+                    agent_observations = self.render_agent_observations(
+                        env_idx=env_idx,
+                        time_step=int(self.episode_lengths[env_idx, :][0]),
+                    )
+                    self.agent_frames_dict[f"env_{env_idx}"].append(agent_observations)
+
+                # Stop rendering if all controlled agents are done
+                if all(self.env.get_dones()[env_idx, :][self.controlled_agent_mask[env_idx]]) or self.episode_lengths[env_idx, :][0] >= 90:
+                    print(f"End rendering env_{env_idx}... -> Log")
                     self.rendering_in_process[f"env_{env_idx}"] = False
-                    self.already_rendered_during_rollout[
-                        f"env_{env_idx}"
-                    ] = True
+                    self.already_rendered_during_rollout[f"env_{env_idx}"] = True
 
-                    # Render simulator state
+                    # Log simulator state video
                     if self.train_config.render_simulator_state:
-                        frames_array = np.array(
-                            self.simulator_state_dict[f"env_{env_idx}"]
+                        self._log_video(
+                            frames=self.simulator_state_dict[f"env_{env_idx}"],
+                            key=f"Video/State/env_{env_idx}",
+                            wandb_obj=wandb_obj,
+                            global_step=global_step,
                         )
-                        wandb_obj.log(
-                            {
-                                f"Video/State/env_{env_idx}": wandb.Video(
-                                    np.moveaxis(frames_array, -1, 1),
-                                    fps=self.train_config.render_fps,
-                                    format=self.train_config.render_format,
-                                    caption=f"global step: {global_step:,}",
-                                )
-                            }
-                        )
-                        del self.simulator_state_dict[f"env_{env_idx}"][:]
+                        #self.simulator_state_dict[f"env_{env_idx}"].clear()
 
+                    # Log agent observations video
                     if self.train_config.render_agent_obs:
-                        print(
-                            f"Rendering agent observations for env_{env_idx}"
-                        )
-                        num_agents = self.agent_frames_dict[f"env_{env_idx}"][
-                            0
-                        ].shape[0]
-                        # Render agent observations
-                        for agent_idx in range(num_agents):
-                            # Stack the frames for this agent along time axis
-                            agent_frames = np.stack(
-                                [
-                                    image[agent_idx]
-                                    for image in self.agent_frames_dict[
-                                        f"env_{env_idx}"
-                                    ]
-                                ],
-                                axis=0,
-                            )
-                            agent_frames = np.transpose(
-                                agent_frames, (0, 3, 1, 2)
-                            )
-                            # Shape: (time_steps, img_width, img_height, 3)
-                            wandb_obj.log(
-                                {
-                                    f"Video/Observation/env_{env_idx}_agent_{agent_idx}": wandb.Video(
-                                        agent_frames,
-                                        fps=self.train_config.render_fps,
-                                        format=self.train_config.render_format,
-                                        caption=f"global step: {global_step:,}",
-                                    )
-                                }
-                            )
-                        del self.agent_frames_dict[f"env_{env_idx}"][:]
+                        self._log_agent_videos(
+                            env_idx=env_idx,
+                            wandb_obj=wandb_obj,
+                            global_step=global_step,
+                    )
+
+    def _log_video(self, frames, key, wandb_obj, global_step):
+        """Helper function to log a video to WandB."""
+        if frames:
+            frames_array = np.array(frames)
+            wandb_obj.log({
+                key: wandb.Video(
+                    np.moveaxis(frames_array, -1, 1),  # Adjust channel axis for WandB
+                    fps=self.train_config.render_fps,
+                    format=self.train_config.render_format,
+                    caption=f"global step: {global_step:,}",
+                )
+            })
+
+    def _log_agent_videos(self, env_idx, wandb_obj, global_step):
+        """Helper function to log agent-specific videos."""
+        num_agents = self.agent_frames_dict[f"env_{env_idx}"][0].shape[0]
+        for agent_idx in range(num_agents):
+            agent_frames = np.stack(
+                [image[agent_idx] for image in self.agent_frames_dict[f"env_{env_idx}"]],
+                axis=0,
+            )
+            agent_frames = np.transpose(agent_frames, (0, 3, 1, 2))  # Convert to (T, C, H, W)
+            wandb_obj.log({
+                f"Video/Observation/env_{env_idx}_agent_{agent_idx}": wandb.Video(
+                    agent_frames,
+                    fps=self.train_config.render_fps,
+                    format=self.train_config.render_format,
+                    caption=f"global step: {global_step:,}",
+                )
+            })
+        self.agent_frames_dict[f"env_{env_idx}"].clear()
+
 
     def render_agent_observations(self, env_idx, time_step):
         """Render a single observation."""
