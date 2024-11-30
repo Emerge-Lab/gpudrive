@@ -40,7 +40,13 @@ class MatplotlibVisualizer:
             self.sim_object.controlled_state_tensor().to_torch() == 1
         ).squeeze(axis=2)
 
-    def plot_simulator_state(self, env_idx: int, center_agent_idx=None):
+    def plot_simulator_state(
+        self, 
+        env_idx: int, 
+        time_step: int=None,
+        center_agent_idx=None,
+        figsize: Tuple[int, int] = (15, 15)
+    ):
         """Plot the current state of the simulator from a birds' eye view."""
 
         # Get global road graph (note: only needs to be done once)
@@ -64,7 +70,7 @@ class MatplotlibVisualizer:
             device=self.device,
         )
 
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig, ax = plt.subplots(figsize=figsize)
 
         # Draw the road graph
         self._plot_roadgraph(
@@ -79,6 +85,26 @@ class MatplotlibVisualizer:
             control_type=types,
             alpha=1.0,
         )
+        
+        # Plot time step
+        if time_step is not None:
+            ax.text(
+                0.5,  # Horizontal center
+                0.95,  # Vertical location near the top
+                f"Time step: {time_step}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+                fontsize=14,  
+                color="black",  # Optional: Change text color
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.8),  # White background
+            )
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        return fig, ax
+        
 
     def _plot_roadgraph(
         self,
@@ -168,20 +194,18 @@ class MatplotlibVisualizer:
 
         # Plot controlled agents
         controlled = control_type.controlled[env_idx, :]
+        # Remove out of bound agents (dead agents)
+        controlled = controlled & (torch.abs(agent_states.pos_x[env_idx, :]) < 1_000)
 
         # Further divide by off-road, collided, and ok agents
-        is_offroad = (
-            self.sim_object.info_tensor().to_torch()[env_idx, :, 0] == 1
-        )
-        is_collided = (
-            self.sim_object.info_tensor()
-            .to_torch()[env_idx, :, 1:3]
-            .sum(axis=1)
-            == 1
-        )
-        is_ok = ~is_offroad & ~is_collided
+        infos = self.sim_object.info_tensor().to_torch().to(self.device)
+    
+        # fmt: off
+        is_offroad = (infos[env_idx, :, 0] == 1) & controlled
+        is_collided = (infos[env_idx, :, 1:3].sum(axis=1) == 1) & controlled
+        is_ok = ~is_offroad & ~is_collided & controlled
 
-        # Color agents based on their status
+        # Off-road agents
         bboxes_controlled_offroad = np.stack(
             (
                 agent_states.pos_x[env_idx, is_offroad].numpy(),
@@ -202,7 +226,7 @@ class MatplotlibVisualizer:
             label=label,
         )
 
-        # Color agents based on their status
+        # Living agents
         bboxes_controlled_ok = np.stack(
             (
                 agent_states.pos_x[env_idx, is_ok].numpy(),
@@ -223,7 +247,7 @@ class MatplotlibVisualizer:
             label=label,
         )
 
-        # Color agents based on their status
+        # Collided agents
         bboxes_controlled_collided = np.stack(
             (
                 agent_states.pos_x[env_idx, is_collided].numpy(),
@@ -280,7 +304,7 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_static,
-            color="grey",
+            color="darkslategray",
             alpha=alpha,
             as_center_pts=as_center_pts,
             label=label,

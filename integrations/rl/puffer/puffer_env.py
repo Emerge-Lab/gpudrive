@@ -20,7 +20,7 @@ from pygpudrive.datatypes.observation import (
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-from pygpudrive.visualize.core import plot_agent_observation
+#from pygpudrive.visualize.core import plot_agent_observation
 from pygpudrive.visualize.utils import img_from_fig
 
 from pufferlib.environment import PufferEnv
@@ -347,9 +347,16 @@ class PufferGPUDrive(PufferEnv):
                     and not self.was_rendered_in_rollout[render_env_idx]
                 ):
                     self.rendering_in_progress[render_env_idx] = True
+                    
+                # Visualize the simulator state
                 if self.rendering_in_progress[render_env_idx]:
-                    simulator_state = self.env.render(render_env_idx)
-                    self.frames[render_env_idx].append(simulator_state)
+                    time_step = self.episode_lengths[render_env_idx, :][0]
+                    sim_state_fig, _ = self.env.vis.plot_simulator_state(
+                        env_idx=render_env_idx,
+                        time_step=time_step,
+                    )
+                    print(f'Appending frame for env_{render_env_idx}...')
+                    self.frames[render_env_idx].append(img_from_fig(sim_state_fig))
 
     def _log_video(self, frames, key, wandb_obj, global_step):
         """TODO: Helper function to log a video to WandB."""
@@ -394,43 +401,43 @@ class PufferGPUDrive(PufferEnv):
             )
         self.agent_frames_dict[f"env_{env_idx}"].clear()
 
-    def render_agent_observations(self, env_idx, time_step):
-        """Render a single observation."""
-        agent_ids = torch.where(self.controlled_agent_mask[env_idx, :])[
-            0
-        ].cpu()
+    # def render_agent_observations(self, env_idx, time_step):
+    #     """Render a single observation."""
+    #     agent_ids = torch.where(self.controlled_agent_mask[env_idx, :])[
+    #         0
+    #     ].cpu()
 
-        ego_state = LocalEgoState.from_tensor(
-            self_obs_tensor=self.env.sim.self_observation_tensor(),
-            backend=self.env.backend,
-            device="cpu",
-        ).clone()
+    #     ego_state = LocalEgoState.from_tensor(
+    #         self_obs_tensor=self.env.sim.self_observation_tensor(),
+    #         backend=self.env.backend,
+    #         device="cpu",
+    #     ).clone()
 
-        local_roadgraph = LocalRoadGraphPoints.from_tensor(
-            local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
-            backend=self.env.backend,
-            device="cpu",
-        ).clone()
+    #     local_roadgraph = LocalRoadGraphPoints.from_tensor(
+    #         local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
+    #         backend=self.env.backend,
+    #         device="cpu",
+    #     ).clone()
 
-        partner_obs = PartnerObs.from_tensor(
-            partner_obs_tensor=self.env.sim.partner_observations_tensor(),
-            backend=self.env.backend,
-            device="cpu",
-        ).clone()
+    #     partner_obs = PartnerObs.from_tensor(
+    #         partner_obs_tensor=self.env.sim.partner_observations_tensor(),
+    #         backend=self.env.backend,
+    #         device="cpu",
+    #     ).clone()
 
-        img_arrays = []
+    #     img_arrays = []
 
-        for agent_id in agent_ids:
+    #     for agent_id in agent_ids:
 
-            observation_fig, _ = plot_agent_observation(
-                env_idx=env_idx,
-                agent_idx=agent_id.item(),
-                observation_roadgraph=local_roadgraph,
-                observation_ego=ego_state,
-                observation_partner=partner_obs,
-                time_step=time_step,
-            )
+    #         observation_fig, _ = plot_agent_observation(
+    #             env_idx=env_idx,
+    #             agent_idx=agent_id.item(),
+    #             observation_roadgraph=local_roadgraph,
+    #             observation_ego=ego_state,
+    #             observation_partner=partner_obs,
+    #             time_step=time_step,
+    #         )
 
-            img_arrays.append(img_from_fig(observation_fig))
+    #         img_arrays.append(img_from_fig(observation_fig))
 
-        return np.array(img_arrays)
+    #     return np.array(img_arrays)
