@@ -67,6 +67,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Rendering setup
         self.vis = MatplotlibVisualizer(
             sim_object=self.sim,
+            goal_radius=self.config.dist_to_goal_threshold,
             vis_config=self.render_config,
             backend=self.backend,
         )

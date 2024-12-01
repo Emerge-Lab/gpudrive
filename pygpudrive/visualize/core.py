@@ -5,6 +5,7 @@ import mediapy
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 import numpy as np
 import gpudrive
 from pygpudrive.visualize import utils
@@ -27,12 +28,13 @@ connect_points_thresholds = {
 
 
 class MatplotlibVisualizer:
-    def __init__(self, sim_object, vis_config: Dict[str, Any], backend: str):
+    def __init__(self, sim_object, vis_config: Dict[str, Any], goal_radius, backend: str):
         self.sim_object = sim_object
         self.vis_config = vis_config
         self.backend = backend
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
+        self.goal_radius = goal_radius
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -41,11 +43,12 @@ class MatplotlibVisualizer:
         ).squeeze(axis=2)
 
     def plot_simulator_state(
-        self, 
-        env_idx: int, 
+        self,
+        env_idx: int,
         time_step: int=None,
         center_agent_idx=None,
-        figsize: Tuple[int, int] = (15, 15)
+        figsize: Tuple[int, int] = (15, 15),
+        zoom_radius: int = 90,
     ):
         """Plot the current state of the simulator from a birds' eye view."""
 
@@ -64,11 +67,23 @@ class MatplotlibVisualizer:
         )
 
         # Get control type tensor
-        types = ControlMasks.from_tensor(
+        control_type = ControlMasks.from_tensor(
             tensor=self.sim_object.response_type_tensor(),
             backend=self.backend,
             device=self.device,
         )
+
+        # Get current state of agents
+        agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
+
+        # Get control mask and omit out of bound agents (dead agents)
+        controlled = control_type.controlled[env_idx, :]
+        controlled_live = controlled & (torch.abs(global_agent_states.pos_x[env_idx, :]) < 1_000)
+
+        # fmt: off
+        is_offroad = (agent_infos[env_idx, :, 0] == 1) & controlled_live
+        is_collided = (agent_infos[env_idx, :, 1:3].sum(axis=1) == 1) & controlled_live
+        is_ok = ~is_offroad & ~is_collided & controlled_live
 
         fig, ax = plt.subplots(figsize=figsize)
 
@@ -80,31 +95,48 @@ class MatplotlibVisualizer:
         # Draw the agents
         self._plot_filtered_agent_bounding_boxes(
             ax=ax,
-            agent_states=global_agent_states,
             env_idx=env_idx,
-            control_type=types,
+            agent_states=global_agent_states,
+            is_ok_mask=is_ok,
+            is_offroad_mask=is_offroad,
+            is_collided_mask=is_collided,
+            control_type=control_type,
             alpha=1.0,
         )
-        
-        # Plot time step
+
+        # Plot rollout statistics
+        num_controlled = controlled.sum().item()
+        num_off_road = is_offroad.sum().item()
+        num_collided = is_collided.sum().item()
         if time_step is not None:
             ax.text(
                 0.5,  # Horizontal center
                 0.95,  # Vertical location near the top
-                f"Time step: {time_step}",
+                f"$t$ = {time_step}  | $N_c$ = {num_controlled}; off-road: {num_off_road/num_controlled:.2f}; collision: {num_collided/num_controlled:.2f}",
                 horizontalalignment="center",
                 verticalalignment="center",
                 transform=ax.transAxes,
-                fontsize=14,  
-                color="black",  # Optional: Change text color
+                fontsize=20,
+                color="black",
                 bbox=dict(facecolor="white", edgecolor="none", alpha=0.8),  # White background
             )
-        
+
+        # Determine center point for zooming
+        if center_agent_idx is not None:
+            center_x = global_agent_states.pos_x[env_idx, center_agent_idx].item()
+            center_y = global_agent_states.pos_y[env_idx, center_agent_idx].item()
+        else:
+            center_x = 0  # Default center x-coordinate (e.g., origin)
+            center_y = 0  # Default center y-coordinate (e.g., origin)
+
+        # Set zoom window around the center
+        ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
+        ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
+
         ax.set_xticks([])
         ax.set_yticks([])
-        
+
         return fig, ax
-        
 
     def _plot_roadgraph(
         self,
@@ -172,13 +204,17 @@ class MatplotlibVisualizer:
 
     def _plot_filtered_agent_bounding_boxes(
         self,
+        env_idx: int,
         ax: matplotlib.axes.Axes,
         agent_states: GlobalEgoState,
-        env_idx: int,
+        is_ok_mask: torch.Tensor,
+        is_offroad_mask: torch.Tensor,
+        is_collided_mask: torch.Tensor,
         control_type: Any,
         alpha: Optional[float] = 1.0,
         as_center_pts: bool = False,
         label: Optional[str] = None,
+        plot_goal_points: bool = True,
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -192,27 +228,14 @@ class MatplotlibVisualizer:
             label: Label for the plotted elements.
         """
 
-        # Plot controlled agents
-        controlled = control_type.controlled[env_idx, :]
-        # Remove out of bound agents (dead agents)
-        controlled = controlled & (torch.abs(agent_states.pos_x[env_idx, :]) < 1_000)
-
-        # Further divide by off-road, collided, and ok agents
-        infos = self.sim_object.info_tensor().to_torch().to(self.device)
-    
-        # fmt: off
-        is_offroad = (infos[env_idx, :, 0] == 1) & controlled
-        is_collided = (infos[env_idx, :, 1:3].sum(axis=1) == 1) & controlled
-        is_ok = ~is_offroad & ~is_collided & controlled
-
         # Off-road agents
         bboxes_controlled_offroad = np.stack(
             (
-                agent_states.pos_x[env_idx, is_offroad].numpy(),
-                agent_states.pos_y[env_idx, is_offroad].numpy(),
-                agent_states.vehicle_length[env_idx, is_offroad].numpy(),
-                agent_states.vehicle_width[env_idx, is_offroad].numpy(),
-                agent_states.rotation_angle[env_idx, is_offroad].numpy(),
+                agent_states.pos_x[env_idx, is_offroad_mask].numpy(),
+                agent_states.pos_y[env_idx, is_offroad_mask].numpy(),
+                agent_states.vehicle_length[env_idx, is_offroad_mask].numpy(),
+                agent_states.vehicle_width[env_idx, is_offroad_mask].numpy(),
+                agent_states.rotation_angle[env_idx, is_offroad_mask].numpy(),
             ),
             axis=1,
         )
@@ -226,35 +249,14 @@ class MatplotlibVisualizer:
             label=label,
         )
 
-        # Living agents
-        bboxes_controlled_ok = np.stack(
-            (
-                agent_states.pos_x[env_idx, is_ok].numpy(),
-                agent_states.pos_y[env_idx, is_ok].numpy(),
-                agent_states.vehicle_length[env_idx, is_ok].numpy(),
-                agent_states.vehicle_width[env_idx, is_ok].numpy(),
-                agent_states.rotation_angle[env_idx, is_ok].numpy(),
-            ),
-            axis=1,
-        )
-
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_controlled_ok,
-            color="g",
-            alpha=alpha,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
-
         # Collided agents
         bboxes_controlled_collided = np.stack(
             (
-                agent_states.pos_x[env_idx, is_collided].numpy(),
-                agent_states.pos_y[env_idx, is_collided].numpy(),
-                agent_states.vehicle_length[env_idx, is_collided].numpy(),
-                agent_states.vehicle_width[env_idx, is_collided].numpy(),
-                agent_states.rotation_angle[env_idx, is_collided].numpy(),
+                agent_states.pos_x[env_idx, is_collided_mask].numpy(),
+                agent_states.pos_y[env_idx, is_collided_mask].numpy(),
+                agent_states.vehicle_length[env_idx, is_collided_mask].numpy(),
+                agent_states.vehicle_width[env_idx, is_collided_mask].numpy(),
+                agent_states.rotation_angle[env_idx, is_collided_mask].numpy(),
             ),
             axis=1,
         )
@@ -268,8 +270,45 @@ class MatplotlibVisualizer:
             label=label,
         )
 
+        # Living agents
+        bboxes_controlled_ok = np.stack(
+            (
+                agent_states.pos_x[env_idx, is_ok_mask].numpy(),
+                agent_states.pos_y[env_idx, is_ok_mask].numpy(),
+                agent_states.vehicle_length[env_idx, is_ok_mask].numpy(),
+                agent_states.vehicle_width[env_idx, is_ok_mask].numpy(),
+                agent_states.rotation_angle[env_idx, is_ok_mask].numpy(),
+            ),
+            axis=1,
+        )
+
+        utils.plot_numpy_bounding_boxes(
+            ax=ax,
+            bboxes=bboxes_controlled_ok,
+            color="g",
+            alpha=alpha,
+            as_center_pts=as_center_pts,
+            label=label,
+        )
+
+        # Plot goal points for living agents
+        if plot_goal_points:
+            goal_x = agent_states.goal_x[env_idx, is_ok_mask].numpy()
+            goal_y = agent_states.goal_y[env_idx, is_ok_mask].numpy()
+            ax.scatter(
+                goal_x,
+                goal_y,
+                s=5,
+                c="g",
+                marker="x",
+            )
+
+            for x, y in zip(goal_x, goal_y):
+                circle = Circle((x, y), radius=self.goal_radius, color='g', fill=False, linestyle='--')
+                ax.add_patch(circle)
+
+
         # Plot agents that are marked as static
-        # Static agents mask
         static = control_type.static[env_idx, :]
 
         pos_x = agent_states.pos_x[env_idx, static]
@@ -278,15 +317,10 @@ class MatplotlibVisualizer:
         vehicle_length = agent_states.vehicle_length[env_idx, static]
         vehicle_width = agent_states.vehicle_width[env_idx, static]
 
-        # Define realistic bounds for positions and angles
-        # TODO: We shouldn't have to do this, this might be a bug
-        realistic_pos_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
+        # Define realistic bounds for static agent positions
+        valid_static_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
             torch.abs(pos_y) < OUT_OF_BOUNDS
         )
-        realistic_angle_mask = torch.abs(rotation_angle) < np.pi
-
-        # Combine masks
-        valid_static_mask = realistic_pos_mask & realistic_angle_mask
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
