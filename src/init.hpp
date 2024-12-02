@@ -54,6 +54,7 @@ namespace gpudrive
     {
         MapObject objects[MAX_OBJECTS];
         MapRoad roads[MAX_ROADS];
+        MetaData metadata;
 
         uint32_t numObjects;
         uint32_t numRoads;

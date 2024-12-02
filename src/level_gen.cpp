@@ -354,6 +354,8 @@ void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
 
     const auto& map = ctx.singleton<Map>();
+    auto& metadata = ctx.singleton<MetaData>();
+    metadata = map.metadata;
 
     if (ctx.data().enableRender)
     {
