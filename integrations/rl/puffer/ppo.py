@@ -569,6 +569,11 @@ class Experience:
 
         # Note: these should be filtered out
         # if self.obs[ptr:end].max() > 1.5:
+        #     # Set elements > 10 to zero
+        #     self.obs[ptr:end] = torch.where(
+        #         torch.abs(self.obs[ptr:end]) > 1.5, torch.zeros_like(self.obs[ptr:end]), self.obs[ptr:end]
+        #     )
+            
         #     print("obs max", self.obs[ptr:end].max())
         #     print("obs min", self.obs[ptr:end].min())
         #     print(f"{torch.where(obs > 1.5)[0]}")

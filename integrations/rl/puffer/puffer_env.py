@@ -65,6 +65,7 @@ class PufferGPUDrive(PufferEnv):
             num_scenes=self.num_worlds,
             discipline=SelectionDiscipline.K_UNIQUE_N,
             k_unique_scenes=self.k_unique_scenes,
+            seed=42 # Make scene sampling deterministic
         )
 
         # Override any default environment settings
@@ -103,6 +104,12 @@ class PufferGPUDrive(PufferEnv):
         )
         self.render_mode = "rgb_array"
         self.num_live = []
+        
+        # Get the tfrecord file names for every environment
+        self.env_to_files = {
+            env_idx: Path(file_path).name 
+            for env_idx, file_path in enumerate(self.env.dataset)
+        }
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         # Number of controlled agents across all worlds
@@ -197,7 +204,11 @@ class PufferGPUDrive(PufferEnv):
         self.render() if self.train_config.render else None
 
         # (2) Get rewards, terminal (dones) and info
-        reward = self.env.get_rewards()[self.controlled_agent_mask]
+        reward = self.env.get_rewards(
+            collision_weight=self.config.collision_weight,
+            off_road_weight=self.config.off_road_weight,
+            goal_achieved_weight=self.config.goal_achieved_weight,
+        )[self.controlled_agent_mask]
         terminal = self.env.get_dones().bool()
 
         self.episode_returns += reward
@@ -241,7 +252,7 @@ class PufferGPUDrive(PufferEnv):
                     frames_array = np.array(self.frames[render_env_idx])
                     self.wandb_obj.log(
                         {
-                            f"State/env_{render_env_idx}": wandb.Video(
+                            f"vis/state/env_{render_env_idx}: {self.env_to_files[render_env_idx]}": wandb.Video(
                                 np.moveaxis(frames_array, -1, 1),
                                 fps=self.train_config.render_fps,
                                 format=self.train_config.render_format,
@@ -249,6 +260,21 @@ class PufferGPUDrive(PufferEnv):
                             )
                         }
                     )
+                    
+                    # Log agent views
+                    if self.train_config.render_agent_obs:
+                        first_person_views = self.render_agent_observations(render_env_idx)
+                        # Log final observations to wandb
+                        for i in range(first_person_views.shape[0]):
+                            self.wandb_obj.log(
+                                {
+                                    f"vis/first_person_view/env_{render_env_idx}_agent_{i}": wandb.Image(
+                                        first_person_views[i],
+                                        caption=f"global step: {self.global_step:,}",
+                                    )
+                                }
+                            )
+                    
                     # Reset rendering storage
                     self.frames[render_env_idx] = []
                     self.rendering_in_progress[render_env_idx] = False
@@ -351,13 +377,15 @@ class PufferGPUDrive(PufferEnv):
                 # Visualize the simulator state
                 if self.rendering_in_progress[render_env_idx]:
                     time_step = self.episode_lengths[render_env_idx, :][0]
-                    sim_state_fig, _ = self.env.vis.plot_simulator_state(
-                        env_idx=render_env_idx,
-                        time_step=time_step,
-                    )
-                    print(f'Appending frame for env_{render_env_idx}...')
-                    self.frames[render_env_idx].append(img_from_fig(sim_state_fig))
-
+                    
+                    if self.train_config.render_simulator_state:
+                        sim_state_fig, _ = self.env.vis.plot_simulator_state(
+                            env_idx=render_env_idx,
+                            time_step=time_step,
+                        )
+                        print(f'Appending frame for env_{render_env_idx}...')
+                        self.frames[render_env_idx].append(img_from_fig(sim_state_fig))
+                        
     def _log_video(self, frames, key, wandb_obj, global_step):
         """TODO: Helper function to log a video to WandB."""
         if frames:
@@ -401,43 +429,21 @@ class PufferGPUDrive(PufferEnv):
             )
         self.agent_frames_dict[f"env_{env_idx}"].clear()
 
-    # def render_agent_observations(self, env_idx, time_step):
-    #     """Render a single observation."""
-    #     agent_ids = torch.where(self.controlled_agent_mask[env_idx, :])[
-    #         0
-    #     ].cpu()
+    def render_agent_observations(self, env_idx):
+        """Render a single observation."""
+        agent_ids = torch.where(self.controlled_agent_mask[env_idx, :])[
+            0
+        ].cpu()
 
-    #     ego_state = LocalEgoState.from_tensor(
-    #         self_obs_tensor=self.env.sim.self_observation_tensor(),
-    #         backend=self.env.backend,
-    #         device="cpu",
-    #     ).clone()
+        img_arrays = []
 
-    #     local_roadgraph = LocalRoadGraphPoints.from_tensor(
-    #         local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
-    #         backend=self.env.backend,
-    #         device="cpu",
-    #     ).clone()
+        for agent_id in agent_ids:
 
-    #     partner_obs = PartnerObs.from_tensor(
-    #         partner_obs_tensor=self.env.sim.partner_observations_tensor(),
-    #         backend=self.env.backend,
-    #         device="cpu",
-    #     ).clone()
+            observation_fig, _ = self.env.vis.plot_agent_observation(
+                env_idx=env_idx,
+                agent_idx=agent_id.item(),
+            )
 
-    #     img_arrays = []
+            img_arrays.append(img_from_fig(observation_fig))
 
-    #     for agent_id in agent_ids:
-
-    #         observation_fig, _ = plot_agent_observation(
-    #             env_idx=env_idx,
-    #             agent_idx=agent_id.item(),
-    #             observation_roadgraph=local_roadgraph,
-    #             observation_ego=ego_state,
-    #             observation_partner=partner_obs,
-    #             time_step=time_step,
-    #         )
-
-    #         img_arrays.append(img_from_fig(observation_fig))
-
-    #     return np.array(img_arrays)
+        return np.array(img_arrays)

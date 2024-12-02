@@ -91,9 +91,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_rewards(
         self,
-        collision_weight=-0.001,
+        collision_weight=-0.005,
         goal_achieved_weight=1.0,
-        off_road_weight=-0.001,
+        off_road_weight=-0.005,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -323,7 +323,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         partner_obs.orientation,
                         partner_obs.vehicle_length,
                         partner_obs.vehicle_width,
-                        partner_obs.agent_type,
+                        #TODO: Potentially add back later
+                        #partner_obs.agent_type,
                     ],
                     dim=-1,
                 )

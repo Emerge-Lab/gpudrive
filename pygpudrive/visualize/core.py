@@ -9,8 +9,8 @@ from matplotlib.patches import Circle
 import numpy as np
 import gpudrive
 from pygpudrive.visualize import utils
-from pygpudrive.datatypes.roadgraph import GlobalRoadGraphPoints
-from pygpudrive.datatypes.observation import GlobalEgoState
+from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
+from pygpudrive.datatypes.observation import LocalEgoState, GlobalEgoState, PartnerObs
 from pygpudrive.datatypes.control import ControlMasks
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -48,7 +48,7 @@ class MatplotlibVisualizer:
         time_step: int=None,
         center_agent_idx=None,
         figsize: Tuple[int, int] = (15, 15),
-        zoom_radius: int = 90,
+        zoom_radius: int = 100,
     ):
         """Plot the current state of the simulator from a birds' eye view."""
 
@@ -345,12 +345,12 @@ class MatplotlibVisualizer:
         )
 
     def plot_agent_observation(
+        self,
         agent_idx: int,
         env_idx: int,
         observation_roadgraph: torch.Tensor = None,
         observation_ego: torch.Tensor = None,
         observation_partner: torch.Tensor = None,
-        time_step: int = 0,
         x_lim: Tuple[float, float] = (-100, 100),
         y_lim: Tuple[float, float] = (-100, 100),
         viz_config=None,
@@ -359,14 +359,27 @@ class MatplotlibVisualizer:
         Args:
             agent_idx (int): Index of the agent whose observation is to be plotted.
             env_idx (int): Index of the environment in the batch.
-            observation_roadgraph (torch.Tensor, optional): Roadgraph tensor. Defaults to None.
-            observation_ego (torch.Tensor, optional): Ego observation tensor. Defaults to None.
-            observation_partner (torch.Tensor, optional): Partner observation tensor. Defaults to None.
-            time_step (int, optional): Time step of the observation. Defaults to 0.
             x_lim (Tuple[float, float], optional): x-axis limits. Defaults to (-100, 100).
             y_lim (Tuple[float, float], optional): y-axis limits. Defaults to (-100, 100).
             viz_config ([type], optional): Visualization config. Defaults to None.
         """
+        observation_ego = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim_object.self_observation_tensor(),
+            backend=self.backend,
+            device="cpu",
+        )
+
+        observation_roadgraph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
+            backend=self.backend,
+            device="cpu",
+        )
+
+        observation_partner = PartnerObs.from_tensor(
+            partner_obs_tensor=self.sim_object.partner_observations_tensor(),
+            backend=self.backend,
+            device="cpu",
+        )
 
         # Check if agent index is valid, otherwise return None
         if observation_ego.id[env_idx, agent_idx] == -1:
@@ -379,7 +392,7 @@ class MatplotlibVisualizer:
         )
 
         fig, ax = utils.init_fig_ax(viz_config)
-        ax.set_title(f"$t$ = {time_step} | obs agent: {agent_idx}")
+        ax.set_title(f"obs agent: {agent_idx}")
 
         # Plot roadgraph if provided
         if observation_roadgraph is not None:
@@ -392,7 +405,7 @@ class MatplotlibVisualizer:
                     observation_roadgraph.x[env_idx, agent_idx, mask],
                     observation_roadgraph.y[env_idx, agent_idx, mask],
                     c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=10,
+                    s=7,
                     label=type_name,
                 )
 
