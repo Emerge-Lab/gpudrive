@@ -375,6 +375,17 @@ namespace gpudrive
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
+    //Metadata struct : masks on agent id
+    struct MetaData
+    {
+        uint32_t sdc_mask[consts::kMaxAgentCount] = {0};
+        uint32_t objects_of_interest[consts::kMaxAgentCount] = {0};
+        uint32_t tracks_to_predict[consts::kMaxAgentCount] = {0};
+        uint32_t difficulty[consts::kMaxAgentCount] = {0};
+    };
+    const size_t MetaDataExportSize = consts::kMaxAgentCount * 4;
+    static_assert(sizeof(MetaData) == sizeof(uint32_t) * MetaDataExportSize);
+
     struct AgentInterface : public madrona::Archetype<
                                 Action,
                                 Reward,

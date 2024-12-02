@@ -2,6 +2,7 @@
 
 #include "init.hpp"
 #include "types.hpp"
+#include "consts.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -270,6 +271,33 @@ namespace gpudrive
     }
 
 
+    void from_json(const nlohmann::json &j, MetaData &metadata)
+    {
+        int sdc_index = j.at("sdc_track_index").get<int>();
+        metadata.sdc_mask[sdc_index] = 1;
+        
+        for (const auto &obj_of_interest : j.at("objects_of_interest"))
+        {
+            int agent_index = obj_of_interest.get<int>();
+            if (agent_index < consts::kMaxAgentCount) 
+            {
+                metadata.objects_of_interest[agent_index] = 1;
+            }
+        }
+        
+        for (const auto &track_to_predict : j.at("tracks_to_predict"))
+        {
+            int agent_index = track_to_predict.at("track_index").get<int>();
+            uint32_t difficulty = track_to_predict.at("difficulty").get<uint32_t>();
+            if (agent_index < consts::kMaxAgentCount)
+            {
+                metadata.tracks_to_predict[agent_index] = 1;
+                metadata.difficulty[agent_index] = difficulty;
+            }
+        }
+    }
+
+
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
         auto mean = calc_mean(j);
@@ -296,5 +324,7 @@ namespace gpudrive
             ++idx;
         }
         map.numRoadSegments = countRoadPoints;
+
+        from_json(j.at("metadata"), map.metadata);
     }
 }

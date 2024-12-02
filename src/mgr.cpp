@@ -796,6 +796,13 @@ Tensor Manager::expertTrajectoryTensor() const {
         {impl_->numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
 }
 
+Tensor Manager::metadataTensor() const {
+    return impl_->exportTensor(
+        ExportID::MetaData, TensorElementType::Int32,
+        {impl_->numWorlds, MetaDataExportSize}
+    );
+}
+
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
