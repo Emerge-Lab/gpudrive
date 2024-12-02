@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 #endif
 
     WindowManager wm {};
-    WindowHandle window = wm.makeWindow("Escape Room", 1920, 1080);
+    WindowHandle window = wm.makeWindow("GPUDrive", 1920, 1080);
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
