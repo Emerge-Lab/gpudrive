@@ -22,8 +22,8 @@ OUT_OF_BOUNDS = 100
 
 connect_points_thresholds = {
     int(gpudrive.EntityType.RoadEdge): 20,
-    int(gpudrive.EntityType.RoadLine): 8,
-    int(gpudrive.EntityType.RoadLane): 8,
+    int(gpudrive.EntityType.RoadLine): 10,
+    int(gpudrive.EntityType.RoadLane): 10,
 }
 
 

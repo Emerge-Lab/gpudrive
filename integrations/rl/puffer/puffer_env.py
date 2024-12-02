@@ -20,7 +20,8 @@ from pygpudrive.datatypes.observation import (
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-#from pygpudrive.visualize.core import plot_agent_observation
+
+# from pygpudrive.visualize.core import plot_agent_observation
 from pygpudrive.visualize.utils import img_from_fig
 
 from pufferlib.environment import PufferEnv
@@ -65,7 +66,7 @@ class PufferGPUDrive(PufferEnv):
             num_scenes=self.num_worlds,
             discipline=SelectionDiscipline.K_UNIQUE_N,
             k_unique_scenes=self.k_unique_scenes,
-            seed=42 # Make scene sampling deterministic
+            seed=42,  # Make scene sampling deterministic
         )
 
         # Override any default environment settings
@@ -104,10 +105,10 @@ class PufferGPUDrive(PufferEnv):
         )
         self.render_mode = "rgb_array"
         self.num_live = []
-        
+
         # Get the tfrecord file names for every environment
         self.env_to_files = {
-            env_idx: Path(file_path).name 
+            env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.env.dataset)
         }
 
@@ -260,10 +261,12 @@ class PufferGPUDrive(PufferEnv):
                             )
                         }
                     )
-                    
+
                     # Log agent views
                     if self.train_config.render_agent_obs:
-                        first_person_views = self.render_agent_observations(render_env_idx)
+                        first_person_views = self.render_agent_observations(
+                            render_env_idx
+                        )
                         # Log final observations to wandb
                         for i in range(first_person_views.shape[0]):
                             self.wandb_obj.log(
@@ -274,7 +277,7 @@ class PufferGPUDrive(PufferEnv):
                                     )
                                 }
                             )
-                    
+
                     # Reset rendering storage
                     self.frames[render_env_idx] = []
                     self.rendering_in_progress[render_env_idx] = False
@@ -373,19 +376,21 @@ class PufferGPUDrive(PufferEnv):
                     and not self.was_rendered_in_rollout[render_env_idx]
                 ):
                     self.rendering_in_progress[render_env_idx] = True
-                    
+
                 # Visualize the simulator state
                 if self.rendering_in_progress[render_env_idx]:
                     time_step = self.episode_lengths[render_env_idx, :][0]
-                    
+
                     if self.train_config.render_simulator_state:
                         sim_state_fig, _ = self.env.vis.plot_simulator_state(
                             env_idx=render_env_idx,
                             time_step=time_step,
                         )
-                        print(f'Appending frame for env_{render_env_idx}...')
-                        self.frames[render_env_idx].append(img_from_fig(sim_state_fig))
-                        
+                        print(f"Appending frame for env_{render_env_idx}...")
+                        self.frames[render_env_idx].append(
+                            img_from_fig(sim_state_fig)
+                        )
+
     def _log_video(self, frames, key, wandb_obj, global_step):
         """TODO: Helper function to log a video to WandB."""
         if frames:

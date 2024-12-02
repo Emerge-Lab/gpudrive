@@ -14,7 +14,7 @@ ROAD_GRAPH_COLORS = {
     6: np.array([255, 0, 0]) / 255.0,  # 'StopSign' (Red)
 }
 
-ROAD_GRAPH_TYPE_NAMES = { # 1-6 ; 0 is None (padding)
+ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
     int(gpudrive.EntityType.RoadEdge): "Road edge",
     int(gpudrive.EntityType.RoadLine): "Road line",
     int(gpudrive.EntityType.RoadLane): "Lane center",

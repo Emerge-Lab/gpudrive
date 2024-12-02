@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/validation" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples" 
+data_dir: "data/processed/validation" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -64,8 +64,8 @@ train:
   compile_mode: "reduce-overhead"
   # Rendering configs
   render: true # Determines whether to render the environment
-  render_interval: 1 # Render every k iterations
-  render_k_scenarios: 10 # Number of scenarios to render
+  render_interval: 2 # Render every k iterations
+  render_k_scenarios: 1 # Number of scenarios to render
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_fps: 15 # Frames per second
