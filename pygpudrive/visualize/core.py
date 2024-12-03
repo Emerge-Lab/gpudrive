@@ -18,12 +18,12 @@ from pygpudrive.visualize.color import (
     REL_OBS_OBJ_COLORS,
 )
 
-OUT_OF_BOUNDS = 100
+OUT_OF_BOUNDS = 1000
 
 connect_points_thresholds = {
-    int(gpudrive.EntityType.RoadEdge): 20,
-    int(gpudrive.EntityType.RoadLine): 12,
-    int(gpudrive.EntityType.RoadLane): 12,
+    int(gpudrive.EntityType.RoadEdge): 30,
+    int(gpudrive.EntityType.RoadLine): 10,
+    int(gpudrive.EntityType.RoadLane): 10,
 }
 
 
@@ -248,6 +248,21 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
+        
+        if plot_goal_points:
+            goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
+            goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
+            ax.scatter(
+                goal_x,
+                goal_y,
+                s=5,
+                c="orange",
+                marker="x",
+            )
+
+            for x, y in zip(goal_x, goal_y):
+                circle = Circle((x, y), radius=self.goal_radius, color='orange', fill=False, linestyle='--')
+                ax.add_patch(circle)
 
         # Collided agents
         bboxes_controlled_collided = np.stack(
@@ -269,6 +284,21 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
+                
+        if plot_goal_points:
+            goal_x = agent_states.goal_x[env_idx, is_collided_mask].numpy()
+            goal_y = agent_states.goal_y[env_idx, is_collided_mask].numpy()
+            ax.scatter(
+                goal_x,
+                goal_y,
+                s=5,
+                c="r",
+                marker="x",
+            )
+
+            for x, y in zip(goal_x, goal_y):
+                circle = Circle((x, y), radius=self.goal_radius, color='r', fill=False, linestyle='--')
+                ax.add_patch(circle)
 
         # Living agents
         bboxes_controlled_ok = np.stack(
@@ -291,7 +321,6 @@ class MatplotlibVisualizer:
             label=label,
         )
 
-        # Plot goal points for living agents
         if plot_goal_points:
             goal_x = agent_states.goal_x[env_idx, is_ok_mask].numpy()
             goal_y = agent_states.goal_y[env_idx, is_ok_mask].numpy()
@@ -308,7 +337,7 @@ class MatplotlibVisualizer:
                 ax.add_patch(circle)
 
 
-        # Plot agents that are marked as static
+        # Plot static agents 
         static = control_type.static[env_idx, :]
 
         pos_x = agent_states.pos_x[env_idx, static]
@@ -392,6 +421,8 @@ class MatplotlibVisualizer:
         )
 
         fig, ax = utils.init_fig_ax(viz_config)
+        ax.clear() # Clear any previous plots
+        ax.set_aspect('equal', adjustable='box')
         ax.set_title(f"obs agent: {agent_idx}")
 
         # Plot roadgraph if provided
