@@ -137,7 +137,14 @@ class MatplotlibVisualizer:
         ax.set_yticks([])
 
         return fig, ax
-
+    
+    def _get_endpoints(self, x, y, length, yaw):
+        """Compute the start and end points of a road segment."""
+        center = np.array([x, y])
+        start = center - np.array([length * np.cos(yaw), length * np.sin(yaw)])
+        end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
+        return start, end
+    
     def _plot_roadgraph(
         self,
         env_idx: int,
@@ -158,46 +165,30 @@ class MatplotlibVisualizer:
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
                 ):
-                    # Get coordinates and IDs
+                    # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
                     y_coords = road_graph.y[env_idx, road_mask].tolist()
-                    ids = road_graph.id[env_idx, road_mask].tolist()
+                    segment_lengths = road_graph.segment_length[env_idx, road_mask].tolist()
+                    segment_orientations = road_graph.orientation[env_idx, road_mask].tolist()
 
-                    # Group points by ID
-                    id_to_points = {}
-                    for x, y, point_id in zip(x_coords, y_coords, ids):
-                        if point_id not in id_to_points:
-                            id_to_points[point_id] = []
-                        id_to_points[point_id].append((x, y))
+                    # Compute and draw road edges using start and end points
+                    for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
+                        start, end = self._get_endpoints(x, y, length, orientation)
 
-                    # Connect points within each road ID group
-                    for point_id, points in id_to_points.items():
-                        if len(points) > 1:
-                            for i in range(len(points) - 1):
-                                p1, p2 = points[i], points[i + 1]
-                                distance = (
-                                    (p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2
-                                ) ** 0.5
+                        # Plot the road edge as a line
+                        ax.plot(
+                            [start[0], end[0]],
+                            [start[1], end[1]],
+                            color=ROAD_GRAPH_COLORS[road_point_type],
+                            linewidth=0.75
+                        )
 
-                                if (
-                                    distance
-                                    <= connect_points_thresholds[
-                                        road_point_type
-                                    ]
-                                ):
-                                    ax.plot(
-                                        [p1[0], p2[0]],
-                                        [p1[1], p2[1]],
-                                        color=ROAD_GRAPH_COLORS[
-                                            road_point_type
-                                        ],
-                                        linewidth=1,
-                                    )
                 else:
+                    # Dots for other road point types
                     ax.scatter(
                         road_graph.x[env_idx, road_mask],
                         road_graph.y[env_idx, road_mask],
-                        s=2,
+                        s=5,
                         label=road_point_type,
                         color=ROAD_GRAPH_COLORS[int(road_point_type)],
                     )
@@ -248,7 +239,7 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
-        
+
         if plot_goal_points:
             goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
             goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
@@ -284,7 +275,7 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
-                
+
         if plot_goal_points:
             goal_x = agent_states.goal_x[env_idx, is_collided_mask].numpy()
             goal_y = agent_states.goal_y[env_idx, is_collided_mask].numpy()
@@ -337,7 +328,7 @@ class MatplotlibVisualizer:
                 ax.add_patch(circle)
 
 
-        # Plot static agents 
+        # Plot static agents
         static = control_type.static[env_idx, :]
 
         pos_x = agent_states.pos_x[env_idx, static]
