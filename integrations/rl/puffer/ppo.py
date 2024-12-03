@@ -105,17 +105,14 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
-    # TODO: Improve
+    # TODO(dc): Hacky -> improve
     data.vecenv.rendering_in_progress = {
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
     data.vecenv.was_rendered_in_rollout = {
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
-    data.vecenv.global_step = data.global_step
     data.vecenv.wandb_obj = data.wandb
-    data.num_rollouts += 1
-    data.vecenv.iters = data.num_rollouts
 
     config, profile, experience = data.config, data.profile, data.experience
 
@@ -177,8 +174,15 @@ def evaluate(data):
         for k, v in infos.items():
             try:
                 data.stats[k] = np.mean(v)
+                # Log variance for goal and collision metrics
+                if 'goal' in k or 'collision' in k or 'offroad' in k:
+                    data.stats[f'{k}_std'] = np.std(v)
             except:
                 continue
+            
+    data.vecenv.iters += 1
+    data.num_rollouts += 1
+    data.vecenv.global_step = data.global_step.copy()
 
     return data.stats, infos
 
