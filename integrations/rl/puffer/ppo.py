@@ -123,7 +123,7 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
-
+        
         with profile.env:
             # Receive data from current timestep
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
@@ -175,12 +175,12 @@ def evaluate(data):
             try:
                 data.stats[k] = np.mean(v)
                 # Log variance for goal and collision metrics
-                if 'goal' in k or 'collision' in k or 'offroad' in k:
-                    data.stats[f'{k}_std'] = np.std(v)
+                # if 'goal' in k or 'collision' in k or 'offroad' in k:
+                #     data.stats[f'{k}_std'] = np.std(v)
             except:
                 continue
             
-    data.vecenv.iters += 1
+    
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
 
@@ -570,18 +570,6 @@ class Experience:
         end = ptr + len(indices)
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
-
-        # Note: these should be filtered out
-        # if self.obs[ptr:end].max() > 1.5:
-        #     # Set elements > 10 to zero
-        #     self.obs[ptr:end] = torch.where(
-        #         torch.abs(self.obs[ptr:end]) > 1.5, torch.zeros_like(self.obs[ptr:end]), self.obs[ptr:end]
-        #     )
-
-        #     print("obs max", self.obs[ptr:end].max())
-        #     print("obs min", self.obs[ptr:end].min())
-        #     print(f"{torch.where(obs > 1.5)[0]}")
-
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
         self.actions_np[ptr:end] = action[indices]
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]
