@@ -22,9 +22,7 @@ namespace gpudrive
     struct MapObject
     {
         MapVector2 position[MAX_POSITIONS];
-        float width;
-        float length;
-        float height;
+        VehicleSize vehicle_size;
         float heading[MAX_POSITIONS];
         MapVector2 velocity[MAX_POSITIONS];
         bool valid[MAX_POSITIONS];

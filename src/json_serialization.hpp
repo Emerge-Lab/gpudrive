@@ -32,9 +32,9 @@ namespace gpudrive
             }
         }
         obj.numPositions = i;
-        j.at("width").get_to(obj.width);
-        j.at("length").get_to(obj.length);
-        j.at("height").get_to(obj.height);
+        j.at("width").get_to(obj.vehicle_size.width);
+        j.at("length").get_to(obj.vehicle_size.length);
+        j.at("height").get_to(obj.vehicle_size.height);
 
         i = 0;
         for (const auto &h : j.at("heading"))
