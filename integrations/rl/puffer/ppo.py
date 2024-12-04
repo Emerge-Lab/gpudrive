@@ -94,6 +94,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         global_step=0,
         global_step_pad=0,
         num_rollouts=0,
+        resample_counter=0,
         epoch=0,
         stats={},
         msg=msg,
@@ -105,17 +106,24 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
-    # TODO: Improve
+    if data.config.resample_scenes:
+        if (
+            data.config.resample_criterion == "global_step"
+            and data.resample_counter >= data.config.resample_interval
+        ):
+            # Sample new batch of scenarios
+            data.vecenv.resample_scenario_batch()
+            # Reset counter
+            data.resample_counter = 0
+
+    # TODO(dc): Hacky -> improve
     data.vecenv.rendering_in_progress = {
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
     data.vecenv.was_rendered_in_rollout = {
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
-    data.vecenv.global_step = data.global_step
     data.vecenv.wandb_obj = data.wandb
-    data.num_rollouts += 1
-    data.vecenv.iters = data.num_rollouts
 
     config, profile, experience = data.config, data.profile, data.experience
 
@@ -135,6 +143,7 @@ def evaluate(data):
         with profile.eval_misc:
             data.global_step += sum(mask)
             data.global_step_pad += data.vecenv.total_agents
+            data.resample_counter += sum(mask)
 
             o = torch.as_tensor(o)
             o_device = o.to(config.device)
@@ -177,8 +186,14 @@ def evaluate(data):
         for k, v in infos.items():
             try:
                 data.stats[k] = np.mean(v)
+                # Log variance for goal and collision metrics
+                if "goal" in k or "collision" in k or "offroad" in k:
+                    data.stats[f"{k}_std"] = np.std(v)
             except:
                 continue
+
+    data.num_rollouts += 1
+    data.vecenv.global_step = data.global_step.copy()
 
     return data.stats, infos
 
@@ -566,18 +581,6 @@ class Experience:
         end = ptr + len(indices)
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
-
-        # Note: these should be filtered out
-        # if self.obs[ptr:end].max() > 1.5:
-        #     # Set elements > 10 to zero
-        #     self.obs[ptr:end] = torch.where(
-        #         torch.abs(self.obs[ptr:end]) > 1.5, torch.zeros_like(self.obs[ptr:end]), self.obs[ptr:end]
-        #     )
-
-        #     print("obs max", self.obs[ptr:end].max())
-        #     print("obs min", self.obs[ptr:end].min())
-        #     print(f"{torch.where(obs > 1.5)[0]}")
-
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
         self.actions_np[ptr:end] = action[indices]
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]

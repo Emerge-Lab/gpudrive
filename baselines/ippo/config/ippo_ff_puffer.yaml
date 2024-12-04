@@ -2,47 +2,60 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/validation" #"data/formatted_json_v2_no_tl_valid" #"data/processed/examples"
+data_dir: "data/processed/validation"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 10 # Number of unique scenes to sample from
+  k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   normalize_obs: true
-  remove_non_vehicles: false
-  use_lidar_obs: false # automatically turns of the other observation types
+  remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
+  use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
   collision_weight: -0.005
-  off_road_weight: -0.01
+  off_road_weight: -0.005
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" #"remove"
-  dist_to_goal_threshold: 5.0
-  polyline_reduction_threshold: 0.4 # Rate at which to sample points from the polyline (0 is all, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
-
+  dist_to_goal_threshold: 3.0
+  polyline_reduction_threshold: 0.2 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
+  sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
+  obs_radius: 60.0 # Visibility radius of the agents
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "visualize_failures"
+  group: "talk_figures"
   mode: "online" # Options: online, offline, disabled
-  tags: ["ppo", "ff", "single_scene"]
+  tags: ["ppo", "ff"]
 
 ## NOTES
 ## Set batch size to 128 * number of controlled agents (e.g. 2**18)
 ## Minibatch size 1/16 of batch size, eg. 16_000
 
 train:
-  exp_id: Puffer_new_data  # Set dynamically in the script if needed
+  exp_id: PPO # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
+  bptt_horizon: 2
+  compile: false
+  compile_mode: "reduce-overhead"
+
+  # # # Data sampling # # #
+  resample_scenes: true
+  resample_criterion: "global_step"
+  resample_interval: 3_000_000
+  resample_mode: "random" # Options: random
+  resample_seed: 42 # TODO: Seed
+
+  # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 80_000_000
-  batch_size: 32_768
+  total_timesteps: 50_000_000
+  batch_size: 65_536
   minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
@@ -53,21 +66,21 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.0001
+  ent_coef: 0.0003
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  checkpoint_interval: 100 # Save policy every k iterations
+
+  # # # Checkpointing # # #
+  checkpoint_interval: 1000 # Save policy every k iterations
   checkpoint_path: "./runs"
-  bptt_horizon: 2
-  compile: false
-  compile_mode: "reduce-overhead"
-  # Rendering configs
+
+  # # # Rendering # # #
   render: true # Determines whether to render the environment
-  render_interval: 2 # Render every k iterations
-  render_k_scenarios: 1 # Number of scenarios to render
-  render_agent_obs: false # Debugging tool, plot what an agent is seing
+  render_interval: 100_000 # Render every k iterations
+  render_k_scenarios: 5 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view
+  render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_fps: 15 # Frames per second
   render_format: "mp4" # Options: gif, mp4
 
