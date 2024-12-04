@@ -41,17 +41,17 @@ train:
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
-  bptt_horizon: 2 
+  bptt_horizon: 2
   compile: false
   compile_mode: "reduce-overhead"
-  
+
   # # # Data sampling # # #
   resample_scenes: true
   resample_criterion: "global_step"
   resample_interval: 3_000_000
   resample_mode: "random" # Options: random
   resample_seed: 42 # TODO: Seed
-  
+
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 50_000_000
@@ -74,8 +74,8 @@ train:
   # # # Checkpointing # # #
   checkpoint_interval: 1000 # Save policy every k iterations
   checkpoint_path: "./runs"
-  
-  # # # Rendering # # # 
+
+  # # # Rendering # # #
   render: true # Determines whether to render the environment
   render_interval: 100_000 # Render every k iterations
   render_k_scenarios: 5 # Number of scenarios to render
