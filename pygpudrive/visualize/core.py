@@ -243,7 +243,7 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_controlled_offroad,
-            color="orange",
+            color="lightgrey",
             alpha=alpha,
             as_center_pts=as_center_pts,
             label=label,
@@ -285,7 +285,8 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_controlled_ok,
-            color="g",
+            # color="g",
+            color = '#75b5c5', #waymax color for controlled vehicles
             alpha=alpha,
             as_center_pts=as_center_pts,
             label=label,
@@ -299,12 +300,12 @@ class MatplotlibVisualizer:
                 goal_x,
                 goal_y,
                 s=5,
-                c="g",
+                c="skyblue",
                 marker="x",
             )
 
             for x, y in zip(goal_x, goal_y):
-                circle = Circle((x, y), radius=self.goal_radius, color='g', fill=False, linestyle='--')
+                circle = Circle((x, y), radius=self.goal_radius, color='#75b5c5', fill=False, linestyle='--')
                 ax.add_patch(circle)
 
 
@@ -338,7 +339,8 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_static,
-            color="darkslategray",
+            # color="darkslategray",
+            color = "gray",
             alpha=alpha,
             as_center_pts=as_center_pts,
             label=label,
