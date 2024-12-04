@@ -300,6 +300,13 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
+        // Check total number of objects against max agent count
+        size_t totalObjects = j.at("objects").size();
+        if (totalObjects > consts::kMaxAgentCount) {
+            std::cerr << "Warning: Number of objects in scene (" << totalObjects 
+                      << ") exceeds the max agent count (" << consts::kMaxAgentCount 
+                      << "). Metadata tensor will be invalid." << std::endl;
+        }
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
