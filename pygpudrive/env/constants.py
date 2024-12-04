@@ -6,6 +6,7 @@ import numpy as np
 MAX_SPEED = 100
 MAX_VEH_LEN = 30
 MAX_VEH_WIDTH = 10
+MAX_VEH_HEIGHT = 3 # What's the appropriate value to set this to?
 MIN_REL_GOAL_COORD = -1000
 MAX_REL_GOAL_COORD = 1000
 MIN_REL_AGENT_POS = -1000
