@@ -94,6 +94,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         global_step=0,
         global_step_pad=0,
         num_rollouts=0,
+        resample_counter=0,
         epoch=0,
         stats={},
         msg=msg,
@@ -104,6 +105,16 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
 @pufferlib.utils.profile
 def evaluate(data):
+
+    if data.config.resample_scenes:
+        if (
+            data.config.resample_criterion == "global_step"
+            and data.resample_counter >= data.config.resample_interval
+        ):
+            # Sample new batch of scenarios
+            data.vecenv.resample_scenario_batch()
+            # Reset counter
+            data.resample_counter = 0
 
     # TODO(dc): Hacky -> improve
     data.vecenv.rendering_in_progress = {
@@ -123,7 +134,7 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
-        
+
         with profile.env:
             # Receive data from current timestep
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
@@ -132,6 +143,7 @@ def evaluate(data):
         with profile.eval_misc:
             data.global_step += sum(mask)
             data.global_step_pad += data.vecenv.total_agents
+            data.resample_counter += sum(mask)
 
             o = torch.as_tensor(o)
             o_device = o.to(config.device)
@@ -175,12 +187,11 @@ def evaluate(data):
             try:
                 data.stats[k] = np.mean(v)
                 # Log variance for goal and collision metrics
-                # if 'goal' in k or 'collision' in k or 'offroad' in k:
-                #     data.stats[f'{k}_std'] = np.std(v)
+                if "goal" in k or "collision" in k or "offroad" in k:
+                    data.stats[f"{k}_std"] = np.std(v)
             except:
                 continue
-            
-    
+
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
 

@@ -62,12 +62,19 @@ class PufferGPUDrive(PufferEnv):
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
         os.chdir(working_dir)
 
+        self.all_scene_paths = [
+            os.path.join(self.data_dir, scene)
+            for scene in sorted(os.listdir(self.data_dir))
+            if scene.startswith("tfrecord")
+        ]
+        self.unique_scene_paths = list(set(self.all_scene_paths))
+
         scene_config = SceneConfig(
             path=data_dir,
             num_scenes=self.num_worlds,
             discipline=SelectionDiscipline.K_UNIQUE_N,
             k_unique_scenes=self.k_unique_scenes,
-            seed=self.config.sampling_seed, 
+            seed=self.config.sampling_seed,
         )
 
         # Override any default environment settings
@@ -175,7 +182,8 @@ class PufferGPUDrive(PufferEnv):
             self.num_agents, dtype=torch.float32
         ).to(self.device)
         self.agent_episode_returns = torch.zeros(
-            (self.num_worlds, self.max_cont_agents_per_env), dtype=torch.float32
+            (self.num_worlds, self.max_cont_agents_per_env),
+            dtype=torch.float32,
         ).to(self.device)
         self.episode_lengths = torch.zeros(
             (self.num_worlds, self.max_cont_agents_per_env),
@@ -227,11 +235,11 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()
         )
-        #TODO(dc): Look into rewards
+        # TODO(dc): Look into rewards
         self.agent_episode_returns += reward
         self.episode_returns += reward_controlled
         self.episode_lengths += 1
-        
+
         # (4) Use previous live agent mask as mask
         self.masks = (  # Flattend mask: (num_worlds * max_cont_agents_per_env)
             self.live_agent_mask[self.controlled_agent_mask].cpu().numpy()
@@ -240,7 +248,7 @@ class PufferGPUDrive(PufferEnv):
         # (5) Set the mask to False for _agents_ that are terminated for the next step
         # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
-        
+
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
 
@@ -250,7 +258,9 @@ class PufferGPUDrive(PufferEnv):
 
             # Log episode videos
             if self.train_config.render:
-                for render_env_idx in range(self.train_config.render_k_scenarios):
+                for render_env_idx in range(
+                    self.train_config.render_k_scenarios
+                ):
                     if (
                         render_env_idx in done_worlds
                         and len(self.frames[render_env_idx]) > 0
@@ -286,7 +296,7 @@ class PufferGPUDrive(PufferEnv):
                                     )
                                 }
                             )
-                            
+
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
                 done_worlds, :
@@ -294,8 +304,10 @@ class PufferGPUDrive(PufferEnv):
             info_tensor = self.env.get_infos()[done_worlds, :, :][
                 controlled_mask
             ]
-            agent_episode_returns = self.agent_episode_returns[done_worlds, :][controlled_mask]
-            
+            agent_episode_returns = self.agent_episode_returns[done_worlds, :][
+                controlled_mask
+            ]
+
             local_roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
                 backend="torch",
@@ -304,26 +316,28 @@ class PufferGPUDrive(PufferEnv):
             rg_sparsity = (
                 local_roadgraph.type[self.controlled_agent_mask] == 0
             ).sum() / local_roadgraph.type[self.controlled_agent_mask].numel()
-            
+
             num_finished_agents = controlled_mask.sum().item()
-            #TODO: Fix this, we should always have at least one controlled agent per env
-            if num_finished_agents > 0: 
+            # TODO: Fix this, we should always have at least one controlled agent per env
+            if num_finished_agents > 0:
                 info.append(
                     {
-                        "mean_episode_reward_per_agent": agent_episode_returns
-                        .mean()
-                        .item(),
+                        "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
                         "perc_goal_achieved": info_tensor[:, 3].sum().item()
                         / num_finished_agents,
                         "perc_off_road": info_tensor[:, 0].sum().item()
                         / num_finished_agents,
                         "perc_veh_collisions": info_tensor[:, 1].sum().item()
                         / num_finished_agents,
-                        "perc_non_veh_collision": info_tensor[:, 2].sum().item()
+                        "perc_non_veh_collision": info_tensor[:, 2]
+                        .sum()
+                        .item()
                         / num_finished_agents,
                         "control_density": (
-                            self.num_agents / self.controlled_agent_mask.numel()
+                            self.num_agents
+                            / self.controlled_agent_mask.numel()
                         ),
+                        "total_controlled_agents": self.num_agents,
                         "episode_length": self.episode_lengths[done_worlds, :]
                         .mean()
                         .item(),
@@ -342,7 +356,6 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
                 # Reset terminals for reset envs
                 # terminal[idx, :] = self.env.get_dones()[idx, :].bool()
-
 
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
@@ -374,7 +387,7 @@ class PufferGPUDrive(PufferEnv):
                     and not self.was_rendered_in_rollout[render_env_idx]
                 ):
                     self.rendering_in_progress[render_env_idx] = True
-                
+
             # Visualize the simulator state
             if self.rendering_in_progress[render_env_idx]:
                 time_step = self.episode_lengths[render_env_idx, :][0]
@@ -388,7 +401,6 @@ class PufferGPUDrive(PufferEnv):
                     self.frames[render_env_idx].append(
                         img_from_fig(sim_state_fig)
                     )
-                    
 
     def _log_video(self, frames, key, wandb_obj, global_step):
         """TODO: Helper function to log a video to WandB."""
@@ -452,7 +464,6 @@ class PufferGPUDrive(PufferEnv):
 
         return np.array(img_arrays)
 
-    
     def resample_scenario_batch(self):
         """Sample a new set of WOMD scenarios."""
         if self.train_config.resample_mode == "random":
@@ -476,7 +487,7 @@ class PufferGPUDrive(PufferEnv):
                     ]  # Trim the result to N scenes
         else:
             raise NotImplementedError(
-                f"Resample mode {self.exp_config.resample_mode} is currently not supported."
+                f"Resample mode {self.train_config.resample_mode} is currently not supported."
             )
 
         # Re-initialize the simulator with the new dataset
@@ -484,14 +495,19 @@ class PufferGPUDrive(PufferEnv):
             f"Re-initializing sim with {len(set(dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
         self.env.reinit_scenarios(dataset)
+        print(f"Done.\n")
 
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_agents = self.controlled_agent_mask.sum().item()
-        
+        self.masks = np.ones(self.num_agents, dtype=bool)
+        self.agent_ids = np.arange(self.num_agents)
+        print(f"Total controlled agents across worlds: {self.num_agents}")
+
+        self.reset()  # Reset storage
         # Get info from new worlds
         self.observations = self.env.reset()[self.controlled_agent_mask]
-        
+
         # Get the tfrecord file names for every environment
         self.env_to_files = {
             env_idx: Path(file_path).name
