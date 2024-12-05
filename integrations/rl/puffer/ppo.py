@@ -194,6 +194,7 @@ def evaluate(data):
 
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
+    data.vecenv.iters = data.num_rollouts
 
     return data.stats, infos
 
@@ -365,6 +366,7 @@ def train(data):
                         "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
                         "performance/pad_agent_sps": profile.pad_agent_sps,
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
+                        "performance/iters": data.num_rollouts,
                         "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,

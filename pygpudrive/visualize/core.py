@@ -136,6 +136,7 @@ class MatplotlibVisualizer:
                 ax.set_aspect("equal", adjustable="box")
             else:
                 fig, ax = plt.subplots(figsize=figsize)
+                ax.set_aspect("equal", adjustable="box")
                 ax.clear()
                 figs.append(fig)
 
@@ -355,7 +356,7 @@ class MatplotlibVisualizer:
                 goal_y,
                 s=5 * marker_size_scale,
                 linewidth=1.5 * line_width_scale,
-                c="orange",
+                c=AGENT_COLOR_BY_STATE["off_road"],
                 marker="x",
             )
 
