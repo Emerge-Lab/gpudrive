@@ -1,25 +1,3 @@
-# Copyright 2023 The Waymax Authors.
-#
-# Licensed under the Waymax License Agreement for Non-commercial Use
-# Use (the "License"); you may not use this file except in compliance
-# with the License. You may obtain a copy of the License at
-#
-#     https://github.com/waymo-research/waymax/blob/main/LICENSE
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""General visualization functions for non-waymax data using matplotlib.
-
-Note there is no batch dimension, and should not rely on any customized data
-structure.
-"""
-
-
-import dataclasses
 import os
 from typing import Optional
 
@@ -30,64 +8,10 @@ from PIL import Image
 
 import os
 import torch
-from pathlib import Path
-import mediapy
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 
 from pygpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
-
-
-@dataclasses.dataclass
-class VizConfig:
-    """Config for visualization."""
-
-    front_x: float = 75.0
-    back_x: float = 75.0
-    front_y: float = 75.0
-    back_y: float = 75.0
-    px_per_meter: float = 4.0
-    show_agent_id: bool = True
-    center_agent_idx: int = -1  # -1 for SDC
-    verbose: bool = True
-
-
-def init_fig_ax_via_size(
-    x_px: float, y_px: float
-) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
-    """Initializes a figure with given size in pixel."""
-    fig, ax = plt.subplots()
-    # Sets output image to pixel resolution.
-    dpi = 100
-    fig.set_size_inches([x_px / dpi, y_px / dpi])
-    fig.set_dpi(dpi)
-    fig.set_facecolor("white")
-    return fig, ax
-
-
-def init_fig_ax(
-    vis_config: VizConfig = VizConfig(),
-) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
-    """Initializes a figure with vis_config."""
-    return init_fig_ax_via_size(
-        (vis_config.front_x + vis_config.back_x) * vis_config.px_per_meter,
-        (vis_config.front_y + vis_config.back_y) * vis_config.px_per_meter,
-    )
-
-
-def center_at_xy(
-    ax: matplotlib.axes.Axes,
-    xy: np.ndarray,
-    vis_config: VizConfig = VizConfig(),
-) -> None:
-    ax.axis(
-        (
-            xy[0] - vis_config.back_x,
-            xy[0] + vis_config.front_x,
-            xy[1] - vis_config.back_y,
-            xy[1] + vis_config.front_y,
-        )
-    )
 
 
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
@@ -139,6 +63,7 @@ def plot_numpy_bounding_boxes(
     bboxes: np.ndarray,
     color: np.ndarray,
     alpha: Optional[float] = 1.0,
+    line_width_scale: float = 1.5,
     as_center_pts: bool = False,
     label: Optional[str] = None,
 ) -> None:
@@ -170,6 +95,7 @@ def plot_numpy_bounding_boxes(
             color=color,
             ms=2,
             alpha=alpha,
+            linewidth=1.7 * line_width_scale,
             label=label,
         )
     else:
@@ -197,6 +123,7 @@ def plot_numpy_bounding_boxes(
             [tl[1, :], tr[1, :], br[1, :], bl[1, :], tl[1, :]],
             color=color,
             zorder=4,
+            linewidth=1.7 * line_width_scale,
             alpha=alpha,
             label=label,
         )
@@ -208,27 +135,9 @@ def plot_numpy_bounding_boxes(
             color=color,
             zorder=4,
             alpha=alpha,
+            linewidth=1.5 * line_width_scale,
             label=label,
         )
-
-
-def rotate_point(cx, cy, angle):
-    """
-    Rotates a point around a center (cx, cy) by an angle in radians.
-
-    Args:
-        cx (float): X coordinate of the center.
-        cy (float): Y coordinate of the center.
-        angle (float): Angle in radians to rotate the point.
-
-    Returns:
-        (float, float): New coordinates of the rotated point.
-    """
-    cos_angle = np.cos(angle)
-    sin_angle = np.sin(angle)
-    x_new = cos_angle * (cx - cx) - sin_angle * (cy - cy) + cx
-    y_new = sin_angle * (cx - cx) + cos_angle * (cy - cy) + cy
-    return x_new, y_new
 
 
 def plot_bounding_box(

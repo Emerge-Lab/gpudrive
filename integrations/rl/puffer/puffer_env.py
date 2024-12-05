@@ -13,11 +13,6 @@ from pygpudrive.env.config import (
     SceneConfig,
     SelectionDiscipline,
 )
-from pygpudrive.datatypes.observation import (
-    LocalEgoState,
-    PartnerObs,
-    LidarObs,
-)
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
@@ -235,7 +230,7 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()
         )
-        # TODO(dc): Look into rewards
+
         self.agent_episode_returns += reward
         self.episode_returns += reward_controlled
         self.episode_lengths += 1
@@ -281,7 +276,7 @@ class PufferGPUDrive(PufferEnv):
                         self.rendering_in_progress[render_env_idx] = False
                         self.was_rendered_in_rollout[render_env_idx] = True
 
-                    # Log agent views (TODO:(dc))
+                    # Log agent views (TODO)
                     if self.train_config.render_agent_obs:
                         first_person_views = self.render_agent_observations(
                             render_env_idx
@@ -318,7 +313,6 @@ class PufferGPUDrive(PufferEnv):
             ).sum() / local_roadgraph.type[self.controlled_agent_mask].numel()
 
             num_finished_agents = controlled_mask.sum().item()
-            # TODO: Fix this, we should always have at least one controlled agent per env
             if num_finished_agents > 0:
                 info.append(
                     {
@@ -354,8 +348,6 @@ class PufferGPUDrive(PufferEnv):
                 # Reset the live agent mask so that the next alive mask will mark
                 # all agents as alive for the next step
                 self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
-                # Reset terminals for reset envs
-                # terminal[idx, :] = self.env.get_dones()[idx, :].bool()
 
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
@@ -388,62 +380,24 @@ class PufferGPUDrive(PufferEnv):
                 ):
                     self.rendering_in_progress[render_env_idx] = True
 
-            # Visualize the simulator state
-            if self.rendering_in_progress[render_env_idx]:
-                time_step = self.episode_lengths[render_env_idx, :][0]
-
-                if self.train_config.render_simulator_state:
-                    sim_state_fig, _ = self.env.vis.plot_simulator_state(
-                        env_idx=render_env_idx,
-                        time_step=time_step,
-                        zoom_radius=90,
-                    )
-                    self.frames[render_env_idx].append(
-                        img_from_fig(sim_state_fig)
-                    )
-
-    def _log_video(self, frames, key, wandb_obj, global_step):
-        """TODO: Helper function to log a video to WandB."""
-        if frames:
-            frames_array = np.array(frames)
-            wandb_obj.log(
-                {
-                    key: wandb.Video(
-                        np.moveaxis(
-                            frames_array, -1, 1
-                        ),  # Adjust channel axis for WandB
-                        fps=self.train_config.render_fps,
-                        format=self.train_config.render_format,
-                        caption=f"global step: {global_step:,}",
-                    )
-                }
+        # Continue rendering if in progress
+        if self.train_config.render_simulator_state:
+            envs_to_render = list(
+                np.where(np.array(list(self.rendering_in_progress.values())))[
+                    0
+                ]
             )
+            time_steps = list(self.episode_lengths[envs_to_render, 0])
 
-    def _log_agent_videos(self, env_idx, wandb_obj, global_step):
-        """TODO: Helper function to log agent-specific videos."""
-        num_agents = self.agent_frames_dict[f"env_{env_idx}"][0].shape[0]
-        for agent_idx in range(num_agents):
-            agent_frames = np.stack(
-                [
-                    image[agent_idx]
-                    for image in self.agent_frames_dict[f"env_{env_idx}"]
-                ],
-                axis=0,
+            sim_state_figures = self.env.vis.plot_simulator_state(
+                env_indices=envs_to_render,
+                time_steps=time_steps,
+                zoom_radius=90,
             )
-            agent_frames = np.transpose(
-                agent_frames, (0, 3, 1, 2)
-            )  # Convert to (T, C, H, W)
-            wandb_obj.log(
-                {
-                    f"Video/Observation/env_{env_idx}_agent_{agent_idx}": wandb.Video(
-                        agent_frames,
-                        fps=self.train_config.render_fps,
-                        format=self.train_config.render_format,
-                        caption=f"global step: {global_step:,}",
-                    )
-                }
-            )
-        self.agent_frames_dict[f"env_{env_idx}"].clear()
+            for render_env_idx in envs_to_render:
+                self.frames[render_env_idx].append(
+                    img_from_fig(sim_state_figures[render_env_idx])
+                )
 
     def render_agent_observations(self, env_idx):
         """Render a single observation."""
