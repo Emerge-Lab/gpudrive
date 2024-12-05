@@ -585,14 +585,6 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
     }
 
     impl_->reset();
-
-    if (impl_->renderMgr.has_value()) {
-        impl_->renderMgr->readECS();
-    }
-
-    if (impl_->cfg.enableBatchRenderer) {
-        impl_->renderMgr->batchRender();
-    }
 }
 
 void Manager::setMaps(const std::vector<std::string> &maps)

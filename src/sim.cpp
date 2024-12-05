@@ -767,7 +767,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         {clear_tmp});
 
     if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {done_sys});
+        RenderingSystem::setupTasks(builder, dependencies);
     }
 
     TaskGraphNodeID lidar;
