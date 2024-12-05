@@ -5,7 +5,7 @@ import mediapy
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Polygon
 import numpy as np
 import gpudrive
 from pygpudrive.visualize import utils
@@ -145,6 +145,59 @@ class MatplotlibVisualizer:
         end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
     
+    def _get_corners_polygon(self, x, y, length, width, orientation):
+        """Calculate the four corners of a speed bump polygon."""
+        # Compute the direction vectors based on orientation
+        print(length)
+        c = np.cos(orientation)
+        s = np.sin(orientation)
+        u = np.array((c, s))  # Unit vector along the orientation
+        ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+        # Center point of the speed bump
+        pt = np.array([x, y])
+
+        # corners
+        tl = pt + (length / 2) * u - (width / 2) * ut  
+        tr = pt + (length / 2) * u + (width / 2) * ut  
+        br = pt - (length / 2) * u + (width / 2) * ut  
+        bl = pt - (length / 2) * u - (width / 2) * ut  
+
+        # Return the corners in order
+        print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
+        return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
+
+    def _get_stripe_polygon(self, x, y, length, width, orientation, index, num_stripes):
+        """Calculate the corners of a stripe within the speed bump polygon."""
+        # print(length)
+        # Compute the direction vectors
+        c = np.cos(orientation)
+        s = np.sin(orientation)
+        u = np.array([c, s])  # Unit vector along the orientation (lengthwise)
+        ut = np.array([-s, c])  # Perpendicular unit vector (widthwise)
+
+        # Total stripe height along the width
+        stripe_width = length / num_stripes
+        half_length = length / 2
+        half_width = width / 2
+
+        # Offset for the current stripe
+        offset_start = -half_length + index * stripe_width
+        offset_end = offset_start + stripe_width
+
+        # Center of the speed bump
+        center = np.array([x, y])
+
+        # Calculate stripe corners
+        stripe_corners = [
+            center + u * offset_start + ut * half_width,  # Top-left
+            center + u * offset_start - ut * half_width,  # Bottom-left
+            center + u * offset_end - ut * half_width,    # Bottom-right
+            center + u * offset_end + ut * half_width,    # Top-right
+        ]
+
+        return np.array(stripe_corners)
+    
     def _plot_roadgraph(
         self,
         env_idx: int,
@@ -164,25 +217,73 @@ class MatplotlibVisualizer:
                     road_point_type == int(gpudrive.EntityType.RoadEdge)
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
                     y_coords = road_graph.y[env_idx, road_mask].tolist()
                     segment_lengths = road_graph.segment_length[env_idx, road_mask].tolist()
+                    segment_widths = road_graph.segment_width[env_idx, road_mask].tolist()
                     segment_orientations = road_graph.orientation[env_idx, road_mask].tolist()
 
-                    # Compute and draw road edges using start and end points
-                    for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
-                        start, end = self._get_endpoints(x, y, length, orientation)
+                    if( not road_point_type == int(gpudrive.EntityType.SpeedBump) ):
+                        # Compute and draw road edges using start and end points
+                        for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
+                            start, end = self._get_endpoints(x, y, length, orientation)
 
-                        # Plot the road edge as a line
-                        ax.plot(
-                            [start[0], end[0]],
-                            [start[1], end[1]],
-                            color=ROAD_GRAPH_COLORS[road_point_type],
-                            linewidth=0.75
-                        )
+                            # Plot the road edge as a line
+                            ax.plot(
+                                [start[0], end[0]],
+                                [start[1], end[1]],
+                                color=ROAD_GRAPH_COLORS[road_point_type],
+                                linewidth=0.75
+                            )
+                    
+                    if (road_point_type == int(gpudrive.EntityType.SpeedBump)):
+                        facecolor = 'xkcd:goldenrod'
+                        edgecolor = 'xkcd:black'
+                        alpha = 1
 
+                        for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
+                            # method1: from waymax using hatch as diagonals  
+                            # points = self._get_corners_polygon(x, y, length, width, orientation)
+
+                            # p = Polygon(
+                            #     points,
+                            #     facecolor=facecolor,
+                            #     edgecolor=edgecolor,
+                            #     linewidth=0,
+                            #     alpha=alpha,
+                            #     hatch=r'//',
+                            #     zorder=2,
+                            # )
+
+                            # ax.add_patch(p)
+
+                            # manual stripes method
+                            stripe_width = 1.05 #based on env0 visual look
+                            num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
+                              
+
+                            for i in range(num_stripes):
+                                # Alternate colors for stripes
+                                stripe_color = facecolor if i % 2 == 0 else edgecolor
+                                print(length)
+                                # Calculate stripe points
+                                stripe_points = self._get_stripe_polygon(
+                                    x, y, length, stripe_width, orientation, i, num_stripes
+                                )
+
+                                stripe_polygon = Polygon(
+                                    stripe_points,
+                                    facecolor=stripe_color,
+                                    edgecolor=None, 
+                                    linewidth=0,
+                                    alpha=alpha,
+                                    zorder=2,
+                                )
+                                ax.add_patch(stripe_polygon)
+                         
                 else:
                     # Dots for other road point types
                     ax.scatter(
