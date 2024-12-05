@@ -34,6 +34,7 @@ from pathlib import Path
 import mediapy
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
+from matplotlib.patches import Polygon
 
 from pygpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
 
@@ -346,3 +347,99 @@ def plot_bounding_box(
             linestyle="-",
             label=label,
         )
+def get_stripe_polygon(
+    x: float,
+    y: float,
+    length: float,
+    width: float,
+    orientation: float,
+    index: int,
+    num_stripes: int,
+) -> np.ndarray:
+    
+    """Calculate the corners of a stripe within the speed bump polygon."""
+    
+    # print(length)
+    # Compute the direction vectors
+    c = np.cos(orientation)
+    s = np.sin(orientation)
+    u = np.array([c, s])  # Unit vector along the orientation (lengthwise)
+    ut = np.array([-s, c])  # Perpendicular unit vector (widthwise)
+
+    # Total stripe height along the width
+    stripe_width = length / num_stripes
+    half_length = length / 2
+    half_width = width / 2
+
+    # Offset for the current stripe
+    offset_start = -half_length + index * stripe_width
+    offset_end = offset_start + stripe_width
+
+    # Center of the speed bump
+    center = np.array([x, y])
+
+    # Calculate stripe corners
+    stripe_corners = [
+        center + u * offset_start + ut * half_width,  # Top-left
+        center + u * offset_start - ut * half_width,  # Bottom-left
+        center + u * offset_end - ut * half_width,    # Bottom-right
+        center + u * offset_end + ut * half_width,    # Top-right
+    ]
+
+    return np.array(stripe_corners)
+
+def plot_speed_bump(
+    x_coords: Union[float, np.ndarray],
+    y_coords: Union[float, np.ndarray],
+    segment_lengths: Union[float, torch.Tensor],
+    segment_widths: Union[float, torch.Tensor],
+    segment_orientations: Union[float, torch.Tensor],
+    ax: matplotlib.axes.Axes,
+    facecolor: str = None,
+    edgecolor: str = None,
+    alpha: float = None,
+)-> None:
+    facecolor = 'xkcd:goldenrod'
+    edgecolor = 'xkcd:black'
+    alpha = 1
+    for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
+        # method1: from waymax using hatch as diagonals  
+        # points = self._get_corners_polygon(x, y, length, width, orientation)
+
+        # p = Polygon(
+        #     points,
+        #     facecolor=facecolor,
+        #     edgecolor=edgecolor,
+        #     linewidth=0,
+        #     alpha=alpha,
+        #     hatch=r'//',
+        #     zorder=2,
+        # )
+
+        # ax.add_patch(p)
+
+        # manual stripes method
+        stripe_width = 1.05 # arbitrary width based on env0 visual look
+        num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
+            
+
+        for i in range(num_stripes):
+            # Alternate colors for stripes
+            stripe_color = facecolor if i % 2 == 0 else edgecolor
+            print(length)
+            # Calculate stripe points
+            stripe_points = get_stripe_polygon(
+                x, y, length, stripe_width, orientation, i, num_stripes
+            )
+
+            stripe_polygon = Polygon(
+                stripe_points,
+                facecolor=stripe_color,
+                edgecolor=None, 
+                linewidth=0,
+                alpha=alpha,
+                zorder=2,
+            )
+            ax.add_patch(stripe_polygon)
+    
+    pass

@@ -164,39 +164,10 @@ class MatplotlibVisualizer:
         bl = pt - (length / 2) * u - (width / 2) * ut  
 
         # Return the corners in order
-        print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
+        # print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
         return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
 
-    def _get_stripe_polygon(self, x, y, length, width, orientation, index, num_stripes):
-        """Calculate the corners of a stripe within the speed bump polygon."""
-        # print(length)
-        # Compute the direction vectors
-        c = np.cos(orientation)
-        s = np.sin(orientation)
-        u = np.array([c, s])  # Unit vector along the orientation (lengthwise)
-        ut = np.array([-s, c])  # Perpendicular unit vector (widthwise)
 
-        # Total stripe height along the width
-        stripe_width = length / num_stripes
-        half_length = length / 2
-        half_width = width / 2
-
-        # Offset for the current stripe
-        offset_start = -half_length + index * stripe_width
-        offset_end = offset_start + stripe_width
-
-        # Center of the speed bump
-        center = np.array([x, y])
-
-        # Calculate stripe corners
-        stripe_corners = [
-            center + u * offset_start + ut * half_width,  # Top-left
-            center + u * offset_start - ut * half_width,  # Bottom-left
-            center + u * offset_end - ut * half_width,    # Bottom-right
-            center + u * offset_end + ut * half_width,    # Top-right
-        ]
-
-        return np.array(stripe_corners)
     
     def _plot_roadgraph(
         self,
@@ -240,50 +211,16 @@ class MatplotlibVisualizer:
                             )
                     
                     if (road_point_type == int(gpudrive.EntityType.SpeedBump)):
-                        facecolor = 'xkcd:goldenrod'
-                        edgecolor = 'xkcd:black'
-                        alpha = 1
+                        utils.plot_speed_bump(
+                            x_coords, 
+                            y_coords, 
+                            segment_lengths, 
+                            segment_widths, 
+                            segment_orientations,
+                            ax
+                        )                       
 
-                        for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
-                            # method1: from waymax using hatch as diagonals  
-                            # points = self._get_corners_polygon(x, y, length, width, orientation)
 
-                            # p = Polygon(
-                            #     points,
-                            #     facecolor=facecolor,
-                            #     edgecolor=edgecolor,
-                            #     linewidth=0,
-                            #     alpha=alpha,
-                            #     hatch=r'//',
-                            #     zorder=2,
-                            # )
-
-                            # ax.add_patch(p)
-
-                            # manual stripes method
-                            stripe_width = 1.05 #based on env0 visual look
-                            num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
-                              
-
-                            for i in range(num_stripes):
-                                # Alternate colors for stripes
-                                stripe_color = facecolor if i % 2 == 0 else edgecolor
-                                print(length)
-                                # Calculate stripe points
-                                stripe_points = self._get_stripe_polygon(
-                                    x, y, length, stripe_width, orientation, i, num_stripes
-                                )
-
-                                stripe_polygon = Polygon(
-                                    stripe_points,
-                                    facecolor=stripe_color,
-                                    edgecolor=None, 
-                                    linewidth=0,
-                                    alpha=alpha,
-                                    zorder=2,
-                                )
-                                ax.add_patch(stripe_polygon)
-                         
                 else:
                     # Dots for other road point types
                     ax.scatter(
@@ -407,8 +344,8 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_controlled_ok,
-            # color="g",
-            color = '#75b5c5', #waymax color for controlled vehicles
+            color="g",
+            # color = '#75b5c5', #waymax color for controlled vehicles
             alpha=alpha,
             as_center_pts=as_center_pts,
             label=label,
