@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 logging.basicConfig(level=logging.INFO)
 
-ERR_VAL = -1e4
+ERR_VAL = 1e-4
 
 _WAYMO_OBJECT_STR = {
     scenario_pb2.Track.TYPE_UNSET: "unset",

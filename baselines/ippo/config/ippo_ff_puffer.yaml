@@ -16,8 +16,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
-  collision_weight: -0.025
-  off_road_weight: -0.025
+  collision_weight: -0.05
+  off_road_weight: -0.05
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "talk_figures"
+  group: "rl_scale"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -48,13 +48,13 @@ train:
   # # # Data sampling # # #
   resample_scenes: false
   resample_criterion: "global_step"
-  resample_interval: 5_000_000
+  resample_interval: 3_000_000
   resample_mode: "random" # Options: random
 
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 500_000_000
-  batch_size: 65_536
+  batch_size: 131_072
   minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
@@ -75,7 +75,7 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: true # Determines whether to render the environment (note: will slow down training)
+  render: false # Determines whether to render the environment (note: will slow down training)
   render_interval: 500 # Render every k iterations
   render_k_scenarios: 5 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view

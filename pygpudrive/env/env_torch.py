@@ -441,15 +441,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory.inferred_actions[:, :, :, :3]
-            inferred_actions[:, :, :, 0] = torch.clamp(
-                inferred_actions[:, :, :, 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
             )
-            inferred_actions[:, :, :, 1] = torch.clamp(
-                inferred_actions[:, :, :, 1], -6, 6
+            inferred_actions[..., 1] = torch.clamp(
+                inferred_actions[..., 1], -6, 6
             )
-            inferred_actions[:, :, :, 2] = torch.clamp(
-                inferred_actions[:, :, :, 2], -torch.pi, torch.pi
+            inferred_actions[..., 2] = torch.clamp(
+                inferred_actions[..., 2], -torch.pi, torch.pi
             )
         elif self.config.dynamics_model == "state":
             # Extract (x, y, yaw, velocity x, velocity y)
@@ -473,12 +473,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
         ):
-            inferred_actions = log_trajectory.inferred_actions[:, :, :, :3]
-            inferred_actions[:, :, :, 0] = torch.clamp(
-                inferred_actions[:, :, :, 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
             )
-            inferred_actions[:, :, :, 1] = torch.clamp(
-                inferred_actions[:, :, :, 1], -0.3, 0.3
+            inferred_actions[..., 1] = torch.clamp(
+                inferred_actions[..., 1], -0.3, 0.3
             )
 
         return (
