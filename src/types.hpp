@@ -93,7 +93,7 @@ struct AgentID {
     };   
 
     struct WorldMeans {
-        madrona::math::Vector3 mean; // TODO: Z is 0 for now, but can be used for 3D in future
+        madrona::math::Vector3 mean; 
     };
 
     const size_t WorldMeansExportSize = 3;

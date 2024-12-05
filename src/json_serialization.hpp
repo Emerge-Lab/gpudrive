@@ -250,10 +250,11 @@ namespace gpudrive
 
     }
 
-    std::pair<float, float> calc_mean(const nlohmann::json &j)
+    std::tuple<float, float, float> calc_mean(const nlohmann::json &j)
     {
-        std::pair<float, float> mean = {0, 0, 0};
+        std::tuple<float, float, float> mean = {0, 0, 0};
         int64_t numEntities = 0;
+        
         for (const auto &obj : j["objects"])
         {
             int i = 0;
@@ -265,12 +266,14 @@ namespace gpudrive
                 float newX = pos["x"];
                 float newY = pos["y"];
                 float newZ = pos["z"];
+                
                 // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-                mean.third += (newZ - mean.third) / numEntities;
+                std::get<0>(mean) += (newX - std::get<0>(mean)) / numEntities;
+                std::get<1>(mean) += (newY - std::get<1>(mean)) / numEntities;
+                std::get<2>(mean) += (newZ - std::get<2>(mean)) / numEntities;
             }
         }
+        
         for (const auto &obj : j["roads"])
         {
             for (const auto &point : obj["geometry"])
@@ -279,13 +282,13 @@ namespace gpudrive
                 float newX = point["x"];
                 float newY = point["y"];
                 float newZ = point["z"];
-
-                // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-                mean.third += (newZ - mean.third) / numEntities;
+                
+                std::get<0>(mean) += (newX - std::get<0>(mean)) / numEntities;
+                std::get<1>(mean) += (newY - std::get<1>(mean)) / numEntities;
+                std::get<2>(mean) += (newZ - std::get<2>(mean)) / numEntities;
             }
         }
+        
         return mean;
     }
 
@@ -293,7 +296,8 @@ namespace gpudrive
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
         auto mean = calc_mean(j);
-        map.mean = {mean.first, mean.second};
+        map.mean = {std::get<0>(mean), std::get<1>(mean), std::get<2>(mean)};  // Updated to handle all 3 components
+        
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
         size_t idx = 0;
         for (const auto &obj : j.at("objects"))
@@ -302,7 +306,7 @@ namespace gpudrive
                 break;
             obj.get_to(map.objects[idx++]);
         }
-
+        
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
         idx = 0;
