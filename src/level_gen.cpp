@@ -163,7 +163,23 @@ static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
     ctx.get<RoadInterfaceEntity>(road_edge).e = ctx.makeEntity<RoadInterface>();
 
     auto pos = Vector3{.x = (start.x + end.x)/2, .y = (start.y + end.y)/2, .z = (start.z + end.z)/2};
-    auto rot = Quat::angleAxis(atan2(end.y - start.y, end.x - start.x), madrona::math::up);
+
+    //Rotation calculation
+    float dx = end.x - start.x;
+    float dy = end.y - start.y;
+    float dz = end.z - start.z;
+    // XY rotation (yaw)
+    auto yawRot = Quat::angleAxis(atan2(dy, dx), madrona::math::up);
+
+    // Z rotation (pitch)
+    float horizontalDist = sqrt(dx*dx + dy*dy);
+    float pitchAngle = atan2(dz, horizontalDist);
+    Vector3 pitchAxis = Vector3::cross(Vector3{dx/horizontalDist, dy/horizontalDist, 0}, madrona::math::up);
+    auto pitchRot = Quat::angleAxis(pitchAngle, pitchAxis);
+
+    // Combined rotation
+    auto rot = yawRot * pitchRot;
+
     auto scale = Diag3x3{.d0 = start.distance(end)/2, .d1 = 0.1, .d2 = 0.1};
     setRoadEntitiesProps(ctx, road_edge, pos, rot, scale, roadInit.type, ObjectID{(int32_t)SimObject::Cube}, ResponseType::Static, roadInit.id, roadInit.mapType);
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
@@ -367,7 +383,7 @@ void createPersistentEntities(Engine &ctx) {
     ctx.singleton<ResetMap>().reset = 0;
 
     auto& means = ctx.singleton<WorldMeans>().mean;
-    means = {map.mean.x, map.mean.y, 0}; // TODO: Add z to the map
+    means = {map.mean.x, map.mean.y, map.mean.z};
 
     CountT agentIdx = 0;
     for (CountT agentCtr = 0; agentCtr < map.numObjects && agentIdx < consts::kMaxAgentCount; ++agentCtr) {
