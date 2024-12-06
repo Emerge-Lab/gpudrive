@@ -136,3 +136,38 @@ class Policy(nn.Module):
         action = self.actor(flat_hidden)
         value = self.value_fn(flat_hidden)
         return action, value
+
+
+class LiDARPolicy(nn.Module):
+    def __init__(
+        self, env, input_size=600, hidden_size=128, act_func="tanh", **kwargs
+    ):
+        super().__init__()
+        self.env = env
+        self.act_func = (
+            torch.nn.Tanh() if act_func == "tanh" else torch.nn.ReLU()
+        )
+
+        self.embed = nn.Sequential(
+            pufferlib.pytorch.layer_init(nn.Linear(input_size, hidden_size)),
+            nn.LayerNorm(hidden_size),
+            self.act_func,
+            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
+        )
+
+        self.actor = pufferlib.pytorch.layer_init(
+            nn.Linear(hidden_size, env.single_action_space.n), std=0.01
+        )
+        self.value_fn = pufferlib.pytorch.layer_init(
+            nn.Linear(hidden_size, 1), std=1
+        )
+
+    def forward(self, observations):
+        hidden = self.embed(observations)
+        actions, value = self.decode_actions(hidden)
+        return actions, value
+
+    def decode_actions(self, flat_hidden, concat=None):
+        action = self.actor(flat_hidden)
+        value = self.value_fn(flat_hidden)
+        return action, value

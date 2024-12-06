@@ -31,7 +31,6 @@ pyximport.install(setup_args={"include_dirs": np.get_include()})
 
 from integrations.rl.puffer.c_gae import compute_gae
 from integrations.rl.puffer.logging import print_dashboard, abbreviate
-from integrations.rl.puffer.utils import make_video
 
 global_steps_list = []
 perc_collisions_list = []
@@ -94,6 +93,8 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         wandb=wandb,
         global_step=0,
         global_step_pad=0,
+        num_rollouts=0,
+        resample_counter=0,
         epoch=0,
         stats={},
         msg=msg,
@@ -104,6 +105,26 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
 @pufferlib.utils.profile
 def evaluate(data):
+
+    if data.config.resample_scenes:
+        if (
+            data.config.resample_criterion == "global_step"
+            and data.resample_counter >= data.config.resample_interval
+        ):
+            # Sample new batch of scenarios
+            data.vecenv.resample_scenario_batch()
+            # Reset counter
+            data.resample_counter = 0
+
+    # TODO(dc): Hacky -> improve
+    data.vecenv.rendering_in_progress = {
+        env_idx: False for env_idx in range(data.config.render_k_scenarios)
+    }
+    data.vecenv.was_rendered_in_rollout = {
+        env_idx: False for env_idx in range(data.config.render_k_scenarios)
+    }
+    data.vecenv.wandb_obj = data.wandb
+
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
@@ -113,17 +134,16 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
+
         with profile.env:
+            # Receive data from current timestep
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
-            # Incremented by the number of controlled valid agents
-            data.global_step += sum(
-                mask
-            )  # data.vecenv.controlled_agent_mask.sum().item()
-            # Incremented by _all_ entries, including the padding agents
+            data.global_step += sum(mask)
             data.global_step_pad += data.vecenv.total_agents
+            data.resample_counter += sum(mask)
 
             o = torch.as_tensor(o)
             o_device = o.to(config.device)
@@ -131,8 +151,6 @@ def evaluate(data):
             d = torch.as_tensor(d)
 
         with profile.eval_forward, torch.no_grad():
-            # TODO: In place-update should be faster. Leaking 7% speed max
-            # Also should be using a cuda tensor to index
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
@@ -145,32 +163,38 @@ def evaluate(data):
             if config.device == "cuda":
                 torch.cuda.synchronize()
 
+        with profile.env:
+            actions = actions.cpu().numpy()
+
+            # Step the environment and reset if done
+            data.vecenv.send(actions)
+
         with profile.eval_misc:
             value = value.flatten()
-            actions = actions.cpu().numpy()
-            mask = torch.as_tensor(mask)  # * policy.mask)
+            mask = torch.as_tensor(mask)
             o = o if config.cpu_offload else o_device
+
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     infos[k].append(v)
 
-        # Step the environment
-        with profile.env:
-            data.vecenv.send(actions)
-
     with profile.eval_misc:
         data.stats = {}
 
         for k, v in infos.items():
-            if "_map" in k and data.wandb is not None:
-                data.stats[f"Media/{k}"] = data.wandb.Image(v[0])
-                continue
-            try:  # TODO: Better checks on log data types
+            try:
                 data.stats[k] = np.mean(v)
+                # Log variance for goal and collision metrics
+                if "goal" in k or "collision" in k or "offroad" in k:
+                    data.stats[f"{k}_std"] = np.std(v)
             except:
                 continue
+
+    data.num_rollouts += 1
+    data.vecenv.global_step = data.global_step.copy()
+    data.vecenv.iters = data.num_rollouts
 
     return data.stats, infos
 
@@ -303,7 +327,7 @@ def train(data):
     with profile.train_misc:
         if config.anneal_lr:
             frac = 1.0 - data.global_step / config.total_timesteps
-            lrnow = frac * config.learning_rate
+            lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
 
         y_pred = experience.values_np
@@ -342,6 +366,7 @@ def train(data):
                         "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
                         "performance/pad_agent_sps": profile.pad_agent_sps,
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
+                        "performance/iters": data.num_rollouts,
                         "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
@@ -352,54 +377,6 @@ def train(data):
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
-
-                # TEMP TODO(dc): Remove after making animation
-                # try:
-                #     global_steps_list.append(data.global_step.copy())
-                #     perc_collisions_list.append(
-                #         data.stats["perc_veh_collisions"].copy()
-                #     )
-                #     perc_offroad_list.append(
-                #         data.stats["perc_off_road"].copy()
-                #     )
-                #     perc_goal_achieved_list.append(
-                #         data.stats["perc_goal_achieved"].copy()
-                #     )
-                #     time_list.append(profile.uptime)
-                # except:
-                #     pass
-
-                # # Save as numpy arrays
-                # if data.global_step > 12e6:
-                #     np.save("global_steps.npy", np.array(global_steps_list))
-                #     np.save(
-                #         "perc_collisions.npy", np.array(perc_collisions_list)
-                #     )
-                #     np.save("perc_offroad.npy", np.array(perc_offroad_list))
-                #     np.save(
-                #         "perc_goal_achieved.npy",
-                #         np.array(perc_goal_achieved_list),
-                #     )
-                #     np.save("wallclock_time.npy", np.array(time_list))
-
-                if (
-                    config.render
-                    and ((data.epoch - 1) % config.render_interval) == 0
-                ):
-                    for env_idx in range(data.config.render_k_scenarios):
-                        # TODO(dc): Improve efficiency and extend to multiple envs
-                        frames = make_video(data, env_idx=env_idx)
-
-                        data.wandb.log(
-                            {
-                                f"env_idx: {env_idx}": data.wandb.Video(
-                                    np.moveaxis(frames, -1, 1),
-                                    fps=data.config.render_fps,
-                                    format="mp4",
-                                    caption=f"global step: {data.global_step:,}",
-                                )
-                            }
-                        )
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
@@ -715,62 +692,6 @@ def save_checkpoint(data):
 
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
-
-
-def rollout(
-    env_creator,
-    env_kwargs,
-    agent_creator,
-    agent_kwargs,
-    model_path=None,
-    device="cuda",
-):
-    # We are just using Serial vecenv to give a consistent
-    # single-agent/multi-agent API for evaluation
-    try:
-        env = pufferlib.vector.make(
-            env_creator, env_kwargs={"render_mode": "rgb_array", **env_kwargs}
-        )
-    except:
-        env = pufferlib.vector.make(env_creator, env_kwargs=env_kwargs)
-
-    if model_path is None:
-        agent = agent_creator(env, **agent_kwargs).to(device)
-    else:
-        # Load the agent's state dictionary instead of the full object
-        agent = agent_creator(env, **agent_kwargs).to(device)
-        agent.load_state_dict(torch.load(model_path, map_location=device))
-
-    ob, info = env.reset()
-    driver = env.driver_env
-    os.system("clear")
-    state = None
-
-    while True:
-        render = driver.render()
-        if driver.render_mode == "ansi":
-            print("\033[0;0H" + render + "\n")
-            time.sleep(0.6)
-        elif driver.render_mode == "rgb_array":
-            import cv2
-
-            render = cv2.cvtColor(render, cv2.COLOR_RGB2BGR)
-            cv2.imshow("frame", render)
-            cv2.waitKey(1)
-            time.sleep(1 / 24)
-
-        with torch.no_grad():
-            ob = torch.from_numpy(ob).to(device)
-            if hasattr(agent, "lstm"):
-                action, _, _, _, state = agent(ob, state)
-            else:
-                action, _, _, _ = agent(ob)
-
-            action = action.cpu().numpy().reshape(env.action_space.shape)
-
-        ob, reward = env.step(action)[:2]
-        reward = reward.mean()
-        print(f"Reward: {reward:.4f}")
 
 
 def seed_everything(seed, torch_deterministic):
