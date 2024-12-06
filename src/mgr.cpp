@@ -273,7 +273,7 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
 
     render_mgr.loadObjects(render_assets->objects, materials, textures, true);
 
-    asset_importer.imageImporter().freeImages(textures);
+    asset_importer.imageImporter().deallocImportedImages(textures);
 
     render_mgr.configureLighting({
         { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{50.0f, 50.0f, 1.0f} }
