@@ -192,8 +192,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
         const Rotation &other_rot = ctx.get<Rotation>(other);
         const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = (other_position - pos).xy();
-        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        Vector3 relative_pos = (other_position - pos);
+        relative_pos = rot.inv().rotateVec(relative_pos);
         float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
