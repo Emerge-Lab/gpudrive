@@ -271,7 +271,9 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     render_assets->objects[(CountT)SimObject::SpeedBump].meshes[0].materialIDX = 8;
     // render_assets->objects[(CountT)SimObject::Cylinder].meshes[0].materialIDX = 7;
 
-   render_mgr.loadObjects(render_assets->objects, materials, textures, true);
+    render_mgr.loadObjects(render_assets->objects, materials, textures, true);
+
+    asset_importer.imageImporter().freeImages(textures);
 
     render_mgr.configureLighting({
         { true, math::Vector3{1.0f, 1.0f, -2.0f}, math::Vector3{50.0f, 50.0f, 1.0f} }
