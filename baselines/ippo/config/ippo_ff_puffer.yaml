@@ -16,8 +16,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
-  collision_weight: -0.05
-  off_road_weight: -0.05
+  collision_weight: -0.025
+  off_road_weight: -0.025
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
