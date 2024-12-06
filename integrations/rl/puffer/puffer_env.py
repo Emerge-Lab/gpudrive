@@ -436,6 +436,12 @@ class PufferGPUDrive(PufferEnv):
         """Sample a new set of WOMD scenarios."""
         if self.train_config.resample_mode == "random":
             total_unique = len(self.unique_scene_paths)
+            
+            # Update set of scenes we've trained on
+            self.training_scenes_set.append(set(self.dataset))
+            
+            # Reset 
+            self.dataset = []
 
             # Update set of scenes we've trained on
             self.training_scenes_set.append(set(self.dataset))
@@ -465,7 +471,6 @@ class PufferGPUDrive(PufferEnv):
         print(
             f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
-
         self.env.reinit_scenarios(self.dataset)
 
         # Update controlled agent mask and other masks
