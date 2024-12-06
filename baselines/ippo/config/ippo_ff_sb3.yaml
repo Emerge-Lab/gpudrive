@@ -1,15 +1,16 @@
-data_dir: "data/processed/examples"
+data_dir: "data/processed/examples" #"data/data_old_debug" #"data/processed/training"
 
-num_worlds: 50
+num_worlds: 100
 
 selection_discipline: "K_UNIQUE_N"  # K_UNIQUE_N / PAD_N
-k_unique_scenes: 3
+k_unique_scenes: 1
 device: "cuda"  # or "cpu"
 
-reward_type: "weighted_combination"
+reward_type: "sparse_on_goal_achieved"
 collision_weight: 0.0
 goal_achieved_weight: 1.0
 off_road_weight: 0.0
+remove_non_vehicles: false
 
 resample_scenarios: false
 resample_criterion: "global_step"  # Options: "global_step"
@@ -18,8 +19,8 @@ resample_mode: "random"  # Options: "random"
 
 render: true
 render_mode: "rgb_array"
-render_freq: 500  # Render every k rollouts
-render_n_worlds: 3  # Number of worlds to render
+render_freq: 50  # Render every k rollouts
+render_n_worlds: 10  # Number of scenarios to render
 
 track_time_to_solve: false
 
@@ -27,9 +28,9 @@ sync_tensorboard: true
 logging_collection_window: 100  # How many trajectories we average logs over
 log_freq: 100
 project_name: "gpudrive"
-group_name: " "
+group_name: "algorithm_logic"
 entity: " "
-tags: 
+tags:
   - "IPPO"
   - "LATE_FUSION"
   - "PERM_EQ"
@@ -49,23 +50,23 @@ vf_coef: 0.5
 n_steps: 91  # Number of steps per rollout
 num_minibatches: 5  # Used to determine the minibatch size
 verbose: 0
-total_timesteps: 30_000_00000
+total_timesteps: 100_000_000
 ent_coef: 0.0001
 lr: 0.0003
 n_epochs: 5
 
 mlp_class: "late_fusion"
 policy: "late_fusion_policy"
-ego_state_layers: 
+ego_state_layers:
   - 64
   - 32
-road_object_layers: 
+road_object_layers:
   - 64
   - 64
-road_graph_layers: 
+road_graph_layers:
   - 64
   - 64
-shared_layers: 
+shared_layers:
   - 64
   - 64
 act_func: "tanh"

@@ -12,10 +12,9 @@ from datetime import datetime
 import torch
 import wandb
 from box import Box
-
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
-from integrations.rl.puffer.utils import Policy
+from integrations.rl.puffer.utils import Policy, LiDARPolicy
 
 import pufferlib
 import pufferlib.vector
@@ -30,7 +29,7 @@ def load_config(config_path):
         config = Box(yaml.safe_load(f))
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["exp_id"] = config["train"]["exp_id"] or datetime_
+    config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{str(config["environment"]["k_unique_scenes"])}__{datetime_}'
     config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available
@@ -70,6 +69,7 @@ def train(args):
     )
 
     policy = make_policy(vecenv.driver_env).to(args.train.device)
+
     args.train.env = args.environment.name
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)
@@ -97,7 +97,11 @@ def init_wandb(args, name, id=None, resume=True):
         group=args.wandb.group,
         mode=args.wandb.mode,
         tags=args.wandb.tags,
-        config={"train": dict(args.train), "vec": dict(args.vec)},
+        config={
+            "environment": dict(args.environment),
+            "train": dict(args.train),
+            "vec": dict(args.vec),
+        },
         name=name,
         save_code=True,
         resume=resume,
@@ -134,6 +138,7 @@ if __name__ == "__main__":
     make_env = env_creator(
         data_dir=config.data_dir,
         environment_config=config.environment,
+        train_config=config.train,
         device=config.train.device,
     )
 

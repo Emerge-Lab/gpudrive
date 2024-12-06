@@ -137,6 +137,9 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else:
                 params.enableLidar = self.config.lidar_obs
                 params.disableClassicalObs = self.config.disable_classic_obs
+                self.config.ego_state = False
+                self.config.road_map_obs = False
+                self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
 
@@ -294,7 +297,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def close(self):
         """Destroy the simulator and visualizer."""
         del self.sim
-        self.visualizer.destroy()
 
     def normalize_tensor(self, x, min_val, max_val):
         """Normalizes an array of values to the range [-1, 1].

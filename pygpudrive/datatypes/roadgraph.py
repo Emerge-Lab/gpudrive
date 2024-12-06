@@ -64,15 +64,19 @@ class GlobalRoadGraphPoints:
         self.orientation = roadgraph_tensor[:, :, 5]
         # Skipping the map element type for now (redundant with the map type).
         self.id = roadgraph_tensor[:, :, 7]
-        self.type = roadgraph_tensor[:, :, 8]
+        # TODO: Use map type instead of enum (8 instead of 6)
+        self.type = roadgraph_tensor[:, :, 6]
 
     @classmethod
     def from_tensor(
-        cls, roadgraph_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        roadgraph_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(roadgraph_tensor.to_torch())
+            return cls(roadgraph_tensor.to_torch().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -132,16 +136,19 @@ class LocalRoadGraphPoints:
         self.segment_height = local_roadgraph_tensor[:, :, :, 4]
         self.orientation = local_roadgraph_tensor[:, :, :, 5]
         self.id = local_roadgraph_tensor[:, :, :, 7]
-        # TODO: Use map type instead of enum (8 instead of 6)
+        # TODO(dc): Use map type instead of enum (8 instead of 6)
         self.type = local_roadgraph_tensor[:, :, :, 6].long()
 
     @classmethod
     def from_tensor(
-        cls, local_roadgraph_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        local_roadgraph_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(local_roadgraph_tensor.to_torch())
+            return cls(local_roadgraph_tensor.to_torch().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -157,9 +164,11 @@ class LocalRoadGraphPoints:
             min_val=constants.MIN_RG_COORD,
             max_val=constants.MAX_RG_COORD,
         )
-        self.segment_length = self.segment_length / constants.MAX_ROAD_SCALE
+        self.segment_length = (
+            self.segment_length / constants.MAX_ROAD_LINE_SEGMENT_LEN
+        )
         self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
-        self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
+        self.segment_height = self.segment_height  # / constants.MAX_ROAD_SCALE
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
         self.id = self.id
 

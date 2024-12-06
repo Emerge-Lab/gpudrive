@@ -6,7 +6,8 @@ TRAJ_LEN = 91  # Length of the logged trajectory
 
 @dataclass
 class LogTrajectory:
-    """A class to represent the logged human trajectories.
+    """A class to represent the logged human trajectories. Initialized from `expert_trajectory_tensor` (src/bindings.cpp).
+    Shape: (num_worlds, max_agents, TRAJ_LEN, action_space)
 
     Attributes:
         pos_xy: Global (but demeaned) positions of the agent(s) across the trajectory.
