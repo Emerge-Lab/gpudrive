@@ -16,12 +16,12 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
-  collision_weight: -0.025
-  off_road_weight: -0.025
+  collision_weight: -0.02
+  off_road_weight: -0.02
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
-  dist_to_goal_threshold: 3.0
+  dist_to_goal_threshold: 3.5
   polyline_reduction_threshold: 0.2 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 60.0 # Visibility radius of the agents
@@ -48,8 +48,9 @@ train:
   # # # Data sampling # # #
   resample_scenes: false
   resample_criterion: "global_step"
-  resample_interval: 3_000_000
+  resample_interval: 1_000_000 # Interval in global steps
   resample_mode: "random" # Options: random
+  resample_limit: 3 # If None, continue resampling indefinitely, if an integer, resample this many times
 
   # # # PPO # # #
   torch_deterministic: false
@@ -75,12 +76,12 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
-  render_interval: 500 # Render every k iterations
-  render_k_scenarios: 5 # Number of scenarios to render
+  render: true # Determines whether to render the environment (note: will slow down training)
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_agent_obs: false # Debugging tool, plot what an agent is seing
-  render_fps: 15 # Frames per second
+  render_interval: 100 # Render every k iterations
+  render_k_scenarios: 1 # Number of scenarios to render
+  render_fps: 20 # Frames per second
   render_format: "mp4" # Options: gif, mp4
 
 vec:

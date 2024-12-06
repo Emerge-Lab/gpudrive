@@ -111,6 +111,7 @@ class PufferGPUDrive(PufferEnv):
 
         # Get the tfrecord file names for every environment
         self.dataset = self.env.dataset
+        self.training_scenes_set = []
         self.env_to_files = {
             env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.dataset)
@@ -423,23 +424,28 @@ class PufferGPUDrive(PufferEnv):
         """Sample a new set of WOMD scenarios."""
         if self.train_config.resample_mode == "random":
             total_unique = len(self.unique_scene_paths)
+            
+            # Update set of scenes we've trained on
+            self.training_scenes_set.append(set(self.dataset))
+            
+            # Reset 
+            self.dataset = []
 
-            # Check if N is greater than the number of unique scenes
+            # Sample batch of unique scenes
             if self.num_worlds <= total_unique:
-                dataset = random.sample(
+                self.dataset = random.sample(
                     self.unique_scene_paths, self.num_worlds
                 )
-
-            # If N is greater, repeat the unique scenes until we get N scenes
-            self.dataset = []
-            while len(dataset) < self.num_worlds:
-                dataset.extend(
-                    random.sample(self.unique_scene_paths, total_unique)
-                )
-                if len(dataset) > self.num_worlds:
-                    dataset = dataset[
-                        : self.num_worlds
-                    ]  # Trim the result to N scenes
+            else:
+                # If N is greater, repeat the unique scenes until we get N scenes
+                while len(self.dataset) < self.num_worlds:
+                    self.dataset.extend(
+                        random.sample(self.unique_scene_paths, total_unique)
+                    )
+                    if len(self.dataset) > self.num_worlds:
+                        self.dataset = self.dataset[
+                            : self.num_worlds
+                        ]
         else:
             raise NotImplementedError(
                 f"Resample mode {self.train_config.resample_mode} is currently not supported."
@@ -447,10 +453,10 @@ class PufferGPUDrive(PufferEnv):
 
         # Re-initialize the simulator with the new dataset
         print(
-            f"Re-initializing sim with {len(set(dataset))} {self.train_config.resample_mode} unique scenes.\n"
+            f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
-        self.env.reinit_scenarios(dataset)
-        print(f"Done.\n")
+        
+        self.env.reinit_scenarios(self.dataset)
 
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -468,3 +474,11 @@ class PufferGPUDrive(PufferEnv):
             env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.dataset)
         }
+
+
+    def clear_render_storage(self):
+        """Clear rendering storage."""
+        for env_idx in range(self.train_config.render_k_scenarios):
+            self.frames[env_idx] = []
+            self.rendering_in_progress[env_idx] = False
+            self.was_rendered_in_rollout[env_idx] = True
