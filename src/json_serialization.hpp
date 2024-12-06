@@ -11,7 +11,12 @@ namespace gpudrive
     {
         p.x = j.at("x").get<float>();
         p.y = j.at("y").get<float>();
-        p.z = j.at("z").get<float>();
+        if (j.contains("z")) {
+	        p.z = j.at("z").get<float>();
+    	}
+        else {
+            p.z = 0.0;
+        }
     }
 
     void from_json(const nlohmann::json &j, MapObject &obj)
