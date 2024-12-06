@@ -211,41 +211,41 @@ We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You c
 
 ### Download the dataset
 
-- Two versions of the dataset are available, a mini version with a 1000 training files and 300 test/validation files, and the full sized dataset with over a 100k unique scenes. 
-- Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.)
-
-Option 1: You can download the dataset programmatically using the Hugging Face `datasets` library:
-```python
-from datasets import load_dataset
-dataset = load_dataset("EMERGE-lab/GPUDrive_mini", cache_dir="data/processed") #OR path/to/your/dir
-```
-Option 2: Use the huggingface-cli:
-
-1. First, install the Hugging Face CLI:
+- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and the [full sized dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with over a 100k unique scenes. 
+- Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
+- To download the dataset you need the huggingface_hub library:
 ```bash
 pip install huggingface_hub
 ```
+Then you can download the dataset using python or just `huggingface-cli`.
 
-2. Log in to your Hugging Face account:
+Option 1: Using Python:
+```python
+>>> from huggingface_hub import snapshot_download
+>>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
+```
+Option 2: Use the huggingface-cli:
+
+1. Log in to your Hugging Face account:
 ```bash
 huggingface-cli login
 ```
 
-3. Download the dataset:
+2. Download the dataset:
 ```bash
-huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed #OR path/to/your/dir
+huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
 ```
 
 Option 3: Manual Download:
 
-1. Visit https://huggingface.co/datasets/EMERGE-lab/GPUDrive
+1. Visit https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini
 2. Navigate to the Files and versions tab.
 3. Download the desired files/directories.
 
 
 ### Re-building the dataset
 
-GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps. (Note: you would only need to do this if there is a newer version of the Waymo dataset that you'd like to test.)
+If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
 
 1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
