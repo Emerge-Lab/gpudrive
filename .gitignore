@@ -25,6 +25,7 @@ data/raw/*
 data/processed/validation/*
 data/processed/testing/*
 data/processed/training/*
+data/formatted_json_v2_no_tl_valid/*
 
 # Logging
 /wandb
