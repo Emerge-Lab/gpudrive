@@ -39,8 +39,7 @@ relativeObservation(const gpudrive::MapObservation &absoluteObservation,
 
   return gpudrive::MapObservation{
       .position = referenceRotation.inv()
-                      .rotateVec({relativePosition.x, relativePosition.y, relativePosition.z})
-                      .xyz(),
+                      .rotateVec({relativePosition.x, relativePosition.y, relativePosition.z}),
       .scale = absoluteObservation.scale,
       .heading =  gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
       .type = absoluteObservation.type};

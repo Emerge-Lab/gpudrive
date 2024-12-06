@@ -174,7 +174,8 @@ static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
     // Z rotation (pitch)
     float horizontalDist = sqrt(dx*dx + dy*dy);
     float pitchAngle = atan2(dz, horizontalDist);
-    Vector3 pitchAxis = Vector3::cross(Vector3{dx/horizontalDist, dy/horizontalDist, 0}, madrona::math::up);
+    Vector3 horizontalDir{dx/horizontalDist, dy/horizontalDist, 0};
+    Vector3 pitchAxis = horizontalDir.cross(madrona::math::up);
     auto pitchRot = Quat::angleAxis(pitchAngle, pitchAxis);
 
     // Combined rotation
