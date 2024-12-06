@@ -56,7 +56,7 @@ void destroyWorld(Engine &ctx);
         ctx.get<ResponseType>(road) = responseType;
         ctx.get<RoadMapId>(road).id = roadIdx;
         ctx.get<MapType>(road) = mapType;
-        ctx.get<MapObservation>(ctx.get<RoadInterfaceEntity>(road).e) = MapObservation{.position = pos.xy(),
+        ctx.get<MapObservation>(ctx.get<RoadInterfaceEntity>(road).e) = MapObservation{.position = pos,
                                                                                        .scale = scale,
                                                                                        .heading = utils::quatToYaw(rot),
                                                                                        .type = (float)type,

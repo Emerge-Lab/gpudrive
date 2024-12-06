@@ -26,7 +26,7 @@ inline float quatToYaw(madrona::base::Rotation q) {
 
 class ReferenceFrame {
 public:
-  ReferenceFrame(const madrona::math::Vector2 &position,
+  ReferenceFrame(const madrona::math::Vector3 &position,
                  const madrona::base::Rotation &rotation)
       : referenceRotation(rotation), referencePosition(position) {}
 
@@ -47,20 +47,19 @@ public:
   }
 
 private:
-  madrona::math::Vector2
+  madrona::math::Vector3
   relative(const madrona::math::Vector3 &absolutePos) const {
-    auto relativePosition = absolutePos.xy() - referencePosition;
+    auto relativePosition = absolutePos - referencePosition;
 
     return referenceRotation.inv()
-        .rotateVec({relativePosition.x, relativePosition.y, 0})
-        .xy();
+        .rotateVec({relativePosition.x, relativePosition.y, relativePosition.z});
   }
 
   float relative(const madrona::base::Rotation &absoluteRot) const {
     return gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
   }
 
-  madrona::math::Vector2 referencePosition;
+  madrona::math::Vector3 referencePosition;
   madrona::base::Rotation referenceRotation;
 };
 }}
