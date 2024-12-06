@@ -1,20 +1,28 @@
 import os
+from typing import List, Optional
 import gymnasium as gym
 from pygpudrive.env.config import RenderConfig, RenderMode
 from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.scene_selector import select_scenes
 import abc
 import gpudrive
+import torch
+import jax.numpy as jnp
 
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
-    """Base class for multi-agent environments in GPUDrive.
-
-    Provides common methods for setting up the simulator and handling output.
-    """
-
-    def __init__(self):
+    def __init__(self, backend="torch"):
         super().__init__()
+        self.backend = backend
+        if self.backend not in ["torch", "jax"]:
+            raise ValueError("Unsupported backend; use 'torch' or 'jax'")
+
+    def to_tensor(self, x):
+        """Convert simulator data to the correct tensor type for the specified backend."""
+        if self.backend == "torch":
+            return x.to_torch()
+        elif self.backend == "jax":
+            return x.to_jax()
 
     @abc.abstractmethod
     def reset(self):
@@ -57,7 +65,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         reward_params = gpudrive.RewardParams()
 
-        if self.config.reward_type == "sparse_on_goal_achieved" or self.config.reward_type == "weighted_combination":
+        if (
+            self.config.reward_type == "sparse_on_goal_achieved"
+            or self.config.reward_type == "weighted_combination"
+        ):
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
@@ -107,7 +118,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
         params.rewardParams = self._set_reward_params()
         params.IgnoreNonVehicles = self.config.remove_non_vehicles
-        params.maxNumControlledVehicles = self.max_cont_agents
+        params.maxNumControlledAgents = self.max_cont_agents
         params.isStaticAgentControlled = False
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
@@ -117,9 +128,18 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 f"Invalid dynamics model: {self.config.dynamics_model}"
             )
 
-        if self.config.enable_lidar:
-            params.enableLidar = self.config.enable_lidar
-            params.disableClassicalObs = True
+        if self.config.lidar_obs:
+            if not self.config.lidar_obs and self.config.disable_classic_obs:
+                raise ValueError(
+                    "Lidar observations must be enabled if classic observations are disabled."
+                )
+
+            else:
+                params.enableLidar = self.config.lidar_obs
+                params.disableClassicalObs = self.config.disable_classic_obs
+                self.config.ego_state = False
+                self.config.road_map_obs = False
+                self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
 
@@ -159,11 +179,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        dataset = select_scenes(scene_config)
+        self.dataset = select_scenes(scene_config)
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
-            scenes=dataset,
+            scenes=self.dataset,
             params=params,
             enable_batch_renderer=self.render_config
             and self.render_config.render_mode
@@ -199,6 +219,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         if action_type == "discrete":
             self.action_space = self._set_discrete_action_space()
+        elif action_type == "continuous":
+            self.action_space = self._set_continuous_action_space()
         else:
             raise ValueError(f"Action space not supported: {action_type}")
 
@@ -253,10 +275,28 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         }:
             return self.visualizer.getRender()
 
+    def reinit_scenarios(self, dataset: List[str]):
+        """Resample the scenes.
+        Args:
+            dataset (List[str]): List of scene names to resample.
+
+        Returns:
+            None
+        """
+
+        # Resample the scenes
+        self.sim.set_maps(dataset)
+
+        # Re-initialize the controlled agents mask
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+
     def close(self):
         """Destroy the simulator and visualizer."""
         del self.sim
-        self.visualizer.destroy()
 
     def normalize_tensor(self, x, min_val, max_val):
         """Normalizes an array of values to the range [-1, 1].

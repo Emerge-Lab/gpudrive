@@ -5,7 +5,6 @@
 
 namespace gpudrive
 {
-
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;
     constexpr size_t MAX_ROADS = 956;
@@ -36,12 +35,15 @@ namespace gpudrive
         uint32_t numVelocities;
         uint32_t numValid;
         MapVector2 mean;
+        bool markAsExpert{false};
     };
 
     struct MapRoad
     {
         // std::array<MapPosition, MAX_POSITIONS> geometry;
         MapVector2 geometry[MAX_GEOMETRY];
+        uint32_t id;
+        MapType mapType;
         EntityType type;
         uint32_t numPoints;
         MapVector2 mean;
@@ -80,14 +82,14 @@ namespace gpudrive
         float distanceToExpertThreshold;
     };
 
-    enum class CollisionBehaviour: uint32_t
+    enum class CollisionBehaviour : uint32_t
     {
         AgentStop,
         AgentRemoved,
         Ignore
     };
 
-    enum class DynamicsModel: uint32_t
+    enum class DynamicsModel : uint32_t
     {
         Classic,
         InvertibleBicycle,
@@ -95,9 +97,10 @@ namespace gpudrive
         State
     };
 
-    enum class FindRoadObservationsWith {
-      KNearestEntitiesWithRadiusFiltering,
-      AllEntitiesWithRadiusFiltering
+    enum class FindRoadObservationsWith
+    {
+        KNearestEntitiesWithRadiusFiltering,
+        AllEntitiesWithRadiusFiltering
     };
 
     struct Parameters
@@ -106,16 +109,15 @@ namespace gpudrive
         float observationRadius;
         RewardParams rewardParams;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
-        uint32_t maxNumControlledVehicles = 10000; // Arbitrary high number to by default control all vehicles 
-        bool IgnoreNonVehicles = false; // Default: false
+        uint32_t maxNumControlledAgents = 10000;                               // Arbitrary high number to by default control all vehicles
+        bool IgnoreNonVehicles = false;                                        // Default: false
         FindRoadObservationsWith roadObservationAlgorithm{
             FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
-        bool isStaticAgentControlled = false; // Default: false
+        bool isStaticAgentControlled = false;       // Default: false
         bool enableLidar = false;
         bool disableClassicalObs = false;
         DynamicsModel dynamicsModel = DynamicsModel::Classic;
-
     };
 
     struct WorldInit

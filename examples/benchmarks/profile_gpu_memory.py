@@ -28,7 +28,7 @@ def make_sim(
     params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
     params.rewardParams = reward_params
     params.IgnoreNonVehicles = True
-    params.maxNumControlledVehicles = max_num_objects
+    params.maxNumControlledAgents = max_num_objects
 
     sim = gpudrive.SimManager(
         exec_mode=gpudrive.madrona.ExecMode.CPU

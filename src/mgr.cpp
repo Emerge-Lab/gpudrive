@@ -104,7 +104,7 @@ struct Manager::Impl {
                 Action *action_buffer,
                 Optional<RenderGPUState> &&render_gpu_state,
                 Optional<render::RenderManager> &&render_mgr,
-		int64_t numWorlds) 
+		int64_t numWorlds)
         : cfg(mgr_cfg),
           physicsLoader(std::move(phys_loader)),
           episodeMgr(ep_mgr),
@@ -181,7 +181,7 @@ struct Manager::CUDAImpl final : Manager::Impl {
                    int64_t numWorlds)
         : Impl(mgr_cfg, std::move(phys_loader),
                ep_mgr, reset_buffer, action_buffer,
-               std::move(render_gpu_state), std::move(render_mgr), numWorlds),  
+               std::move(render_gpu_state), std::move(render_mgr), numWorlds),
           gpuExec(std::move(gpu_exec)),
           stepGraph(gpuExec.buildLaunchGraph(TaskGraphID::Step)),
           resetGraph(gpuExec.buildLaunchGraph(TaskGraphID::Reset)) {}
@@ -408,7 +408,7 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
             roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
-Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) { 
+Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
     Sim::Config sim_cfg;
     sim_cfg.enableLidar = mgr_cfg.params.enableLidar;
 
@@ -422,7 +422,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 #ifdef MADRONA_CUDA_SUPPORT
         CUcontext cu_ctx = MWCudaExecutor::initCUDA(mgr_cfg.gpuID);
 
-        EpisodeManager *episode_mgr = 
+        EpisodeManager *episode_mgr =
             (EpisodeManager *)cu::allocGPU(sizeof(EpisodeManager));
         REQ_CUDA(cudaMemset(episode_mgr, 0, sizeof(EpisodeManager)));
 
@@ -436,7 +436,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
-        
+
         int64_t worldIdx{0};
         for (auto const &scene : mgr_cfg.scenes) {
 	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
@@ -467,17 +467,17 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             .worldDataAlignment = alignof(Sim),
             .numWorlds = static_cast<uint32_t>(numWorlds),
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
-            .numExportedBuffers = (uint32_t)ExportID::NumExports, 
+            .numExportedBuffers = (uint32_t)ExportID::NumExports,
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
         }, cu_ctx);
 
-        WorldReset *world_reset_buffer = 
+        WorldReset *world_reset_buffer =
             (WorldReset *)gpu_exec.getExported((uint32_t)ExportID::Reset);
 
-        Action *agent_actions_buffer = 
+        Action *agent_actions_buffer =
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
         madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < numWorlds; i++) {
@@ -512,7 +512,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         HeapArray<WorldInit> world_inits(numWorlds);
 
         int64_t worldIdx{0};
-    
+
         for (auto const &scene : mgr_cfg.scenes)
         {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
@@ -546,10 +546,10 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             (uint32_t)TaskGraphID::NumTaskGraphs,
         };
 
-        WorldReset *world_reset_buffer = 
+        WorldReset *world_reset_buffer =
             (WorldReset *)cpu_exec.getExported((uint32_t)ExportID::Reset);
 
-        Action *agent_actions_buffer = 
+        Action *agent_actions_buffer =
             (Action *)cpu_exec.getExported((uint32_t)ExportID::Action);
         auto cpu_impl = new CPUImpl {
             mgr_cfg,
@@ -563,7 +563,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 	    numWorlds
         };
 
-        for (int64_t i = 0; i < mgr_cfg.scenes.size(); i++) {
+        for (size_t i = 0; i < mgr_cfg.scenes.size(); i++) {
           auto &init = world_inits[i];
           delete init.map;
         }
@@ -597,14 +597,62 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
     }
 
     impl_->reset();
+}
 
-    if (impl_->renderMgr.has_value()) {
-        impl_->renderMgr->readECS();
+void Manager::setMaps(const std::vector<std::string> &maps)
+{
+    assert(impl_->cfg.scenes.size() == maps.size());
+    impl_->cfg.scenes = maps;
+
+    ResetMap resetmap{
+        1,
+    };
+
+    if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
+    {
+#ifdef MADRONA_CUDA_SUPPORT
+        auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+            Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
+            madrona::cu::deallocGPU(map);
+
+            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+        }
+
+#else
+        // Handle the case where CUDA support is not available
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    }
+    else
+    {
+
+        auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
+
+        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        {
+            // Parse the map string into your MapData structure
+            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
+                                                                      ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+
+            Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+            memcpy(mapDevicePtr, map, sizeof(Map));
+            delete map;
+
+            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+        }
     }
 
-    if (impl_->cfg.enableBatchRenderer) {
-        impl_->renderMgr->batchRender();
-    }
+    // Vector of range on integers from 0 to the number of worlds
+    std::vector<int32_t> worldIndices(maps.size());
+    std::iota(worldIndices.begin(), worldIndices.end(), 0);
+    reset(worldIndices);
 }
 
 Tensor Manager::actionTensor() const
@@ -621,10 +669,19 @@ Tensor Manager::actionTensor() const
 Tensor Manager::rewardTensor() const
 {
     return impl_->exportTensor(ExportID::Reward, TensorElementType::Float32,
+                            {
+                                impl_->numWorlds,
+                                consts::kMaxAgentCount,
+                                1,
+                            });
+}
+
+Tensor Manager::worldMeansTensor() const
+{
+    return impl_->exportTensor(ExportID::WorldMeans, TensorElementType::Float32,
                                {
                                    impl_->numWorlds,
-                                   consts::kMaxAgentCount,
-                                   1,
+                                   WorldMeansExportSize,
                                });
 }
 
@@ -701,8 +758,9 @@ Tensor Manager::lidarTensor() const
                                {
                                    impl_->numWorlds,
                                    consts::kMaxAgentCount,
+                                   3, // Trace lidars on 3 planes
                                    consts::numLidarSamples,
-                                   2,
+                                   LidarExportSize / (3 * consts::numLidarSamples),
                                });
 }
 
@@ -812,7 +870,7 @@ void Manager::setAction(int32_t world_idx, int32_t agent_idx,
 }
 
 std::vector<Shape>
-Manager::getShapeTensorFromDeviceMemory(madrona::ExecMode mode) {
+Manager::getShapeTensorFromDeviceMemory() {
     const uint32_t numWorlds = impl_->numWorlds;
     const auto &tensor = shapeTensor();
 

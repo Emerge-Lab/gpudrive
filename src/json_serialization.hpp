@@ -15,8 +15,6 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
-        const auto &valid = j.at("valid");
-
         obj.mean = {0,0};
         uint32_t i = 0;
         for (const auto &pos : j.at("position"))
@@ -93,6 +91,11 @@ namespace gpudrive
             obj.type = EntityType::Cyclist;
         else
             obj.type = EntityType::None;
+
+	std::string markAsExpertKey = "mark_as_expert";
+	if (j.contains(markAsExpertKey)) {
+	    from_json(j.at("mark_as_expert"), obj.markAsExpert);
+	}
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
@@ -113,6 +116,7 @@ namespace gpudrive
             road.type = EntityType::StopSign;
         else
             road.type = EntityType::None;
+
         
         std::vector<MapVector2> geometry_points_;
         for(const auto &point: j.at("geometry"))
@@ -180,7 +184,7 @@ namespace gpudrive
                 }
                 k++;
             }
-            for (int i = 0; i < new_geometry_points.size(); i++)
+            for (size_t i = 0; i < new_geometry_points.size(); i++)
             {
                 if(i==MAX_GEOMETRY)
                     break;
@@ -197,6 +201,28 @@ namespace gpudrive
                 road.geometry[i] = geometry_points_[i * sample_every_n_]; 
             }
             road.numPoints = num_sampled_points;
+        }
+
+        if (j.contains("id")) {
+            road.id = j.at("id").get<uint32_t>();
+        }
+
+        if (j.contains("map_element_id"))
+        {
+            auto mapElementId = j.at("map_element_id").get<int32_t>();
+
+            if(mapElementId == 4 or mapElementId >= static_cast<int32_t>(MapType::NUM_TYPES) or mapElementId < -1)
+            {
+                road.mapType = MapType::UNKNOWN;
+            }
+            else
+            {
+                road.mapType = static_cast<MapType>(mapElementId);
+            }
+        }
+        else
+        {
+            road.mapType = MapType::UNKNOWN;
         }
 
         for (int i = 0; i < road.numPoints; i++)

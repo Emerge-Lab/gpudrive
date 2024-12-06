@@ -50,7 +50,7 @@ namespace gpudrive
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
-            .def_rw("maxNumControlledVehicles", &Parameters::maxNumControlledVehicles)
+            .def_rw("maxNumControlledAgents", &Parameters::maxNumControlledAgents)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
             .def_rw("initOnlyValidAgentsAtFirstStep", &Parameters::initOnlyValidAgentsAtFirstStep)
@@ -124,7 +124,9 @@ namespace gpudrive
             .def("rgb_tensor", &Manager::rgbTensor)
             .def("depth_tensor", &Manager::depthTensor)
             .def("response_type_tensor", &Manager::responseTypeTensor)
-            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor);
+            .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor)
+            .def("set_maps", &Manager::setMaps)
+            .def("world_means_tensor", &Manager::worldMeansTensor);
     }
 
 }

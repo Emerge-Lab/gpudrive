@@ -5,13 +5,11 @@
 /CMakeSettings.json
 /scripts/__pycache__
 /train_src/madrona_escape_room_learn/__pycache__
-/waymo_data*
 .vscode/launch.json
 .vscode/settings.json
 .vscode/tasks.json
 /examples/benchmarks/results/
 /baselines/ippo/logs/*
-
 *.sif
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
@@ -19,24 +17,21 @@
 /bin
 /zipp*
 .python-version
-/baselines/ippo/logs/*
 /google-cloud-sdk/*
 
 # Data
 hpc/overlay*
-data/formatted_json_v2_no_tl_train/*
-/maps_*/*
-/formatted_json_v2_no_tl_train
-/formatted_json_v2_no_tl_valid/*
-/waymo_data_new
-/maps_16
-**/*ppo_model*/
-/wandb*
-/videos/*
+data/raw/*
+data/processed/validation/*
+data/processed/testing/*
+data/processed/training/*
+data/formatted_json_v2_no_tl_valid/*
 
 # Logging
 /wandb
+/wandb*
 events.out.tfevents.*
+/runs*
 
 ### C++ ###
 # Prerequisites
@@ -46,7 +41,6 @@ events.out.tfevents.*
 *.slo
 *.lo
 *.o
-
 
 # Precompiled Headers
 *.gch

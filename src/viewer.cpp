@@ -67,29 +67,30 @@ int main(int argc, char *argv[])
 #endif
 
     WindowManager wm {};
-    WindowHandle window = wm.makeWindow("Escape Room", 640, 480);
+    WindowHandle window = wm.makeWindow("GPUDrive", 1920, 1080);
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
     Manager mgr({
         .execMode = exec_mode,
         .gpuID = 0,
-        .scenes = {"testJsons/test.json"},
+        .scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json"},
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
-            .maxNumControlledVehicles = 0
+            .maxNumControlledAgents = 0
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
         .extRenderDev = render_gpu.device(),
     });
 
+    madrona::CountT stepCtr = 0;
     // math::Quat initial_camera_rotation = math::Quat::angleAxis(0, math::up).normalize();
     math::Quat initial_camera_rotation =
             (math::Quat::angleAxis(0, math::up) *
             math::Quat::angleAxis(-math::pi / 2.f, math::right)).normalize();
 
-        Viewer viewer(mgr.getRenderManager(), window.get(), {
+    Viewer viewer(mgr.getRenderManager(), window.get(), {
         .numWorlds = num_worlds,
         .simTickRate = 20,
         .cameraMoveSpeed = 20.f,
@@ -152,7 +153,12 @@ int main(int argc, char *argv[])
     };
 
     viewer.loop(
-    [](CountT world_idx, const Viewer::UserInput &input) {
+    [&mgr](CountT world_idx, const Viewer::UserInput &input) {
+
+        using Key = Viewer::KeyboardKey;
+        if (input.keyHit(Key::R)) {
+            mgr.reset({(int)world_idx});
+        }
         (void)world_idx;
     },
     [&mgr](CountT world_idx, CountT agent_idx,
@@ -164,10 +170,6 @@ int main(int argc, char *argv[])
 
         float acceleration{0};
         const float accelerationDelta{1};
-
-        if (input.keyPressed(Key::R)) {
-            mgr.triggerReset(world_idx);
-        }
 
         bool shift_pressed = input.keyPressed(Key::Shift);
 
@@ -197,7 +199,12 @@ int main(int argc, char *argv[])
         }
 
         mgr.step();
-        
-        printObs();
+        stepCtr++;
+
+        if(stepCtr % consts::episodeLen == 0) {
+            mgr.reset({0});
+        }
+
+        // printObs();
     }, []() {});
 }

@@ -41,3 +41,10 @@
 - urllib3==2.2.1
 - virtualenv==20.25.1
 - zipp==3.18.1
+- tensorflow==2.12.0
+- waymo-open-dataset-tf-2-12-0==1.6.4
+- mediapy
+- gymnasium
+- pygame
+- pynvml==11.5.3
+- python-box==7.2.0

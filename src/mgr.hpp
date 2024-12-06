@@ -67,6 +67,7 @@ public:
     MGR_EXPORT madrona::py::Tensor infoTensor() const;
     MGR_EXPORT madrona::py::Tensor responseTypeTensor() const;
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
+    MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
@@ -75,9 +76,10 @@ public:
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
+    MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
-    getShapeTensorFromDeviceMemory(madrona::ExecMode mode);
+    getShapeTensorFromDeviceMemory();
 
     madrona::render::RenderManager & getRenderManager();
 

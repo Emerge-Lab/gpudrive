@@ -34,9 +34,9 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"../data/tfrecord-00001-of-01000_307.json",
-         "../data/tfrecord-00003-of-01000_109.json",
-         "../data/tfrecord-00012-of-01000_389.json"};
+    std::vector<std::string> scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json",
+         "../data/processed/examples/tfrecord-00003-of-01000_109.json",
+         "../data/processed/examples/tfrecord-00012-of-01000_389.json"};
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
                 .distanceToGoalThreshold = 0.5,
                 .distanceToExpertThreshold = 0.5
             },
-            .maxNumControlledVehicles = 0,
+            .maxNumControlledAgents = 0,
         }
     });
 
@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
     auto controlledStatePrinter = mgr.controlledStateTensor().makePrinter();
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
     auto info_printer = mgr.infoTensor().makePrinter();
+    auto means_printer = mgr.worldMeansTensor().makePrinter();
 
     auto printObs = [&]() {
         // printf("Self\n");
@@ -97,8 +98,8 @@ int main(int argc, char *argv[])
         // printf("Reward\n");
         // rewardPrinter.print();
 
-        printf("Done\n");
-        donePrinter.print();
+        // printf("Done\n");
+        // donePrinter.print();
 
         // printf("Controlled State\n");
         // controlledStatePrinter.print();
@@ -108,10 +109,13 @@ int main(int argc, char *argv[])
 
         // printf("Info\n");
         // info_printer.print();
+
+        printf("Means\n");
+        means_printer.print();
     };
 
     auto worldToShape =
-	mgr.getShapeTensorFromDeviceMemory(exec_mode);
+	mgr.getShapeTensorFromDeviceMemory();
 
     const auto start = std::chrono::steady_clock::now();
     for (CountT i = 0; i < (CountT)num_steps; i++) {
@@ -124,8 +128,6 @@ int main(int argc, char *argv[])
                     float head = 0;
 
                     mgr.setAction(j, k, acc, steer, head);
-
-                    int64_t base_idx = j * num_steps * 2 * 3 + i * 2 * 3 + k * 3;
                 }
             }
         }

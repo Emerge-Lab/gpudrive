@@ -12,6 +12,7 @@ def select_scenes(config):
 
     all_scenes = sorted(os.listdir(config.path))
     # Remove elements that are not tfrecord files (traffic scenes)
+    # NOTE: This uses the naming convention of the traffic scenes as a filter
     all_scenes = [
         scene for scene in all_scenes if scene.startswith("tfrecord")
     ]
@@ -23,7 +24,8 @@ def select_scenes(config):
         )
 
     def random_sample(k):
-        rand = random.Random(0x5CA1AB1E)
+        seed = config.seed if config.seed is not None else 0x5CA1AB1E
+        rand = random.Random(seed)
         return rand.sample(all_scenes, k)
 
     def repeat_to_N(scenes):
@@ -35,7 +37,7 @@ def select_scenes(config):
             selected_scenes = all_scenes[: config.num_scenes]
             selected_scenes = all_scenes[: config.num_scenes]
         case SelectionDiscipline.RANDOM_N:
-            selected_scenes = random_sample(all_scenes)
+            selected_scenes = random_sample(config.num_scenes)
         case SelectionDiscipline.PAD_N:
             selected_scenes = repeat_to_N(all_scenes)
         case SelectionDiscipline.EXACT_N:
@@ -45,6 +47,7 @@ def select_scenes(config):
             assert (
                 config.k_unique_scenes > 0 or config.k_unique_scenes is None
             ), "K_UNIQUE_N discipline requires specifying positive value for K"
+
             selected_scenes = repeat_to_N(
                 random_sample(config.k_unique_scenes)
             )
@@ -61,7 +64,7 @@ def select_scenes(config):
     ]
 
     print(
-        f"\n--- Ratio unique scenes / number of worls = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
+        f"\n--- Ratio unique scenes / number of worlds = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
     )
 
     return scene_paths

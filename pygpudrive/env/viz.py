@@ -9,7 +9,7 @@ from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
 # AGENT COLORS
 PINK = (255, 105, 180)
 GREEN = (113, 228, 0)
-BLUE = (0, 191, 255)
+BLUE = (0, 127, 255)
 DODGER_BLUE = (30, 144, 255)
 RED_ORANGE = (255, 69, 0)
 WHITE = (255, 255, 255)
@@ -22,9 +22,9 @@ class PyGameVisualizer:
     WINDOW_W, WINDOW_H = 1920, 1080
     PADDING_PCT = 0.0
     COLOR_LIST = [
+        BLUE,
         PINK,
         GREEN,
-        BLUE,
         DODGER_BLUE,
         RED_ORANGE,
     ]
@@ -44,12 +44,15 @@ class PyGameVisualizer:
         
         # ROAD MAP COLORS
         self.color_dict = {
-    float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
+            float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
             float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
             float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
             float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
             float(gpudrive.EntityType.CrossWalk): (255, 255, 255),  # White
             float(gpudrive.EntityType.StopSign): (213, 20, 20),  # Dark red
+            float(gpudrive.EntityType.Vehicle): (0, 255, 0),  # Green
+            float(gpudrive.EntityType.Pedestrian): (0, 255, 0),  # Green
+            float(gpudrive.EntityType.Cyclist): (0, 0, 255),  # Blue
         }
 
         self.num_agents = self.sim.shape_tensor().to_torch().cpu().numpy()
@@ -166,10 +169,10 @@ class PyGameVisualizer:
         for i in range(map_infos.shape[0]):
             map_info = map_infos[i]
             map_info = map_info[
-                map_info[:, -1] != float(gpudrive.EntityType.Padding)
+                map_info[:, 6] != float(gpudrive.EntityType.Padding)
             ]
             roads = map_info[
-                map_info[:, -1] <= float(gpudrive.EntityType.RoadLane)
+                map_info[:, 6] <= float(gpudrive.EntityType.RoadLane)
             ]
             endpoints = PyGameVisualizer.get_all_endpoints(roads)
 
@@ -277,10 +280,10 @@ class PyGameVisualizer:
         """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
-            if map_obj[-1] == float(gpudrive.EntityType.Padding) or map_obj[-1] == float(gpudrive.EntityType._None):
+            if map_obj[6] == float(gpudrive.EntityType.Padding) or map_obj[6] == float(gpudrive.EntityType._None):
                 continue
 
-            elif map_obj[-1] <= float(gpudrive.EntityType.RoadLane):
+            elif map_obj[6] <= float(gpudrive.EntityType.RoadLane):
                 start, end = PyGameVisualizer.get_endpoints(
                     map_obj[:2], map_obj
                 )
@@ -288,12 +291,12 @@ class PyGameVisualizer:
                 end = self.scale_coords(end, world_render_idx)
 
                 # DRAW ROAD EDGE
-                if map_obj[-1] == float(gpudrive.EntityType.RoadEdge):
+                if map_obj[6] == float(gpudrive.EntityType.RoadEdge):
                     self.draw_line(
                         surf,
                         start,
                         end,
-                        self.color_dict[map_obj[-1]],
+                        self.color_dict[map_obj[6]],
                         thickness=self.render_config.line_thickness,
                     )
 
@@ -303,12 +306,12 @@ class PyGameVisualizer:
                         surf,
                         start,
                         end,
-                        self.color_dict[map_obj[-1]],
+                        self.color_dict[map_obj[6]],
                         thickness=self.render_config.line_thickness,
                     )
 
             # DRAW STOP SIGNS
-            elif map_obj[-1] <= float(gpudrive.EntityType.StopSign):
+            elif map_obj[6] <= float(gpudrive.EntityType.StopSign):
 
                 center, width, height, rotation = (
                     map_obj[:2],
@@ -316,7 +319,7 @@ class PyGameVisualizer:
                     map_obj[2],
                     map_obj[5],
                 )
-                if map_obj[-1] == float(gpudrive.EntityType.StopSign):
+                if map_obj[6] == float(gpudrive.EntityType.StopSign):
 
                     width *= self.zoom_scales_x[world_render_idx]
                     height *= self.zoom_scales_y[world_render_idx]
@@ -328,16 +331,16 @@ class PyGameVisualizer:
                     box_corners[i] = self.scale_coords(
                         box_corner, world_render_idx
                     )
-                if map_obj[-1] == float(gpudrive.EntityType.SpeedBump):
+                if map_obj[6] == float(gpudrive.EntityType.SpeedBump):
                     pygame.gfxdraw.aapolygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
                 else:
                     pygame.gfxdraw.aapolygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
                     pygame.gfxdraw.filled_polygon(
-                        surf, box_corners, self.color_dict[map_obj[-1]]
+                        surf, box_corners, self.color_dict[map_obj[6]]
                     )
 
     def init_map(self):
@@ -377,6 +380,34 @@ class PyGameVisualizer:
                 raise NotImplementedError
             return self.sim.depth_tensor().to_torch()
 
+    def plotLidar(self, surf, lidar_data, world_render_idx):
+        numLidarSamples = lidar_data.shape[0]
+
+        lidar_entity_types = lidar_data[:, 1]
+        lidar_pos = lidar_data[:, 2:4]
+
+        for i in range(numLidarSamples):
+            if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
+                continue
+            coords = lidar_pos[i]
+            scaled_coords = self.scale_coords(coords, world_render_idx)
+           
+            pygame.gfxdraw.aacircle(
+                surf,
+                int(scaled_coords[0]),
+                int(scaled_coords[1]),
+                2,
+                self.color_dict[lidar_entity_types[i]]
+            )
+
+            pygame.gfxdraw.filled_circle(
+                surf,
+                int(scaled_coords[0]),
+                int(scaled_coords[1]),
+                2,
+                self.color_dict[lidar_entity_types[i]]
+            )
+
     def draw(
         self, cont_agent_mask, world_render_idx=0, color_objects_by_actor=None
     ):
@@ -390,9 +421,9 @@ class PyGameVisualizer:
                 info_tensor = self.sim.info_tensor().to_torch()[
                     world_render_idx
                 ]
-                if info_tensor[agent_idx, -1] == float(
+                if info_tensor[agent_idx, 6] == float(
                     gpudrive.EntityType.Padding
-                ) or info_tensor[agent_idx, -1] == float(
+                ) or info_tensor[agent_idx, 6] == float(
                     gpudrive.EntityType._None
                 ):
                     continue
@@ -406,8 +437,8 @@ class PyGameVisualizer:
                     .numpy()
                 )
                 agent_map_info = agent_map_info[
-                    (agent_map_info[:, -1] != 0.0)
-                    & (agent_map_info[:, -1] != 10.0)
+                    (agent_map_info[:, 6] != 0.0)
+                    & (agent_map_info[:, 6] != 10.0)
                 ]
 
                 agent_info = (
@@ -469,6 +500,7 @@ class PyGameVisualizer:
                     agent_pos = agent[1:3]
                     agent_rot = agent[3]
                     agent_size = agent[4:6]
+                    agent_type = agent[6]
 
                     agent_corners = PyGameVisualizer.compute_agent_corners(
                         agent_pos,
@@ -630,10 +662,18 @@ class PyGameVisualizer:
                 return self.isopen
         elif self.render_config.render_mode == RenderMode.PYGAME_LIDAR:
             render_rgbs = []
-            render_mask = self.create_render_mask()
-            num_agents = render_mask.sum().item()
+            num_agents = self.num_agents[world_render_idx][0]
+
             # Loop through each agent to render their egocentric view
             for agent_idx in range(num_agents):
+                info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
+                if info_tensor[agent_idx, -1] == float(
+                    gpudrive.EntityType.Padding
+                ) or info_tensor[agent_idx, -1] == float(
+                    gpudrive.EntityType._None
+                ):
+                    continue
+
                 self.surf.fill(self.BACKGROUND_COLOR)
                 temp_surf = pygame.Surface(
                     (self.surf.get_width(), self.surf.get_height())
@@ -648,46 +688,22 @@ class PyGameVisualizer:
                     .numpy()
                 )
 
-                numLidarSamples = 1024
-
                 lidar_data = (
                     self.sim.lidar_tensor()
-                    .to_torch()[world_render_idx, agent_idx, :, :]
+                    .to_torch()[world_render_idx, agent_idx, :, :, :] # shape is (num_worlds, num_agents, num_planes, num_samples, 2)
                     .cpu()
                     .detach()
                     .numpy()
                 )
-
-                lidar_depths = lidar_data[:, 0]
-
-                lidar_angles = np.linspace(0, 2 * np.pi, numLidarSamples)
-
-                num_lidar_plotted = 0
-
-                for i in range(numLidarSamples):
-                    angle = lidar_angles[i]
-                    depth = lidar_depths[i]
-                    if depth == 0:
-                        continue
-                    x = depth * np.cos(angle)
-                    y = depth * np.sin(angle)
-
-                    start = self.scale_coords((0, 0), world_render_idx)
-                    end = self.scale_coords(np.array([x, y]), world_render_idx)
-
-                    pygame.gfxdraw.aacircle(
-                        temp_surf, int(end[0]), int(end[1]), 2, WHITE
-                    )
-                    pygame.gfxdraw.filled_circle(
-                        temp_surf, int(end[0]), int(end[1]), 2, WHITE
-                    )
-                    num_lidar_plotted += 1
+                
+                for lidar_plane in lidar_data:
+                    self.plotLidar(temp_surf, lidar_plane, world_render_idx)
 
                 goal_pos = agent_info[3:5]  # x, y
                 agent_size = agent_info[1:3]  # length, width
 
                 agent_corners = PyGameVisualizer.compute_agent_corners(
-                    (0, 0), agent_size[1], agent_size[0], np.pi / 2
+                    (0, 0), agent_size[1], agent_size[0], 0
                 )
                 agent_corners = [
                     self.scale_coords(corner, world_render_idx)
