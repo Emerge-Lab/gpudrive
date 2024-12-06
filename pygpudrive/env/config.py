@@ -115,6 +115,9 @@ class EnvConfig:
         gpudrive.numLidarSamples
     )
 
+    #Param to init all objects:
+    init_all_objects: bool = False
+
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
 

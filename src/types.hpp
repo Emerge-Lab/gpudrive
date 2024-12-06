@@ -64,9 +64,9 @@ namespace gpudrive
         NUM_TYPES = 21,
     };
 
-struct AgentID {
-    int32_t id;
-};
+    struct AgentID {
+        int32_t id;
+    };
 
     struct VehicleSize
     {
@@ -126,6 +126,12 @@ struct AgentID {
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
+
+        static inline Action zero()
+        {
+            return Action{
+                .classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
+        }
     };
 
     const size_t ActionExportSize = 3 + 1 + 6;
@@ -179,7 +185,7 @@ struct AgentID {
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
-    float id;
+        float id;
         static inline SelfObservation zero()
         {
             return SelfObservation{
@@ -316,6 +322,18 @@ struct AgentID {
         float headings[consts::kTrajectoryLength];
         float valids[consts::kTrajectoryLength];
         Action inverseActions[consts::kTrajectoryLength];
+
+        static inline void zero(Trajectory& traj)
+        {
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            {
+                traj.positions[i] = {0, 0};
+                traj.velocities[i] = {0, 0};
+                traj.headings[i] = 0;
+                traj.valids[i] = 0;
+                traj.inverseActions[i] = Action::zero();
+            }
+        }
     };
 
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
@@ -357,6 +375,17 @@ struct AgentID {
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
+    //Metadata struct : masks on agent id
+    struct MetaData
+    {
+        int32_t sdc_mask[consts::kMaxAgentCount] = {0};
+        int32_t objects_of_interest[consts::kMaxAgentCount] = {0};
+        int32_t tracks_to_predict[consts::kMaxAgentCount] = {0};
+        int32_t difficulty[consts::kMaxAgentCount] = {0};
+    };
+    const size_t MetaDataExportSize = consts::kMaxAgentCount * 4;
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
+
     struct AgentInterface : public madrona::Archetype<
                                 Action,
                                 Reward,
@@ -371,7 +400,7 @@ struct AgentID {
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
-    AgentID,
+                                AgentID,
 
                                 ControlledState // Drive Logic
 
