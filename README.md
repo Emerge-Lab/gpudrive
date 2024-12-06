@@ -7,6 +7,8 @@ GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 mill
 
 For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
+TODO: Update with new videos
+
 <figure>
 <img src="assets/GPUDrive_eval_with_humans_control_6.gif" alt="...">
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>

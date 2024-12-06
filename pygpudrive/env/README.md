@@ -154,6 +154,8 @@ See the `resample_scenario_batch()` method in `pygpudrive/env/wrappers/sb3_wrapp
 
 ## Render
 
+TODO: Update docs
+
 Render settings can be changed using the `RenderConfig`.
 
 | `Render Mode`             | Description                                                                                                        |
