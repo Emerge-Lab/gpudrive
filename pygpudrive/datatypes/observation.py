@@ -14,6 +14,7 @@ class LocalEgoState:
         speed: Speed of the agent in relative coordinates.
         vehicle_length: Length of the agent's bounding box.
         vehicle_width: Width of the agent's bounding box.
+        vehicle_height: Height of the agent's bounding box.
         rel_goal_x: Relative x-coordinate to the goal.
         rel_goal_y: Relative y-coordinate to the goal.
         is_collided: Whether the agent is in collision with another object.
@@ -25,10 +26,11 @@ class LocalEgoState:
         self.speed = self_obs_tensor[:, :, 0]
         self.vehicle_length = self_obs_tensor[:, :, 1]
         self.vehicle_width = self_obs_tensor[:, :, 2]
-        self.rel_goal_x = self_obs_tensor[:, :, 3]
-        self.rel_goal_y = self_obs_tensor[:, :, 4]
-        self.is_collided = self_obs_tensor[:, :, 5]
-        self.id = self_obs_tensor[:, :, 6]
+        self.vehicle_height = self_obs_tensor[:, :, 3]
+        self.rel_goal_x = self_obs_tensor[:, :, 4]
+        self.rel_goal_y = self_obs_tensor[:, :, 5]
+        self.is_collided = self_obs_tensor[:, :, 6]
+        self.id = self_obs_tensor[:, :, 7]
 
     @classmethod
     def from_tensor(
@@ -48,6 +50,7 @@ class LocalEgoState:
         self.speed = self.speed / constants.MAX_SPEED
         self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
         self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
+        self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
         self.rel_goal_x = normalize_min_max(
             tensor=self.rel_goal_x,
             min_val=constants.MIN_REL_GOAL_COORD,
@@ -70,7 +73,7 @@ class LocalEgoState:
 class GlobalEgoState:
     """A class to represent the ego state of the agent in global coordinates.
     Initialized from abs_self_obs_tensor (src/bindings). For details, see
-    `AbsoluteSelfObservation` in src/types.hpp. Shape: (num_worlds, max_agents, 13).
+    `AbsoluteSelfObservation` in src/types.hpp. Shape: (num_worlds, max_agents, 14).
 
     Attributes:
         pos_x: Global x-coordinate of the agent.
@@ -82,6 +85,7 @@ class GlobalEgoState:
         goal_y: Global y-coordinate of the goal.
         vehicle_length: Length of the agent's bounding box.
         vehicle_width: Width of the agent's bounding box.
+        vehicle_height: Height of the agent's bounding box.
         id: Unique identifier of the agent.
     """
 
@@ -96,7 +100,8 @@ class GlobalEgoState:
         self.goal_y = abs_self_obs_tensor[:, :, 9]
         self.vehicle_length = abs_self_obs_tensor[:, :, 10]
         self.vehicle_width = abs_self_obs_tensor[:, :, 11]
-        self.id = abs_self_obs_tensor[:, :, 12]
+        self.vehicle_height = abs_self_obs_tensor[:, :, 12]
+        self.id = abs_self_obs_tensor[:, :, 13]
 
     @classmethod
     def from_tensor(
@@ -130,6 +135,7 @@ class PartnerObs:
     orientation: torch.Tensor
     vehicle_length: torch.Tensor
     vehicle_width: torch.Tensor
+    vehicle_height: torch.Tensor
     agent_type: torch.Tensor
     ids: torch.Tensor
 
@@ -148,8 +154,9 @@ class PartnerObs:
         self.orientation = partner_obs_tensor[:, :, :, 3].unsqueeze(-1)
         self.vehicle_length = partner_obs_tensor[:, :, :, 4].unsqueeze(-1)
         self.vehicle_width = partner_obs_tensor[:, :, :, 5].unsqueeze(-1)
-        self.agent_type = partner_obs_tensor[:, :, :, 6].unsqueeze(-1)
-        self.ids = partner_obs_tensor[:, :, :, 7].unsqueeze(-1)
+        self.vehicle_height = partner_obs_tensor[:, :, :, 6].unsqueeze(-1)        
+        self.agent_type = partner_obs_tensor[:, :, :, 7].unsqueeze(-1)
+        self.ids = partner_obs_tensor[:, :, :, 8].unsqueeze(-1)
 
     @classmethod
     def from_tensor(
@@ -180,6 +187,7 @@ class PartnerObs:
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
         self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
         self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
+        self.vehicle_heights = self.vehicle_heights / constants.MAX_VEH_HEIGHT
         self.agent_type = self.agent_type.long()
         self.ids = self.ids
 
