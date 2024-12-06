@@ -318,7 +318,7 @@ struct AgentID {
         Action inverseActions[consts::kTrajectoryLength];
     };
 
-    const size_t TrajectoryExportSize = 3 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
+    const size_t TrajectoryExportSize = 3 * consts::kTrajectoryLength + 2 * 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
     static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
@@ -353,7 +353,7 @@ struct AgentID {
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 5 + 3 + 2 + 1
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
