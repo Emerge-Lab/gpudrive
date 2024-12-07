@@ -394,7 +394,7 @@ class PufferGPUDrive(PufferEnv):
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
-                zoom_radius=90,
+                zoom_radius=100,
             )
             for render_env_idx in envs_to_render:
                 self.frames[render_env_idx].append(
@@ -424,11 +424,11 @@ class PufferGPUDrive(PufferEnv):
         """Sample a new set of WOMD scenarios."""
         if self.train_config.resample_mode == "random":
             total_unique = len(self.unique_scene_paths)
-            
+
             # Update set of scenes we've trained on
             self.training_scenes_set.append(set(self.dataset))
-            
-            # Reset 
+
+            # Reset
             self.dataset = []
 
             # Sample batch of unique scenes
@@ -443,9 +443,7 @@ class PufferGPUDrive(PufferEnv):
                         random.sample(self.unique_scene_paths, total_unique)
                     )
                     if len(self.dataset) > self.num_worlds:
-                        self.dataset = self.dataset[
-                            : self.num_worlds
-                        ]
+                        self.dataset = self.dataset[: self.num_worlds]
         else:
             raise NotImplementedError(
                 f"Resample mode {self.train_config.resample_mode} is currently not supported."
@@ -455,7 +453,7 @@ class PufferGPUDrive(PufferEnv):
         print(
             f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
-        
+
         self.env.reinit_scenarios(self.dataset)
 
         # Update controlled agent mask and other masks
@@ -474,7 +472,6 @@ class PufferGPUDrive(PufferEnv):
             env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.dataset)
         }
-
 
     def clear_render_storage(self):
         """Clear rendering storage."""

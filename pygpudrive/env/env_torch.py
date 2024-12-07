@@ -70,6 +70,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             goal_radius=self.config.dist_to_goal_threshold,
             vis_config=self.render_config,
             backend=self.backend,
+            num_worlds=self.num_worlds,
         )
 
     def reset(self):
