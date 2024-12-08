@@ -242,6 +242,11 @@ Option 3: Manual Download:
 2. Navigate to the Files and versions tab.
 3. Download the desired files/directories.
 
+_NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectories of 10k files each (according to hugging face constraints). In order for the path to work with GPUDrive, you need to run
+```python
+python data_utils/extract_groups.py #use --help if you've used a custom download path
+```
+
 
 ### Re-building the dataset
 
