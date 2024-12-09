@@ -18,7 +18,7 @@ def move_file(args):
 
 def extract_groups(dataset_dir, num_workers=None):
     """
-    Extract all files from group directories back to the parent directory using parallel processing.
+    Extract all files from group directories back to the parent directory in parallel.
     
     Args:
         dataset_dir (str): Path to the dataset directory containing group folders

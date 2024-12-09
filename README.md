@@ -211,7 +211,7 @@ We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You c
 
 ### Download the dataset
 
-- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and the [full sized dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with over a 100k unique scenes. 
+- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
 - Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
 - To download the dataset you need the huggingface_hub library:
 ```bash
@@ -250,7 +250,7 @@ python data_utils/extract_groups.py #use --help if you've used a custom download
 
 ### Re-building the dataset
 
-If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
+If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains well over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
 
 1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
