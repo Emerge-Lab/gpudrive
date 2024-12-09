@@ -187,7 +187,7 @@ class PartnerObs:
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
         self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
         self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
-        self.vehicle_heights = self.vehicle_heights / constants.MAX_VEH_HEIGHT
+        self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
         self.agent_type = self.agent_type.long()
         self.ids = self.ids
 
