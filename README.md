@@ -213,7 +213,7 @@ We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You c
 
 - Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
 - Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
-- To download the dataset you need the huggingface_hub library:
+- To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
 ```bash
 pip install huggingface_hub
 ```
