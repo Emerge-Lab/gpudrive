@@ -62,3 +62,4 @@ dependencies:
       - urllib3==2.2.1
       - virtualenv==20.25.1
       - zipp==3.18.1
+      - huggingface_hub==0.26.5

@@ -121,8 +121,8 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
-    ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
-    ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<VehicleSize>(agent) = agentInit.vehicle_size;
+    ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.vehicle_size.length/2, .d1 = agentInit.vehicle_size.width/2, .d2 = 1};
     ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<EntityType>(agent) = agentInit.type;
