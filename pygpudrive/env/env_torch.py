@@ -12,6 +12,7 @@ from pygpudrive.env.base_env import GPUDriveGymEnv
 
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
+    GlobalEgoState,
     PartnerObs,
     LidarObs,
 )
@@ -95,6 +96,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         collision_weight=-0.005,
         goal_achieved_weight=1.0,
         off_road_weight=-0.005,
+        world_time_steps=None,
+        log_distance_weight=0.01,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -122,6 +125,56 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
+
+            return weighted_rewards
+
+        elif self.config.reward_type == "distance_to_logs":
+            # Reward based on distance to logs and penalty for collision
+
+            # Return the weighted combination of the reward components
+            info_tensor = self.sim.info_tensor().to_torch()
+            off_road = info_tensor[:, :, 0].to(torch.float)
+
+            # True if the vehicle collided with another road object
+            # (i.e. a cyclist or pedestrian)
+            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+            goal_achieved = info_tensor[:, :, 3].to(torch.float)
+
+            weighted_rewards = (
+                collision_weight * collided
+                + goal_achieved_weight * goal_achieved
+                + off_road_weight * off_road
+            )
+
+            log_trajectory = LogTrajectory.from_tensor(
+                self.sim.expert_trajectory_tensor(),
+                self.num_worlds,
+                self.max_agent_count,
+                backend=self.backend,
+            )
+
+            # Index log positions at current time steps
+            log_traj_pos = []
+            for i in range(self.num_worlds):
+                log_traj_pos.append(
+                    log_trajectory.pos_xy[i, :, world_time_steps[i], :]
+                )
+            log_traj_pos_tensor = torch.stack(log_traj_pos)
+
+            agent_state = GlobalEgoState.from_tensor(
+                self.sim.absolute_self_observation_tensor(),
+                self.backend,
+            )
+
+            agent_pos = torch.stack(
+                [agent_state.pos_x, agent_state.pos_y], dim=-1
+            )
+
+            # compute euclidean distance between agent and logs
+            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+
+            # add reward based on inverse distance to logs
+            weighted_rewards += log_distance_weight * torch.exp(-dist_to_logs)
 
             return weighted_rewards
 

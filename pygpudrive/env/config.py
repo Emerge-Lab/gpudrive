@@ -90,9 +90,7 @@ class EnvConfig:
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
     # Reward settings
-    reward_type: str = (
-        "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
-    )
+    reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
