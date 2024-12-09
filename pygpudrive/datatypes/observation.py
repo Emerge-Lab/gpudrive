@@ -7,8 +7,8 @@ import gpudrive
 
 class LocalEgoState:
     """A class to represent the ego state of the agent in relative coordinates.
-    Initialized from agent_roadmap_tensor (src/bindings). For details, see
-    `agentMapObservations` in src/types.hpp.
+    Initialized from self_observation_tensor (src/bindings). For details, see
+    `SelfObservation` in src/types.hpp.
 
     Attributes:
         speed: Speed of the agent in relative coordinates.
@@ -225,7 +225,7 @@ class LidarObs:
         - Axis 3 represents the lidar points per type, which can be configured in src/consts.hpp as `numLidarSamples`.
         - Axis 4 represents the depth, type and x, y, values of the lidar points.
     Initialized from lidar_tensor (src/bindings).
-    For details, see `LidarObservations` in src/types.hpp.
+    For details, see `Lidar` and `LidarSample` in src/types.hpp.
     """
 
     def __init__(self, lidar_tensor: torch.Tensor):
