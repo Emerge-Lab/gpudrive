@@ -21,6 +21,11 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.visualize.utils import img_from_fig
 
 from pufferlib.environment import PufferEnv
+from pygpudrive.datatypes.observation import (
+    LocalEgoState,
+    PartnerObs,
+    LidarObs,
+)
 
 
 def env_creator(
@@ -215,6 +220,7 @@ class PufferGPUDrive(PufferEnv):
             collision_weight=self.config.collision_weight,
             off_road_weight=self.config.off_road_weight,
             goal_achieved_weight=self.config.goal_achieved_weight,
+            world_time_steps=self.episode_lengths[:, 0].long(),
         )
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
@@ -313,6 +319,15 @@ class PufferGPUDrive(PufferEnv):
                 local_roadgraph.type[self.controlled_agent_mask] == 0
             ).sum() / local_roadgraph.type[self.controlled_agent_mask].numel()
 
+            ego_state = LocalEgoState.from_tensor(
+                self_obs_tensor=self.env.sim.self_observation_tensor(),
+                backend="torch",
+                device="cuda",
+            )
+            agent_speeds = (
+                ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
+            )
+
             num_finished_agents = controlled_mask.sum().item()
             if num_finished_agents > 0:
                 info.append(
@@ -337,6 +352,7 @@ class PufferGPUDrive(PufferEnv):
                         .mean()
                         .item(),
                         "rg_sparsity": rg_sparsity.item(),
+                        "mean_agent_speed": agent_speeds.mean().item(),
                     }
                 )
 
