@@ -247,6 +247,8 @@ class MatplotlibVisualizer:
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
                     or road_point_type == int(gpudrive.EntityType.SpeedBump)
+                    or road_point_type == int(gpudrive.EntityType.StopSign)
+
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -259,7 +261,11 @@ class MatplotlibVisualizer:
                         env_idx, road_mask
                     ].tolist()
 
-                    if( not road_point_type == int(gpudrive.EntityType.SpeedBump) ):
+                    if(
+                        road_point_type == int(gpudrive.EntityType.RoadEdge)
+                        or road_point_type == int(gpudrive.EntityType.RoadLine)
+                        or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    ):
                         # Compute and draw road edges using start and end points
                         for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
                             start, end = self._get_endpoints(x, y, length, orientation)
@@ -272,40 +278,28 @@ class MatplotlibVisualizer:
                                 linewidth=0.75
                             )
                     
-                    if (road_point_type == int(gpudrive.EntityType.SpeedBump)):
-                        utils.plot_speed_bump(
+                    elif (road_point_type == int(gpudrive.EntityType.SpeedBump)):
+                        utils.plot_speed_bumps(
                             x_coords, 
                             y_coords, 
                             segment_lengths, 
                             segment_widths, 
                             segment_orientations,
                             ax
-                        )          
-                    # # Compute and draw road edges using start and end points
-                    # for x, y, length, orientation in zip(
-                    #     x_coords,
-                    #     y_coords,
-                    #     segment_lengths,
-                    #     segment_orientations,
-                    # ):
-                    #     start, end = self._get_endpoints(
-                    #         x, y, length, orientation
-                    #     )
-
-                    #     if road_point_type == int(
-                    #         gpudrive.EntityType.RoadEdge
-                    #     ):
-                    #         line_width = 1.1 * line_width_scale
-
-                    #     else:
-                    #         line_width = 0.75 * line_width_scale
-
-                    #     ax.plot(
-                    #         [start[0], end[0]],
-                    #         [start[1], end[1]],
-                    #         color=ROAD_GRAPH_COLORS[road_point_type],
-                    #         linewidth=line_width,
-                    #     )
+                        )  
+                
+                    elif (road_point_type == int(gpudrive.EntityType.StopSign)):
+                        for x, y in zip(x_coords, y_coords):
+                            point = np.array([x, y])
+                            utils.plot_stop_sign(
+                                point=point,
+                                ax=ax,
+                                radius=1.5,        
+                                facecolor='xkcd:red',      
+                                edgecolor="none",    
+                                linewidth=3.0,        
+                                alpha=1.0,            
+                            )
 
                 else:
                     # Dots for other road point types
@@ -556,7 +550,13 @@ class MatplotlibVisualizer:
         if observation_ego.id[env_idx, agent_idx] == -1:
             return None, None
 
-        fig, ax = plt.subplots(figsize=figsize)
+        # fig, ax = plt.subplots(figsize=figsize)
+        viz_config = (
+            utils.VizConfig()
+            if viz_config is None
+            else utils.VizConfig(**viz_config)
+        )
+        fig, ax = utils.init_fig_ax(viz_config)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
         ax.set_title(f"obs agent: {agent_idx}")
