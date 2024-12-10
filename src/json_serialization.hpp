@@ -2,6 +2,7 @@
 
 #include "init.hpp"
 #include "types.hpp"
+#include "consts.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -32,8 +33,10 @@ namespace gpudrive
             }
         }
         obj.numPositions = i;
-        j.at("width").get_to(obj.width);
-        j.at("length").get_to(obj.length);
+        j.at("width").get_to(obj.vehicle_size.width);
+        j.at("length").get_to(obj.vehicle_size.length);
+        j.at("height").get_to(obj.vehicle_size.height);
+        j.at("id").get_to(obj.id);
 
         i = 0;
         for (const auto &h : j.at("heading"))
@@ -269,8 +272,48 @@ namespace gpudrive
     }
 
 
+    void from_json(const nlohmann::json &j, MetaData &metadata)
+    {
+        int sdc_index = j.at("sdc_track_index").get<int>();
+        metadata.sdc_mask[sdc_index] = 1;
+        int idx = 0;
+        for (const auto &obj_of_interest : j.at("objects_of_interest"))
+        {
+            int agent_id = obj_of_interest.get<int>();
+            if (idx < consts::kMaxAgentCount) 
+            {
+                metadata.objects_of_interest[idx] = agent_id;
+                idx++;
+            }
+        }
+        while (idx != consts::kMaxAgentCount) 
+        {
+            metadata.objects_of_interest[idx] = -1;
+            idx++;
+        }
+        
+        for (const auto &track_to_predict : j.at("tracks_to_predict"))
+        {
+            int agent_index = track_to_predict.at("track_index").get<int>();
+            uint32_t difficulty = track_to_predict.at("difficulty").get<int32_t>();
+            if (agent_index < consts::kMaxAgentCount)
+            {
+                metadata.tracks_to_predict[agent_index] = 1;
+                metadata.difficulty[agent_index] = difficulty;
+            }
+        }
+    }
+
+
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
+        // Check total number of objects against max agent count
+        size_t totalObjects = j.at("objects").size();
+        if (totalObjects > consts::kMaxAgentCount) {
+            std::cerr << "Warning: Number of objects in scene (" << totalObjects 
+                      << ") exceeds the max agent count (" << consts::kMaxAgentCount 
+                      << "). Metadata tensor will be invalid." << std::endl;
+        }
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
@@ -295,5 +338,7 @@ namespace gpudrive
             ++idx;
         }
         map.numRoadSegments = countRoadPoints;
+
+        from_json(j.at("metadata"), map.metadata);
     }
 }

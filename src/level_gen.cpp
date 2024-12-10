@@ -60,7 +60,7 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     {
         trajectory.positions[i] = Vector2{.x = agentInit.position[i].x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.position[i].y - ctx.singleton<WorldMeans>().mean.y};
         trajectory.velocities[i] = Vector2{.x = agentInit.velocity[i].x, .y = agentInit.velocity[i].y};
-        trajectory.headings[i] = toRadians(agentInit.heading[i]);
+        trajectory.headings[i] = agentInit.heading[i];
         trajectory.valids[i] = (float)agentInit.valid[i];
         trajectory.inverseActions[i] = getZeroAction(ctx.data().params.dynamicsModel);
     }
@@ -121,12 +121,13 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     auto agent = ctx.makeRenderableEntity<Agent>();
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e = ctx.makeEntity<AgentInterface>();
 
-    ctx.get<VehicleSize>(agent) = {.length = agentInit.length, .width = agentInit.width};
-    ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.length/2, .d1 = agentInit.width/2, .d2 = 1};
+    ctx.get<VehicleSize>(agent) = agentInit.vehicle_size;
+    ctx.get<Scale>(agent) = Diag3x3{.d0 = agentInit.vehicle_size.length/2, .d1 = agentInit.vehicle_size.width/2, .d2 = 1};
     ctx.get<Scale>(agent) *= consts::vehicleLengthScale;
     ctx.get<ObjectID>(agent) = ObjectID{(int32_t)SimObject::Agent};
     ctx.get<EntityType>(agent) = agentInit.type;
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y}};
+    ctx.get<AgentID>(agent_iface) = AgentID{.id = static_cast<int32_t>(agentInit.id)};
 
     populateExpertTrajectory(ctx, agent, agentInit);
 
@@ -134,6 +135,8 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent) ? ResponseType::Static : ResponseType::Dynamic;
     ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent, agentInit.markAsExpert)};
     ctx.data().numControlledAgents += ctx.get<ControlledState>(agent_iface).controlled;
+
+
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,
@@ -306,6 +309,8 @@ void createPaddingEntities(Engine &ctx) {
             partner_obs.obs[i] = PartnerObservation::zero();
         }
 
+        Trajectory::zero(ctx.get<Trajectory>(agent_iface));
+
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
@@ -349,6 +354,8 @@ void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
 
     const auto& map = ctx.singleton<Map>();
+    auto& metadata = ctx.singleton<MetaData>();
+    metadata = map.metadata;
 
     if (ctx.data().enableRender)
     {
@@ -372,7 +379,6 @@ void createPersistentEntities(Engine &ctx) {
 
         auto agent = createAgent(ctx, agentInit);
         ctx.data().agent_ifaces[agentIdx] = ctx.get<AgentInterfaceEntity>(agent).e;
-        ctx.get<AgentID>(ctx.data().agent_ifaces[agentIdx]) = AgentID{.id = static_cast<int32_t>(agentIdx)};
         ctx.data().agents[agentIdx++] = agent;
     }
     ctx.data().numAgents = agentIdx;
