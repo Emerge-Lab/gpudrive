@@ -404,3 +404,29 @@ def plot_stop_sign(
         zorder=2,
     )
     ax.add_patch(p)
+
+def plot_crosswalk(
+    points,
+    ax: plt.Axes = None,
+    facecolor: str = None,
+    edgecolor: str = None,
+    alpha: float = None,
+):
+    if ax is None:
+        ax = plt.gca()
+    # override default config
+    facecolor = crosswalk_config['facecolor'] if facecolor is None else facecolor
+    edgecolor = crosswalk_config['edgecolor'] if edgecolor is None else edgecolor
+    alpha = crosswalk_config['alpha'] if alpha is None else alpha
+
+    p = Polygon(
+        points,
+        facecolor=facecolor,
+        edgecolor=edgecolor,
+        linewidth=2,
+        alpha=alpha,
+        hatch=r'//',
+        zorder=2,
+    )
+
+    ax.add_patch(p)
