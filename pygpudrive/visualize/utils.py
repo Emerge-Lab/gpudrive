@@ -347,6 +347,28 @@ def plot_bounding_box(
             linestyle="-",
             label=label,
         )
+
+def get_corners_polygon(x, y, length, width, orientation):
+    """Calculate the four corners of a speed bump (can be any) polygon."""
+    # Compute the direction vectors based on orientation
+    print(length)
+    c = np.cos(orientation)
+    s = np.sin(orientation)
+    u = np.array((c, s))  # Unit vector along the orientation
+    ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+    # Center point of the speed bump
+    pt = np.array([x, y])
+
+    # corners
+    tl = pt + (length / 2) * u - (width / 2) * ut  
+    tr = pt + (length / 2) * u + (width / 2) * ut  
+    br = pt - (length / 2) * u + (width / 2) * ut  
+    bl = pt - (length / 2) * u - (width / 2) * ut  
+
+    # print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
+    return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
+
 def get_stripe_polygon(
     x: float,
     y: float,
@@ -404,42 +426,42 @@ def plot_speed_bump(
     alpha = 1
     for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
         # method1: from waymax using hatch as diagonals  
-        # points = self._get_corners_polygon(x, y, length, width, orientation)
+        points = get_corners_polygon(x, y, length, width, orientation)
 
-        # p = Polygon(
-        #     points,
-        #     facecolor=facecolor,
-        #     edgecolor=edgecolor,
-        #     linewidth=0,
-        #     alpha=alpha,
-        #     hatch=r'//',
-        #     zorder=2,
-        # )
+        p = Polygon(
+            points,
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+            linewidth=0,
+            alpha=alpha,
+            hatch=r'//',
+            zorder=2,
+        )
 
-        # ax.add_patch(p)
+        ax.add_patch(p)
 
-        # manual stripes method
-        stripe_width = 1.05 # arbitrary width based on env0 visual look
-        num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
+        # # manual stripes method
+        # stripe_width = 1.05 # arbitrary width based on env0 visual look
+        # num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
             
 
-        for i in range(num_stripes):
-            # Alternate colors for stripes
-            stripe_color = facecolor if i % 2 == 0 else edgecolor
-            print(length)
-            # Calculate stripe points
-            stripe_points = get_stripe_polygon(
-                x, y, length, stripe_width, orientation, i, num_stripes
-            )
+        # for i in range(num_stripes):
+        #     # Alternate colors for stripes
+        #     stripe_color = facecolor if i % 2 == 0 else edgecolor
+        #     print(length)
+        #     # Calculate stripe points
+        #     stripe_points = get_stripe_polygon(
+        #         x, y, length, stripe_width, orientation, i, num_stripes
+        #     )
 
-            stripe_polygon = Polygon(
-                stripe_points,
-                facecolor=stripe_color,
-                edgecolor=None, 
-                linewidth=0,
-                alpha=alpha,
-                zorder=2,
-            )
-            ax.add_patch(stripe_polygon)
+        #     stripe_polygon = Polygon(
+        #         stripe_points,
+        #         facecolor=stripe_color,
+        #         edgecolor=None, 
+        #         linewidth=0,
+        #         alpha=alpha,
+        #         zorder=2,
+        #     )
+        #     ax.add_patch(stripe_polygon)
     
     pass
