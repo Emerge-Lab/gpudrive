@@ -246,6 +246,7 @@ class MatplotlibVisualizer:
                     road_point_type == int(gpudrive.EntityType.RoadEdge)
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -253,35 +254,58 @@ class MatplotlibVisualizer:
                     segment_lengths = road_graph.segment_length[
                         env_idx, road_mask
                     ].tolist()
+                    segment_widths = road_graph.segment_width[env_idx, road_mask].tolist()
                     segment_orientations = road_graph.orientation[
                         env_idx, road_mask
                     ].tolist()
 
-                    # Compute and draw road edges using start and end points
-                    for x, y, length, orientation in zip(
-                        x_coords,
-                        y_coords,
-                        segment_lengths,
-                        segment_orientations,
-                    ):
-                        start, end = self._get_endpoints(
-                            x, y, length, orientation
-                        )
+                    if( not road_point_type == int(gpudrive.EntityType.SpeedBump) ):
+                        # Compute and draw road edges using start and end points
+                        for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
+                            start, end = self._get_endpoints(x, y, length, orientation)
 
-                        if road_point_type == int(
-                            gpudrive.EntityType.RoadEdge
-                        ):
-                            line_width = 1.1 * line_width_scale
+                            # Plot the road edge as a line
+                            ax.plot(
+                                [start[0], end[0]],
+                                [start[1], end[1]],
+                                color=ROAD_GRAPH_COLORS[road_point_type],
+                                linewidth=0.75
+                            )
+                    
+                    if (road_point_type == int(gpudrive.EntityType.SpeedBump)):
+                        utils.plot_speed_bump(
+                            x_coords, 
+                            y_coords, 
+                            segment_lengths, 
+                            segment_widths, 
+                            segment_orientations,
+                            ax
+                        )          
+                    # # Compute and draw road edges using start and end points
+                    # for x, y, length, orientation in zip(
+                    #     x_coords,
+                    #     y_coords,
+                    #     segment_lengths,
+                    #     segment_orientations,
+                    # ):
+                    #     start, end = self._get_endpoints(
+                    #         x, y, length, orientation
+                    #     )
 
-                        else:
-                            line_width = 0.75 * line_width_scale
+                    #     if road_point_type == int(
+                    #         gpudrive.EntityType.RoadEdge
+                    #     ):
+                    #         line_width = 1.1 * line_width_scale
 
-                        ax.plot(
-                            [start[0], end[0]],
-                            [start[1], end[1]],
-                            color=ROAD_GRAPH_COLORS[road_point_type],
-                            linewidth=line_width,
-                        )
+                    #     else:
+                    #         line_width = 0.75 * line_width_scale
+
+                    #     ax.plot(
+                    #         [start[0], end[0]],
+                    #         [start[1], end[1]],
+                    #         color=ROAD_GRAPH_COLORS[road_point_type],
+                    #         linewidth=line_width,
+                    #     )
 
                 else:
                     # Dots for other road point types
