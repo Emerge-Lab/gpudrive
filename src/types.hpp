@@ -64,7 +64,8 @@ namespace gpudrive
         NUM_TYPES = 21,
     };
 
-    struct AgentID {
+    struct AgentID 
+    {
         int32_t id;
     };
 
@@ -72,6 +73,7 @@ namespace gpudrive
     {
         float length;
         float width;
+        float height;
     };
 
     struct Goal
@@ -190,14 +192,14 @@ namespace gpudrive
         {
             return SelfObservation{
                 .speed = 0,
-                .vehicle_size = {0, 0},
+                .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
-            .id = -1};
+                .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 7;
+    const size_t SelfObservationExportSize = 8; // 1 + 3 + 2 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -223,7 +225,7 @@ namespace gpudrive
         }
     };
 
-    const size_t MapObservationExportSize = 9;
+    const size_t MapObservationExportSize = 9; // 2 + 3 + 1 + 1 + 1 + 1
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -234,18 +236,29 @@ namespace gpudrive
         float heading;
         VehicleSize vehicle_size;
         float type;
-    float id;
+        float id;
 
-    static inline PartnerObservation zero() {
-        return PartnerObservation{
-            .speed = 0,
-            .position = {0, 0},
-            .heading = 0,
-            .vehicle_size = {0, 0},
-            .type = static_cast<float>(EntityType::None),
-            .id = -1};
-    }
-};
+        static inline PartnerObservation zero() {
+            return PartnerObservation{
+                .speed = 0,
+                .position = {0, 0},
+                .heading = 0,
+                .vehicle_size = {0, 0, 0},
+                .type = static_cast<float>(EntityType::None),
+                .id = -1};
+        }
+    };
+
+    // Egocentric observations of other agents
+    struct PartnerObservations
+    {
+        PartnerObservation obs[consts::kMaxAgentCount - 1];
+    };
+
+    const size_t PartnerObservationExportSize = 9; // 1 + 2 + 1 + 3 + 1 + 1
+
+    static_assert(sizeof(PartnerObservations) == sizeof(float) *
+        (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
     struct RoadMapId{
         int32_t id;
@@ -254,17 +267,6 @@ namespace gpudrive
     const size_t RoadMapIdExportSize = 1;
 
     static_assert(sizeof(RoadMapId) == sizeof(int) * RoadMapIdExportSize);
-
-    // Egocentric observations of other agents
-    struct PartnerObservations
-    {
-        PartnerObservation obs[consts::kMaxAgentCount - 1];
-    };
-
-    const size_t PartnerObservationExportSize = 8;
-
-    static_assert(sizeof(PartnerObservations) == sizeof(float) *
-                                                     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
     struct AgentMapObservations
     {
@@ -358,7 +360,7 @@ namespace gpudrive
 
     struct AbsoluteRotation
     {
-        Rotation rotationAsQuat;
+        Rotation rotationAsQuat; // x, y, z, w
         float rotationFromAxis;
     };
 
@@ -371,7 +373,7 @@ namespace gpudrive
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 5 + 2 + 3 + 1
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
