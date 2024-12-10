@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pylab as plt
 import numpy as np
 from PIL import Image
-from matplotlib.patches import Circle, Polygon
+from matplotlib.patches import Circle, Polygon, RegularPolygon
 
 import os
 import torch
@@ -260,7 +260,7 @@ def plot_bounding_box(
 def get_corners_polygon(x, y, length, width, orientation):
     """Calculate the four corners of a speed bump (can be any) polygon."""
     # Compute the direction vectors based on orientation
-    print(length)
+    # print(length)
     c = np.cos(orientation)
     s = np.sin(orientation)
     u = np.array((c, s))  # Unit vector along the orientation
@@ -319,7 +319,7 @@ def get_stripe_polygon(
 
     return np.array(stripe_corners)
 
-def plot_speed_bump(
+def plot_speed_bumps(
     x_coords: Union[float, np.ndarray],
     y_coords: Union[float, np.ndarray],
     segment_lengths: Union[float, torch.Tensor],
@@ -374,3 +374,33 @@ def plot_speed_bump(
         #     ax.add_patch(stripe_polygon)
     
     pass
+
+def plot_stop_sign(
+    point: np.ndarray,
+    ax: matplotlib.axes.Axes,
+    radius: float = None,
+    facecolor: str = None,
+    edgecolor: str = None,
+    linewidth: float = None,
+    alpha: float = None,
+) -> None:
+    # Default configurations for the stop sign
+    facecolor = "red" if facecolor is None else facecolor
+    edgecolor = "white" if edgecolor is None else edgecolor
+    linewidth = 1.5 if linewidth is None else linewidth
+    radius = 1.0 if radius is None else radius
+    alpha = 1.0 if alpha is None else alpha
+
+    point = np.array(point).reshape(-1)
+
+    p = RegularPolygon(
+        point,
+        numVertices=6,  # For hexagonal stop sign
+        radius=radius,
+        facecolor=facecolor,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+        alpha=alpha,
+        zorder=2,
+    )
+    ax.add_patch(p)
