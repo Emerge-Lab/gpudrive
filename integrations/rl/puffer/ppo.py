@@ -94,6 +94,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         global_step=0,
         global_step_pad=0,
         num_rollouts=0,
+        resample_buffer=0,
         resample_counter=0,
         epoch=0,
         stats={},
@@ -106,17 +107,23 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
+    # Resample data logic
     if data.config.resample_scenes:
         if (
-            data.config.resample_criterion == "global_step"
-            and data.resample_counter >= data.config.resample_interval
+            (data.config.resample_limit is None or data.resample_counter < data.config.resample_limit)
+            and data.config.resample_criterion == "global_step"
+            and data.resample_buffer >= data.config.resample_interval
         ):
+            print(f"Resampling scenarios: {data.resample_counter + 1}" + 
+                (f" / {data.config.resample_limit}" if data.config.resample_limit is not None else ""))
+            
             # Sample new batch of scenarios
             data.vecenv.resample_scenario_batch()
-            # Reset counter
-            data.resample_counter = 0
+            data.resample_buffer = 0
+            
+            if data.config.resample_limit is not None:  # Increment counter only if there is a limit
+                data.resample_counter += 1
 
-    # TODO(dc): Hacky -> improve
     data.vecenv.rendering_in_progress = {
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
@@ -124,7 +131,11 @@ def evaluate(data):
         env_idx: False for env_idx in range(data.config.render_k_scenarios)
     }
     data.vecenv.wandb_obj = data.wandb
-
+    data.vecenv.frames = {
+        env_idx: []
+        for env_idx in range(data.config.render_k_scenarios)
+    }
+    
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
@@ -143,7 +154,7 @@ def evaluate(data):
         with profile.eval_misc:
             data.global_step += sum(mask)
             data.global_step_pad += data.vecenv.total_agents
-            data.resample_counter += sum(mask)
+            data.resample_buffer += sum(mask)
 
             o = torch.as_tensor(o)
             o_device = o.to(config.device)

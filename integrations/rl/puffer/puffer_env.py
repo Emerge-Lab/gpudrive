@@ -21,6 +21,9 @@ from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.visualize.utils import img_from_fig
 
 from pufferlib.environment import PufferEnv
+from pygpudrive.datatypes.observation import (
+    LocalEgoState,
+)
 
 
 def env_creator(
@@ -111,6 +114,7 @@ class PufferGPUDrive(PufferEnv):
 
         # Get the tfrecord file names for every environment
         self.dataset = self.env.dataset
+        self.training_scenes_set = []
         self.env_to_files = {
             env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.dataset)
@@ -312,6 +316,15 @@ class PufferGPUDrive(PufferEnv):
                 local_roadgraph.type[self.controlled_agent_mask] == 0
             ).sum() / local_roadgraph.type[self.controlled_agent_mask].numel()
 
+            ego_state = LocalEgoState.from_tensor(
+                self_obs_tensor=self.env.sim.self_observation_tensor(),
+                backend="torch",
+                device="cuda",
+            )
+            agent_speeds = (
+                ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
+            )
+
             num_finished_agents = controlled_mask.sum().item()
             if num_finished_agents > 0:
                 info.append(
@@ -336,6 +349,7 @@ class PufferGPUDrive(PufferEnv):
                         .mean()
                         .item(),
                         "rg_sparsity": rg_sparsity.item(),
+                        "mean_agent_speed": agent_speeds.mean().item(),
                     }
                 )
 
@@ -393,11 +407,11 @@ class PufferGPUDrive(PufferEnv):
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
-                zoom_radius=90,
+                zoom_radius=100,
             )
-            for render_env_idx in envs_to_render:
+            for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
-                    img_from_fig(sim_state_figures[render_env_idx])
+                    img_from_fig(sim_state_figures[idx])
                 )
 
     def render_agent_observations(self, env_idx):
@@ -424,22 +438,25 @@ class PufferGPUDrive(PufferEnv):
         if self.train_config.resample_mode == "random":
             total_unique = len(self.unique_scene_paths)
 
-            # Check if N is greater than the number of unique scenes
+            # Update set of scenes we've trained on
+            self.training_scenes_set.append(set(self.dataset))
+
+            # Reset
+            self.dataset = []
+
+            # Sample batch of unique scenes
             if self.num_worlds <= total_unique:
-                dataset = random.sample(
+                self.dataset = random.sample(
                     self.unique_scene_paths, self.num_worlds
                 )
-
-            # If N is greater, repeat the unique scenes until we get N scenes
-            self.dataset = []
-            while len(dataset) < self.num_worlds:
-                dataset.extend(
-                    random.sample(self.unique_scene_paths, total_unique)
-                )
-                if len(dataset) > self.num_worlds:
-                    dataset = dataset[
-                        : self.num_worlds
-                    ]  # Trim the result to N scenes
+            else:
+                # If N is greater, repeat the unique scenes until we get N scenes
+                while len(self.dataset) < self.num_worlds:
+                    self.dataset.extend(
+                        random.sample(self.unique_scene_paths, total_unique)
+                    )
+                    if len(self.dataset) > self.num_worlds:
+                        self.dataset = self.dataset[: self.num_worlds]
         else:
             raise NotImplementedError(
                 f"Resample mode {self.train_config.resample_mode} is currently not supported."
@@ -447,10 +464,10 @@ class PufferGPUDrive(PufferEnv):
 
         # Re-initialize the simulator with the new dataset
         print(
-            f"Re-initializing sim with {len(set(dataset))} {self.train_config.resample_mode} unique scenes.\n"
+            f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
-        self.env.reinit_scenarios(dataset)
-        print(f"Done.\n")
+
+        self.env.reinit_scenarios(self.dataset)
 
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -468,3 +485,10 @@ class PufferGPUDrive(PufferEnv):
             env_idx: Path(file_path).name
             for env_idx, file_path in enumerate(self.dataset)
         }
+
+    def clear_render_storage(self):
+        """Clear rendering storage."""
+        for env_idx in range(self.train_config.render_k_scenarios):
+            self.frames[env_idx] = []
+            self.rendering_in_progress[env_idx] = False
+            self.was_rendered_in_rollout[env_idx] = True
