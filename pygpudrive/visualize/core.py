@@ -17,7 +17,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
-from pygpudrive.datatypes.control import ControlMasks
+from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
     ROAD_GRAPH_TYPE_NAMES,
@@ -26,12 +26,6 @@ from pygpudrive.visualize.color import (
 )
 
 OUT_OF_BOUNDS = 1000
-
-connect_points_thresholds = {
-    int(gpudrive.EntityType.RoadEdge): 30,
-    int(gpudrive.EntityType.RoadLine): 10,
-    int(gpudrive.EntityType.RoadLane): 10,
-}
 
 
 class MatplotlibVisualizer:
@@ -48,8 +42,10 @@ class MatplotlibVisualizer:
     def get_controlled_agents_mask(self):
         """Get the control mask."""
         return (
-            self.sim_object.controlled_state_tensor().to_torch() == 1
-        ).squeeze(axis=2)
+            (self.sim_object.controlled_state_tensor().to_torch() == 1)
+            .squeeze(axis=2)
+            .to(self.device)
+        )
 
     def plot_simulator_state(
         self,
@@ -93,11 +89,12 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
-        control_type = ControlMasks.from_tensor(
+        response_type = ResponseType.from_tensor(
             tensor=self.sim_object.response_type_tensor(),
             backend=self.backend,
             device=self.device,
         )
+
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
         figs = []  # Store all figures if returning multiple
@@ -141,7 +138,7 @@ class MatplotlibVisualizer:
                 figs.append(fig)
 
             # Get control mask and omit out-of-bound agents (dead agents)
-            controlled = control_type.controlled[env_idx, :]
+            controlled = self.controlled_agents[env_idx, :]
             controlled_live = controlled & (
                 torch.abs(global_agent_states.pos_x[env_idx, :]) < 1_000
             )
@@ -169,7 +166,7 @@ class MatplotlibVisualizer:
                 is_ok_mask=is_ok,
                 is_offroad_mask=is_offroad,
                 is_collided_mask=is_collided,
-                control_type=control_type,
+                response_type=response_type,
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
@@ -306,7 +303,7 @@ class MatplotlibVisualizer:
         is_ok_mask: torch.Tensor,
         is_offroad_mask: torch.Tensor,
         is_collided_mask: torch.Tensor,
-        control_type: Any,
+        response_type: Any,
         alpha: Optional[float] = 1.0,
         as_center_pts: bool = False,
         label: Optional[str] = None,
@@ -320,7 +317,7 @@ class MatplotlibVisualizer:
             ax: Matplotlib axis for plotting.
             global_agent_state: The global state of agents from `GlobalEgoState`.
             env_idx: Environment index to select specific environment agents.
-            control_type: Mask to filter agents.
+            response_type: Mask to filter agents.
             alpha: Alpha value for drawing, i.e., 0 means fully transparent.
             as_center_pts: If True, only plot center points instead of full boxes.
             label: Label for the plotted elements.
@@ -458,28 +455,30 @@ class MatplotlibVisualizer:
                 )
                 ax.add_patch(circle)
 
-        # Plot static agents
-        static = control_type.static[env_idx, :]
+        # Plot human_replay agents (those that are static or expert-controlled)
+        log_replay = (
+            response_type.static[env_idx, :] | response_type.moving[env_idx, :]
+        ) & ~self.controlled_agents[env_idx, :]
 
-        pos_x = agent_states.pos_x[env_idx, static]
-        pos_y = agent_states.pos_y[env_idx, static]
-        rotation_angle = agent_states.rotation_angle[env_idx, static]
-        vehicle_length = agent_states.vehicle_length[env_idx, static]
-        vehicle_width = agent_states.vehicle_width[env_idx, static]
+        pos_x = agent_states.pos_x[env_idx, log_replay]
+        pos_y = agent_states.pos_y[env_idx, log_replay]
+        rotation_angle = agent_states.rotation_angle[env_idx, log_replay]
+        vehicle_length = agent_states.vehicle_length[env_idx, log_replay]
+        vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
-        # Define realistic bounds for static agent positions
-        valid_static_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
+        # Define realistic bounds for log_replay agent positions
+        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
             torch.abs(pos_y) < OUT_OF_BOUNDS
         )
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
             (
-                pos_x[valid_static_mask].numpy(),
-                pos_y[valid_static_mask].numpy(),
-                vehicle_length[valid_static_mask].numpy(),
-                vehicle_width[valid_static_mask].numpy(),
-                rotation_angle[valid_static_mask].numpy(),
+                pos_x[valid_mask].numpy(),
+                pos_y[valid_mask].numpy(),
+                vehicle_length[valid_mask].numpy(),
+                vehicle_width[valid_mask].numpy(),
+                rotation_angle[valid_mask].numpy(),
             ),
             axis=1,
         )
@@ -488,7 +487,7 @@ class MatplotlibVisualizer:
         utils.plot_numpy_bounding_boxes(
             ax=ax,
             bboxes=bboxes_static,
-            color=AGENT_COLOR_BY_STATE["static"],
+            color=AGENT_COLOR_BY_STATE["log_replay"],
             alpha=alpha,
             line_width_scale=line_width_scale,
             as_center_pts=as_center_pts,
