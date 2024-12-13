@@ -380,7 +380,6 @@ namespace gpudrive
     //Metadata struct : using agent IDs.
     struct MetaData
     {
-        int32_t id;
         int32_t isSdc;
         int32_t isObjectOfInterest;
         int32_t isTrackToPredict;
@@ -388,14 +387,13 @@ namespace gpudrive
 
         static inline void zero(MetaData& metadata)
         {
-            metadata.id = -1;
             metadata.isSdc = -1;
             metadata.isObjectOfInterest = -1;
             metadata.isTrackToPredict = -1;
             metadata.difficulty = -1;
         }
     };
-    const size_t MetaDataExportSize = 5;
+    const size_t MetaDataExportSize = 4;
     static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
 
     struct AgentInterface : public madrona::Archetype<

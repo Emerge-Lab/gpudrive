@@ -18,11 +18,10 @@ class Metadata:
 
     def __init__(self, metadata_tensor: torch.Tensor):
         """Initializes the Metadata with the metadata tensor."""
-        self.id = metadata_tensor[:, :, 0]
-        self.isSdc = metadata_tensor[:, :, 1]
-        self.isOfInterest = metadata_tensor[:, :, 2]
-        self.isModeled = metadata_tensor[:, :, 3]
-        self.difficulty = metadata_tensor[:, :, 4]
+        self.isSdc = metadata_tensor[:, :, 0]
+        self.isOfInterest = metadata_tensor[:, :, 1]
+        self.isModeled = metadata_tensor[:, :, 2]
+        self.difficulty = metadata_tensor[:, :, 3]
 
     @classmethod
     def from_tensor(
@@ -37,4 +36,4 @@ class Metadata:
     @property
     def shape(self) -> tuple[int, ...]:
         """Shape (num_worlds, num_agents) of each metadata mask."""
-        return self.id.shape
+        return self.isSdc.shape
