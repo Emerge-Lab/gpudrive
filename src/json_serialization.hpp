@@ -36,8 +36,7 @@ namespace gpudrive
         j.at("width").get_to(obj.vehicle_size.width);
         j.at("length").get_to(obj.vehicle_size.length);
         j.at("height").get_to(obj.vehicle_size.height);
-        j.at("id").get_to(obj.id); //TODO: Remove id from object struct
-        j.at("id").get_to(obj.metadata.id);  // Move ID into metadata instead of MapObject
+        j.at("id").get_to(obj.id);
 
         i = 0;
         for (const auto &h : j.at("heading"))
@@ -280,73 +279,61 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
-        // Check total number of objects against max agent count
-        size_t totalObjects = j.at("objects").size();
-        // if (totalObjects > consts::kMaxAgentCount) {
-        //     std::cerr << "Warning: Number of objects in scene (" << totalObjects 
-        //               << ") exceeds the max agent count (" << consts::kMaxAgentCount 
-        //               << ")." << std::endl;
-        // }
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
+
+        // Create id to object index mapping
+        std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
-        for (const auto &obj : j.at("objects"))
-        {
+        for (const auto &obj : j.at("objects")) {
             if (idx >= map.numObjects)
                 break;
-            obj.get_to(map.objects[idx++]);
+            obj.get_to(map.objects[idx]);
+            idToObjIdx[map.objects[idx].id] = idx;
+            idx++;
         }
+
         const auto& metadata = j.at("metadata");
 
-        // Get SDC ID from the index
+        // Set SDC
         int sdc_index = metadata.at("sdc_track_index").get<int>();
-        if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
+        if (sdc_index < 0 || sdc_index >= j.at("objects").size()) {
+            std::cerr << "Warning: Invalid sdc_track_index " << sdc_index << " in scene " << j.at("name").get<std::string>() << std::endl;
+        } else {
             int sdc_id = j.at("objects")[sdc_index].at("id").get<int>();
-            // Find object with matching ID and set metadata
-            for (size_t i = 0; i < map.numObjects; i++) {
-                if (map.objects[i].metadata.id == sdc_id) {
-                    map.objects[i].metadata.isSdc = 1;
-                    break;
-                }
+            if (auto it = idToObjIdx.find(sdc_id); it != idToObjIdx.end()) {
+                map.objects[it->second].metadata.isSdc = 1;
             }
         }
 
         // Set objects of interest
         for (const auto& obj_id : metadata.at("objects_of_interest")) {
             int interest_id = obj_id.get<int>();
-            // Find object with matching ID and set metadata
-            for (size_t i = 0; i < map.numObjects; i++) {
-                if (map.objects[i].metadata.id == interest_id) {
-                    map.objects[i].metadata.isObjectOfInterest = 1;
-                    break;
-                }
+            if (auto it = idToObjIdx.find(interest_id); it != idToObjIdx.end()) {
+                map.objects[it->second].metadata.isObjectOfInterest = 1;
             }
         }
 
-        // Set tracks to predict and difficulty using IDs instead of indices
+        // Set tracks to predict
         for (const auto& track : metadata.at("tracks_to_predict")) {
             int track_index = track.at("track_index").get<int>();
-            if (track_index >= 0 && track_index < j.at("objects").size()) {
+            if (track_index < 0 || track_index >= j.at("objects").size()) {
+                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
+            } else {
                 int track_id = j.at("objects")[track_index].at("id").get<int>();
-                int difficulty = track.at("difficulty").get<int>();
-                
-                // Find object with matching ID and set metadata
-                for (size_t i = 0; i < map.numObjects; i++) {
-                    if (map.objects[i].metadata.id == track_id) {
-                        map.objects[i].metadata.isTrackToPredict = 1;
-                        map.objects[i].metadata.difficulty = difficulty;
-                        break;
-                    }
+                if (auto it = idToObjIdx.find(track_id); it != idToObjIdx.end()) {
+                    map.objects[it->second].metadata.isTrackToPredict = 1;
+                    map.objects[it->second].metadata.difficulty = track.at("difficulty").get<int>();
                 }
             }
         }
 
+        // Process roads
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
         idx = 0;
-        for (const auto &road : j.at("roads"))
-        {
+        for (const auto &road : j.at("roads")) {
             if (idx >= map.numRoads)
                 break;
             from_json(road, map.roads[idx], polylineReductionThreshold);
