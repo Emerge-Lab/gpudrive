@@ -16,8 +16,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
-  collision_weight: -0.03
-  off_road_weight: -0.03
+  collision_weight: -0.035
+  off_road_weight: -0.035
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
@@ -48,12 +48,13 @@ train:
   # # # Data sampling # # #
   resample_scenes: false
   resample_criterion: "global_step"
-  resample_interval: 3_000_000
+  resample_interval: 5_000_000
+  resample_limit: 10000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   resample_mode: "random" # Options: random
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 500_000_000
+  total_timesteps: 1_000_000_000
   batch_size: 131_072
   minibatch_size: 16_384
   learning_rate: 3e-4

@@ -392,7 +392,6 @@ class PufferGPUDrive(PufferEnv):
                     self.episode_lengths[render_env_idx, :][0] == 0
                     and not self.was_rendered_in_rollout[render_env_idx]
                 ):
-                    print(f"Render at iter: { self.iters}")
                     self.rendering_in_progress[render_env_idx] = True
 
         # Continue rendering if in progress
@@ -491,4 +490,5 @@ class PufferGPUDrive(PufferEnv):
         for env_idx in range(self.train_config.render_k_scenarios):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
-            self.was_rendered_in_rollout[env_idx] = True
+            self.was_rendered_in_rollout[env_idx] = False
+            

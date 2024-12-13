@@ -32,12 +32,6 @@ pyximport.install(setup_args={"include_dirs": np.get_include()})
 from integrations.rl.puffer.c_gae import compute_gae
 from integrations.rl.puffer.logging import print_dashboard, abbreviate
 
-global_steps_list = []
-perc_collisions_list = []
-perc_offroad_list = []
-perc_goal_achieved_list = []
-time_list = []
-
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
     seed_everything(config.seed, config.torch_deterministic)
@@ -110,11 +104,11 @@ def evaluate(data):
     # Resample data logic
     if data.config.resample_scenes:
         if (
-            (data.config.resample_limit is None or data.resample_counter < data.config.resample_limit)
+            data.resample_counter < int(data.config.resample_limit)
             and data.config.resample_criterion == "global_step"
             and data.resample_buffer >= data.config.resample_interval
         ):
-            print(f"Resampling scenarios: {data.resample_counter + 1}" + 
+            print(f"Resampling scenarios: {data.resample_counter + 1:,}" + 
                 (f" / {data.config.resample_limit}" if data.config.resample_limit is not None else ""))
             
             # Sample new batch of scenarios
@@ -124,17 +118,8 @@ def evaluate(data):
             if data.config.resample_limit is not None:  # Increment counter only if there is a limit
                 data.resample_counter += 1
 
-    data.vecenv.rendering_in_progress = {
-        env_idx: False for env_idx in range(data.config.render_k_scenarios)
-    }
-    data.vecenv.was_rendered_in_rollout = {
-        env_idx: False for env_idx in range(data.config.render_k_scenarios)
-    }
     data.vecenv.wandb_obj = data.wandb
-    data.vecenv.frames = {
-        env_idx: []
-        for env_idx in range(data.config.render_k_scenarios)
-    }
+    data.vecenv.clear_render_storage()
     
     config, profile, experience = data.config, data.profile, data.experience
 
