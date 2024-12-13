@@ -282,11 +282,11 @@ namespace gpudrive
     {
         // Check total number of objects against max agent count
         size_t totalObjects = j.at("objects").size();
-        if (totalObjects > consts::kMaxAgentCount) {
-            std::cerr << "Warning: Number of objects in scene (" << totalObjects 
-                      << ") exceeds the max agent count (" << consts::kMaxAgentCount 
-                      << ")." << std::endl;
-        }
+        // if (totalObjects > consts::kMaxAgentCount) {
+        //     std::cerr << "Warning: Number of objects in scene (" << totalObjects 
+        //               << ") exceeds the max agent count (" << consts::kMaxAgentCount 
+        //               << ")." << std::endl;
+        // }
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
