@@ -34,7 +34,11 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"/home/nadarenator/Desktop/Projects/gpudrive/data/processed/validation/tfrecord-00005-of-00150_3.json"};
+    std::vector<std::string> scenes = {
+        "../data/processed/examples/tfrecord-00000-of-00150_78.json",
+        "../data/processed/examples/tfrecord-00043-of-00150_223.json",
+        "../data/processed/examples/tfrecord-00149-of-00150_111.json"
+    };
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
