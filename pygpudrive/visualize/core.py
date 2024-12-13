@@ -130,10 +130,10 @@ class MatplotlibVisualizer:
             if return_single_figure:
                 ax = axes[idx]
                 ax.clear()  # Clear any previous plots
-                ax.set_aspect("equal", adjustable="datalim")
+                ax.set_aspect("equal", adjustable="box")
             else:
                 fig, ax = plt.subplots(figsize=figsize)
-                ax.set_aspect("equal", adjustable="datalim")
+                ax.set_aspect("equal", adjustable="box")
                 ax.clear()
                 figs.append(fig)
 
@@ -216,9 +216,6 @@ class MatplotlibVisualizer:
             plt.tight_layout()
             return fig
         else:
-            for fig in figs:
-                plt.tight_layout()
-                plt.close(fig)  # Close unused figures in notebooks
             return figs
 
     def _get_endpoints(self, x, y, length, yaw):
