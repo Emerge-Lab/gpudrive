@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/validation"
+data_dir: "data/processed/examples"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -16,8 +16,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
-  collision_weight: -0.025
-  off_road_weight: -0.025
+  collision_weight: -0.03
+  off_road_weight: -0.03
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "rl_scale"
+  group: "my_group"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -65,7 +65,7 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.0003
+  ent_coef: 0.0001
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
@@ -77,7 +77,7 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_interval: 500 # Render every k iterations
-  render_k_scenarios: 5 # Number of scenarios to render
+  render_k_scenarios: 10 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_fps: 15 # Frames per second
