@@ -213,18 +213,23 @@ We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You c
 
 - Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
 - Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
+
+<details>
+  <summary>Download the dataset</summary>
+
 - To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
 ```bash
 pip install huggingface_hub
 ```
 Then you can download the dataset using python or just `huggingface-cli`.
 
-Option 1: Using Python:
+- **Option 1**: Using Python
 ```python
 >>> from huggingface_hub import snapshot_download
 >>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
 ```
-Option 2: Use the huggingface-cli:
+
+- **Option 2**: Use the huggingface-cli
 
 1. Log in to your Hugging Face account:
 ```bash
@@ -236,7 +241,7 @@ huggingface-cli login
 huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
 ```
 
-Option 3: Manual Download:
+- **Option 3**: Manual Download
 
 1. Visit https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini
 2. Navigate to the Files and versions tab.
@@ -247,10 +252,14 @@ _NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectorie
 python data_utils/extract_groups.py #use --help if you've used a custom download path
 ```
 
+</details>
 
-### Re-building the dataset
+### Re-build the dataset
 
-If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains well over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
+If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains well over 100,000 scenarios. To download new files and create scenarios for the simulator, follow the steps below.
+
+<details>
+  <summary>Re-build the dataset in 3 steps</summary>
 
 1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
@@ -307,6 +316,8 @@ INFO:root:Done!
 and that's it!
 
 > **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 250 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
+
+</details>
 
 ## 📜 Citations
 
