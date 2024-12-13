@@ -117,14 +117,15 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.config.polyline_reduction_threshold
         )
         params.rewardParams = self._set_reward_params()
-        params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledAgents = self.max_cont_agents
         if self.config.init_all_objects:
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False
+            params.IgnoreNonVehicles = False
         else:
             params.isStaticAgentControlled = False
             params.initOnlyValidAgentsAtFirstStep = True
+            params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
         ]
