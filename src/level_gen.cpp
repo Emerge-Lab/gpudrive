@@ -136,7 +136,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent, agentInit.markAsExpert)};
     ctx.data().numControlledAgents += ctx.get<ControlledState>(agent_iface).controlled;
 
-
+    ctx.get<MetaData>(agent_iface) = agentInit.metadata;
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,
@@ -310,7 +310,7 @@ void createPaddingEntities(Engine &ctx) {
         }
 
         Trajectory::zero(ctx.get<Trajectory>(agent_iface));
-
+        MetaData::zero(ctx.get<MetaData>(agent_iface));
     }
 
     for (CountT roadIdx = ctx.data().numRoads;
@@ -354,8 +354,6 @@ void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
 
     const auto& map = ctx.singleton<Map>();
-    auto& metadata = ctx.singleton<MetaData>();
-    metadata = map.metadata;
 
     if (ctx.data().enableRender)
     {

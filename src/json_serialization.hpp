@@ -36,7 +36,8 @@ namespace gpudrive
         j.at("width").get_to(obj.vehicle_size.width);
         j.at("length").get_to(obj.vehicle_size.length);
         j.at("height").get_to(obj.vehicle_size.height);
-        j.at("id").get_to(obj.id);
+        j.at("id").get_to(obj.id); //TODO: Remove id from object struct
+        j.at("id").get_to(obj.metadata.id);  // Move ID into metadata instead of MapObject
 
         i = 0;
         for (const auto &h : j.at("heading"))
@@ -95,10 +96,16 @@ namespace gpudrive
         else
             obj.type = EntityType::None;
 
-	std::string markAsExpertKey = "mark_as_expert";
-	if (j.contains(markAsExpertKey)) {
-	    from_json(j.at("mark_as_expert"), obj.markAsExpert);
-	}
+        std::string markAsExpertKey = "mark_as_expert";
+        if (j.contains(markAsExpertKey)) {
+            from_json(j.at("mark_as_expert"), obj.markAsExpert);
+        }
+
+         // Initialize metadata fields to 0
+        obj.metadata.isSdc = 0;
+        obj.metadata.isObjectOfInterest = 0;
+        obj.metadata.isTrackToPredict = 0;
+        obj.metadata.difficulty = 0;
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
@@ -271,40 +278,6 @@ namespace gpudrive
         return mean;
     }
 
-
-    void from_json(const nlohmann::json &j, MetaData &metadata)
-    {
-        int sdc_index = j.at("sdc_track_index").get<int>();
-        metadata.sdc_mask[sdc_index] = 1;
-        int idx = 0;
-        for (const auto &obj_of_interest : j.at("objects_of_interest"))
-        {
-            int agent_id = obj_of_interest.get<int>();
-            if (idx < consts::kMaxAgentCount) 
-            {
-                metadata.objects_of_interest[idx] = agent_id;
-                idx++;
-            }
-        }
-        while (idx != consts::kMaxAgentCount) 
-        {
-            metadata.objects_of_interest[idx] = -1;
-            idx++;
-        }
-        
-        for (const auto &track_to_predict : j.at("tracks_to_predict"))
-        {
-            int agent_index = track_to_predict.at("track_index").get<int>();
-            uint32_t difficulty = track_to_predict.at("difficulty").get<int32_t>();
-            if (agent_index < consts::kMaxAgentCount)
-            {
-                metadata.tracks_to_predict[agent_index] = 1;
-                metadata.difficulty[agent_index] = difficulty;
-            }
-        }
-    }
-
-
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
         // Check total number of objects against max agent count
@@ -312,7 +285,7 @@ namespace gpudrive
         if (totalObjects > consts::kMaxAgentCount) {
             std::cerr << "Warning: Number of objects in scene (" << totalObjects 
                       << ") exceeds the max agent count (" << consts::kMaxAgentCount 
-                      << "). Metadata tensor will be invalid." << std::endl;
+                      << ")." << std::endl;
         }
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
@@ -323,6 +296,50 @@ namespace gpudrive
             if (idx >= map.numObjects)
                 break;
             obj.get_to(map.objects[idx++]);
+        }
+        const auto& metadata = j.at("metadata");
+
+        // Get SDC ID from the index
+        int sdc_index = metadata.at("sdc_track_index").get<int>();
+        if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
+            int sdc_id = j.at("objects")[sdc_index].at("id").get<int>();
+            // Find object with matching ID and set metadata
+            for (size_t i = 0; i < map.numObjects; i++) {
+                if (map.objects[i].metadata.id == sdc_id) {
+                    map.objects[i].metadata.isSdc = 1;
+                    break;
+                }
+            }
+        }
+
+        // Set objects of interest
+        for (const auto& obj_id : metadata.at("objects_of_interest")) {
+            int interest_id = obj_id.get<int>();
+            // Find object with matching ID and set metadata
+            for (size_t i = 0; i < map.numObjects; i++) {
+                if (map.objects[i].metadata.id == interest_id) {
+                    map.objects[i].metadata.isObjectOfInterest = 1;
+                    break;
+                }
+            }
+        }
+
+        // Set tracks to predict and difficulty using IDs instead of indices
+        for (const auto& track : metadata.at("tracks_to_predict")) {
+            int track_index = track.at("track_index").get<int>();
+            if (track_index >= 0 && track_index < j.at("objects").size()) {
+                int track_id = j.at("objects")[track_index].at("id").get<int>();
+                int difficulty = track.at("difficulty").get<int>();
+                
+                // Find object with matching ID and set metadata
+                for (size_t i = 0; i < map.numObjects; i++) {
+                    if (map.objects[i].metadata.id == track_id) {
+                        map.objects[i].metadata.isTrackToPredict = 1;
+                        map.objects[i].metadata.difficulty = difficulty;
+                        break;
+                    }
+                }
+            }
         }
 
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
@@ -338,7 +355,5 @@ namespace gpudrive
             ++idx;
         }
         map.numRoadSegments = countRoadPoints;
-
-        from_json(j.at("metadata"), map.metadata);
     }
 }

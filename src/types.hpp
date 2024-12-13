@@ -377,15 +377,25 @@ namespace gpudrive
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
-    //Metadata struct : masks on agent id
+    //Metadata struct : using agent IDs.
     struct MetaData
     {
-        int32_t sdc_mask[consts::kMaxAgentCount] = {0};
-        int32_t objects_of_interest[consts::kMaxAgentCount] = {0};
-        int32_t tracks_to_predict[consts::kMaxAgentCount] = {0};
-        int32_t difficulty[consts::kMaxAgentCount] = {0};
+        int32_t id;
+        int32_t isSdc;
+        int32_t isObjectOfInterest;
+        int32_t isTrackToPredict;
+        int32_t difficulty;
+
+        static inline void zero(MetaData& metadata)
+        {
+            metadata.id = -1;
+            metadata.isSdc = -1;
+            metadata.isObjectOfInterest = -1;
+            metadata.isTrackToPredict = -1;
+            metadata.difficulty = -1;
+        }
     };
-    const size_t MetaDataExportSize = consts::kMaxAgentCount * 4;
+    const size_t MetaDataExportSize = 5;
     static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
 
     struct AgentInterface : public madrona::Archetype<
@@ -403,6 +413,7 @@ namespace gpudrive
                                 ResponseType,
                                 Trajectory,
                                 AgentID,
+                                MetaData,
 
                                 ControlledState // Drive Logic
 

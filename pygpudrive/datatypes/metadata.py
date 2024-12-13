@@ -9,19 +9,20 @@ class Metadata:
     `MetaData` in src/types.hpp
     
     Attributes (all masks are 0/1 int of shape (NumWorlds, NumAgents)):
-        sdc_mask: Whether agent is self-driving car.
-        interested: IDs of agents interested (-1 otherwise).
-        prediction_mask: Whether agent's trajectory needs to be predicted (WOSAC).
-        difficulty_mask: Difficulty of the agent's trajectory to be predicted (1 or 2, 0 otherwise)
+        id: Unique ID of the agent (non-negative int).
+        isSdc: Whether agent is self-driving car (1/0, -1 padding). 
+        isOfInterest: IDs of agents interested (1/0, -1 padding).
+        isModeled: Whether agent's trajectory needs to be predicted for WOSAC (1/0, -1 padding).
+        difficulty: Difficulty of the agent's trajectory to be predicted (0/1/2 if isModeled, 0 if !isModeled, -1 padding).
     """
 
     def __init__(self, metadata_tensor: torch.Tensor):
         """Initializes the Metadata with the metadata tensor."""
-        metadata_tensor = metadata_tensor.reshape(-1, 4, gpudrive.kMaxAgentCount)
-        self.sdc_mask = metadata_tensor[:, 0, :]
-        self.interested = metadata_tensor[:, 1, :]
-        self.prediction_mask = metadata_tensor[:, 2, :]
-        self.difficulty_mask = metadata_tensor[:, 3, :]
+        self.id = metadata_tensor[:, :, 0]
+        self.isSdc = metadata_tensor[:, :, 1]
+        self.isOfInterest = metadata_tensor[:, :, 2]
+        self.isModeled = metadata_tensor[:, :, 3]
+        self.difficulty = metadata_tensor[:, :, 4]
 
     @classmethod
     def from_tensor(
@@ -36,4 +37,4 @@ class Metadata:
     @property
     def shape(self) -> tuple[int, ...]:
         """Shape (num_worlds, num_agents) of each metadata mask."""
-        return self.sdc_mask.shape
+        return self.id.shape

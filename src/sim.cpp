@@ -55,13 +55,13 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentID>();
     registry.registerComponent<RoadMapId>();
     registry.registerComponent<MapType>();
+    registry.registerComponent<MetaData>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
     registry.registerSingleton<ResetMap>();
     registry.registerSingleton<WorldMeans>();
-    registry.registerSingleton<MetaData>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -74,7 +74,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Map>((uint32_t)ExportID::Map);
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
-    registry.exportSingleton<MetaData>((uint32_t)ExportID::MetaData);
     
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
@@ -105,6 +104,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::ResponseType);
     registry.exportColumn<AgentInterface, Trajectory>(
         (uint32_t)ExportID::Trajectory);
+    registry.exportColumn<AgentInterface, MetaData>(
+        (uint32_t)ExportID::MetaData);
 }
 
 static inline void cleanupWorld(Engine &ctx) {
