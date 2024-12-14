@@ -32,11 +32,14 @@ class LocalEgoState:
 
     @classmethod
     def from_tensor(
-        cls, self_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        self_obs_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates an LocalEgoState from the agent_observation_tensor."""
         if backend == "torch":
-            return cls(self_obs_tensor.to_torch().clone())
+            return cls(self_obs_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -88,7 +91,7 @@ class GlobalEgoState:
         self.pos_y = abs_self_obs_tensor[:, :, 1]
         self.pos_z = abs_self_obs_tensor[:, :, 2]
         self.rotation_as_quaternion = abs_self_obs_tensor[:, :, 3:6]
-        self.rotation_from_axis_angle = abs_self_obs_tensor[:, :, 7]
+        self.rotation_angle = abs_self_obs_tensor[:, :, 7]
         self.goal_x = abs_self_obs_tensor[:, :, 8]
         self.goal_y = abs_self_obs_tensor[:, :, 9]
         self.vehicle_length = abs_self_obs_tensor[:, :, 10]
@@ -97,11 +100,14 @@ class GlobalEgoState:
 
     @classmethod
     def from_tensor(
-        cls, abs_self_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        abs_self_obs_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates an GlobalEgoState from a tensor."""
         if backend == "torch":
-            return cls(abs_self_obs_tensor.to_torch().clone())
+            return cls(abs_self_obs_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -131,7 +137,7 @@ class PartnerObs:
     A dataclass that represents information about other agents in the
     scenario, as viewed from the perspective of the ego agent
     (in relative coordinates). Initialized from partner_obs_tensor (src/bindings). For details, see
-    `PartnerObservations` in src/types.hpp.
+    `PartnerObservations` in src/types.hpp. Shape: (num_worlds, num_agents, num_agents-1, 8).
     """
 
     def __init__(self, partner_obs_tensor: torch.Tensor):
@@ -147,11 +153,14 @@ class PartnerObs:
 
     @classmethod
     def from_tensor(
-        cls, partner_obs_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls,
+        partner_obs_tensor: gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
     ):
         """Creates an PartnerObs from a tensor."""
         if backend == "torch":
-            return cls(partner_obs_tensor.to_torch().clone())
+            return cls(partner_obs_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 

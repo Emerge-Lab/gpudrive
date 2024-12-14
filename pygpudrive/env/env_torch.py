@@ -18,6 +18,8 @@ from pygpudrive.datatypes.observation import (
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
+from pygpudrive.visualize.core import MatplotlibVisualizer
+
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -61,8 +63,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._setup_action_space(action_type)
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
+
         # Rendering setup
-        self.visualizer = self._setup_rendering()
+        self.vis = MatplotlibVisualizer(
+            sim_object=self.sim,
+            goal_radius=self.config.dist_to_goal_threshold,
+            vis_config=self.render_config,
+            backend=self.backend,
+        )
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -82,7 +90,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def get_rewards(
-        self, collision_weight=0, goal_achieved_weight=1.0, off_road_weight=0
+        self,
+        collision_weight=-0.005,
+        goal_achieved_weight=1.0,
+        off_road_weight=-0.005,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -215,9 +226,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     action_3.item(),
                 ]
                 self.values_to_action_key[
-                    round(action_1.item(), 3),
-                    round(action_2.item(), 3),
-                    round(action_3.item(), 3),
+                    round(action_1.item(), 5),
+                    round(action_2.item(), 5),
+                    round(action_3.item(), 5),
                 ] = action_idx
 
             self.action_keys_tensor = torch.tensor(
@@ -312,7 +323,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         partner_obs.orientation,
                         partner_obs.vehicle_length,
                         partner_obs.vehicle_width,
-                        partner_obs.agent_type,
+                        # TODO: Potentially add back later
+                        # partner_obs.agent_type,
                     ],
                     dim=-1,
                 )
@@ -372,7 +384,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ],
                     dim=-1,
                 )
-                .flatten(dim=2)
+                .flatten(start_dim=2)
                 .to(self.device)
             )
         else:
@@ -429,7 +441,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory.inferred_actions[:, :3]
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
             inferred_actions[..., 0] = torch.clamp(
                 inferred_actions[..., 0], -6, 6
             )
@@ -481,12 +493,12 @@ if __name__ == "__main__":
 
     # CONFIGURE
     TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 128
-    NUM_WORLDS = 10
+    MAX_CONTROLLED_AGENTS = 32
+    NUM_WORLDS = 1
 
-    env_config = EnvConfig(dynamics_model="state")
+    env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
@@ -501,23 +513,13 @@ if __name__ == "__main__":
     obs = env.reset()
     frames = []
 
-    for i in range(TOTAL_STEPS):
-        print(f"Step: {i}")
+    expert_actions, _, _, _ = env.get_expert_actions()
 
-        # Take a random actions
-        rand_action = torch.Tensor(
-            [
-                [
-                    env.action_space.sample()
-                    for _ in range(
-                        env_config.max_num_agents_in_scene * NUM_WORLDS
-                    )
-                ]
-            ]
-        ).reshape(NUM_WORLDS, env_config.max_num_agents_in_scene)
+    for t in range(TOTAL_STEPS):
+        print(f"Step: {t}")
 
         # Step the environment
-        env.step_dynamics(rand_action)
+        env.step_dynamics(expert_actions[:, :, t, :])
 
         frames.append(env.render())
 
