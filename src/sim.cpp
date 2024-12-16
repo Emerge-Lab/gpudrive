@@ -668,6 +668,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
     out.vehicle_size = vehicleSize;
+    out.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
