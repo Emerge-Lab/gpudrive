@@ -2,11 +2,6 @@
 
 namespace test_utils
 {
-    float degreesToRadians(float degrees)
-    {
-        return degrees * M_PI / 180.0;
-    }
-
     std::vector<float> flatten_obs(const py::Tensor &obs)
     {
         int64_t num_elems = 1;

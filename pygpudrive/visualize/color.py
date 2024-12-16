@@ -27,8 +27,7 @@ AGENT_COLOR_BY_STATE = {
     "ok": "g",  # Controlled and doing fine
     "collided": "r",  # Controlled and collided
     "off_road": "orange",  # Controlled and off-road
-    "static": "#c7c7c7",  # Agents marked as static
-    "human_replay": "darkslategray",  # Agents marked as experts (replay human logs)
+    "log_replay": "#c7c7c7",  # Agents marked as expert controlled or static
 }
 
 REL_OBS_OBJ_COLORS = {
