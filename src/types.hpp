@@ -76,7 +76,7 @@ struct AgentID {
 
     struct Goal
     {
-        madrona::math::Vector2 position;
+        madrona::math::Vector3 position;
     };
 
     // WorldReset is a per-world singleton component that causes the current
@@ -93,7 +93,7 @@ struct AgentID {
     };   
 
     struct WorldMeans {
-        madrona::math::Vector3 mean; // TODO: Z is 0 for now, but can be used for 3D in future
+        madrona::math::Vector3 mean; 
     };
 
     const size_t WorldMeansExportSize = 3;
@@ -185,19 +185,19 @@ struct AgentID {
             return SelfObservation{
                 .speed = 0,
                 .vehicle_size = {0, 0},
-                .goal = {.position = {0, 0}},
+                .goal = {.position = {0, 0, 0}},
                 .collisionState = 0,
             .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 7;
+    const size_t SelfObservationExportSize = 8;
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
     struct MapObservation
     {
-        madrona::math::Vector2 position;
+        madrona::math::Vector3 position;
         Scale scale;
         float heading;
         float type;
@@ -207,7 +207,7 @@ struct AgentID {
         static inline MapObservation zero()
         {
             return MapObservation{
-                .position = {0, 0},
+                .position = {0, 0, 0},
                 .scale = madrona::math::Diag3x3{0, 0, 0},
                 .heading = 0,
                 .type = static_cast<float>(EntityType::None),
@@ -217,14 +217,14 @@ struct AgentID {
         }
     };
 
-    const size_t MapObservationExportSize = 9;
+    const size_t MapObservationExportSize = 10;
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
     struct PartnerObservation
     {
         float speed;
-        madrona::math::Vector2 position;
+        madrona::math::Vector3 position;
         float heading;
         VehicleSize vehicle_size;
         float type;
@@ -233,7 +233,7 @@ struct AgentID {
     static inline PartnerObservation zero() {
         return PartnerObservation{
             .speed = 0,
-            .position = {0, 0},
+            .position = {0, 0, 0},
             .heading = 0,
             .vehicle_size = {0, 0},
             .type = static_cast<float>(EntityType::None),
@@ -255,7 +255,7 @@ struct AgentID {
         PartnerObservation obs[consts::kMaxAgentCount - 1];
     };
 
-    const size_t PartnerObservationExportSize = 8;
+    const size_t PartnerObservationExportSize = 9;
 
     static_assert(sizeof(PartnerObservations) == sizeof(float) *
                                                      (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
@@ -275,7 +275,7 @@ struct AgentID {
     {
         float depth;
         float encodedType;
-        madrona::math::Vector2 position;
+        madrona::math::Vector3 position;
     };
 
     // Linear depth values and entity type in a circle around the agent
@@ -286,7 +286,7 @@ struct AgentID {
         LidarSample samplesRoadLines[consts::numLidarSamples];
     };
 
-    const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
+    const size_t LidarExportSize = 3 * consts::numLidarSamples * 5;
 
     static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
     // Number of steps remaining in the episode. Allows non-recurrent policies
@@ -311,14 +311,14 @@ struct AgentID {
 
     struct Trajectory
     {
-        madrona::math::Vector2 positions[consts::kTrajectoryLength];
+        madrona::math::Vector3 positions[consts::kTrajectoryLength];
         madrona::math::Vector2 velocities[consts::kTrajectoryLength];
         float headings[consts::kTrajectoryLength];
         float valids[consts::kTrajectoryLength];
         Action inverseActions[consts::kTrajectoryLength];
     };
 
-    const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
+    const size_t TrajectoryExportSize = 3 * consts::kTrajectoryLength + 2 * 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
     static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
@@ -353,7 +353,7 @@ struct AgentID {
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 5 + 3 + 2 + 1
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 

@@ -20,7 +20,7 @@ void fillZeros(gpudrive::MapObservation *begin,
                gpudrive::MapObservation *beyond) {
   while (begin < beyond) {
     *begin++ =
-        gpudrive::MapObservation{.position = {0, 0},
+        gpudrive::MapObservation{.position = {0, 0, 0},
                                  .scale = madrona::math::Diag3x3{0, 0, 0},
                                  .heading = 0.f,
                                  .type = (float)gpudrive::EntityType::None};
@@ -30,16 +30,16 @@ void fillZeros(gpudrive::MapObservation *begin,
 gpudrive::MapObservation
 relativeObservation(const gpudrive::MapObservation &absoluteObservation,
                     const madrona::base::Rotation &referenceRotation,
-                    const madrona::math::Vector2 &referencePosition) {
+                    const madrona::math::Vector3 &referencePosition) {
   auto relativePosition =
-      madrona::math::Vector2{.x = absoluteObservation.position.x,
-                             .y = absoluteObservation.position.y} -
+      madrona::math::Vector3{.x = absoluteObservation.position.x,
+                             .y = absoluteObservation.position.y,
+                             .z = absoluteObservation.position.z} -
       referencePosition;
 
   return gpudrive::MapObservation{
       .position = referenceRotation.inv()
-                      .rotateVec({relativePosition.x, relativePosition.y, 0})
-                      .xy(),
+                      .rotateVec({relativePosition.x, relativePosition.y, relativePosition.z}),
       .scale = absoluteObservation.scale,
       .heading =  gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
       .type = absoluteObservation.type};
@@ -50,7 +50,7 @@ bool isObservationsValid(gpudrive::Engine &ctx,
                          gpudrive::MapObservation *observations,
                          madrona::CountT K,
                          const madrona::base::Rotation &referenceRotation,
-                         const madrona::math::Vector2 &referencePosition) {
+                         const madrona::math::Vector3 &referencePosition) {
 #ifdef MADRONA_GPU_MODE
   return true;
 #else
@@ -102,7 +102,7 @@ namespace gpudrive {
 
 template <madrona::CountT K>
 void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
-                                const madrona::math::Vector2 &referencePosition,
+                                const madrona::math::Vector3 &referencePosition,
                                 gpudrive::MapObservation *heap) {
   const Entity *roads = ctx.data().roads;
   const auto roadCount = ctx.data().numRoads;

@@ -163,8 +163,8 @@ inline void collectSelfObsSystem(Engine &ctx,
     auto &self_obs = ctx.get<SelfObservation>(agent_iface.e);
     self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
-    auto goalPos = goal.position - pos.xy();
-    self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
+    auto goalPos = goal.position - pos;
+    self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, goalPos.z});
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
@@ -192,8 +192,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
         const Rotation &other_rot = ctx.get<Rotation>(other);
         const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = (other_position - pos).xy();
-        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        Vector3 relative_pos = (other_position - pos);
+        relative_pos = rot.inv().rotateVec(relative_pos);
         float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
@@ -231,13 +231,13 @@ inline void collectMapObservationsSystem(Engine &ctx,
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
-            ctx, rot, pos.xy(), map_obs.obs);
+            ctx, rot, pos, map_obs.obs);
         return;
     }
 
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
-    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
+    utils::ReferenceFrame referenceFrame(pos, rot);
     CountT arrIndex = 0; CountT roadIdx = 0;
     while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
         Entity road = ctx.data().roads[roadIdx++];
@@ -452,13 +452,13 @@ inline void rewardSystem(Engine &ctx,
     const auto &rewardType = ctx.data().params.rewardParams.rewardType;
     if(rewardType == RewardType::DistanceBased)
     {
-        float dist = (position.xy() - goal.position).length();
+        float dist = (position - goal.position).length();
         float reward = -dist;
         out_reward.v = reward;
     }
     else if(rewardType == RewardType::OnGoalAchieved)
     {
-        float dist = (position.xy() - goal.position).length();
+        float dist = (position - goal.position).length();
         float reward = (dist < ctx.data().params.rewardParams.distanceToGoalThreshold) ? 1.f : 0.f;
         out_reward.v = reward;
     }
@@ -502,7 +502,7 @@ inline void doneSystem(Engine &ctx,
     // An agent can be done early if it reaches the goal
     if (done.v != 1 || info.reachedGoal != 1)
     {
-        float dist = (position.xy() - goal.position).length();
+        float dist = (position - goal.position).length();
         if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
         {
             done.v = 1;
