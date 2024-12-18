@@ -41,6 +41,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
         episode_len=exp_config.episode_len,
         remove_non_vehicles=exp_config.remove_non_vehicles,
         polyline_reduction_threshold=exp_config.polyline_reduction_threshold,
+        obs_radius=exp_config.observation_radius,
     )
 
     # Select model
