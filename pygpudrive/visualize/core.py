@@ -229,6 +229,27 @@ class MatplotlibVisualizer:
         start = center - np.array([length * np.cos(yaw), length * np.sin(yaw)])
         end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
+    
+    def _get_corners_polygon(self, x, y, length, width, orientation):
+        """Calculate the four corners of a speed bump (can be any) polygon."""
+        # Compute the direction vectors based on orientation
+        # print(length)
+        c = np.cos(orientation)
+        s = np.sin(orientation)
+        u = np.array((c, s))  # Unit vector along the orientation
+        ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+        # Center point of the speed bump
+        pt = np.array([x, y])
+
+        # corners
+        tl = pt + (length / 2) * u - (width / 2) * ut  
+        tr = pt + (length / 2) * u + (width / 2) * ut  
+        br = pt - (length / 2) * u + (width / 2) * ut  
+        bl = pt - (length / 2) * u - (width / 2) * ut  
+
+        # print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
+        return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
 
     def _plot_roadgraph(
         self,
@@ -251,6 +272,10 @@ class MatplotlibVisualizer:
                     road_point_type == int(gpudrive.EntityType.RoadEdge)
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
+                    or road_point_type == int(gpudrive.EntityType.StopSign)
+                    or road_point_type == int(gpudrive.EntityType.CrossWalk)
+
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -258,35 +283,60 @@ class MatplotlibVisualizer:
                     segment_lengths = road_graph.segment_length[
                         env_idx, road_mask
                     ].tolist()
+                    segment_widths = road_graph.segment_width[env_idx, road_mask].tolist()
                     segment_orientations = road_graph.orientation[
                         env_idx, road_mask
                     ].tolist()
 
-                    # Compute and draw road edges using start and end points
-                    for x, y, length, orientation in zip(
-                        x_coords,
-                        y_coords,
-                        segment_lengths,
-                        segment_orientations,
+                    if(
+                        road_point_type == int(gpudrive.EntityType.RoadEdge)
+                        or road_point_type == int(gpudrive.EntityType.RoadLine)
+                        or road_point_type == int(gpudrive.EntityType.RoadLane)
                     ):
-                        start, end = self._get_endpoints(
-                            x, y, length, orientation
-                        )
+                        # Compute and draw road edges using start and end points
+                        for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
+                            start, end = self._get_endpoints(x, y, length, orientation)
 
-                        if road_point_type == int(
-                            gpudrive.EntityType.RoadEdge
-                        ):
-                            line_width = 1.1 * line_width_scale
-
-                        else:
-                            line_width = 0.75 * line_width_scale
-
-                        ax.plot(
-                            [start[0], end[0]],
-                            [start[1], end[1]],
-                            color=ROAD_GRAPH_COLORS[road_point_type],
-                            linewidth=line_width,
-                        )
+                            # Plot the road edge as a line
+                            ax.plot(
+                                [start[0], end[0]],
+                                [start[1], end[1]],
+                                color=ROAD_GRAPH_COLORS[road_point_type],
+                                linewidth=0.75
+                            )
+                    
+                    elif (road_point_type == int(gpudrive.EntityType.SpeedBump)):
+                        utils.plot_speed_bumps(
+                            x_coords, 
+                            y_coords, 
+                            segment_lengths, 
+                            segment_widths, 
+                            segment_orientations,
+                            ax
+                        )  
+                
+                    elif (road_point_type == int(gpudrive.EntityType.StopSign)):
+                        for x, y in zip(x_coords, y_coords):
+                            point = np.array([x, y])
+                            utils.plot_stop_sign(
+                                point=point,
+                                ax=ax,
+                                radius=1.5,        
+                                facecolor='xkcd:red',      
+                                edgecolor="none",    
+                                linewidth=3.0,        
+                                alpha=1.0,            
+                            )
+                    elif (road_point_type == int(gpudrive.EntityType.CrossWalk)):
+                        for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
+                            points = self._get_corners_polygon(x, y, length, width, orientation)
+                            utils.plot_crosswalk(
+                                points=points,
+                                ax=ax,
+                                facecolor="none",
+                                edgecolor='xkcd:bluish grey',
+                                alpha=0.4,
+                            )
 
                 else:
                     # Dots for other road point types
@@ -535,7 +585,13 @@ class MatplotlibVisualizer:
         if observation_ego.id[env_idx, agent_idx] == -1:
             return None, None
 
-        fig, ax = plt.subplots(figsize=figsize)
+        # fig, ax = plt.subplots(figsize=figsize)
+        viz_config = (
+            utils.VizConfig()
+            if viz_config is None
+            else utils.VizConfig(**viz_config)
+        )
+        fig, ax = utils.init_fig_ax(viz_config)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
         ax.set_title(f"obs agent: {agent_idx}")
