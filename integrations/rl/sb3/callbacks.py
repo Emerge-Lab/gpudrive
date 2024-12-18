@@ -5,6 +5,7 @@ import torch
 import wandb
 from stable_baselines3.common.callbacks import BaseCallback
 from time import perf_counter
+from pygpudrive.visualize.utils import img_from_fig
 
 
 class MultiAgentCallback(BaseCallback):
@@ -196,9 +197,13 @@ class MultiAgentCallback(BaseCallback):
             done = base_env.get_dones()
 
             if step_num % 2 == 0:
-                frames.append(
-                    base_env.render(world_render_idx=render_world_idx)
+                sim_state_figs = base_env.vis.plot_simulator_state(
+                    env_indices=[render_world_idx],
+                    time_steps=[step_num],
+                    zoom_radius=100,
                 )
+
+                frames.append(img_from_fig(sim_state_figs[0]))
 
             if done[control_mask].sum() == control_mask.sum():
                 break
