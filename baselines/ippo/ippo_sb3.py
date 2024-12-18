@@ -40,6 +40,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
         off_road_weight=exp_config.off_road_weight,
         episode_len=exp_config.episode_len,
         remove_non_vehicles=exp_config.remove_non_vehicles,
+        polyline_reduction_threshold=exp_config.polyline_reduction_threshold,
     )
 
     # Select model

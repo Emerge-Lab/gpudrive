@@ -11,6 +11,7 @@ collision_weight: 0.0
 goal_achieved_weight: 1.0
 off_road_weight: 0.0
 remove_non_vehicles: false
+polyline_reduction_threshold: 0.2
 
 resample_scenarios: false
 resample_criterion: "global_step"  # Options: "global_step"
