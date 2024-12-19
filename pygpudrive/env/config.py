@@ -89,14 +89,34 @@ class EnvConfig:
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
+    # Reward
+    reward_type: str = (
+        "sparse_on_goal_achieved"  # options: "sparse_on_goal_achieved"
+    )
+    # The radius around the goal point within which the agent is considered
+    # to have reached the goal
+    dist_to_goal_threshold: float = 3.0
+
+    # Initialization steps: Number of steps to take before the episode starts
+    init_steps: int = 0
+
     # Reward settings
     reward_type: str = (
         "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
     )
 
+    # Set the weights for the reward components
+    # R = a * collided + b * goal_achieved + c * off_road
+    collision_weight = -1.0
+    goal_achieved_weight = 1.0
+    off_road_weight = -1.0
+
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"
     )
+
+    # Integrations: Enable pre-trained Versatile Behavior Diffusion model
+    return_vbd_data: bool = False
 
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_agents_in_scene: int = (
@@ -114,7 +134,7 @@ class EnvConfig:
     num_lidar_samples: int = gpudrive.numLidarSamples
 
 
-    #Param to init all objects:
+    # Param to init all objects:
     init_all_objects: bool = False
 
 class SelectionDiscipline(Enum):
@@ -192,6 +212,7 @@ class RenderConfig:
     draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
     color_scheme: str = "light"
+    render_init: bool = False
 
     def __str__(self) -> str:
         """Returns a string representation of the rendering configuration."""

@@ -2,11 +2,11 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/examples"
+data_dir: "data/processed/sampled/training"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
+  num_worlds: 50 # Number of parallel environments
   k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
@@ -55,7 +55,7 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 1_000_000_000
-  batch_size: 131_072
+  batch_size: 81_920
   minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
