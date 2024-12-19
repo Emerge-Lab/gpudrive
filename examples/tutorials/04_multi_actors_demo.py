@@ -20,7 +20,7 @@ if __name__ == "__main__":
     MAX_CONTROLLED_AGENTS = 2 # Number of agents to control per scene
     NUM_WORLDS = 2
     DEVICE = "cpu"
-    DATA_PATH = "data"
+    DATA_PATH = "data/processed/examples"
     TRAINED_POLICY_PATH = "models/learned_sb3_policy.zip"
     VIDEO_PATH = f"videos/"
     FPS = 23

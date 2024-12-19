@@ -64,7 +64,7 @@ protected:
             agent_width_map[n_agents] = (float)obj["width"];
             initialState.push_back(float(obj["position"][0]["x"]) - mean.first);
             initialState.push_back(float(obj["position"][0]["y"]) - mean.second);
-            auto theta = std::fmod(test_utils::degreesToRadians(obj["heading"][0]), M_PI*2);
+            float_t theta = obj["heading"][0];
             theta = theta > M_PI ? theta -  M_PI*2 : (theta < - M_PI ? theta +  M_PI*2 : theta);
             initialState.push_back(theta);
             initialState.push_back(math::Vector2{.x = obj["velocity"][0]["x"], .y = obj["velocity"][0]["y"]}.length());

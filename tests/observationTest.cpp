@@ -13,11 +13,6 @@
 using namespace madrona;
 using nlohmann::json;
 
-
-float degreesToRadians(float degrees) {
-    return degrees * M_PI / 180.0;
-}
-
 class ObservationsTest : public ::testing::Test {
 protected:    
     uint32_t num_worlds = 1;

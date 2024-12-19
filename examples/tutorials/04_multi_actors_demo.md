@@ -38,9 +38,6 @@ scene_config = SceneConfig(
     discipline=SelectionDiscipline.FIRST_N,
     k_unique_scenes=K_UNIQUE_SCENES,
 )
-render_config = RenderConfig(
-    draw_obj_idx=True, # If True, draws the indices of the vehicles for easy inspection
-)
 
 # Make env
 env = GPUDriveTorchEnv(
