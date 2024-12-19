@@ -64,14 +64,16 @@ namespace gpudrive
         NUM_TYPES = 21,
     };
 
-struct AgentID {
-    int32_t id;
-};
+    struct AgentID 
+    {
+        int32_t id;
+    };
 
     struct VehicleSize
     {
         float length;
         float width;
+        float height;
     };
 
     struct Goal
@@ -126,6 +128,12 @@ struct AgentID {
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
+
+        static inline Action zero()
+        {
+            return Action{
+                .classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
+        }
     };
 
     const size_t ActionExportSize = 3 + 1 + 6;
@@ -179,19 +187,19 @@ struct AgentID {
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
-    float id;
+        float id;
         static inline SelfObservation zero()
         {
             return SelfObservation{
                 .speed = 0,
-                .vehicle_size = {0, 0},
+                .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
-            .id = -1};
+                .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 7;
+    const size_t SelfObservationExportSize = 8; // 1 + 3 + 2 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -217,7 +225,7 @@ struct AgentID {
         }
     };
 
-    const size_t MapObservationExportSize = 9;
+    const size_t MapObservationExportSize = 9; // 2 + 3 + 1 + 1 + 1 + 1
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -228,18 +236,29 @@ struct AgentID {
         float heading;
         VehicleSize vehicle_size;
         float type;
-    float id;
+        float id;
 
-    static inline PartnerObservation zero() {
-        return PartnerObservation{
-            .speed = 0,
-            .position = {0, 0},
-            .heading = 0,
-            .vehicle_size = {0, 0},
-            .type = static_cast<float>(EntityType::None),
-            .id = -1};
-    }
-};
+        static inline PartnerObservation zero() {
+            return PartnerObservation{
+                .speed = 0,
+                .position = {0, 0},
+                .heading = 0,
+                .vehicle_size = {0, 0, 0},
+                .type = static_cast<float>(EntityType::None),
+                .id = -1};
+        }
+    };
+
+    // Egocentric observations of other agents
+    struct PartnerObservations
+    {
+        PartnerObservation obs[consts::kMaxAgentCount - 1];
+    };
+
+    const size_t PartnerObservationExportSize = 9; // 1 + 2 + 1 + 3 + 1 + 1
+
+    static_assert(sizeof(PartnerObservations) == sizeof(float) *
+        (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
     struct RoadMapId{
         int32_t id;
@@ -248,17 +267,6 @@ struct AgentID {
     const size_t RoadMapIdExportSize = 1;
 
     static_assert(sizeof(RoadMapId) == sizeof(int) * RoadMapIdExportSize);
-
-    // Egocentric observations of other agents
-    struct PartnerObservations
-    {
-        PartnerObservation obs[consts::kMaxAgentCount - 1];
-    };
-
-    const size_t PartnerObservationExportSize = 8;
-
-    static_assert(sizeof(PartnerObservations) == sizeof(float) *
-                                                     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
     struct AgentMapObservations
     {
@@ -316,6 +324,18 @@ struct AgentID {
         float headings[consts::kTrajectoryLength];
         float valids[consts::kTrajectoryLength];
         Action inverseActions[consts::kTrajectoryLength];
+
+        static inline void zero(Trajectory& traj)
+        {
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            {
+                traj.positions[i] = {0, 0};
+                traj.velocities[i] = {0, 0};
+                traj.headings[i] = 0;
+                traj.valids[i] = 0;
+                traj.inverseActions[i] = Action::zero();
+            }
+        }
     };
 
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
@@ -340,7 +360,7 @@ struct AgentID {
 
     struct AbsoluteRotation
     {
-        Rotation rotationAsQuat;
+        Rotation rotationAsQuat; // x, y, z, w
         float rotationFromAxis;
     };
 
@@ -353,9 +373,28 @@ struct AgentID {
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 5 + 2 + 3 + 1
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
+    //Metadata struct : using agent IDs.
+    struct MetaData
+    {
+        int32_t isSdc;
+        int32_t isObjectOfInterest;
+        int32_t isTrackToPredict;
+        int32_t difficulty;
+
+        static inline void zero(MetaData& metadata)
+        {
+            metadata.isSdc = -1;
+            metadata.isObjectOfInterest = -1;
+            metadata.isTrackToPredict = -1;
+            metadata.difficulty = -1;
+        }
+    };
+    const size_t MetaDataExportSize = 4;
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
 
     struct AgentInterface : public madrona::Archetype<
                                 Action,
@@ -371,7 +410,8 @@ struct AgentID {
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
-    AgentID,
+                                AgentID,
+                                MetaData,
 
                                 ControlledState // Drive Logic
 
