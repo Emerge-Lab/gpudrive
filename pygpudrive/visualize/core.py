@@ -1,6 +1,5 @@
 import os
 import torch
-import math
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
@@ -30,14 +29,16 @@ OUT_OF_BOUNDS = 1000
 
 class MatplotlibVisualizer:
     def __init__(
-        self, sim_object, vis_config: Dict[str, Any], goal_radius, backend: str
+        self, sim_object, render_config: Dict[str, Any], goal_radius, backend: str
     ):
         self.sim_object = sim_object
-        self.vis_config = vis_config
+        self.render_config = render_config
         self.backend = backend
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
+        self.num_envs = self.sim_object.num_envs
+        self.cache_static_map_elements()
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -46,6 +47,22 @@ class MatplotlibVisualizer:
             .squeeze(axis=2)
             .to(self.device)
         )
+        
+    def cache_static_map_elements(self):
+        
+        self.global_roadgraph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim_object.map_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        # for env_idx in range():
+        # self.cached_roadgraphs = self._plot_roadgraph(
+        #     road_graph=global_roadgraph,
+        #     env_idx=env_idx,
+        #     ax=ax,
+        #     line_width_scale=line_width_scale,
+        #     marker_size_scale=marker_scale,
+        # )
 
     def plot_simulator_state(
         self,
@@ -54,7 +71,6 @@ class MatplotlibVisualizer:
         center_agent_indices: Optional[List[int]] = None,
         figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
-        return_single_figure: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -65,8 +81,6 @@ class MatplotlibVisualizer:
             center_agent_indices: Optional list of center agent indices for zooming.
             figsize: Tuple for figure size of each subplot.
             zoom_radius: Radius for zooming in around the center agent.
-            return_single_figure: If True, plots all environments in a single figure.
-                                Otherwise, returns a list of figures.
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -79,11 +93,6 @@ class MatplotlibVisualizer:
             )  # Default to None for all
 
         # Extract data for all environments
-        global_roadgraph = GlobalRoadGraphPoints.from_tensor(
-            roadgraph_tensor=self.sim_object.map_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
             backend=self.backend,
@@ -97,27 +106,8 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
-        figs = []  # Store all figures if returning multiple
-
-        if return_single_figure:
-            # Calculate rows and columns for square layout
-            num_envs = len(env_indices)
-            num_rows = math.ceil(math.sqrt(num_envs))
-            num_cols = math.ceil(num_envs / num_rows)
-
-            total_figsize = (figsize[0] * num_cols, figsize[1] * num_rows)
-            fig, axes = plt.subplots(
-                nrows=num_rows,
-                ncols=num_cols,
-                figsize=total_figsize,
-                squeeze=False,
-            )
-            axes = axes.flatten()
-        else:
-            axes = [None] * len(
-                env_indices
-            )  # Placeholder for individual plotting
-
+        figs = [] 
+       
         # Calculate scale factors based on figure size
         max_fig_size = max(figsize)
         marker_scale = max_fig_size / 15  # Adjust this factor as needed
@@ -127,15 +117,10 @@ class MatplotlibVisualizer:
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
-            if return_single_figure:
-                ax = axes[idx]
-                ax.clear()  # Clear any previous plots
-                ax.set_aspect("equal", adjustable="box")
-            else:
-                fig, ax = plt.subplots(figsize=figsize)
-                ax.set_aspect("equal", adjustable="box")
-                ax.clear()
-                figs.append(fig)
+            
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.clear()
+            ax.set_aspect("equal", adjustable="box")
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agents[env_idx, :]
@@ -151,7 +136,7 @@ class MatplotlibVisualizer:
 
             # Draw the road graph
             self._plot_roadgraph(
-                road_graph=global_roadgraph,
+                road_graph=self.global_roadgraph,
                 env_idx=env_idx,
                 ax=ax,
                 line_width_scale=line_width_scale,
@@ -209,14 +194,10 @@ class MatplotlibVisualizer:
 
             ax.set_xticks([])
             ax.set_yticks([])
+            
+            figs.append(fig)
 
-        if return_single_figure:
-            for ax in axes[len(env_indices) :]:
-                ax.axis("off")  # Hide unused subplots
-            plt.tight_layout()
-            return fig
-        else:
-            return figs
+        return figs
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
