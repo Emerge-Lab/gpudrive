@@ -42,7 +42,7 @@ class MapElementIds(enum.IntEnum):
 @dataclass
 class GlobalRoadGraphPoints:
     """A class to represent global road graph points. All information is
-    global but demeaned, that is, centered at zero. Takes in 
+    global but demeaned, that is, centered at zero. Takes in
     map_observation_tensor of shape (num_worlds, num_road_points, 9).
 
     Attributes:
@@ -114,7 +114,7 @@ class GlobalRoadGraphPoints:
         self.x -= self.segment_length * np.cos(self.orientation)
         self.y -= self.segment_length * np.sin(self.orientation)
 
-            # Get the dimensions
+        # Get the dimensions
         num_worlds, num_road_points = self.x.shape
         device = self.x.device
 
@@ -136,7 +136,9 @@ class GlobalRoadGraphPoints:
             type_batch = self.type[batch_idx]
 
             # Find the indices where ids change
-            id_shifted = torch.cat([id_batch[1:], id_batch.new_tensor([id_batch[-1] + 1])])
+            id_shifted = torch.cat(
+                [id_batch[1:], id_batch.new_tensor([id_batch[-1] + 1])]
+            )
             id_change = id_shifted != id_batch
             last_indices = torch.nonzero(id_change).squeeze(-1)
 
@@ -165,8 +167,12 @@ class GlobalRoadGraphPoints:
                 segment_length_last = segment_length_slice[-1]
                 orientation_last = orientation_slice[-1]
 
-                end_x = start_x_last + 2 * segment_length_last * torch.cos(orientation_last)
-                end_y = start_y_last + 2 * segment_length_last * torch.sin(orientation_last)
+                end_x = start_x_last + 2 * segment_length_last * torch.cos(
+                    orientation_last
+                )
+                end_y = start_y_last + 2 * segment_length_last * torch.sin(
+                    orientation_last
+                )
 
                 # Orientation is set to zero for the final point
                 end_orientation = torch.tensor(0.0, device=device)
@@ -208,7 +214,9 @@ class GlobalRoadGraphPoints:
             if total_points < self.num_points:
                 # Pad with zeros to reach num_points
                 pad_size = self.num_points - total_points
-                pad_tensor = lambda t: torch.cat([t, torch.zeros(pad_size, device=device)])
+                pad_tensor = lambda t: torch.cat(
+                    [t, torch.zeros(pad_size, device=device)]
+                )
                 new_x_batch = pad_tensor(new_x_batch)
                 new_y_batch = pad_tensor(new_y_batch)
                 new_segment_length_batch = pad_tensor(new_segment_length_batch)
@@ -219,8 +227,12 @@ class GlobalRoadGraphPoints:
                 # Truncate to num_points
                 new_x_batch = new_x_batch[: self.num_points]
                 new_y_batch = new_y_batch[: self.num_points]
-                new_segment_length_batch = new_segment_length_batch[: self.num_points]
-                new_orientation_batch = new_orientation_batch[: self.num_points]
+                new_segment_length_batch = new_segment_length_batch[
+                    : self.num_points
+                ]
+                new_orientation_batch = new_orientation_batch[
+                    : self.num_points
+                ]
                 new_id_batch = new_id_batch[: self.num_points]
                 new_type_batch = new_type_batch[: self.num_points]
 

@@ -6,18 +6,20 @@ import torch
 import gpudrive
 from itertools import product
 
-from data_utils.vbd_data import process_scenario_data
-
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
+    GlobalEgoState,
     PartnerObs,
     LidarObs,
 )
 from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
+from pygpudrive.datatypes.roadgraph import (
+    LocalRoadGraphPoints,
+    GlobalRoadGraphPoints,
+)
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 
@@ -44,6 +46,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
+        self.sample_batch = None
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -67,18 +70,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.episode_len = self.config.episode_len
 
         # Rendering setup
-        self.visualizer = self._setup_rendering()
+        self.vis = MatplotlibVisualizer(
+            sim_object=self.sim,
+            goal_radius=self.config.dist_to_goal_threshold,
+            vis_config=self.render_config,
+            backend=self.backend,
+        )
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
 
-        # If there are warmup steps (by default, init_steps=0),
-        # advance the simulator before returning the first observation
-        self.sample_batch = self.advance_sim_with_log_playback(
-            init_steps=self.config.init_steps,
-            render_init=self.render_config.render_init,
-        )
+        # Advance the simulator with log playback if warmup steps are provided
+        if self.config.init_steps > 0:
+            self.advance_sim_with_log_playback(
+                init_steps=self.config.init_steps,
+                render_init=self.render_config.render_init,
+            )
 
         return self.get_obs()
 
@@ -254,13 +262,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             action_1 = self.dx.clone().cpu().numpy()
             action_2 = self.dy.clone().cpu().numpy()
             action_3 = self.dyaw.clone().cpu().numpy()
-        else:
+        elif self.config.dynamics_model == "classic":
             self.steer_actions = self.config.steer_actions.to(self.device)
             self.accel_actions = self.config.accel_actions.to(self.device)
             self.head_actions = torch.tensor([0], device=self.device)
             action_1 = self.steer_actions.clone().cpu().numpy()
             action_2 = self.accel_actions.clone().cpu().numpy()
             action_3 = self.head_actions.clone().cpu().numpy()
+        else:
+            raise ValueError(
+                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
+            )
 
         action_space = Tuple(
             (
@@ -425,12 +437,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return obs_filtered
 
-    def get_controlled_agents_mask(self):
-        """Get the control mask."""
-        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
-            axis=2
-        )
-
     def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
@@ -446,48 +452,60 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raise ValueError(
                 f"VBD expects only a single world, given {self.num_worlds}."
             )
-            
+
         self.init_frames = []
 
         self.log_playback_traj, _, _, _ = self.get_expert_actions()
-        
-        means_xy = self.sim.world_means_tensor().to_torch()[:, :2]
-        
+
+        means_xy = (
+            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        )
+
         # Get the logged trajectory
-        #Q(KJ): Do we still have to revert the mean here? Yes we do
+        # Q(KJ): Do we still have to revert the mean here? Yes we do
         log_trajectory = LogTrajectory.from_tensor(
             self.sim.expert_trajectory_tensor(),
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
         )
-        log_trajectory.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-        
+        log_trajectory.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+
         # Get global road graph and restore the mean
         global_road_graph = GlobalRoadGraphPoints.from_tensor(
             roadgraph_tensor=self.sim.map_observation_tensor(),
             backend=self.backend,
+            device=self.device,
         )
-        global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_road_graph.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
         global_road_graph.restore_xy()
-        
+
         # Get global agent observations and restore the mean
         global_agent_obs = GlobalEgoState.from_tensor(
             abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
             backend=self.backend,
+            device=self.device,
         )
-        global_agent_obs.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_agent_obs.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
 
         for time_step in range(init_steps):
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
             )
-
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
 
         if self.config.return_vbd_data:
-            sample_batch = process_scenario_data(
+
+            from data_utils.vbd_data import process_scenario_data
+
+            self.sample_batch = process_scenario_data(
                 max_controlled_agents=self.max_cont_agents,
                 controlled_agent_mask=self.cont_agent_mask[0],
                 global_agent_obs=global_agent_obs,
@@ -497,23 +515,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 init_steps=init_steps,
                 raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
             )
-
-            data_dict = {
-                "agents_history": agents_history,
-                "agents_interested": agents_interested,
-                "agents_type": agents_type.long(),
-                "agents_future": agents_future,
-                "traffic_light_points": traffic_light_points,
-                "polylines": polylines,
-                "polylines_valid": polylines_valid,
-                "relations": torch.Tensor(relations).unsqueeze(0),
-                "agents_id": agents_id,
-                "anchors": torch.zeros((1, 32, 64, 2)),  # Placeholder
-            }
-
-            return data_dict
-        else:
-            return None
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
@@ -533,9 +534,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_expert_actions = inferred_expert_actions[..., :3]
-            inferred_expert_actions[..., 0] = torch.clamp(
-                inferred_expert_actions[..., 0], -6, 6
+            inferred_actions = log_trajectory.inferred_actions[:, :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
             )
             inferred_actions[..., 1] = torch.clamp(
                 inferred_actions[..., 1], -6, 6
@@ -561,112 +562,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 dim=-1,
             )
-
-        else:  # classic or bicycle
-            inferred_expert_actions = inferred_expert_actions[..., :3]
-            inferred_expert_actions[..., 0] = torch.clamp(
-                inferred_expert_actions[..., 0], -6, 6
+        elif (
+            self.config.dynamics_model == "classic"
+            or self.config.dynamics_model == "bicycle"
+        ):
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
+            inferred_actions[..., 0] = torch.clamp(
+                inferred_actions[..., 0], -6, 6
             )
-            inferred_expert_actions[..., 1] = torch.clamp(
-                inferred_expert_actions[..., 1], -0.3, 0.3
+            inferred_actions[..., 1] = torch.clamp(
+                inferred_actions[..., 1], -0.3, 0.3
             )
-        if full_output:
-            return inferred_expert_actions, velocity, positions, headings
-        else:
-            return inferred_expert_actions
 
-    def normalize_and_flatten_partner_obs(self, obs):
-        """Normalize partner state features.
-        Args:
-            obs: torch.Tensor of shape (
-                num_worlds,
-                kMaxAgentCount,
-                kMaxAgentCount - 1,
-                num_features
-            )
-        """
-
-        # TODO: Fix (there should not be nans in the obs)
-        obs = torch.nan_to_num(obs, nan=0)
-
-        # Speed
-        obs[:, :, :, 0] /= constants.MAX_SPEED
-
-        # Relative position
-        obs[:, :, :, 1] = self.normalize_tensor(
-            obs[:, :, :, 1],
-            constants.MIN_REL_AGENT_POS,
-            constants.MAX_REL_AGENT_POS,
+        return (
+            inferred_actions,
+            log_trajectory.pos_xy,
+            log_trajectory.vel_xy,
+            log_trajectory.yaw,
         )
-        obs[:, :, :, 2] = self.normalize_tensor(
-            obs[:, :, :, 2],
-            constants.MIN_REL_AGENT_POS,
-            constants.MAX_REL_AGENT_POS,
-        )
-
-        # Orientation (heading)
-        obs[:, :, :, 3] /= constants.MAX_ORIENTATION_RAD
-
-        # Vehicle length and width
-        obs[:, :, :, 4] /= constants.MAX_VEH_LEN
-        obs[:, :, :, 5] /= constants.MAX_VEH_WIDTH
-
-        # One-hot encode the type of the other visible objects
-        one_hot_encoded_object_types = self.one_hot_encode_object_type(
-            obs[:, :, :, 6]
-        )
-
-        # Concat the one-hot encoding with the rest of the features
-        obs = torch.concat(
-            (obs[:, :, :, :6], one_hot_encoded_object_types), dim=-1
-        )
-
-        return obs.flatten(start_dim=2)
-
-    def one_hot_encode_roadpoints(self, roadmap_type_tensor):
-
-        # Set garbage object types to zero
-        road_types = torch.where(
-            (roadmap_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
-            | (roadmap_type_tensor > self.ROAD_MAP_OBJECT_TYPES),
-            0.0,
-            roadmap_type_tensor,
-        ).int()
-
-        return torch.nn.functional.one_hot(
-            road_types.long(),
-            num_classes=self.ROAD_MAP_OBJECT_TYPES,
-        )
-
-    def one_hot_encode_object_type(self, object_type_tensor):
-        """One-hot encode the object type."""
-
-        VEHICLE = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Vehicle]
-        PEDESTRIAN = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Pedestrian]
-        CYCLIST = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType.Cyclist]
-        PADDING = self.ENTITY_TYPE_TO_INT[gpudrive.EntityType._None]
-
-        # Set garbage object elements to zero
-        object_types = torch.where(
-            (object_type_tensor < self.MIN_OBJ_ENTITY_ENUM)
-            | (object_type_tensor > self.MAX_OBJ_ENTITY_ENUM),
-            0.0,
-            object_type_tensor,
-        ).int()
-
-        one_hot_object_type = torch.nn.functional.one_hot(
-            torch.where(
-                condition=(object_types == VEHICLE)
-                | (object_types == PEDESTRIAN)
-                | (object_types == CYCLIST)
-                | object_types
-                == PADDING,
-                input=object_types,
-                other=0,
-            ).long(),
-            num_classes=self.ROAD_OBJECT_TYPES,
-        )
-        return one_hot_object_type
 
     @property
     def step_in_episode(self):
@@ -675,50 +588,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             - self.sim.steps_remaining_tensor().to_torch().flatten()[0].item()
         )
 
-    def normalize_and_flatten_map_obs(self, obs):
-        """Normalize map observation features."""
-
-        # Road point coordinates
-        obs[:, :, :, 0] = self.normalize_tensor(
-            obs[:, :, :, 0],
-            constants.MIN_RG_COORD,
-            constants.MAX_RG_COORD,
-        )
-
-        obs[:, :, :, 1] = self.normalize_tensor(
-            obs[:, :, :, 1],
-            constants.MIN_RG_COORD,
-            constants.MAX_RG_COORD,
-        )
-
-        # Road line segment length
-        obs[:, :, :, 2] /= constants.MAX_ROAD_LINE_SEGMENT_LEN
-
-        # Road scale (width and height)
-        obs[:, :, :, 3] /= constants.MAX_ROAD_SCALE
-        # obs[:, :, :, 4] seems already scaled
-
-        # Road point orientation
-        obs[:, :, :, 5] /= constants.MAX_ORIENTATION_RAD
-
-        # Road types: one-hot encode them
-        one_hot_road_types = self.one_hot_encode_roadpoints(obs[:, :, :, 6])
-
-        # Concatenate the one-hot encoding with the rest of the features
-        obs = torch.cat((obs[:, :, :, :6], one_hot_road_types), dim=-1)
-
-        return obs.flatten(start_dim=2)
-
 
 if __name__ == "__main__":
 
     init_steps = 10
     MAX_NUM_OBJECTS = 32
-    NUM_WORLDS = 1
+    NUM_WORLDS = 10
 
     env_config = EnvConfig(
         init_steps=init_steps,  # Warmup period
-        return_vbd_data=True,  # Use VBD
+        return_vbd_data=False,  # Use VBD
         dynamics_model="state",  # Use state-based dynamics model
         dist_to_goal_threshold=1e-5,  # Trick to make sure the agents don't disappear when they reach the goal
         collision_behavior="ignore",  # Ignore collisions
@@ -738,19 +617,5 @@ if __name__ == "__main__":
     obs = env.reset()
 
     sample_batch = env.sample_batch
-
-    frames = []
-
-    for t in range(TOTAL_STEPS):
-        print(f"Step: {t}")
-
-        # Step the environment
-        env.step_dynamics(expert_actions[:, :, t, :])
-
-        frames.append(env.render())
-
-        obs = env.get_obs()
-        reward = env.get_rewards()
-        done = env.get_dones()
 
     env.close()
