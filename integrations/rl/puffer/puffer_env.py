@@ -68,7 +68,7 @@ class PufferGPUDrive(PufferEnv):
             if scene.startswith("tfrecord")
         ]
         self.unique_scene_paths = list(set(self.all_scene_paths))
-
+        
         scene_config = SceneConfig(
             path=data_dir,
             num_scenes=self.num_worlds,
@@ -453,12 +453,6 @@ class PufferGPUDrive(PufferEnv):
             # Update set of scenes we've trained on
             self.training_scenes_set.append(set(self.dataset))
             
-            # Reset 
-            self.dataset = []
-
-            # Update set of scenes we've trained on
-            self.training_scenes_set.append(set(self.dataset))
-
             # Reset
             self.dataset = []
 

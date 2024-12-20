@@ -21,7 +21,6 @@ import pufferlib.vector
 import pufferlib.frameworks.cleanrl
 from rich.console import Console
 
-
 def load_config(config_path):
     """Load the configuration file."""
     # fmt: off
@@ -29,18 +28,31 @@ def load_config(config_path):
         config = Box(yaml.safe_load(f))
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{str(config["environment"]["k_unique_scenes"])}__{datetime_}'
+    
+    if config["train"]["resample_scenes"]:
+        all_scene_paths = [
+            os.path.join(config["data_dir"], scene)
+            for scene in sorted(os.listdir(config["data_dir"]))
+            if scene.startswith("tfrecord")
+        ]
+        if config["train"]["resample_scenes"]:
+            dataset_size = len(all_scene_paths)
+        
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+    else:
+        dataset_size = str(config["environment"]["k_unique_scenes"])
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+    
+    config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available
     # fmt: on
     return pufferlib.namespace(**config)
 
-
 def make_policy(env):
     """Create a policy based on the environment."""
     return pufferlib.frameworks.cleanrl.Policy(Policy(env))
-
 
 def train(args):
     """Main training loop for the PPO agent."""

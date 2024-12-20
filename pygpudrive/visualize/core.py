@@ -17,6 +17,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
+from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -32,18 +33,20 @@ class MatplotlibVisualizer:
     def __init__(
         self,
         sim_object,
-        vis_config: Dict[str, Any],
         goal_radius,
         backend: str,
         num_worlds: int,
+        render_config: Dict[str, Any],
+        env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
-        self.vis_config = vis_config
         self.backend = backend
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
+        self.render_config = render_config
+        self.env_config = env_config    
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -504,9 +507,7 @@ class MatplotlibVisualizer:
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
         # Define realistic bounds for log_replay agent positions
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
-            torch.abs(pos_y) < OUT_OF_BOUNDS
-        )
+        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (torch.abs(pos_y) < OUT_OF_BOUNDS) & (vehicle_length < 15) & (vehicle_width < 10)
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
@@ -535,11 +536,6 @@ class MatplotlibVisualizer:
         self,
         agent_idx: int,
         env_idx: int,
-        observation_roadgraph: torch.Tensor = None,
-        observation_ego: torch.Tensor = None,
-        observation_partner: torch.Tensor = None,
-        x_lim: Tuple[float, float] = (-100, 100),
-        y_lim: Tuple[float, float] = (-100, 100),
         figsize: Tuple[int, int] = (10, 10),
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
@@ -574,7 +570,7 @@ class MatplotlibVisualizer:
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
-        ax.set_title(f"obs agent: {agent_idx}")
+        ax.set_title(f"Observation agent: {agent_idx}", y=1.05)
 
         # Plot roadgraph if provided
         if observation_roadgraph is not None:
@@ -649,32 +645,44 @@ class MatplotlibVisualizer:
                 0,  # Start at the ego vehicle's position
                 speed,
                 0,  # Arrow points to the right, proportional to speed
-                head_width=0.5,
-                head_length=0.7,
+                head_width=1.0,
+                head_length=1.1,
                 fc=REL_OBS_OBJ_COLORS["ego"],
                 ec=REL_OBS_OBJ_COLORS["ego"],
             )
-
-            ax.plot(
+            
+            ax.scatter(
                 observation_ego.rel_goal_x[env_idx, agent_idx],
                 observation_ego.rel_goal_y[env_idx, agent_idx],
-                markersize=23,
-                label="Goal",
-                marker="*",
-                markeredgecolor="k",
-                linestyle="None",
-                color=REL_OBS_OBJ_COLORS["ego_goal"],
-            )[0]
+                s=5,
+                linewidth=1.5,
+                c=ego_agent_color,
+                marker="x",
+            )
 
-        # fig.legend(
-        #     loc="upper center",
-        #     bbox_to_anchor=(0.5, 0.1),
-        #     ncol=5,
-        #     fontsize=10,
-        #     title="Elements",
-        # )
-        ax.set_xlim(x_lim)
-        ax.set_ylim(y_lim)
+            circle = Circle(
+                (observation_ego.rel_goal_x[env_idx, agent_idx], observation_ego.rel_goal_y[env_idx, agent_idx]),
+                radius=self.goal_radius,
+                color=ego_agent_color,
+                fill=False,
+                linestyle="--",
+            )
+            ax.add_patch(circle)
+            
+            observation_radius = Circle(
+                (0, 0),
+                radius=self.env_config.obs_radius,
+                color='#d9d9d9',
+                linewidth=1.5,
+                fill=False,
+                linestyle="-",
+            )
+            ax.add_patch(observation_radius)
+            plt.axis("off")
+       
+
+        ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_xticks([])
         ax.set_yticks([])
 
