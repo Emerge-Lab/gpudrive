@@ -51,6 +51,7 @@ train:
   resample_interval: 5_000_000 
   resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   resample_mode: "random" # Options: random
+  resample_dataset_size: 1000 # Number of unique scenes to sample from 
 
   # # # PPO # # #
   torch_deterministic: false

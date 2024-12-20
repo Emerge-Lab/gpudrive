@@ -30,13 +30,9 @@ def load_config(config_path):
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
     
     if config["train"]["resample_scenes"]:
-        all_scene_paths = [
-            os.path.join(config["data_dir"], scene)
-            for scene in sorted(os.listdir(config["data_dir"]))
-            if scene.startswith("tfrecord")
-        ]
+       
         if config["train"]["resample_scenes"]:
-            dataset_size = len(all_scene_paths)
+            dataset_size = config["train"]["resample_dataset_size"]
         
         config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
     else:
