@@ -56,10 +56,10 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 72), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 36), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 32), decimals=3
+        torch.linspace(-4.0, 4.0, 16), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -90,9 +90,7 @@ class EnvConfig:
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
     # Reward settings
-    reward_type: str = (
-        "sparse_on_goal_achieved"  # Alternatively, "weighted_combination"
-    )
+    reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
         3.0  # Radius around goal considered as "goal achieved"

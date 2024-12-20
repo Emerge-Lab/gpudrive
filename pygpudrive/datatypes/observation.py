@@ -72,7 +72,7 @@ class LocalEgoState:
 
 class GlobalEgoState:
     """A class to represent the ego state of the agent in global coordinates.
-    Initialized from abs_self_obs_tensor (src/bindings). For details, see
+    Initialized from absolute_self_observation_tensor (src/bindings). For details, see
     `AbsoluteSelfObservation` in src/types.hpp. Shape: (num_worlds, max_agents, 14).
 
     Attributes:

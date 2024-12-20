@@ -23,6 +23,8 @@ from pygpudrive.visualize.utils import img_from_fig
 from pufferlib.environment import PufferEnv
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
+    PartnerObs,
+    LidarObs,
 )
 
 
@@ -218,6 +220,7 @@ class PufferGPUDrive(PufferEnv):
             collision_weight=self.config.collision_weight,
             off_road_weight=self.config.off_road_weight,
             goal_achieved_weight=self.config.goal_achieved_weight,
+            world_time_steps=self.episode_lengths[:, 0].long(),
         )
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
@@ -325,6 +328,15 @@ class PufferGPUDrive(PufferEnv):
                 ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
             )
 
+            ego_state = LocalEgoState.from_tensor(
+                self_obs_tensor=self.env.sim.self_observation_tensor(),
+                backend="torch",
+                device="cuda",
+            )
+            agent_speeds = (
+                ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
+            )
+
             num_finished_agents = controlled_mask.sum().item()
             if num_finished_agents > 0:
                 info.append(
@@ -349,6 +361,7 @@ class PufferGPUDrive(PufferEnv):
                         .mean()
                         .item(),
                         "rg_sparsity": rg_sparsity.item(),
+                        "mean_agent_speed": agent_speeds.mean().item(),
                         "mean_agent_speed": agent_speeds.mean().item(),
                     }
                 )
@@ -436,6 +449,12 @@ class PufferGPUDrive(PufferEnv):
         """Sample a new set of WOMD scenarios."""
         if self.train_config.resample_mode == "random":
             total_unique = len(self.unique_scene_paths)
+            
+            # Update set of scenes we've trained on
+            self.training_scenes_set.append(set(self.dataset))
+            
+            # Reset 
+            self.dataset = []
 
             # Update set of scenes we've trained on
             self.training_scenes_set.append(set(self.dataset))
@@ -465,7 +484,6 @@ class PufferGPUDrive(PufferEnv):
         print(
             f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
         )
-
         self.env.reinit_scenarios(self.dataset)
 
         # Update controlled agent mask and other masks

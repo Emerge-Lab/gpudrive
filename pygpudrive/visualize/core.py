@@ -30,7 +30,12 @@ OUT_OF_BOUNDS = 1000
 
 class MatplotlibVisualizer:
     def __init__(
-        self, sim_object, vis_config: Dict[str, Any], goal_radius, backend: str
+        self,
+        sim_object,
+        vis_config: Dict[str, Any],
+        goal_radius,
+        backend: str,
+        num_worlds: int,
     ):
         self.sim_object = sim_object
         self.vis_config = vis_config
@@ -38,6 +43,7 @@ class MatplotlibVisualizer:
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
+        self.num_worlds = num_worlds
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -55,6 +61,7 @@ class MatplotlibVisualizer:
         figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
         return_single_figure: bool = False,
+        plot_log_replay_trajectory: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -97,6 +104,14 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
+        if plot_log_replay_trajectory:
+            log_trajectory = LogTrajectory.from_tensor(
+                self.sim_object.expert_trajectory_tensor(),
+                self.num_worlds,
+                self.controlled_agents.shape[1],
+                backend=self.backend,
+            )
+
         figs = []  # Store all figures if returning multiple
 
         if return_single_figure:
@@ -114,9 +129,7 @@ class MatplotlibVisualizer:
             )
             axes = axes.flatten()
         else:
-            axes = [None] * len(
-                env_indices
-            )  # Placeholder for individual plotting
+            axes = [None] * len(env_indices)
 
         # Calculate scale factors based on figure size
         max_fig_size = max(figsize)
@@ -157,6 +170,15 @@ class MatplotlibVisualizer:
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
             )
+
+            if plot_log_replay_trajectory:
+                self._plot_log_replay_trajectory(
+                    ax=ax,
+                    control_mask=controlled_live,
+                    env_idx=env_idx,
+                    log_trajectory=log_trajectory,
+                    line_width_scale=line_width_scale,
+                )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -207,7 +229,7 @@ class MatplotlibVisualizer:
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
-            ax.set_xticks([])
+            # ax.set_xticks([])
             ax.set_yticks([])
 
         if return_single_figure:
@@ -217,6 +239,23 @@ class MatplotlibVisualizer:
             return fig
         else:
             return figs
+
+    def _plot_log_replay_trajectory(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        control_mask: torch.Tensor,
+        log_trajectory: LogTrajectory,
+        line_width_scale: int = 1.0,
+    ):
+        ax.scatter(
+            log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
+            log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+            color="lightgreen",
+            linewidth=0.35 * line_width_scale,
+            alpha=0.35,
+            zorder=0,
+        )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
@@ -579,7 +618,7 @@ class MatplotlibVisualizer:
                     env_idx, agent_idx, :, :
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
-                alpha=0.8,
+                alpha=0.9,
             )
 
         if observation_ego is not None:
