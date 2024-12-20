@@ -410,7 +410,7 @@ class PufferGPUDrive(PufferEnv):
             )
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
-                    img_from_fig(sim_state_figures[idx])
+                    sim_state_figures[idx]
                 )
 
     def render_agent_observations(self, env_idx):

@@ -37,8 +37,7 @@ class MatplotlibVisualizer:
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
-        self.num_envs = self.sim_object.num_envs
-        self.cache_static_map_elements()
+        self.num_envs = self.controlled_agents.shape[0]
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -47,22 +46,6 @@ class MatplotlibVisualizer:
             .squeeze(axis=2)
             .to(self.device)
         )
-        
-    def cache_static_map_elements(self):
-        
-        self.global_roadgraph = GlobalRoadGraphPoints.from_tensor(
-            roadgraph_tensor=self.sim_object.map_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
-        # for env_idx in range():
-        # self.cached_roadgraphs = self._plot_roadgraph(
-        #     road_graph=global_roadgraph,
-        #     env_idx=env_idx,
-        #     ax=ax,
-        #     line_width_scale=line_width_scale,
-        #     marker_size_scale=marker_scale,
-        # )
 
     def plot_simulator_state(
         self,
@@ -93,6 +76,12 @@ class MatplotlibVisualizer:
             )  # Default to None for all
 
         # Extract data for all environments
+        global_roadgraph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim_object.map_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
             backend=self.backend,
@@ -106,7 +95,7 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
-        figs = [] 
+        frames = [] 
        
         # Calculate scale factors based on figure size
         max_fig_size = max(figsize)
@@ -136,7 +125,7 @@ class MatplotlibVisualizer:
 
             # Draw the road graph
             self._plot_roadgraph(
-                road_graph=self.global_roadgraph,
+                road_graph=global_roadgraph,
                 env_idx=env_idx,
                 ax=ax,
                 line_width_scale=line_width_scale,
@@ -195,9 +184,10 @@ class MatplotlibVisualizer:
             ax.set_xticks([])
             ax.set_yticks([])
             
-            figs.append(fig)
+            frames.append(utils.img_from_fig(fig))
+            plt.close(fig)
 
-        return figs
+        return frames
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""

@@ -332,7 +332,7 @@ def plot_speed_bumps(
 )-> None:
     facecolor = 'xkcd:goldenrod'
     edgecolor = 'xkcd:black'
-    alpha = 1
+    alpha = 0.5
     for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
         # method1: from waymax using hatch as diagonals  
         points = get_corners_polygon(x, y, length, width, orientation)
@@ -348,31 +348,7 @@ def plot_speed_bumps(
         )
 
         ax.add_patch(p)
-
-        # # manual stripes method
-        # stripe_width = 1.05 # arbitrary width based on env0 visual look
-        # num_stripes = int(length//stripe_width)  # Adjust for thicker or thinner stripes
-            
-
-        # for i in range(num_stripes):
-        #     # Alternate colors for stripes
-        #     stripe_color = facecolor if i % 2 == 0 else edgecolor
-        #     print(length)
-        #     # Calculate stripe points
-        #     stripe_points = get_stripe_polygon(
-        #         x, y, length, stripe_width, orientation, i, num_stripes
-        #     )
-
-        #     stripe_polygon = Polygon(
-        #         stripe_points,
-        #         facecolor=stripe_color,
-        #         edgecolor=None, 
-        #         linewidth=0,
-        #         alpha=alpha,
-        #         zorder=2,
-        #     )
-        #     ax.add_patch(stripe_polygon)
-    
+        
     pass
 
 def plot_stop_sign(
