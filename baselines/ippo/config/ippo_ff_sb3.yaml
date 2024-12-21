@@ -11,6 +11,8 @@ collision_weight: 0.0
 goal_achieved_weight: 1.0
 off_road_weight: 0.0
 remove_non_vehicles: false
+polyline_reduction_threshold: 0.4
+observation_radius: 60.0
 
 resample_scenarios: false
 resample_criterion: "global_step"  # Options: "global_step"
@@ -19,8 +21,8 @@ resample_mode: "random"  # Options: "random"
 
 render: true
 render_mode: "rgb_array"
-render_freq: 50  # Render every k rollouts
-render_n_worlds: 10  # Number of scenarios to render
+render_freq: 100  # Render every k rollouts
+render_n_worlds: 1  # Number of scenarios to render
 
 track_time_to_solve: false
 
