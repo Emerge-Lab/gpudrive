@@ -68,13 +68,13 @@ class PufferGPUDrive(PufferEnv):
             for scene in sorted(os.listdir(self.data_dir))
             if scene.startswith("tfrecord")
         ]
-        
+
         resample_dataset_size = min(
             self.train_config.resample_dataset_size, len(dataset)
         )
-        
+
         self.dataset = dataset[:resample_dataset_size]
-        
+
         scene_config = SceneConfig(
             path=data_dir,
             num_scenes=self.num_worlds,
@@ -121,11 +121,11 @@ class PufferGPUDrive(PufferEnv):
         self.render_mode = "rgb_array"
 
         # Get the tfrecord file names for every environment
-        self.dataset = self.env.dataset
+        self.data_batch = self.env.dataset
         self.training_scenes_set = []
         self.env_to_files = {
             env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.dataset)
+            for env_idx, file_path in enumerate(self.data_batch)
         }
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -453,27 +453,23 @@ class PufferGPUDrive(PufferEnv):
 
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
-        if self.train_config.resample_mode == "random":
-            # Clear the batch
-            self.data_batch = []
 
-            # Sample batch 
-            if self.num_worlds <= len(self.dataset):
-                self.data_batch = random.sample(
-                    self.dataset, self.num_worlds
-                )
-            else:
-                # If we have more worlds than files, repeat the worlds until we have enough scenes
-                while len(self.dataset) < self.num_worlds:
-                    self.data_batch.extend(
-                        random.sample(self.unique_scene_paths, len(self.data_batch))
-                    )
-                    if len(self.dataset) > self.num_worlds:
-                        self.data_batch = self.data_batch[: self.num_worlds]
+        # Clear the batch
+        self.data_batch = []
+
+        # Sample batch
+        if self.num_worlds <= len(self.dataset):
+            self.data_batch = random.sample(self.dataset, self.num_worlds)
         else:
-            raise NotImplementedError(
-                f"Resample mode {self.train_config.resample_mode} is currently not supported."
-            )
+            # If we have more worlds than files, repeat the worlds until we have enough scenes
+            while len(self.dataset) < self.num_worlds:
+                self.data_batch.extend(
+                    random.sample(
+                        self.unique_scene_paths, len(self.data_batch)
+                    )
+                )
+                if len(self.dataset) > self.num_worlds:
+                    self.data_batch = self.data_batch[: self.num_worlds]
 
         # Re-initialize the simulator with the new dataset
         print(
@@ -488,7 +484,7 @@ class PufferGPUDrive(PufferEnv):
         self.agent_ids = np.arange(self.num_agents)
         print(f"Total controlled agents across worlds: {self.num_agents}")
 
-        self.reset() # Reset storage
+        self.reset()  # Reset storage
         # Get info from new worlds
         self.observations = self.env.reset()[self.controlled_agent_mask]
 
@@ -504,4 +500,3 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
-            
