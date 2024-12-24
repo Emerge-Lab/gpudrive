@@ -7,7 +7,12 @@ import gpudrive
 import imageio
 from itertools import product
 
-from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig, RenderMode
+from pygpudrive.env.config import (
+    EnvConfig,
+    RenderConfig,
+    SceneConfig,
+    RenderMode,
+)
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 from pygpudrive.datatypes.observation import (
@@ -524,16 +529,16 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
-        
+
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-        
+
         frames = env.vis.plot_simulator_state(
             env_indices=list(range(NUM_WORLDS)),
             zoom_radius=90,
             center_agent_indices=[0],
-            time_steps=4*[t],
+            time_steps=4 * [t],
             plot_agent_ids=True,
         )
 
