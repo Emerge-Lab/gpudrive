@@ -7,7 +7,7 @@ import gpudrive
 import imageio
 from itertools import product
 
-from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig, RenderMode
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
 from pygpudrive.datatypes.observation import (
@@ -65,12 +65,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.episode_len = self.config.episode_len
 
         # Rendering setup
-        self.vis = MatplotlibVisualizer(
-            sim_object=self.sim,
-            goal_radius=self.config.dist_to_goal_threshold,
-            render_config=self.render_config,
-            backend=self.backend,
-        )
+        if self.render_config.render_mode == RenderMode.MATPLOTLIB:
+            self.vis = MatplotlibVisualizer(
+                sim_object=self.sim,
+                goal_radius=self.config.dist_to_goal_threshold,
+                render_config=self.render_config,
+                backend=self.backend,
+            )
+        else:
+            raise ValueError(
+                f"Invalid render mode: {self.render_config.render_mode}"
+            )
 
     def reset(self):
         """Reset the worlds and return the initial observations."""
@@ -510,15 +515,6 @@ if __name__ == "__main__":
     # RUN
     obs = env.reset()
 
-    # Plot a bird's eye view of the environment
-    frames = env.vis.plot_simulator_state(
-        env_indices=list(range(4)),
-        zoom_radius=90,
-        # center_agent_indices=[1],
-        time_steps=4 * [0],
-        plot_agent_ids=True,
-    )
-
     frames = []
 
     expert_actions, _, _, _ = env.get_expert_actions()
@@ -528,12 +524,18 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
-
-        frames.append(env.render())
-
+        
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
+        
+        frames = env.vis.plot_simulator_state(
+            env_indices=list(range(NUM_WORLDS)),
+            zoom_radius=90,
+            center_agent_indices=[0],
+            time_steps=4*[t],
+            plot_agent_ids=True,
+        )
 
     # import imageio
     imageio.mimsave("world1.gif", np.array(frames))

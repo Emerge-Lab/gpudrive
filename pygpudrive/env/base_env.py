@@ -253,34 +253,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def render(self, world_render_idx=0, color_objects_by_actor=None):
-        """Renders the environment.
-
-        Args:
-            world_render_idx (int): Index of the world to render.
-
-        Returns:
-            Any: Rendered view of the world, or None if an invalid index is specified.
-        """
-        if world_render_idx >= self.num_worlds:
-            print(f"Invalid world_render_idx: {world_render_idx}")
-            return None
-        if self.render_config.render_mode in {
-            RenderMode.PYGAME_ABSOLUTE,
-            RenderMode.PYGAME_EGOCENTRIC,
-            RenderMode.PYGAME_LIDAR,
-        }:
-            return self.visualizer.getRender(
-                world_render_idx=world_render_idx,
-                cont_agent_mask=self.cont_agent_mask,
-                color_objects_by_actor=color_objects_by_actor,
-            )
-        elif self.render_config.render_mode in {
-            RenderMode.MADRONA_RGB,
-            RenderMode.MADRONA_DEPTH,
-        }:
-            return self.visualizer.getRender()
-
     def reinit_scenarios(self, dataset: List[str]):
         """Resample the scenes.
         Args:
