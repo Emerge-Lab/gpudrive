@@ -4,7 +4,7 @@ import numpy as np
 import math
 import gpudrive
 
-from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
+from pygpudrive.env.config import MadronaOption, RenderMode
 
 # AGENT COLORS
 PINK = (255, 105, 180)
@@ -34,17 +34,19 @@ class PyGameVisualizer:
         self.render_config = render_config
         self.WINDOW_W, self.WINDOW_H = render_config.resolution
         self.goal_radius = goal_radius
-        
+
         if self.render_config.color_scheme == "light":
             self.BACKGROUND_COLOR = WHITE
             self.vehicle_idx_color = CHARCOAL
         else:
             self.BACKGROUND_COLOR = CHARCOAL
             self.vehicle_idx_color = WHITE
-        
+
         # ROAD MAP COLORS
         self.color_dict = {
-            float(gpudrive.EntityType.RoadEdge): (68, 193, 123) if self.render_config.color_scheme == "dark" else (47,79,79),
+            float(gpudrive.EntityType.RoadEdge): (68, 193, 123)
+            if self.render_config.color_scheme == "dark"
+            else (47, 79, 79),
             float(gpudrive.EntityType.RoadLine): (255, 245, 99),  # Yellow
             float(gpudrive.EntityType.RoadLane): (225, 225, 225),  # Grey
             float(gpudrive.EntityType.SpeedBump): (138, 43, 226),  # Purple
@@ -280,7 +282,9 @@ class PyGameVisualizer:
         """Draw static map elements."""
         for idx, map_obj in enumerate(map_info):
 
-            if map_obj[6] == float(gpudrive.EntityType.Padding) or map_obj[6] == float(gpudrive.EntityType._None):
+            if map_obj[6] == float(gpudrive.EntityType.Padding) or map_obj[
+                6
+            ] == float(gpudrive.EntityType._None):
                 continue
 
             elif map_obj[6] <= float(gpudrive.EntityType.RoadLane):
@@ -387,17 +391,17 @@ class PyGameVisualizer:
         lidar_pos = lidar_data[:, 2:4]
 
         for i in range(numLidarSamples):
-            if(lidar_entity_types[i] == float(gpudrive.EntityType._None)):
+            if lidar_entity_types[i] == float(gpudrive.EntityType._None):
                 continue
             coords = lidar_pos[i]
             scaled_coords = self.scale_coords(coords, world_render_idx)
-           
+
             pygame.gfxdraw.aacircle(
                 surf,
                 int(scaled_coords[0]),
                 int(scaled_coords[1]),
                 2,
-                self.color_dict[lidar_entity_types[i]]
+                self.color_dict[lidar_entity_types[i]],
             )
 
             pygame.gfxdraw.filled_circle(
@@ -405,7 +409,7 @@ class PyGameVisualizer:
                 int(scaled_coords[0]),
                 int(scaled_coords[1]),
                 2,
-                self.color_dict[lidar_entity_types[i]]
+                self.color_dict[lidar_entity_types[i]],
             )
 
     def draw(
@@ -629,7 +633,9 @@ class PyGameVisualizer:
                     )
                     font = pygame.font.Font(None, scaled_font_size)
                     text = font.render(
-                        str(valid_agent_indices.pop(0)), True, self.vehicle_idx_color
+                        str(valid_agent_indices.pop(0)),
+                        True,
+                        self.vehicle_idx_color,
                     )
                     text_rect = text.get_rect(
                         center=(
@@ -666,7 +672,9 @@ class PyGameVisualizer:
 
             # Loop through each agent to render their egocentric view
             for agent_idx in range(num_agents):
-                info_tensor = self.sim.info_tensor().to_torch()[world_render_idx]
+                info_tensor = self.sim.info_tensor().to_torch()[
+                    world_render_idx
+                ]
                 if info_tensor[agent_idx, -1] == float(
                     gpudrive.EntityType.Padding
                 ) or info_tensor[agent_idx, -1] == float(
@@ -690,12 +698,14 @@ class PyGameVisualizer:
 
                 lidar_data = (
                     self.sim.lidar_tensor()
-                    .to_torch()[world_render_idx, agent_idx, :, :, :] # shape is (num_worlds, num_agents, num_planes, num_samples, 2)
+                    .to_torch()[
+                        world_render_idx, agent_idx, :, :, :
+                    ]  # shape is (num_worlds, num_agents, num_planes, num_samples, 2)
                     .cpu()
                     .detach()
                     .numpy()
                 )
-                
+
                 for lidar_plane in lidar_data:
                     self.plotLidar(temp_surf, lidar_plane, world_render_idx)
 

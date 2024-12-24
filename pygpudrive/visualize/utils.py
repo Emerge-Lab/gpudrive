@@ -67,18 +67,20 @@ def plot_numpy_bounding_boxes(
     line_width_scale: float = 1.5,
     as_center_pts: bool = False,
     label: Optional[str] = None,
+    plot_agent_ids: bool = False,
+    agent_ids: Optional[List[int]] = None,
+    agent_ids_offset=0.35,
 ) -> None:
     """Plots multiple bounding boxes.
 
     Args:
-      ax: Fig handles.
-      bboxes: Shape (num_bbox, 5), with last dimension as (x, y, length, width,
-        yaw).
-      color: Shape (3,), represents RGB color for drawing.
-      alpha: Alpha value for drawing, i.e. 0 means fully transparent.
-      as_center_pts: If set to True, bboxes will be drawn as center points,
+        ax: Fig handles.
+        bboxes: Shape (num_bbox, 5), with last dimension as (x, y, length, width, yaw).
+        color: Shape (3,), represents RGB color for drawing.
+        alpha: Alpha value for drawing, i.e. 0 means fully transparent.
+        as_center_pts: If set to True, bboxes will be drawn as center points,
         instead of full bboxes.
-      label: String, represents the meaning of the color for different boxes.
+        plot_agent_ids: If set to True, agent ids will be plotted on the bounding boxes.
     """
     if bboxes.ndim != 2 or bboxes.shape[1] != 5:
         raise ValueError(
@@ -97,7 +99,6 @@ def plot_numpy_bounding_boxes(
             ms=2,
             alpha=alpha,
             linewidth=1.7 * line_width_scale,
-            label=label,
         )
     else:
         c = np.cos(bboxes[:, 4])
@@ -139,6 +140,32 @@ def plot_numpy_bounding_boxes(
             linewidth=1.5 * line_width_scale,
             label=label,
         )
+
+        if plot_agent_ids and agent_ids is not None:
+            # Compute cos and sin for yaw
+            c = np.cos(bboxes[:, 4])
+            s = np.sin(bboxes[:, 4])
+
+            # Compute the top-right corner coordinates
+            length, width = bboxes[:, 2], bboxes[:, 3]
+            top_right_x = bboxes[:, 0] + (length / 2) * c + (width / 2) * s
+            top_right_y = bboxes[:, 1] + (length / 2) * s - (width / 2) * c
+
+            # Add offsets for text placement
+            text_x = top_right_x + agent_ids_offset
+            text_y = top_right_y + agent_ids_offset
+
+            # Plot all agent IDs at computed positions
+            for x, y, agent_id in zip(text_x, text_y, agent_ids):
+                ax.text(
+                    x,
+                    y,
+                    str(int(agent_id)),
+                    color="k",  # Text color
+                    fontsize=15 * line_width_scale,  # Font size
+                    zorder=5,
+                    alpha=alpha,
+                )
 
 
 def plot_bounding_box(
@@ -257,6 +284,7 @@ def plot_bounding_box(
             label=label,
         )
 
+
 def get_corners_polygon(x, y, length, width, orientation):
     """Calculate the four corners of a speed bump (can be any) polygon."""
     # Compute the direction vectors based on orientation
@@ -270,13 +298,14 @@ def get_corners_polygon(x, y, length, width, orientation):
     pt = np.array([x, y])
 
     # corners
-    tl = pt + (length / 2) * u - (width / 2) * ut  
-    tr = pt + (length / 2) * u + (width / 2) * ut  
-    br = pt - (length / 2) * u + (width / 2) * ut  
-    bl = pt - (length / 2) * u - (width / 2) * ut  
+    tl = pt + (length / 2) * u - (width / 2) * ut
+    tr = pt + (length / 2) * u + (width / 2) * ut
+    br = pt - (length / 2) * u + (width / 2) * ut
+    bl = pt - (length / 2) * u - (width / 2) * ut
 
     # print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
     return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
+
 
 def get_stripe_polygon(
     x: float,
@@ -287,9 +316,9 @@ def get_stripe_polygon(
     index: int,
     num_stripes: int,
 ) -> np.ndarray:
-    
+
     """Calculate the corners of a stripe within the speed bump polygon."""
-    
+
     # print(length)
     # Compute the direction vectors
     c = np.cos(orientation)
@@ -313,11 +342,12 @@ def get_stripe_polygon(
     stripe_corners = [
         center + u * offset_start + ut * half_width,  # Top-left
         center + u * offset_start - ut * half_width,  # Bottom-left
-        center + u * offset_end - ut * half_width,    # Bottom-right
-        center + u * offset_end + ut * half_width,    # Top-right
+        center + u * offset_end - ut * half_width,  # Bottom-right
+        center + u * offset_end + ut * half_width,  # Top-right
     ]
 
     return np.array(stripe_corners)
+
 
 def plot_speed_bumps(
     x_coords: Union[float, np.ndarray],
@@ -329,12 +359,18 @@ def plot_speed_bumps(
     facecolor: str = None,
     edgecolor: str = None,
     alpha: float = None,
-)-> None:
-    facecolor = 'xkcd:goldenrod'
-    edgecolor = 'xkcd:black'
+) -> None:
+    facecolor = "xkcd:goldenrod"
+    edgecolor = "xkcd:black"
     alpha = 0.5
-    for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
-        # method1: from waymax using hatch as diagonals  
+    for x, y, length, width, orientation in zip(
+        x_coords,
+        y_coords,
+        segment_lengths,
+        segment_widths,
+        segment_orientations,
+    ):
+        # method1: from waymax using hatch as diagonals
         points = get_corners_polygon(x, y, length, width, orientation)
 
         p = Polygon(
@@ -343,13 +379,14 @@ def plot_speed_bumps(
             edgecolor=edgecolor,
             linewidth=0,
             alpha=alpha,
-            hatch=r'//',
+            hatch=r"//",
             zorder=2,
         )
 
         ax.add_patch(p)
-        
+
     pass
+
 
 def plot_stop_sign(
     point: np.ndarray,
@@ -381,6 +418,7 @@ def plot_stop_sign(
     )
     ax.add_patch(p)
 
+
 def plot_crosswalk(
     points,
     ax: plt.Axes = None,
@@ -391,9 +429,13 @@ def plot_crosswalk(
     if ax is None:
         ax = plt.gca()
     # override default config
-    facecolor = crosswalk_config['facecolor'] if facecolor is None else facecolor
-    edgecolor = crosswalk_config['edgecolor'] if edgecolor is None else edgecolor
-    alpha = crosswalk_config['alpha'] if alpha is None else alpha
+    facecolor = (
+        crosswalk_config["facecolor"] if facecolor is None else facecolor
+    )
+    edgecolor = (
+        crosswalk_config["edgecolor"] if edgecolor is None else edgecolor
+    )
+    alpha = crosswalk_config["alpha"] if alpha is None else alpha
 
     p = Polygon(
         points,
@@ -401,7 +443,7 @@ def plot_crosswalk(
         edgecolor=edgecolor,
         linewidth=2,
         alpha=alpha,
-        hatch=r'//',
+        hatch=r"//",
         zorder=2,
     )
 

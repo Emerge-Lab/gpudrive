@@ -29,14 +29,18 @@ OUT_OF_BOUNDS = 1000
 
 class MatplotlibVisualizer:
     def __init__(
-        self, sim_object, render_config: Dict[str, Any], goal_radius, backend: str
+        self,
+        sim_object,
+        render_config: Dict[str, Any],
+        goal_radius,
+        backend: str,
     ):
         self.sim_object = sim_object
         self.render_config = render_config
         self.backend = backend
         self.device = "cpu"
-        self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
+        self.controlled_agents = self.get_controlled_agents_mask()
         self.num_envs = self.controlled_agents.shape[0]
 
     def get_controlled_agents_mask(self):
@@ -54,16 +58,20 @@ class MatplotlibVisualizer:
         center_agent_indices: Optional[List[int]] = None,
         figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
+        plot_agent_ids: bool = False,
     ):
         """
-        Plot simulator states for one or multiple environments.
+        Plot a birds' eye view of the simulator state for one or multiple environments.
 
         Args:
-            env_indices: List of environment indices to plot.
-            time_steps: Optional list of time steps corresponding to each environment.
-            center_agent_indices: Optional list of center agent indices for zooming.
-            figsize: Tuple for figure size of each subplot.
-            zoom_radius: Radius for zooming in around the center agent.
+            env_indices (list of int): List of environment indices to plot.
+            time_steps (list of int, optional): List of time steps corresponding to each environment. Defaults to None.
+            center_agent_indices (list of int, optional): List of center agent indices for zooming. Defaults to None.
+            figsize (tuple of int, int): Tuple specifying the figure size of each subplot.
+            zoom_radius (float): Radius for zooming in around the center agent.
+
+        Returns:
+            matplotlib.figure.Figure: The figure object containing the plots.
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -81,7 +89,7 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
-        
+
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
             backend=self.backend,
@@ -95,8 +103,8 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
-        frames = [] 
-       
+        frames = []
+
         # Calculate scale factors based on figure size
         max_fig_size = max(figsize)
         marker_scale = max_fig_size / 15  # Adjust this factor as needed
@@ -106,7 +114,7 @@ class MatplotlibVisualizer:
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
-            
+
             fig, ax = plt.subplots(figsize=figsize)
             ax.clear()
             ax.set_aspect("equal", adjustable="box")
@@ -144,6 +152,7 @@ class MatplotlibVisualizer:
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
+                plot_agent_ids=plot_agent_ids,
             )
 
             # Plot rollout statistics
@@ -183,7 +192,7 @@ class MatplotlibVisualizer:
 
             ax.set_xticks([])
             ax.set_yticks([])
-            
+
             frames.append(utils.img_from_fig(fig))
             plt.close(fig)
 
@@ -195,7 +204,7 @@ class MatplotlibVisualizer:
         start = center - np.array([length * np.cos(yaw), length * np.sin(yaw)])
         end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
-    
+
     def _get_corners_polygon(self, x, y, length, width, orientation):
         """Calculate the four corners of a speed bump (can be any) polygon."""
         # Compute the direction vectors based on orientation
@@ -209,12 +218,11 @@ class MatplotlibVisualizer:
         pt = np.array([x, y])
 
         # corners
-        tl = pt + (length / 2) * u - (width / 2) * ut  
-        tr = pt + (length / 2) * u + (width / 2) * ut  
-        br = pt - (length / 2) * u + (width / 2) * ut  
-        bl = pt - (length / 2) * u - (width / 2) * ut  
+        tl = pt + (length / 2) * u - (width / 2) * ut
+        tr = pt + (length / 2) * u + (width / 2) * ut
+        br = pt - (length / 2) * u + (width / 2) * ut
+        bl = pt - (length / 2) * u - (width / 2) * ut
 
-        # print([tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()])
         return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
 
     def _plot_roadgraph(
@@ -241,7 +249,6 @@ class MatplotlibVisualizer:
                     or road_point_type == int(gpudrive.EntityType.SpeedBump)
                     or road_point_type == int(gpudrive.EntityType.StopSign)
                     or road_point_type == int(gpudrive.EntityType.CrossWalk)
-
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -249,58 +256,75 @@ class MatplotlibVisualizer:
                     segment_lengths = road_graph.segment_length[
                         env_idx, road_mask
                     ].tolist()
-                    segment_widths = road_graph.segment_width[env_idx, road_mask].tolist()
+                    segment_widths = road_graph.segment_width[
+                        env_idx, road_mask
+                    ].tolist()
                     segment_orientations = road_graph.orientation[
                         env_idx, road_mask
                     ].tolist()
 
-                    if(
+                    if (
                         road_point_type == int(gpudrive.EntityType.RoadEdge)
                         or road_point_type == int(gpudrive.EntityType.RoadLine)
                         or road_point_type == int(gpudrive.EntityType.RoadLane)
                     ):
                         # Compute and draw road edges using start and end points
-                        for x, y, length, orientation in zip(x_coords, y_coords, segment_lengths, segment_orientations):
-                            start, end = self._get_endpoints(x, y, length, orientation)
+                        for x, y, length, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_orientations,
+                        ):
+                            start, end = self._get_endpoints(
+                                x, y, length, orientation
+                            )
 
                             # Plot the road edge as a line
                             ax.plot(
                                 [start[0], end[0]],
                                 [start[1], end[1]],
                                 color=ROAD_GRAPH_COLORS[road_point_type],
-                                linewidth=0.75
+                                linewidth=0.75,
                             )
-                    
-                    elif (road_point_type == int(gpudrive.EntityType.SpeedBump)):
+
+                    elif road_point_type == int(gpudrive.EntityType.SpeedBump):
                         utils.plot_speed_bumps(
-                            x_coords, 
-                            y_coords, 
-                            segment_lengths, 
-                            segment_widths, 
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
                             segment_orientations,
-                            ax
-                        )  
-                
-                    elif (road_point_type == int(gpudrive.EntityType.StopSign)):
+                            ax,
+                        )
+
+                    elif road_point_type == int(gpudrive.EntityType.StopSign):
                         for x, y in zip(x_coords, y_coords):
                             point = np.array([x, y])
                             utils.plot_stop_sign(
                                 point=point,
                                 ax=ax,
-                                radius=1.5,        
-                                facecolor='xkcd:red',      
-                                edgecolor="none",    
-                                linewidth=3.0,        
-                                alpha=1.0,            
+                                radius=1.5,
+                                facecolor="xkcd:red",
+                                edgecolor="none",
+                                linewidth=3.0,
+                                alpha=1.0,
                             )
-                    elif (road_point_type == int(gpudrive.EntityType.CrossWalk)):
-                        for x, y, length, width, orientation in zip(x_coords, y_coords, segment_lengths, segment_widths, segment_orientations):
-                            points = self._get_corners_polygon(x, y, length, width, orientation)
+                    elif road_point_type == int(gpudrive.EntityType.CrossWalk):
+                        for x, y, length, width, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
+                            segment_orientations,
+                        ):
+                            points = self._get_corners_polygon(
+                                x, y, length, width, orientation
+                            )
                             utils.plot_crosswalk(
                                 points=points,
                                 ax=ax,
                                 facecolor="none",
-                                edgecolor='xkcd:bluish grey',
+                                edgecolor="xkcd:bluish grey",
                                 alpha=0.4,
                             )
 
@@ -329,6 +353,7 @@ class MatplotlibVisualizer:
         plot_goal_points: bool = True,
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
+        plot_agent_ids: bool = False,
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -353,38 +378,40 @@ class MatplotlibVisualizer:
             ),
             axis=1,
         )
-
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_controlled_offroad,
-            color=AGENT_COLOR_BY_STATE["off_road"],
-            alpha=alpha,
-            line_width_scale=line_width_scale,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
-
-        if plot_goal_points:
-            goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
-            goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
-            ax.scatter(
-                goal_x,
-                goal_y,
-                s=5 * marker_size_scale,
-                linewidth=1.5 * line_width_scale,
-                c=AGENT_COLOR_BY_STATE["off_road"],
-                marker="x",
+        if len(bboxes_controlled_offroad) > 0:
+            utils.plot_numpy_bounding_boxes(
+                ax=ax,
+                bboxes=bboxes_controlled_offroad,
+                color=AGENT_COLOR_BY_STATE["off_road"],
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+                plot_agent_ids=plot_agent_ids,
+                agent_ids=agent_states.id[env_idx, is_offroad_mask].numpy(),
             )
 
-            for x, y in zip(goal_x, goal_y):
-                circle = Circle(
-                    (x, y),
-                    radius=self.goal_radius,
-                    color=AGENT_COLOR_BY_STATE["off_road"],
-                    fill=False,
-                    linestyle="--",
+            if plot_goal_points:
+                goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
+                goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
+                ax.scatter(
+                    goal_x,
+                    goal_y,
+                    s=5 * marker_size_scale,
+                    linewidth=1.5 * line_width_scale,
+                    c=AGENT_COLOR_BY_STATE["off_road"],
+                    marker="x",
                 )
-                ax.add_patch(circle)
+
+                for x, y in zip(goal_x, goal_y):
+                    circle = Circle(
+                        (x, y),
+                        radius=self.goal_radius,
+                        color=AGENT_COLOR_BY_STATE["off_road"],
+                        fill=False,
+                        linestyle="--",
+                    )
+                    ax.add_patch(circle)
 
         # Collided agents
         bboxes_controlled_collided = np.stack(
@@ -397,38 +424,40 @@ class MatplotlibVisualizer:
             ),
             axis=1,
         )
-
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_controlled_collided,
-            color=AGENT_COLOR_BY_STATE["collided"],
-            alpha=alpha,
-            line_width_scale=line_width_scale,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
-
-        if plot_goal_points:
-            goal_x = agent_states.goal_x[env_idx, is_collided_mask].numpy()
-            goal_y = agent_states.goal_y[env_idx, is_collided_mask].numpy()
-            ax.scatter(
-                goal_x,
-                goal_y,
-                s=5 * marker_size_scale,
-                c=AGENT_COLOR_BY_STATE["collided"],
-                linewidth=1.5 * line_width_scale,
-                marker="x",
+        if len(bboxes_controlled_collided) > 0:
+            utils.plot_numpy_bounding_boxes(
+                ax=ax,
+                bboxes=bboxes_controlled_collided,
+                color=AGENT_COLOR_BY_STATE["collided"],
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+                plot_agent_ids=plot_agent_ids,
+                agent_ids=agent_states.id[env_idx, is_collided_mask].numpy(),
             )
 
-            for x, y in zip(goal_x, goal_y):
-                circle = Circle(
-                    (x, y),
-                    radius=self.goal_radius,
-                    color=AGENT_COLOR_BY_STATE["collided"],
-                    fill=False,
-                    linestyle="--",
+            if plot_goal_points:
+                goal_x = agent_states.goal_x[env_idx, is_collided_mask].numpy()
+                goal_y = agent_states.goal_y[env_idx, is_collided_mask].numpy()
+                ax.scatter(
+                    goal_x,
+                    goal_y,
+                    s=5 * marker_size_scale,
+                    c=AGENT_COLOR_BY_STATE["collided"],
+                    linewidth=1.5 * line_width_scale,
+                    marker="x",
                 )
-                ax.add_patch(circle)
+
+                for x, y in zip(goal_x, goal_y):
+                    circle = Circle(
+                        (x, y),
+                        radius=self.goal_radius,
+                        color=AGENT_COLOR_BY_STATE["collided"],
+                        fill=False,
+                        linestyle="--",
+                    )
+                    ax.add_patch(circle)
 
         # Living agents
         bboxes_controlled_ok = np.stack(
@@ -442,37 +471,40 @@ class MatplotlibVisualizer:
             axis=1,
         )
 
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_controlled_ok,
-            color=AGENT_COLOR_BY_STATE["ok"],
-            alpha=alpha,
-            line_width_scale=line_width_scale,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
-
-        if plot_goal_points:
-            goal_x = agent_states.goal_x[env_idx, is_ok_mask].numpy()
-            goal_y = agent_states.goal_y[env_idx, is_ok_mask].numpy()
-            ax.scatter(
-                goal_x,
-                goal_y,
-                s=5 * marker_size_scale,
-                linewidth=1.5 * line_width_scale,
-                c=AGENT_COLOR_BY_STATE["ok"],
-                marker="x",
+        if len(bboxes_controlled_ok) > 0:
+            utils.plot_numpy_bounding_boxes(
+                ax=ax,
+                bboxes=bboxes_controlled_ok,
+                color=AGENT_COLOR_BY_STATE["ok"],
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+                plot_agent_ids=plot_agent_ids,
+                agent_ids=agent_states.id[env_idx, is_ok_mask].numpy(),
             )
 
-            for x, y in zip(goal_x, goal_y):
-                circle = Circle(
-                    (x, y),
-                    radius=self.goal_radius,
-                    color=AGENT_COLOR_BY_STATE["ok"],
-                    fill=False,
-                    linestyle="--",
+            if plot_goal_points:
+                goal_x = agent_states.goal_x[env_idx, is_ok_mask].numpy()
+                goal_y = agent_states.goal_y[env_idx, is_ok_mask].numpy()
+                ax.scatter(
+                    goal_x,
+                    goal_y,
+                    s=5 * marker_size_scale,
+                    linewidth=1.5 * line_width_scale,
+                    c=AGENT_COLOR_BY_STATE["ok"],
+                    marker="x",
                 )
-                ax.add_patch(circle)
+
+                for x, y in zip(goal_x, goal_y):
+                    circle = Circle(
+                        (x, y),
+                        radius=self.goal_radius,
+                        color=AGENT_COLOR_BY_STATE["ok"],
+                        fill=False,
+                        linestyle="--",
+                    )
+                    ax.add_patch(circle)
 
         # Plot human_replay agents (those that are static or expert-controlled)
         log_replay = (
@@ -503,15 +535,16 @@ class MatplotlibVisualizer:
         )
 
         # Plot static bounding boxes
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_static,
-            color=AGENT_COLOR_BY_STATE["log_replay"],
-            alpha=alpha,
-            line_width_scale=line_width_scale,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
+        if len(bboxes_static) > 0:
+            utils.plot_numpy_bounding_boxes(
+                ax=ax,
+                bboxes=bboxes_static,
+                color=AGENT_COLOR_BY_STATE["log_replay"],
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+            )
 
     def plot_agent_observation(
         self,
@@ -523,6 +556,7 @@ class MatplotlibVisualizer:
         x_lim: Tuple[float, float] = (-100, 100),
         y_lim: Tuple[float, float] = (-100, 100),
         figsize: Tuple[int, int] = (10, 10),
+        plot_agent_ids: bool = True,
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
         Args:
@@ -553,13 +587,8 @@ class MatplotlibVisualizer:
         if observation_ego.id[env_idx, agent_idx] == -1:
             return None, None
 
-        # fig, ax = plt.subplots(figsize=figsize)
-        viz_config = (
-            utils.VizConfig()
-            if viz_config is None
-            else utils.VizConfig(**viz_config)
-        )
-        fig, ax = utils.init_fig_ax(viz_config)
+        fig, ax = plt.subplots(figsize=figsize)
+
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
         ax.set_title(f"obs agent: {agent_idx}")
@@ -654,13 +683,6 @@ class MatplotlibVisualizer:
                 color=REL_OBS_OBJ_COLORS["ego_goal"],
             )[0]
 
-        # fig.legend(
-        #     loc="upper center",
-        #     bbox_to_anchor=(0.5, 0.1),
-        #     ncol=5,
-        #     fontsize=10,
-        #     title="Elements",
-        # )
         ax.set_xlim(x_lim)
         ax.set_ylim(y_lim)
         ax.set_xticks([])

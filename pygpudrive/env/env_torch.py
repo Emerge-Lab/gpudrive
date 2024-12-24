@@ -26,13 +26,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def __init__(
         self,
-        config,
-        scene_config,
         max_cont_agents,
-        device="cuda",
-        action_type="discrete",
+        scene_config,
+        config=EnvConfig(),
         render_config: RenderConfig = RenderConfig(),
+        action_type="discrete",
         backend="torch",
+        device="cuda",
     ):
         # Initialization of environment configurations
         self.config = config
@@ -497,7 +497,6 @@ if __name__ == "__main__":
     NUM_WORLDS = 1
 
     env_config = EnvConfig(dynamics_model="delta_local")
-    render_config = RenderConfig()
     scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
 
     # MAKE ENV
@@ -506,11 +505,20 @@ if __name__ == "__main__":
         scene_config=scene_config,
         max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
         device="cpu",
-        render_config=render_config,
     )
 
     # RUN
     obs = env.reset()
+
+    # Plot a bird's eye view of the environment
+    frames = env.vis.plot_simulator_state(
+        env_indices=list(range(4)),
+        zoom_radius=90,
+        # center_agent_indices=[1],
+        time_steps=4 * [0],
+        plot_agent_ids=True,
+    )
+
     frames = []
 
     expert_actions, _, _, _ = env.get_expert_actions()

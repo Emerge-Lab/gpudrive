@@ -113,9 +113,9 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-
-    #Param to init all objects:
+    # Param to init all objects:
     init_all_objects: bool = False
+
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
@@ -150,18 +150,9 @@ class SceneConfig:
 class RenderMode(Enum):
     """Enum for specifying rendering mode."""
 
-    PYGAME_ABSOLUTE = "pygame_absolute"
-    PYGAME_EGOCENTRIC = "pygame_egocentric"
-    PYGAME_LIDAR = "pygame_lidar"
+    MATPLOTLIB = "matplotlib"
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
-
-
-class PygameOption(Enum):
-    """Enum for Pygame rendering options."""
-
-    HUMAN = "human"
-    RGB = "rgb"
 
 
 class MadronaOption(Enum):
@@ -176,28 +167,13 @@ class RenderConfig:
     """Configuration settings for rendering the environment.
 
     Attributes:
-        render_mode (RenderMode): The mode used for rendering the environment.
-        view_option (Enum): Rendering view option (e.g., RGB, human view).
+        render_mode (RenderMode): The mode used for rendering the environment. Default is MATPLOTLIB.
+        view_option (MadronaOption): Rendering view option used for the Madrona viewer (e.g., agent or top-down view).
         resolution (Tuple[int, int]): Resolution of the rendered image.
-        line_thickness (int): Thickness of the road lines in the rendering.
-        draw_obj_idx (bool): Whether to draw object indices on objects.
         obj_idx_font_size (int): Font size for object indices.
-        color_scheme (str): Color mode for the rendering ("light" or "dark").
     """
 
-    render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
-    view_option: Enum = PygameOption.RGB
+    render_mode: RenderMode = RenderMode.MATPLOTLIB
+    view_option: MadronaOption = None
     resolution: Tuple[int, int] = (1024, 1024)
-    line_thickness: int = 0.7
-    draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
-    color_scheme: str = "light"
-
-    def __str__(self) -> str:
-        """Returns a string representation of the rendering configuration."""
-        return (
-            f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
-            f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
-            f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
-            f"ColorScheme: {self.color_scheme}"
-        )
