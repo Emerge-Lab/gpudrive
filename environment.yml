@@ -63,3 +63,6 @@ dependencies:
       - virtualenv==20.25.1
       - zipp==3.18.1
       - huggingface_hub==0.26.5
+      - wandb==0.19.1
+      - python-box==7.3.0
+      - python-dotenv==1.0.1
