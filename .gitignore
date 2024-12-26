@@ -238,4 +238,10 @@ pyrightconfig.json
 
 *~
 
+
+# Environment variables
+# To be manually created using .env.template
+.env 
+
+
 # End of https://www.toptal.com/developers/gitignore/api/python,c++

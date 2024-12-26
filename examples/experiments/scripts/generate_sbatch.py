@@ -15,6 +15,9 @@ load_dotenv()
 LOG_FOLDER = os.getenv('LOG_FOLDER')
 HPC_ACCOUNT = os.getenv('NYU_HPC_ACCOUNT')
 USERNAME = os.getenv('USERNAME')
+SINGULARITY_IMAGE = os.getenv('SINGULARITY_IMAGE')
+OVERLAY_FILE = os.getenv('OVERLAY_FILE')
+RUN_FILE = 'baselines/ippo/ippo_pufferlib.py'
 
 # Default SLURM fields
 DEFAULT_SLURM_FIELDS = {
@@ -30,6 +33,9 @@ DEFAULT_SLURM_FIELDS = {
     'error': f'{LOG_FOLDER}error_%A_%a.txt',
     'account': HPC_ACCOUNT,
     'username': USERNAME,
+    'singularity_image': SINGULARITY_IMAGE,
+    'overlay_file': OVERLAY_FILE,
+    'run_file': RUN_FILE
 }
 
 # a template for the entire submit script
@@ -50,8 +56,8 @@ TEMPLATE_SBATCH = '''
 #SBATCH --gres=gpu:{num_gpus}
 #SBATCH --account={account}
 
-SINGULARITY_IMAGE=/scratch/work/public/singularity/cuda12.2.2-cudnn8.9.4-devel-ubuntu22.04.3.sif
-OVERLAY_FILE=/scratch/{username}/images/gpudrive/overlay-50G-10M.ext3
+SINGULARITY_IMAGE={singularity_image}
+OVERLAY_FILE=/scratch/{username}/{overlay_file}
 
 singularity exec --nv --overlay "${{OVERLAY_FILE}}:ro" \
     "${{SINGULARITY_IMAGE}}" \
@@ -70,7 +76,7 @@ source /share/apps/anaconda3/2020.07/etc/profile.d/conda.sh
 # Activate conda environment
 conda activate /scratch/{username}/.conda/gpudrive
 # Run PPO 
-python baselines/ippo/ippo_pufferlib.py {param_cli_list}
+python {run_file} {param_cli_list}
 '''
 
 def _mth(exp):
@@ -203,7 +209,7 @@ def get_scripts(fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_or
     return TEMPLATE_SBATCH.format(**subs), TEMPLATE_BASH.format(**subs)
 
 
-def save_scripts(sbatch_filename, bash_filename, file_path, run_script, fields, params, param_order=None):
+def save_scripts(sbatch_filename, bash_filename, file_path, fields, params, param_order=None):
     '''
     creates and writes to file a SLURM submission script using the passed
     fields and which creates an array of jobs which sweep the given params
@@ -221,7 +227,7 @@ def save_scripts(sbatch_filename, bash_filename, file_path, run_script, fields, 
     '''
     
     # Create scripts
-    sbatch_script, bash_script = get_scripts(fields, params, param_order, run_script)
+    sbatch_script, bash_script = get_scripts(fields, params, param_order)
 
     if not file_path:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -253,8 +259,7 @@ if __name__ == '__main__':
     save_scripts(
         sbatch_filename=f"sbatch_{SWEEP_NAME}.sh",
         bash_filename="bash_exec.sh",
-        file_path="examples/experiments/scripts/run_scripts/",
-        run_script="baselines/ippo/ippo_pufferlib.py",
+        file_path="examples/experiments/scripts/sbatch_scripts/",
         fields=fields,
         params=params,
     )
