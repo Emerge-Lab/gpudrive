@@ -1,6 +1,6 @@
 '''
-A script for generating sbatch submission scripts which sweep parameters based 
-on https://github.com/TysonRayJones/PythonTools/tree/master
+A script for generating sbatch array submission scripts.
+Based on https://github.com/TysonRayJones/PythonTools/tree/master
 '''
 import numpy as np
 import os
@@ -17,6 +17,8 @@ HPC_ACCOUNT = os.getenv('NYU_HPC_ACCOUNT')
 USERNAME = os.getenv('USERNAME')
 SINGULARITY_IMAGE = os.getenv('SINGULARITY_IMAGE')
 OVERLAY_FILE = os.getenv('OVERLAY_FILE')
+
+# Set to python file to run
 RUN_FILE = 'baselines/ippo/ippo_pufferlib.py'
 
 # Default SLURM fields
@@ -38,7 +40,7 @@ DEFAULT_SLURM_FIELDS = {
     'run_file': RUN_FILE
 }
 
-# a template for the entire submit script
+# a template for the submit script
 # (bash braces must be escaped by doubling: $var = ${{var}})
 # num_jobs, param_arr_init, param_val_assign and param_list are special fields
 
@@ -61,11 +63,10 @@ OVERLAY_FILE=/scratch/{username}/{overlay_file}
 
 singularity exec --nv --overlay "${{OVERLAY_FILE}}:ro" \
     "${{SINGULARITY_IMAGE}}" \
-    /bin/bash examples/experiments/scripts/run_scripts/bash_exec.sh "${{SLURM_ARRAY_TASK_ID}}"
+    /bin/bash examples/experiments/scripts/sbatch_scripts/bash_exec.sh "${{SLURM_ARRAY_TASK_ID}}"
+    
 echo "Successfully launched image."
-'''.strip()
 
-TEMPLATE_BASH = '''
 {param_arr_init}
 
 trial=${{SLURM_ARRAY_TASK_ID}}
@@ -73,11 +74,13 @@ trial=${{SLURM_ARRAY_TASK_ID}}
 
 # Source the Conda setup script to make the `conda` command available
 source /share/apps/anaconda3/2020.07/etc/profile.d/conda.sh
+
 # Activate conda environment
 conda activate /scratch/{username}/.conda/gpudrive
+
 # Run PPO 
 python {run_file} {param_cli_list}
-'''
+'''.strip()
 
 def _mth(exp):
     return '$(( %s ))' % exp
@@ -121,16 +124,7 @@ def _to_bash(obj):
 
 
 def _get_params_bash(params, values):
-    # builds bash code to perform the equivalent of
-    '''
-    def get_inds(params, ind):
-        inds = []
-        for length in map(len, params):
-            inds.append(ind % length)
-            ind //= length
-        return inds[::-1]
-    '''
-    # get lines of bash code for creating/accessing param arrays
+    # Get lines of bash code for creating/accessing param arrays
     init_lines = []
     assign_lines = []
     init_temp = PARAM_EXPRS['param_arr_init']
@@ -144,13 +138,17 @@ def _get_params_bash(params, values):
         assign_lines.append(
             assign_temps['increment'].format(param=param))
 
-    # remove superfluous final trial reassign
+    # Remove superfluous final trial reassign
     assign_lines.pop()
 
     return init_lines, assign_lines
 
 
-def get_scripts(fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_order=None, run_script=None):
+def get_script(
+    fields: Dict = DEFAULT_SLURM_FIELDS, 
+    params: Dict = {}, 
+    param_order=None
+):
     '''
     returns a string of a SLURM submission script using the passed fields
     and which creates an array of jobs which sweep the given params
@@ -167,7 +165,6 @@ def get_scripts(fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_or
                  job number. If not supplied, uses an arbitrary order
     '''
 
-    # check arguments have correct type
     assert isinstance(fields, dict)
     assert isinstance(params, dict)
     assert (isinstance(param_order, list) or
@@ -176,22 +173,23 @@ def get_scripts(fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_or
     if param_order == None:
         param_order = list(params.keys())
 
-    # check each field appears in the template
+    # Check each field appears in the template
     for field in fields:
         if ('{%s}' % field) not in TEMPLATE_SBATCH:
             raise ValueError('passed field %s unused in template' % field)
 
-    # calculate total number of jobs (minus 1; SLURM is inclusive)
+    # Calculate total number of jobs (minus 1; SLURM is inclusive)
     num_jobs = 1
     for vals in params.values():
         num_jobs *= len(vals)
     num_jobs -= 1
 
-    # get bash code for param sweeping
+    # Get bash code for param sweeping
     init_lines, assign_lines = _get_params_bash(
-        param_order, [params[key] for key in param_order])
+        param_order, [params[key] for key in param_order]
+    )
 
-    # build template substitutions (overriding defaults)
+    # Build template substitutions (overriding defaults)
     subs = {
         'param_arr_init': '\n'.join(init_lines),
         'param_val_assign': '\n'.join(assign_lines),
@@ -206,60 +204,39 @@ def get_scripts(fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_or
     if 'job_name' not in subs:
         subs['job_name'] = "my_job"
 
-    return TEMPLATE_SBATCH.format(**subs), TEMPLATE_BASH.format(**subs)
+    return TEMPLATE_SBATCH.format(**subs)
 
 
-def save_scripts(sbatch_filename, bash_filename, file_path, fields, params, param_order=None):
-    '''
-    creates and writes to file a SLURM submission script using the passed
-    fields and which creates an array of jobs which sweep the given params
-
-    fields:      dict of SLURM field names to their values. type is ignored
-    params:      a dict of (param names, param value list) pairs.
-                 The param name is the name of the bash variable created in
-                 the submission script which will contain the param's current
-                 value (for that SLURM job instance). param value list is
-                 a list (or range instance) of the values the param should take,
-                 to be run once against every other possible configuration of all params.
-    param_order: a list containing all param names which indicates the ordering
-                 of the params in the sweep. The last param changes every
-                 job number. If not supplied, uses an arbitrary order
-    '''
+def save_script(filename, file_path, fields, params, param_order=None):
+    '''Generate and save sbatch (.sh) submission script.'''
     
-    # Create scripts
-    sbatch_script, bash_script = get_scripts(fields, params, param_order)
+    sbatch_script = get_script(fields, params, param_order)
 
     if not file_path:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
-    with open(file_path+sbatch_filename, 'w') as file:
+    with open(file_path+filename, 'w') as file:
         file.write(sbatch_script)
-
-    with open(file_path+bash_filename, 'w') as file:
-        file.write(bash_script)
-
 
 if __name__ == '__main__':
 
-    SWEEP_NAME = 'rewards_sweep'
+    sweep_name = 'test'
 
-    # Define SBATCH params
     fields = {
         'time_h': 5, # Max time per job
         'num_gpus': 1, # GPUs per job 
         'max_sim_jobs': 25, # Max jobs at the same time
-        'job_name': SWEEP_NAME,
+        'job_name': sweep_name,
     }
 
-    params = {
-        'sweep_name': [SWEEP_NAME], # Project name
-        'lr': [3e-4],
+    hyperparams = {
+        'sweep_name': [sweep_name], # Project name
+        'lr': [3e-4, 1e-4],
     }
     
-    save_scripts(
-        sbatch_filename=f"sbatch_{SWEEP_NAME}.sh",
-        bash_filename="bash_exec.sh",
+    save_script(
         file_path="examples/experiments/scripts/sbatch_scripts/",
+        filename=f"sbatch_{sweep_name}.sh",
         fields=fields,
-        params=params,
+        params=hyperparams,
     )
