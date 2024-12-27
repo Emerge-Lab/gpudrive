@@ -66,4 +66,5 @@ dependencies:
       - wandb==0.19.1
       - python-box==7.3.0
       - python-dotenv==1.0.1
-      - jax==0.4.35
+      - jax==0.4.0
+      - typer==0.9.0
