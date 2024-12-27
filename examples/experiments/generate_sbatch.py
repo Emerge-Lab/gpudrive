@@ -63,7 +63,7 @@ OVERLAY_FILE=/scratch/{username}/{overlay_file}
 
 singularity exec --nv --overlay "${{OVERLAY_FILE}}:ro" \
     "${{SINGULARITY_IMAGE}}" \
-    /bin/bash examples/experiments/scripts/sbatch_scripts/bash_exec.sh "${{SLURM_ARRAY_TASK_ID}}"
+    /bin/bash 
     
 echo "Successfully launched image."
 
@@ -77,6 +77,10 @@ source /share/apps/anaconda3/2020.07/etc/profile.d/conda.sh
 
 # Activate conda environment
 conda activate /scratch/{username}/.conda/gpudrive
+
+# Set up SSL certificates for wandb logging
+export SSL_CERT_FILE=$(python -m certifi)
+export REQUESTS_CA_BUNDLE=$(python -m certifi)
 
 # Run PPO 
 python {run_file} {param_cli_list}
@@ -220,23 +224,26 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == '__main__':
 
-    sweep_name = 'test'
+    group = 'rewards_sweep'
 
     fields = {
         'time_h': 5, # Max time per job
         'num_gpus': 1, # GPUs per job 
         'max_sim_jobs': 25, # Max jobs at the same time
-        'job_name': sweep_name,
+        'memory': 50,
+        'job_name': group,
     }
 
     hyperparams = {
-        'sweep_name': [sweep_name], # Project name
-        'lr': [3e-4, 1e-4],
+        'group': [group], # Group name
+        'num_worlds': [500],
+        'collision_weight': [-0.075, -0.1, -0.5],
+        'off_road_weight': [-0.075, -0.1, -0.5],
     }
     
     save_script(
         file_path="examples/experiments/scripts/sbatch_scripts/",
-        filename=f"sbatch_{sweep_name}.sh",
+        filename=f"sbatch_{group}.sh",
         fields=fields,
         params=hyperparams,
     )
