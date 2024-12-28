@@ -108,19 +108,27 @@ def evaluate(data):
             and data.config.resample_criterion == "global_step"
             and data.resample_buffer >= data.config.resample_interval
         ):
-            print(f"Resampling scenarios: {data.resample_counter + 1:,}" + 
-                (f" / {data.config.resample_limit}" if data.config.resample_limit is not None else ""))
-            
+            print(
+                f"Resampling scenarios: {data.resample_counter + 1:,}"
+                + (
+                    f" / {data.config.resample_limit}"
+                    if data.config.resample_limit is not None
+                    else ""
+                )
+            )
+
             # Sample new batch of scenarios
             data.vecenv.resample_scenario_batch()
             data.resample_buffer = 0
-            
-            if data.config.resample_limit is not None:  # Increment counter only if there is a limit
+
+            if (
+                data.config.resample_limit is not None
+            ):  # Increment counter only if there is a limit
                 data.resample_counter += 1
 
     data.vecenv.wandb_obj = data.wandb
     data.vecenv.clear_render_storage()
-    
+
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
@@ -662,13 +670,12 @@ class Utilization(Thread):
 
 
 def save_checkpoint(data):
-
     config = data.config
     path = os.path.join(config.checkpoint_path, config.exp_id)
     if not os.path.exists(path):
         os.makedirs(path)
 
-    model_name = f"model_{data.epoch:06d}.pt"
+    model_name = f"model_{config.exp_id}_{data.epoch:06d}.pt"
     model_path = os.path.join(path, model_name)
     torch.save(data.uncompiled_policy.state_dict(), model_path)
 
@@ -683,6 +690,15 @@ def save_checkpoint(data):
     state_path = os.path.join(path, "trainer_state.pt")
     torch.save(state, state_path + ".tmp")
     os.rename(state_path + ".tmp", state_path)
+
+    # Log model checkpoint to WandB
+    data.wandb.save(model_path)
+    # Log model artifact to WandB
+    artifact = data.wandb.Artifact(f"model-{config.exp_id}", type="model")
+    artifact.add_file(model_path)
+    artifact.add_file(state_path)
+    data.wandb.log_artifact(artifact)
+
     return model_path
 
 
