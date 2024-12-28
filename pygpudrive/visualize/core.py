@@ -17,6 +17,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
+from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -30,14 +31,22 @@ OUT_OF_BOUNDS = 1000
 
 class MatplotlibVisualizer:
     def __init__(
-        self, sim_object, vis_config: Dict[str, Any], goal_radius, backend: str
+        self,
+        sim_object,
+        goal_radius,
+        backend: str,
+        num_worlds: int,
+        render_config: Dict[str, Any],
+        env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
-        self.vis_config = vis_config
         self.backend = backend
         self.device = "cpu"
         self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
+        self.num_worlds = num_worlds
+        self.render_config = render_config
+        self.env_config = env_config
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -55,6 +64,7 @@ class MatplotlibVisualizer:
         figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
         return_single_figure: bool = False,
+        plot_log_replay_trajectory: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -97,6 +107,14 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
+        if plot_log_replay_trajectory:
+            log_trajectory = LogTrajectory.from_tensor(
+                self.sim_object.expert_trajectory_tensor(),
+                self.num_worlds,
+                self.controlled_agents.shape[1],
+                backend=self.backend,
+            )
+
         figs = []  # Store all figures if returning multiple
 
         if return_single_figure:
@@ -114,9 +132,7 @@ class MatplotlibVisualizer:
             )
             axes = axes.flatten()
         else:
-            axes = [None] * len(
-                env_indices
-            )  # Placeholder for individual plotting
+            axes = [None] * len(env_indices)
 
         # Calculate scale factors based on figure size
         max_fig_size = max(figsize)
@@ -157,6 +173,15 @@ class MatplotlibVisualizer:
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
             )
+
+            if plot_log_replay_trajectory:
+                self._plot_log_replay_trajectory(
+                    ax=ax,
+                    control_mask=controlled_live,
+                    env_idx=env_idx,
+                    log_trajectory=log_trajectory,
+                    line_width_scale=line_width_scale,
+                )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -217,6 +242,23 @@ class MatplotlibVisualizer:
             return fig
         else:
             return figs
+
+    def _plot_log_replay_trajectory(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        control_mask: torch.Tensor,
+        log_trajectory: LogTrajectory,
+        line_width_scale: int = 1.0,
+    ):
+        ax.scatter(
+            log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
+            log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+            color="lightgreen",
+            linewidth=0.35 * line_width_scale,
+            alpha=0.35,
+            zorder=0,
+        )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
@@ -465,8 +507,11 @@ class MatplotlibVisualizer:
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
         # Define realistic bounds for log_replay agent positions
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
-            torch.abs(pos_y) < OUT_OF_BOUNDS
+        valid_mask = (
+            (torch.abs(pos_x) < OUT_OF_BOUNDS)
+            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+            & (vehicle_length < 15)
+            & (vehicle_width < 10)
         )
 
         # Filter valid static agent attributes
@@ -496,11 +541,6 @@ class MatplotlibVisualizer:
         self,
         agent_idx: int,
         env_idx: int,
-        observation_roadgraph: torch.Tensor = None,
-        observation_ego: torch.Tensor = None,
-        observation_partner: torch.Tensor = None,
-        x_lim: Tuple[float, float] = (-100, 100),
-        y_lim: Tuple[float, float] = (-100, 100),
         figsize: Tuple[int, int] = (10, 10),
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
@@ -535,7 +575,7 @@ class MatplotlibVisualizer:
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
-        ax.set_title(f"obs agent: {agent_idx}")
+        ax.set_title(f"Observation agent: {agent_idx}", y=1.05)
 
         # Plot roadgraph if provided
         if observation_roadgraph is not None:
@@ -579,7 +619,7 @@ class MatplotlibVisualizer:
                     env_idx, agent_idx, :, :
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
-                alpha=0.8,
+                alpha=0.9,
             )
 
         if observation_ego is not None:
@@ -610,32 +650,46 @@ class MatplotlibVisualizer:
                 0,  # Start at the ego vehicle's position
                 speed,
                 0,  # Arrow points to the right, proportional to speed
-                head_width=0.5,
-                head_length=0.7,
+                head_width=1.0,
+                head_length=1.1,
                 fc=REL_OBS_OBJ_COLORS["ego"],
                 ec=REL_OBS_OBJ_COLORS["ego"],
             )
 
-            ax.plot(
+            ax.scatter(
                 observation_ego.rel_goal_x[env_idx, agent_idx],
                 observation_ego.rel_goal_y[env_idx, agent_idx],
-                markersize=23,
-                label="Goal",
-                marker="*",
-                markeredgecolor="k",
-                linestyle="None",
-                color=REL_OBS_OBJ_COLORS["ego_goal"],
-            )[0]
+                s=5,
+                linewidth=1.5,
+                c=ego_agent_color,
+                marker="x",
+            )
 
-        # fig.legend(
-        #     loc="upper center",
-        #     bbox_to_anchor=(0.5, 0.1),
-        #     ncol=5,
-        #     fontsize=10,
-        #     title="Elements",
-        # )
-        ax.set_xlim(x_lim)
-        ax.set_ylim(y_lim)
+            circle = Circle(
+                (
+                    observation_ego.rel_goal_x[env_idx, agent_idx],
+                    observation_ego.rel_goal_y[env_idx, agent_idx],
+                ),
+                radius=self.goal_radius,
+                color=ego_agent_color,
+                fill=False,
+                linestyle="--",
+            )
+            ax.add_patch(circle)
+
+            observation_radius = Circle(
+                (0, 0),
+                radius=self.env_config.obs_radius,
+                color="#d9d9d9",
+                linewidth=1.5,
+                fill=False,
+                linestyle="-",
+            )
+            ax.add_patch(observation_radius)
+            plt.axis("off")
+
+        ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_xticks([])
         ax.set_yticks([])
 
