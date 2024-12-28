@@ -243,7 +243,7 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "rewards_sweep"
+    group = "rewards_sweep_12_28_24"
 
     fields = {
         "time_h": 7,  # Max time per job (job will finish if run is done before)
@@ -257,7 +257,7 @@ if __name__ == "__main__":
         "group": [group],  # Group name
         "num_worlds": [500],
         "k_unique_scenes": [500],  # Sample in batches of 500
-        "seed": [42, 0, 1],
+        "seed": [42, 0],
         "total_timesteps": [1_000_000],
         "collision_weight": [-0.075, -0.1, -0.5, -1.0],
         "off_road_weight": [-0.075, -0.1, -0.5, -1.0],
