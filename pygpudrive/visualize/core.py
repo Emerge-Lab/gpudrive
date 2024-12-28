@@ -46,7 +46,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.env_config = env_config    
+        self.env_config = env_config
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -232,7 +232,7 @@ class MatplotlibVisualizer:
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
-            # ax.set_xticks([])
+            ax.set_xticks([])
             ax.set_yticks([])
 
         if return_single_figure:
@@ -507,7 +507,12 @@ class MatplotlibVisualizer:
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
         # Define realistic bounds for log_replay agent positions
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (torch.abs(pos_y) < OUT_OF_BOUNDS) & (vehicle_length < 15) & (vehicle_width < 10)
+        valid_mask = (
+            (torch.abs(pos_x) < OUT_OF_BOUNDS)
+            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+            & (vehicle_length < 15)
+            & (vehicle_width < 10)
+        )
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
@@ -650,7 +655,7 @@ class MatplotlibVisualizer:
                 fc=REL_OBS_OBJ_COLORS["ego"],
                 ec=REL_OBS_OBJ_COLORS["ego"],
             )
-            
+
             ax.scatter(
                 observation_ego.rel_goal_x[env_idx, agent_idx],
                 observation_ego.rel_goal_y[env_idx, agent_idx],
@@ -661,25 +666,27 @@ class MatplotlibVisualizer:
             )
 
             circle = Circle(
-                (observation_ego.rel_goal_x[env_idx, agent_idx], observation_ego.rel_goal_y[env_idx, agent_idx]),
+                (
+                    observation_ego.rel_goal_x[env_idx, agent_idx],
+                    observation_ego.rel_goal_y[env_idx, agent_idx],
+                ),
                 radius=self.goal_radius,
                 color=ego_agent_color,
                 fill=False,
                 linestyle="--",
             )
             ax.add_patch(circle)
-            
+
             observation_radius = Circle(
                 (0, 0),
                 radius=self.env_config.obs_radius,
-                color='#d9d9d9',
+                color="#d9d9d9",
                 linewidth=1.5,
                 fill=False,
                 linestyle="-",
             )
             ax.add_patch(observation_radius)
             plt.axis("off")
-       
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
