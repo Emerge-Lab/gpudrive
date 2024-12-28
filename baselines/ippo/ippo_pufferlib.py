@@ -28,6 +28,7 @@ from typer import Typer
 
 app = Typer()
 
+
 def load_config(config_path):
     """Load the configuration file."""
     # fmt: off
@@ -35,7 +36,18 @@ def load_config(config_path):
         config = Box(yaml.safe_load(f))
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{str(config["environment"]["k_unique_scenes"])}__{datetime_}'
+
+    if config["train"]["resample_scenes"]:
+
+        if config["train"]["resample_scenes"]:
+            dataset_size = config["train"]["resample_dataset_size"]
+
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+    else:
+        dataset_size = str(config["environment"]["k_unique_scenes"])
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+
+    config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available
@@ -143,7 +155,7 @@ def run(
         str, typer.Argument(help="The path to the default configuration file")
     ] = "baselines/ippo/config/ippo_ff_puffer.yaml",
     *,
-    #fmt: off
+    # fmt: off
     # Environment options
     num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
     k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
@@ -154,19 +166,24 @@ def run(
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     # Train options
+    seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
     resample_interval: Annotated[Optional[int], typer.Option(help="The interval for resampling scenes")] = None,
+    resample_dataset_size: Annotated[Optional[int], typer.Option(help="The size of the dataset to sample from")] = None,
     total_timesteps: Annotated[Optional[int], typer.Option(help="The total number of training steps")] = None,
     ent_coef: Annotated[Optional[float], typer.Option(help="Entropy coefficient")] = None,
+    update_epochs: Annotated[Optional[int], typer.Option(help="The number of epochs for updating the policy")] = None,
+    batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
+    minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
     group: Annotated[Optional[str], typer.Option(help="WandB group name")] = None,
 ):
     """Run PPO training with the given configuration."""
-    #fmt: on
-      
+    # fmt: on
+
     # Load default configs
     config = load_config(config_path)
 
@@ -181,22 +198,35 @@ def run(
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
     }
-    config.environment.update({k: v for k, v in env_config.items() if v is not None})
+    config.environment.update(
+        {k: v for k, v in env_config.items() if v is not None}
+    )
     train_config = {
+        "seed": seed,
         "learning_rate": learning_rate,
-        "resample_scenes": None if resample_scenes is None else bool(resample_scenes),
+        "resample_scenes": None
+        if resample_scenes is None
+        else bool(resample_scenes),
         "resample_interval": resample_interval,
+        "resample_dataset_size": resample_dataset_size,
         "total_timesteps": total_timesteps,
         "ent_coef": ent_coef,
+        "update_epochs": update_epochs,
+        "batch_size": batch_size,
+        "minibatch_size": minibatch_size,
     }
-    config.train.update({k: v for k, v in train_config.items() if v is not None})
-    
+    config.train.update(
+        {k: v for k, v in train_config.items() if v is not None}
+    )
+
     wandb_config = {
         "project": project,
         "entity": entity,
         "group": group,
     }
-    config.wandb.update({k: v for k, v in wandb_config.items() if v is not None})
+    config.wandb.update(
+        {k: v for k, v in wandb_config.items() if v is not None}
+    )
 
     make_env = env_creator(
         data_dir=config.data_dir,
@@ -207,6 +237,7 @@ def run(
 
     if config.mode == "train":
         train(config, make_env)
+
 
 if __name__ == "__main__":
     app()
