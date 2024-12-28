@@ -35,7 +35,7 @@ def load_config(config_path):
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
 
-    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
+    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
 
     if config["train"]["resample_scenes"]:
 
@@ -122,7 +122,7 @@ def init_wandb(args, name, id=None, resume=True):
         },
         name=name,
         save_code=True,
-        resume=resume,
+        resume=False,
     )
     return wandb
 

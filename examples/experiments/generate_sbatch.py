@@ -258,7 +258,7 @@ if __name__ == "__main__":
         "num_worlds": [500],
         "k_unique_scenes": [500],  # Sample in batches of 500
         "seed": [42, 0],
-        "total_timesteps": [1_000_000],
+        "total_timesteps": [1_000_000_000],
         "collision_weight": [-0.075, -0.1, -0.5, -1.0],
         "off_road_weight": [-0.075, -0.1, -0.5, -1.0],
         "resample_dataset_size": [1000, 5000],
