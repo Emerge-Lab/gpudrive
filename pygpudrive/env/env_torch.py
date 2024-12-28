@@ -378,7 +378,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         partner_obs.orientation,
                         partner_obs.vehicle_length,
                         partner_obs.vehicle_width,
-                        # TODO: Potentially add back later
                         # partner_obs.agent_type,
                     ],
                     dim=-1,
