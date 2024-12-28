@@ -246,7 +246,7 @@ if __name__ == "__main__":
     group = "rewards_sweep"
 
     fields = {
-        "time_h": 5,  # Max time per job (job will finish if run is done before)
+        "time_h": 7,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 25,  # Max jobs at the same time
         "memory": 50,
@@ -257,11 +257,11 @@ if __name__ == "__main__":
         "group": [group],  # Group name
         "num_worlds": [500],
         "k_unique_scenes": [500],  # Sample in batches of 500
-        "seed": [42, 0],
+        "seed": [42, 0, 1],
         "total_timesteps": [1_000_000],
         "collision_weight": [-0.075, -0.1, -0.5, -1.0],
         "off_road_weight": [-0.075, -0.1, -0.5, -1.0],
-        "resample_dataset_size": [1000, 5000, 10_000],
+        "resample_dataset_size": [1000, 5000],
     }
 
     save_script(
