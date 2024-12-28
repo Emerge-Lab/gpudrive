@@ -166,11 +166,16 @@ def run(
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     # Train options
+    seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
     resample_interval: Annotated[Optional[int], typer.Option(help="The interval for resampling scenes")] = None,
+    resample_dataset_size: Annotated[Optional[int], typer.Option(help="The size of the dataset to sample from")] = None,
     total_timesteps: Annotated[Optional[int], typer.Option(help="The total number of training steps")] = None,
     ent_coef: Annotated[Optional[float], typer.Option(help="Entropy coefficient")] = None,
+    update_epochs: Annotated[Optional[int], typer.Option(help="The number of epochs for updating the policy")] = None,
+    batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
+    minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -197,13 +202,18 @@ def run(
         {k: v for k, v in env_config.items() if v is not None}
     )
     train_config = {
+        "seed": seed,
         "learning_rate": learning_rate,
         "resample_scenes": None
         if resample_scenes is None
         else bool(resample_scenes),
         "resample_interval": resample_interval,
+        "resample_dataset_size": resample_dataset_size,
         "total_timesteps": total_timesteps,
         "ent_coef": ent_coef,
+        "update_epochs": update_epochs,
+        "batch_size": batch_size,
+        "minibatch_size": minibatch_size,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
