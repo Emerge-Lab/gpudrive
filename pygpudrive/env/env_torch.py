@@ -20,6 +20,7 @@ from pygpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
     GlobalRoadGraphPoints,
 )
+from pygpudrive.datatypes.metadata import Metadata
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 
@@ -494,12 +495,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
         )
 
+
+
         for time_step in range(init_steps):
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
             )
             if render_init:  # Render the initial frames
                 self.init_frames.append(self.render())
+
+        metadata =  Metadata.from_tensor(
+            metadata_tensor=self.sim.metadata_tensor(),
+            backend=self.backend,
+        )
 
         if self.config.return_vbd_data:
 
@@ -514,6 +522,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 episode_len=self.episode_len,
                 init_steps=init_steps,
                 raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
+                metadata=metadata
             )
 
     def get_expert_actions(self):

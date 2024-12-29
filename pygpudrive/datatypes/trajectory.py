@@ -13,6 +13,7 @@ class LogTrajectory:
         pos_xy: Global (but demeaned) positions of the agent(s) across the trajectory.
         vel_xy: Global (but demeaned) velocity of the agent(s) across the trajectory.
         yaw: Headings (yaw angles) of the agent(s) across the trajectory.
+        valids: Valid flag for each timestep in the trajectory.
         actions: Expert actions performed by the agent(s) across the trajectory.
     """
 
@@ -27,6 +28,9 @@ class LogTrajectory:
         self.yaw = raw_logs[:, :, 4 * TRAJ_LEN: 5 * TRAJ_LEN].view(
             num_worlds, max_agents, TRAJ_LEN, -1
         )
+        self.valids = raw_logs[:, :, 5 * TRAJ_LEN:6 * TRAJ_LEN].view(
+            num_worlds, max_agents, TRAJ_LEN, -1
+        ).to(torch.int32)
         self.inferred_actions = raw_logs[:, :, 6 * TRAJ_LEN: 16 * TRAJ_LEN].view(
             num_worlds, max_agents, TRAJ_LEN, -1
         )
