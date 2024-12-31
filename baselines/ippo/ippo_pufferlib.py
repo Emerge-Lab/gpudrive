@@ -34,23 +34,7 @@ def load_config(config_path):
     # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-
-    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
-
-    if config["train"]["resample_scenes"]:
-
-        if config["train"]["resample_scenes"]:
-            dataset_size = config["train"]["resample_dataset_size"]
-
-        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
-    else:
-        dataset_size = str(config["environment"]["k_unique_scenes"])
-        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
-
-    config["environment"]["dataset_size"] = dataset_size
-    config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
-    if torch.cuda.is_available():
-        config["train"]["device"] = "cuda"  # Set to 'cuda' if available
+        
     # fmt: on
     return pufferlib.namespace(**config)
 
@@ -227,6 +211,21 @@ def run(
     config.wandb.update(
         {k: v for k, v in wandb_config.items() if v is not None}
     )
+    
+    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
+
+    if config["train"]["resample_scenes"]:
+        if config["train"]["resample_scenes"]:
+            dataset_size = config["train"]["resample_dataset_size"]
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+    else:
+        dataset_size = str(config["environment"]["k_unique_scenes"])
+        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+
+    config["environment"]["dataset_size"] = dataset_size
+    config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
+    if torch.cuda.is_available():
+        config["train"]["device"] = "cuda"  # Set to 'cuda' if available
 
     make_env = env_creator(
         data_dir=config.data_dir,
