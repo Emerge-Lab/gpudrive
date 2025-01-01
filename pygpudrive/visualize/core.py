@@ -581,16 +581,69 @@ class MatplotlibVisualizer:
         if observation_roadgraph is not None:
             for road_type, type_name in ROAD_GRAPH_TYPE_NAMES.items():
                 mask = (
-                    observation_roadgraph.type[env_idx, agent_idx, :]
-                    == road_type
+                    observation_roadgraph.type[env_idx, agent_idx, :] == road_type
                 )
+
+                # Extract relevant roadgraph data for plotting
+                x_points = observation_roadgraph.x[env_idx, agent_idx, mask]
+                y_points = observation_roadgraph.y[env_idx, agent_idx, mask]
+                orientations = observation_roadgraph.orientation[env_idx, agent_idx, mask]
+                segment_lengths = observation_roadgraph.segment_length[env_idx, agent_idx, mask]
+                widths = observation_roadgraph.segment_width[env_idx, agent_idx, mask]
+
+                # Scatter plot for the points
                 ax.scatter(
-                    observation_roadgraph.x[env_idx, agent_idx, mask],
-                    observation_roadgraph.y[env_idx, agent_idx, mask],
-                    c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=7,
-                    label=type_name,
+                    x_points, y_points, c=[ROAD_GRAPH_COLORS[road_type]], s=8, label=type_name
                 )
+
+                # Plot lines for road edges
+                for x, y, orientation, segment_length, width in zip(
+                    x_points, y_points, orientations, segment_lengths, widths
+                ):
+                    dx = segment_length * 0.5 * np.cos(orientation)
+                    dy = segment_length * 0.5 * np.sin(orientation)
+
+                    # Calculate line endpoints for the road edge
+                    x_start = x - dx
+                    y_start = y - dy
+                    x_end = x + dx
+                    y_end = y + dy
+
+                    # Add width as a perpendicular offset
+                    width_dx = width * 0.5 * np.sin(orientation)
+                    width_dy = -width * 0.5 * np.cos(orientation)
+
+                    # Draw the road edge as a polygon (line with width)
+                    ax.plot(
+                        [x_start - width_dx, x_end - width_dx],
+                        [y_start - width_dy, y_end - width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0
+                    )
+                    ax.plot(
+                        [x_start + width_dx, x_end + width_dx],
+                        [y_start + width_dy, y_end + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0
+                    )
+                    ax.plot(
+                        [x_start - width_dx, x_start + width_dx],
+                        [y_start - width_dy, y_start + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0
+                    )
+                    ax.plot(
+                        [x_end - width_dx, x_end + width_dx],
+                        [y_end - width_dy, y_end + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0
+                    )
+
+
 
         # Plot partner agents if provided
         if observation_partner is not None:
@@ -619,7 +672,7 @@ class MatplotlibVisualizer:
                     env_idx, agent_idx, :, :
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
-                alpha=0.9,
+                alpha=1.0,
             )
 
         if observation_ego is not None:

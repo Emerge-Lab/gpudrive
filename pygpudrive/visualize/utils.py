@@ -213,6 +213,7 @@ def plot_bounding_box(
                 color=color,
                 alpha=alpha,
                 linestyle="-",
+                linewidth=2,
                 label=label if i == 0 else None,
             )
     else:
@@ -254,4 +255,5 @@ def plot_bounding_box(
             alpha=alpha,
             linestyle="-",
             label=label,
+            linewidth=2,
         )
