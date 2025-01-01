@@ -4,9 +4,8 @@ from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 import gpudrive
-import imageio
 from itertools import product
-
+import gymnasium as gym
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
@@ -18,6 +17,7 @@ from pygpudrive.datatypes.observation import (
 )
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 
@@ -84,12 +84,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
 
     def get_infos(self):
-        return (
-            self.sim.info_tensor()
-            .to_torch()
-            .squeeze(dim=2)
-            .to(torch.float)
-            .to(self.device)
+        return Info.from_tensor(
+            self.sim.info_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
 
     def get_rewards(
@@ -565,7 +563,6 @@ if __name__ == "__main__":
 
     # RUN
     obs = env.reset()
-    frames = []
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
@@ -575,13 +572,9 @@ if __name__ == "__main__":
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
 
-        frames.append(env.render())
-
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
-
-    # import imageio
-    imageio.mimsave("world1.gif", np.array(frames))
+        info = env.get_infos()
 
     env.close()

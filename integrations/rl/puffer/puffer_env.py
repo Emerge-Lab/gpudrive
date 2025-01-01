@@ -23,8 +23,6 @@ from pygpudrive.visualize.utils import img_from_fig
 from pufferlib.environment import PufferEnv
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
-    PartnerObs,
-    LidarObs,
 )
 
 
@@ -257,8 +255,9 @@ class PufferGPUDrive(PufferEnv):
         self.episode_lengths += 1
 
         # Log off road and collision events
-        self.offroad_in_episode += self.env.get_infos()[:, :, 0]
-        self.collided_in_episode += self.env.get_infos()[:, :, 1:3].sum(axis=2)
+        info = self.env.get_infos()
+        self.offroad_in_episode += info.off_road
+        self.collided_in_episode += info.collided
 
         # (4) Use previous live agent mask as mask
         self.masks = (  # Flattend mask: (num_worlds * max_cont_agents_per_env)
@@ -328,9 +327,9 @@ class PufferGPUDrive(PufferEnv):
                 / num_finished_agents
             )
             goal_achieved_rate = (
-                self.env.get_infos()[done_worlds, :, :][controlled_mask][
-                    :, 3
-                ].sum()
+                self.env.get_infos()
+                .goal_achieved[done_worlds, :][controlled_mask]
+                .sum()
                 / num_finished_agents
             )
 
