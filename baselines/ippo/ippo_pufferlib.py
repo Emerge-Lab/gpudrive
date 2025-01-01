@@ -12,11 +12,14 @@ from typing_extensions import Annotated
 import yaml
 from datetime import datetime
 import torch
+import numpy as np
 import wandb
 from box import Box
+
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
-from integrations.rl.puffer.utils import Policy
+
+from networks.late_fusion import LateFusionTransformer
 
 import pufferlib
 import pufferlib.vector
@@ -29,25 +32,31 @@ from typer import Typer
 app = Typer()
 
 
+def get_model_parameters(policy):
+    """Helper function to count the number of trainable parameters."""
+    params = filter(lambda p: p.requires_grad, policy.parameters())
+    return sum([np.prod(p.size()) for p in params])
+
+
 def load_config(config_path):
     """Load the configuration file."""
-    # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-        
-    # fmt: on
     return pufferlib.namespace(**config)
 
 
-def make_policy(env):
+def make_policy(env, config):
     """Create a policy based on the environment."""
-    return pufferlib.frameworks.cleanrl.Policy(Policy(env))
+    return LateFusionTransformer(
+        input_dim=config.network.input_dim,
+        action_dim=env.single_action_space.n,
+        hidden_dim=config.network.hidden_dim,
+        pred_heads_arch=config.network.pred_heads_arch,
+    ).to(config.train.device)
 
 
 def train(args, make_env):
     """Main training loop for the PPO agent."""
-    args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
-    args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
         # Note: Only native backend is currently supported with GPUDrive
@@ -70,9 +79,15 @@ def train(args, make_env):
         backend=backend,
     )
 
-    policy = make_policy(vecenv.driver_env).to(args.train.device)
+    policy = make_policy(env=vecenv.driver_env, config=args).to(
+        args.train.device
+    )
 
+    args.network.num_parameters = get_model_parameters(policy)
     args.train.env = args.environment.name
+
+    args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
+    args.train.__dict__.update(dict(args.wandb.config.train))
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)
     while data.global_step < args.train.total_timesteps:
@@ -211,19 +226,25 @@ def run(
     config.wandb.update(
         {k: v for k, v in wandb_config.items() if v is not None}
     )
-    
+
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
 
     if config["train"]["resample_scenes"]:
         if config["train"]["resample_scenes"]:
             dataset_size = config["train"]["resample_dataset_size"]
-        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+        config["train"][
+            "exp_id"
+        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
     else:
         dataset_size = str(config["environment"]["k_unique_scenes"])
-        config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+        config["train"][
+            "exp_id"
+        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
 
     config["environment"]["dataset_size"] = dataset_size
-    config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
+    config["train"]["device"] = config["train"].get(
+        "device", "cpu"
+    )  # Default to 'cpu' if not set
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available
 
