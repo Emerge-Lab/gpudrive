@@ -64,7 +64,8 @@ class SceneDataLoader:
         return self
 
     def __len__(self):
-        return len(self.dataset)
+        """Get the number of batches in the dataloader."""
+        return len(self.dataset) // self.batch_size
 
     def __next__(self) -> List[str]:
         if self.sample_with_replacement:
