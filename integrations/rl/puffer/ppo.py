@@ -669,35 +669,46 @@ class Utilization(Thread):
         self.stopped = True
 
 
-def save_checkpoint(data):
+def save_checkpoint(data, save_checkpoint_to_wandb=True):
+    
     config = data.config
     path = os.path.join(config.checkpoint_path, config.exp_id)
+    
     if not os.path.exists(path):
         os.makedirs(path)
 
     model_name = f"model_{config.exp_id}_{data.epoch:06d}.pt"
     model_path = os.path.join(path, model_name)
-    torch.save(data.uncompiled_policy.state_dict(), model_path)
 
+    # Save training state
     state = {
+        "parameters": data.uncompiled_policy.state_dict(),
         "optimizer_state_dict": data.optimizer.state_dict(),
         "global_step": data.global_step,
         "agent_step": data.global_step,
         "update": data.epoch,
         "model_name": model_name,
+        "model_class": data.uncompiled_policy.__class__.__name__,
+        "model_arch": config.network,
+        "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
     }
-    state_path = os.path.join(path, "trainer_state.pt")
-    torch.save(state, state_path + ".tmp")
-    os.rename(state_path + ".tmp", state_path)
+    
+    torch.save(state, model_path)
+    if save_checkpoint_to_wandb and data.wandb is not None:
 
-    # Log model checkpoint to WandB
-    data.wandb.save(model_path)
-    # Log model artifact to WandB
-    artifact = data.wandb.Artifact(f"model-{config.exp_id}", type="model")
-    artifact.add_file(model_path)
-    artifact.add_file(state_path)
-    data.wandb.log_artifact(artifact)
+        data.wandb.save(model_path)
+
+        data.wandb.config.update(
+            {
+                "network_class": data.uncompiled_policy.__class__.__name__,
+                "network_arch": config.network,
+                "exp_id": config.exp_id,
+            }
+        )
+
+        # Optionally log the optimizer state path
+        data.wandb.save(model_path)
 
     return model_path
 

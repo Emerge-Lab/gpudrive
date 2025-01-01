@@ -48,10 +48,11 @@ def load_config(config_path):
 def make_policy(env, config):
     """Create a policy based on the environment."""
     return LateFusionTransformer(
-        input_dim=config.network.input_dim,
+        input_dim=config.train.network.input_dim,
         action_dim=env.single_action_space.n,
-        hidden_dim=config.network.hidden_dim,
-        pred_heads_arch=config.network.pred_heads_arch,
+        hidden_dim=config.train.network.hidden_dim,
+        pred_heads_arch=config.train.network.pred_heads_arch,
+        dropout=config.train.network.dropout,
     ).to(config.train.device)
 
 
@@ -83,7 +84,7 @@ def train(args, make_env):
         args.train.device
     )
 
-    args.network.num_parameters = get_model_parameters(policy)
+    args.train.network.num_parameters = get_model_parameters(policy)
     args.train.env = args.environment.name
 
     args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)

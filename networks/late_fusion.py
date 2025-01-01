@@ -5,6 +5,7 @@ from torch.distributions.utils import logits_to_probs
 import pufferlib
 from pygpudrive.env import constants
 
+import gpudrive
 
 def unpack_obs(obs_flat):
     """
@@ -16,7 +17,7 @@ def unpack_obs(obs_flat):
     Returns:
         ego_state, road_objects, road_graph (torch.Tensor).
     """
-    top_k_road_points = 128  # TODO: Fix hardcoding
+    top_k_road_points = gpudrive.kMaxAgentMapObservationsCount
 
     ego_state = obs_flat[:, : constants.EGO_FEAT_DIM]
     vis_state = obs_flat[:, constants.EGO_FEAT_DIM :]
@@ -138,6 +139,7 @@ class LateFusionTransformer(nn.Module):
             ),
             nn.LayerNorm(input_dim),
             self.act_func,
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
@@ -145,7 +147,9 @@ class LateFusionTransformer(nn.Module):
             pufferlib.pytorch.layer_init(
                 nn.Linear(constants.PARTNER_FEAT_DIM, input_dim)
             ),
+            nn.LayerNorm(input_dim),
             self.act_func,
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
@@ -155,11 +159,13 @@ class LateFusionTransformer(nn.Module):
             ),
             nn.LayerNorm(input_dim),
             self.act_func,
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
-        self.shared_embed = nn.Linear(
-            self.input_dim * self.num_modes, self.hidden_dim
+        self.shared_embed = nn.Sequential(
+            nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
+            nn.Dropout(self.dropout)
         )
 
         if self.num_transformer_layers > 0:
@@ -172,13 +178,11 @@ class LateFusionTransformer(nn.Module):
                 ]
             )
 
-        self.critic = self._build_network(
-            hidden_dim, self.pred_heads_arch, "critic"
+        self.actor = pufferlib.pytorch.layer_init(
+            nn.Linear(hidden_dim, action_dim), std=0.01
         )
-        self.actor = self._build_network(
-            input_dim=hidden_dim,
-            net_arch=self.pred_heads_arch,
-            network_type="actor",
+        self.critic = pufferlib.pytorch.layer_init(
+            nn.Linear(hidden_dim, 1), std=1
         )
 
     def encode_observations(self, observation):

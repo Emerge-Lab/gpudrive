@@ -22,9 +22,9 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
   dist_to_goal_threshold: 3.5
-  polyline_reduction_threshold: 0.2 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
+  polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
-  obs_radius: 60.0 # Visibility radius of the agents
+  obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: ""
   project: "paper_1_self_play"
@@ -35,14 +35,6 @@ wandb:
 ## NOTES
 ## Good batch size: 128 * number of controlled agents (e.g. 2**18)
 ## Minibatch size 1/16 of batch size, eg. 16_000
-
-network:
-    input_dim: 64 # Embedding of the input features
-    hidden_dim: 128 # Latent dimension 
-    num_transformer_layers: 0 # Number of transformer layers
-    pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
-    class_name: "LateFusionTransformer" 
-    num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
 train:
   exp_id: PPO # Set dynamically in the script if needed
@@ -79,13 +71,23 @@ train:
   max_grad_norm: 0.5
   target_kl: null
 
+  # # # Network # # #
+  network:
+    input_dim: 64 # Embedding of the input features
+    hidden_dim: 128 # Latent dimension 
+    pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
+    num_transformer_layers: 0 # Number of transformer layers
+    dropout: 0.1
+    class_name: "LateFusionTransformer" 
+    num_parameters: 0 # Total trainable parameters, to be filled at runtime
+
   # # # Checkpointing # # #
-  checkpoint_interval: 200 # Save policy every k iterations
+  checkpoint_interval: 10 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
-  render_interval: 500 # Render every k iterations
+  render_interval: 200 # Render every k iterations
   render_k_scenarios: 5 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_agent_obs: false # Debugging tool, plot what an agent is seing
