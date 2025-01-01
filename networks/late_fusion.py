@@ -2,7 +2,7 @@ from typing import List, Union
 import torch
 from torch import nn
 from torch.distributions.utils import logits_to_probs
-import pufferlib
+import pufferlib.models
 from pygpudrive.env import constants
 
 import gpudrive
