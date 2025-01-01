@@ -16,25 +16,33 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination" #"distance_to_logs"
-  collision_weight: -0.5
-  off_road_weight: -0.5
+  collision_weight: -0.1
+  off_road_weight: -0.1
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
   dist_to_goal_threshold: 3.5
-  polyline_reduction_threshold: 0.2 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
+  polyline_reduction_threshold: 0.05 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
-  obs_radius: 60.0 # Visibility radius of the agents
+  obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "paper_rl_scale"
+  group: "my_group"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 ## NOTES
 ## Good batch size: 128 * number of controlled agents (e.g. 2**18)
 ## Minibatch size 1/16 of batch size, eg. 16_000
+
+network:
+    input_dim: 64 # Embedding of the input features
+    hidden_dim: 128 # Latent dimension 
+    num_transformer_layers: 0 # Number of transformer layers
+    pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
+    class_name: "LateFusionTransformer" 
+    num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
 train:
   exp_id: PPO # Set dynamically in the script if needed
@@ -48,13 +56,13 @@ train:
   # # # Data sampling # # #
   resample_scenes: true
   resample_criterion: "global_step"
-  resample_dataset_size: 10_000 # Number of unique scenes to sample from
+  resample_dataset_size: 1000 # Number of unique scenes to sample from
   resample_interval: 5_000_000
   resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 5_000_000_000
+  total_timesteps: 500_000_000
   batch_size: 131_072
   minibatch_size: 16_384
   learning_rate: 3e-4
