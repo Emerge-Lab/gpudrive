@@ -56,7 +56,6 @@ class SceneDataLoader:
             self.indices = None  # No need to track indices for replacement
         else:
             self.indices = list(range(len(self.dataset)))
-            random.shuffle(self.indices)
         self.current_index = 0
 
     def __iter__(self) -> Iterator[List[str]]:

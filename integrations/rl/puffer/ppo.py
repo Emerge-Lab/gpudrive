@@ -670,10 +670,10 @@ class Utilization(Thread):
 
 
 def save_checkpoint(data, save_checkpoint_to_wandb=True):
-    
+
     config = data.config
     path = os.path.join(config.checkpoint_path, config.exp_id)
-    
+
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -692,9 +692,9 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
         "model_arch": config.network,
         "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
-        "num_params": config.network.num_parameters,
+        "num_params": config.network["num_parameters"],
     }
-    
+
     torch.save(state, model_path)
     if save_checkpoint_to_wandb and data.wandb is not None:
 
