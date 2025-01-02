@@ -10,30 +10,27 @@ import random
 from pygpudrive.env.config import (
     EnvConfig,
     RenderConfig,
-    SceneConfig,
-    SelectionDiscipline,
 )
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-
-# from pygpudrive.visualize.core import plot_agent_observation
-from pygpudrive.visualize.utils import img_from_fig
-
-from pufferlib.environment import PufferEnv
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
 )
 
+from pygpudrive.visualize.utils import img_from_fig
+
+from pufferlib.environment import PufferEnv
+
 
 def env_creator(
-    data_dir,
+    data_loader,
     environment_config,
     train_config,
     device="cuda",
 ):
     return lambda: PufferGPUDrive(
-        data_dir=data_dir,
+        data_loader=data_loader,
         device=device,
         config=environment_config,
         train_config=train_config,
@@ -43,10 +40,9 @@ def env_creator(
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
 
-    def __init__(self, data_dir, device, config, train_config, buf=None):
+    def __init__(self, data_loader, device, config, train_config, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
 
-        self.data_dir = data_dir
         self.device = device
         self.config = config
         self.train_config = train_config
@@ -59,27 +55,6 @@ class PufferGPUDrive(PufferEnv):
         # Set working directory to the base directory 'gpudrive'
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
         os.chdir(working_dir)
-
-        # Dataset size to sample from
-        dataset = [
-            os.path.join(self.data_dir, scene)
-            for scene in sorted(os.listdir(self.data_dir))
-            if scene.startswith("tfrecord")
-        ]
-
-        resample_dataset_size = min(
-            self.train_config.resample_dataset_size, len(dataset)
-        )
-
-        self.dataset = dataset[:resample_dataset_size]
-
-        scene_config = SceneConfig(
-            path=data_dir,
-            num_scenes=self.num_worlds,
-            discipline=SelectionDiscipline.K_UNIQUE_N,
-            k_unique_scenes=self.k_unique_scenes,
-            seed=self.config.sampling_seed,
-        )
 
         # Override any default environment settings
         env_config = dataclasses.replace(
@@ -105,7 +80,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.env = GPUDriveTorchEnv(
             config=env_config,
-            scene_config=scene_config,
+            data_loader=data_loader,
             render_config=render_config,
             max_cont_agents=self.max_cont_agents_per_env,
             device=device,
@@ -119,14 +94,12 @@ class PufferGPUDrive(PufferEnv):
         self.render_mode = "rgb_array"
 
         # Get the tfrecord file names for every environment
-        self.data_batch = self.env.dataset
-        self.training_scenes_set = []
         self.env_to_files = {
             env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.data_batch)
+            for env_idx, file_path in enumerate(self.env.data_batch)
         }
-
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
+
         # Number of controlled agents across all worlds
         self.num_agents = self.controlled_agent_mask.sum().item()
 
@@ -459,28 +432,8 @@ class PufferGPUDrive(PufferEnv):
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
 
-        # Clear the batch
-        self.data_batch = []
-
-        # Sample batch
-        if self.num_worlds <= len(self.dataset):
-            self.data_batch = random.sample(self.dataset, self.num_worlds)
-        else:
-            # If we have more worlds than files, repeat the worlds until we have enough scenes
-            while len(self.dataset) < self.num_worlds:
-                self.data_batch.extend(
-                    random.sample(
-                        self.unique_scene_paths, len(self.data_batch)
-                    )
-                )
-                if len(self.dataset) > self.num_worlds:
-                    self.data_batch = self.data_batch[: self.num_worlds]
-
-        # Re-initialize the simulator with the new dataset
-        print(
-            f"Setting new data batch (batch_size = {len(set(self.data_batch))})\n"
-        )
-        self.env.reinit_scenarios(self.data_batch)
+        # Swap the data batch
+        self.env.swap_data_batch()
 
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -496,7 +449,7 @@ class PufferGPUDrive(PufferEnv):
         # Get the tfrecord file names for every environment
         self.env_to_files = {
             env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.data_batch)
+            for env_idx, file_path in enumerate(self.env.data_batch)
         }
 
     def clear_render_storage(self):

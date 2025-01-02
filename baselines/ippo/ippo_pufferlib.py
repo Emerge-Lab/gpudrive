@@ -20,6 +20,7 @@ from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
 
 from networks.late_fusion import LateFusionTransformer
+from pygpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
 import pufferlib.vector
@@ -249,8 +250,17 @@ def run(
     if torch.cuda.is_available():
         config["train"]["device"] = "cuda"  # Set to 'cuda' if available
 
+    # Make dataloader
+    train_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=config.environment.num_worlds,
+        dataset_size=config.train.resample_dataset_size,
+        sample_with_replacement=True,
+    )
+
+    # Make environment
     make_env = env_creator(
-        data_dir=config.data_dir,
+        data_loader=train_loader,
         environment_config=config.environment,
         train_config=config.train,
         device=config.train.device,

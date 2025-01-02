@@ -20,6 +20,7 @@ from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
+from pygpudrive.env.dataset import SceneDataLoader
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -28,7 +29,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def __init__(
         self,
         config,
-        scene_config,
+        data_loader,
         max_cont_agents,
         device="cuda",
         action_type="discrete",
@@ -37,8 +38,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     ):
         # Initialization of environment configurations
         self.config = config
-        self.scene_config = scene_config
-        self.num_worlds = scene_config.num_scenes
+        self.data_loader = data_loader
+        self.num_worlds = data_loader.batch_size
         self.max_cont_agents = max_cont_agents
         self.device = device
         self.render_config = render_config
@@ -47,8 +48,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
-        # Initialize simulator with parameters
-        self.sim = self._initialize_simulator(params, scene_config)
+        # Get initial data batch
+        self.data_batch = next(iter(self.data_loader))
+
+        # Initialize simulator
+        self.sim = self._initialize_simulator(params, self.data_batch)
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
@@ -475,6 +479,34 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             axis=2
         )
 
+    def swap_data_batch(self, data_batch=None):
+        """
+        Swap the current data batch in the simulator with a new one
+        and reinitialize dependent attributes.
+        """
+        # Sample new data batch from the data loader
+        if data_batch is None:
+            self.data_batch = next(self.data_loader)
+        else:
+            self.data_batch = data_batch
+
+        # Validate that the number of worlds (envs) matches the batch size
+        if len(self.data_batch) != self.num_worlds:
+            raise ValueError(
+                f"Data batch size ({len(self.data_batch)}) does not match "
+                f"the expected number of worlds ({self.num_worlds})."
+            )
+
+        # Update the simulator with the new data
+        self.sim.set_maps(self.data_batch)
+
+        # Reinitialize the mask for controlled agents
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
@@ -543,30 +575,32 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    # CONFIGURE
-    TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 32
-    NUM_WORLDS = 1
-
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
+    data_config = SceneConfig(batch_size=100, dataset_size=1000)
 
-    # MAKE ENV
-    env = GPUDriveTorchEnv(
-        config=env_config,
-        scene_config=scene_config,
-        max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
-        device="cpu",
-        render_config=render_config,
+    # Create data loader
+    train_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=data_config.batch_size,
+        dataset_size=data_config.dataset_size,
+        sample_with_replacement=True,
     )
 
-    # RUN
+    # Make env
+    env = GPUDriveTorchEnv(
+        config=env_config,
+        data_loader=train_loader,
+        max_cont_agents=128,  # Number of agents to control
+        device="cuda",
+    )
+
+    # Rollout
     obs = env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
-    for t in range(TOTAL_STEPS):
+    for t in range(env_config.episode_len):
         print(f"Step: {t}")
 
         # Step the environment
