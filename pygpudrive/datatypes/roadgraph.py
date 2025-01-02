@@ -79,7 +79,7 @@ class GlobalRoadGraphPoints:
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(roadgraph_tensor.to_torch().to(device))
+            return cls(roadgraph_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
