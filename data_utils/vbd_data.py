@@ -47,7 +47,7 @@ def filter_topk_roadgraph_points(global_road_graph, reference_points, topk):
         filtered_width = global_road_graph.segment_width[0][top_idx]
         filtered_height = global_road_graph.segment_height[0][top_idx]
         filtered_orientation = global_road_graph.orientation[0][top_idx]
-        filtered_type = global_road_graph.type[0][top_idx]
+        filtered_type = global_road_graph.vbd_type[0][top_idx]
         filtered_id = global_road_graph.id[0][top_idx]
 
         # Stack the filtered attributes to form a new roadgraph tensor
@@ -298,7 +298,7 @@ def process_scenario_data(
     roadgraph_points_x = np.asarray(global_road_graph.x[0])
     roadgraph_points_y = np.asarray(global_road_graph.y[0])
     roadgraph_points_heading = np.asarray(global_road_graph.orientation[0])
-    roadgraph_points_types = np.asarray(global_road_graph.type[0])
+    roadgraph_points_types = np.asarray(global_road_graph.vbd_type[0])
     road_graph_points_ids = np.asarray(global_road_graph.id[0])
     
     for id in sorted_map_ids:

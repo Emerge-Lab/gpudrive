@@ -65,8 +65,9 @@ class GlobalRoadGraphPoints:
         self.segment_width = roadgraph_tensor[:, :, 3]
         self.segment_height = roadgraph_tensor[:, :, 4]
         self.orientation = roadgraph_tensor[:, :, 5]
+        self.type = roadgraph_tensor[:, :, 6] # Original GPUDrive road types, used for plotting
         self.id = roadgraph_tensor[:, :, 7]
-        self.type = roadgraph_tensor[:, :, 8]
+        self.vbd_type = roadgraph_tensor[:, :, 8] # VBD map types aligned with Waymax
         self.num_points = roadgraph_tensor.shape[1]
 
     @classmethod
