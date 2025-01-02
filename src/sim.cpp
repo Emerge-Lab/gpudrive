@@ -279,15 +279,14 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const CollisionDetectionEvent &collisionEvent,
+                           CollisionDetectionEvent& collisionEvent,
                            const ResponseType &responseType) {
-    
     if (collisionEvent.hasCollided.load_relaxed()) {
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
                 e.get<Done>(agent_iface.e).v = 1;
                 agentZeroVelSystem(e, velocity);
-                 break;
+                break;
 
             case CollisionBehaviour::AgentRemoved:
                 e.get<Done>(agent_iface.e).v = 1;
@@ -296,21 +295,22 @@ inline void movementSystem(Engine &e,
                 break;
 
             case CollisionBehaviour::Ignore:
-                // Do nothing.
+                // Reset collision state at the start of each timestep.
+                // This ensures the collision state is only true if the agent collided in the current timestep.
+                collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
                 break;
         }
     }
+
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
-    if(responseType == ResponseType::Static)
-    {
+    if (responseType == ResponseType::Static) {
         // Do nothing. The agent is static.
         // Agent can only be static if isStaticAgentControlled is set to true.
         return;
     }
 
-    if(e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static)
-    {
+    if (e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static) {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
         // In that case we teleport the agent. The agent will not collide with anything.
@@ -322,11 +322,9 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if(controlledState.controlled)
-    {
+    if (controlledState.controlled) {
         Action &action = e.get<Action>(agent_iface.e);
-        switch (e.data().params.dynamicsModel)
-        {
+        switch (e.data().params.dynamicsModel) {
 
             case DynamicsModel::InvertibleBicycle:
             {
@@ -349,9 +347,7 @@ inline void movementSystem(Engine &e,
                 break;
             }
         }
-    }
-    else
-    {
+    } else {
         // Follow expert trajectory
         const Trajectory &trajectory = e.get<Trajectory>(agent_iface.e);
         CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
@@ -513,6 +509,7 @@ inline void doneSystem(Engine &ctx,
         }
     }
 }
+
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
@@ -537,7 +534,7 @@ void collisionDetectionSystem(Engine &ctx,
                 // Case: If a controlled agent gets done, we teleport it to the padding position
                 // Hence we need to ignore the collision detection for it.
                 // The agent can also be done because it collided.
-                // In that case, we don't want to ignore collision. Especially if AgentStop is set.
+                // In that case, we dont want to ignore collision. Especially if AgentStop is set.
                 auto &done = ctx.get<Done>(agent_iface.value().e);
                 auto &collisionEvent = ctx.get<CollisionDetectionEvent>(candidate);
                 if (done.v && !collisionEvent.hasCollided.load_relaxed())
@@ -551,6 +548,7 @@ void collisionDetectionSystem(Engine &ctx,
 
     if (isInvalidExpertOrDone(candidateCollision.a) || 
         isInvalidExpertOrDone(candidateCollision.b)) {
+
         return;
     }
 
@@ -576,70 +574,61 @@ void collisionDetectionSystem(Engine &ctx,
     auto obbB = OrientedBoundingBox2D::from(positionB, rotationB, scaleB);
 
     bool hasCollided = OrientedBoundingBox2D::hasCollided(obbA, obbB);
-    
-    // Reset the collision status for each entity
-    auto maybeCollisionDetectionEventA = ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
-    if (maybeCollisionDetectionEventA.valid()) {
-        maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(0);
-        auto agent_ifaceA = ctx.get<AgentInterfaceEntity>(candidateCollision.a).e;
-        ctx.get<Info>(agent_ifaceA).collidedWithRoad = 0;
-        ctx.get<Info>(agent_ifaceA).collidedWithVehicle = 0;
-        ctx.get<Info>(agent_ifaceA).collidedWithNonVehicle = 0;
-    }
-
-    auto maybeCollisionDetectionEventB = ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
-    if (maybeCollisionDetectionEventB.valid()) {
-        maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(0);
-        auto agent_ifaceB = ctx.get<AgentInterfaceEntity>(candidateCollision.b).e;
-        ctx.get<Info>(agent_ifaceB).collidedWithRoad = 0;
-        ctx.get<Info>(agent_ifaceB).collidedWithVehicle = 0;
-        ctx.get<Info>(agent_ifaceB).collidedWithNonVehicle = 0;
-    }
-
-    if (!hasCollided) {
+    if (not hasCollided) {
         return;
     }
 
-    // Handle the collision and update the collision state accordingly
     EntityType aEntityType = ctx.get<EntityType>(candidateCollision.a);
     EntityType bEntityType = ctx.get<EntityType>(candidateCollision.b);
 
-    for (auto &pair : ctx.data().collisionPairs)
+    for(auto &pair : ctx.data().collisionPairs)
     {
-        if ((pair.first == aEntityType && pair.second == bEntityType) ||
-            (pair.first == bEntityType && pair.second == aEntityType))
+        if((pair.first == aEntityType && pair.second == bEntityType) ||
+           (pair.first == bEntityType && pair.second == aEntityType))
         {
             return;
         }
     }
 
+    auto maybeCollisionDetectionEventA =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
     if (maybeCollisionDetectionEventA.valid()) {
         maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
-        auto agent_ifaceA = ctx.get<AgentInterfaceEntity>(candidateCollision.a).e;
-        if (bEntityType > EntityType::None && bEntityType <= EntityType::StopSign) {
-            ctx.get<Info>(agent_ifaceA).collidedWithRoad = 1;
+        auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.a).e;
+        if(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)
+        {
+            ctx.get<Info>(agent_iface).collidedWithRoad = 1;
         }
-        else if (bEntityType == EntityType::Vehicle) {
-            ctx.get<Info>(agent_ifaceA).collidedWithVehicle = 1;
+        else if(bEntityType == EntityType::Vehicle)
+        {
+            ctx.get<Info>(agent_iface).collidedWithVehicle = 1;
         }
-        else if (bEntityType <= EntityType::Cyclist) {
-            ctx.get<Info>(agent_ifaceA).collidedWithNonVehicle = 1;
+        else if(bEntityType <= EntityType::Cyclist)
+        {
+            ctx.get<Info>(agent_iface).collidedWithNonVehicle = 1;
         }
     }
 
+    auto maybeCollisionDetectionEventB =
+        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
     if (maybeCollisionDetectionEventB.valid()) {
         maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
-        auto agent_ifaceB = ctx.get<AgentInterfaceEntity>(candidateCollision.b).e;
-        if (aEntityType > EntityType::None && aEntityType <= EntityType::StopSign) {
-            ctx.get<Info>(agent_ifaceB).collidedWithRoad = 1;
+        auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.b).e;
+        if(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)
+        {
+            ctx.get<Info>(agent_iface).collidedWithRoad = 1;
         }
-        else if (aEntityType == EntityType::Vehicle) {
-            ctx.get<Info>(agent_ifaceB).collidedWithVehicle = 1;
+        else if(aEntityType == EntityType::Vehicle)
+        {
+            ctx.get<Info>(agent_iface).collidedWithVehicle = 1;
         }
-        else if (aEntityType <= EntityType::Cyclist) {
-            ctx.get<Info>(agent_ifaceB).collidedWithNonVehicle = 1;
+        else if(aEntityType <= EntityType::Cyclist)
+        {
+            ctx.get<Info>(agent_iface).collidedWithNonVehicle = 1;
         }
     }
+
+
 }
 
 // Helper function for sorting nodes in the taskgraph.
