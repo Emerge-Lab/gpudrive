@@ -254,13 +254,13 @@ if __name__ == "__main__":
         data_loader=train_loader,
         dataset_name="train",
         store=True,
-        store_dir="",
+        #store_dir="",
     )
 
-    df_res_test = evaluate_policy(
-        env=env,
-        policy=policy,
-        data_loader=test_loader,
-        dataset_name="test",
-        store=True,
-    )
+    # df_res_test = evaluate_policy(
+    #     env=env,
+    #     policy=policy,
+    #     data_loader=test_loader,
+    #     dataset_name="test",
+    #     store=True,
+    # )

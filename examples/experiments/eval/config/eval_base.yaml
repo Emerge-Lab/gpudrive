@@ -24,4 +24,4 @@ obs_radius: 50.0 # Visibility radius of the agents
 device: "cuda" # Options: "cpu", "cuda"
 
 
-model_path: examples/experiments/eval/models/model_PPO__S_100__01_01_12_34_30_454_000130.pt
+model_path: examples/experiments/eval/models/model_PPO__R_1000__01_01_16_47_36_976_000600.pt

@@ -16,8 +16,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination" #"distance_to_logs"
-  collision_weight: -0.05
-  off_road_weight: -0.05
+  collision_weight: -0.25
+  off_road_weight: -0.25
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop"
@@ -46,7 +46,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: true
   resample_criterion: "global_step"
   resample_dataset_size: 1000 # Number of unique scenes to sample from
   resample_interval: 5_000_000
@@ -55,7 +55,7 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 500_000_000
-  batch_size: 131_072
+  batch_size: 81_920 #131_072
   minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
@@ -77,12 +77,12 @@ train:
     hidden_dim: 128 # Latent dimension 
     pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
     num_transformer_layers: 0 # Number of transformer layers
-    dropout: 0.1
+    dropout: 0.01
     class_name: "LateFusionTransformer" 
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 10 # Save policy every k iterations
+  checkpoint_interval: 200 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
