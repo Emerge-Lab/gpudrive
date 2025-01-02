@@ -403,7 +403,7 @@ class PufferGPUDrive(PufferEnv):
             )
             time_steps = list(self.episode_lengths[envs_to_render, 0])
 
-            sim_state_figures = self.env.vis.plot_simulator_state(
+            sim_state_figures = self.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
                 zoom_radius=100,
@@ -422,8 +422,7 @@ class PufferGPUDrive(PufferEnv):
         img_arrays = []
 
         for agent_id in agent_ids:
-
-            observation_fig, _ = self.env.vis.plot_agent_observation(
+            observation_fig, _ = self.vis.plot_agent_observation(
                 env_idx=env_idx,
                 agent_idx=agent_id.item(),
             )

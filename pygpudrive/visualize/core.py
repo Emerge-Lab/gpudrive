@@ -236,7 +236,7 @@ class MatplotlibVisualizer:
         """Plot the road graph."""
 
         for road_point_type in road_graph.type.unique().tolist():
-            if road_point_type == int(gpudrive.EntityType._None):
+            if road_point_type == int(gpudrive.EntityType._None) or road_point_type == -1:
                 # Skip padding road points
                 continue
             else:
@@ -285,12 +285,15 @@ class MatplotlibVisualizer:
 
                 else:
                     # Dots for other road point types
+                    # TODO: Add support for new road point types
+                    color = ROAD_GRAPH_COLORS[int(road_point_type)] if int(road_point_type) in ROAD_GRAPH_COLORS else "black"
+                    
                     ax.scatter(
                         road_graph.x[env_idx, road_mask],
                         road_graph.y[env_idx, road_mask],
                         s=5 * marker_size_scale,
                         label=road_point_type,
-                        color=ROAD_GRAPH_COLORS[int(road_point_type)],
+                        color=color,
                     )
 
     def _plot_filtered_agent_bounding_boxes(

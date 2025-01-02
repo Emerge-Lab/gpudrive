@@ -21,9 +21,8 @@ from pygpudrive.datatypes.roadgraph import (
     GlobalRoadGraphPoints,
 )
 from pygpudrive.datatypes.metadata import Metadata
-
 from pygpudrive.visualize.core import MatplotlibVisualizer
-
+from pygpudrive.visualize.utils import img_from_fig
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -502,7 +501,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 actions=self.log_playback_traj[:, :, time_step, :]
             )
             if render_init:  # Render the initial frames
-                self.init_frames.append(self.render())
+                fig = self.vis.plot_simulator_state(
+                    env_indices=[0],
+                    time_steps=[time_step],
+                )[0]
+                self.init_frames.append(img_from_fig(fig))
 
         metadata =  Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
