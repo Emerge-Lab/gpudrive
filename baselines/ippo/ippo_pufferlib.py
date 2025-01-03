@@ -254,7 +254,7 @@ def run(
     train_loader = SceneDataLoader(
         root="data/processed/training",
         batch_size=config.environment.num_worlds,
-        dataset_size=config.train.resample_dataset_size,
+        dataset_size=config.train.resample_dataset_size if config.train.resample_scenes else config.environment.k_unique_scenes,
         sample_with_replacement=True,
     )
 
@@ -271,4 +271,5 @@ def run(
 
 
 if __name__ == "__main__":
+
     app()

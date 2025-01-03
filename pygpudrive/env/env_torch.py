@@ -3,9 +3,7 @@
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
-import gpudrive
 from itertools import product
-import gymnasium as gym
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
 
@@ -48,8 +46,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
-        # Get initial data batch
-        self.data_batch = next(iter(self.data_loader))
+        # Initialize the iterator once
+        self.data_iterator = iter(self.data_loader)
+
+        # Get the initial data batch
+        self.data_batch = next(self.data_iterator)
 
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
@@ -486,7 +487,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         # Sample new data batch from the data loader
         if data_batch is None:
-            self.data_batch = next(self.data_loader)
+            self.data_batch = next(self.data_iterator)
         else:
             self.data_batch = data_batch
 

@@ -56,7 +56,7 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 36), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 42), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 16), decimals=3
@@ -137,9 +137,10 @@ class SceneConfig:
             K_UNIQUE_N discipline.
         seed (Optional[int]): Seed for random scene selection.
     """
-
-    path: str
-    num_scenes: int
+    batch_size: int # Number of scenes per batch (should be equal to number of worlds in the env).
+    dataset_size: int # Maximum number of files to include in the dataset.
+    path: str = None
+    num_scenes: int = None
     discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
     k_unique_scenes: Optional[int] = None
     seed: Optional[int] = None
