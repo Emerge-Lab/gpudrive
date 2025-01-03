@@ -93,7 +93,7 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
-        3.0  # Radius around goal considered as "goal achieved"
+        4.0  # Radius around goal considered as "goal achieved"
     )
 
     # C++ and Python shared settings (modifiable via C++ codebase)
