@@ -508,6 +508,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        # Reinitialize the visualizer with the new data
+        # TODO: Improve
+        self.vis = MatplotlibVisualizer(
+            sim_object=self.sim,
+            goal_radius=self.config.dist_to_goal_threshold,
+            backend=self.backend,
+            num_worlds=self.num_worlds,
+            render_config=self.render_config,
+            env_config=self.config,
+        )
+
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
