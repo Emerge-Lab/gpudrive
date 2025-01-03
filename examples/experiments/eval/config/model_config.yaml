@@ -8,6 +8,6 @@ models:
   # - name: model_PPO__R_10000__01_02_19_06_39_239_008000.pt
   #   train_dataset_size: 10_000
   #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_10000__01_02_19_06_39_239?nw=nwuserdaphnecor
-    
+
   # - model_name: None
   #   train_dataset: 100

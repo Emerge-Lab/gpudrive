@@ -21,7 +21,9 @@ def load_policy(path_to_cpt, model_name, device):
     """Load a policy from a given path."""
 
     # Load the saved checkpoint
-    saved_cpt = torch.load(f'{path_to_cpt}/{model_name}.pt', map_location=device)
+    saved_cpt = torch.load(
+        f"{path_to_cpt}/{model_name}.pt", map_location=device
+    )
 
     # Create policy architecture from saved checkpoint
     policy = LateFusionTransformer(
@@ -42,14 +44,14 @@ def load_policy(path_to_cpt, model_name, device):
 
 def rollout(env, policy, device, render_sim_state=False):
     """Rollout policy in the environment."""
-    
-    sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)} 
+
+    sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)}
 
     # Storage
     goal_achieved = torch.zeros(env.num_worlds).to(device)
     collided = torch.zeros(env.num_worlds).to(device)
     off_road = torch.zeros(env.num_worlds).to(device)
-    
+
     active_worlds = list(range(env.num_worlds))
 
     next_obs = env.reset()
@@ -70,19 +72,19 @@ def rollout(env, policy, device, render_sim_state=False):
 
         # Step the environment
         env.step_dynamics(action_template)
-        
-        if render_sim_state:# and time_step % 2 == 0:
+
+        if render_sim_state:  # and time_step % 2 == 0:
             print(f"Rendering time step: {time_step}")
-            
+
             # Render worlds that are not done
             figs = env.vis.plot_simulator_state(
                 env_indices=active_worlds,
-                time_steps=[time_step]*len(active_worlds),
+                time_steps=[time_step] * len(active_worlds),
                 zoom_radius=150,
             )
             for i, env_id in enumerate(active_worlds):
-                sim_state_frames[env_id].append(img_from_fig(figs[i])) 
-                
+                sim_state_frames[env_id].append(img_from_fig(figs[i]))
+
         # Get infos from the environment
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
@@ -103,10 +105,14 @@ def rollout(env, policy, device, render_sim_state=False):
                 # If world is not done yet, store scene stats
                 if world in active_worlds:
                     active_worlds.remove(world)
-                    print(f'done_worlds: {world} at t = {time_step}')
-                    
+                    print(f"done_worlds: {world} at t = {time_step}")
+
                     goal_achieved[world] = (
-                        (infos.goal_achieved[world, :][env.cont_agent_mask[world]])
+                        (
+                            infos.goal_achieved[world, :][
+                                env.cont_agent_mask[world]
+                            ]
+                        )
                         .sum()
                         .item()
                     )
@@ -133,11 +139,11 @@ def rollout(env, policy, device, render_sim_state=False):
     controlled_agents_in_world = env.cont_agent_mask.sum(dim=1)
 
     return (
-        goal_achieved, 
-        collided, 
-        off_road, 
-        controlled_agents_in_world, 
-        sim_state_frames
+        goal_achieved,
+        collided,
+        off_road,
+        controlled_agents_in_world,
+        sim_state_frames,
     )
 
 
@@ -209,14 +215,14 @@ def load_config(cfg: str) -> Box:
 
 def make_env(config):
     """Make the environment with the given config."""
-    
+
     train_loader = SceneDataLoader(
         root="data/processed/training",
         batch_size=setting_config.num_worlds,
         dataset_size=1000,
         sample_with_replacement=False,
-    )  
-        
+    )
+
     # Override any default environment settings
     env_config = dataclasses.replace(
         EnvConfig(),
@@ -244,6 +250,7 @@ def make_env(config):
 
     return env
 
+
 def make_videos(data_batch, env, policy, device):
     """Make videos policy rollouts environment."""
 
@@ -251,30 +258,35 @@ def make_videos(data_batch, env, policy, device):
     env.swap_data_batch(data_batch)
 
     # Rollout policy in the environments
-    _, _, _, _, sim_state_frames = rollout(env, policy, device, render_sim_state=True)
+    _, _, _, _, sim_state_frames = rollout(
+        env, policy, device, render_sim_state=True
+    )
 
     return sim_state_frames
+
 
 if __name__ == "__main__":
 
     # Load configurations
-    setting_config = load_config("examples/experiments/eval/config/setting_config")
+    setting_config = load_config(
+        "examples/experiments/eval/config/setting_config"
+    )
     model_config = load_config("examples/experiments/eval/config/model_config")
-    
+
     # Make environment
     env = make_env(setting_config)
-    
+
     for model in model_config.models:
-        
-        print(f'Evaluating model: {model.name}')
-       
+
+        print(f"Evaluating model: {model.name}")
+
         # Load policy
         policy = load_policy(
             path_to_cpt=model_config.models_path,
             model_name=model.name,
             device=setting_config.device,
         )
-        
+
         # Create data loaders
         train_loader = SceneDataLoader(
             root="data/processed/training",
@@ -304,16 +316,16 @@ if __name__ == "__main__":
             data_loader=test_loader,
             dataset_name="test",
         )
-        
+
         # Concatenate train/test results
         df_res = pd.concat([df_res_train, df_res_test])
-        
+
         # Add metadata
         df_res["train_dataset_size"] = model.train_dataset_size
-        
-        # Store 
+
+        # Store
         df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
-        
+
     # Visualize failures
     # Sample scenarios with a high failure rate
     # Load policy
@@ -322,61 +334,72 @@ if __name__ == "__main__":
         model_name=model.name,
         device=setting_config.device,
     )
-    
-    print(f'Visualizing failed scenarios for model: {model.name}')
-    
+
+    print(f"Visualizing failed scenarios for model: {model.name}")
+
     bad_scenarios = df_res_train[df_res_train["goal_achieved"] < 0.5]
-    
+
     # All train
     base_path = "data/processed/training/"
     selected_scenes_train = df_res_train.scene.values
-    selected_batch_train = [f"{base_path}{scene}.json" for scene in selected_scenes_train]
+    selected_batch_train = [
+        f"{base_path}{scene}.json" for scene in selected_scenes_train
+    ]
 
     sim_state_frames_train = make_videos(
         data_batch=selected_batch_train,
-        env=env, 
-        policy=policy, 
-        device=setting_config.device
+        env=env,
+        policy=policy,
+        device=setting_config.device,
     )
-    
+
     # Test
     base_path = "data/processed/testing/"
     selected_scenes_test = df_res_test.scene.values
-    selected_batch_test = [f"{base_path}{scene}.json" for scene in selected_scenes_test][:10]
+    selected_batch_test = [
+        f"{base_path}{scene}.json" for scene in selected_scenes_test
+    ][:10]
 
     sim_state_frames_test = make_videos(
         data_batch=selected_batch_test,
-        env=env, 
-        policy=policy, 
-        device=setting_config.device
+        env=env,
+        policy=policy,
+        device=setting_config.device,
     )
-    
+
     # Convert to set of numpy arrays
-    sim_state_arrays_train = {k: np.array(v) for k, v in sim_state_frames_train.items()}
-    sim_state_arrays_test = {k: np.array(v) for k, v in sim_state_frames_test.items()}
-    
+    sim_state_arrays_train = {
+        k: np.array(v) for k, v in sim_state_frames_train.items()
+    }
+    sim_state_arrays_test = {
+        k: np.array(v) for k, v in sim_state_frames_test.items()
+    }
+
     # Save videos
     output_folder = "output_videos_small_model"
     os.makedirs(output_folder, exist_ok=True)
 
     # Save videos
     for env_id, frames in sim_state_arrays_train.items():
-        
+
         # Define the output file path
-        video_path = os.path.join(output_folder, f"{selected_scenes_train[env_id]}.mp4")
-        
+        video_path = os.path.join(
+            output_folder, f"{selected_scenes_train[env_id]}.mp4"
+        )
+
         # Convert frames (numpy arrays) to video
-        mediapy.write_video(video_path, frames, fps=15, codec='h264')
-        
+        mediapy.write_video(video_path, frames, fps=15, codec="h264")
+
         print(f"Saved video: {video_path}")
-    
+
     for env_id, frames in sim_state_arrays_test.items():
-        
+
         # Define the output file path
-        video_path = os.path.join(output_folder, f"{selected_scenes_test[env_id]}.mp4")
-        
+        video_path = os.path.join(
+            output_folder, f"{selected_scenes_test[env_id]}.mp4"
+        )
+
         # Convert frames (numpy arrays) to video
-        mediapy.write_video(video_path, frames, fps=15, codec='h264')
-        
+        mediapy.write_video(video_path, frames, fps=15, codec="h264")
+
         print(f"Saved video: {video_path}")
-        

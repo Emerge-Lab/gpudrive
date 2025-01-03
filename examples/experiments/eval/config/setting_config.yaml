@@ -12,7 +12,7 @@ partner_obs: true
 normalize_obs: true
 remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
 use_lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-reward_type: "weighted_combination" 
+reward_type: "weighted_combination"
 collision_weight: -0.1
 off_road_weight: -0.1
 goal_achieved_weight: 1.0
