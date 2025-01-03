@@ -10,10 +10,8 @@ class ResponseType:
 
     def __init__(self, tensor: torch.Tensor):
         """Initializes the ego state with an observation tensor."""
-        self.moving = (tensor == 0).squeeze(-1)  # Controlled agents
-        self.kinematic = (tensor == 1).squeeze(
-            -1
-        )  # Kinematic agents (not used)
+        self.moving = (tensor == 0).squeeze(-1)  # Agents that are moving
+        self.kinematic = (tensor == 1).squeeze(-1)  # Kinematic (not used)
         self.static = (tensor == 2).squeeze(-1)  # Static and padding agents
 
     @classmethod
