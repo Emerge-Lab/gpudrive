@@ -355,19 +355,24 @@ def process_scenario_data(
     relations = np.asarray(relations)
 
     data_dict = {
-        "agents_history": np.float32(agents_history),
-        "agents_interested": np.int32(agents_interested),
-        "agents_type": np.int32(agents_type),
-        "agents_future": np.float32(agents_future),
-        "traffic_light_points": np.float32(traffic_light_points),
-        "polylines": np.float32(polylines),
-        "polylines_valid": np.int32(polylines_valid),
-        "relations": np.float32(relations),
-        "agents_id": np.int32(agents_id),
-        "anchors": np.zeros((1, 32, 64, 2)),  # Placeholder, not used
+        "agents_history": np.float32(np.expand_dims(agents_history, axis=0)),
+        "agents_interested": np.int32(np.expand_dims(agents_interested, axis=0)),
+        "agents_type": np.int32(np.expand_dims(agents_type, axis=0)),
+        "agents_future": np.float32(np.expand_dims(agents_future, axis=0)),
+        "traffic_light_points": np.float32(np.expand_dims(traffic_light_points, axis=0)),
+        "polylines": np.float32(np.expand_dims(polylines, axis=0)),
+        "polylines_valid": np.int32(np.expand_dims(polylines_valid, axis=0)),
+        "relations": np.float32(np.expand_dims(relations, axis=0)),
+        "agents_id": np.int32(np.expand_dims(agents_id, axis=0)),
     }
 
-    return data_dict
+    torch_dict = {
+        key: torch.from_numpy(value) 
+        for key, value in data_dict.items()
+    }
+    torch_dict["anchors"] = torch.zeros(1, 32, 64, 2) # Placeholder, not used
+
+    return torch_dict
 
 
 def sample_to_action():

@@ -548,7 +548,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Convert TFRecord files to JSON. \
-            Note: This takes about 45 seconds per tfrecord file (=50 traffic scenes)."
+            Note: This takes about 45 seconds per tfrecord file (=500 traffic scenes)."
     )
     parser.add_argument(
         "tfrecord_dir", help="Path to the directory containing TFRecord files"
