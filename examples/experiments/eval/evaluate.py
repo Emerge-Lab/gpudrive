@@ -1,25 +1,27 @@
 import torch
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import yaml
 from box import Box
+import numpy as np
 import dataclasses
-from datetime import datetime
+import os
 from pathlib import Path
+import mediapy
 
-from pygpudrive.env.config import EnvConfig, SceneConfig, SelectionDiscipline
+from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.env.dataset import SceneDataLoader
+from pygpudrive.visualize.utils import img_from_fig
 
 from networks.late_fusion import LateFusionTransformer
 
 
-def load_policy(path_to_cpt, device):
+def load_policy(path_to_cpt, model_name, device):
     """Load a policy from a given path."""
 
     # Load the saved checkpoint
-    saved_cpt = torch.load(path_to_cpt, map_location=device)
+    saved_cpt = torch.load(f'{path_to_cpt}/{model_name}.pt', map_location=device)
 
     # Create policy architecture from saved checkpoint
     policy = LateFusionTransformer(
@@ -38,13 +40,17 @@ def load_policy(path_to_cpt, device):
     return policy.eval()
 
 
-def rollout(env, policy, device):
+def rollout(env, policy, device, render_sim_state=False):
     """Rollout policy in the environment."""
+    
+    sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)} 
 
     # Storage
     goal_achieved = torch.zeros(env.num_worlds).to(device)
     collided = torch.zeros(env.num_worlds).to(device)
     off_road = torch.zeros(env.num_worlds).to(device)
+    
+    active_worlds = list(range(env.num_worlds))
 
     next_obs = env.reset()
 
@@ -56,6 +62,7 @@ def rollout(env, policy, device):
         # Get actions
         action, _, _, _ = policy(next_obs[live_agent_mask])
 
+        # Insert actions at the right positions
         action_template = torch.zeros(
             (env.num_worlds, env.max_agent_count), dtype=torch.int64
         ).to(device)
@@ -63,14 +70,26 @@ def rollout(env, policy, device):
 
         # Step the environment
         env.step_dynamics(action_template)
-
+        
+        if render_sim_state:# and time_step % 2 == 0:
+            print(f"Rendering time step: {time_step}")
+            
+            # Render worlds that are not done
+            figs = env.vis.plot_simulator_state(
+                env_indices=active_worlds,
+                time_steps=[time_step]*len(active_worlds),
+                zoom_radius=150,
+            )
+            for i, env_id in enumerate(active_worlds):
+                sim_state_frames[env_id].append(img_from_fig(figs[i])) 
+                
         # Get infos from the environment
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
 
         # Update mask
-        live_agent_mask = torch.logical_or(live_agent_mask, ~dones)
+        live_agent_mask[dones] = False
 
         # Check terminal envs and store stats
         num_dones_per_world = (dones * env.cont_agent_mask).sum(dim=1)
@@ -81,23 +100,29 @@ def rollout(env, policy, device):
 
         if len(done_worlds) > 0:
             for world in done_worlds:
-                goal_achieved[world] = (
-                    (infos.goal_achieved[world, :][env.cont_agent_mask[world]])
-                    .sum()
-                    .item()
-                )
-                collided[world] = (
-                    infos.collided[world, :][env.cont_agent_mask[world]]
-                    .sum()
-                    .item()
-                )
-                off_road[world] = (
-                    infos.off_road[world, :][env.cont_agent_mask[world]]
-                    .sum()
-                    .item()
-                )
+                # If world is not done yet, store scene stats
+                if world in active_worlds:
+                    active_worlds.remove(world)
+                    print(f'done_worlds: {world} at t = {time_step}')
+                    
+                    goal_achieved[world] = (
+                        (infos.goal_achieved[world, :][env.cont_agent_mask[world]])
+                        .sum()
+                        .item()
+                    )
+                    collided[world] = (
+                        infos.collided[world, :][env.cont_agent_mask[world]]
+                        .sum()
+                        .item()
+                    )
+                    off_road[world] = (
+                        infos.off_road[world, :][env.cont_agent_mask[world]]
+                        .sum()
+                        .item()
+                    )
+                else:
+                    continue
 
-        # Check if all agents are done
         if dones.all():
             break
 
@@ -107,7 +132,13 @@ def rollout(env, policy, device):
     off_road = off_road / env.cont_agent_mask.sum(dim=1)
     controlled_agents_in_world = env.cont_agent_mask.sum(dim=1)
 
-    return goal_achieved, collided, off_road, controlled_agents_in_world
+    return (
+        goal_achieved, 
+        collided, 
+        off_road, 
+        controlled_agents_in_world, 
+        sim_state_frames
+    )
 
 
 def evaluate_policy(
@@ -115,8 +146,6 @@ def evaluate_policy(
     policy,
     data_loader,
     dataset_name,
-    store=False,
-    store_dir="./",
     device="cuda",
 ):
     """Evaluate policy in the environment."""
@@ -126,18 +155,18 @@ def evaluate_policy(
         "goal_achieved": [],
         "collided": [],
         "off_road": [],
-        "controlled_agents_in_world": [],
+        "controlled_agents_in_scene": [],
     }
 
     for batch in tqdm(
         data_loader,
-        desc=f"Processing batches",
+        desc=f"Processing {dataset_name} batches",
         total=len(data_loader),
         colour="blue",
     ):
 
         # Update simulator with the new batch of data
-        env.reinit_scenarios(batch)
+        env.swap_data_batch(batch)
 
         # Rollout policy in the environments
         (
@@ -145,6 +174,7 @@ def evaluate_policy(
             collided,
             off_road,
             controlled_agents_in_world,
+            _,
         ) = rollout(env, policy, device)
 
         # Store results for the current batch
@@ -153,17 +183,13 @@ def evaluate_policy(
         res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
         res_dict["collided"].extend(collided.cpu().numpy())
         res_dict["off_road"].extend(off_road.cpu().numpy())
-        res_dict["controlled_agents_in_world"].extend(
+        res_dict["controlled_agents_in_scene"].extend(
             controlled_agents_in_world.cpu().numpy()
         )
 
     # Convert to pandas dataframe
     df_res = pd.DataFrame(res_dict)
     df_res["dataset"] = dataset_name
-
-    if store:
-        dt_string = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        df_res.to_csv(f"{store_dir}/{dataset_name}_{dt_string}.csv")
 
     return df_res
 
@@ -183,15 +209,14 @@ def load_config(cfg: str) -> Box:
 
 def make_env(config):
     """Make the environment with the given config."""
-
-    scene_config = SceneConfig(
-        path=config.data_dir,
-        num_scenes=config.num_worlds,
-        discipline=SelectionDiscipline.K_UNIQUE_N,
-        k_unique_scenes=config.num_worlds,
-        seed=config.sampling_seed,
-    )
-
+    
+    train_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=setting_config.num_worlds,
+        dataset_size=1000,
+        sample_with_replacement=False,
+    )  
+        
     # Override any default environment settings
     env_config = dataclasses.replace(
         EnvConfig(),
@@ -212,55 +237,146 @@ def make_env(config):
 
     env = GPUDriveTorchEnv(
         config=env_config,
-        scene_config=scene_config,
+        data_loader=train_loader,
         max_cont_agents=config.max_controlled_agents,
         device=config.device,
     )
 
     return env
 
+def make_videos(data_batch, env, policy, device):
+    """Make videos policy rollouts environment."""
+
+    # Update simulator with the provided data batch
+    env.swap_data_batch(data_batch)
+
+    # Rollout policy in the environments
+    _, _, _, _, sim_state_frames = rollout(env, policy, device, render_sim_state=True)
+
+    return sim_state_frames
 
 if __name__ == "__main__":
 
-    # Make environment with the given config
-    config = load_config("examples/experiments/eval/config/eval_base")
-    env = make_env(config)
+    # Load configurations
+    setting_config = load_config("examples/experiments/eval/config/setting_config")
+    model_config = load_config("examples/experiments/eval/config/model_config")
+    
+    # Make environment
+    env = make_env(setting_config)
+    
+    for model in model_config.models:
+        
+        print(f'Evaluating model: {model.name}')
+       
+        # Load policy
+        policy = load_policy(
+            path_to_cpt=model_config.models_path,
+            model_name=model.name,
+            device=setting_config.device,
+        )
+        
+        # Create data loaders
+        train_loader = SceneDataLoader(
+            root="data/processed/training",
+            batch_size=setting_config.num_worlds,
+            dataset_size=model.train_dataset_size,
+            sample_with_replacement=False,
+        )
 
-    # Make dataloaders
-    train_loader = SceneDataLoader(
-        root="data/processed/training",
-        batch_size=100,  # Number of worlds
-        dataset_size=1000,
-        sample_with_replacement=False,
-    )
+        test_loader = SceneDataLoader(
+            root="data/processed/testing",
+            batch_size=setting_config.num_worlds,
+            dataset_size=setting_config.test_dataset_size,
+            sample_with_replacement=False,
+        )
 
-    test_loader = SceneDataLoader(
-        root="data/processed/testing",
-        batch_size=100,
-        dataset_size=1000,
-        sample_with_replacement=False,
-    )
+        # Do rollouts
+        df_res_train = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=train_loader,
+            dataset_name="train",
+        )
 
+        df_res_test = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=test_loader,
+            dataset_name="test",
+        )
+        
+        # Concatenate train/test results
+        df_res = pd.concat([df_res_train, df_res_test])
+        
+        # Add metadata
+        df_res["train_dataset_size"] = model.train_dataset_size
+        
+        # Store 
+        df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
+        
+    # Visualize failures
+    # Sample scenarios with a high failure rate
     # Load policy
     policy = load_policy(
-        path_to_cpt=config.model_path,
-        device=config.device,
+        path_to_cpt=model_config.models_path,
+        model_name=model.name,
+        device=setting_config.device,
     )
+    
+    print(f'Visualizing failed scenarios for model: {model.name}')
+    
+    bad_scenarios = df_res_train[df_res_train["goal_achieved"] < 0.5]
+    
+    # All train
+    base_path = "data/processed/training/"
+    selected_scenes_train = df_res_train.scene.values
+    selected_batch_train = [f"{base_path}{scene}.json" for scene in selected_scenes_train]
 
-    # Evaluate
-    df_res_train = evaluate_policy(
-        env=env,
-        policy=policy,
-        data_loader=train_loader,
-        dataset_name="train",
-        store=True,
-        #store_dir="",
+    sim_state_frames_train = make_videos(
+        data_batch=selected_batch_train,
+        env=env, 
+        policy=policy, 
+        device=setting_config.device
     )
+    
+    # Test
+    base_path = "data/processed/testing/"
+    selected_scenes_test = df_res_test.scene.values
+    selected_batch_test = [f"{base_path}{scene}.json" for scene in selected_scenes_test][:10]
 
-    # df_res_test = evaluate_policy(
-    #     env=env,
-    #     policy=policy,
-    #     data_loader=test_loader,
-    #     dataset_name="test",
-    #     store=True,
-    # )
+    sim_state_frames_test = make_videos(
+        data_batch=selected_batch_test,
+        env=env, 
+        policy=policy, 
+        device=setting_config.device
+    )
+    
+    # Convert to set of numpy arrays
+    sim_state_arrays_train = {k: np.array(v) for k, v in sim_state_frames_train.items()}
+    sim_state_arrays_test = {k: np.array(v) for k, v in sim_state_frames_test.items()}
+    
+    # Save videos
+    output_folder = "output_videos_small_model"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Save videos
+    for env_id, frames in sim_state_arrays_train.items():
+        
+        # Define the output file path
+        video_path = os.path.join(output_folder, f"{selected_scenes_train[env_id]}.mp4")
+        
+        # Convert frames (numpy arrays) to video
+        mediapy.write_video(video_path, frames, fps=15, codec='h264')
+        
+        print(f"Saved video: {video_path}")
+    
+    for env_id, frames in sim_state_arrays_test.items():
+        
+        # Define the output file path
+        video_path = os.path.join(output_folder, f"{selected_scenes_test[env_id]}.mp4")
+        
+        # Convert frames (numpy arrays) to video
+        mediapy.write_video(video_path, frames, fps=15, codec='h264')
+        
+        print(f"Saved video: {video_path}")
+        

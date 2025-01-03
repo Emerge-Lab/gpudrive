@@ -1,9 +1,11 @@
+res_path: examples/experiments/eval/dataframes # Store dataframes here
+test_dataset_size: 100 # Number of test scenarios to evaluate on
+
+# Environment settings
 data_dir: "data/processed/training"
-
-
-num_worlds: 100 # Number of parallel environments
-k_unique_scenes: 100 # Number of unique scenes to sample from
-max_controlled_agents: 128 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+num_worlds: 10 # Number of parallel environments for evaluation
+k_unique_scenes: 10 # Number of unique scenes to sample from
+max_controlled_agents: 128 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true
 partner_obs: true
@@ -24,4 +26,4 @@ obs_radius: 50.0 # Visibility radius of the agents
 device: "cuda" # Options: "cpu", "cuda"
 
 
-model_path: examples/experiments/eval/models/model_PPO__R_1000__01_01_16_47_36_976_000600.pt
+model_path: examples/experiments/eval/models/model_PPO__S_100__01_02_12_56_49_981_000800_cb_rmv.pt #examples/experiments/eval/models/model_PPO__R_1000__01_01_16_47_36_976_000600.pt
