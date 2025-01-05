@@ -298,6 +298,8 @@ inline void movementSystem(Engine &e,
                 // Reset collision state at the start of each timestep.
                 // This ensures the collision state is only true if the agent collided in the current timestep.
                 collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
+                Info& info = e.get<Info>(agent_iface.e);
+                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
                 break;
         }
     }
