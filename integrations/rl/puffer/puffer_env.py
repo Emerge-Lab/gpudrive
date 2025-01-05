@@ -222,8 +222,9 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()
         )
-
-        self.agent_episode_returns += reward
+        
+        # Add rewards for living agents
+        self.agent_episode_returns[self.live_agent_mask] += reward[self.live_agent_mask]
         self.episode_returns += reward_controlled
         self.episode_lengths += 1
 
