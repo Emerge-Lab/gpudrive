@@ -19,7 +19,7 @@ class SceneDataLoader:
 
     Attributes:
         root (str): Path to the directory containing scene files.
-        batch_size (int): Number of scenes per batch (should be equal to number of worlds in the env).
+        batch_size (int): Number of scenes per batch (usually equal to number of worlds in the env).
         dataset_size (int): Maximum number of files to include in the dataset.
         sample_with_replacement (bool): Whether to sample files with replacement.
         file_prefix (str): Prefix for scene files to include in the dataset.
@@ -48,6 +48,12 @@ class SceneDataLoader:
         self.dataset = self.dataset[
             : min(self.dataset_size, len(self.dataset))
         ]
+
+        # If dataset_size < batch_size, repeat the dataset until it matches the batch size
+        if self.dataset_size < self.batch_size:
+            repeat_count = (self.batch_size // self.dataset_size) + 1
+            self.dataset *= repeat_count
+            self.dataset = self.dataset[: self.batch_size]
 
         # Shuffle the dataset if required
         if self.shuffle:
@@ -97,7 +103,7 @@ if __name__ == "__main__":
     data_loader = SceneDataLoader(
         root="data/processed/training",
         batch_size=100,
-        dataset_size=1000,
+        dataset_size=50,
         sample_with_replacement=False,
         shuffle=True,  # Shuffle the dataset before batching
     )
