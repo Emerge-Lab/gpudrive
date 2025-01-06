@@ -166,6 +166,7 @@ def run(
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
+    collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -181,6 +182,7 @@ def run(
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
     group: Annotated[Optional[str], typer.Option(help="WandB group name")] = None,
+    render: Annotated[Optional[int], typer.Option(help="Whether to render the environment; 0 or 1")] = None,
 ):
     """Run PPO training with the given configuration."""
     # fmt: on
@@ -198,6 +200,7 @@ def run(
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
+        "collision_behavior": collision_behavior,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
@@ -215,6 +218,7 @@ def run(
         "update_epochs": update_epochs,
         "batch_size": batch_size,
         "minibatch_size": minibatch_size,
+        "render": True if render == 1 else False,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
@@ -252,9 +256,11 @@ def run(
 
     # Make dataloader
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root=config.data_dir,
         batch_size=config.environment.num_worlds,
-        dataset_size=config.train.resample_dataset_size if config.train.resample_scenes else config.environment.k_unique_scenes,
+        dataset_size=config.train.resample_dataset_size 
+        if config.train.resample_scenes 
+        else config.environment.k_unique_scenes,
         sample_with_replacement=True,
     )
 
