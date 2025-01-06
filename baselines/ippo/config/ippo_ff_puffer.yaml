@@ -49,7 +49,7 @@ train:
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
-  bptt_horizon: 2
+  bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
 

@@ -54,48 +54,42 @@ def entropy(logits):
 def sample_logits(
     logits: Union[torch.Tensor, List[torch.Tensor]],
     action=None,
-    is_continuous=False,
+    deterministic=False,
 ):
-    is_discrete = isinstance(logits, torch.Tensor)
-    if is_continuous:
-        batch = logits.loc.shape[0]
-        if action is None:
-            action = logits.sample().view(batch, -1)
-
-        log_probs = logits.log_prob(action.view(batch, -1)).sum(1)
-        logits_entropy = logits.entropy().view(batch, -1).sum(1)
-        return action, log_probs, logits_entropy
-    elif is_discrete:
-        normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
-        logits = [logits]
-    else:
-        normalized_logits = [
-            l - l.logsumexp(dim=-1, keepdim=True) for l in logits
-        ]
+    """Sample logits: Supports deterministic sampling."""
+    
+    normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
+    logits = [logits]
 
     if action is None:
-        action = torch.stack(
-            [
-                torch.multinomial(logits_to_probs(l), 1).squeeze()
-                for l in logits
-            ]
-        )
+        if deterministic:
+            # Select the action with the maximum probability
+            action = torch.stack(
+                [l.argmax(dim=-1) for l in logits]
+            )
+        else:
+            # Sample actions stochastically from the logits
+            action = torch.stack(
+                [
+                    torch.multinomial(logits_to_probs(l), 1).squeeze()
+                    for l in logits
+                ]
+            )
     else:
         batch = logits[0].shape[0]
         action = action.view(batch, -1).T
 
     assert len(logits) == len(action)
+
     logprob = torch.stack(
         [log_prob(l, a) for l, a in zip(normalized_logits, action)]
     ).T.sum(1)
+
     logits_entropy = torch.stack(
         [entropy(l) for l in normalized_logits]
     ).T.sum(1)
 
-    if is_discrete:
-        return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
-
-    return action.T, logprob, logits_entropy
+    return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
 
 
 class EncoderBlock(nn.Module):
@@ -120,7 +114,6 @@ class LateFusionTransformer(nn.Module):
         num_transformer_layers=0,
         dropout=0.00,
         act_func="tanh",
-        is_continuous=False,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -131,7 +124,6 @@ class LateFusionTransformer(nn.Module):
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.ReLU()
-        self.is_continuous = is_continuous
 
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -200,7 +192,7 @@ class LateFusionTransformer(nn.Module):
 
         return self.shared_embed(embed)
 
-    def forward(self, obs, action=None):
+    def forward(self, obs, action=None, deterministic=False):
 
         # Encode the observations
         hidden = self.encode_observations(obs)
@@ -209,9 +201,8 @@ class LateFusionTransformer(nn.Module):
         value = self.critic(hidden)
         logits = self.actor(hidden)
 
-        action, logprob, entropy = sample_logits(
-            logits, action, self.is_continuous
-        )
+        action, logprob, entropy = sample_logits(logits, action, deterministic)
+        
         return action, logprob, entropy, value
 
     def _build_network(self, input_dim, net_arch, network_type):

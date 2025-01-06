@@ -41,15 +41,15 @@ train:
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
-  bptt_horizon: 2
+  bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: true
   resample_criterion: "global_step"
-  resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 5_000_000
+  resample_dataset_size: 1000 # Number of unique scenes to sample from
+  resample_interval: 2_000_000
   resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
 
   # # # PPO # # #
@@ -82,12 +82,12 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 100 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
-  render_interval: 100 # Render every k iterations
+  render: true # Determines whether to render the environment (note: will slow down training)
+  render_interval: 500 # Render every k iterations
   render_k_scenarios: 5 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_agent_obs: false # Debugging tool, plot what an agent is seing

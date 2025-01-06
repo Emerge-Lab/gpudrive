@@ -1,13 +1,13 @@
 models_path: examples/experiments/eval/models
 
 models:
-  - name: model_PPO__S_10__01_03_09_18_36_173_000750
+  - name: model_PPO__S_10__01_05_14_56_16_165_000500 (1)
     train_dataset_size: 10
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__S_10__01_03_09_18_36_173?nw=nwuserdaphnecor
+    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__S_100__01_03_17_35_49_555?nw=nwuserdaphnecor
 
-  # - name: model_PPO__R_10000__01_02_19_06_39_239_008000.pt
+  # - name: model_PPO__R_10000__01_03_18_49_40_585_002500
   #   train_dataset_size: 10_000
-  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_10000__01_02_19_06_39_239?nw=nwuserdaphnecor
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_10000__01_03_18_49_48_862?nw=nwuserdaphnecor
 
   # - model_name: None
   #   train_dataset: 100
