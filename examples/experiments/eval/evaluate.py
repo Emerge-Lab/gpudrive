@@ -17,6 +17,7 @@ from pygpudrive.visualize.utils import img_from_fig
 from networks.late_fusion import LateFusionTransformer
 
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -63,11 +64,13 @@ def rollout(env, policy, device, deterministic=False, render_sim_state=False):
     live_agent_mask = env.cont_agent_mask.clone()
 
     for time_step in range(env.config.episode_len):
-        
+
         logging.debug(f"Time step: {time_step}")
 
         # Get actions
-        action, _, _, _ = policy(next_obs[live_agent_mask], deterministic=deterministic)
+        action, _, _, _ = policy(
+            next_obs[live_agent_mask], deterministic=deterministic
+        )
 
         # Insert actions at the right positions
         action_template = torch.zeros(
@@ -88,8 +91,10 @@ def rollout(env, policy, device, deterministic=False, render_sim_state=False):
                 zoom_radius=150,
             )
             for idx, env_id in enumerate(active_worlds):
-                sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
-                
+                sim_state_frames[env_id].append(
+                    img_from_fig(sim_state_figures[idx])
+                )
+
         # Get infos from the environment
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
@@ -110,9 +115,8 @@ def rollout(env, policy, device, deterministic=False, render_sim_state=False):
                 # If world is not done yet, store scene stats
                 if world in active_worlds:
                     active_worlds.remove(world)
-                    
+
                     logging.debug(f"done_worlds: {world} at t = {time_step}")
-                    logging.debug(f"goal_achieved: {infos.goal_achieved[world, :]}")
 
                     goal_achieved[world] = (
                         (
@@ -133,7 +137,7 @@ def rollout(env, policy, device, deterministic=False, render_sim_state=False):
                         .sum()
                         .item()
                     )
-                
+
                 else:
                     continue
 
@@ -161,6 +165,7 @@ def evaluate_policy(
     data_loader,
     dataset_name,
     device="cuda",
+    deterministic=False,
 ):
     """Evaluate policy in the environment."""
 
@@ -189,7 +194,7 @@ def evaluate_policy(
             off_road,
             controlled_agents_in_world,
             _,
-        ) = rollout(env, policy, device, deterministic=False)
+        ) = rollout(env, policy, device, deterministic=deterministic)
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
@@ -259,7 +264,7 @@ if __name__ == "__main__":
         "examples/experiments/eval/config/setting_config"
     )
     model_config = load_config("examples/experiments/eval/config/model_config")
-    
+
     train_loader = SceneDataLoader(
         root="data/processed/training",
         batch_size=setting_config.num_worlds,
@@ -287,7 +292,7 @@ if __name__ == "__main__":
             batch_size=setting_config.num_worlds,
             dataset_size=model.train_dataset_size,
             sample_with_replacement=False,
-            shuffle=False, # Don't shuffle because we're using the first N scenes that were also used for training  
+            shuffle=False,  # Don't shuffle because we're using the first N scenes that were also used for training
         )
 
         test_loader = SceneDataLoader(
@@ -304,22 +309,23 @@ if __name__ == "__main__":
             policy=policy,
             data_loader=train_loader,
             dataset_name="train",
+            deterministic=False,
         )
 
-        df_res_test = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=test_loader,
-            dataset_name="test",
-        )
+        # df_res_test = evaluate_policy(
+        #     env=env,
+        #     policy=policy,
+        #     data_loader=test_loader,
+        #     dataset_name="test",
+        # )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
+        df_res = pd.concat([df_res_train])  # df_res_test])
 
         # Add metadata
         df_res["train_dataset_size"] = model.train_dataset_size
 
         # Store
         df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
-        
-        print(f'Saved at {setting_config.res_path}/{model.name}.csv')
+
+        print(f"Saved at {setting_config.res_path}/{model.name}.csv")
