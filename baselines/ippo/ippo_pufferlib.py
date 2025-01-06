@@ -167,6 +167,7 @@ def run(
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
+    remove_non_vehicles: Annotated[Optional[int], typer.Option(help="Remove non-vehicles from the scene; 0 or 1")] = None,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -200,7 +201,8 @@ def run(
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
-        "collision_behavior": collision_behavior,
+        "collision_behavior": bool(collision_behavior) if collision_behavior else None,
+        "remove_non_vehicles": bool(remove_non_vehicles) if remove_non_vehicles else None,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
