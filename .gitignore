@@ -245,4 +245,11 @@ pyrightconfig.json
 # Logs
 examples/experiments/scripts/logs/*
 
+# Videos
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
+
 # End of https://www.toptal.com/developers/gitignore/api/python,c++
