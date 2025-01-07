@@ -19,7 +19,7 @@ import logging
 import torch
 import random
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class RandomPolicy:
@@ -37,14 +37,15 @@ class RandomPolicy:
         )
         return random_action, None, None, None
 
+
 def load_policy(path_to_cpt, model_name, device):
     """Load a policy from a given path."""
 
     # Load the saved checkpoint
     if model_name == "random_baseline":
         return RandomPolicy(env.action_space.n)
-    
-    else: # Load a trained model
+
+    else:  # Load a trained model
         saved_cpt = torch.load(
             f=f"{path_to_cpt}/{model_name}.pt",
             map_location=device,
@@ -73,7 +74,11 @@ def load_policy(path_to_cpt, model_name, device):
 
 
 def rollout(
-    env, policy, device, deterministic: bool = False, render_sim_state: bool = False
+    env,
+    policy,
+    device,
+    deterministic: bool = False,
+    render_sim_state: bool = False,
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -86,7 +91,7 @@ def rollout(
         render_sim_state (bool): Whether to render the simulation state.
 
     Returns:
-        tuple: Averages for goal achieved, collisions, off-road occurrences, 
+        tuple: Averages for goal achieved, collisions, off-road occurrences,
                controlled agents count, and simulation state frames.
     """
     # Initialize storage
@@ -96,11 +101,11 @@ def rollout(
     episode_len = env.config.episode_len
 
     # Metrics storage
-    goal_achieved = torch.zeros(num_worlds, device=device)
-    collided = torch.zeros(num_worlds, device=device)
-    off_road = torch.zeros(num_worlds, device=device)
-
+    goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
+    collided = torch.zeros((num_worlds, max_agent_count), device=device)
+    off_road = torch.zeros((num_worlds, max_agent_count), device=device)
     active_worlds = set(range(num_worlds))
+
     next_obs = env.reset()
     live_agent_mask = env.cont_agent_mask.clone()
 
@@ -130,12 +135,23 @@ def rollout(
                     zoom_radius=150,
                 )
                 for idx, env_id in enumerate(active_worlds):
-                    sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
+                    sim_state_frames[env_id].append(
+                        img_from_fig(sim_state_figures[idx])
+                    )
 
         # Update observations, dones, and infos
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
+
+        # Count the collisions, off-road occurrences, and goal achievements
+        # at a given time step for living agents
+        off_road[live_agent_mask] += infos.off_road[live_agent_mask]
+        collided[live_agent_mask] += infos.collided[live_agent_mask]
+        goal_achieved[live_agent_mask] += infos.goal_achieved[live_agent_mask]
+
+        logging.debug(f"active_worlds: {active_worlds}")
+        logging.debug(f"num_agents_live: {live_agent_mask.sum()}")
 
         # Update live agent mask
         live_agent_mask[dones] = False
@@ -143,34 +159,36 @@ def rollout(
         # Process completed worlds
         num_dones_per_world = (dones & env.cont_agent_mask).sum(dim=1)
         total_controlled_agents = env.cont_agent_mask.sum(dim=1)
-        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
+        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(
+            as_tuple=True
+        )[0]
 
         for world in done_worlds:
             if world in active_worlds:
                 active_worlds.remove(world)
-                logging.debug(f"World {world} completed at time step {time_step}")
-
-                mask = env.cont_agent_mask[world]
-                goal_achieved[world] = infos.goal_achieved[world, mask].sum().item()
-                collided[world] = infos.collided[world, mask].sum().item()
-                off_road[world] = infos.off_road[world, mask].sum().item()
-
+                logging.debug(
+                    f"World {world} completed at time step {time_step}"
+                )
         if not active_worlds:  # Exit early if all worlds are done
             break
 
-    # Normalize metrics
-    controlled_agents_per_world = env.cont_agent_mask.sum(dim=1).float()
-    goal_achieved = torch.div(
-        goal_achieved, controlled_agents_per_world, rounding_mode='floor'
-    ).nan_to_num(0.0)
-    collided = torch.div(collided, controlled_agents_per_world, rounding_mode='floor').nan_to_num(0.0)
-    off_road = torch.div(off_road, controlled_agents_per_world, rounding_mode='floor').nan_to_num(0.0)
+    # Aggregate metrics to obtain averages across scenes
+    controlled_agents_per_scene = env.cont_agent_mask.sum(dim=1).float()
+    goal_achieved_per_scene = (goal_achieved > 0).float().sum(
+        axis=1
+    ) / controlled_agents_per_scene
+    collided_per_scene = (collided > 0).float().sum(
+        axis=1
+    ) / controlled_agents_per_scene
+    off_road_per_scene = (off_road > 0).float().sum(
+        axis=1
+    ) / controlled_agents_per_scene
 
     return (
-        goal_achieved,
-        collided,
-        off_road,
-        controlled_agents_per_world,
+        goal_achieved_per_scene,
+        collided_per_scene,
+        off_road_per_scene,
+        controlled_agents_per_scene,
         sim_state_frames,
     )
 
@@ -208,7 +226,7 @@ def evaluate_policy(
             goal_achieved,
             collided,
             off_road,
-            controlled_agents_in_world,
+            controlled_agents_in_scene,
             _,
         ) = rollout(env, policy, device, deterministic=deterministic)
 
@@ -219,7 +237,7 @@ def evaluate_policy(
         res_dict["collided"].extend(collided.cpu().numpy())
         res_dict["off_road"].extend(off_road.cpu().numpy())
         res_dict["controlled_agents_in_scene"].extend(
-            controlled_agents_in_world.cpu().numpy()
+            controlled_agents_in_scene.cpu().numpy()
         )
 
     # Convert to pandas dataframe
@@ -283,8 +301,8 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=setting_config.train_dir,
-        batch_size=setting_config.num_worlds,
-        dataset_size=100,
+        batch_size=2,  # setting_config.num_worlds,
+        dataset_size=1000,
         sample_with_replacement=False,
     )
 
@@ -319,11 +337,13 @@ if __name__ == "__main__":
             batch_size=setting_config.num_worlds,
             dataset_size=setting_config.test_dataset_size,
             sample_with_replacement=False,
-            shuffle=True, 
+            shuffle=True,
         )
 
-        logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
-        
+        logging.info(
+            f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
+        )
+
         # Rollouts
         df_res_train = evaluate_policy(
             env=env,
