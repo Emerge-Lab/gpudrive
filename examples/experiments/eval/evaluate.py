@@ -17,8 +17,20 @@ from pygpudrive.visualize.utils import img_from_fig
 from networks.late_fusion import LateFusionTransformer
 
 import logging
+import torch
+import random
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+
+
+class RandomPolicy:
+    def __init__(self, action_space_n):
+        self.action_space_n = action_space_n
+
+    def __call__(self):
+        # Sample a random action as an integer
+        random_action = random.randint(0, self.action_space_n - 1)
+        return torch.tensor(random_action)
 
 
 def load_policy(path_to_cpt, model_name, device):
@@ -26,8 +38,12 @@ def load_policy(path_to_cpt, model_name, device):
 
     # Load the saved checkpoint
     saved_cpt = torch.load(
-        f"{path_to_cpt}/{model_name}.pt", map_location=device
+        f=f"{path_to_cpt}/{model_name}.pt",
+        map_location=device,
+        weights_only=False,
     )
+
+    logging.info(f"Loaded model from {path_to_cpt}/{model_name}.pt")
 
     # Create policy architecture from saved checkpoint
     policy = LateFusionTransformer(
@@ -42,6 +58,8 @@ def load_policy(path_to_cpt, model_name, device):
 
     # Load the model parameters
     policy.load_state_dict(saved_cpt["parameters"])
+
+    logging.info("Loaded model parameters")
 
     return policy.eval()
 
@@ -277,7 +295,7 @@ if __name__ == "__main__":
 
     for model in model_config.models:
 
-        print(f"Evaluating model: {model.name}")
+        logging.info(f"Evaluating model {model.name} \n")
 
         # Load policy
         policy = load_policy(
@@ -285,6 +303,9 @@ if __name__ == "__main__":
             model_name=model.name,
             device=setting_config.device,
         )
+
+        # Random policy as baseline
+        rand_policy = RandomPolicy(env.action_space.n)
 
         # Create data loaders
         train_loader = SceneDataLoader(
@@ -312,20 +333,21 @@ if __name__ == "__main__":
             deterministic=False,
         )
 
-        # df_res_test = evaluate_policy(
-        #     env=env,
-        #     policy=policy,
-        #     data_loader=test_loader,
-        #     dataset_name="test",
-        # )
+        df_res_test = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=test_loader,
+            dataset_name="test",
+        )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train])  # df_res_test])
+        df_res = pd.concat([df_res_train, df_res_test])
 
         # Add metadata
+        df_res["model_name"] = model.name
         df_res["train_dataset_size"] = model.train_dataset_size
 
         # Store
         df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
 
-        print(f"Saved at {setting_config.res_path}/{model.name}.csv")
+        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv")

@@ -201,8 +201,10 @@ def run(
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
-        "collision_behavior": bool(collision_behavior) if collision_behavior else None,
-        "remove_non_vehicles": bool(remove_non_vehicles) if remove_non_vehicles else None,
+        "collision_behavior": collision_behavior,
+        "remove_non_vehicles": None
+        if remove_non_vehicles is None
+        else bool(remove_non_vehicles),
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
@@ -260,8 +262,8 @@ def run(
     train_loader = SceneDataLoader(
         root=config.data_dir,
         batch_size=config.environment.num_worlds,
-        dataset_size=config.train.resample_dataset_size 
-        if config.train.resample_scenes 
+        dataset_size=config.train.resample_dataset_size
+        if config.train.resample_scenes
         else config.environment.k_unique_scenes,
         sample_with_replacement=True,
     )
