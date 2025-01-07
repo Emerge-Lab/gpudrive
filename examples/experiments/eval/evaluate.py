@@ -27,9 +27,7 @@ class RandomPolicy:
         self.action_space_n = action_space_n
 
     def __call__(self, obs, deterministic=False):
-        """
-        Generate random actions
-        """
+        """Generate random actions."""
         # Uniformly sample integers from the action space for each observation
         batch_size = obs.shape[0]
         random_action = torch.randint(
@@ -100,7 +98,7 @@ def rollout(
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
 
-    # Metrics storage
+    # Storage
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
     collided = torch.zeros((num_worlds, max_agent_count), device=device)
     off_road = torch.zeros((num_worlds, max_agent_count), device=device)
@@ -108,7 +106,7 @@ def rollout(
 
     next_obs = env.reset()
     live_agent_mask = env.cont_agent_mask.clone()
-
+    
     for time_step in range(episode_len):
         logging.debug(f"Time step: {time_step}")
 
@@ -167,7 +165,7 @@ def rollout(
             if world in active_worlds:
                 active_worlds.remove(world)
                 logging.debug(
-                    f"World {world} completed at time step {time_step}"
+                    f"World {world} done at time step {time_step}"
                 )
         if not active_worlds:  # Exit early if all worlds are done
             break
@@ -301,7 +299,7 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=setting_config.train_dir,
-        batch_size=2,  # setting_config.num_worlds,
+        batch_size=setting_config.num_worlds,
         dataset_size=1000,
         sample_with_replacement=False,
     )
@@ -327,7 +325,7 @@ if __name__ == "__main__":
         train_loader = SceneDataLoader(
             root=setting_config.train_dir,
             batch_size=setting_config.num_worlds,
-            dataset_size=model.train_dataset_size,
+            dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
             sample_with_replacement=False,
             shuffle=False,  # Don't shuffle because we're using the first N scenes that were also used for training
         )
@@ -335,7 +333,7 @@ if __name__ == "__main__":
         test_loader = SceneDataLoader(
             root=setting_config.test_dir,
             batch_size=setting_config.num_worlds,
-            dataset_size=setting_config.test_dataset_size,
+            dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
             sample_with_replacement=False,
             shuffle=True,
         )
@@ -371,6 +369,6 @@ if __name__ == "__main__":
         if not os.path.exists(setting_config.res_path):
             os.makedirs(setting_config.res_path)
 
-        df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
+        df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
 
         logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
