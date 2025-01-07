@@ -44,9 +44,9 @@ if __name__ == "__main__":
     
     # Data loader
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root=setting_config.train_dir,
         batch_size=setting_config.num_worlds,
-        dataset_size=10,
+        dataset_size=1000,
         sample_with_replacement=False,
     )
 
@@ -56,9 +56,11 @@ if __name__ == "__main__":
     # Load policy
     policy = load_policy(
         path_to_cpt=model_config.models_path,
-        model_name=model_config['models'][0].name,
+        model_name=model_config['models'][1].name,
         device=setting_config.device,
     )
+    
+    logging.info(f"Loaded policy {model_config['models'][1].name,}")
 
     # Show all training vids
     selected_batch_train = env.data_batch

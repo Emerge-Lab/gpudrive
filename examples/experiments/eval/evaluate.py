@@ -7,7 +7,6 @@ import numpy as np
 import dataclasses
 import os
 from pathlib import Path
-import mediapy
 
 from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
@@ -27,152 +26,151 @@ class RandomPolicy:
     def __init__(self, action_space_n):
         self.action_space_n = action_space_n
 
-    def __call__(self):
-        # Sample a random action as an integer
-        random_action = random.randint(0, self.action_space_n - 1)
-        return torch.tensor(random_action)
-
+    def __call__(self, obs, deterministic=False):
+        """
+        Generate random actions
+        """
+        # Uniformly sample integers from the action space for each observation
+        batch_size = obs.shape[0]
+        random_action = torch.randint(
+            0, self.action_space_n, (batch_size,), dtype=torch.int64
+        )
+        return random_action, None, None, None
 
 def load_policy(path_to_cpt, model_name, device):
     """Load a policy from a given path."""
 
     # Load the saved checkpoint
-    saved_cpt = torch.load(
-        f=f"{path_to_cpt}/{model_name}.pt",
-        map_location=device,
-        weights_only=False,
-    )
-
-    logging.info(f"Loaded model from {path_to_cpt}/{model_name}.pt")
-
-    # Create policy architecture from saved checkpoint
-    policy = LateFusionTransformer(
-        input_dim=saved_cpt["model_arch"]["input_dim"],
-        action_dim=saved_cpt["action_dim"],
-        hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-        pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
-        num_transformer_layers=saved_cpt["model_arch"][
-            "num_transformer_layers"
-        ],
-    ).to(device)
-
-    # Load the model parameters
-    policy.load_state_dict(saved_cpt["parameters"])
-
-    logging.info("Loaded model parameters")
-
-    return policy.eval()
-
-
-def rollout(env, policy, device, deterministic=False, render_sim_state=False):
-    """Rollout policy in the environment."""
-
-    sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)}
-
-    # Storage
-    goal_achieved = torch.zeros(env.num_worlds).to(device)
-    collided = torch.zeros(env.num_worlds).to(device)
-    off_road = torch.zeros(env.num_worlds).to(device)
-
-    active_worlds = list(range(env.num_worlds))
-
-    next_obs = env.reset()
-
-    # Initialize masks
-    live_agent_mask = env.cont_agent_mask.clone()
-
-    for time_step in range(env.config.episode_len):
-
-        logging.debug(f"Time step: {time_step}")
-
-        # Get actions
-        action, _, _, _ = policy(
-            next_obs[live_agent_mask], deterministic=deterministic
+    if model_name == "random_baseline":
+        return RandomPolicy(env.action_space.n)
+    
+    else: # Load a trained model
+        saved_cpt = torch.load(
+            f=f"{path_to_cpt}/{model_name}.pt",
+            map_location=device,
+            weights_only=False,
         )
 
-        # Insert actions at the right positions
-        action_template = torch.zeros(
-            (env.num_worlds, env.max_agent_count), dtype=torch.int64
+        logging.info(f"Load model from {path_to_cpt}/{model_name}.pt")
+
+        # Create policy architecture from saved checkpoint
+        policy = LateFusionTransformer(
+            input_dim=saved_cpt["model_arch"]["input_dim"],
+            action_dim=saved_cpt["action_dim"],
+            hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
+            num_transformer_layers=saved_cpt["model_arch"][
+                "num_transformer_layers"
+            ],
         ).to(device)
-        action_template[live_agent_mask] = action
 
-        # Step the environment
-        env.step_dynamics(action_template)
+        # Load the model parameters
+        policy.load_state_dict(saved_cpt["parameters"])
 
-        if render_sim_state:
-            print(f"Rendering time step: {time_step}")
+        logging.info("Load model parameters")
 
-            # Render worlds that are not done
-            sim_state_figures = env.vis.plot_simulator_state(
-                env_indices=active_worlds,
-                time_steps=[time_step] * len(active_worlds),
-                zoom_radius=150,
+        return policy.eval()
+
+
+def rollout(
+    env, policy, device, deterministic: bool = False, render_sim_state: bool = False
+):
+    """
+    Perform a rollout of a policy in the environment.
+
+    Args:
+        env: The simulation environment.
+        policy: The policy to be rolled out.
+        device: The device to execute computations on (CPU/GPU).
+        deterministic (bool): Whether to use deterministic policy actions.
+        render_sim_state (bool): Whether to render the simulation state.
+
+    Returns:
+        tuple: Averages for goal achieved, collisions, off-road occurrences, 
+               controlled agents count, and simulation state frames.
+    """
+    # Initialize storage
+    sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)}
+    num_worlds = env.num_worlds
+    max_agent_count = env.max_agent_count
+    episode_len = env.config.episode_len
+
+    # Metrics storage
+    goal_achieved = torch.zeros(num_worlds, device=device)
+    collided = torch.zeros(num_worlds, device=device)
+    off_road = torch.zeros(num_worlds, device=device)
+
+    active_worlds = set(range(num_worlds))
+    next_obs = env.reset()
+    live_agent_mask = env.cont_agent_mask.clone()
+
+    for time_step in range(episode_len):
+        logging.debug(f"Time step: {time_step}")
+
+        # Get actions for active agents
+        if live_agent_mask.any():
+            action, _, _, _ = policy(
+                next_obs[live_agent_mask], deterministic=deterministic
             )
-            for idx, env_id in enumerate(active_worlds):
-                sim_state_frames[env_id].append(
-                    img_from_fig(sim_state_figures[idx])
-                )
 
-        # Get infos from the environment
+            # Insert actions into a template
+            action_template = torch.zeros(
+                (num_worlds, max_agent_count), dtype=torch.int64, device=device
+            )
+            action_template[live_agent_mask] = action.to(device)
+
+            # Step the environment
+            env.step_dynamics(action_template)
+
+            if render_sim_state:
+                logging.debug(f"Rendering time step: {time_step}")
+                sim_state_figures = env.vis.plot_simulator_state(
+                    env_indices=list(active_worlds),
+                    time_steps=[time_step] * len(active_worlds),
+                    zoom_radius=150,
+                )
+                for idx, env_id in enumerate(active_worlds):
+                    sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
+
+        # Update observations, dones, and infos
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
 
-        # Update mask
+        # Update live agent mask
         live_agent_mask[dones] = False
 
-        # Check terminal envs and store stats
-        num_dones_per_world = (dones * env.cont_agent_mask).sum(dim=1)
-        total_controlled_agents_per_world = env.cont_agent_mask.sum(dim=1)
-        done_worlds = torch.where(
-            (num_dones_per_world == total_controlled_agents_per_world)
-        )[0]
+        # Process completed worlds
+        num_dones_per_world = (dones & env.cont_agent_mask).sum(dim=1)
+        total_controlled_agents = env.cont_agent_mask.sum(dim=1)
+        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
 
-        if len(done_worlds) > 0:
-            for world in done_worlds:
-                # If world is not done yet, store scene stats
-                if world in active_worlds:
-                    active_worlds.remove(world)
+        for world in done_worlds:
+            if world in active_worlds:
+                active_worlds.remove(world)
+                logging.debug(f"World {world} completed at time step {time_step}")
 
-                    logging.debug(f"done_worlds: {world} at t = {time_step}")
+                mask = env.cont_agent_mask[world]
+                goal_achieved[world] = infos.goal_achieved[world, mask].sum().item()
+                collided[world] = infos.collided[world, mask].sum().item()
+                off_road[world] = infos.off_road[world, mask].sum().item()
 
-                    goal_achieved[world] = (
-                        (
-                            infos.goal_achieved[world, :][
-                                env.cont_agent_mask[world]
-                            ]
-                        )
-                        .sum()
-                        .item()
-                    )
-                    collided[world] = (
-                        infos.collided[world, :][env.cont_agent_mask[world]]
-                        .sum()
-                        .item()
-                    )
-                    off_road[world] = (
-                        infos.off_road[world, :][env.cont_agent_mask[world]]
-                        .sum()
-                        .item()
-                    )
-
-                else:
-                    continue
-
-        if dones.all():
+        if not active_worlds:  # Exit early if all worlds are done
             break
 
-    # Aggregate metrics to get average ratio per scene
-    goal_achieved = goal_achieved / env.cont_agent_mask.sum(dim=1)
-    collided = collided / env.cont_agent_mask.sum(dim=1)
-    off_road = off_road / env.cont_agent_mask.sum(dim=1)
-    controlled_agents_in_world = env.cont_agent_mask.sum(dim=1)
+    # Normalize metrics
+    controlled_agents_per_world = env.cont_agent_mask.sum(dim=1).float()
+    goal_achieved = torch.div(
+        goal_achieved, controlled_agents_per_world, rounding_mode='floor'
+    ).nan_to_num(0.0)
+    collided = torch.div(collided, controlled_agents_per_world, rounding_mode='floor').nan_to_num(0.0)
+    off_road = torch.div(off_road, controlled_agents_per_world, rounding_mode='floor').nan_to_num(0.0)
 
     return (
         goal_achieved,
         collided,
         off_road,
-        controlled_agents_in_world,
+        controlled_agents_per_world,
         sim_state_frames,
     )
 
@@ -284,9 +282,9 @@ if __name__ == "__main__":
     model_config = load_config("examples/experiments/eval/config/model_config")
 
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root=setting_config.train_dir,
         batch_size=setting_config.num_worlds,
-        dataset_size=1000,
+        dataset_size=100,
         sample_with_replacement=False,
     )
 
@@ -309,7 +307,7 @@ if __name__ == "__main__":
 
         # Create data loaders
         train_loader = SceneDataLoader(
-            root="data/processed/training",
+            root=setting_config.train_dir,
             batch_size=setting_config.num_worlds,
             dataset_size=model.train_dataset_size,
             sample_with_replacement=False,
@@ -317,14 +315,16 @@ if __name__ == "__main__":
         )
 
         test_loader = SceneDataLoader(
-            root="data/processed/testing",
+            root=setting_config.test_dir,
             batch_size=setting_config.num_worlds,
             dataset_size=setting_config.test_dataset_size,
             sample_with_replacement=False,
-            shuffle=True,
+            shuffle=True, 
         )
 
-        # Do rollouts
+        logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
+        
+        # Rollouts
         df_res_train = evaluate_policy(
             env=env,
             policy=policy,
@@ -348,6 +348,9 @@ if __name__ == "__main__":
         df_res["train_dataset_size"] = model.train_dataset_size
 
         # Store
+        if not os.path.exists(setting_config.res_path):
+            os.makedirs(setting_config.res_path)
+
         df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv")
 
-        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv")
+        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
