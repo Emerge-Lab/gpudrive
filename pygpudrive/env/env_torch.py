@@ -515,17 +515,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
-        # Reinitialize the visualizer with the new data
-        # TODO: Improve
-        self.vis = MatplotlibVisualizer(
-            sim_object=self.sim,
-            goal_radius=self.config.dist_to_goal_threshold,
-            backend=self.backend,
-            num_worlds=self.num_worlds,
-            render_config=self.render_config,
-            env_config=self.config,
-        )
-
+        # Reset key plotting information from the visualizer
+        self.vis._set_key_information(self.cont_agent_mask)
+        
+    
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
@@ -602,7 +595,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    data_config = SceneConfig(batch_size=1, dataset_size=1000)
+    data_config = SceneConfig(batch_size=2, dataset_size=1000)
 
     # Create data loader
     train_loader = SceneDataLoader(
@@ -646,29 +639,49 @@ if __name__ == "__main__":
         figsize=(8, 8),
     )
 
-    sim_state[0].savefig(f"sim_state.png")  # Save the figure to a file
+    sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
     agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
 
     sim_frames = []
     agent_obs_frames = []
+    
+    env.swap_data_batch()
+    env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
-    for t in range(40):
+    env_idx = 0
+
+    for t in range(90):
         print(f"Step: {t}")
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
+        
+        # if (t + 1) % 2 == 0:
+            # env.swap_data_batch()
+            # env.reset()
+        #     print(f"dataset: {env.data_batch}")
+
+        #sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+        #agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
+        
+        highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][-1].item()
 
         # Make video
         sim_state = env.vis.plot_simulator_state(
-            env_indices=[0], zoom_radius=90, time_steps=[t], figsize=(8, 8)
+            env_indices=[env_idx], 
+            zoom_radius=50, 
+            time_steps=[t], 
+            figsize=(10, 10),
+            center_agent_indices=[highlight_agent]
+
         )
 
         agent_obs_fig, ax = env.vis.plot_agent_observation(
-            env_idx=0,
-            agent_idx=torch.where(env.cont_agent_mask[0, :])[0][-1].item(),
-            figsize=(8, 8),
+            env_idx=env_idx,
+            agent_idx=highlight_agent,
+            figsize=(10, 10),
         )
 
         sim_frames.append(img_from_fig(sim_state[0]))
@@ -678,6 +691,9 @@ if __name__ == "__main__":
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()
+        
+        if done[0, highlight_agent].bool():
+            break
 
     env.close()
 

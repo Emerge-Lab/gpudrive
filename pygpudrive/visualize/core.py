@@ -41,13 +41,15 @@ class MatplotlibVisualizer:
         env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
-        self.controlled_agent_mask = controlled_agent_mask
         self.backend = backend
         self.device = "cpu"
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
         self.env_config = env_config
+        self._set_key_information(controlled_agent_mask)
+        
+    def _set_key_information(self, controlled_agent_mask):
         self.response_type = ResponseType.from_tensor(
             tensor=self.sim_object.response_type_tensor(),
             backend=self.backend,
@@ -58,6 +60,7 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
+        self.controlled_agent_mask = controlled_agent_mask
 
     def plot_simulator_state(
         self,
@@ -504,17 +507,12 @@ class MatplotlibVisualizer:
         vehicle_length = agent_states.vehicle_length[env_idx, log_replay]
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
-            torch.abs(pos_y) < OUT_OF_BOUNDS
-        )
         # Define realistic bounds for log_replay agent positions
-
-        # valid_mask = (
-        #     (torch.abs(pos_x) < OUT_OF_BOUNDS)
-        #     & (torch.abs(pos_y) < OUT_OF_BOUNDS)
-        #     & (vehicle_length < 15)
-        #     & (vehicle_width < 10)
-        # )
+        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
+            torch.abs(pos_y) < OUT_OF_BOUNDS) & (
+            (vehicle_length > 0.5) & (vehicle_length < 15) & 
+            (vehicle_width > 0.5) & (vehicle_width < 15)
+        )
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
@@ -743,8 +741,8 @@ class MatplotlibVisualizer:
             observation_radius = Circle(
                 (0, 0),
                 radius=self.env_config.obs_radius,
-                color="#d9d9d9",
-                linewidth=1.5,
+                color="#000000",
+                linewidth=.8,
                 fill=False,
                 linestyle="-",
             )
