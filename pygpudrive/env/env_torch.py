@@ -73,6 +73,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Rendering setup
         self.vis = MatplotlibVisualizer(
             sim_object=self.sim,
+            controlled_agent_mask=self.cont_agent_mask,
             goal_radius=self.config.dist_to_goal_threshold,
             backend=self.backend,
             num_worlds=self.num_worlds,
@@ -86,7 +87,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.get_obs()
 
     def get_dones(self):
-        return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
+        return (
+            self.sim.done_tensor()
+            .to_torch()
+            .clone()
+            .squeeze(dim=2)
+            .to(torch.float)
+        )
 
     def get_infos(self):
         return Info.from_tensor(
@@ -112,11 +119,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         The importance of each component is determined by the weights.
         """
         if self.config.reward_type == "sparse_on_goal_achieved":
-            return self.sim.reward_tensor().to_torch().squeeze(dim=2)
+            return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch()
+            info_tensor = self.sim.info_tensor().to_torch().clone()
             off_road = info_tensor[:, :, 0].to(torch.float)
 
             # True if the vehicle is in collision with another road object
@@ -136,7 +143,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Reward based on distance to logs and penalty for collision
 
             # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch()
+            info_tensor = self.sim.info_tensor().to_torch().clone()
             off_road = info_tensor[:, :, 0].to(torch.float)
 
             # True if the vehicle collided with another road object
@@ -476,9 +483,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
-        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
-            axis=2
-        )
+        return (
+            self.sim.controlled_state_tensor().to_torch().clone() == 1
+        ).squeeze(axis=2)
 
     def swap_data_batch(self, data_batch=None):
         """
@@ -587,9 +594,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
+    import matplotlib.pyplot as plt
+    from datetime import datetime
+    from pygpudrive.visualize.utils import img_from_fig
+
+    plt.ion()  # Turn on interactive mode
+
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    data_config = SceneConfig(batch_size=100, dataset_size=1000)
+    data_config = SceneConfig(batch_size=1, dataset_size=1000)
 
     # Create data loader
     train_loader = SceneDataLoader(
@@ -604,19 +617,62 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=128,  # Number of agents to control
-        device="cuda",
+        device="cpu",
+    )
+
+    print(f"dataset: {env.data_batch}")
+
+    print(
+        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
     )
 
     # Rollout
     obs = env.reset()
 
+    print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
+
+    # Plotting
+    sim_state = env.vis.plot_simulator_state(
+        env_indices=[0], zoom_radius=150, time_steps=[0], figsize=(8, 8)
+    )
+
+    # get the time as string
+    now = datetime.now()
+    dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
+
+    agent_obs_fig, ax = env.vis.plot_agent_observation(
+        env_idx=0,
+        agent_idx=torch.where(env.cont_agent_mask[0, :])[0][-1].item(),
+        figsize=(8, 8),
+    )
+
+    sim_state[0].savefig(f"sim_state.png")  # Save the figure to a file
+    agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
+
+    sim_frames = []
+    agent_obs_frames = []
+
     expert_actions, _, _, _ = env.get_expert_actions()
 
-    for t in range(env_config.episode_len):
+    for t in range(40):
         print(f"Step: {t}")
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
+
+        # Make video
+        sim_state = env.vis.plot_simulator_state(
+            env_indices=[0], zoom_radius=90, time_steps=[t], figsize=(8, 8)
+        )
+
+        agent_obs_fig, ax = env.vis.plot_agent_observation(
+            env_idx=0,
+            agent_idx=torch.where(env.cont_agent_mask[0, :])[0][-1].item(),
+            figsize=(8, 8),
+        )
+
+        sim_frames.append(img_from_fig(sim_state[0]))
+        agent_obs_frames.append(img_from_fig(agent_obs_fig))
 
         obs = env.get_obs()
         reward = env.get_rewards()
@@ -624,3 +680,13 @@ if __name__ == "__main__":
         info = env.get_infos()
 
     env.close()
+
+    # Save the video with mediapy
+    import mediapy as media
+
+    media.write_video(
+        "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
+    )
+    media.write_video(
+        "obs_video.gif", np.array(agent_obs_frames), fps=10, codec="gif"
+    )

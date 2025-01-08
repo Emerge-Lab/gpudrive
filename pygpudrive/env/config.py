@@ -43,9 +43,9 @@ class EnvConfig:
 
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
-    obs_radius: float = 100.0  # Radius for road observations
+    obs_radius: float = 50.0  # Radius for road observations
     polyline_reduction_threshold: float = (
-        1.0  # Threshold for polyline reduction
+        0.1  # Threshold for polyline reduction
     )
 
     # Dynamics model
@@ -93,7 +93,7 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
-        4.0  # Radius around goal considered as "goal achieved"
+        2.0  # Radius around goal considered as "goal achieved"
     )
 
     # C++ and Python shared settings (modifiable via C++ codebase)
@@ -111,9 +111,9 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-
-    #Param to init all objects:
+    # Param to init all objects:
     init_all_objects: bool = False
+
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
@@ -137,8 +137,9 @@ class SceneConfig:
             K_UNIQUE_N discipline.
         seed (Optional[int]): Seed for random scene selection.
     """
-    batch_size: int # Number of scenes per batch (should be equal to number of worlds in the env).
-    dataset_size: int # Maximum number of files to include in the dataset.
+
+    batch_size: int  # Number of scenes per batch (should be equal to number of worlds in the env).
+    dataset_size: int  # Maximum number of files to include in the dataset.
     path: str = None
     num_scenes: int = None
     discipline: SelectionDiscipline = SelectionDiscipline.PAD_N

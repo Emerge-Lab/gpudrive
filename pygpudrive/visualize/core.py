@@ -33,6 +33,7 @@ class MatplotlibVisualizer:
     def __init__(
         self,
         sim_object,
+        controlled_agent_mask,
         goal_radius,
         backend: str,
         num_worlds: int,
@@ -40,9 +41,9 @@ class MatplotlibVisualizer:
         env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
+        self.controlled_agent_mask = controlled_agent_mask
         self.backend = backend
         self.device = "cpu"
-        self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
@@ -56,14 +57,6 @@ class MatplotlibVisualizer:
             roadgraph_tensor=self.sim_object.map_observation_tensor(),
             backend=self.backend,
             device=self.device,
-        )
-
-    def get_controlled_agents_mask(self):
-        """Get the control mask."""
-        return (
-            (self.sim_object.controlled_state_tensor().to_torch() == 1)
-            .squeeze(axis=2)
-            .to(self.device)
         )
 
     def plot_simulator_state(
@@ -110,7 +103,7 @@ class MatplotlibVisualizer:
             log_trajectory = LogTrajectory.from_tensor(
                 self.sim_object.expert_trajectory_tensor(),
                 self.num_worlds,
-                self.controlled_agents.shape[1],
+                self.controlled_agent_mask.shape[1],
                 backend=self.backend,
             )
 
@@ -157,7 +150,7 @@ class MatplotlibVisualizer:
                 plt.close(fig)  # Close the figure to prevent carryover
 
             # Get control mask and omit out-of-bound agents (dead agents)
-            controlled = self.controlled_agents[env_idx, :]
+            controlled = self.controlled_agent_mask[env_idx, :]
             controlled_live = controlled & (
                 torch.abs(global_agent_states.pos_x[env_idx, :]) < 1_000
             )
@@ -235,8 +228,8 @@ class MatplotlibVisualizer:
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
-            ax.set_xticks([])
-            ax.set_yticks([])
+            # ax.set_xticks([])
+            # ax.set_yticks([])
 
         if return_single_figure:
             for ax in axes[len(env_indices) :]:
@@ -503,7 +496,7 @@ class MatplotlibVisualizer:
         # Plot human_replay agents (those that are static or expert-controlled)
         log_replay = (
             response_type.static[env_idx, :] | response_type.moving[env_idx, :]
-        ) & ~self.controlled_agents[env_idx, :]
+        ) & ~self.controlled_agent_mask[env_idx, :]
 
         pos_x = agent_states.pos_x[env_idx, log_replay]
         pos_y = agent_states.pos_y[env_idx, log_replay]
@@ -511,13 +504,17 @@ class MatplotlibVisualizer:
         vehicle_length = agent_states.vehicle_length[env_idx, log_replay]
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
-        # Define realistic bounds for log_replay agent positions
-        valid_mask = (
-            (torch.abs(pos_x) < OUT_OF_BOUNDS)
-            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
-            & (vehicle_length < 15)
-            & (vehicle_width < 10)
+        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
+            torch.abs(pos_y) < OUT_OF_BOUNDS
         )
+        # Define realistic bounds for log_replay agent positions
+
+        # valid_mask = (
+        #     (torch.abs(pos_x) < OUT_OF_BOUNDS)
+        #     & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+        #     & (vehicle_length < 15)
+        #     & (vehicle_width < 10)
+        # )
 
         # Filter valid static agent attributes
         bboxes_static = np.stack(
@@ -580,7 +577,6 @@ class MatplotlibVisualizer:
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
-        ax.set_title(f"Observation agent: {agent_idx}", y=1.05)
 
         # Plot roadgraph if provided
         if observation_roadgraph is not None:
