@@ -48,8 +48,12 @@ class MatplotlibVisualizer:
         self.render_config = render_config
         self.env_config = env_config
         self._set_key_information(controlled_agent_mask)
-        
+
     def _set_key_information(self, controlled_agent_mask):
+        """
+        Initialize key information for visualization based on the 
+        current batch of scenarios.
+        """
         self.response_type = ResponseType.from_tensor(
             tensor=self.sim_object.response_type_tensor(),
             backend=self.backend,
@@ -93,14 +97,15 @@ class MatplotlibVisualizer:
             center_agent_indices = [None] * len(
                 env_indices
             )  # Default to None for all
-
+        
+        # Changes at every time step
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
             backend=self.backend,
             device=self.device,
         )
 
-        agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
+        agent_infos = self.sim_object.info_tensor().to_torch().clone().to(self.device)
 
         if plot_log_replay_trajectory:
             log_trajectory = LogTrajectory.from_tensor(
@@ -508,10 +513,15 @@ class MatplotlibVisualizer:
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
         # Define realistic bounds for log_replay agent positions
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
-            torch.abs(pos_y) < OUT_OF_BOUNDS) & (
-            (vehicle_length > 0.5) & (vehicle_length < 15) & 
-            (vehicle_width > 0.5) & (vehicle_width < 15)
+        valid_mask = (
+            (torch.abs(pos_x) < OUT_OF_BOUNDS)
+            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+            & (
+                (vehicle_length > 0.5)
+                & (vehicle_length < 15)
+                & (vehicle_width > 0.5)
+                & (vehicle_width < 15)
+            )
         )
 
         # Filter valid static agent attributes
@@ -742,7 +752,7 @@ class MatplotlibVisualizer:
                 (0, 0),
                 radius=self.env_config.obs_radius,
                 color="#000000",
-                linewidth=.8,
+                linewidth=0.8,
                 fill=False,
                 linestyle="-",
             )

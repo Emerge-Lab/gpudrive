@@ -517,8 +517,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Reset key plotting information from the visualizer
         self.vis._set_key_information(self.cont_agent_mask)
-        
-    
+
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
@@ -639,12 +638,12 @@ if __name__ == "__main__":
         figsize=(8, 8),
     )
 
-    sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+    sim_state[0].savefig(f"sim_state.png")  # Save the figure to a file
     agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
 
     sim_frames = []
     agent_obs_frames = []
-    
+
     env.swap_data_batch()
     env.reset()
 
@@ -657,25 +656,26 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
-        
+
         # if (t + 1) % 2 == 0:
-            # env.swap_data_batch()
-            # env.reset()
+        # env.swap_data_batch()
+        # env.reset()
         #     print(f"dataset: {env.data_batch}")
 
-        #sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
-        #agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
-        
-        highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][-1].item()
+        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
+
+        highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
+            -1
+        ].item()
 
         # Make video
         sim_state = env.vis.plot_simulator_state(
-            env_indices=[env_idx], 
-            zoom_radius=50, 
-            time_steps=[t], 
+            env_indices=[env_idx],
+            zoom_radius=50,
+            time_steps=[t],
             figsize=(10, 10),
-            center_agent_indices=[highlight_agent]
-
+            center_agent_indices=[highlight_agent],
         )
 
         agent_obs_fig, ax = env.vis.plot_agent_observation(
@@ -691,7 +691,7 @@ if __name__ == "__main__":
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()
-        
+
         if done[0, highlight_agent].bool():
             break
 
