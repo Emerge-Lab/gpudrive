@@ -1,14 +1,18 @@
 models_path: examples/experiments/eval/models
 
 models:
-  - name: model_PPO__R_80000__01_06_21_53_26_373_007223
-    train_dataset_size: 10
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_80000__01_06_21_53_26_373?nw=nwuserdaphnecor
+  - name: random_baseline
+    train_dataset_size: 1000
+    wandb: null
+    trained_on: null
+  # - name: model_PPO__R_80000__01_06_21_53_26_373_007223
+  #   train_dataset_size: 10
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_80000__01_06_21_53_26_373?nw=nwuserdaphnecor
 
-  # Fav model! (works well)
-  - name: model_PPO__R_1000__01_05_20_45_44_827_007000
-    train_dataset_size: 3
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_05_20_45_44_827?nw=nwuserdaphnecor
+  # # Fav model! (works well)
+  # - name: model_PPO__R_1000__01_05_20_45_44_827_007000
+  #   train_dataset_size: 3
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_05_20_45_44_827?nw=nwuserdaphnecor
 
   # # Test from cluster
   # - name: model_PPO__R_100__01_06_11_18_11_162_002000

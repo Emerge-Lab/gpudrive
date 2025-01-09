@@ -35,7 +35,6 @@ class RandomPolicy:
         )
         return random_action, None, None, None
 
-
 def load_policy(path_to_cpt, model_name, device):
     """Load a policy from a given path."""
 
@@ -43,7 +42,7 @@ def load_policy(path_to_cpt, model_name, device):
     if model_name == "random_baseline":
         return RandomPolicy(env.action_space.n)
 
-    else:  # Load a trained model
+    else: # Load a trained model
         saved_cpt = torch.load(
             f=f"{path_to_cpt}/{model_name}.pt",
             map_location=device,
@@ -72,11 +71,7 @@ def load_policy(path_to_cpt, model_name, device):
 
 
 def rollout(
-    env,
-    policy,
-    device,
-    deterministic: bool = False,
-    render_sim_state: bool = False,
+    env, policy, device, deterministic: bool = False, render_sim_state: bool = False
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -133,9 +128,7 @@ def rollout(
                     zoom_radius=150,
                 )
                 for idx, env_id in enumerate(active_worlds):
-                    sim_state_frames[env_id].append(
-                        img_from_fig(sim_state_figures[idx])
-                    )
+                    sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
 
         # Update observations, dones, and infos
         next_obs = env.get_obs()
@@ -157,30 +150,20 @@ def rollout(
         # Process completed worlds
         num_dones_per_world = (dones & env.cont_agent_mask).sum(dim=1)
         total_controlled_agents = env.cont_agent_mask.sum(dim=1)
-        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(
-            as_tuple=True
-        )[0]
+        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
 
         for world in done_worlds:
             if world in active_worlds:
                 active_worlds.remove(world)
-                logging.debug(
-                    f"World {world} done at time step {time_step}"
-                )
+                logging.debug(f"World {world} completed at time step {time_step}")
         if not active_worlds:  # Exit early if all worlds are done
             break
 
     # Aggregate metrics to obtain averages across scenes
     controlled_agents_per_scene = env.cont_agent_mask.sum(dim=1).float()
-    goal_achieved_per_scene = (goal_achieved > 0).float().sum(
-        axis=1
-    ) / controlled_agents_per_scene
-    collided_per_scene = (collided > 0).float().sum(
-        axis=1
-    ) / controlled_agents_per_scene
-    off_road_per_scene = (off_road > 0).float().sum(
-        axis=1
-    ) / controlled_agents_per_scene
+    goal_achieved_per_scene = (goal_achieved > 0).float().sum(axis=1) / controlled_agents_per_scene
+    collided_per_scene = (collided > 0).float().sum(axis=1) / controlled_agents_per_scene
+    off_road_per_scene =  (off_road > 0).float().sum(axis=1) / controlled_agents_per_scene
 
     return (
         goal_achieved_per_scene,
@@ -338,9 +321,7 @@ if __name__ == "__main__":
             shuffle=True,
         )
 
-        logging.info(
-            f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
-        )
+        logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
 
         # Rollouts
         df_res_train = evaluate_policy(

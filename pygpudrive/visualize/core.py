@@ -44,7 +44,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (15, 15)
+        self.figsize = (10, 10)
         self.env_config = env_config
         self.initialize_static_scenario_data(controlled_agent_mask)
 
@@ -142,7 +142,7 @@ class MatplotlibVisualizer:
             plt.close(fig)  # Close the figure to prevent carryover
 
             # Render the pre-cached road graph for the current environment
-            #cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
+            # cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
             # ax.imshow(
             #     cached_roadgraph_array,
             #     origin="upper",
