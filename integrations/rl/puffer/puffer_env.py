@@ -48,7 +48,7 @@ class PufferGPUDrive(PufferEnv):
         self.train_config = train_config
         self.max_cont_agents_per_env = config.max_controlled_agents
         self.num_worlds = config.num_worlds
-        self.k_unique_scenes = config.k_unique_scenes
+        
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -77,7 +77,8 @@ class PufferGPUDrive(PufferEnv):
         render_config = RenderConfig(
             draw_obj_idx=True,
         )
-
+        
+        # Make env
         self.env = GPUDriveTorchEnv(
             config=env_config,
             data_loader=data_loader,
@@ -93,11 +94,6 @@ class PufferGPUDrive(PufferEnv):
         )
         self.render_mode = "rgb_array"
 
-        # Get the tfrecord file names for every environment
-        self.env_to_files = {
-            env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.env.data_batch)
-        }
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
 
         # Number of controlled agents across all worlds
@@ -116,20 +112,9 @@ class PufferGPUDrive(PufferEnv):
             (self.num_worlds, self.max_cont_agents_per_env), dtype=torch.int64
         ).to(self.device)
 
-        # Rendering storage
-        self.rendering_in_progress = {
-            env_idx: False
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-        self.was_rendered_in_rollout = {
-            env_idx: True
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-        self.frames = {
-            env_idx: []
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-
+        # Setup rendering storage
+        self.clear_render_storage()
+        
         self.wandb_obj = None
         self.global_step = 0
         self.iters = 0
@@ -263,7 +248,7 @@ class PufferGPUDrive(PufferEnv):
                         frames_array = np.array(self.frames[render_env_idx])
                         self.wandb_obj.log(
                             {
-                                f"vis/state/env_{render_env_idx}: {self.env_to_files[render_env_idx]}": wandb.Video(
+                                f"vis/state/env_{render_env_idx}": wandb.Video(
                                     np.moveaxis(frames_array, -1, 1),
                                     fps=self.train_config.render_fps,
                                     format=self.train_config.render_format,
@@ -456,12 +441,6 @@ class PufferGPUDrive(PufferEnv):
         self.reset()  # Reset storage
         # Get info from new worlds
         self.observations = self.env.reset()[self.controlled_agent_mask]
-
-        # Get the tfrecord file names for every environment
-        self.env_to_files = {
-            env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.env.data_batch)
-        }
 
     def clear_render_storage(self):
         """Clear rendering storage."""
