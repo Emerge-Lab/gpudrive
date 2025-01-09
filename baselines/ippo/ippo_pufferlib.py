@@ -222,7 +222,7 @@ def run(
         "update_epochs": update_epochs,
         "batch_size": batch_size,
         "minibatch_size": minibatch_size,
-        "render": True if render == 1 else False,
+        "render": None if render is None else bool(render),
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}

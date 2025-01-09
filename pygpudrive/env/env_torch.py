@@ -492,8 +492,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Swap the current data batch in the simulator with a new one
         and reinitialize dependent attributes.
         """
-        # Sample new data batch from the data loader
-        if data_batch is None:
+
+        if data_batch is None:  # Sample new data batch from the data loader
             self.data_batch = next(self.data_iterator)
         else:
             self.data_batch = data_batch
@@ -661,7 +661,7 @@ if __name__ == "__main__":
             agent_idx=highlight_agent,
             figsize=(10, 10),
         )
-        
+
         sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
         agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
 

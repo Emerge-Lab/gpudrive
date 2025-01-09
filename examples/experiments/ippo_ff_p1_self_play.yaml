@@ -7,7 +7,7 @@ data_dir: "data/processed/training"
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 10 # Number of unique scenes to sample from
+  k_unique_scenes: 5 # Number of unique scenes to sample from
   max_controlled_agents: 128 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "paper_1_self_play"
-  group: "mvp"
+  group: "verify"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -55,7 +55,7 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 1_000_000_000
-  batch_size: 65_536
+  batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: false

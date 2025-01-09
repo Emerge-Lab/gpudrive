@@ -222,9 +222,11 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()
         )
-        
+
         # Add rewards for living agents
-        self.agent_episode_returns[self.live_agent_mask] += reward[self.live_agent_mask]
+        self.agent_episode_returns[self.live_agent_mask] += reward[
+            self.live_agent_mask
+        ]
         self.episode_returns += reward_controlled
         self.episode_lengths += 1
 
@@ -314,7 +316,7 @@ class PufferGPUDrive(PufferEnv):
             local_roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
                 backend="torch",
-                device="cuda",
+                device=self.device,
             )
             rg_sparsity = (
                 local_roadgraph.type[self.controlled_agent_mask] == 0
@@ -323,7 +325,7 @@ class PufferGPUDrive(PufferEnv):
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.env.sim.self_observation_tensor(),
                 backend="torch",
-                device="cuda",
+                device=self.device,
             )
             agent_speeds = (
                 ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
@@ -433,6 +435,15 @@ class PufferGPUDrive(PufferEnv):
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
 
+        if self.wandb_obj is not None:
+            self.wandb_obj.log(
+                {
+                    "Charts/unique_scenes_in_batch": len(
+                        set(self.env.data_batch)
+                    )
+                }
+            )
+
         # Swap the data batch
         self.env.swap_data_batch()
 
@@ -441,7 +452,6 @@ class PufferGPUDrive(PufferEnv):
         self.num_agents = self.controlled_agent_mask.sum().item()
         self.masks = np.ones(self.num_agents, dtype=bool)
         self.agent_ids = np.arange(self.num_agents)
-        print(f"Total controlled agents across worlds: {self.num_agents}")
 
         self.reset()  # Reset storage
         # Get info from new worlds
