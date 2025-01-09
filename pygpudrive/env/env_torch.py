@@ -515,8 +515,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
-        # Reset key plotting information from the visualizer
-        self.vis._set_key_information(self.cont_agent_mask)
+        # Reset static scenario data for the visualizer
+        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
@@ -586,11 +586,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    import matplotlib.pyplot as plt
-    from datetime import datetime
     from pygpudrive.visualize.utils import img_from_fig
-
-    plt.ion()  # Turn on interactive mode
+    import mediapy as media
 
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
@@ -623,35 +620,17 @@ if __name__ == "__main__":
 
     print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
 
-    # Plotting
-    sim_state = env.vis.plot_simulator_state(
-        env_indices=[0], zoom_radius=150, time_steps=[0], figsize=(8, 8)
-    )
-
-    # get the time as string
-    now = datetime.now()
-    dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
-
-    agent_obs_fig, ax = env.vis.plot_agent_observation(
-        env_idx=0,
-        agent_idx=torch.where(env.cont_agent_mask[0, :])[0][-1].item(),
-        figsize=(8, 8),
-    )
-
-    sim_state[0].savefig(f"sim_state.png")  # Save the figure to a file
-    agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
-
     sim_frames = []
     agent_obs_frames = []
 
-    env.swap_data_batch()
-    env.reset()
+    # env.swap_data_batch()
+    # env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
 
-    for t in range(90):
+    for t in range(10):
         print(f"Step: {t}")
 
         # Step the environment
@@ -670,22 +649,24 @@ if __name__ == "__main__":
         ].item()
 
         # Make video
-        sim_state = env.vis.plot_simulator_state(
+        sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
             zoom_radius=50,
             time_steps=[t],
-            figsize=(10, 10),
             center_agent_indices=[highlight_agent],
         )
 
-        agent_obs_fig, ax = env.vis.plot_agent_observation(
+        agent_obs = env.vis.plot_agent_observation(
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
         )
+        
+        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
+        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
 
-        sim_frames.append(img_from_fig(sim_state[0]))
-        agent_obs_frames.append(img_from_fig(agent_obs_fig))
+        sim_frames.append(img_from_fig(sim_states[0]))
+        agent_obs_frames.append(img_from_fig(agent_obs))
 
         obs = env.get_obs()
         reward = env.get_rewards()
@@ -696,9 +677,6 @@ if __name__ == "__main__":
             break
 
     env.close()
-
-    # Save the video with mediapy
-    import mediapy as media
 
     media.write_video(
         "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"

@@ -1,11 +1,10 @@
-import os
 import torch
-import math
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
+
 import gpudrive
 from pygpudrive.visualize import utils
 from pygpudrive.datatypes.roadgraph import (
@@ -28,7 +27,6 @@ from pygpudrive.visualize.color import (
 
 OUT_OF_BOUNDS = 1000
 
-
 class MatplotlibVisualizer:
     def __init__(
         self,
@@ -46,10 +44,11 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
+        self.figsize = (15, 15)
         self.env_config = env_config
-        self._set_key_information(controlled_agent_mask)
+        self.initialize_static_scenario_data(controlled_agent_mask)
 
-    def _set_key_information(self, controlled_agent_mask):
+    def initialize_static_scenario_data(self, controlled_agent_mask):
         """
         Initialize key information for visualization based on the 
         current batch of scenarios.
@@ -64,16 +63,35 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
-        self.controlled_agent_mask = controlled_agent_mask
+        self.controlled_agent_mask = controlled_agent_mask.to(self.device)
+        
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim_object.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.controlled_agent_mask.shape[1],
+            backend=self.backend,
+        )
+
+        # Cache pre-rendered road graphs for all environments
+        self.cached_roadgraphs = []
+        for env_idx in range(self.controlled_agent_mask.shape[0]):
+            fig, ax = plt.subplots(figsize=self.figsize)
+            self._plot_roadgraph(
+                road_graph=self.global_roadgraph,
+                env_idx=env_idx,
+                ax=ax,
+                line_width_scale=1.0,  
+                marker_size_scale=1.0,
+            )
+            self.cached_roadgraphs.append(fig)
+            plt.close(fig)  
 
     def plot_simulator_state(
         self,
         env_indices: List[int],
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
-        figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
-        return_single_figure: bool = False,
         plot_log_replay_trajectory: bool = False,
     ):
         """
@@ -94,9 +112,7 @@ class MatplotlibVisualizer:
         if time_steps is None:
             time_steps = [None] * len(env_indices)  # Default to None for all
         if center_agent_indices is None:
-            center_agent_indices = [None] * len(
-                env_indices
-            )  # Default to None for all
+            center_agent_indices = [None] * len(env_indices)  # Default to None for all
         
         # Changes at every time step
         global_agent_states = GlobalEgoState.from_tensor(
@@ -107,55 +123,39 @@ class MatplotlibVisualizer:
 
         agent_infos = self.sim_object.info_tensor().to_torch().clone().to(self.device)
 
-        if plot_log_replay_trajectory:
-            log_trajectory = LogTrajectory.from_tensor(
-                self.sim_object.expert_trajectory_tensor(),
-                self.num_worlds,
-                self.controlled_agent_mask.shape[1],
-                backend=self.backend,
-            )
-
-        figs = []  # Store all figures if returning multiple
-
-        if return_single_figure:
-            # Calculate rows and columns for square layout
-            num_envs = len(env_indices)
-            num_rows = math.ceil(math.sqrt(num_envs))
-            num_cols = math.ceil(num_envs / num_rows)
-
-            total_figsize = (figsize[0] * num_cols, figsize[1] * num_rows)
-            fig, axes = plt.subplots(
-                nrows=num_rows,
-                ncols=num_cols,
-                figsize=total_figsize,
-                squeeze=False,
-            )
-            axes = axes.flatten()
-
-            for idx in range(len(axes)):
-                axes[idx].clear()  # Clear each subplot
-        else:
-            axes = [None] * len(env_indices)
-
+        figs = [] 
+    
         # Calculate scale factors based on figure size
-        max_fig_size = max(figsize)
-        marker_scale = max_fig_size / 15  # Adjust this factor as needed
-        line_width_scale = max_fig_size / 15  # Adjust this factor as needed
+        marker_scale = max(self.figsize) / 15 
+        line_width_scale = max(self.figsize) / 15 
 
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
-            if return_single_figure:
-                ax = axes[idx]
-                ax.clear()  # Clear any previous plots
-                ax.set_aspect("equal", adjustable="box")
-            else:
-                fig, ax = plt.subplots(figsize=figsize)
-                ax.clear()  # Clear any existing content
-                ax.set_aspect("equal", adjustable="box")
-                figs.append(fig)  # Add the new figure
-                plt.close(fig)  # Close the figure to prevent carryover
+
+            # Initialize figure and axes from cached road graph
+            fig, ax = plt.subplots(figsize=self.figsize)
+            ax.clear()  # Clear any existing content
+            ax.set_aspect("equal", adjustable="box")
+            figs.append(fig)  # Add the new figure
+            plt.close(fig)  # Close the figure to prevent carryover
+
+            # Render the pre-cached road graph for the current environment
+            #cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
+            # ax.imshow(
+            #     cached_roadgraph_array,
+            #     origin="upper",
+            #     extent=(-100, 100, -100, 100),  # Stretch to full plot
+            #     zorder=0,  # Draw as background
+            # )
+            
+            # Explicitly set the axis limits to match your coordinates
+            #cached_ax.set_xlim(-100, 100)
+            #cached_ax.set_ylim(-100, 100)
+
+            # Remove axes 
+            #cached_ax.axis('off')
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -178,12 +178,13 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
+
             if plot_log_replay_trajectory:
                 self._plot_log_replay_trajectory(
                     ax=ax,
                     control_mask=controlled_live,
                     env_idx=env_idx,
-                    log_trajectory=log_trajectory,
+                    log_trajectory=self.log_trajectory,
                     line_width_scale=line_width_scale,
                 )
 
@@ -236,18 +237,10 @@ class MatplotlibVisualizer:
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
-            # ax.set_xticks([])
-            # ax.set_yticks([])
+            figs.append(fig)
 
-        if return_single_figure:
-            for ax in axes[len(env_indices) :]:
-                ax.clear()
-                ax.axis("off")  # Hide unused subplots
-            plt.tight_layout()
-            plt.close(fig)  # Close the figure to prevent carryover
-            return fig
-        else:
-            return figs
+        return figs
+    
 
     def _plot_log_replay_trajectory(
         self,
@@ -764,4 +757,4 @@ class MatplotlibVisualizer:
         ax.set_xticks([])
         ax.set_yticks([])
 
-        return fig, ax
+        return fig
