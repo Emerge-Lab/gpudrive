@@ -113,7 +113,18 @@ class PufferGPUDrive(PufferEnv):
         ).to(self.device)
 
         # Setup rendering storage
-        self.clear_render_storage()
+        self.rendering_in_progress = {
+            env_idx: False
+            for env_idx in range(self.train_config.render_k_scenarios)
+        }
+        self.was_rendered_in_rollout = {
+            env_idx: True
+            for env_idx in range(self.train_config.render_k_scenarios)
+        }
+        self.frames = {
+            env_idx: []
+            for env_idx in range(self.train_config.render_k_scenarios)
+        }
         
         self.wandb_obj = None
         self.global_step = 0
