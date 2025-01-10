@@ -43,9 +43,9 @@ class EnvConfig:
 
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
-    obs_radius: float = 100.0  # Radius for road observations
+    obs_radius: float = 50.0  # Radius for road observations
     polyline_reduction_threshold: float = (
-        1.0  # Threshold for polyline reduction
+        0.1  # Threshold for polyline reduction
     )
 
     # Dynamics model
@@ -56,7 +56,7 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 36), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 42), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 16), decimals=3
@@ -93,7 +93,7 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
-        3.0  # Radius around goal considered as "goal achieved"
+        2.0  # Radius around goal considered as "goal achieved"
     )
 
     # C++ and Python shared settings (modifiable via C++ codebase)
@@ -111,9 +111,9 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-
-    #Param to init all objects:
+    # Param to init all objects:
     init_all_objects: bool = False
+
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""
@@ -138,8 +138,10 @@ class SceneConfig:
         seed (Optional[int]): Seed for random scene selection.
     """
 
-    path: str
-    num_scenes: int
+    batch_size: int  # Number of scenes per batch (should be equal to number of worlds in the env).
+    dataset_size: int  # Maximum number of files to include in the dataset.
+    path: str = None
+    num_scenes: int = None
     discipline: SelectionDiscipline = SelectionDiscipline.PAD_N
     k_unique_scenes: Optional[int] = None
     seed: Optional[int] = None
@@ -148,8 +150,7 @@ class SceneConfig:
 class RenderMode(Enum):
     """Enum for specifying rendering mode."""
 
-    PYGAME_ABSOLUTE = "pygame_absolute"
-    PYGAME_EGOCENTRIC = "pygame_egocentric"
+    MATPLOTLIB = "matplotlib"
     PYGAME_LIDAR = "pygame_lidar"
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
@@ -171,31 +172,15 @@ class MadronaOption(Enum):
 
 @dataclass
 class RenderConfig:
-    """Configuration settings for rendering the environment.
-
+    """
+    Configuration settings for rendering the environment.
     Attributes:
-        render_mode (RenderMode): The mode used for rendering the environment.
-        view_option (Enum): Rendering view option (e.g., RGB, human view).
-        resolution (Tuple[int, int]): Resolution of the rendered image.
-        line_thickness (int): Thickness of the road lines in the rendering.
-        draw_obj_idx (bool): Whether to draw object indices on objects.
-        obj_idx_font_size (int): Font size for object indices.
-        color_scheme (str): Color mode for the rendering ("light" or "dark").
+        render_mode (RenderMode): The mode used for rendering the environment. Default is MATPLOTLIB.
+        view_option (MadronaOption): Rendering view option used for the Madrona viewer (e.g., agent or top-down view).
     """
 
-    render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
-    view_option: Enum = PygameOption.RGB
+    render_mode: RenderMode = RenderMode.MATPLOTLIB
+    view_option: Enum = None
     resolution: Tuple[int, int] = (1024, 1024)
-    line_thickness: int = 0.7
     draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
-    color_scheme: str = "light"
-
-    def __str__(self) -> str:
-        """Returns a string representation of the rendering configuration."""
-        return (
-            f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
-            f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
-            f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
-            f"ColorScheme: {self.color_scheme}"
-        )
