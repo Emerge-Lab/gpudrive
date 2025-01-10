@@ -125,7 +125,7 @@ def init_wandb(args, name, id=None, resume=True):
         save_code=True,
         resume=False,
     )
- 
+
     return wandb
 
 
@@ -277,7 +277,7 @@ def run(
         train_config=config.train,
         device=config.train.device,
     )
-    
+
     if config.mode == "train":
         train(config, make_env)
 

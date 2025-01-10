@@ -49,7 +49,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     obs_dtype = vecenv.single_observation_space.dtype
     atn_shape = vecenv.single_action_space.shape
     total_agents = vecenv.num_agents
-    
+
     # Log initial data coverage
     vecenv.wandb_obj = wandb
     vecenv.log_data_coverage()
