@@ -5,10 +5,8 @@ import torch
 import dataclasses
 import wandb
 import gymnasium
-from pygpudrive.env.config import (
-    EnvConfig,
-    RenderConfig,
-)
+from collections import Counter
+from pygpudrive.env.config import EnvConfig
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
@@ -79,7 +77,7 @@ class PufferGPUDrive(PufferEnv):
             max_cont_agents=self.max_cont_agents_per_env,
             device=device,
         )
-        
+                
         self.obs_size = self.env.observation_space.shape[-1]
         self.single_action_space = self.env.action_space
         self.single_observation_space = gymnasium.spaces.Box(
@@ -121,9 +119,12 @@ class PufferGPUDrive(PufferEnv):
                 for env_idx in range(self.train_config.render_k_scenarios)
             }
 
-        self.wandb_obj = None
         self.global_step = 0
         self.iters = 0
+        
+        # Data logging storage
+        self.file_to_index = {file: idx for idx, file in enumerate(self.env.data_loader.dataset)}
+        self.cumulative_unique_files = set()
 
     def _obs_and_mask(self, obs):
         # self.buf.masks[:] = self.env.cont_agent_mask.numpy().ravel() * self.live_agent_mask
@@ -304,15 +305,6 @@ class PufferGPUDrive(PufferEnv):
                 controlled_mask
             ]
 
-            local_roadgraph = LocalRoadGraphPoints.from_tensor(
-                local_roadgraph_tensor=self.env.sim.agent_roadmap_tensor(),
-                backend="torch",
-                device=self.device,
-            )
-            rg_sparsity = (
-                local_roadgraph.type[self.controlled_agent_mask] == 0
-            ).sum() / local_roadgraph.type[self.controlled_agent_mask].numel()
-
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.env.sim.self_observation_tensor(),
                 backend="torch",
@@ -323,25 +315,20 @@ class PufferGPUDrive(PufferEnv):
             )
 
             if num_finished_agents > 0:
+                # fmt: off
                 info.append(
                     {
                         "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
                         "perc_goal_achieved": goal_achieved_rate.item(),
                         "perc_off_road": off_road_rate.item(),
                         "perc_veh_collisions": collision_rate.item(),
-                        "control_density": (
-                            self.num_agents
-                            / self.controlled_agent_mask.numel()
-                        ),
                         "total_controlled_agents": self.num_agents,
-                        "episode_length": self.episode_lengths[done_worlds, :]
-                        .mean()
-                        .item(),
-                        "rg_sparsity": rg_sparsity.item(),
+                        "control_density": self.num_agents / self.controlled_agent_mask.numel(),
                         "mean_agent_speed": agent_speeds.mean().item(),
+                        "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                     }
                 )
-
+                # fmt: on
             # Asynchronously reset the done worlds and empty storage
             for idx in done_worlds:
                 self.env.sim.reset([idx])
@@ -425,19 +412,10 @@ class PufferGPUDrive(PufferEnv):
 
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
-
-        if self.wandb_obj is not None:
-            self.wandb_obj.log(
-                {
-                    "Charts/unique_scenes_in_batch": len(
-                        set(self.env.data_batch)
-                    )
-                }
-            )
-
+        
         # Swap the data batch
         self.env.swap_data_batch()
-
+        
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_agents = self.controlled_agent_mask.sum().item()
@@ -447,6 +425,8 @@ class PufferGPUDrive(PufferEnv):
         self.reset()  # Reset storage
         # Get info from new worlds
         self.observations = self.env.reset()[self.controlled_agent_mask]
+        
+        self.log_data_coverage()
 
     def clear_render_storage(self):
         """Clear rendering storage."""
@@ -454,3 +434,30 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+            
+            
+    def log_data_coverage(self):
+        """Data coverage statistics."""
+        
+        scenario_counts = list(Counter(self.env.data_batch).values())
+        scenario_unique = len(set(self.env.data_batch))
+        
+        batch_idx = {self.file_to_index[file] for file in self.env.data_batch}
+        
+        # Check how many new files are in the batch
+        new_idx = batch_idx - self.cumulative_unique_files
+        
+        # Update the cumulative set
+        self.cumulative_unique_files.update(new_idx)
+        
+        if self.wandb_obj is not None:
+            self.wandb_obj.log(
+                {
+                    
+                    "Data/new_files_in_batch": len(new_idx),
+                    "Data/unique_scenarios_in_batch": scenario_unique,
+                    "Data/scenario_counts_in_batch": wandb.Histogram(scenario_counts),
+                    "Data/coverage": (len(self.cumulative_unique_files) / len(self.file_to_index)) * 100,
+                },
+                step=self.global_step,
+            )

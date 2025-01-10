@@ -49,6 +49,10 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     obs_dtype = vecenv.single_observation_space.dtype
     atn_shape = vecenv.single_action_space.shape
     total_agents = vecenv.num_agents
+    
+    # Log initial data coverage
+    vecenv.wandb_obj = wandb
+    vecenv.log_data_coverage()
 
     lstm = policy.lstm if hasattr(policy, "lstm") else None
 
@@ -126,7 +130,6 @@ def evaluate(data):
             ):  # Increment counter only if there is a limit
                 data.resample_counter += 1
 
-    data.vecenv.wandb_obj = data.wandb
     data.vecenv.clear_render_storage()
 
     config, profile, experience = data.config, data.profile, data.experience

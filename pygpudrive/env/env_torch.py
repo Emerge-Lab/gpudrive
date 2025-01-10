@@ -50,7 +50,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize the iterator once
         self.data_iterator = iter(self.data_loader)
 
-        # Get the initial data batch
+        # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
 
         # Initialize simulator
@@ -77,7 +77,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._setup_action_space(action_type)
         self.num_agents = self.cont_agent_mask.sum().item()
         self.single_action_space = self.action_space
-        self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
+        #self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
         self.observation_space = pufferlib.spaces.joint_space(self.single_observation_space, self.num_agents)
 
         self.info_dim = 5  # Number of info features
