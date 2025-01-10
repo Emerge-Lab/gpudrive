@@ -463,7 +463,7 @@ class PufferGPUDrive(PufferEnv):
                     ),
                     "Data/coverage": (
                         len(self.cumulative_unique_files)
-                        / len(self.file_to_index)
+                        / len(set(self.file_to_index))
                     )
                     * 100,
                 },
