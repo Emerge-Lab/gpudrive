@@ -267,6 +267,26 @@ class MatplotlibVisualizer:
         end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
 
+    def _get_corners_polygon(self, x, y, length, width, orientation):
+        """Calculate the four corners of a speed bump (can be any) polygon."""
+        # Compute the direction vectors based on orientation
+        # print(length)
+        c = np.cos(orientation)
+        s = np.sin(orientation)
+        u = np.array((c, s))  # Unit vector along the orientation
+        ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+        # Center point of the speed bump
+        pt = np.array([x, y])
+
+        # corners
+        tl = pt + (length / 2) * u - (width / 2) * ut
+        tr = pt + (length / 2) * u + (width / 2) * ut
+        br = pt - (length / 2) * u + (width / 2) * ut
+        bl = pt - (length / 2) * u - (width / 2) * ut
+
+        return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
+
     def _plot_roadgraph(
         self,
         env_idx: int,
