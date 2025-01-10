@@ -45,7 +45,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (10, 10)
+        self.figsize = (15, 15)
         self.env_config = env_config
         self.initialize_static_scenario_data(controlled_agent_mask)
 

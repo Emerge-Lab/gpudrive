@@ -166,18 +166,28 @@ def rollout(
             break
 
     # Aggregate metrics to obtain averages across scenes
-    #TODO: Check if everything adds up to 1
-    #TODO: Track number of agents that did not collide nor complete the goal
     controlled_agents_per_scene = env.cont_agent_mask.sum(dim=1).float()
     goal_achieved_per_scene = (goal_achieved > 0).float().sum(axis=1) / controlled_agents_per_scene
     collided_per_scene = (collided > 0).float().sum(axis=1) / controlled_agents_per_scene
     off_road_per_scene =  (off_road > 0).float().sum(axis=1) / controlled_agents_per_scene
+    not_goal_nor_crash = torch.logical_and(
+        goal_achieved == 0,  # Didn't reach the goal
+        torch.logical_and(
+            collided == 0,     # Didn't collide
+            torch.logical_and(
+                off_road == 0,  # Didn't go off-road
+                env.cont_agent_mask  # Only count controlled agents
+            )
+            )
+    )
+    not_goal_nor_crash_per_scene = not_goal_nor_crash.float().sum(dim=1) / controlled_agents_per_scene
 
     return (
         goal_achieved_per_scene,
         collided_per_scene,
         off_road_per_scene,
         controlled_agents_per_scene,
+        not_goal_nor_crash_per_scene,
         sim_state_frames,
     )
 
@@ -217,6 +227,7 @@ def evaluate_policy(
             collided,
             off_road,
             controlled_agents_in_scene,
+            not_goal_nor_crashed,
             _,
         ) = rollout(env, policy, device, deterministic=deterministic, render_sim_state=render_sim_state)
 
@@ -226,6 +237,7 @@ def evaluate_policy(
         res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
         res_dict["collided"].extend(collided.cpu().numpy())
         res_dict["off_road"].extend(off_road.cpu().numpy())
+        res_dict["not_goal_nor_crashed"].extend(not_goal_nor_crashed.cpu().numpy())
         res_dict["controlled_agents_in_scene"].extend(
             controlled_agents_in_scene.cpu().numpy()
         )
@@ -291,76 +303,71 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=setting_config.train_dir,
-        batch_size=2,
-        dataset_size=5,
-        sample_with_replacement=True,
+        batch_size=3,
+        dataset_size=3,
+        sample_with_replacement=False,
     )
 
     # Make environment
     env = make_env(setting_config, train_loader)
 
-    for model in model_config.models:
+    # for model in model_config.models:
 
-        logging.info(f"Evaluating model {model.name} \n")
+    #logging.info(f"Evaluating model {model.name} \n")
 
-        # Load policy
-        policy = load_policy(
-            path_to_cpt=model_config.models_path,
-            model_name=model.name,
-            device=setting_config.device,
-        )
+    # Load policy
+    policy = load_policy(
+        path_to_cpt=model_config.models_path,
+        model_name="model_PPO__S_3__01_09_20_23_08_617_005061", #model.name,
+        device=setting_config.device,
+    )
 
-        # Random policy as baseline
-        rand_policy = RandomPolicy(env.action_space.n)
+    # Random policy as baseline
+    rand_policy = RandomPolicy(env.action_space.n)
 
-        # Create data loaders
-        # TODO: Send model and data path to eugene
-        train_loader = SceneDataLoader(
-            root=setting_config.train_dir,
-            batch_size=setting_config.num_worlds,
-            dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
-            sample_with_replacement=True, # Note: Sample with replacement changes the scene order (fix)
-            shuffle=False,  # Don't shuffle because we're using the first N scenes that were also used for training
-        )
+    # Create data loaders (todo)
+    
+    # Evaluate policy
+    df_res_train = evaluate_policy(
+        env=env,
+        policy=policy,
+        data_loader=train_loader,
+        dataset_name="train",
+        deterministic=False,
+        render_sim_state=False,
+    )
+
 
         # test_loader = SceneDataLoader(
         #     root=setting_config.test_dir,
-        #     batch_size=setting_config.num_worlds,
-        #     dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
-        #     sample_with_replacement=False,
-        #     shuffle=True,
-        # )
+        # #     batch_size=setting_config.num_worlds,
+        # #     dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
+        # #     sample_with_replacement=False,
+        # #     shuffle=True,
+        # # )
 
-        #logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
+        # #logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
 
-        # Rollouts
-        df_res_train = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=train_loader,
-            dataset_name="train",
-            deterministic=False,
-            render_sim_state=True,
-        )
+        # # Rollouts
+        
+        # # df_res_test = evaluate_policy(
+        # #     env=env,
+        # #     policy=policy,
+        # #     data_loader=test_loader,
+        # #     dataset_name="test",
+        # # )
 
-        # df_res_test = evaluate_policy(
-        #     env=env,
-        #     policy=policy,
-        #     data_loader=test_loader,
-        #     dataset_name="test",
-        # )
+        # # Concatenate train/test results
+        # #df_res = pd.concat([df_res_train, df_res_test])
 
-        # Concatenate train/test results
-        #df_res = pd.concat([df_res_train, df_res_test])
+        # # Add metadata
+        # #df_res["model_name"] = model.name
+        # #df_res["train_dataset_size"] = model.train_dataset_size
 
-        # Add metadata
-        #df_res["model_name"] = model.name
-        #df_res["train_dataset_size"] = model.train_dataset_size
+        # # Store
+        # if not os.path.exists(setting_config.res_path):
+        #     os.makedirs(setting_config.res_path)
 
-        # Store
-        if not os.path.exists(setting_config.res_path):
-            os.makedirs(setting_config.res_path)
+        # #df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
 
-        #df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
-
-        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
+        # logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")

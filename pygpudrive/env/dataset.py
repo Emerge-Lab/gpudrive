@@ -89,8 +89,9 @@ class SceneDataLoader:
             ]
             self.current_index += self.batch_size
 
-            if self.current_index > len(self.indices):
-                raise StopIteration
+            # Wrap around the indices list if we exceed its length
+            if self.current_index >= len(self.indices):
+                self.current_index = 0  # Reset to start of indices
 
             # Retrieve the corresponding scenes
             batch = [self.dataset[i] for i in batch_indices]
@@ -109,7 +110,6 @@ class SceneDataLoader:
             batch = [self.dataset[i] for i in batch_indices]
 
         return batch
-
 
 # Example usage
 if __name__ == "__main__":
