@@ -35,7 +35,7 @@ class SceneDataLoader:
             )
 
         # Set the random seed for reproducibility
-        random.seed(self.seed)
+        self.random_gen = random.Random(self.seed)
 
         # Create the dataset from valid files in the directory
         self.dataset = [
@@ -57,7 +57,7 @@ class SceneDataLoader:
 
         # Shuffle the dataset if required
         if self.shuffle:
-            random.shuffle(self.dataset)
+            self.random_gen.shuffle(self.dataset)
 
         # Initialize state for iteration
         self._reset_indices()
@@ -65,7 +65,7 @@ class SceneDataLoader:
     def _reset_indices(self):
         """Reset indices for sampling."""
         if self.sample_with_replacement:
-            self.indices = None  # No need to track indices for replacement
+            self.indices = [self.random_gen.randint(0, len(self.dataset) - 1) for _ in range(len(self.dataset))]
         else:
             self.indices = list(range(len(self.dataset)))
         self.current_index = 0
@@ -80,16 +80,22 @@ class SceneDataLoader:
 
     def __next__(self) -> List[str]:
         if self.sample_with_replacement:
-            batch = random.choices(self.dataset, k=self.batch_size)
+            # Get the next batch of "deterministic" random indices
+            batch_indices = self.indices[self.current_index:self.current_index + self.batch_size]
+            self.current_index += self.batch_size
+
+            if self.current_index > len(self.indices):
+                raise StopIteration
+
+            # Retrieve the corresponding scenes
+            batch = [self.dataset[i] for i in batch_indices]
         else:
             if self.current_index >= len(self.indices):
                 raise StopIteration
 
             # Get the next batch of indices
-            end_index = min(
-                self.current_index + self.batch_size, len(self.indices)
-            )
-            batch_indices = self.indices[self.current_index : end_index]
+            end_index = min(self.current_index + self.batch_size, len(self.indices))
+            batch_indices = self.indices[self.current_index:end_index]
             self.current_index = end_index
 
             # Retrieve the corresponding scenes
@@ -100,13 +106,27 @@ class SceneDataLoader:
 
 # Example usage
 if __name__ == "__main__":
+    from pprint import pprint
+    
     data_loader = SceneDataLoader(
         root="data/processed/training",
-        batch_size=100,
-        dataset_size=50,
-        sample_with_replacement=False,
-        shuffle=True,  # Shuffle the dataset before batching
+        batch_size=2,
+        dataset_size=2,
+        sample_with_replacement=True,  # Sampling with replacement
+        shuffle=False,  # Shuffle the dataset before batching
     )
+    
+    print('\nDataset')
+    pprint(data_loader.dataset[:5])
+    
+    
+    print('\nBatch 1')
+    batch = next(iter(data_loader))
+    pprint(batch)
 
-    for batch in data_loader:
-        print(batch)
+
+    print('\nBatch 2')
+    batch = next(iter(data_loader))
+    pprint(batch)
+
+    print('done')
