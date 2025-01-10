@@ -10,8 +10,10 @@ import os
 import torch
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
+from matplotlib.patches import Circle, Polygon, RegularPolygon
 
 from pygpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
+
 
 def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
@@ -19,13 +21,14 @@ def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
         left=0.0, bottom=0.0, right=1.0, top=1.0, wspace=0.0, hspace=0.0
     )
     fig.canvas.draw()
-    
+
     # Extract image data
     data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    
+
     plt.close(fig)  # Close the figure
     return img
+
 
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
@@ -270,3 +273,166 @@ def plot_bounding_box(
             label=label,
             linewidth=2,
         )
+
+
+def get_corners_polygon(x, y, length, width, orientation):
+    """Calculate the four corners of a speed bump (can be any) polygon."""
+    # Compute the direction vectors based on orientation
+    # print(length)
+    c = np.cos(orientation)
+    s = np.sin(orientation)
+    u = np.array((c, s))  # Unit vector along the orientation
+    ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+    # Center point of the speed bump
+    pt = np.array([x, y])
+
+    # corners
+    tl = pt + (length / 2) * u - (width / 2) * ut
+    tr = pt + (length / 2) * u + (width / 2) * ut
+    br = pt - (length / 2) * u + (width / 2) * ut
+    bl = pt - (length / 2) * u - (width / 2) * ut
+
+    return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
+
+
+def get_stripe_polygon(
+    x: float,
+    y: float,
+    length: float,
+    width: float,
+    orientation: float,
+    index: int,
+    num_stripes: int,
+) -> np.ndarray:
+
+    """Calculate the corners of a stripe within the speed bump polygon."""
+
+    # Compute the direction vectors
+    c = np.cos(orientation)
+    s = np.sin(orientation)
+    u = np.array([c, s])  # Unit vector along the orientation (lengthwise)
+    ut = np.array([-s, c])  # Perpendicular unit vector (widthwise)
+
+    # Total stripe height along the width
+    stripe_width = length / num_stripes
+    half_length = length / 2
+    half_width = width / 2
+
+    # Offset for the current stripe
+    offset_start = -half_length + index * stripe_width
+    offset_end = offset_start + stripe_width
+
+    # Center of the speed bump
+    center = np.array([x, y])
+
+    # Calculate stripe corners
+    stripe_corners = [
+        center + u * offset_start + ut * half_width,  # Top-left
+        center + u * offset_start - ut * half_width,  # Bottom-left
+        center + u * offset_end - ut * half_width,  # Bottom-right
+        center + u * offset_end + ut * half_width,  # Top-right
+    ]
+
+    return np.array(stripe_corners)
+
+
+def plot_speed_bumps(
+    x_coords: Union[float, np.ndarray],
+    y_coords: Union[float, np.ndarray],
+    segment_lengths: Union[float, torch.Tensor],
+    segment_widths: Union[float, torch.Tensor],
+    segment_orientations: Union[float, torch.Tensor],
+    ax: matplotlib.axes.Axes,
+    facecolor: str = None,
+    edgecolor: str = None,
+    alpha: float = None,
+) -> None:
+    facecolor = "xkcd:goldenrod"
+    edgecolor = "xkcd:black"
+    alpha = 0.5
+    for x, y, length, width, orientation in zip(
+        x_coords,
+        y_coords,
+        segment_lengths,
+        segment_widths,
+        segment_orientations,
+    ):
+        # method1: from waymax using hatch as diagonals
+        points = get_corners_polygon(x, y, length, width, orientation)
+
+        p = Polygon(
+            points,
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+            linewidth=0,
+            alpha=alpha,
+            hatch=r"//",
+            zorder=2,
+        )
+
+        ax.add_patch(p)
+
+    pass
+
+
+def plot_stop_sign(
+    point: np.ndarray,
+    ax: matplotlib.axes.Axes,
+    radius: float = None,
+    facecolor: str = None,
+    edgecolor: str = None,
+    linewidth: float = None,
+    alpha: float = None,
+) -> None:
+    # Default configurations for the stop sign
+    facecolor = "red" if facecolor is None else facecolor
+    edgecolor = "white" if edgecolor is None else edgecolor
+    linewidth = 1.5 if linewidth is None else linewidth
+    radius = 1.0 if radius is None else radius
+    alpha = 1.0 if alpha is None else alpha
+
+    point = np.array(point).reshape(-1)
+
+    p = RegularPolygon(
+        point,
+        numVertices=6,  # For hexagonal stop sign
+        radius=radius,
+        facecolor=facecolor,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+        alpha=alpha,
+        zorder=2,
+    )
+    ax.add_patch(p)
+
+
+def plot_crosswalk(
+    points,
+    ax: plt.Axes = None,
+    facecolor: str = None,
+    edgecolor: str = None,
+    alpha: float = None,
+):
+    if ax is None:
+        ax = plt.gca()
+    # override default config
+    facecolor = (
+        crosswalk_config["facecolor"] if facecolor is None else facecolor
+    )
+    edgecolor = (
+        crosswalk_config["edgecolor"] if edgecolor is None else edgecolor
+    )
+    alpha = crosswalk_config["alpha"] if alpha is None else alpha
+
+    p = Polygon(
+        points,
+        facecolor=facecolor,
+        edgecolor=edgecolor,
+        linewidth=2,
+        alpha=alpha,
+        hatch=r"//",
+        zorder=2,
+    )
+
+    ax.add_patch(p)

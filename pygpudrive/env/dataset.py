@@ -65,7 +65,10 @@ class SceneDataLoader:
     def _reset_indices(self):
         """Reset indices for sampling."""
         if self.sample_with_replacement:
-            self.indices = [self.random_gen.randint(0, len(self.dataset) - 1) for _ in range(len(self.dataset))]
+            self.indices = [
+                self.random_gen.randint(0, len(self.dataset) - 1)
+                for _ in range(len(self.dataset))
+            ]
         else:
             self.indices = list(range(len(self.dataset)))
         self.current_index = 0
@@ -81,7 +84,9 @@ class SceneDataLoader:
     def __next__(self) -> List[str]:
         if self.sample_with_replacement:
             # Get the next batch of "deterministic" random indices
-            batch_indices = self.indices[self.current_index:self.current_index + self.batch_size]
+            batch_indices = self.indices[
+                self.current_index : self.current_index + self.batch_size
+            ]
             self.current_index += self.batch_size
 
             if self.current_index > len(self.indices):
@@ -94,8 +99,10 @@ class SceneDataLoader:
                 raise StopIteration
 
             # Get the next batch of indices
-            end_index = min(self.current_index + self.batch_size, len(self.indices))
-            batch_indices = self.indices[self.current_index:end_index]
+            end_index = min(
+                self.current_index + self.batch_size, len(self.indices)
+            )
+            batch_indices = self.indices[self.current_index : end_index]
             self.current_index = end_index
 
             # Retrieve the corresponding scenes
@@ -107,7 +114,7 @@ class SceneDataLoader:
 # Example usage
 if __name__ == "__main__":
     from pprint import pprint
-    
+
     data_loader = SceneDataLoader(
         root="data/processed/training",
         batch_size=2,
@@ -115,18 +122,14 @@ if __name__ == "__main__":
         sample_with_replacement=True,  # Sampling with replacement
         shuffle=False,  # Shuffle the dataset before batching
     )
-    
-    print('\nDataset')
+
+    print("\nDataset")
     pprint(data_loader.dataset[:5])
-    
-    
-    print('\nBatch 1')
+
+    print("\nBatch 1")
     batch = next(iter(data_loader))
     pprint(batch)
 
-
-    print('\nBatch 2')
+    print("\nBatch 2")
     batch = next(iter(data_loader))
     pprint(batch)
-
-    print('done')

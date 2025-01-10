@@ -29,9 +29,9 @@ class EnvConfig:
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
-    
+
     # Maximum number of controlled agents in the scene
-    max_controlled_agents: int = gpudrive.kMaxAgentCount  
+    max_controlled_agents: int = gpudrive.kMaxAgentCount
     num_worlds: int = 1  # Number of worlds in the environment
 
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
@@ -154,8 +154,7 @@ class SceneConfig:
 class RenderMode(Enum):
     """Enum for specifying rendering mode."""
 
-    PYGAME_ABSOLUTE = "pygame_absolute"
-    PYGAME_EGOCENTRIC = "pygame_egocentric"
+    MATPLOTLIB = "matplotlib"
     PYGAME_LIDAR = "pygame_lidar"
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
@@ -177,31 +176,15 @@ class MadronaOption(Enum):
 
 @dataclass
 class RenderConfig:
-    """Configuration settings for rendering the environment.
-
+    """
+    Configuration settings for rendering the environment.
     Attributes:
-        render_mode (RenderMode): The mode used for rendering the environment.
-        view_option (Enum): Rendering view option (e.g., RGB, human view).
-        resolution (Tuple[int, int]): Resolution of the rendered image.
-        line_thickness (int): Thickness of the road lines in the rendering.
-        draw_obj_idx (bool): Whether to draw object indices on objects.
-        obj_idx_font_size (int): Font size for object indices.
-        color_scheme (str): Color mode for the rendering ("light" or "dark").
+        render_mode (RenderMode): The mode used for rendering the environment. Default is MATPLOTLIB.
+        view_option (MadronaOption): Rendering view option used for the Madrona viewer (e.g., agent or top-down view).
     """
 
-    render_mode: RenderMode = RenderMode.PYGAME_ABSOLUTE
-    view_option: Enum = PygameOption.RGB
+    render_mode: RenderMode = RenderMode.MATPLOTLIB
+    view_option: Enum = None
     resolution: Tuple[int, int] = (1024, 1024)
-    line_thickness: int = 0.7
     draw_obj_idx: bool = False
     obj_idx_font_size: int = 9
-    color_scheme: str = "light"
-
-    def __str__(self) -> str:
-        """Returns a string representation of the rendering configuration."""
-        return (
-            f"RenderMode: {self.render_mode.value}, ViewOption: {self.view_option.value}, "
-            f"Resolution: {self.resolution}, LineThickness: {self.line_thickness}, "
-            f"DrawObjectIdx: {self.draw_obj_idx}, ObjectIdxFontSize: {self.obj_idx_font_size}, "
-            f"ColorScheme: {self.color_scheme}"
-        )

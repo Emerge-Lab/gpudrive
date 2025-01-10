@@ -73,13 +73,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.single_observation_space = gymnasium.spaces.Box(
             low=0, high=255, shape=(self.observation_space.shape[-1],), dtype=np.float32
         )
-        
+
         self._setup_action_space(action_type)
         self.num_agents = self.cont_agent_mask.sum().item()
         self.single_action_space = self.action_space
         self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
         self.observation_space = pufferlib.spaces.joint_space(self.single_observation_space, self.num_agents)
-        
+
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 

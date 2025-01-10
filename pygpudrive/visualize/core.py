@@ -27,6 +27,7 @@ from pygpudrive.visualize.color import (
 
 OUT_OF_BOUNDS = 1000
 
+
 class MatplotlibVisualizer:
     def __init__(
         self,
@@ -50,7 +51,7 @@ class MatplotlibVisualizer:
 
     def initialize_static_scenario_data(self, controlled_agent_mask):
         """
-        Initialize key information for visualization based on the 
+        Initialize key information for visualization based on the
         current batch of scenarios.
         """
         self.response_type = ResponseType.from_tensor(
@@ -64,7 +65,7 @@ class MatplotlibVisualizer:
             device=self.device,
         )
         self.controlled_agent_mask = controlled_agent_mask.to(self.device)
-        
+
         self.log_trajectory = LogTrajectory.from_tensor(
             self.sim_object.expert_trajectory_tensor(),
             self.num_worlds,
@@ -80,11 +81,11 @@ class MatplotlibVisualizer:
         #         road_graph=self.global_roadgraph,
         #         env_idx=env_idx,
         #         ax=ax,
-        #         line_width_scale=1.0,  
+        #         line_width_scale=1.0,
         #         marker_size_scale=1.0,
         #     )
         #     self.cached_roadgraphs.append(fig)
-        #     plt.close(fig)  
+        #     plt.close(fig)
 
     def plot_simulator_state(
         self,
@@ -112,8 +113,10 @@ class MatplotlibVisualizer:
         if time_steps is None:
             time_steps = [None] * len(env_indices)  # Default to None for all
         if center_agent_indices is None:
-            center_agent_indices = [None] * len(env_indices)  # Default to None for all
-        
+            center_agent_indices = [None] * len(
+                env_indices
+            )  # Default to None for all
+
         # Changes at every time step
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
@@ -121,13 +124,15 @@ class MatplotlibVisualizer:
             device=self.device,
         )
 
-        agent_infos = self.sim_object.info_tensor().to_torch().clone().to(self.device)
+        agent_infos = (
+            self.sim_object.info_tensor().to_torch().clone().to(self.device)
+        )
 
-        figs = [] 
-    
+        figs = []
+
         # Calculate scale factors based on figure size
-        marker_scale = max(self.figsize) / 15 
-        line_width_scale = max(self.figsize) / 15 
+        marker_scale = max(self.figsize) / 15
+        line_width_scale = max(self.figsize) / 15
 
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
@@ -149,13 +154,13 @@ class MatplotlibVisualizer:
             #     extent=(-100, 100, -100, 100),  # Stretch to full plot
             #     zorder=0,  # Draw as background
             # )
-            
-            # Explicitly set the axis limits to match your coordinates
-            #cached_ax.set_xlim(-100, 100)
-            #cached_ax.set_ylim(-100, 100)
 
-            # Remove axes 
-            #cached_ax.axis('off')
+            # Explicitly set the axis limits to match your coordinates
+            # cached_ax.set_xlim(-100, 100)
+            # cached_ax.set_ylim(-100, 100)
+
+            # Remove axes
+            # cached_ax.axis('off')
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -237,7 +242,6 @@ class MatplotlibVisualizer:
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
         return figs
-    
 
     def _plot_log_replay_trajectory(
         self,
@@ -284,6 +288,9 @@ class MatplotlibVisualizer:
                     road_point_type == int(gpudrive.EntityType.RoadEdge)
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
+                    or road_point_type == int(gpudrive.EntityType.StopSign)
+                    or road_point_type == int(gpudrive.EntityType.CrossWalk)
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -291,35 +298,84 @@ class MatplotlibVisualizer:
                     segment_lengths = road_graph.segment_length[
                         env_idx, road_mask
                     ].tolist()
+                    segment_widths = road_graph.segment_width[
+                        env_idx, road_mask
+                    ].tolist()
                     segment_orientations = road_graph.orientation[
                         env_idx, road_mask
                     ].tolist()
 
-                    # Compute and draw road edges using start and end points
-                    for x, y, length, orientation in zip(
-                        x_coords,
-                        y_coords,
-                        segment_lengths,
-                        segment_orientations,
+                    if (
+                        road_point_type == int(gpudrive.EntityType.RoadEdge)
+                        or road_point_type == int(gpudrive.EntityType.RoadLine)
+                        or road_point_type == int(gpudrive.EntityType.RoadLane)
                     ):
-                        start, end = self._get_endpoints(
-                            x, y, length, orientation
-                        )
-
-                        if road_point_type == int(
-                            gpudrive.EntityType.RoadEdge
+                        # Compute and draw road edges using start and end points
+                        for x, y, length, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_orientations,
                         ):
-                            line_width = 1.1 * line_width_scale
+                            start, end = self._get_endpoints(
+                                x, y, length, orientation
+                            )
 
-                        else:
-                            line_width = 0.75 * line_width_scale
+                            # Plot the road edge as a line
+                            if road_point_type == int(
+                                gpudrive.EntityType.RoadEdge
+                            ):
+                                line_width = 1.1 * line_width_scale
+                            else:
+                                line_width = 0.75 * line_width_scale
 
-                        ax.plot(
-                            [start[0], end[0]],
-                            [start[1], end[1]],
-                            color=ROAD_GRAPH_COLORS[road_point_type],
-                            linewidth=line_width,
+                            ax.plot(
+                                [start[0], end[0]],
+                                [start[1], end[1]],
+                                color=ROAD_GRAPH_COLORS[road_point_type],
+                                linewidth=line_width,
+                            )
+
+                    elif road_point_type == int(gpudrive.EntityType.SpeedBump):
+                        utils.plot_speed_bumps(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
+                            segment_orientations,
+                            ax,
                         )
+
+                    elif road_point_type == int(gpudrive.EntityType.StopSign):
+                        for x, y in zip(x_coords, y_coords):
+                            point = np.array([x, y])
+                            utils.plot_stop_sign(
+                                point=point,
+                                ax=ax,
+                                radius=1.5,
+                                facecolor="xkcd:red",
+                                edgecolor="none",
+                                linewidth=3.0,
+                                alpha=0.8,
+                            )
+                    elif road_point_type == int(gpudrive.EntityType.CrossWalk):
+                        for x, y, length, width, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
+                            segment_orientations,
+                        ):
+                            points = self._get_corners_polygon(
+                                x, y, length, width, orientation
+                            )
+                            utils.plot_crosswalk(
+                                points=points,
+                                ax=ax,
+                                facecolor="none",
+                                edgecolor="xkcd:bluish grey",
+                                alpha=0.4,
+                            )
 
                 else:
                     # Dots for other road point types
