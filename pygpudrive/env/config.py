@@ -29,6 +29,10 @@ class EnvConfig:
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
+    
+    # Maximum number of controlled agents in the scene
+    max_controlled_agents: int = gpudrive.kMaxAgentCount  
+    num_worlds: int = 1  # Number of worlds in the environment
 
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
     # and partner_obs are invalid. This makes the sim 2x faster

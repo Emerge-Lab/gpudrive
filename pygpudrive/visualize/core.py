@@ -73,18 +73,18 @@ class MatplotlibVisualizer:
         )
 
         # Cache pre-rendered road graphs for all environments
-        self.cached_roadgraphs = []
-        for env_idx in range(self.controlled_agent_mask.shape[0]):
-            fig, ax = plt.subplots(figsize=self.figsize)
-            self._plot_roadgraph(
-                road_graph=self.global_roadgraph,
-                env_idx=env_idx,
-                ax=ax,
-                line_width_scale=1.0,  
-                marker_size_scale=1.0,
-            )
-            self.cached_roadgraphs.append(fig)
-            plt.close(fig)  
+        # self.cached_roadgraphs = []
+        # for env_idx in range(self.controlled_agent_mask.shape[0]):
+        #     fig, ax = plt.subplots(figsize=self.figsize)
+        #     self._plot_roadgraph(
+        #         road_graph=self.global_roadgraph,
+        #         env_idx=env_idx,
+        #         ax=ax,
+        #         line_width_scale=1.0,  
+        #         marker_size_scale=1.0,
+        #     )
+        #     self.cached_roadgraphs.append(fig)
+        #     plt.close(fig)  
 
     def plot_simulator_state(
         self,
@@ -178,7 +178,6 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
-
             if plot_log_replay_trajectory:
                 self._plot_log_replay_trajectory(
                     ax=ax,
@@ -236,8 +235,6 @@ class MatplotlibVisualizer:
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
-
-            figs.append(fig)
 
         return figs
     

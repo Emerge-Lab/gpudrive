@@ -3,10 +3,8 @@ import numpy as np
 from pathlib import Path
 import torch
 import dataclasses
-import gymnasium
 import wandb
-import random
-
+import gymnasium
 from pygpudrive.env.config import (
     EnvConfig,
     RenderConfig,
@@ -40,7 +38,7 @@ def env_creator(
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
 
-    def __init__(self, data_loader, device, config, train_config, buf=None):
+    def __init__(self, data_loader, device, config, train_config=None, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
 
         self.device = device
@@ -48,7 +46,7 @@ class PufferGPUDrive(PufferEnv):
         self.train_config = train_config
         self.max_cont_agents_per_env = config.max_controlled_agents
         self.num_worlds = config.num_worlds
-        
+
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -63,37 +61,33 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=config.road_map_obs,
             partner_obs=config.partner_obs,
             reward_type=config.reward_type,
-            norm_obs=config.normalize_obs,
+            norm_obs=config.norm_obs,
             dynamics_model=config.dynamics_model,
             collision_behavior=config.collision_behavior,
             dist_to_goal_threshold=config.dist_to_goal_threshold,
             polyline_reduction_threshold=config.polyline_reduction_threshold,
             remove_non_vehicles=config.remove_non_vehicles,
-            lidar_obs=config.use_lidar_obs,
-            disable_classic_obs=True if config.use_lidar_obs else False,
+            lidar_obs=config.lidar_obs,
+            disable_classic_obs=True if config.lidar_obs else False,
             obs_radius=config.obs_radius,
         )
 
-        render_config = RenderConfig(
-            draw_obj_idx=True,
-        )
-        
         # Make env
         self.env = GPUDriveTorchEnv(
             config=env_config,
             data_loader=data_loader,
-            render_config=render_config,
             max_cont_agents=self.max_cont_agents_per_env,
             device=device,
         )
-
+        
         self.obs_size = self.env.observation_space.shape[-1]
         self.single_action_space = self.env.action_space
         self.single_observation_space = gymnasium.spaces.Box(
             low=0, high=255, shape=(self.obs_size,), dtype=np.float32
         )
-        self.render_mode = "rgb_array"
-
+        
+        #self.single_observation_space = self.env.single_observation_space
+        #self.observation_space = self.env.observation_space
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
 
         # Number of controlled agents across all worlds
@@ -113,19 +107,20 @@ class PufferGPUDrive(PufferEnv):
         ).to(self.device)
 
         # Setup rendering storage
-        self.rendering_in_progress = {
-            env_idx: False
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-        self.was_rendered_in_rollout = {
-            env_idx: True
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-        self.frames = {
-            env_idx: []
-            for env_idx in range(self.train_config.render_k_scenarios)
-        }
-        
+        if self.train_config is not None:
+            self.rendering_in_progress = {
+                env_idx: False
+                for env_idx in range(self.train_config.render_k_scenarios)
+            }
+            self.was_rendered_in_rollout = {
+                env_idx: True
+                for env_idx in range(self.train_config.render_k_scenarios)
+            }
+            self.frames = {
+                env_idx: []
+                for env_idx in range(self.train_config.render_k_scenarios)
+            }
+
         self.wandb_obj = None
         self.global_step = 0
         self.iters = 0

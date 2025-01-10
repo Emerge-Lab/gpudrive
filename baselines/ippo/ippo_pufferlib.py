@@ -265,7 +265,8 @@ def run(
         dataset_size=config.train.resample_dataset_size
         if config.train.resample_scenes
         else config.environment.k_unique_scenes,
-        sample_with_replacement=True,
+        sample_with_replacement=config.train.sample_with_replacement,
+        shuffle=config.train.shuffle_dataset,
     )
 
     # Make environment
@@ -275,7 +276,7 @@ def run(
         train_config=config.train,
         device=config.train.device,
     )
-
+    
     if config.mode == "train":
         train(config, make_env)
 

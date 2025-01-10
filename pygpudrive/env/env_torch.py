@@ -6,7 +6,7 @@ import torch
 from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-
+import gymnasium
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -19,6 +19,7 @@ from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 from pygpudrive.env.dataset import SceneDataLoader
+import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -66,7 +67,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
+        # self.single_observation_space = Box(
+        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
+        # )
+        self.single_observation_space = gymnasium.spaces.Box(
+            low=0, high=255, shape=(self.observation_space.shape[-1],), dtype=np.float32
+        )
+        
         self._setup_action_space(action_type)
+        self.num_agents = self.cont_agent_mask.sum().item()
+        self.single_action_space = self.action_space
+        self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
+        self.observation_space = pufferlib.spaces.joint_space(self.single_observation_space, self.num_agents)
+        
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 
@@ -599,6 +612,7 @@ if __name__ == "__main__":
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
+        shuffle=False,
     )
 
     # Make env
