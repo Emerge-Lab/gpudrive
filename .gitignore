@@ -242,6 +242,9 @@ pyrightconfig.json
 # To be manually created using .env.template
 .env
 
+# Sbatch scripts
+*.sh
+
 # Logs
 examples/experiments/scripts/logs/*
 
