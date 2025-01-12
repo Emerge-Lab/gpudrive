@@ -246,6 +246,7 @@ pyrightconfig.json
 examples/experiments/scripts/logs/*
 
 # Videos
+videos/
 output_videos_larger_dataset/
 output_videos_small_dataset/
 

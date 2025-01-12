@@ -4,7 +4,7 @@ from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
-
+import pandas as pd
 import gpudrive
 from pygpudrive.visualize import utils
 from pygpudrive.datatypes.roadgraph import (
@@ -24,6 +24,8 @@ from pygpudrive.visualize.color import (
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
 )
+
+import pdb
 
 OUT_OF_BOUNDS = 1000
 
@@ -93,7 +95,9 @@ class MatplotlibVisualizer:
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
+        results_df: Optional[pd.DataFrame] = None,
         plot_log_replay_trajectory: bool = False,
+        eval_mode: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -159,9 +163,6 @@ class MatplotlibVisualizer:
             # cached_ax.set_xlim(-100, 100)
             # cached_ax.set_ylim(-100, 100)
 
-            # Remove axes
-            # cached_ax.axis('off')
-
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
             controlled_live = controlled & (
@@ -206,17 +207,20 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
-            # Plot rollout statistics
-            num_controlled = controlled.sum().item()
-            num_off_road = is_offroad.sum().item()
-            num_collided = is_collided.sum().item()
-            if time_step is not None:
+            if time_step is not None and not eval_mode:
+                # Plot rollout statistics
+                num_controlled = controlled.sum().item() 
+                num_off_road = is_offroad.sum().item()
+                num_collided = is_collided.sum().item()
+                off_road_rate = num_off_road / num_controlled if num_controlled > 0 else 0
+                collision_rate = num_collided / num_controlled if num_controlled > 0 else 0
+                
                 ax.text(
                     0.5,  # Horizontal center
                     0.95,  # Vertical location near the top
                     f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-                    f"off-road: {num_off_road/num_controlled:.2f}; "
-                    f"collision: {num_collided/num_controlled:.2f}",
+                    f"off-road: {off_road_rate:.2f}; "
+                    f"collision: {collision_rate:.2f}",
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
@@ -224,6 +228,30 @@ class MatplotlibVisualizer:
                     color="black",
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
                 )
+            else:
+                if eval_mode and results_df is not None: 
+      
+                    num_controlled = results_df.iloc[env_idx].controlled_agents_in_scene
+                    off_road_rate = results_df.iloc[env_idx].off_road * 100
+                    collision_rate = results_df.iloc[env_idx].collided * 100
+                    goal_rate = results_df.iloc[env_idx].goal_achieved * 100
+                    other = results_df.iloc[env_idx].not_goal_nor_crashed * 100       
+                    
+                    ax.text(
+                        0.5,  # Horizontal center
+                        0.95,  # Vertical location near the top
+                        f"$N_c$ = {num_controlled}; " 
+                        f"OR: {off_road_rate:.1f}; " 
+                        f"CR: {collision_rate:.1f}; "
+                        f"GR: {goal_rate:.1f}; "
+                        f"Other: {other:.1f}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=ax.transAxes,
+                        fontsize=20 * marker_scale,
+                        color="black",
+                        bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+                    )
 
             # Determine center point for zooming
             if center_agent_idx is not None:
@@ -240,6 +268,10 @@ class MatplotlibVisualizer:
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
+            
+            # Remove ticks
+            ax.set_xticks([])
+            ax.set_yticks([])
 
         return figs
 
@@ -373,10 +405,10 @@ class MatplotlibVisualizer:
                                 point=point,
                                 ax=ax,
                                 radius=1.5,
-                                facecolor="xkcd:red",
+                                facecolor="#c04000",
                                 edgecolor="none",
                                 linewidth=3.0,
-                                alpha=0.8,
+                                alpha=0.9,
                             )
                     elif road_point_type == int(gpudrive.EntityType.CrossWalk):
                         for x, y, length, width, orientation in zip(

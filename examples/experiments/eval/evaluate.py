@@ -35,7 +35,7 @@ class RandomPolicy:
         )
         return random_action, None, None, None
 
-def load_policy(path_to_cpt, model_name, device):
+def load_policy(path_to_cpt, model_name, device, env=None):
     """Load a policy from a given path."""
 
     # Load the saved checkpoint
@@ -76,7 +76,9 @@ def rollout(
     device, 
     deterministic: bool = False, 
     render_sim_state: bool = False,
-    zoom_radius: int = 90,
+    render_every_n_steps: int = 5,
+    zoom_radius: int = 100,
+    results_df: pd.DataFrame = None,
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -102,7 +104,7 @@ def rollout(
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
     collided = torch.zeros((num_worlds, max_agent_count), device=device)
     off_road = torch.zeros((num_worlds, max_agent_count), device=device)
-    active_worlds = set(range(num_worlds))
+    active_worlds = np.arange(num_worlds).tolist()
 
     next_obs = env.reset()
     live_agent_mask = env.cont_agent_mask.clone()
@@ -125,15 +127,21 @@ def rollout(
             # Step the environment
             env.step_dynamics(action_template)
 
-            if render_sim_state:
-                if time_step % 5 == 0:                    
+            if render_sim_state and len(active_worlds) > 0:
+                has_live_agent = torch.where(live_agent_mask[active_worlds, :].sum(axis=1) > 0)[0].tolist()
+                
+                if time_step % render_every_n_steps == 0:                    
+                
                     logging.info(f"Rendering time step {time_step}")
+                    
                     sim_state_figures = env.vis.plot_simulator_state(
-                        env_indices=list(active_worlds),
-                        time_steps=[time_step] * len(active_worlds),
+                        env_indices=has_live_agent,
+                        time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
+                        results_df=results_df,
+                        eval_mode=True,
                     )
-                    for idx, env_id in enumerate(active_worlds):
+                    for idx, env_id in enumerate(has_live_agent):
                         sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
 
         # Update observations, dones, and infos
@@ -161,7 +169,10 @@ def rollout(
         for world in done_worlds:
             if world in active_worlds:
                 active_worlds.remove(world)
-                logging.debug(f"World {world} completed at time step {time_step}")
+                logging.debug(
+                    f"World {world} done at time step {time_step}"
+                )
+        
         if not active_worlds:  # Exit early if all worlds are done
             break
 
@@ -208,6 +219,7 @@ def evaluate_policy(
         "goal_achieved": [],
         "collided": [],
         "off_road": [],
+        "not_goal_nor_crashed": [],
         "controlled_agents_in_scene": [],
     }
 
@@ -229,7 +241,13 @@ def evaluate_policy(
             controlled_agents_in_scene,
             not_goal_nor_crashed,
             _,
-        ) = rollout(env, policy, device, deterministic=deterministic, render_sim_state=render_sim_state)
+        ) = rollout(
+            env=env, 
+            policy=policy, 
+            device=device, 
+            deterministic=deterministic, 
+            render_sim_state=render_sim_state
+        )
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
@@ -303,71 +321,75 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=setting_config.train_dir,
-        batch_size=3,
-        dataset_size=3,
+        batch_size=setting_config.num_worlds,
+        dataset_size=setting_config.num_worlds,
         sample_with_replacement=False,
     )
 
     # Make environment
     env = make_env(setting_config, train_loader)
 
-    # for model in model_config.models:
+    for model in model_config.models:
 
-    #logging.info(f"Evaluating model {model.name} \n")
+        logging.info(f"Evaluating model {model.name} \n")
 
-    # Load policy
-    policy = load_policy(
-        path_to_cpt=model_config.models_path,
-        model_name="model_PPO__S_3__01_09_20_23_08_617_005061", #model.name,
-        device=setting_config.device,
-    )
+        # Load policy
+        policy = load_policy(
+            path_to_cpt=model_config.models_path,
+            model_name=model.name,
+            device=setting_config.device,
+            env=env,
+        )
 
-    # Random policy as baseline
-    rand_policy = RandomPolicy(env.action_space.n)
-
-    # Create data loaders (todo)
-    
-    # Evaluate policy
-    df_res_train = evaluate_policy(
-        env=env,
-        policy=policy,
-        data_loader=train_loader,
-        dataset_name="train",
-        deterministic=False,
-        render_sim_state=False,
-    )
-
-
-        # test_loader = SceneDataLoader(
-        #     root=setting_config.test_dir,
-        # #     batch_size=setting_config.num_worlds,
-        # #     dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
-        # #     sample_with_replacement=False,
-        # #     shuffle=True,
-        # # )
-
-        # #logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
-
-        # # Rollouts
+        # Create dataloaders for train and test sets
+        train_loader = SceneDataLoader(
+            root=setting_config.train_dir,
+            batch_size=setting_config.num_worlds,
+            dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
+            sample_with_replacement=False,
+            shuffle=False,
+        )
         
-        # # df_res_test = evaluate_policy(
-        # #     env=env,
-        # #     policy=policy,
-        # #     data_loader=test_loader,
-        # #     dataset_name="test",
-        # # )
+        test_loader = SceneDataLoader(
+            root=setting_config.test_dir,
+            batch_size=setting_config.num_worlds,
+            dataset_size=setting_config.test_dataset_size if model.name != "random_baseline" else 1000,
+            sample_with_replacement=False,
+            shuffle=True,
+        )
+        
+        # Rollouts
+        logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
+        
+        df_res_train = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=train_loader,
+            dataset_name="train",
+            deterministic=False,
+            render_sim_state=False,
+        )
 
-        # # Concatenate train/test results
-        # #df_res = pd.concat([df_res_train, df_res_test])
+        df_res_test = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=test_loader,
+            dataset_name="test",
+            deterministic=False,
+            render_sim_state=False,
+        )
 
-        # # Add metadata
-        # #df_res["model_name"] = model.name
-        # #df_res["train_dataset_size"] = model.train_dataset_size
+        # Concatenate train/test results
+        df_res = pd.concat([df_res_train, df_res_test])
 
-        # # Store
-        # if not os.path.exists(setting_config.res_path):
-        #     os.makedirs(setting_config.res_path)
+        # Add metadata
+        df_res["model_name"] = model.name
+        df_res["train_dataset_size"] = model.train_dataset_size
 
-        # #df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
+        # Store
+        if not os.path.exists(setting_config.res_path):
+            os.makedirs(setting_config.res_path)
 
-        # logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
+        df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
+
+        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
