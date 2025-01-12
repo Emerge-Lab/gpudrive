@@ -180,6 +180,7 @@ def run(
     update_epochs: Annotated[Optional[int], typer.Option(help="The number of epochs for updating the policy")] = None,
     batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
     minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
+    gamma: Annotated[Optional[float], typer.Option(help="The discount factor for rewards")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -224,6 +225,7 @@ def run(
         "batch_size": batch_size,
         "minibatch_size": minibatch_size,
         "render": None if render is None else bool(render),
+        "gamma": gamma,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
