@@ -129,26 +129,27 @@ class LocalRoadGraphPoints:
 
     def __init__(self, local_roadgraph_tensor: torch.Tensor):
         """Initializes the global road graph points with a tensor."""
-        self.x = local_roadgraph_tensor[:, :, :, 0]
-        self.y = local_roadgraph_tensor[:, :, :, 1]
-        self.segment_length = local_roadgraph_tensor[:, :, :, 2]
-        self.segment_width = local_roadgraph_tensor[:, :, :, 3]
-        self.segment_height = local_roadgraph_tensor[:, :, :, 4]
-        self.orientation = local_roadgraph_tensor[:, :, :, 5]
-        self.id = local_roadgraph_tensor[:, :, :, 7]
+        self.x = local_roadgraph_tensor[:, :, 0]
+        self.y = local_roadgraph_tensor[:, :, 1]
+        self.segment_length = local_roadgraph_tensor[:, :, 2]
+        self.segment_width = local_roadgraph_tensor[:, :, 3]
+        self.segment_height = local_roadgraph_tensor[:, :, 4]
+        self.orientation = local_roadgraph_tensor[:, :, 5]
+        self.id = local_roadgraph_tensor[:, :, 7]
         # TODO(dc): Use map type instead of enum (8 instead of 6)
-        self.type = local_roadgraph_tensor[:, :, :, 6].long()
+        self.type = local_roadgraph_tensor[:, :, 6].long()
 
     @classmethod
     def from_tensor(
         cls,
         local_roadgraph_tensor: gpudrive.madrona.Tensor,
         backend="torch",
+        mask=None,
         device="cuda",
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(local_roadgraph_tensor.to_torch().clone().to(device))
+            return cls(local_roadgraph_tensor.to_torch().to(device)[mask])
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 

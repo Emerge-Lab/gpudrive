@@ -7,7 +7,7 @@ from pygpudrive.env.scene_selector import select_scenes
 import abc
 import gpudrive
 import torch
-import jax.numpy as jnp
+#import jax.numpy as jnp
 
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):

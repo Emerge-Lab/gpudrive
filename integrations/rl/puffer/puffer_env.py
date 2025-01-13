@@ -94,7 +94,7 @@ class PufferGPUDrive(PufferEnv):
         self.num_agents = self.controlled_agent_mask.sum().item()
 
         # Reset the environment and get the initial observations
-        self.observations = self.env.reset()[self.controlled_agent_mask]
+        self.observations = self.env.reset(self.controlled_agent_mask)
 
         # This assigns a bunch of buffers to self.
         # You can't use them because you want torch, not numpy
@@ -215,9 +215,8 @@ class PufferGPUDrive(PufferEnv):
                 )
                 == self.controlled_agent_mask.sum(dim=1)
             )[0]
-            .cpu()
-            .numpy()
         )
+        done_worlds_cpu = done_worlds.cpu().numpy()
 
         # Add rewards for living agents
         self.agent_episode_returns[self.live_agent_mask] += reward[
@@ -309,14 +308,18 @@ class PufferGPUDrive(PufferEnv):
                 controlled_mask
             ]
 
+            '''
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.env.sim.self_observation_tensor(),
                 backend="torch",
                 device=self.device,
+                mask=controlled_mask
             )
-            agent_speeds = (
-                ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
-            )
+            '''
+            agent_speeds = 0 #(
+            # TODO: What are you logging here? Final speed of last agents in finished worlds?
+            #    ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
+            #)
 
             if num_finished_agents > 0:
                 # fmt: off
@@ -328,27 +331,28 @@ class PufferGPUDrive(PufferEnv):
                         "perc_veh_collisions": collision_rate.item(),
                         "total_controlled_agents": self.num_agents,
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
-                        "mean_agent_speed": agent_speeds.mean().item(),
+                        #"mean_agent_speed": agent_speeds.mean().item(),
+                        "mean_agent_speed": 0,
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                     }
                 )
                 # fmt: on
-            # Asynchronously reset the done worlds and empty storage
-            for idx in done_worlds:
-                self.env.sim.reset([idx])
-                self.episode_returns[idx] = 0
-                self.agent_episode_returns[idx, :] = 0
-                self.episode_lengths[idx, :] = 0
-                # Reset the live agent mask so that the next alive mask will mark
-                # all agents as alive for the next step
-                self.live_agent_mask[idx] = self.controlled_agent_mask[idx]
-                self.offroad_in_episode[idx, :] = 0
-                self.collided_in_episode[idx, :] = 0
 
+            # Asynchronously reset the done worlds and empty storage
+            self.env.sim.reset(done_worlds_cpu)
+            self.episode_returns[done_worlds] = 0
+            self.agent_episode_returns[done_worlds, :] = 0
+            self.episode_lengths[done_worlds, :] = 0
+            # Reset the live agent mask so that the next alive mask will mark
+            # all agents as alive for the next step
+            self.live_agent_mask[done_worlds] = self.controlled_agent_mask[done_worlds]
+            self.offroad_in_episode[done_worlds, :] = 0
+            self.collided_in_episode[done_worlds, :] = 0
+ 
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
-        next_obs = self.env.get_obs()[self.controlled_agent_mask]
-
+        #next_obs = self.env.get_obs()[self.controlled_agent_mask]
+        next_obs = self.env.get_obs(self.controlled_agent_mask)
         self.observations = next_obs
         self.rewards = reward_controlled
         self.terminals = terminal
@@ -416,7 +420,7 @@ class PufferGPUDrive(PufferEnv):
 
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
-
+        return
         # Swap the data batch
         self.env.swap_data_batch()
 
