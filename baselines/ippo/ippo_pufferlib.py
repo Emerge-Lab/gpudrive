@@ -161,9 +161,6 @@ def run(
     # Environment options
     num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
     k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
-    collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
-    off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
-    goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
@@ -181,6 +178,9 @@ def run(
     batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
     minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
     gamma: Annotated[Optional[float], typer.Option(help="The discount factor for rewards")] = None,
+    collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
+    off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
+    goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -197,9 +197,6 @@ def run(
     env_config = {
         "num_worlds": num_worlds,
         "k_unique_scenes": k_unique_scenes,
-        "collision_weight": collision_weight,
-        "off_road_weight": off_road_weight,
-        "goal_achieved_weight": goal_achieved_weight,
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
@@ -226,6 +223,9 @@ def run(
         "minibatch_size": minibatch_size,
         "render": None if render is None else bool(render),
         "gamma": gamma,
+        "collision_weight": collision_weight,
+        "off_road_weight": off_road_weight,
+        "goal_achieved_weight": goal_achieved_weight,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}

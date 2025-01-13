@@ -122,9 +122,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_rewards(
         self,
-        collision_weight=-0.005,
+        collision_weight=0.005,
         goal_achieved_weight=1.0,
-        off_road_weight=-0.005,
+        off_road_weight=0.005,
         world_time_steps=None,
         log_distance_weight=0.01,
     ):
@@ -150,9 +150,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
 
             weighted_rewards = (
-                collision_weight * collided
+                -collision_weight * collided
                 + goal_achieved_weight * goal_achieved
-                + off_road_weight * off_road
+                - off_road_weight * off_road
             )
 
             return weighted_rewards

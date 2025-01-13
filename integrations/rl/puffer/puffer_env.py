@@ -36,9 +36,7 @@ def env_creator(
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
 
-    def __init__(
-        self, data_loader, device, config, train_config=None, buf=None
-    ):
+    def __init__(self, data_loader, device, config, train_config, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
 
         self.device = device
@@ -130,6 +128,11 @@ class PufferGPUDrive(PufferEnv):
         }
         self.cumulative_unique_files = set()
 
+        # Init rewards
+        self.collision_weight = train_config.collision_weight
+        self.off_road_weight = train_config.off_road_weight
+        self.goal_achieved_weight = train_config.goal_achieved_weight
+
     def _obs_and_mask(self, obs):
         # self.buf.masks[:] = self.env.cont_agent_mask.numpy().ravel() * self.live_agent_mask
         # return np.asarray(obs).reshape(NUM_WORLDS*MAX_NUM_OBJECTS, self.obs_size)
@@ -198,9 +201,9 @@ class PufferGPUDrive(PufferEnv):
 
         # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards(
-            collision_weight=self.config.collision_weight,
-            off_road_weight=self.config.off_road_weight,
-            goal_achieved_weight=self.config.goal_achieved_weight,
+            collision_weight=self.collision_weight,
+            off_road_weight=self.off_road_weight,
+            goal_achieved_weight=self.goal_achieved_weight,
             world_time_steps=self.episode_lengths[:, 0].long(),
         )
         # Flatten rewards; only keep rewards for controlled agents

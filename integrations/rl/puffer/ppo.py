@@ -105,6 +105,33 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
+    if data.config.collision_penalty_warmup:
+        warmup_frac = min(
+            1.0, data.global_step / data.config.warmup_steps
+        )  # Clamp between 0 and 1
+
+        # Warmup period where penalties are initially zero
+        if (
+            warmup_frac < data.config.penalty_start_frac
+        ):  # Zero penalties during initial fraction
+            collision_weight = 0.0
+            off_road_weight = 0.0
+        else:
+            # Linearly increase penalties after the start fraction
+            effective_warmup_frac = (
+                warmup_frac - data.config.penalty_start_frac
+            ) / (1.0 - data.config.penalty_start_frac)
+            collision_weight = (
+                effective_warmup_frac * data.config.collision_weight
+            )
+            off_road_weight = (
+                effective_warmup_frac * data.config.off_road_weight
+            )
+
+        # Set in env for get_rewards() function
+        data.vecenv.collision_weight = collision_weight
+        data.vecenv.off_road_weight = off_road_weight
+
     # Resample data logic
     if data.config.resample_scenes:
         if (
@@ -380,6 +407,8 @@ def train(data):
                         "train/learning_rate": data.optimizer.param_groups[0][
                             "lr"
                         ],
+                        "train/collision_weight": data.vecenv.collision_weight,
+                        "train/off_road_weight": data.vecenv.off_road_weight,
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }

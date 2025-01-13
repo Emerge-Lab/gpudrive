@@ -71,10 +71,10 @@ def load_policy(path_to_cpt, model_name, device, env=None):
 
 
 def rollout(
-    env, 
-    policy, 
-    device, 
-    deterministic: bool = False, 
+    env,
+    policy,
+    device,
+    deterministic: bool = False,
     render_sim_state: bool = False,
     render_every_n_steps: int = 5,
     zoom_radius: int = 100,
@@ -108,7 +108,7 @@ def rollout(
 
     next_obs = env.reset()
     live_agent_mask = env.cont_agent_mask.clone()
-    
+
     for time_step in range(episode_len):
         logging.debug(f"Time step: {time_step}")
 
@@ -129,11 +129,11 @@ def rollout(
 
             if render_sim_state and len(active_worlds) > 0:
                 has_live_agent = torch.where(live_agent_mask[active_worlds, :].sum(axis=1) > 0)[0].tolist()
-                
-                if time_step % render_every_n_steps == 0:                    
-                
+
+                if time_step % render_every_n_steps == 0:
+
                     logging.info(f"Rendering time step {time_step}")
-                    
+
                     sim_state_figures = env.vis.plot_simulator_state(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
@@ -172,7 +172,7 @@ def rollout(
                 logging.debug(
                     f"World {world} done at time step {time_step}"
                 )
-        
+
         if not active_worlds:  # Exit early if all worlds are done
             break
 
@@ -242,10 +242,10 @@ def evaluate_policy(
             not_goal_nor_crashed,
             _,
         ) = rollout(
-            env=env, 
-            policy=policy, 
-            device=device, 
-            deterministic=deterministic, 
+            env=env,
+            policy=policy,
+            device=device,
+            deterministic=deterministic,
             render_sim_state=render_sim_state
         )
 
@@ -330,7 +330,9 @@ if __name__ == "__main__":
     env = make_env(setting_config, train_loader)
 
     for model in model_config.models:
+    for model in model_config.models:
 
+        logging.info(f"Evaluating model {model.name} \n")
         logging.info(f"Evaluating model {model.name} \n")
 
         # Load policy
@@ -349,7 +351,7 @@ if __name__ == "__main__":
             sample_with_replacement=False,
             shuffle=False,
         )
-        
+
         test_loader = SceneDataLoader(
             root=setting_config.test_dir,
             batch_size=setting_config.num_worlds,
@@ -357,10 +359,10 @@ if __name__ == "__main__":
             sample_with_replacement=False,
             shuffle=True,
         )
-        
+
         # Rollouts
         logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
-        
+
         df_res_train = evaluate_policy(
             env=env,
             policy=policy,
