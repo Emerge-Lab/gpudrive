@@ -60,7 +60,7 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 42), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 37), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 16), decimals=3
