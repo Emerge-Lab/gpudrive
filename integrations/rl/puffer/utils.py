@@ -96,7 +96,6 @@ class Policy(nn.Module):
             observations, self.env
         )
         ego_embed = self.ego_embed(ego_state)
-
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
