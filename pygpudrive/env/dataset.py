@@ -119,18 +119,35 @@ if __name__ == "__main__":
 
     data_loader = SceneDataLoader(
         root="data/processed/training",
-        batch_size=2,
-        dataset_size=10,
+        batch_size=5,
+        dataset_size=15,
         sample_with_replacement=True,  # Sampling with replacement
         shuffle=False,  # Shuffle the dataset before batching
     )
 
     unique_files_sampled = set()
-    for batch in data_loader:
+    for idx, batch in enumerate(data_loader):
         unique_files_sampled.update(batch)
-
         coverage = len(unique_files_sampled) / len(data_loader.dataset) * 100
+        print(f"coverage: {coverage:.2f}%")            
+        if idx > 4:
+            break 
+        
+    pprint(unique_files_sampled)
 
-        print(f"coverage: {coverage:.2f}%")
-
-    print(f"Data Coverage: {coverage:.2f}%")
+    # Now without replacement
+    data_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=5,
+        dataset_size=15,
+        sample_with_replacement=False,  # Sampling with replacement
+        shuffle=False,  # Shuffle the dataset before batching
+    )
+    
+    unique_files_sampled = set()
+    for idx, batch in enumerate(data_loader):
+        print(idx)
+        pprint(batch)
+        
+        unique_files_sampled.update(batch)
+        coverage = len(unique_files_sampled) / len(data_loader.dataset) * 100
