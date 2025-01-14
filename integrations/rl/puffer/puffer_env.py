@@ -7,12 +7,8 @@ import wandb
 import gymnasium
 from collections import Counter
 from pygpudrive.env.config import EnvConfig
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
-from pygpudrive.datatypes.observation import (
-    LocalEgoState,
-)
 
 from pygpudrive.visualize.utils import img_from_fig
 
@@ -84,8 +80,6 @@ class PufferGPUDrive(PufferEnv):
             low=0, high=255, shape=(self.obs_size,), dtype=np.float32
         )
 
-        # self.single_observation_space = self.env.single_observation_space
-        # self.observation_space = self.env.observation_space
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
 
         # Number of controlled agents across all worlds
@@ -241,7 +235,7 @@ class PufferGPUDrive(PufferEnv):
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
 
-        info = []
+        log_info = []
 
         if len(done_worlds) > 0:
 
@@ -315,14 +309,9 @@ class PufferGPUDrive(PufferEnv):
                 mask=controlled_mask
             )
             """
-            agent_speeds = 0  # (
-            # TODO: What are you logging here? Final speed of last agents in finished worlds?
-            #    ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
-            # )
-
             if num_finished_agents > 0:
                 # fmt: off
-                info.append(
+                log_info.append(
                     {
                         "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
                         "perc_goal_achieved": goal_achieved_rate.item(),
@@ -330,8 +319,6 @@ class PufferGPUDrive(PufferEnv):
                         "perc_veh_collisions": collision_rate.item(),
                         "total_controlled_agents": self.num_agents,
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
-                        #"mean_agent_speed": agent_speeds.mean().item(),
-                        "mean_agent_speed": 0,
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                     }
                 )
@@ -352,8 +339,8 @@ class PufferGPUDrive(PufferEnv):
 
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
-        # next_obs = self.env.get_obs()[self.controlled_agent_mask]
         next_obs = self.env.get_obs(self.controlled_agent_mask)
+        
         self.observations = next_obs
         self.rewards = reward_controlled
         self.terminals = terminal
@@ -362,7 +349,7 @@ class PufferGPUDrive(PufferEnv):
             self.rewards,
             self.terminals,
             self.truncations,
-            info,
+            log_info,
         )
 
     def render(self):

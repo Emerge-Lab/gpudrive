@@ -221,8 +221,8 @@ def evaluate(data):
             try:
                 data.stats[k] = np.mean(v)
                 # Log variance for goal and collision metrics
-                if "goal" in k or "collision" in k or "offroad" in k:
-                    data.stats[f"{k}_std"] = np.std(v)
+                # if "goal" in k or "collision" in k or "offroad" in k:
+                #     data.stats[f"{k}_std"] = np.std(v)
             except:
                 continue
 

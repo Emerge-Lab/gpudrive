@@ -1,4 +1,4 @@
-mode: "sweep"
+mode: "train" # Options: "train", "sweep"
 use_rnn: false
 eval_model_path: null
 baseline: false
@@ -6,7 +6,7 @@ data_dir: "data/processed/examples"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 300 # Number of parallel environments
+  num_worlds: 100 # Number of parallel environments
   k_unique_scenes: 3 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
@@ -23,8 +23,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
-  entity: "jsuarez"
-  project: "paper_1_self_play"
+  entity: "emerge_"
+  project: "self_play_rl"
   group: "verify"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff", "basic-sweep"]
@@ -53,9 +53,9 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 50_000_000
+  total_timesteps: 100_000_000
   batch_size: 131_072
-  minibatch_size: 16384
+  minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
@@ -69,8 +69,8 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  collision_weight: 0.5 # Note: Assuming we want to avoid collisions and off-road events
-  off_road_weight: 0.5
+  collision_weight: 0.05 # Note: Assuming we want to avoid collisions and off-road events
+  off_road_weight: 0.05
   goal_achieved_weight: 1.0
   # Settings below introduce a warmup period where the collision penalties are
   # set to zero and then gradually increase. Control the fraction of the warmup period during which penalties are zero.
@@ -128,16 +128,15 @@ sweep:
       scale: 0.5
       clip: 1.0
 
-  environment:
     collision_weight:
       distribution: "uniform"
-      min: -1.0
-      max: 0.0
+      min: 0.05
+      max: 1.0
 
     off_road_weight:
       distribution: "uniform"
-      min: -1.0
-      max: 0.0
+      min: 0.05
+      max: 1.0
 
     goal_achieved_weight:
       distribution: "uniform"
