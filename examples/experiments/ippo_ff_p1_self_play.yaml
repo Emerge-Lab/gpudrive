@@ -46,7 +46,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: False
   resample_criterion: "global_step"
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 20_000_000
@@ -63,7 +63,7 @@ train:
   anneal_lr: false
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 5
+  update_epochs: 1
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false

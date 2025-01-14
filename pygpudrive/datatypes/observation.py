@@ -172,7 +172,7 @@ class PartnerObs:
 
     def __init__(self, partner_obs_tensor: torch.Tensor):
         """Initializes the partner observation from a tensor."""
-        self.data = partner_obs_tensor
+        self.data = partner_obs_tensor[:, :, :7]
         '''
         self.speed = partner_obs_tensor[:, :, 0].unsqueeze(-1)
         self.rel_pos_x = partner_obs_tensor[:, :, 1].unsqueeze(-1)
