@@ -340,7 +340,7 @@ class PufferGPUDrive(PufferEnv):
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
         next_obs = self.env.get_obs(self.controlled_agent_mask)
-        
+
         self.observations = next_obs
         self.rewards = reward_controlled
         self.terminals = terminal

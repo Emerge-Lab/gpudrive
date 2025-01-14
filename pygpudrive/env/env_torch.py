@@ -373,8 +373,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.norm_obs:
             ego_state.normalize()
 
-        # TODO: I deleted this permute. Was it needed?
-        # .permute(1, 2, 0)
         return [ego_state.data]
         """
         [
