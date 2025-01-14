@@ -2,13 +2,13 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training"
+data_dir: "data/processed/examples"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
-  max_controlled_agents: 128 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  num_worlds: 50 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
+  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -43,7 +43,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_criterion: "global_step"
   resample_dataset_size: 1000 # Number of unique scenes to sample from
   resample_interval: 1_000_000
@@ -65,7 +65,7 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.0001
+  ent_coef: 0.001
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
