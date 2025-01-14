@@ -154,6 +154,23 @@ def train(args, vecenv):
     ppo.evaluate(data)
     ppo.close(data)
 
+def set_experiment_metadata(config):
+    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
+    if config["train"]["resample_scenes"]:
+        if config["train"]["resample_scenes"]:
+            dataset_size = config["train"]["resample_dataset_size"]
+        config["train"][
+            "exp_id"
+        ] = f'PPO_R_{dataset_size}__{datetime_}'
+    else:
+        dataset_size = str(config["environment"]["k_unique_scenes"])
+        config["train"][
+            "exp_id"
+        ] = f'PPO_S_{dataset_size}__{datetime_}'
+
+    config["environment"]["dataset_size"] = dataset_size
+
+
 def init_wandb(args, name, id=None, resume=True, tag=None):
     wandb.init(
         id=id or wandb.util.generate_id(),
@@ -264,21 +281,6 @@ def run(
         {k: v for k, v in wandb_config.items() if v is not None}
     )
 
-    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
-
-    if config["train"]["resample_scenes"]:
-        if config["train"]["resample_scenes"]:
-            dataset_size = config["train"]["resample_dataset_size"]
-        config["train"][
-            "exp_id"
-        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
-    else:
-        dataset_size = str(config["environment"]["k_unique_scenes"])
-        config["train"][
-            "exp_id"
-        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
-
-    config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get(
         "device", "cpu"
     )  # Default to 'cpu' if not set
@@ -313,16 +315,17 @@ def run(
     )
 
     if config.mode == "train":
+        set_experiment_metadata(config)
         train(config, vecenv)
     elif config.mode == "sweep":
         for i in range(max_runs):
             np.random.seed(int(time.time()))
             random.seed(int(time.time()))
+            set_experiment_metadata(config)
             hypers = sample_hyperparameters(config.sweep)
             config.train.update(hypers['train'])
+            config.environment.update(hypers['environment'])
             train(config, vecenv)
-
-
 
 if __name__ == "__main__":
     import cProfile
