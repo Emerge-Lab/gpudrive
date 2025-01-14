@@ -391,7 +391,7 @@ def train(data):
 
 
 def close(data):
-    data.vecenv.close()
+    #data.vecenv.close()
     data.utilization.stop()
     config = data.config
     if data.wandb is not None:

@@ -1,4 +1,4 @@
-mode: "train"
+mode: "sweep"
 use_rnn: false
 eval_model_path: null
 baseline: false
@@ -26,11 +26,11 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
-  entity: ""
+  entity: "jsuarez"
   project: "paper_1_self_play"
   group: "verify"
   mode: "online" # Options: online, offline, disabled
-  tags: ["ppo", "ff"]
+  tags: ["ppo", "ff", "basic-sweep"]
 
 ## NOTES
 ## Good batch size: 128 * number of controlled agents (e.g. 2**18)
@@ -56,7 +56,7 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 1_000_000_000
+  total_timesteps: 50_000_000
   batch_size: 131_072
   minibatch_size: 16384
   learning_rate: 3e-4
@@ -95,6 +95,32 @@ train:
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_format: "mp4" # Options: gif, mp4
   render_fps: 15 # Frames per second
+
+sweep:
+  train:
+    learning_rate:
+      distribution: "log_normal"
+      mean: 0.005
+      scale: 1.0
+      clip: 2.0
+
+    ent_coef:
+      distribution: "log_normal"
+      mean: 0.005
+      scale: 0.5
+      clip: 1.0
+
+    gamma:
+      distribution: "logit_normal"
+      mean: 0.98
+      scale: 0.5
+      clip: 1.0
+
+    gae_lambda:
+      distribution: "logit_normal"
+      mean: 0.95
+      scale: 0.5
+      clip: 1.0
 
 vec:
   backend: "native" # Only native is currently supported
