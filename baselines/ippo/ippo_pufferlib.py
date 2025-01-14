@@ -334,7 +334,6 @@ def run(
             set_experiment_metadata(config)
             hypers = sample_hyperparameters(config.sweep)
             config.train.update(hypers["train"])
-            config.environment.update(hypers["environment"])
             train(config, vecenv)
 
 
