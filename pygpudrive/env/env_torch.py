@@ -373,7 +373,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # TODO: I deleted this permute. Was it needed?
         #.permute(1, 2, 0)
-        return [
+        return [ego_state.data]
+        '''
+        [
             ego_state.speed.unsqueeze(-1),
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
@@ -381,6 +383,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.rel_goal_y.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
         ]
+        '''
 
     def _get_partner_obs(self, mask):
         """Get partner observations."""
@@ -395,9 +398,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if self.config.norm_obs:
             partner_obs.normalize()
-            partner_obs.one_hot_encode_agent_types()
+            #partner_obs.one_hot_encode_agent_types()
 
-        return [
+        return [partner_obs.data.flatten(start_dim=1)]
+        '''
+        [
             partner_obs.speed.squeeze(-1),
             partner_obs.rel_pos_x.squeeze(-1),
             partner_obs.rel_pos_y.squeeze(-1),
@@ -405,6 +410,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs.vehicle_length.squeeze(-1),
             partner_obs.vehicle_width.squeeze(-1),
         ]
+        '''
 
     def _get_road_map_obs(self, mask):
         """Get road map observations."""
@@ -422,12 +428,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             roadgraph.one_hot_encode_road_point_types()
 
         return [
-            roadgraph.x,
-            roadgraph.y,
-            roadgraph.segment_length,
-            roadgraph.segment_width,
-            roadgraph.segment_height,
-            roadgraph.orientation,
+            #roadgraph.x,
+            #roadgraph.y,
+            #roadgraph.segment_length,
+            #roadgraph.segment_width,
+            #roadgraph.segment_height,
+            #roadgraph.orientation,
+            roadgraph.data.flatten(start_dim=1),
             roadgraph.type.flatten(start_dim=1),
         ]
 
@@ -453,15 +460,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-
         ego_states = self._get_ego_state(mask)
-
         partner_observations = self._get_partner_obs(mask)
-
         road_map_observations = self._get_road_map_obs(mask)
-
         lidar_obs = self._get_lidar_obs(mask)
-
         obs = ego_states + partner_observations + road_map_observations + lidar_obs
         return torch.cat(obs, dim=-1)
 

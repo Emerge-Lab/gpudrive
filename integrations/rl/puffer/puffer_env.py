@@ -420,7 +420,6 @@ class PufferGPUDrive(PufferEnv):
 
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
-        return
         # Swap the data batch
         self.env.swap_data_batch()
 
@@ -432,7 +431,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.reset()  # Reset storage
         # Get info from new worlds
-        self.observations = self.env.reset()[self.controlled_agent_mask]
+        self.observations = self.env.reset(self.controlled_agent_mask)
 
         self.log_data_coverage()
 

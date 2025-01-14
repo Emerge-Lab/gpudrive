@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import torch
 import enum
 import gpudrive
-from pygpudrive.utils.geometry import normalize_min_max
+from pygpudrive.utils.geometry import normalize_min_max, normalize_min_max_inplace
 from pygpudrive.env import constants
 
 
@@ -135,8 +135,9 @@ class LocalRoadGraphPoints:
         self.segment_width = local_roadgraph_tensor[:, :, 3]
         self.segment_height = local_roadgraph_tensor[:, :, 4]
         self.orientation = local_roadgraph_tensor[:, :, 5]
-        self.id = local_roadgraph_tensor[:, :, 7]
+        #self.id = local_roadgraph_tensor[:, :, 7]
         # TODO(dc): Use map type instead of enum (8 instead of 6)
+        self.data = local_roadgraph_tensor[:, :, :6]
         self.type = local_roadgraph_tensor[:, :, 6].long()
 
     @classmethod
@@ -155,12 +156,12 @@ class LocalRoadGraphPoints:
 
     def normalize(self):
         """Normalizes the road graph points to [-1, 1]."""
-        self.x = normalize_min_max(
+        normalize_min_max_inplace(
             self.x,
             min_val=constants.MIN_RG_COORD,
             max_val=constants.MAX_RG_COORD,
         )
-        self.y = normalize_min_max(
+        normalize_min_max_inplace(
             self.y,
             min_val=constants.MIN_RG_COORD,
             max_val=constants.MAX_RG_COORD,
@@ -171,7 +172,7 @@ class LocalRoadGraphPoints:
         self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
         self.segment_height = self.segment_height  # / constants.MAX_ROAD_SCALE
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
-        self.id = self.id
+        #self.id = self.id
 
     def one_hot_encode_road_point_types(self):
         """One-hot encodes the type of road point."""
