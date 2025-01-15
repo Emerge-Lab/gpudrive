@@ -301,14 +301,6 @@ class PufferGPUDrive(PufferEnv):
                 controlled_mask
             ]
 
-            """
-            ego_state = LocalEgoState.from_tensor(
-                self_obs_tensor=self.env.sim.self_observation_tensor(),
-                backend="torch",
-                device=self.device,
-                mask=controlled_mask
-            )
-            """
             if num_finished_agents > 0:
                 # fmt: off
                 log_info.append(

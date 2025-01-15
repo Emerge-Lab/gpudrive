@@ -219,6 +219,7 @@ def evaluate(data):
 
         for k, v in infos.items():
             try:
+                # We log the average across all done worlds in a rollout
                 data.stats[k] = np.mean(v)
                 # Log variance for goal and collision metrics
                 # if "goal" in k or "collision" in k or "offroad" in k:
