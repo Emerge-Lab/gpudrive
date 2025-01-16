@@ -21,6 +21,7 @@ import random
 
 logging.basicConfig(level=logging.INFO)
 
+import pdb
 
 class RandomPolicy:
     def __init__(self, action_space_n):
@@ -105,9 +106,11 @@ def rollout(
     collided = torch.zeros((num_worlds, max_agent_count), device=device)
     off_road = torch.zeros((num_worlds, max_agent_count), device=device)
     active_worlds = np.arange(num_worlds).tolist()
-
-    next_obs = env.reset()
-    live_agent_mask = env.cont_agent_mask.clone()
+    
+    controlled_agent_mask = env.cont_agent_mask.clone()
+    live_agent_mask = controlled_agent_mask.clone()
+    
+    next_obs = env.reset(live_agent_mask)
 
     for time_step in range(episode_len):
         logging.debug(f"Time step: {time_step}")
@@ -115,13 +118,14 @@ def rollout(
         # Get actions for active agents
         if live_agent_mask.any():
             action, _, _, _ = policy(
-                next_obs[live_agent_mask], deterministic=deterministic
+                next_obs, deterministic=deterministic
             )
 
             # Insert actions into a template
             action_template = torch.zeros(
                 (num_worlds, max_agent_count), dtype=torch.int64, device=device
             )
+                    
             action_template[live_agent_mask] = action.to(device)
 
             # Step the environment
@@ -144,11 +148,10 @@ def rollout(
                     for idx, env_id in enumerate(has_live_agent):
                         sim_state_frames[env_id].append(img_from_fig(sim_state_figures[idx]))
 
-        # Update observations, dones, and infos
-        next_obs = env.get_obs()
+        # Update live agent mask
         dones = env.get_dones().bool()
         infos = env.get_infos()
-
+            
         # Count the collisions, off-road occurrences, and goal achievements
         # at a given time step for living agents
         off_road[live_agent_mask] += infos.off_road[live_agent_mask]
@@ -158,13 +161,14 @@ def rollout(
         logging.debug(f"active_worlds: {active_worlds}")
         logging.debug(f"num_agents_live: {live_agent_mask.sum()}")
 
-        # Update live agent mask
-        live_agent_mask[dones] = False
-
         # Process completed worlds
-        num_dones_per_world = (dones & env.cont_agent_mask).sum(dim=1)
-        total_controlled_agents = env.cont_agent_mask.sum(dim=1)
+        num_dones_per_world = (dones & controlled_agent_mask).sum(dim=1)
+        total_controlled_agents = controlled_agent_mask.sum(dim=1)
         done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
+        
+        # Get next observations
+        live_agent_mask[dones] = False
+        next_obs = env.get_obs(live_agent_mask)
 
         for world in done_worlds:
             if world in active_worlds:
@@ -177,7 +181,7 @@ def rollout(
             break
 
     # Aggregate metrics to obtain averages across scenes
-    controlled_agents_per_scene = env.cont_agent_mask.sum(dim=1).float()
+    controlled_agents_per_scene = controlled_agent_mask.sum(dim=1).float()
     goal_achieved_per_scene = (goal_achieved > 0).float().sum(axis=1) / controlled_agents_per_scene
     collided_per_scene = (collided > 0).float().sum(axis=1) / controlled_agents_per_scene
     off_road_per_scene =  (off_road > 0).float().sum(axis=1) / controlled_agents_per_scene
@@ -187,7 +191,7 @@ def rollout(
             collided == 0,     # Didn't collide
             torch.logical_and(
                 off_road == 0,  # Didn't go off-road
-                env.cont_agent_mask  # Only count controlled agents
+                controlled_agent_mask  # Only count controlled agents
             )
             )
     )
@@ -330,9 +334,7 @@ if __name__ == "__main__":
     env = make_env(setting_config, train_loader)
 
     for model in model_config.models:
-    for model in model_config.models:
 
-        logging.info(f"Evaluating model {model.name} \n")
         logging.info(f"Evaluating model {model.name} \n")
 
         # Load policy
@@ -372,17 +374,17 @@ if __name__ == "__main__":
             render_sim_state=False,
         )
 
-        df_res_test = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=test_loader,
-            dataset_name="test",
-            deterministic=False,
-            render_sim_state=False,
-        )
+        # df_res_test = evaluate_policy(
+        #     env=env,
+        #     policy=policy,
+        #     data_loader=test_loader,
+        #     dataset_name="test",
+        #     deterministic=False,
+        #     render_sim_state=False,
+        # )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
+        df_res = df_res_train #pd.concat([df_res_train, df_res_test])
 
         # Add metadata
         df_res["model_name"] = model.name
