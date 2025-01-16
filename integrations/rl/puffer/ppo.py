@@ -341,17 +341,17 @@ def train(data):
                     torch.cuda.synchronize()
 
             with profile.train_misc:
-                losses.policy_loss += (pg_loss.item() / num_update_iters)
+                losses.policy_loss += pg_loss.item() / num_update_iters
                 losses.value_loss += v_loss.item() / num_update_iters
-                losses.entropy += (entropy_loss.item() / num_update_iters)
-                losses.old_approx_kl += (old_approx_kl.item() / num_update_iters)
-                losses.approx_kl += (approx_kl.item() / num_update_iters)
+                losses.entropy += entropy_loss.item() / num_update_iters
+                losses.old_approx_kl += old_approx_kl.item() / num_update_iters
+                losses.approx_kl += approx_kl.item() / num_update_iters
                 losses.clipfrac += clipfrac.item() / num_update_iters
-                        
+
         if config.target_kl is not None:
             if approx_kl > config.target_kl:
                 break
-    
+
     with profile.train_misc:
         if config.anneal_lr:
             frac = 1.0 - data.global_step / config.total_timesteps
