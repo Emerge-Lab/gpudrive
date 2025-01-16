@@ -23,6 +23,8 @@ from pygpudrive.visualize.utils import img_from_fig
 from pufferlib.environment import PufferEnv
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
+    PartnerObs,
+    LidarObs,
 )
 
 
@@ -60,12 +62,18 @@ class PufferGPUDrive(PufferEnv):
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
         os.chdir(working_dir)
 
-        self.all_scene_paths = [
+        # Dataset size to sample from
+        dataset = [
             os.path.join(self.data_dir, scene)
             for scene in sorted(os.listdir(self.data_dir))
             if scene.startswith("tfrecord")
         ]
-        self.unique_scene_paths = list(set(self.all_scene_paths))
+
+        resample_dataset_size = min(
+            self.train_config.resample_dataset_size, len(dataset)
+        )
+
+        self.dataset = dataset[:resample_dataset_size]
 
         scene_config = SceneConfig(
             path=data_dir,
@@ -113,11 +121,11 @@ class PufferGPUDrive(PufferEnv):
         self.render_mode = "rgb_array"
 
         # Get the tfrecord file names for every environment
-        self.dataset = self.env.dataset
+        self.data_batch = self.env.dataset
         self.training_scenes_set = []
         self.env_to_files = {
             env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.dataset)
+            for env_idx, file_path in enumerate(self.data_batch)
         }
 
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -218,6 +226,7 @@ class PufferGPUDrive(PufferEnv):
             collision_weight=self.config.collision_weight,
             off_road_weight=self.config.off_road_weight,
             goal_achieved_weight=self.config.goal_achieved_weight,
+            world_time_steps=self.episode_lengths[:, 0].long(),
         )
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
@@ -325,6 +334,15 @@ class PufferGPUDrive(PufferEnv):
                 ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
             )
 
+            ego_state = LocalEgoState.from_tensor(
+                self_obs_tensor=self.env.sim.self_observation_tensor(),
+                backend="torch",
+                device="cuda",
+            )
+            agent_speeds = (
+                ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
+            )
+
             num_finished_agents = controlled_mask.sum().item()
             if num_finished_agents > 0:
                 info.append(
@@ -349,6 +367,7 @@ class PufferGPUDrive(PufferEnv):
                         .mean()
                         .item(),
                         "rg_sparsity": rg_sparsity.item(),
+                        "mean_agent_speed": agent_speeds.mean().item(),
                         "mean_agent_speed": agent_speeds.mean().item(),
                     }
                 )
@@ -432,40 +451,30 @@ class PufferGPUDrive(PufferEnv):
         return np.array(img_arrays)
 
     def resample_scenario_batch(self):
-        """Sample a new set of WOMD scenarios."""
-        if self.train_config.resample_mode == "random":
-            total_unique = len(self.unique_scene_paths)
+        """Sample and set new batch of WOMD scenarios."""
 
-            # Update set of scenes we've trained on
-            self.training_scenes_set.append(set(self.dataset))
+        # Clear the batch
+        self.data_batch = []
 
-            # Reset
-            self.dataset = []
-
-            # Sample batch of unique scenes
-            if self.num_worlds <= total_unique:
-                self.dataset = random.sample(
-                    self.unique_scene_paths, self.num_worlds
-                )
-            else:
-                # If N is greater, repeat the unique scenes until we get N scenes
-                while len(self.dataset) < self.num_worlds:
-                    self.dataset.extend(
-                        random.sample(self.unique_scene_paths, total_unique)
-                    )
-                    if len(self.dataset) > self.num_worlds:
-                        self.dataset = self.dataset[: self.num_worlds]
+        # Sample batch
+        if self.num_worlds <= len(self.dataset):
+            self.data_batch = random.sample(self.dataset, self.num_worlds)
         else:
-            raise NotImplementedError(
-                f"Resample mode {self.train_config.resample_mode} is currently not supported."
-            )
+            # If we have more worlds than files, repeat the worlds until we have enough scenes
+            while len(self.dataset) < self.num_worlds:
+                self.data_batch.extend(
+                    random.sample(
+                        self.unique_scene_paths, len(self.data_batch)
+                    )
+                )
+                if len(self.dataset) > self.num_worlds:
+                    self.data_batch = self.data_batch[: self.num_worlds]
 
         # Re-initialize the simulator with the new dataset
         print(
-            f"Re-initializing sim with {len(set(self.dataset))} {self.train_config.resample_mode} unique scenes.\n"
+            f"Setting new data batch (batch_size = {len(set(self.data_batch))})\n"
         )
-
-        self.env.reinit_scenarios(self.dataset)
+        self.env.reinit_scenarios(self.data_batch)
 
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
@@ -481,7 +490,7 @@ class PufferGPUDrive(PufferEnv):
         # Get the tfrecord file names for every environment
         self.env_to_files = {
             env_idx: Path(file_path).name
-            for env_idx, file_path in enumerate(self.dataset)
+            for env_idx, file_path in enumerate(self.data_batch)
         }
 
     def clear_render_storage(self):
@@ -490,4 +499,3 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
-            

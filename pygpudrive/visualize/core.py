@@ -1,11 +1,10 @@
-import os
 import torch
-import math
 import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
+
 import gpudrive
 from pygpudrive.visualize import utils
 from pygpudrive.datatypes.roadgraph import (
@@ -17,6 +16,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
+from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -30,31 +30,70 @@ OUT_OF_BOUNDS = 1000
 
 class MatplotlibVisualizer:
     def __init__(
-        self, sim_object, vis_config: Dict[str, Any], goal_radius, backend: str
+        self,
+        sim_object,
+        controlled_agent_mask,
+        goal_radius,
+        backend: str,
+        num_worlds: int,
+        render_config: Dict[str, Any],
+        env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
-        self.vis_config = vis_config
         self.backend = backend
         self.device = "cpu"
-        self.controlled_agents = self.get_controlled_agents_mask()
         self.goal_radius = goal_radius
+        self.num_worlds = num_worlds
+        self.render_config = render_config
+        self.figsize = (10, 10)
+        self.env_config = env_config
+        self.initialize_static_scenario_data(controlled_agent_mask)
 
-    def get_controlled_agents_mask(self):
-        """Get the control mask."""
-        return (
-            (self.sim_object.controlled_state_tensor().to_torch() == 1)
-            .squeeze(axis=2)
-            .to(self.device)
+    def initialize_static_scenario_data(self, controlled_agent_mask):
+        """
+        Initialize key information for visualization based on the
+        current batch of scenarios.
+        """
+        self.response_type = ResponseType.from_tensor(
+            tensor=self.sim_object.response_type_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
+        self.global_roadgraph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim_object.map_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        self.controlled_agent_mask = controlled_agent_mask.to(self.device)
+
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim_object.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.controlled_agent_mask.shape[1],
+            backend=self.backend,
+        )
+
+        # Cache pre-rendered road graphs for all environments
+        # self.cached_roadgraphs = []
+        # for env_idx in range(self.controlled_agent_mask.shape[0]):
+        #     fig, ax = plt.subplots(figsize=self.figsize)
+        #     self._plot_roadgraph(
+        #         road_graph=self.global_roadgraph,
+        #         env_idx=env_idx,
+        #         ax=ax,
+        #         line_width_scale=1.0,
+        #         marker_size_scale=1.0,
+        #     )
+        #     self.cached_roadgraphs.append(fig)
+        #     plt.close(fig)
 
     def plot_simulator_state(
         self,
         env_indices: List[int],
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
-        figsize: Tuple[int, int] = (15, 15),
         zoom_radius: int = 100,
-        return_single_figure: bool = False,
+        plot_log_replay_trajectory: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -78,67 +117,53 @@ class MatplotlibVisualizer:
                 env_indices
             )  # Default to None for all
 
-        # Extract data for all environments
-        global_roadgraph = GlobalRoadGraphPoints.from_tensor(
-            roadgraph_tensor=self.sim_object.map_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
+        # Changes at every time step
         global_agent_states = GlobalEgoState.from_tensor(
             self.sim_object.absolute_self_observation_tensor(),
             backend=self.backend,
             device=self.device,
         )
-        response_type = ResponseType.from_tensor(
-            tensor=self.sim_object.response_type_tensor(),
-            backend=self.backend,
-            device=self.device,
+
+        agent_infos = (
+            self.sim_object.info_tensor().to_torch().clone().to(self.device)
         )
 
-        agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
-
-        figs = []  # Store all figures if returning multiple
-
-        if return_single_figure:
-            # Calculate rows and columns for square layout
-            num_envs = len(env_indices)
-            num_rows = math.ceil(math.sqrt(num_envs))
-            num_cols = math.ceil(num_envs / num_rows)
-
-            total_figsize = (figsize[0] * num_cols, figsize[1] * num_rows)
-            fig, axes = plt.subplots(
-                nrows=num_rows,
-                ncols=num_cols,
-                figsize=total_figsize,
-                squeeze=False,
-            )
-            axes = axes.flatten()
-        else:
-            axes = [None] * len(
-                env_indices
-            )  # Placeholder for individual plotting
+        figs = []
 
         # Calculate scale factors based on figure size
-        max_fig_size = max(figsize)
-        marker_scale = max_fig_size / 15  # Adjust this factor as needed
-        line_width_scale = max_fig_size / 15  # Adjust this factor as needed
+        marker_scale = max(self.figsize) / 15
+        line_width_scale = max(self.figsize) / 15
 
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
-            if return_single_figure:
-                ax = axes[idx]
-                ax.clear()  # Clear any previous plots
-                ax.set_aspect("equal", adjustable="box")
-            else:
-                fig, ax = plt.subplots(figsize=figsize)
-                ax.set_aspect("equal", adjustable="box")
-                ax.clear()
-                figs.append(fig)
+
+            # Initialize figure and axes from cached road graph
+            fig, ax = plt.subplots(figsize=self.figsize)
+            ax.clear()  # Clear any existing content
+            ax.set_aspect("equal", adjustable="box")
+            figs.append(fig)  # Add the new figure
+            plt.close(fig)  # Close the figure to prevent carryover
+
+            # Render the pre-cached road graph for the current environment
+            # cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
+            # ax.imshow(
+            #     cached_roadgraph_array,
+            #     origin="upper",
+            #     extent=(-100, 100, -100, 100),  # Stretch to full plot
+            #     zorder=0,  # Draw as background
+            # )
+
+            # Explicitly set the axis limits to match your coordinates
+            # cached_ax.set_xlim(-100, 100)
+            # cached_ax.set_ylim(-100, 100)
+
+            # Remove axes
+            # cached_ax.axis('off')
 
             # Get control mask and omit out-of-bound agents (dead agents)
-            controlled = self.controlled_agents[env_idx, :]
+            controlled = self.controlled_agent_mask[env_idx, :]
             controlled_live = controlled & (
                 torch.abs(global_agent_states.pos_x[env_idx, :]) < 1_000
             )
@@ -151,12 +176,21 @@ class MatplotlibVisualizer:
 
             # Draw the road graph
             self._plot_roadgraph(
-                road_graph=global_roadgraph,
+                road_graph=self.global_roadgraph,
                 env_idx=env_idx,
                 ax=ax,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
             )
+
+            if plot_log_replay_trajectory:
+                self._plot_log_replay_trajectory(
+                    ax=ax,
+                    control_mask=controlled_live,
+                    env_idx=env_idx,
+                    log_trajectory=self.log_trajectory,
+                    line_width_scale=line_width_scale,
+                )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -166,7 +200,7 @@ class MatplotlibVisualizer:
                 is_ok_mask=is_ok,
                 is_offroad_mask=is_offroad,
                 is_collided_mask=is_collided,
-                response_type=response_type,
+                response_type=self.response_type,
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
@@ -207,16 +241,24 @@ class MatplotlibVisualizer:
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
 
-            ax.set_xticks([])
-            ax.set_yticks([])
+        return figs
 
-        if return_single_figure:
-            for ax in axes[len(env_indices) :]:
-                ax.axis("off")  # Hide unused subplots
-            plt.tight_layout()
-            return fig
-        else:
-            return figs
+    def _plot_log_replay_trajectory(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        control_mask: torch.Tensor,
+        log_trajectory: LogTrajectory,
+        line_width_scale: int = 1.0,
+    ):
+        ax.scatter(
+            log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
+            log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+            color="lightgreen",
+            linewidth=0.35 * line_width_scale,
+            alpha=0.35,
+            zorder=0,
+        )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
@@ -224,6 +266,26 @@ class MatplotlibVisualizer:
         start = center - np.array([length * np.cos(yaw), length * np.sin(yaw)])
         end = center + np.array([length * np.cos(yaw), length * np.sin(yaw)])
         return start, end
+
+    def _get_corners_polygon(self, x, y, length, width, orientation):
+        """Calculate the four corners of a speed bump (can be any) polygon."""
+        # Compute the direction vectors based on orientation
+        # print(length)
+        c = np.cos(orientation)
+        s = np.sin(orientation)
+        u = np.array((c, s))  # Unit vector along the orientation
+        ut = np.array((-s, c))  # Unit vector perpendicular to the orientation
+
+        # Center point of the speed bump
+        pt = np.array([x, y])
+
+        # corners
+        tl = pt + (length / 2) * u - (width / 2) * ut
+        tr = pt + (length / 2) * u + (width / 2) * ut
+        br = pt - (length / 2) * u + (width / 2) * ut
+        bl = pt - (length / 2) * u - (width / 2) * ut
+
+        return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
 
     def _plot_roadgraph(
         self,
@@ -246,6 +308,9 @@ class MatplotlibVisualizer:
                     road_point_type == int(gpudrive.EntityType.RoadEdge)
                     or road_point_type == int(gpudrive.EntityType.RoadLine)
                     or road_point_type == int(gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
+                    or road_point_type == int(gpudrive.EntityType.StopSign)
+                    or road_point_type == int(gpudrive.EntityType.CrossWalk)
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -253,35 +318,84 @@ class MatplotlibVisualizer:
                     segment_lengths = road_graph.segment_length[
                         env_idx, road_mask
                     ].tolist()
+                    segment_widths = road_graph.segment_width[
+                        env_idx, road_mask
+                    ].tolist()
                     segment_orientations = road_graph.orientation[
                         env_idx, road_mask
                     ].tolist()
 
-                    # Compute and draw road edges using start and end points
-                    for x, y, length, orientation in zip(
-                        x_coords,
-                        y_coords,
-                        segment_lengths,
-                        segment_orientations,
+                    if (
+                        road_point_type == int(gpudrive.EntityType.RoadEdge)
+                        or road_point_type == int(gpudrive.EntityType.RoadLine)
+                        or road_point_type == int(gpudrive.EntityType.RoadLane)
                     ):
-                        start, end = self._get_endpoints(
-                            x, y, length, orientation
-                        )
-
-                        if road_point_type == int(
-                            gpudrive.EntityType.RoadEdge
+                        # Compute and draw road edges using start and end points
+                        for x, y, length, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_orientations,
                         ):
-                            line_width = 1.1 * line_width_scale
+                            start, end = self._get_endpoints(
+                                x, y, length, orientation
+                            )
 
-                        else:
-                            line_width = 0.75 * line_width_scale
+                            # Plot the road edge as a line
+                            if road_point_type == int(
+                                gpudrive.EntityType.RoadEdge
+                            ):
+                                line_width = 1.1 * line_width_scale
+                            else:
+                                line_width = 0.75 * line_width_scale
 
-                        ax.plot(
-                            [start[0], end[0]],
-                            [start[1], end[1]],
-                            color=ROAD_GRAPH_COLORS[road_point_type],
-                            linewidth=line_width,
+                            ax.plot(
+                                [start[0], end[0]],
+                                [start[1], end[1]],
+                                color=ROAD_GRAPH_COLORS[road_point_type],
+                                linewidth=line_width,
+                            )
+
+                    elif road_point_type == int(gpudrive.EntityType.SpeedBump):
+                        utils.plot_speed_bumps(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
+                            segment_orientations,
+                            ax,
                         )
+
+                    elif road_point_type == int(gpudrive.EntityType.StopSign):
+                        for x, y in zip(x_coords, y_coords):
+                            point = np.array([x, y])
+                            utils.plot_stop_sign(
+                                point=point,
+                                ax=ax,
+                                radius=1.5,
+                                facecolor="xkcd:red",
+                                edgecolor="none",
+                                linewidth=3.0,
+                                alpha=0.8,
+                            )
+                    elif road_point_type == int(gpudrive.EntityType.CrossWalk):
+                        for x, y, length, width, orientation in zip(
+                            x_coords,
+                            y_coords,
+                            segment_lengths,
+                            segment_widths,
+                            segment_orientations,
+                        ):
+                            points = self._get_corners_polygon(
+                                x, y, length, width, orientation
+                            )
+                            utils.plot_crosswalk(
+                                points=points,
+                                ax=ax,
+                                facecolor="none",
+                                edgecolor="xkcd:bluish grey",
+                                alpha=0.4,
+                            )
 
                 else:
                     # Dots for other road point types
@@ -459,7 +573,7 @@ class MatplotlibVisualizer:
         # Plot human_replay agents (those that are static or expert-controlled)
         log_replay = (
             response_type.static[env_idx, :] | response_type.moving[env_idx, :]
-        ) & ~self.controlled_agents[env_idx, :]
+        ) & ~self.controlled_agent_mask[env_idx, :]
 
         pos_x = agent_states.pos_x[env_idx, log_replay]
         pos_y = agent_states.pos_y[env_idx, log_replay]
@@ -468,8 +582,15 @@ class MatplotlibVisualizer:
         vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
         # Define realistic bounds for log_replay agent positions
-        valid_mask = (torch.abs(pos_x) < OUT_OF_BOUNDS) & (
-            torch.abs(pos_y) < OUT_OF_BOUNDS
+        valid_mask = (
+            (torch.abs(pos_x) < OUT_OF_BOUNDS)
+            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+            & (
+                (vehicle_length > 0.5)
+                & (vehicle_length < 15)
+                & (vehicle_width > 0.5)
+                & (vehicle_width < 15)
+            )
         )
 
         # Filter valid static agent attributes
@@ -499,11 +620,6 @@ class MatplotlibVisualizer:
         self,
         agent_idx: int,
         env_idx: int,
-        observation_roadgraph: torch.Tensor = None,
-        observation_ego: torch.Tensor = None,
-        observation_partner: torch.Tensor = None,
-        x_lim: Tuple[float, float] = (-100, 100),
-        y_lim: Tuple[float, float] = (-100, 100),
         figsize: Tuple[int, int] = (10, 10),
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
@@ -538,7 +654,6 @@ class MatplotlibVisualizer:
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
         ax.set_aspect("equal", adjustable="box")
-        ax.set_title(f"obs agent: {agent_idx}")
 
         # Plot roadgraph if provided
         if observation_roadgraph is not None:
@@ -547,13 +662,75 @@ class MatplotlibVisualizer:
                     observation_roadgraph.type[env_idx, agent_idx, :]
                     == road_type
                 )
+
+                # Extract relevant roadgraph data for plotting
+                x_points = observation_roadgraph.x[env_idx, agent_idx, mask]
+                y_points = observation_roadgraph.y[env_idx, agent_idx, mask]
+                orientations = observation_roadgraph.orientation[
+                    env_idx, agent_idx, mask
+                ]
+                segment_lengths = observation_roadgraph.segment_length[
+                    env_idx, agent_idx, mask
+                ]
+                widths = observation_roadgraph.segment_width[
+                    env_idx, agent_idx, mask
+                ]
+
+                # Scatter plot for the points
                 ax.scatter(
-                    observation_roadgraph.x[env_idx, agent_idx, mask],
-                    observation_roadgraph.y[env_idx, agent_idx, mask],
+                    x_points,
+                    y_points,
                     c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=7,
+                    s=8,
                     label=type_name,
                 )
+
+                # Plot lines for road edges
+                for x, y, orientation, segment_length, width in zip(
+                    x_points, y_points, orientations, segment_lengths, widths
+                ):
+                    dx = segment_length * 0.5 * np.cos(orientation)
+                    dy = segment_length * 0.5 * np.sin(orientation)
+
+                    # Calculate line endpoints for the road edge
+                    x_start = x - dx
+                    y_start = y - dy
+                    x_end = x + dx
+                    y_end = y + dy
+
+                    # Add width as a perpendicular offset
+                    width_dx = width * 0.5 * np.sin(orientation)
+                    width_dy = -width * 0.5 * np.cos(orientation)
+
+                    # Draw the road edge as a polygon (line with width)
+                    ax.plot(
+                        [x_start - width_dx, x_end - width_dx],
+                        [y_start - width_dy, y_end - width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0,
+                    )
+                    ax.plot(
+                        [x_start + width_dx, x_end + width_dx],
+                        [y_start + width_dy, y_end + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0,
+                    )
+                    ax.plot(
+                        [x_start - width_dx, x_start + width_dx],
+                        [y_start - width_dy, y_start + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0,
+                    )
+                    ax.plot(
+                        [x_end - width_dx, x_end + width_dx],
+                        [y_end - width_dy, y_end + width_dy],
+                        color=ROAD_GRAPH_COLORS[road_type],
+                        alpha=0.5,
+                        linewidth=1.0,
+                    )
 
         # Plot partner agents if provided
         if observation_partner is not None:
@@ -582,7 +759,7 @@ class MatplotlibVisualizer:
                     env_idx, agent_idx, :, :
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
-                alpha=0.8,
+                alpha=1.0,
             )
 
         if observation_ego is not None:
@@ -613,33 +790,47 @@ class MatplotlibVisualizer:
                 0,  # Start at the ego vehicle's position
                 speed,
                 0,  # Arrow points to the right, proportional to speed
-                head_width=0.5,
-                head_length=0.7,
+                head_width=1.0,
+                head_length=1.1,
                 fc=REL_OBS_OBJ_COLORS["ego"],
                 ec=REL_OBS_OBJ_COLORS["ego"],
             )
 
-            ax.plot(
+            ax.scatter(
                 observation_ego.rel_goal_x[env_idx, agent_idx],
                 observation_ego.rel_goal_y[env_idx, agent_idx],
-                markersize=23,
-                label="Goal",
-                marker="*",
-                markeredgecolor="k",
-                linestyle="None",
-                color=REL_OBS_OBJ_COLORS["ego_goal"],
-            )[0]
+                s=5,
+                linewidth=1.5,
+                c=ego_agent_color,
+                marker="x",
+            )
 
-        # fig.legend(
-        #     loc="upper center",
-        #     bbox_to_anchor=(0.5, 0.1),
-        #     ncol=5,
-        #     fontsize=10,
-        #     title="Elements",
-        # )
-        ax.set_xlim(x_lim)
-        ax.set_ylim(y_lim)
+            circle = Circle(
+                (
+                    observation_ego.rel_goal_x[env_idx, agent_idx],
+                    observation_ego.rel_goal_y[env_idx, agent_idx],
+                ),
+                radius=self.goal_radius,
+                color=ego_agent_color,
+                fill=False,
+                linestyle="--",
+            )
+            ax.add_patch(circle)
+
+            observation_radius = Circle(
+                (0, 0),
+                radius=self.env_config.obs_radius,
+                color="#000000",
+                linewidth=0.8,
+                fill=False,
+                linestyle="-",
+            )
+            ax.add_patch(observation_radius)
+            plt.axis("off")
+
+        ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_xticks([])
         ax.set_yticks([])
 
-        return fig, ax
+        return fig

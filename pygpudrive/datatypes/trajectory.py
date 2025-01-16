@@ -4,6 +4,7 @@ import gpudrive
 
 TRAJ_LEN = 91  # Length of the logged trajectory
 
+
 @dataclass
 class LogTrajectory:
     """A class to represent the logged human trajectories. Initialized from `expert_trajectory_tensor` (src/bindings.cpp).
@@ -17,12 +18,14 @@ class LogTrajectory:
         actions: Expert actions performed by the agent(s) across the trajectory.
     """
 
-    def __init__(self, raw_logs: torch.Tensor, num_worlds: int, max_agents: int):
-        """Initializes the expert trajectory with an observation tensor."""    
+    def __init__(
+        self, raw_logs: torch.Tensor, num_worlds: int, max_agents: int
+    ):
+        """Initializes the expert trajectory with an observation tensor."""
         self.pos_xy = raw_logs[:, :, : 2 * TRAJ_LEN].view(
             num_worlds, max_agents, TRAJ_LEN, -1
         )
-        self.vel_xy = raw_logs[:, :, 2 * TRAJ_LEN: 4 * TRAJ_LEN].view(
+        self.vel_xy = raw_logs[:, :, 2 * TRAJ_LEN : 4 * TRAJ_LEN].view(
             num_worlds, max_agents, TRAJ_LEN, -1
         )
         self.yaw = raw_logs[:, :, 4 * TRAJ_LEN: 5 * TRAJ_LEN].view(
@@ -36,7 +39,13 @@ class LogTrajectory:
         )
 
     @classmethod
-    def from_tensor(cls, expert_traj_tensor: gpudrive.madrona.Tensor, num_worlds: int, max_agents: int, backend="torch"):
+    def from_tensor(
+        cls,
+        expert_traj_tensor: gpudrive.madrona.Tensor,
+        num_worlds: int,
+        max_agents: int,
+        backend="torch",
+    ):
         """Creates an LogTrajectory from a tensor."""
         if backend == "torch":
             return cls(expert_traj_tensor.to_torch().clone(), num_worlds, max_agents)  # Pass the entire tensor
