@@ -64,6 +64,15 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=config.lidar_obs,
             disable_classic_obs=True if config.lidar_obs else False,
             obs_radius=config.obs_radius,
+            steer_actions=torch.round(
+                torch.linspace(
+                    -torch.pi, torch.pi, config.num_steer_angle_bins
+                ),
+                decimals=3,
+            ),
+            accel_actions=torch.round(
+                torch.linspace(-4.0, 4.0, config.num_accel_bins), decimals=3
+            ),
         )
 
         # Make env
