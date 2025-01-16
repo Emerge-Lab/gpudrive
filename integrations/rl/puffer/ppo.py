@@ -96,6 +96,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         resample_counter=0,
         epoch=0,
         stats={},
+        infos=defaultdict(list),
         msg=msg,
         last_log_time=0,
         utilization=utilization,
@@ -163,7 +164,7 @@ def evaluate(data):
 
     with profile.eval_misc:
         policy = data.policy
-        infos = defaultdict(list)
+        data.completed_episodes_in_rollout = 0
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
 
     # Rollout loop
@@ -210,28 +211,37 @@ def evaluate(data):
 
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
+            # Append new info
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
-                    infos[k].append(v)
-
+                    data.infos[k].append(v)
+                    
+            # Track number of envs done in this rollout
+            data.completed_episodes_in_rollout += len(info)
+                     
     with profile.eval_misc:
-        data.stats = {}
-
-        for k, v in infos.items():
-            try:
-                # We log the average across all done worlds in a rollout
-                data.stats[k] = np.mean(v)
-                # Log variance for goal and collision metrics
-                # if "goal" in k or "collision" in k or "offroad" in k:
-                #     data.stats[f"{k}_std"] = np.std(v)
-            except:
-                continue
-
+        data.stats = {}        
+        
+        # Log the average across all K done worlds across last N rollouts
+        if len(data.infos['mean_episode_reward_per_agent']) > data.config.log_window:
+            for k, v in data.infos.items():
+                try:
+                    data.stats[k] = np.mean(v)
+                    
+                    # Log variance for goal and collision metrics
+                    if "goal" in k or "collision" in k or "offroad" in k:
+                        data.stats[f"std_{k}"] = np.std(v)
+                except:
+                    continue
+                
+            # Reset info dict
+            data.infos = defaultdict(list)
+                    
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
     data.vecenv.iters = data.num_rollouts
 
-    return data.stats, infos
+    return data.stats, data.infos, data.completed_episodes_in_rollout
 
 
 @pufferlib.utils.profile
@@ -395,18 +405,23 @@ def train(data):
                         "performance/pad_agent_sps": profile.pad_agent_sps,
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
                         "performance/iters": data.num_rollouts,
-                        "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
+                        "global_step": data.global_step,
                         "train/learning_rate": data.optimizer.param_groups[0][
                             "lr"
                         ],
                         "train/collision_weight": data.vecenv.collision_weight,
                         "train/off_road_weight": data.vecenv.off_road_weight,
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        "metrics/completed_episodes_in_rollout": data.completed_episodes_in_rollout,
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
+
+                if bool(data.stats):
+                    data.wandb.log({
+                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                    }, step=data.global_step) 
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)

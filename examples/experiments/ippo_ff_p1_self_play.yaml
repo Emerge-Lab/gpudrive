@@ -2,7 +2,7 @@ mode: "train" # Options: "train", "sweep"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/examples"
+data_dir: "data/processed/training"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -41,6 +41,7 @@ train:
   bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
+  log_window: 100 # Log performance metrics every k completed episodes
 
   # # # Data sampling # # #
   resample_scenes: False
@@ -53,7 +54,7 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 100_000_000
+  total_timesteps: 500_000_000
   batch_size: 131_072
   minibatch_size: 16_384
   learning_rate: 3e-4
@@ -69,8 +70,8 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  collision_weight: 0.05 # Note: Assuming we want to avoid collisions and off-road events
-  off_road_weight: 0.05
+  collision_weight: 0.5 # Note: Assuming we want to avoid collisions and off-road events
+  off_road_weight: 0.5
   goal_achieved_weight: 1.0
   # Settings below introduce a warmup period where the collision penalties are
   # set to zero and then gradually increase. Control the fraction of the warmup period during which penalties are zero.
@@ -106,7 +107,7 @@ sweep:
   train:
     learning_rate:
       distribution: "log_normal"
-      mean: 0.005
+      mean: 0.0003
       scale: 1.0
       clip: 2.0
 
@@ -130,18 +131,13 @@ sweep:
 
     collision_weight:
       distribution: "uniform"
-      min: 0.05
-      max: 1.0
+      min: 0.1
+      max: 0.5
 
     off_road_weight:
       distribution: "uniform"
-      min: 0.05
-      max: 1.0
-
-    goal_achieved_weight:
-      distribution: "uniform"
-      min: 0.0
-      max: 1.0
+      min: 0.1
+      max: 0.5
 
 vec:
   backend: "native" # Only native is currently supported
