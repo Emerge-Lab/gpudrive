@@ -249,6 +249,7 @@ def train(data):
     config, profile, experience = data.config, data.profile, data.experience
     data.losses = make_losses()
     losses = data.losses
+    data.enow = config.ent_coef
 
     with profile.train_misc:
         idxs = experience.sort_training_data()
@@ -336,7 +337,7 @@ def train(data):
                 entropy_loss = entropy.mean()
                 loss = (
                     pg_loss
-                    - config.ent_coef * entropy_loss
+                    - data.enow * entropy_loss
                     + v_loss * config.vf_coef
                 )
 
@@ -367,7 +368,10 @@ def train(data):
             frac = 1.0 - data.global_step / config.total_timesteps
             lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
-
+        if config.anneal_entropy:
+            frac = 1.0 - data.global_step / config.total_timesteps
+            data.enow = config.ent_coef * frac
+        
         y_pred = experience.values_np
         y_true = experience.returns_np
         var_y = np.var(y_true)
@@ -415,7 +419,7 @@ def train(data):
                         "train/off_road_weight": data.vecenv.off_road_weight,
                         "metrics/completed_episodes_in_rollout": data.completed_episodes_in_rollout,
                         **{f"train/{k}": v for k, v in data.losses.items()},
-                    }
+                    }, step=data.global_step
                 )
 
                 if bool(data.stats):

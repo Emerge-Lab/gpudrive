@@ -448,12 +448,12 @@ class PufferGPUDrive(PufferEnv):
         if self.wandb_obj is not None:
             self.wandb_obj.log(
                 {
-                    "Data/new_files_in_batch": len(new_idx),
-                    "Data/unique_scenarios_in_batch": scenario_unique,
-                    "Data/scenario_counts_in_batch": wandb.Histogram(
+                    "data/new_files_in_batch": len(new_idx),
+                    "data/unique_scenarios_in_batch": scenario_unique,
+                    "data/scenario_counts_in_batch": wandb.Histogram(
                         scenario_counts
                     ),
-                    "Data/coverage": (
+                    "data/coverage": (
                         len(self.cumulative_unique_files)
                         / len(set(self.file_to_index))
                     )
