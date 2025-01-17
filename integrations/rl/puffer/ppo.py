@@ -108,7 +108,7 @@ def evaluate(data):
 
     if data.config.collision_penalty_warmup:
         warmup_frac = min(
-            1.0, data.global_step / data.config.warmup_steps
+            1.0, data.global_step / data.config.total_timesteps
         )  # Clamp between 0 and 1
 
         # Warmup period where penalties are initially zero
@@ -172,7 +172,15 @@ def evaluate(data):
 
         with profile.env:
             # Receive data from current timestep
-            o, r, d, t, info, env_id, mask = data.vecenv.recv()
+            (
+                obs,
+                reward,
+                terminated,
+                truncated,
+                info,
+                env_id,
+                mask,
+            ) = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
@@ -180,20 +188,20 @@ def evaluate(data):
             data.global_step_pad += data.vecenv.total_agents
             data.resample_buffer += sum(mask)
 
-            o = torch.as_tensor(o)
-            o_device = o.to(config.device)
-            r = torch.as_tensor(r)
-            d = torch.as_tensor(d)
+            obs = torch.as_tensor(obs)
+            obs_device = obs.to(config.device)
+            reward = torch.as_tensor(reward)
+            terminated = torch.as_tensor(terminated)
 
         with profile.eval_forward, torch.no_grad():
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
-                actions, logprob, _, value, (h, c) = policy(o_device, (h, c))
+                actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
             else:
-                actions, logprob, _, value = policy(o_device)
+                actions, logprob, _, value = policy(obs_device)
 
             if config.device == "cuda":
                 torch.cuda.synchronize()
@@ -207,36 +215,40 @@ def evaluate(data):
         with profile.eval_misc:
             value = value.flatten()
             mask = torch.as_tensor(mask)
-            o = o if config.cpu_offload else o_device
+            obs = obs if config.cpu_offload else obs_device
 
-            experience.store(o, value, actions, logprob, r, d, env_id, mask)
+            experience.store(
+                obs, value, actions, logprob, reward, terminated, env_id, mask
+            )
 
-            # Append new info
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     data.infos[k].append(v)
-                    
+
             # Track number of envs done in this rollout
             data.completed_episodes_in_rollout += len(info)
-                     
+
     with profile.eval_misc:
-        data.stats = {}        
-        
+        data.stats = {}
+
         # Log the average across all K done worlds across last N rollouts
-        if len(data.infos['mean_episode_reward_per_agent']) > data.config.log_window:
+        if (
+            len(data.infos["mean_episode_reward_per_agent"])
+            > data.config.log_window
+        ):
             for k, v in data.infos.items():
                 try:
                     data.stats[k] = np.mean(v)
-                    
+
                     # Log variance for goal and collision metrics
                     if "goal" in k or "collision" in k or "offroad" in k:
                         data.stats[f"std_{k}"] = np.std(v)
                 except:
                     continue
-                
+
             # Reset info dict
             data.infos = defaultdict(list)
-                    
+
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
     data.vecenv.iters = data.num_rollouts
@@ -371,7 +383,7 @@ def train(data):
         if config.anneal_entropy:
             frac = 1.0 - data.global_step / config.total_timesteps
             data.enow = config.ent_coef * frac
-        
+
         y_pred = experience.values_np
         y_true = experience.returns_np
         var_y = np.var(y_true)
@@ -401,6 +413,7 @@ def train(data):
                 and data.global_step > 0
                 and time.perf_counter() - data.last_log_time > 3.0
             ):
+                # fmt: off
                 data.last_log_time = time.perf_counter()
                 data.wandb.log(
                     {
@@ -412,9 +425,8 @@ def train(data):
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
                         "global_step": data.global_step,
-                        "train/learning_rate": data.optimizer.param_groups[0][
-                            "lr"
-                        ],
+                        "train/learning_rate": data.optimizer.param_groups[0]["lr"],
+                        "train/ent_coef": data.enow,
                         "train/collision_weight": data.vecenv.collision_weight,
                         "train/off_road_weight": data.vecenv.off_road_weight,
                         "metrics/completed_episodes_in_rollout": data.completed_episodes_in_rollout,
@@ -425,8 +437,8 @@ def train(data):
                 if bool(data.stats):
                     data.wandb.log({
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
-                    }, step=data.global_step) 
-
+                    }, step=data.global_step)
+                # fmt: on
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
             data.msg = f"Checkpoint saved at update {data.epoch}"

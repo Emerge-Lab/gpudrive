@@ -253,25 +253,7 @@ class PufferGPUDrive(PufferEnv):
                 for render_env_idx in range(
                     self.train_config.render_k_scenarios
                 ):
-                    if (
-                        render_env_idx in done_worlds
-                        and len(self.frames[render_env_idx]) > 0
-                    ):
-                        frames_array = np.array(self.frames[render_env_idx])
-                        self.wandb_obj.log(
-                            {
-                                f"vis/state/env_{render_env_idx}": wandb.Video(
-                                    np.moveaxis(frames_array, -1, 1),
-                                    fps=self.train_config.render_fps,
-                                    format=self.train_config.render_format,
-                                    caption=f"global step: {self.global_step:,}",
-                                )
-                            }
-                        )
-                        # Reset rendering storage
-                        self.frames[render_env_idx] = []
-                        self.rendering_in_progress[render_env_idx] = False
-                        self.was_rendered_in_rollout[render_env_idx] = True
+                    self.log_video_to_wandb(render_env_idx, done_worlds)
 
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
@@ -280,7 +262,6 @@ class PufferGPUDrive(PufferEnv):
 
             num_finished_agents = controlled_mask.sum().item()
 
-            # Collision rates are summed across all agents in the episode
             off_road_rate = (
                 torch.where(
                     self.offroad_in_episode[done_worlds, :][controlled_mask]
@@ -345,6 +326,9 @@ class PufferGPUDrive(PufferEnv):
         self.observations = next_obs
         self.rewards = reward_controlled
         self.terminals = terminal
+        # Truncation is when the episode is not done but the agent is not in the goal
+        # self.truncations = torch.logical_and(~self.terminals, ~self.env.get_infos().goal_achieved[self.controlled_agent_mask].bool())
+
         return (
             self.observations,
             self.rewards,
@@ -430,6 +414,27 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+
+    def log_video_to_wandb(self, render_env_idx, done_worlds):
+        if (
+            render_env_idx in done_worlds
+            and len(self.frames[render_env_idx]) > 0
+        ):
+            frames_array = np.array(self.frames[render_env_idx])
+            self.wandb_obj.log(
+                {
+                    f"vis/state/env_{render_env_idx}": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),
+                        fps=self.train_config.render_fps,
+                        format=self.train_config.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                }
+            )
+            # Reset rendering storage
+            self.frames[render_env_idx] = []
+            self.rendering_in_progress[render_env_idx] = False
+            self.was_rendered_in_rollout[render_env_idx] = True
 
     def log_data_coverage(self):
         """Data coverage statistics."""
