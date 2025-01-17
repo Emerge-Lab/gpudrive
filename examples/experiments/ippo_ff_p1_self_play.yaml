@@ -57,8 +57,8 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 500_000_000
-  batch_size: 32_768
-  minibatch_size: 8192
+  batch_size: 131_072
+  minibatch_size: 32_768
   learning_rate: 3e-4
   anneal_lr: false # Linearly decay the learning rate
   anneal_entropy: false # Linearly decay the entropy coefficient
