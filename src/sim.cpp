@@ -284,7 +284,6 @@ inline void movementSystem(Engine &e,
     if (collisionEvent.hasCollided.load_relaxed()) {
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
-                e.get<Done>(agent_iface.e).v = 1;
                 agentZeroVelSystem(e, velocity);
                 break;
 
