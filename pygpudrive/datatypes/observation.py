@@ -72,7 +72,7 @@ class LocalEgoState:
 
 class GlobalEgoState:
     """A class to represent the ego state of the agent in global coordinates.
-    Initialized from abs_self_obs_tensor (src/bindings). For details, see
+    Initialized from absolute_self_observation_tensor (src/bindings). For details, see
     `AbsoluteSelfObservation` in src/types.hpp. Shape: (num_worlds, max_agents, 14).
 
     Attributes:
@@ -120,12 +120,11 @@ class GlobalEgoState:
     def shape(self) -> tuple[int, ...]:
         """Shape (num_worlds, num_agents) of the ego state tensor."""
         return self.pos_x.shape
-
+    
     def restore_mean(self, mean_x, mean_y):
         """Reapplies the mean to revert back to the original coordinates."""
         self.pos_x += mean_x
         self.pos_y += mean_y
-
 
 @dataclass
 class PartnerObs:

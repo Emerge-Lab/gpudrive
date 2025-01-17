@@ -68,6 +68,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         if (
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
+            or self.config.reward_type == "distance_to_logs"
         ):
             reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
         else:
@@ -151,7 +152,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
         return params
 
-    def _initialize_simulator(self, params, scene_config):
+    def _initialize_simulator(self, params, data_batch):
         """Initializes the simulation with the specified parameters.
 
         Args:
@@ -166,11 +167,10 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        self.dataset = select_scenes(scene_config)
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
-            scenes=self.dataset,
+            scenes=data_batch,
             params=params,
             enable_batch_renderer=self.render_config
             and self.render_config.render_mode
@@ -233,25 +233,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 f"Invalid collision behavior: {self.config.collision_behavior}"
             )
         return params
-
-    def reinit_scenarios(self, dataset: List[str]):
-        """Resample the scenes.
-        Args:
-            dataset (List[str]): List of scene names to resample.
-
-        Returns:
-            None
-        """
-
-        # Resample the scenes
-        self.sim.set_maps(dataset)
-
-        # Re-initialize the controlled agents mask
-        self.cont_agent_mask = self.get_controlled_agents_mask()
-        self.max_agent_count = self.cont_agent_mask.shape[1]
-        self.num_valid_controlled_agents_across_worlds = (
-            self.cont_agent_mask.sum().item()
-        )
 
     def close(self):
         """Destroy the simulator and visualizer."""

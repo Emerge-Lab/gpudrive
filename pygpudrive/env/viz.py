@@ -4,7 +4,7 @@ import numpy as np
 import math
 import gpudrive
 
-from pygpudrive.env.config import MadronaOption, PygameOption, RenderMode
+from pygpudrive.env.config import MadronaOption, RenderMode
 
 # AGENT COLORS
 PINK = (255, 105, 180)
