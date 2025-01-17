@@ -231,6 +231,12 @@ def run(
     collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
     goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
+    collision_penalty_warmup: Annotated[Optional[int], typer.Option(help="Whether to use a warmup period for the collision penalties; 0 or 1")] = None,
+    penalty_start_frac: Annotated[Optional[float], typer.Option(help="The fraction of the total timesteps to start applying penalties")] = None,
+    warmup_steps: Annotated[Optional[int], typer.Option(help="The number of warmup steps for the penalties")] = None,
+    # Mode
+    mode: Annotated[str, typer.Option(help="The mode to run; 'train' or 'sweep'")] = "train",
+    
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -243,6 +249,10 @@ def run(
 
     # Load default configs
     config = load_config(config_path)
+    
+    # Update config.mode if not None
+    if mode is not None:
+        config.mode = mode
 
     # Override configs with command-line arguments
     env_config = {
@@ -277,6 +287,9 @@ def run(
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,
         "goal_achieved_weight": goal_achieved_weight,
+        "collision_penalty_warmup": None if collision_penalty_warmup is None else bool(collision_penalty_warmup),
+        "penalty_start_frac": penalty_start_frac,
+        "warmup_steps": warmup_steps,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
