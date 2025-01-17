@@ -45,7 +45,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (10, 10)
+        self.figsize = (4, 4)
         self.env_config = env_config
         self.initialize_static_scenario_data(controlled_agent_mask)
 
@@ -620,6 +620,7 @@ class MatplotlibVisualizer:
         self,
         agent_idx: int,
         env_idx: int,
+        trajectory: Optional[np.ndarray] = None,
         figsize: Tuple[int, int] = (10, 10),
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
@@ -827,6 +828,17 @@ class MatplotlibVisualizer:
             )
             ax.add_patch(observation_radius)
             plt.axis("off")
+        
+        if trajectory is not None:
+            ax.plot(
+                trajectory[:, 0],  # x coordinates
+                trajectory[:, 1],  # y coordinates
+                color=REL_OBS_OBJ_COLORS["ego"],
+                linestyle='--',
+                linewidth=1.5,
+                alpha=0.7,
+                label="Ego trajectory"
+            )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
