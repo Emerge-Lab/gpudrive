@@ -882,6 +882,11 @@ Sim::Sim(Engine &ctx,
 
     auto& map = ctx.singleton<Map>();
     map = *(init.map);
+
+    auto& deletedAgents = ctx.singleton<DeletedAgents>();
+    for (auto i = 0; i < consts::kMaxAgentCount; i++) {
+        deletedAgents.deletedAgents[i] = -1;
+    }
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
 
