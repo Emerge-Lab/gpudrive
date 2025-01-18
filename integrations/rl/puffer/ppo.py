@@ -431,13 +431,13 @@ def train(data):
                         "train/off_road_weight": data.vecenv.off_road_weight,
                         "metrics/completed_episodes_in_rollout": data.completed_episodes_in_rollout,
                         **{f"train/{k}": v for k, v in data.losses.items()},
-                    }, step=data.global_step
+                    }
                 )
 
                 if bool(data.stats):
                     data.wandb.log({
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
-                    }, step=data.global_step)
+                    }
                 # fmt: on
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
