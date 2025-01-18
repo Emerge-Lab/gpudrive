@@ -94,6 +94,10 @@ namespace gpudrive
         int32_t reset;
     };   
 
+    struct DeleteAgents {
+        int32_t deleteAgents[consts::kMaxAgentCount];
+    };
+
     struct WorldMeans {
         madrona::math::Vector3 mean; // TODO: Z is 0 for now, but can be used for 3D in future
     };

@@ -638,10 +638,55 @@ void Manager::setMaps(const std::vector<std::string> &maps)
     }
 
     // Vector of range on integers from 0 to the number of worlds
-    std::vector<int32_t> worldIndices(maps.size());
+    std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
     std::iota(worldIndices.begin(), worldIndices.end(), 0);
     reset(worldIndices);
 }
+
+void Manager::setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete)
+{
+    if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
+    {
+#ifdef MADRONA_CUDA_SUPPORT
+        auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
+        auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeleteAgents);
+        for (const auto &[worldIdx, agents] : agentsToDelete)
+        {
+            assert(worldIdx < impl_->cfg.scenes.size());
+            assert(agents.size() <= consts::kMaxAgentCount);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + worldIdx * consts::kMaxAgentCount;
+            for (size_t i = 0; i < agents.size(); i++)
+            {
+                REQ_CUDA(cudaMemcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t), cudaMemcpyHostToDevice));
+            }
+        }
+#else
+        // Handle the case where CUDA support is not available
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    }
+    else
+    {
+        auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
+        auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeleteAgents);
+        for (const auto &[worldIdx, agents] : agentsToDelete)
+        {
+            assert(worldIdx < impl_->cfg.scenes.size());
+            assert(agents.size() <= consts::kMaxAgentCount);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + worldIdx * consts::kMaxAgentCount;
+            for (size_t i = 0; i < agents.size(); i++)
+            {
+                memcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t));
+            }
+        }
+    }
+
+    std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
+    std::iota(worldIndices.begin(), worldIndices.end(), 0);
+    reset(worldIndices);
+
+}
+
 
 Tensor Manager::actionTensor() const
 {

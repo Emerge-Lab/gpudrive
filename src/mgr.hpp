@@ -78,6 +78,9 @@ public:
                               float acceleration, float steering,
                               float headAngle);
     MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
+
+    MGR_EXPORT void setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete);
+  
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory();
