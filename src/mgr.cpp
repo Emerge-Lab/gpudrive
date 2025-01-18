@@ -610,6 +610,11 @@ void Manager::setMaps(const std::vector<std::string> &maps)
 
             auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
             REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+
+            // reset agents to delete
+            auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+            REQ_CUDA(cudaMemset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t)));
         }
 
 #else
@@ -634,6 +639,11 @@ void Manager::setMaps(const std::vector<std::string> &maps)
 
             auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
             memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+
+            // reset agents to delete
+            auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+            memset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t));
         }
     }
 
