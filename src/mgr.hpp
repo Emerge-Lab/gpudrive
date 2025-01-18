@@ -69,6 +69,7 @@ public:
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
     MGR_EXPORT madrona::py::Tensor metadataTensor() const;
+    MGR_EXPORT madrona::py::Tensor deletedAgentsTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
@@ -79,7 +80,7 @@ public:
                               float headAngle);
     MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
 
-    MGR_EXPORT void setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete);
+    MGR_EXPORT void deleteAgents(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete);
   
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>

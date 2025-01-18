@@ -643,13 +643,27 @@ void Manager::setMaps(const std::vector<std::string> &maps)
     reset(worldIndices);
 }
 
-void Manager::setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete)
+Tensor Manager::deletedAgentsTensor() const
 {
+    return impl_->exportTensor(ExportID::DeletedAgents, TensorElementType::Int32,
+                               {
+                                   impl_->numWorlds,
+                                   consts::kMaxAgentCount,
+                               });
+}
+
+void Manager::deleteAgents(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete)
+{
+
+    ResetMap resetmap{
+        1,
+    };
+
     if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
     {
 #ifdef MADRONA_CUDA_SUPPORT
         auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
-        auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeleteAgents);
+        auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
         for (const auto &[worldIdx, agents] : agentsToDelete)
         {
             assert(worldIdx < impl_->cfg.scenes.size());
@@ -659,6 +673,8 @@ void Manager::setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>
             {
                 REQ_CUDA(cudaMemcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t), cudaMemcpyHostToDevice));
             }
+            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + worldIdx;
+            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
         }
 #else
         // Handle the case where CUDA support is not available
@@ -668,7 +684,7 @@ void Manager::setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>
     else
     {
         auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
-        auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeleteAgents);
+        auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
         for (const auto &[worldIdx, agents] : agentsToDelete)
         {
             assert(worldIdx < impl_->cfg.scenes.size());
@@ -678,13 +694,14 @@ void Manager::setToDelete(const std::unordered_map<int32_t, std::vector<int32_t>
             {
                 memcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t));
             }
+            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + worldIdx;
+            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
         }
     }
 
     std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
     std::iota(worldIndices.begin(), worldIndices.end(), 0);
     reset(worldIndices);
-
 }
 
 

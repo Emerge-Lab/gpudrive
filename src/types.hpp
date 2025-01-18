@@ -94,8 +94,8 @@ namespace gpudrive
         int32_t reset;
     };   
 
-    struct DeleteAgents {
-        int32_t deleteAgents[consts::kMaxAgentCount];
+    struct DeletedAgents {
+        int32_t deletedAgents[consts::kMaxAgentCount];
     };
 
     struct WorldMeans {

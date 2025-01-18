@@ -37,7 +37,7 @@ enum class ExportID : uint32_t {
     ResetMap,
     WorldMeans,
     MetaData,
-    DeleteAgents,
+    DeletedAgents,
     NumExports
 };
 
