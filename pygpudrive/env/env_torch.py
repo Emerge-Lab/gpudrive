@@ -489,44 +489,55 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
+    import mediapy
+    from pygpudrive.visualize.utils import img_from_fig
 
     # CONFIGURE
     TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 32
-    NUM_WORLDS = 1
+    MAX_CONTROLLED_AGENTS = 2
+    NUM_WORLDS = 2
 
     env_config = EnvConfig(dynamics_model="delta_local")
-    render_config = RenderConfig()
-    scene_config = SceneConfig("data/processed/training", NUM_WORLDS)
+    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
+    render_config = RenderConfig(
+        draw_expert_trajectories=True,
+        draw_only_ego_expert_traj=True,
+    )
 
     # MAKE ENV
     env = GPUDriveTorchEnv(
         config=env_config,
         scene_config=scene_config,
         max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
-        device="cpu",
-        render_config=render_config,
+        action_type="continuous",
+        device="cuda",
     )
 
     # RUN
     obs = env.reset()
-    frames = []
-
-    expert_actions, _, _, _ = env.get_expert_actions()
+    frames = {f"env_{i}": [] for i in range(NUM_WORLDS)}
 
     for t in range(TOTAL_STEPS):
         print(f"Step: {t}")
 
         # Step the environment
+        expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
 
-        frames.append(env.render())
+        figs = env.vis.plot_simulator_state(
+            env_indices=list(range(NUM_WORLDS)),
+            time_steps=[t]*NUM_WORLDS,
+            figsize=(6, 6),
+            zoom_radius=100,
+        )
+
+        for i in range(NUM_WORLDS):
+            frames[f"env_{i}"].append(img_from_fig(figs[i]))
 
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
 
-    # import imageio
-    imageio.mimsave("world1.gif", np.array(frames))
-
+    for i in range(NUM_WORLDS):
+        mediapy.write_video(f"world{i}.mp4", frames[f"env_{i}"], fps=5)
     env.close()
