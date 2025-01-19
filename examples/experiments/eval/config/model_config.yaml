@@ -1,20 +1,32 @@
-models_path: examples/experiments/eval/models/scaling_laws
+models_path: examples/experiments/eval/models/sota_0119
 
 models:
-  - name: random_baseline
-    train_dataset_size: null
-    wandb: null
-    trained_on: null
+  # - name: random_baseline
+  #   train_dataset_size: null
+  #   wandb: null
+  #   trained_on: null
 
-  - name: model_PPO__R_100__01_10_17_06_33_696_003000
-    train_dataset_size: 100
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_100__01_10_17_06_33_696?nw=nwuserdaphnecor
-    trained_on: cluster
-  
-  - name: model_PPO__R_1000__01_10_17_06_33_697_003500
+  # Represents the current SOTA 
+  - name: model_PPO_R_1000__01_18_12_46_43_477_019500
     train_dataset_size: 1000
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_10_17_06_33_697?nw=nwuserdaphnecor
+    wandb: https://wandb.ai/emerge_/self_play_rl_0118/runs/PPO_R_1000__01_18_12_46_43_477?nw=nwuserdaphnecor
     trained_on: cluster
+
+  # - name: 
+  #   train_dataset_size: 10_000
+  #   wandb: 
+  #   trained_on: cluster
+
+  # Previous SOTA models
+  # - name: model_PPO__R_100__01_10_17_06_33_696_003000
+  #   train_dataset_size: 100
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_100__01_10_17_06_33_696?nw=nwuserdaphnecor
+  #   trained_on: cluster
+  
+  # - name: model_PPO__R_1000__01_10_17_06_33_697_003500
+  #   train_dataset_size: 1000
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_10_17_06_33_697?nw=nwuserdaphnecor
+  #   trained_on: cluster
 
   # - name: model_PPO__R_10000__01_10_17_13_39_676
   #   train_dataset_size: 10_000

@@ -2,12 +2,12 @@ mode: "train" # Options: "train", "sweep"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training"
+data_dir: "/scratch/kj2676/gpudrive/data/processed/training"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 1 # Number of unique scenes to sample from
+  num_worlds: 500 # Number of parallel environments
+  k_unique_scenes: 500 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -26,7 +26,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: "emerge_"
-  project: "self_play_rl_0117"
+  project: "self_play_rl_0118"
   group: "quick_experiments"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
@@ -42,10 +42,10 @@ train:
   log_window: 100 # Log performance metrics every k completed episodes
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: true
   resample_criterion: "global_step"
   resample_dataset_size: 500 # Number of unique scenes to sample from
-  resample_interval: 20_000_000
+  resample_interval: 10_000_000
   resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   sample_with_replacement: true
   shuffle_dataset: false
@@ -69,19 +69,19 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  collision_weight: 0.5 # Note: Assuming we want to avoid collisions and off-road events
-  off_road_weight: 0.5
+  collision_weight: 0.2 # Note: Assuming we want to avoid collisions and off-road events
+  off_road_weight: 0.2
   goal_achieved_weight: 1.0
   # Settings below introduce a warmup period where the collision penalties are
   # set to zero and then gradually increase. Control the fraction of the warmup period during which penalties are zero.
   # For example, config.penalty_start_frac = 0.3 means the first 30% of the steps has no penalties.
-  collision_penalty_warmup: true
-  penalty_start_frac: 0.1
+  collision_penalty_warmup: false
+  penalty_start_frac: 0.2
 
   # # # Network # # #
   network:
     input_dim: 64 # Embedding of the input features
-    hidden_dim: 192 # Latent dimension
+    hidden_dim: 128 # Latent dimension
     pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
     num_transformer_layers: 0 # Number of transformer layers
     dropout: 0.01
@@ -93,7 +93,7 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: true # Determines whether to render the environment (note: will slow down training)
+  render: false # Determines whether to render the environment (note: will slow down training)
   render_interval: 100 # Render every k iterations
   render_k_scenarios: 1 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view

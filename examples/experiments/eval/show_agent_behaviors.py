@@ -22,8 +22,38 @@ import pdb
 
 logging.basicConfig(level=logging.INFO)
 
-def make_videos(data_batch, env, policy, device, zoom_radius, results_df):
+def make_videos(
+    df_results, 
+    policy, 
+    eval_config,
+    sort_by=None,
+    show_top_k=100,
+    device='cuda', 
+    zoom_radius=100, 
+    deterministic=False,
+    render_every_n_steps=10,
+    ):
     """Make videos policy rollouts environment."""
+    
+    # Make environment
+    train_loader = SceneDataLoader(
+        root=eval_config.train_dir,
+        batch_size=show_top_k,
+        dataset_size=show_top_k,
+        sample_with_replacement=False,
+        shuffle=False
+    )
+    
+    env = make_env(eval_config, train_loader)    
+    
+    # Sample data batch from dataframe
+    if sort_by == 'failures':
+        pass
+    elif sort_by == 'success':
+        pass
+    elif sort_by is None:
+        data_batch = env.data_batch
+    
     # Update simulator with the provided data batch
     env.swap_data_batch(data_batch)
 
@@ -32,11 +62,11 @@ def make_videos(data_batch, env, policy, device, zoom_radius, results_df):
         env=env, 
         policy=policy, 
         device=device, 
-        deterministic=False,
+        deterministic=deterministic,
         render_sim_state=True,
-        render_every_n_steps=3,
+        render_every_n_steps=render_every_n_steps,
         zoom_radius=zoom_radius,
-        results_df=results_df
+        results_df=df_results
     )
 
     return sim_state_frames
@@ -45,22 +75,8 @@ def make_videos(data_batch, env, policy, device, zoom_radius, results_df):
 if __name__ == "__main__":
     
     # Load configurations
-    setting_config = load_config(
-        "examples/experiments/eval/config/setting_config"
-    )
+    eval_config = load_config("examples/experiments/eval/config/eval_config")
     model_config = load_config("examples/experiments/eval/config/model_config")
-    
-    # Data loader
-    train_loader = SceneDataLoader(
-        root=setting_config.train_dir,
-        batch_size=100,
-        dataset_size=100,
-        sample_with_replacement=False,
-        shuffle=False
-    )
-
-    # Make environment
-    env = make_env(setting_config, train_loader)
     
     MODEL_TO_LOAD = model_config['models'][0].name
  
@@ -68,30 +84,26 @@ if __name__ == "__main__":
     policy = load_policy(
         path_to_cpt=model_config.models_path,
         model_name=MODEL_TO_LOAD,
-        device=setting_config.device,
+        device=eval_config.device,
     )
     
     logging.info(f"Loaded policy {MODEL_TO_LOAD}")
     
     # Load results dataframe
-    results_df = pd.read_csv("examples/experiments/eval/dataframes/model_PPO__R_100__01_10_17_06_33_696_003000.csv")
-    results_df_selected = results_df[results_df['dataset'] == 'train']
-
-    #pdb.set_trace()
-    
-    # TODO: Select scenes from results df
-
-    # Select data 
-    selected_batch_train = env.data_batch
+    df_res = pd.read_csv(f"examples/experiments/eval/dataframes/{MODEL_TO_LOAD}.csv")
+    df_res = df_res[df_res['dataset'] == 'train']
 
     # Rollout policy and make videos
     sim_state_frames_train = make_videos(
-        data_batch=selected_batch_train,
-        env=env,
-        policy=policy,
-        device=setting_config.device,
-        zoom_radius=100,
-        results_df=results_df_selected
+        df_results=df_res, 
+        policy=policy, 
+        eval_config=eval_config,
+        sort_by=None,
+        show_top_k=50,
+        device='cuda', 
+        zoom_radius=100, 
+        deterministic=False,
+        render_every_n_steps=3,
     )
 
     sim_state_arrays_train = {

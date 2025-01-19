@@ -303,6 +303,15 @@ def make_env(config, train_loader):
         lidar_obs=config.lidar_obs,
         disable_classic_obs=True if config.lidar_obs else False,
         obs_radius=config.obs_radius,
+        steer_actions=torch.round(
+            torch.linspace(
+                -torch.pi, torch.pi, config.num_steer_angle_bins
+            ),
+            decimals=3,
+        ),
+        accel_actions=torch.round(
+            torch.linspace(-4.0, 4.0, config.num_accel_bins), decimals=3
+        ),
     )
 
     env = GPUDriveTorchEnv(
@@ -318,111 +327,86 @@ def make_env(config, train_loader):
 if __name__ == "__main__":
 
     # Load configurations
-    setting_config = load_config(
-        "examples/experiments/eval/config/setting_config"
-    )
+    eval_config = load_config("examples/experiments/eval/config/eval_config")
     model_config = load_config("examples/experiments/eval/config/model_config")
 
     train_loader = SceneDataLoader(
-        root=setting_config.train_dir,
-        batch_size=5,
-        dataset_size=setting_config.num_worlds,
+        root=eval_config.train_dir,
+        batch_size=eval_config.num_worlds,
+        dataset_size=eval_config.num_worlds,
         sample_with_replacement=False,
     )
-
-    setting_config.device = "cpu"
     
-    env = make_env(setting_config, train_loader)
+    env = make_env(eval_config, train_loader)
 
-    policy = load_policy(
-        path_to_cpt='examples/experiments/eval/models',
-        model_name='model_PPO_S_5__01_16_18_07_00_802_001298',
-        device='cpu'
-    )
+    for model in model_config.models:
 
-    goal_achieved, collided, off_road, controlled, not_goal_nor_crashed, frames = rollout(
-        env=env, 
-        policy=policy, 
-        device='cpu', 
-        deterministic=True,
-        render_sim_state=True,
-        zoom_radius=200,
-    )
-        
+        logging.info(f"Evaluating model {model.name} \n")
 
-    # Make environment
-    #env = make_env(setting_config, train_loader)
-
-    # for model in model_config.models:
-
-    #     logging.info(f"Evaluating model {model.name} \n")
-
-    #     # Load policy
-    #     # policy = load_policy(
-    #     #     path_to_cpt=model_config.models_path,
-    #     #     model_name=model.name,
-    #     #     device='cpu',
-    #     #     env=env,
-    #     # )
+        # Load policy
+        # policy = load_policy(
+        #     path_to_cpt=model_config.models_path,
+        #     model_name=model.name,
+        #     device='cpu',
+        #     env=env,
+        # )
     
-    #     policy = load_policy(
-    #         path_to_cpt='examples/experiments/eval/models',
-    #         model_name='model_PPO_S_5__01_16_18_07_00_802_001298',
-    #         device='cpu'
-    #     )
+        policy = load_policy(
+            path_to_cpt=model_config.models_path,
+            model_name=model.name,
+            device=eval_config.device,
+        )
 
-    #     # Create dataloaders for train and test sets
-    #     train_loader = SceneDataLoader(
-    #         root=setting_config.train_dir,
-    #         batch_size=setting_config.num_worlds,
-    #         dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
-    #         sample_with_replacement=False,
-    #         shuffle=False,
-    #     )
+        # Create dataloaders for train and test sets
+        train_loader = SceneDataLoader(
+            root=eval_config.train_dir,
+            batch_size=eval_config.num_worlds,
+            dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
+            sample_with_replacement=False,
+            shuffle=False,
+        )
 
-    #     # test_loader = SceneDataLoader(
-    #     #     root=setting_config.test_dir,
-    #     #     batch_size=setting_config.num_worlds,
-    #     #     dataset_size=setting_config.test_dataset_size if model.name != "random_baseline" else 1000,
-    #     #     sample_with_replacement=False,
-    #     #     shuffle=True,
-    #     # )
+        # test_loader = SceneDataLoader(
+        #     root=eval_config.test_dir,
+        #     batch_size=eval_config.num_worlds,
+        #     dataset_size=eval_config.test_dataset_size if model.name != "random_baseline" else 1000,
+        #     sample_with_replacement=False,
+        #     shuffle=True,
+        # )
         
-    #     # Rollouts
-    #     #logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
+        # Rollouts
+        #logging.info(f'Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes')
 
-    #     # df_res_train = evaluate_policy(
-    #     #     env=env,
-    #     #     policy=policy,
-    #     #     data_loader=train_loader,
-    #     #     dataset_name="train",
-    #     #     deterministic=False,
-    #     #     render_sim_state=False,
-    #     #     device='cpu',
-    #     # )
+        df_res_train = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=train_loader,
+            dataset_name="train",
+            deterministic=False,
+            render_sim_state=False,
+        )
         
-        
+    
+        # df_res_test = evaluate_policy(
+        #     env=env,
+        #     policy=policy,
+        #     data_loader=test_loader,
+        #     dataset_name="test",
+        #     deterministic=False,
+        #     render_sim_state=False,
+        # )
 
-    #     # df_res_test = evaluate_policy(
-    #     #     env=env,
-    #     #     policy=policy,
-    #     #     data_loader=test_loader,
-    #     #     dataset_name="test",
-    #     #     deterministic=False,
-    #     #     render_sim_state=False,
-    #     # )
+        # Concatenate train/test results
+        df_res = df_res_train #pd.concat([df_res_train, df_res_test])
 
-    #     # Concatenate train/test results
-    #     df_res = df_res_train #pd.concat([df_res_train, df_res_test])
+        # Add metadata
+        df_res["model_name"] = model.name
+        df_res["train_dataset_size"] = model.train_dataset_size
 
-    #     # Add metadata
-    #     df_res["model_name"] = model.name
-    #     df_res["train_dataset_size"] = model.train_dataset_size
+        # Store
+        if not os.path.exists(eval_config.res_path):
+            os.makedirs(eval_config.res_path)
 
-    #     # Store
-    #     if not os.path.exists(setting_config.res_path):
-    #         os.makedirs(setting_config.res_path)
+        df_res.to_csv(f"{eval_config.res_path}/{model.name}.csv", index=False)
 
-    #     df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
-
-    #     logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
+        logging.info(f"Saved at {eval_config.res_path}/{model.name}.csv \n")
