@@ -91,11 +91,11 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         wandb=wandb,
         global_step=0,
         global_step_pad=0,
-        num_rollouts=0,
         resample_buffer=0,
         resample_counter=0,
         epoch=0,
         stats={},
+        infos=defaultdict(list),
         msg=msg,
         last_log_time=0,
         utilization=utilization,
@@ -105,20 +105,21 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
-    # Sample new batch of scenarios
-    if data.config.resample_scenes and data.resample_buffer >= data.config.resample_interval:
+    # Sample new batch of scenarios before start of rollout
+    if (
+        data.config.resample_scenes
+        and data.resample_buffer >= data.config.resample_interval
+    ):
         print(f"Resampling scenarios at global step {data.global_step}")
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
-    
-    # Rendering storage
+
     data.vecenv.clear_render_storage()
 
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
         policy = data.policy
-        infos = defaultdict(list)
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
 
     # Rollout loop
@@ -126,7 +127,15 @@ def evaluate(data):
 
         with profile.env:
             # Receive data from current timestep
-            obs, reward, terminal, truncated, info, env_id, mask = data.vecenv.recv()
+            (
+                obs,
+                reward,
+                terminal,
+                truncated,
+                info,
+                env_id,
+                mask,
+            ) = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
@@ -163,29 +172,48 @@ def evaluate(data):
             mask = torch.as_tensor(mask)
             obs_device = obs_device if config.cpu_offload else obs_device
 
-            experience.store(obs_device, value, actions, logprob, reward, terminal, env_id, mask)
+            experience.store(
+                obs_device,
+                value,
+                actions,
+                logprob,
+                reward,
+                terminal,
+                env_id,
+                mask,
+            )
 
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
-                    infos[k].append(v)
+                    data.infos[k].append(v)
 
     with profile.eval_misc:
         data.stats = {}
 
-        for k, v in infos.items():
-            try:
-                data.stats[k] = np.mean(v)
-                # Log variance for goal and collision metrics
-                if "goal" in k or "collision" in k or "offroad" in k:
-                    data.stats[f"{k}_std"] = np.std(v)
-            except:
-                continue
+        # Store the average across K done worlds across last N rollouts
+        # ensure we are logging an unbiased estimate of the performance
+        if (
+            len(data.infos["mean_episode_reward_per_agent"])
+            > data.config.log_window
+        ):
+            for k, v in data.infos.items():
+                try:
+                    data.stats[k] = np.mean(v)
 
-    data.num_rollouts += 1
+                    # Log variance for goal and collision metrics
+                    if "goal" in k or "collision" in k or "offroad" in k:
+                        data.stats[f"std_{k}"] = np.std(v)
+                except:
+                    continue
+
+            # Reset info dict
+            data.infos = defaultdict(list)
+
+    # Increment steps
     data.vecenv.global_step = data.global_step.copy()
-    data.vecenv.iters = data.num_rollouts
+    data.vecenv.iters += 1
 
-    return data.stats, infos
+    return data.stats, data.infos
 
 
 @pufferlib.utils.profile
@@ -336,11 +364,13 @@ def train(data):
                 data.msg,
             )
 
+            # fmt: off
             if (
                 data.wandb is not None
                 and data.global_step > 0
                 and time.perf_counter() - data.last_log_time > 3.0
             ):
+
                 data.last_log_time = time.perf_counter()
                 data.wandb.log(
                     {
@@ -348,17 +378,21 @@ def train(data):
                         "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
                         "performance/pad_agent_sps": profile.pad_agent_sps,
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
-                        "performance/iters": data.num_rollouts,
                         "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
-                        "train/learning_rate": data.optimizer.param_groups[0][
-                            "lr"
-                        ],
+                        "train/learning_rate": data.optimizer.param_groups[0]["lr"],
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
+
+            if bool(data.stats):
+                data.wandb.log({
+                    **{f"metrics/{k}": v for k, v in data.stats.items()},
+                })
+
+            # fmt: on
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
