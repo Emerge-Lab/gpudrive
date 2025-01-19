@@ -234,6 +234,9 @@ def run(
     collision_penalty_warmup: Annotated[Optional[int], typer.Option(help="Whether to use a warmup period for the collision penalties; 0 or 1")] = None,
     penalty_start_frac: Annotated[Optional[float], typer.Option(help="The fraction of the total timesteps to start applying penalties")] = None,
     warmup_steps: Annotated[Optional[int], typer.Option(help="The number of warmup steps for the penalties")] = None,
+    anneal_entropy: Annotated[Optional[int], typer.Option(help="Linearly anneal the entropy coefficient; 0 or 1")] = None,
+    anneal_lr: Annotated[Optional[int], typer.Option(help="Linearly anneal the lr rate; 0 or 1")] = None,
+    
     # Mode
     mode: Annotated[str, typer.Option(help="The mode to run; 'train' or 'sweep'")] = "train",
     
@@ -283,6 +286,8 @@ def run(
         "batch_size": batch_size,
         "minibatch_size": minibatch_size,
         "render": None if render is None else bool(render),
+        "anneal_entropy": None if anneal_entropy is None else bool(anneal_entropy),
+        "anneal_lr": None if anneal_lr is None else bool(anneal_lr),
         "gamma": gamma,
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,

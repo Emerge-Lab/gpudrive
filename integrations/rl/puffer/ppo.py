@@ -437,7 +437,7 @@ def train(data):
                 if bool(data.stats):
                     data.wandb.log({
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
-                    }
+                    })
                 # fmt: on
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
