@@ -25,8 +25,6 @@ from pygpudrive.visualize.color import (
     AGENT_COLOR_BY_STATE,
 )
 
-import pdb
-
 OUT_OF_BOUNDS = 1000
 
 
@@ -209,12 +207,16 @@ class MatplotlibVisualizer:
 
             if time_step is not None and not eval_mode:
                 # Plot rollout statistics
-                num_controlled = controlled.sum().item() 
+                num_controlled = controlled.sum().item()
                 num_off_road = is_offroad.sum().item()
                 num_collided = is_collided.sum().item()
-                off_road_rate = num_off_road / num_controlled if num_controlled > 0 else 0
-                collision_rate = num_collided / num_controlled if num_controlled > 0 else 0
-                
+                off_road_rate = (
+                    num_off_road / num_controlled if num_controlled > 0 else 0
+                )
+                collision_rate = (
+                    num_collided / num_controlled if num_controlled > 0 else 0
+                )
+
                 ax.text(
                     0.5,  # Horizontal center
                     0.95,  # Vertical location near the top
@@ -229,19 +231,21 @@ class MatplotlibVisualizer:
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
                 )
             else:
-                if eval_mode and results_df is not None: 
-      
-                    num_controlled = results_df.iloc[env_idx].controlled_agents_in_scene
+                if eval_mode and results_df is not None:
+
+                    num_controlled = results_df.iloc[
+                        env_idx
+                    ].controlled_agents_in_scene
                     off_road_rate = results_df.iloc[env_idx].off_road * 100
                     collision_rate = results_df.iloc[env_idx].collided * 100
                     goal_rate = results_df.iloc[env_idx].goal_achieved * 100
-                    other = results_df.iloc[env_idx].not_goal_nor_crashed * 100       
-                    
+                    other = results_df.iloc[env_idx].not_goal_nor_crashed * 100
+
                     ax.text(
                         0.5,  # Horizontal center
                         0.95,  # Vertical location near the top
-                        f"$N_c$ = {num_controlled}; " 
-                        f"OR: {off_road_rate:.1f}; " 
+                        f"t = {time_step} | $N_c$ = {num_controlled}; "
+                        f"OR: {off_road_rate:.1f}; "
                         f"CR: {collision_rate:.1f}; "
                         f"GR: {goal_rate:.1f}; "
                         f"Other: {other:.1f}",
@@ -250,7 +254,9 @@ class MatplotlibVisualizer:
                         transform=ax.transAxes,
                         fontsize=20 * marker_scale,
                         color="black",
-                        bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+                        bbox=dict(
+                            facecolor="white", edgecolor="none", alpha=0.9
+                        ),
                     )
 
             # Determine center point for zooming
@@ -268,7 +274,7 @@ class MatplotlibVisualizer:
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
-            
+
             # Remove ticks
             ax.set_xticks([])
             ax.set_yticks([])
