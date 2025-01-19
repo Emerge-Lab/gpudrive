@@ -105,31 +105,13 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
-    # Resample data logic
-    if data.config.resample_scenes:
-        if (
-            data.resample_counter < int(data.config.resample_limit)
-            and data.config.resample_criterion == "global_step"
-            and data.resample_buffer >= data.config.resample_interval
-        ):
-            print(
-                f"Resampling scenarios: {data.resample_counter + 1:,}"
-                + (
-                    f" / {data.config.resample_limit}"
-                    if data.config.resample_limit is not None
-                    else ""
-                )
-            )
-
-            # Sample new batch of scenarios
-            data.vecenv.resample_scenario_batch()
-            data.resample_buffer = 0
-
-            if (
-                data.config.resample_limit is not None
-            ):  # Increment counter only if there is a limit
-                data.resample_counter += 1
-
+    # Sample new batch of scenarios
+    if data.config.resample_scenes and data.resample_buffer >= data.config.resample_interval:
+        print(f"Resampling scenarios at global step {data.global_step}")
+        data.vecenv.resample_scenario_batch()
+        data.resample_buffer = 0
+    
+    # Rendering storage
     data.vecenv.clear_render_storage()
 
     config, profile, experience = data.config, data.profile, data.experience
@@ -144,7 +126,7 @@ def evaluate(data):
 
         with profile.env:
             # Receive data from current timestep
-            o, r, d, t, info, env_id, mask = data.vecenv.recv()
+            obs, reward, terminal, truncated, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
@@ -152,20 +134,20 @@ def evaluate(data):
             data.global_step_pad += data.vecenv.total_agents
             data.resample_buffer += sum(mask)
 
-            o = torch.as_tensor(o)
-            o_device = o.to(config.device)
-            r = torch.as_tensor(r)
-            d = torch.as_tensor(d)
+            obs = torch.as_tensor(obs)
+            obs_device = obs.to(config.device)
+            reward = torch.as_tensor(reward)
+            terminal = torch.as_tensor(terminal)
 
         with profile.eval_forward, torch.no_grad():
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
-                actions, logprob, _, value, (h, c) = policy(o_device, (h, c))
+                actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
             else:
-                actions, logprob, _, value = policy(o_device)
+                actions, logprob, _, value = policy(obs_device)
 
             if config.device == "cuda":
                 torch.cuda.synchronize()
@@ -179,9 +161,9 @@ def evaluate(data):
         with profile.eval_misc:
             value = value.flatten()
             mask = torch.as_tensor(mask)
-            o = o if config.cpu_offload else o_device
+            obs_device = obs_device if config.cpu_offload else obs_device
 
-            experience.store(o, value, actions, logprob, r, d, env_id, mask)
+            experience.store(obs_device, value, actions, logprob, reward, terminal, env_id, mask)
 
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):

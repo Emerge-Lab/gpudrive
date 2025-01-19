@@ -47,10 +47,8 @@ train:
 
   # # # Data sampling # # #
   resample_scenes: true
-  resample_criterion: "global_step"
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 1_000_000
-  resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   sample_with_replacement: true
   shuffle_dataset: false
 
