@@ -224,6 +224,7 @@ def train(data):
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
+    num_update_iters = config.update_epochs * experience.num_minibatches
     for epoch in range(config.update_epochs):
         lstm_state = None
         for mb in range(experience.num_minibatches):
@@ -312,20 +313,12 @@ def train(data):
                     torch.cuda.synchronize()
 
             with profile.train_misc:
-                losses.policy_loss += (
-                    pg_loss.item() / experience.num_minibatches
-                )
-                losses.value_loss += v_loss.item() / experience.num_minibatches
-                losses.entropy += (
-                    entropy_loss.item() / experience.num_minibatches
-                )
-                losses.old_approx_kl += (
-                    old_approx_kl.item() / experience.num_minibatches
-                )
-                losses.approx_kl += (
-                    approx_kl.item() / experience.num_minibatches
-                )
-                losses.clipfrac += clipfrac.item() / experience.num_minibatches
+                losses.policy_loss += pg_loss.item() / num_update_iters
+                losses.value_loss += v_loss.item() / num_update_iters
+                losses.entropy += entropy_loss.item() / num_update_iters
+                losses.old_approx_kl += old_approx_kl.item() / num_update_iters
+                losses.approx_kl += approx_kl.item() / num_update_iters
+                losses.clipfrac += clipfrac.item() / num_update_iters
 
         if config.target_kl is not None:
             if approx_kl > config.target_kl:
