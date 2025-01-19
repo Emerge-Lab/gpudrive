@@ -239,6 +239,17 @@ class PufferGPUDrive(PufferEnv):
         # (5) Set the mask to False for _agents_ that are terminated for the next step
         # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
+        
+        truncated = torch.logical_and(
+            ~terminal,
+            torch.logical_and(
+                ~self.offroad_in_episode.bool(),
+                torch.logical_and(
+                    ~self.collided_in_episode.bool(),
+                    ~self.env.get_infos().goal_achieved.bool(),
+                )
+            )
+        )
 
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
@@ -317,6 +328,8 @@ class PufferGPUDrive(PufferEnv):
             agent_speeds = (
                 ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
             )
+            
+            num_truncated = truncated[done_worlds, :][controlled_mask].sum().item()
 
             if num_finished_agents > 0:
                 # fmt: off
@@ -330,6 +343,9 @@ class PufferGPUDrive(PufferEnv):
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
                         "mean_agent_speed": agent_speeds.mean().item(),
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
+                        "num_truncated": num_truncated,
+                        "perc_truncated": num_truncated / num_finished_agents,
+                        "num_completed_episodes": len(done_worlds),
                     }
                 )
                 # fmt: on
@@ -352,6 +368,17 @@ class PufferGPUDrive(PufferEnv):
         self.observations = next_obs
         self.rewards = reward_controlled
         self.terminals = terminal
+        self.truncations = truncated[self.controlled_agent_mask]
+        
+        # Truncated is defined as not crashed nor goal achieved
+        self.truncations = torch.logical_and(
+            ~self.offroad_in_episode[self.controlled_agent_mask].bool(),
+            torch.logical_and(
+                ~self.collided_in_episode[self.controlled_agent_mask].bool(),
+                ~self.env.get_infos().goal_achieved[self.controlled_agent_mask].bool(),
+            )
+        )
+        
         return (
             self.observations,
             self.rewards,

@@ -193,12 +193,15 @@ def evaluate(data):
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
         if (
-            len(data.infos["mean_episode_reward_per_agent"])
+            sum(data.infos['num_completed_episodes'])
             > data.config.log_window
         ):
             for k, v in data.infos.items():
                 try:
-                    data.stats[k] = np.mean(v)
+                    if "num_completed_episodes" in k:
+                        data.stats[k] = np.sum(v)
+                    else:
+                        data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
                     if "goal" in k or "collision" in k or "offroad" in k:
