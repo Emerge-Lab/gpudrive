@@ -239,7 +239,7 @@ class PufferGPUDrive(PufferEnv):
         # (5) Set the mask to False for _agents_ that are terminated for the next step
         # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
-        
+
         truncated = torch.logical_and(
             ~terminal,
             torch.logical_and(
@@ -247,8 +247,8 @@ class PufferGPUDrive(PufferEnv):
                 torch.logical_and(
                     ~self.collided_in_episode.bool(),
                     ~self.env.get_infos().goal_achieved.bool(),
-                )
-            )
+                ),
+            ),
         )
 
         # Flatten
@@ -263,25 +263,7 @@ class PufferGPUDrive(PufferEnv):
                 for render_env_idx in range(
                     self.train_config.render_k_scenarios
                 ):
-                    if (
-                        render_env_idx in done_worlds
-                        and len(self.frames[render_env_idx]) > 0
-                    ):
-                        frames_array = np.array(self.frames[render_env_idx])
-                        self.wandb_obj.log(
-                            {
-                                f"vis/state/env_{render_env_idx}": wandb.Video(
-                                    np.moveaxis(frames_array, -1, 1),
-                                    fps=self.train_config.render_fps,
-                                    format=self.train_config.render_format,
-                                    caption=f"global step: {self.global_step:,}",
-                                )
-                            }
-                        )
-                        # Reset rendering storage
-                        self.frames[render_env_idx] = []
-                        self.rendering_in_progress[render_env_idx] = False
-                        self.was_rendered_in_rollout[render_env_idx] = True
+                    self.log_video_to_wandb(render_env_idx, done_worlds)
 
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
@@ -328,8 +310,10 @@ class PufferGPUDrive(PufferEnv):
             agent_speeds = (
                 ego_state.speed[done_worlds][controlled_mask].cpu().numpy()
             )
-            
-            num_truncated = truncated[done_worlds, :][controlled_mask].sum().item()
+
+            num_truncated = (
+                truncated[done_worlds, :][controlled_mask].sum().item()
+            )
 
             if num_finished_agents > 0:
                 # fmt: off
@@ -369,16 +353,18 @@ class PufferGPUDrive(PufferEnv):
         self.rewards = reward_controlled
         self.terminals = terminal
         self.truncations = truncated[self.controlled_agent_mask]
-        
+
         # Truncated is defined as not crashed nor goal achieved
         self.truncations = torch.logical_and(
             ~self.offroad_in_episode[self.controlled_agent_mask].bool(),
             torch.logical_and(
                 ~self.collided_in_episode[self.controlled_agent_mask].bool(),
-                ~self.env.get_infos().goal_achieved[self.controlled_agent_mask].bool(),
-            )
+                ~self.env.get_infos()
+                .goal_achieved[self.controlled_agent_mask]
+                .bool(),
+            ),
         )
-        
+
         return (
             self.observations,
             self.rewards,
@@ -465,6 +451,27 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+
+    def log_video_to_wandb(self, render_env_idx, done_worlds):
+        if (
+            render_env_idx in done_worlds
+            and len(self.frames[render_env_idx]) > 0
+        ):
+            frames_array = np.array(self.frames[render_env_idx])
+            self.wandb_obj.log(
+                {
+                    f"vis/state/env_{render_env_idx}": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),
+                        fps=self.train_config.render_fps,
+                        format=self.train_config.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                }
+            )
+            # Reset rendering storage
+            self.frames[render_env_idx] = []
+            self.rendering_in_progress[render_env_idx] = False
+            self.was_rendered_in_rollout[render_env_idx] = True
 
     def log_data_coverage(self):
         """Data coverage statistics."""
