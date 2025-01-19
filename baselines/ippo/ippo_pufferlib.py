@@ -172,6 +172,7 @@ def run(
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
+    anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
     resample_interval: Annotated[Optional[int], typer.Option(help="The interval for resampling scenes")] = None,
     resample_dataset_size: Annotated[Optional[int], typer.Option(help="The size of the dataset to sample from")] = None,
@@ -214,6 +215,7 @@ def run(
     train_config = {
         "seed": seed,
         "learning_rate": learning_rate,
+        "anneal_lr": None if anneal_lr is None else bool(anneal_lr),
         "resample_scenes": None
         if resample_scenes is None
         else bool(resample_scenes),
