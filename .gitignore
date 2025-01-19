@@ -245,6 +245,9 @@ pyrightconfig.json
 # Logs
 examples/experiments/scripts/logs/*
 
+# Sbatch scripts
+*.sh
+
 # Videos
 videos/
 output_videos_larger_dataset/

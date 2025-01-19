@@ -7,8 +7,8 @@ data_dir: "data/processed/training"
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
-  max_controlled_agents: 128 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  k_unique_scenes: 2 # Number of unique scenes to sample from
+  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -27,8 +27,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: ""
-  project: "paper_1_self_play"
-  group: "verify"
+  project: "self_play_rl_safe"
+  group: "small_experiments"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
