@@ -240,14 +240,12 @@ class PufferGPUDrive(PufferEnv):
         # Shape: (num_worlds, max_cont_agents_per_env)
         self.live_agent_mask[terminal] = 0
 
+        # Truncated is defined as not crashed nor goal achieved
         truncated = torch.logical_and(
-            ~terminal,
+            ~self.offroad_in_episode.bool(),
             torch.logical_and(
-                ~self.offroad_in_episode.bool(),
-                torch.logical_and(
-                    ~self.collided_in_episode.bool(),
-                    ~self.env.get_infos().goal_achieved.bool(),
-                ),
+                ~self.collided_in_episode.bool(),
+                ~self.env.get_infos().goal_achieved.bool(),
             ),
         )
 
@@ -353,17 +351,6 @@ class PufferGPUDrive(PufferEnv):
         self.rewards = reward_controlled
         self.terminals = terminal
         self.truncations = truncated[self.controlled_agent_mask]
-
-        # Truncated is defined as not crashed nor goal achieved
-        self.truncations = torch.logical_and(
-            ~self.offroad_in_episode[self.controlled_agent_mask].bool(),
-            torch.logical_and(
-                ~self.collided_in_episode[self.controlled_agent_mask].bool(),
-                ~self.env.get_infos()
-                .goal_achieved[self.controlled_agent_mask]
-                .bool(),
-            ),
-        )
 
         return (
             self.observations,
