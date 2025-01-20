@@ -45,6 +45,7 @@ def make_videos(
     # Make environment
     train_loader = SceneDataLoader(
         root=base_data_path,
+        root=base_data_path,
         batch_size=show_top_k,
         dataset_size=show_top_k,
         sample_with_replacement=False,
@@ -120,6 +121,7 @@ if __name__ == "__main__":
         render_every_n_steps=3,
     )
 
+    sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
     sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
     videos_dir = Path(f"videos/{MODEL_TO_LOAD}")
     videos_dir.mkdir(parents=True, exist_ok=True)

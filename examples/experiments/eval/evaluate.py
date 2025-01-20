@@ -70,7 +70,6 @@ def load_policy(path_to_cpt, model_name, device, env=None):
 
         return policy.eval()
 
-
 def rollout(
     env,
     policy,
@@ -122,6 +121,9 @@ def rollout(
     logging.info(
         f"Removed {bugged_agent_mask.sum()} bugged agents; {(bugged_agent_mask.sum()/env.cont_agent_mask.sum())*100:.2f}% of controlled agents \n"
     )
+    
+    logging.info(f"Removed {bugged_agent_mask.sum()} bugged agents; {(bugged_agent_mask.sum()/env.cont_agent_mask.sum())*100:.2f}% of controlled agents \n")
+    
 
     controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
 
