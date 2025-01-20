@@ -238,12 +238,14 @@ class SB3MultiAgentEnv(VecEnv):
         print(
             f"Re-initializing sim with {len(set(dataset))} {self.exp_config.resample_mode} unique scenes.\n"
         )
-        self._env.reinit_scenarios(dataset)
+        self._env.swap_data_batch(dataset)
 
         # Update controlled agent mask
         self.controlled_agent_mask = self._env.cont_agent_mask.clone()
         self.max_agent_count = self._env.max_agent_count
-        self.num_valid_controlled_agents_across_worlds = self._env.num_valid_controlled_agents_across_worlds
+        self.num_valid_controlled_agents_across_worlds = (
+            self._env.num_valid_controlled_agents_across_worlds
+        )
         self.num_envs = self.controlled_agent_mask.sum().item()
 
     def _update_info_dict(self, info, indices) -> None:

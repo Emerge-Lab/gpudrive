@@ -86,23 +86,23 @@ norm_obs: bool = True  # Normalizes observations if true
 lidar_obs: bool = True # Use LiDAR
 ```
 
-| Observation Feature                     | Shape                                                  | Description                                                                                                                 | Features                                                                                                                                                                                                                   |
-| --------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Observation Feature                     | Shape                                                  | Description                                                                                                                 | Features                                                                                                                                                                                                                             |
+| --------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **ego_state** 🚘                  | `(max_num_agents_in_scene, 7)`                       | Basic ego information.                                                                                                      | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise), agent id                                                                                                    |
 | **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_agents_in_scene, max_num_objects - 1, 11)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius. | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)`, agent id |
-| **road_map_obs** 🛣️ 🛑          | `(max_num_agents_in_scene, top_k_road_points, 13)`   | Information about the road graph  and other static road objects.                                                            | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)`            |
-| **lidar_obs**                     | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)` | LiDAR rays                                                                                                                  | The number of LiDAR points can be set by changing `numLidarSamples` in `src/consts.hpp`. The default is 30 points.                                                                                                     |
+| **road_map_obs** 🛣️ 🛑          | `(max_num_agents_in_scene, top_k_road_points, 13)`   | Information about the road graph  and other static road objects.                                                            | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)`                      |
+| **lidar_obs**                     | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)` | LiDAR rays                                                                                                                  | The number of LiDAR points can be set by changing `numLidarSamples` in `src/consts.hpp`. The default is 30 points.                                                                                                               |
 
 ---
 
 ### Data structures
 
 See the observation and roadgraph data structures at:
+
 - **Agent observations**: [`pygpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/observation.py)
 - **Roadgraph**: [`pygpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/roadgraph.py).
 
 These datastructures are used in `env_torch.py`.
-
 
 ### Note about LiDAR
 
@@ -139,14 +139,12 @@ The `SceneConfig` dataclass is used to configure how scenes are selected from a 
 
 ### Resampling traffic scenarios
 
-The `reinit_scenarios()` method in `pygpudrive/env/base_env.py` reinitializes the simulator with new traffic scenarios as follows:
+The `swap_data_batch()` method in `pygpudrive/env/torch_env.py` reinitializes the simulator with new traffic scenarios as follows:
 
 1. **Scene re-initialization:**
    This function updates the simulation maps by calling `self.sim.set_maps(dataset)`, replacing the current scenes with those provided `dataset`, which should be a list with paths to traffic scenarios.
-
 2. **Controlled agent mask re-nitialization:**
    It reinitializes the controlled agents' mask using `self.get_controlled_agents_mask()`, determining which agents are user-controlled (this will change based on the specific traffic scenes used).
-
 3. **Agent count update:**
    The function updates `self.max_agent_count` to reflect the number of controlled agents and recomputes `self.num_valid_controlled_agents_across_worlds`, indicating the total active controlled agents across all scenarios.
 

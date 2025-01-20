@@ -6,35 +6,6 @@ import pufferlib.models
 import numpy as np
 from pygpudrive.env import constants
 
-
-def make_video(data, env_idx=0):
-    """Make a video of the agent's trajectory."""
-    frames = []
-    env = data.vecenv
-    policy = data.policy
-
-    obs, _ = env.reset()
-
-    with torch.no_grad():
-        for _ in range(env.env.episode_len):
-
-            # Get actions
-            action, _, _, _ = policy(obs)
-            action = action.cpu().numpy()
-
-            # Step
-            obs, _, terminated, truncated, _ = env.step(action)
-
-            # Render
-            frame = env.render(env_idx)
-            frames.append(frame)
-
-            if terminated.all() or truncated.all():
-                break
-
-    return np.array(frames)
-
-
 def unpack_obs(obs_flat, env):
     """
     Unpack the flattened observation into the ego state and visible state.
@@ -125,7 +96,6 @@ class Policy(nn.Module):
             observations, self.env
         )
         ego_embed = self.ego_embed(ego_state)
-
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)

@@ -46,7 +46,6 @@ def is_valid_json_structure(file_path):
         # If an error occurs (invalid JSON or IO error), mark as invalid
         return False
 
-
 def delete_corrupted_file(file_path):
     """Deletes the corrupted file."""
     try:
@@ -57,7 +56,11 @@ def delete_corrupted_file(file_path):
 
 
 if __name__ == "__main__":
+    
+    # 1: Download the dataset
+    #snapshot_download(repo_id="EMERGE-lab/GPUDrive", repo_type="dataset", local_dir="data/processed")
 
+    # 2: Check the structure of the JSON files and delete any corrupted files
     data_dir = "data/processed/training"
 
     total_scenes = 0

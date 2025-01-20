@@ -50,6 +50,10 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     atn_shape = vecenv.single_action_space.shape
     total_agents = vecenv.num_agents
 
+    # Log initial data coverage
+    vecenv.wandb_obj = wandb
+    vecenv.log_data_coverage()
+
     lstm = policy.lstm if hasattr(policy, "lstm") else None
 
     # Rollout buffer
@@ -92,6 +96,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         resample_counter=0,
         epoch=0,
         stats={},
+        infos=defaultdict(list),
         msg=msg,
         last_log_time=0,
         utilization=utilization,
@@ -101,6 +106,33 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 @pufferlib.utils.profile
 def evaluate(data):
 
+    if data.config.collision_penalty_warmup:
+        warmup_frac = min(
+            1.0, data.global_step / data.config.total_timesteps
+        )  # Clamp between 0 and 1
+
+        # Warmup period where penalties are initially zero
+        if (
+            warmup_frac < data.config.penalty_start_frac
+        ):  # Zero penalties during initial fraction
+            collision_weight = 0.0
+            off_road_weight = 0.0
+        else:
+            # Linearly increase penalties after the start fraction
+            effective_warmup_frac = (
+                warmup_frac - data.config.penalty_start_frac
+            ) / (1.0 - data.config.penalty_start_frac)
+            collision_weight = (
+                effective_warmup_frac * data.config.collision_weight
+            )
+            off_road_weight = (
+                effective_warmup_frac * data.config.off_road_weight
+            )
+
+        # Set in env for get_rewards() function
+        data.vecenv.collision_weight = collision_weight
+        data.vecenv.off_road_weight = off_road_weight
+
     # Resample data logic
     if data.config.resample_scenes:
         if (
@@ -108,24 +140,31 @@ def evaluate(data):
             and data.config.resample_criterion == "global_step"
             and data.resample_buffer >= data.config.resample_interval
         ):
-            print(f"Resampling scenarios: {data.resample_counter + 1:,}" + 
-                (f" / {data.config.resample_limit}" if data.config.resample_limit is not None else ""))
-            
+            print(
+                f"Resampling scenarios: {data.resample_counter + 1:,}"
+                + (
+                    f" / {data.config.resample_limit}"
+                    if data.config.resample_limit is not None
+                    else ""
+                )
+            )
+
             # Sample new batch of scenarios
             data.vecenv.resample_scenario_batch()
             data.resample_buffer = 0
-            
-            if data.config.resample_limit is not None:  # Increment counter only if there is a limit
+
+            if (
+                data.config.resample_limit is not None
+            ):  # Increment counter only if there is a limit
                 data.resample_counter += 1
 
-    data.vecenv.wandb_obj = data.wandb
     data.vecenv.clear_render_storage()
-    
+
     config, profile, experience = data.config, data.profile, data.experience
 
     with profile.eval_misc:
         policy = data.policy
-        infos = defaultdict(list)
+        data.completed_episodes_in_rollout = 0
         lstm_h, lstm_c = experience.lstm_h, experience.lstm_c
 
     # Rollout loop
@@ -133,7 +172,15 @@ def evaluate(data):
 
         with profile.env:
             # Receive data from current timestep
-            o, r, d, t, info, env_id, mask = data.vecenv.recv()
+            (
+                obs,
+                reward,
+                terminated,
+                truncated,
+                info,
+                env_id,
+                mask,
+            ) = data.vecenv.recv()
             env_id = env_id.tolist()
 
         with profile.eval_misc:
@@ -141,20 +188,20 @@ def evaluate(data):
             data.global_step_pad += data.vecenv.total_agents
             data.resample_buffer += sum(mask)
 
-            o = torch.as_tensor(o)
-            o_device = o.to(config.device)
-            r = torch.as_tensor(r)
-            d = torch.as_tensor(d)
+            obs = torch.as_tensor(obs)
+            obs_device = obs.to(config.device)
+            reward = torch.as_tensor(reward)
+            terminated = torch.as_tensor(terminated)
 
         with profile.eval_forward, torch.no_grad():
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
-                actions, logprob, _, value, (h, c) = policy(o_device, (h, c))
+                actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
             else:
-                actions, logprob, _, value = policy(o_device)
+                actions, logprob, _, value = policy(obs_device)
 
             if config.device == "cuda":
                 torch.cuda.synchronize()
@@ -168,31 +215,45 @@ def evaluate(data):
         with profile.eval_misc:
             value = value.flatten()
             mask = torch.as_tensor(mask)
-            o = o if config.cpu_offload else o_device
+            obs = obs if config.cpu_offload else obs_device
 
-            experience.store(o, value, actions, logprob, r, d, env_id, mask)
+            experience.store(
+                obs, value, actions, logprob, reward, terminated, env_id, mask
+            )
 
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
-                    infos[k].append(v)
+                    data.infos[k].append(v)
+
+            # Track number of envs done in this rollout
+            data.completed_episodes_in_rollout += len(info)
 
     with profile.eval_misc:
         data.stats = {}
 
-        for k, v in infos.items():
-            try:
-                data.stats[k] = np.mean(v)
-                # Log variance for goal and collision metrics
-                if "goal" in k or "collision" in k or "offroad" in k:
-                    data.stats[f"{k}_std"] = np.std(v)
-            except:
-                continue
+        # Log the average across all K done worlds across last N rollouts
+        if (
+            len(data.infos["mean_episode_reward_per_agent"])
+            > data.config.log_window
+        ):
+            for k, v in data.infos.items():
+                try:
+                    data.stats[k] = np.mean(v)
+
+                    # Log variance for goal and collision metrics
+                    if "goal" in k or "collision" in k or "offroad" in k:
+                        data.stats[f"std_{k}"] = np.std(v)
+                except:
+                    continue
+
+            # Reset info dict
+            data.infos = defaultdict(list)
 
     data.num_rollouts += 1
     data.vecenv.global_step = data.global_step.copy()
     data.vecenv.iters = data.num_rollouts
 
-    return data.stats, infos
+    return data.stats, data.infos, data.completed_episodes_in_rollout
 
 
 @pufferlib.utils.profile
@@ -200,6 +261,7 @@ def train(data):
     config, profile, experience = data.config, data.profile, data.experience
     data.losses = make_losses()
     losses = data.losses
+    data.enow = config.ent_coef
 
     with profile.train_misc:
         idxs = experience.sort_training_data()
@@ -213,6 +275,7 @@ def train(data):
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
+    num_update_iters = config.update_epochs * experience.num_minibatches
     for epoch in range(config.update_epochs):
         lstm_state = None
         for mb in range(experience.num_minibatches):
@@ -286,7 +349,7 @@ def train(data):
                 entropy_loss = entropy.mean()
                 loss = (
                     pg_loss
-                    - config.ent_coef * entropy_loss
+                    - data.enow * entropy_loss
                     + v_loss * config.vf_coef
                 )
 
@@ -301,20 +364,12 @@ def train(data):
                     torch.cuda.synchronize()
 
             with profile.train_misc:
-                losses.policy_loss += (
-                    pg_loss.item() / experience.num_minibatches
-                )
-                losses.value_loss += v_loss.item() / experience.num_minibatches
-                losses.entropy += (
-                    entropy_loss.item() / experience.num_minibatches
-                )
-                losses.old_approx_kl += (
-                    old_approx_kl.item() / experience.num_minibatches
-                )
-                losses.approx_kl += (
-                    approx_kl.item() / experience.num_minibatches
-                )
-                losses.clipfrac += clipfrac.item() / experience.num_minibatches
+                losses.policy_loss += pg_loss.item() / num_update_iters
+                losses.value_loss += v_loss.item() / num_update_iters
+                losses.entropy += entropy_loss.item() / num_update_iters
+                losses.old_approx_kl += old_approx_kl.item() / num_update_iters
+                losses.approx_kl += approx_kl.item() / num_update_iters
+                losses.clipfrac += clipfrac.item() / num_update_iters
 
         if config.target_kl is not None:
             if approx_kl > config.target_kl:
@@ -325,6 +380,9 @@ def train(data):
             frac = 1.0 - data.global_step / config.total_timesteps
             lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
+        if config.anneal_entropy:
+            frac = 1.0 - data.global_step / config.total_timesteps
+            data.enow = config.ent_coef * frac
 
         y_pred = experience.values_np
         y_true = experience.returns_np
@@ -355,6 +413,7 @@ def train(data):
                 and data.global_step > 0
                 and time.perf_counter() - data.last_log_time > 3.0
             ):
+                # fmt: off
                 data.last_log_time = time.perf_counter()
                 data.wandb.log(
                     {
@@ -363,24 +422,30 @@ def train(data):
                         "performance/pad_agent_sps": profile.pad_agent_sps,
                         "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
                         "performance/iters": data.num_rollouts,
-                        "global_step": data.global_step,
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
-                        "train/learning_rate": data.optimizer.param_groups[0][
-                            "lr"
-                        ],
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        "global_step": data.global_step,
+                        "train/learning_rate": data.optimizer.param_groups[0]["lr"],
+                        "train/ent_coef": data.enow,
+                        "train/collision_weight": data.vecenv.collision_weight,
+                        "train/off_road_weight": data.vecenv.off_road_weight,
+                        "metrics/completed_episodes_in_rollout": data.completed_episodes_in_rollout,
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
 
+                if bool(data.stats):
+                    data.wandb.log({
+                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                    })
+                # fmt: on
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
             data.msg = f"Checkpoint saved at update {data.epoch}"
 
 
 def close(data):
-    data.vecenv.close()
+    # data.vecenv.close()
     data.utilization.stop()
     config = data.config
     if data.wandb is not None:
@@ -661,28 +726,48 @@ class Utilization(Thread):
         self.stopped = True
 
 
-def save_checkpoint(data):
+def save_checkpoint(data, save_checkpoint_to_wandb=True):
 
     config = data.config
     path = os.path.join(config.checkpoint_path, config.exp_id)
+
     if not os.path.exists(path):
         os.makedirs(path)
 
-    model_name = f"model_{data.epoch:06d}.pt"
+    model_name = f"model_{config.exp_id}_{data.epoch:06d}.pt"
     model_path = os.path.join(path, model_name)
-    torch.save(data.uncompiled_policy.state_dict(), model_path)
 
+    # Save training state
     state = {
+        "parameters": data.uncompiled_policy.state_dict(),
         "optimizer_state_dict": data.optimizer.state_dict(),
         "global_step": data.global_step,
         "agent_step": data.global_step,
         "update": data.epoch,
         "model_name": model_name,
+        "model_class": data.uncompiled_policy.__class__.__name__,
+        "model_arch": config.network,
+        "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
+        "num_params": config.network["num_parameters"],
     }
-    state_path = os.path.join(path, "trainer_state.pt")
-    torch.save(state, state_path + ".tmp")
-    os.rename(state_path + ".tmp", state_path)
+
+    torch.save(state, model_path)
+    if save_checkpoint_to_wandb and data.wandb is not None:
+
+        data.wandb.save(model_path)
+
+        data.wandb.config.update(
+            {
+                "network_class": data.uncompiled_policy.__class__.__name__,
+                "network_arch": config.network,
+                "exp_id": config.exp_id,
+            }
+        )
+
+        # Optionally log the optimizer state path
+        data.wandb.save(model_path)
+
     return model_path
 
 

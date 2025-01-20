@@ -243,25 +243,33 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "rewards_sweep"
+    group = "collision_behavior_ignore_0118"
 
     fields = {
-        "time_h": 5,  # Max time per job (job will finish if run is done before)
+        "time_h": 24,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
-        "max_sim_jobs": 25,  # Max jobs at the same time
-        "memory": 50,
+        "max_sim_jobs": 30,  # Max jobs at the same time
+        "memory": 70,
         "job_name": group,
     }
 
     hyperparams = {
         "group": [group],  # Group name
-        "num_worlds": [500],
-        "k_unique_scenes": [500],  # Sample in batches of 500
-        "seed": [42, 0],
-        "total_timesteps": [1_000_000],
-        "collision_weight": [-0.075, -0.1, -0.5, -1.0],
-        "off_road_weight": [-0.075, -0.1, -0.5, -1.0],
-        "resample_dataset_size": [1000, 5000, 10_000],
+        "num_worlds": [500], 
+        "resample_scenes": [1], # Yes/no
+        "k_unique_scenes": [500], # If not resample, this is the dataset size
+        "resample_interval": [2_000_000],
+        "resample_dataset_size": [1000, 10_000],
+        #"collision_behavior": ["ignore"], # Options: ignore, remove
+        "collision_weight": [0.5],
+        "off_road_weight": [0.5],
+        "ent_coef": [0.0001, 0.001],
+        "total_timesteps": [3_000_000_000],
+        "batch_size": [131_072, 65_536],
+        "minibatch_size": [16_384],
+        "update_epochs": [1, 2],
+        "anneal_lr": [0, 1],
+        "collision_penalty_warmup": [0],
     }
 
     save_script(

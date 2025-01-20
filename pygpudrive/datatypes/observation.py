@@ -1,9 +1,8 @@
 import torch
 from dataclasses import dataclass
 from pygpudrive.env import constants
-from pygpudrive.utils.geometry import normalize_min_max
+from pygpudrive.utils.geometry import normalize_min_max, normalize_min_max_inplace
 import gpudrive
-
 
 class LocalEgoState:
     """A class to represent the ego state of the agent in relative coordinates.
@@ -23,14 +22,17 @@ class LocalEgoState:
 
     def __init__(self, self_obs_tensor: torch.Tensor):
         """Initializes the ego state with an observation tensor."""
-        self.speed = self_obs_tensor[:, :, 0]
-        self.vehicle_length = self_obs_tensor[:, :, 1]
-        self.vehicle_width = self_obs_tensor[:, :, 2]
-        self.vehicle_height = self_obs_tensor[:, :, 3]
-        self.rel_goal_x = self_obs_tensor[:, :, 4]
-        self.rel_goal_y = self_obs_tensor[:, :, 5]
-        self.is_collided = self_obs_tensor[:, :, 6]
-        self.id = self_obs_tensor[:, :, 7]
+        self.data = self_obs_tensor[:, :7]
+        '''
+        self.speed = self_obs_tensor[:, 0]
+        self.vehicle_length = self_obs_tensor[:, 1]
+        self.vehicle_width = self_obs_tensor[:, 2]
+        self.vehicle_height = self_obs_tensor[:, 3]
+        self.rel_goal_x = self_obs_tensor[:, 4]
+        self.rel_goal_y = self_obs_tensor[:, 5]
+        self.is_collided = self_obs_tensor[:, 6]
+        self.id = self_obs_tensor[:, 7]
+        '''
 
     @classmethod
     def from_tensor(
@@ -38,15 +40,36 @@ class LocalEgoState:
         self_obs_tensor: gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
+        mask=None
     ):
         """Creates an LocalEgoState from the agent_observation_tensor."""
         if backend == "torch":
-            return cls(self_obs_tensor.to_torch().clone().to(device))
+            obj = cls(self_obs_tensor.to_torch()[mask].to(device))
+            obj.norm = torch.Tensor([
+                constants.MAX_SPEED,
+                constants.MAX_VEH_LEN,
+                constants.MAX_VEH_WIDTH,
+                constants.MAX_VEH_HEIGHT
+            ]).to(device)
+            return obj
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
     def normalize(self):
         """Normalizes the ego state to be between -1 and 1."""
+        self.data[:, :4] /= self.norm
+        normalize_min_max_inplace(
+            self.data[:, 4],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+        normalize_min_max_inplace(
+            self.data[:, 5],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+ 
+        '''
         self.speed = self.speed / constants.MAX_SPEED
         self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
         self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
@@ -63,6 +86,7 @@ class LocalEgoState:
         )
         self.is_collided = self.is_collided
         self.id = self.id
+        '''
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -148,15 +172,18 @@ class PartnerObs:
 
     def __init__(self, partner_obs_tensor: torch.Tensor):
         """Initializes the partner observation from a tensor."""
-        self.speed = partner_obs_tensor[:, :, :, 0].unsqueeze(-1)
-        self.rel_pos_x = partner_obs_tensor[:, :, :, 1].unsqueeze(-1)
-        self.rel_pos_y = partner_obs_tensor[:, :, :, 2].unsqueeze(-1)
-        self.orientation = partner_obs_tensor[:, :, :, 3].unsqueeze(-1)
-        self.vehicle_length = partner_obs_tensor[:, :, :, 4].unsqueeze(-1)
-        self.vehicle_width = partner_obs_tensor[:, :, :, 5].unsqueeze(-1)
-        self.vehicle_height = partner_obs_tensor[:, :, :, 6].unsqueeze(-1)        
-        self.agent_type = partner_obs_tensor[:, :, :, 7].unsqueeze(-1)
-        self.ids = partner_obs_tensor[:, :, :, 8].unsqueeze(-1)
+        self.data = partner_obs_tensor[:, :, :7]
+        '''
+        self.speed = partner_obs_tensor[:, :, 0].unsqueeze(-1)
+        self.rel_pos_x = partner_obs_tensor[:, :, 1].unsqueeze(-1)
+        self.rel_pos_y = partner_obs_tensor[:, :, 2].unsqueeze(-1)
+        self.orientation = partner_obs_tensor[:, :, 3].unsqueeze(-1)
+        self.vehicle_length = partner_obs_tensor[:, :, 4].unsqueeze(-1)
+        self.vehicle_width = partner_obs_tensor[:, :, 5].unsqueeze(-1)
+        self.vehicle_height = partner_obs_tensor[:, :, 6].unsqueeze(-1)        
+        self.agent_type = partner_obs_tensor[:, :, 7].unsqueeze(-1)
+        self.ids = partner_obs_tensor[:, :, 8].unsqueeze(-1)
+        '''
 
     @classmethod
     def from_tensor(
@@ -164,32 +191,44 @@ class PartnerObs:
         partner_obs_tensor: gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
+        mask=None,
     ):
         """Creates an PartnerObs from a tensor."""
         if backend == "torch":
-            return cls(partner_obs_tensor.to_torch().clone().to(device))
+            obj = cls(partner_obs_tensor.to_torch()[mask].to(device))
+            obj.norm = torch.Tensor([
+                constants.MAX_ORIENTATION_RAD,
+                constants.MAX_VEH_LEN,
+                constants.MAX_VEH_WIDTH,
+                constants.MAX_VEH_HEIGHT
+            ]).to(device)
+            return obj
+ 
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
     def normalize(self):
         """Normalizes the partner observation."""
-        self.speed = self.speed / constants.MAX_SPEED
-        self.rel_pos_x = normalize_min_max(
-            tensor=self.rel_pos_x,
+        self.data[:, :, 0] /= constants.MAX_SPEED
+        normalize_min_max_inplace(
+            tensor=self.data[:, :, 1],
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
-        self.rel_pos_y = normalize_min_max(
-            tensor=self.rel_pos_y,
+        normalize_min_max_inplace(
+            tensor=self.data[:, :, 2],
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
+        self.data[:, :, 3:7] /= self.norm
+        '''
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
         self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
         self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
         self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
         self.agent_type = self.agent_type.long()
         self.ids = self.ids
+        '''
 
     def one_hot_encode_agent_types(self):
         """One-hot encodes the agent types. This operation increases the

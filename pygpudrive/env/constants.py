@@ -5,10 +5,12 @@ import numpy as np
 # Observation space constants
 MAX_SPEED = 100
 MAX_VEH_LEN = 30
-MAX_VEH_WIDTH = 10
-MAX_VEH_HEIGHT = 3
-MIN_REL_GOAL_COORD = -1000
-MAX_REL_GOAL_COORD = 1000
+MAX_VEH_WIDTH = 15
+MAX_VEH_HEIGHT = 5
+MIN_REL_GOAL_COORD = (
+    -10_000
+)  # Note: (1000 or 100 should be enough, may indicate a bug or these are just from dead controlled agents)
+MAX_REL_GOAL_COORD = 10_000
 MIN_REL_AGENT_POS = -1000
 MAX_REL_AGENT_POS = 1000
 MAX_ORIENTATION_RAD = 2 * np.pi
@@ -21,5 +23,5 @@ MAX_ROAD_SCALE = 100
 
 # Feature shape constants
 EGO_FEAT_DIM = 6
-PARTNER_FEAT_DIM = 6  # 10
+PARTNER_FEAT_DIM = 6
 ROAD_GRAPH_FEAT_DIM = 13

@@ -30,6 +30,10 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
 
+    # Maximum number of controlled agents in the scene
+    max_controlled_agents: int = gpudrive.kMaxAgentCount
+    num_worlds: int = 1  # Number of worlds in the environment
+
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
     # and partner_obs are invalid. This makes the sim 2x faster
     disable_classic_obs: bool = False  # Disable classic observations
@@ -56,10 +60,10 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 42), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 31), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 16), decimals=3
+        torch.linspace(-4.0, 4.0, 21), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 

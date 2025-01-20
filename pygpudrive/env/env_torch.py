@@ -1,4 +1,4 @@
-"""Troch gymnasium environment that interfaces with the GPU Drive simulator."""
+"""Base Gym Environment that interfaces with the GPU Drive simulator."""
 
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
@@ -6,7 +6,7 @@ import torch
 from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-
+import gymnasium
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -19,6 +19,7 @@ from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 from pygpudrive.env.dataset import SceneDataLoader
+import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -49,7 +50,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize the iterator once
         self.data_iterator = iter(self.data_loader)
 
-        # Get the initial data batch
+        # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
 
         # Initialize simulator
@@ -64,9 +65,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Setup action and observation spaces
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
+        # self.single_observation_space = Box(
+        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
+        # )
+        self.single_observation_space = gymnasium.spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.observation_space.shape[-1],),
+            dtype=np.float32,
+        )
+
         self._setup_action_space(action_type)
+        self.num_agents = self.cont_agent_mask.sum().item()
+        self.single_action_space = self.action_space
+        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
+        self.observation_space = pufferlib.spaces.joint_space(
+            self.single_observation_space, self.num_agents
+        )
+
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 
@@ -81,10 +101,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def reset(self):
+    def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
-        return self.get_obs()
+        return self.get_obs(mask)
 
     def get_dones(self):
         return (
@@ -104,9 +124,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_rewards(
         self,
-        collision_weight=-0.005,
+        collision_weight=0.005,
         goal_achieved_weight=1.0,
-        off_road_weight=-0.005,
+        off_road_weight=0.005,
         world_time_steps=None,
         log_distance_weight=0.01,
     ):
@@ -132,9 +152,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             goal_achieved = info_tensor[:, :, 3].to(torch.float)
 
             weighted_rewards = (
-                collision_weight * collided
+                -collision_weight * collided
                 + goal_achieved_weight * goal_achieved
-                + off_road_weight * off_road
+                - off_road_weight * off_road
             )
 
             return weighted_rewards
@@ -337,149 +357,123 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self) -> torch.Tensor:
+    def _get_ego_state(self, mask) -> torch.Tensor:
         """Get the ego state.
         Returns:
             Shape: (num_worlds, max_agents, num_features)
         """
-        if self.config.ego_state:
-            ego_state = LocalEgoState.from_tensor(
-                self_obs_tensor=self.sim.self_observation_tensor(),
-                backend=self.backend,
-            )
-            if self.config.norm_obs:
-                ego_state.normalize()
+        if not self.config.ego_state:
+            return []
 
-            return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 2, 0)
-                .to(self.device)
-            )
-        else:
-            return torch.Tensor().to(self.device)
+        ego_state = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend=self.backend,
+            mask=mask,
+            device=self.device,
+        )
+        if self.config.norm_obs:
+            ego_state.normalize()
 
-    def _get_partner_obs(self):
+        return [ego_state.data]
+        """
+        [
+            ego_state.speed.unsqueeze(-1),
+            ego_state.vehicle_length.unsqueeze(-1),
+            ego_state.vehicle_width.unsqueeze(-1),
+            ego_state.rel_goal_x.unsqueeze(-1),
+            ego_state.rel_goal_y.unsqueeze(-1),
+            ego_state.is_collided.unsqueeze(-1),
+        ]
+        """
+
+    def _get_partner_obs(self, mask):
         """Get partner observations."""
-        if self.config.partner_obs:
-            partner_obs = PartnerObs.from_tensor(
-                partner_obs_tensor=self.sim.partner_observations_tensor(),
-                backend=self.backend,
-            )
+        if not self.config.partner_obs:
+            return []
 
-            if self.config.norm_obs:
-                partner_obs.normalize()
-                partner_obs.one_hot_encode_agent_types()
+        partner_obs = PartnerObs.from_tensor(
+            partner_obs_tensor=self.sim.partner_observations_tensor(),
+            backend=self.backend,
+            device=self.device,
+            mask=mask,
+        )
 
-            return (
-                torch.concat(
-                    [
-                        partner_obs.speed,
-                        partner_obs.rel_pos_x,
-                        partner_obs.rel_pos_y,
-                        partner_obs.orientation,
-                        partner_obs.vehicle_length,
-                        partner_obs.vehicle_width,
-                        # partner_obs.agent_type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
+        if self.config.norm_obs:
+            partner_obs.normalize()
+            # partner_obs.one_hot_encode_agent_types()
 
-        else:
-            return torch.Tensor().to(self.device)
+        return [partner_obs.data.flatten(start_dim=1)]
+        """
+        [
+            partner_obs.speed.squeeze(-1),
+            partner_obs.rel_pos_x.squeeze(-1),
+            partner_obs.rel_pos_y.squeeze(-1),
+            partner_obs.orientation.squeeze(-1),
+            partner_obs.vehicle_length.squeeze(-1),
+            partner_obs.vehicle_width.squeeze(-1),
+        ]
+        """
 
-    def _get_road_map_obs(self):
+    def _get_road_map_obs(self, mask):
         """Get road map observations."""
-        if self.config.road_map_obs:
-            roadgraph = LocalRoadGraphPoints.from_tensor(
-                local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
-                backend=self.backend,
-            )
+        if not self.config.road_map_obs:
+            return []
 
-            if self.config.norm_obs:
-                roadgraph.normalize()
-                roadgraph.one_hot_encode_road_point_types()
+        roadgraph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
+            backend=self.backend,
+            device=self.device,
+            mask=mask,
+        )
 
-            return (
-                torch.cat(
-                    [
-                        roadgraph.x.unsqueeze(-1),
-                        roadgraph.y.unsqueeze(-1),
-                        roadgraph.segment_length.unsqueeze(-1),
-                        roadgraph.segment_width.unsqueeze(-1),
-                        roadgraph.segment_height.unsqueeze(-1),
-                        roadgraph.orientation.unsqueeze(-1),
-                        roadgraph.type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
+        if self.config.norm_obs:
+            roadgraph.normalize()
+            roadgraph.one_hot_encode_road_point_types()
 
-        else:
-            return torch.Tensor().to(self.device)
+        return [
+            # roadgraph.x,
+            # roadgraph.y,
+            # roadgraph.segment_length,
+            # roadgraph.segment_width,
+            # roadgraph.segment_height,
+            # roadgraph.orientation,
+            roadgraph.data.flatten(start_dim=1),
+            roadgraph.type.flatten(start_dim=1),
+        ]
 
-    def _get_lidar_obs(self):
+    def _get_lidar_obs(self, mask):
         """Get lidar observations."""
-        if self.config.lidar_obs:
-            lidar = LidarObs.from_tensor(
-                lidar_tensor=self.sim.lidar_tensor(),
-                backend=self.backend,
-            )
+        if not self.config.lidar_obs:
+            return []
 
-            return (
-                torch.cat(
-                    [
-                        lidar.agent_samples,
-                        lidar.road_edge_samples,
-                        lidar.road_line_samples,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
-        else:
-            return torch.Tensor().to(self.device)
+        lidar = LidarObs.from_tensor(
+            lidar_tensor=self.sim.lidar_tensor(),
+            backend=self.backend,
+        )
 
-    def get_obs(self):
+        return [
+            lidar.agent_samples[mask],
+            lidar.road_edge_samples[mask],
+            lidar.road_line_samples[mask],
+        ]
+
+    def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
 
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-
-        ego_states = self._get_ego_state()
-
-        partner_observations = self._get_partner_obs()
-
-        road_map_observations = self._get_road_map_obs()
-
-        lidar_obs = self._get_lidar_obs()
-
-        obs_filtered = torch.cat(
-            (
-                ego_states,
-                partner_observations,
-                road_map_observations,
-                lidar_obs,
-            ),
-            dim=-1,
+        ego_states = self._get_ego_state(mask)
+        partner_observations = self._get_partner_obs(mask)
+        road_map_observations = self._get_road_map_obs(mask)
+        lidar_obs = self._get_lidar_obs(mask)
+        obs = (
+            ego_states
+            + partner_observations
+            + road_map_observations
+            + lidar_obs
         )
-
-        return obs_filtered
+        return torch.cat(obs, dim=-1)
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -599,6 +593,7 @@ if __name__ == "__main__":
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
+        shuffle=False,
     )
 
     # Make env
@@ -611,6 +606,10 @@ if __name__ == "__main__":
 
     print(f"dataset: {env.data_batch}")
 
+    print(
+        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
+    )
+
     # Rollout
     obs = env.reset()
 
@@ -618,6 +617,9 @@ if __name__ == "__main__":
 
     sim_frames = []
     agent_obs_frames = []
+
+    # env.swap_data_batch()
+    # env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
@@ -628,6 +630,14 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
+
+        # if (t + 1) % 2 == 0:
+        # env.swap_data_batch()
+        # env.reset()
+        #     print(f"dataset: {env.data_batch}")
+
+        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
 
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
@@ -647,8 +657,8 @@ if __name__ == "__main__":
             figsize=(10, 10),
         )
 
-        # sim_states[0].savefig(f"sim_state.png")
-        # agent_obs.savefig(f"agent_obs.png")
+        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
+        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
 
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))

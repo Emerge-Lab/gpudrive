@@ -242,7 +242,18 @@ pyrightconfig.json
 # To be manually created using .env.template
 .env
 
+# Sbatch scripts
+*.sh
+
 # Logs
 examples/experiments/scripts/logs/*
+
+# Videos
+videos/
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++
