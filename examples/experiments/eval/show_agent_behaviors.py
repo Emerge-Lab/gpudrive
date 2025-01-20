@@ -1,127 +1,138 @@
-import torch
 import pandas as pd
-from tqdm import tqdm
-import yaml
 from box import Box
 import numpy as np
-import dataclasses
-import os
 from pathlib import Path
 import mediapy
 
-from pygpudrive.env.config import EnvConfig
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.env.dataset import SceneDataLoader
-from pygpudrive.visualize.utils import img_from_fig
-
-from networks.late_fusion import LateFusionTransformer
 from evaluate import load_policy, load_config, make_env, rollout
 
 import logging
-import pdb
 
 logging.basicConfig(level=logging.INFO)
 
+
 def make_videos(
-    df_results, 
-    policy, 
+    df_results,
+    policy,
     eval_config,
-    sort_by=None,
+    sort_by=None,  # Options: 'goal_achieved',
     show_top_k=100,
-    device='cuda', 
-    zoom_radius=100, 
+    device="cuda",
+    zoom_radius=100,
     deterministic=False,
     render_every_n_steps=10,
-    ):
-    """Make videos policy rollouts environment."""
-    
+):
+    """Make videos policy rollouts environment.
+    Args:
+        df_results (pd.DataFrame): Dataframe with the results of the policy rollout.
+        policy (torch.nn.Module): Policy to select actions.
+        eval_config (Box): Configuration for the evaluation.
+        sort_by (str): Sample scenarios from dataframe sorted by this column. Options:
+            - goal_achieved: Sort by goal_achieved in descending order (successes first).
+            - collided: Sort by collided in descending order.
+            - off_road: Sort by off_road in descending order.
+            - not_goal_nor_crashed: Sort by not_goal_nor_crashed in descending order.
+            - controlled_agents_in_scene: Sort by controlled_agents_in_scene in descending order.
+    """
+
+    base_data_path = (
+        eval_config.train_dir
+        if df_results["dataset"][0] == "train"
+        else eval_config.test_dir
+    )
+
     # Make environment
     train_loader = SceneDataLoader(
-        root=eval_config.train_dir,
+        root=base_data_path,
         batch_size=show_top_k,
         dataset_size=show_top_k,
         sample_with_replacement=False,
-        shuffle=False
+        shuffle=False,
     )
-    
-    env = make_env(eval_config, train_loader)    
-    
-    # Sample data batch from dataframe
-    if sort_by == 'failures':
-        pass
-    elif sort_by == 'success':
-        pass
+
+    env = make_env(eval_config, train_loader)
+
+    # Select data batch toi
+    if sort_by is not None and sort_by in df_results.columns:
+        df_top_k = df_results.sort_values(by=sort_by, ascending=False).head(
+            show_top_k
+        )
+        data_batch = (
+            base_data_path + "/" + df_top_k.scene.values + ".json"
+        ).tolist()
+
     elif sort_by is None:
         data_batch = env.data_batch
-    
-    # Update simulator with the provided data batch
+
     env.swap_data_batch(data_batch)
 
     # Rollout policy in the environments
     _, _, _, _, _, sim_state_frames = rollout(
-        env=env, 
-        policy=policy, 
-        device=device, 
+        env=env,
+        policy=policy,
+        device=device,
         deterministic=deterministic,
         render_sim_state=True,
         render_every_n_steps=render_every_n_steps,
         zoom_radius=zoom_radius,
-        results_df=df_results
+        results_df=df_results,
     )
 
     return sim_state_frames
 
 
 if __name__ == "__main__":
-    
+
+    # Specify which model to load and the dataset to evaluate
+    MODEL_TO_LOAD = "model_PPO__R_1000__01_19_11_15_25_854_002500"
+    DATASET = "train"
+
     # Configurations
     eval_config = load_config("examples/experiments/eval/config/eval_config")
     model_config = load_config("examples/experiments/eval/config/model_config")
-    
-    MODEL_TO_LOAD = "model_PPO__R_1000__01_19_11_15_25_854_002500"
- 
+
     # Load policy
     policy = load_policy(
         path_to_cpt=model_config.models_path,
         model_name=MODEL_TO_LOAD,
         device=eval_config.device,
     )
-    
-    logging.info(f"Loaded policy {MODEL_TO_LOAD}")
-    
+
     # Load results dataframe
-    df_res = pd.read_csv(f"examples/experiments/eval/dataframes/0120/{MODEL_TO_LOAD}.csv")
-    df_res = df_res[df_res['dataset'] == 'train']
+    df_res = pd.read_csv(f"{eval_config.res_path}/{MODEL_TO_LOAD}.csv")
+    df_res = df_res[df_res["dataset"] == DATASET]
+
+    logging.info(
+        f"Loaded policy {MODEL_TO_LOAD} and corresponding results df."
+    )
 
     # Rollout policy and make videos
-    sim_state_frames_train = make_videos(
-        df_results=df_res, 
-        policy=policy, 
+    sim_state_frames = make_videos(
+        df_results=df_res,
+        policy=policy,
         eval_config=eval_config,
-        sort_by=None,
-        show_top_k=50,
-        device='cuda', 
-        zoom_radius=100, 
+        sort_by="collided",  # Options: 'goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed', 'controlled_agents_in_scene'
+        show_top_k=1,
+        device="cuda",
+        zoom_radius=100,
         deterministic=False,
         render_every_n_steps=3,
     )
 
-    sim_state_arrays_train = {
-        k: np.array(v) for k, v in sim_state_frames_train.items()
-    }
-    
+    sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
     videos_dir = Path(f"videos/{MODEL_TO_LOAD}")
     videos_dir.mkdir(parents=True, exist_ok=True)
 
     # Save videos locally
-    for env_id, frames in sim_state_arrays_train.items():
-    
-        video_path = videos_dir / f"train_scene_{env_id}.mp4"
-        
+    for env_id, frames in sim_state_arrays.items():
+
+        video_path = videos_dir / f"scene_{env_id}.mp4"
+
         mediapy.write_video(
             str(video_path),
             frames,
-            fps=5, 
+            fps=8,
         )
-        
+
         logging.info(f"Saved video to {video_path}")
