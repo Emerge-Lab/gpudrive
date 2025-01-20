@@ -1,11 +1,11 @@
-res_path: examples/experiments/eval/dataframes # Store dataframes here
+res_path: examples/experiments/eval/dataframes/0120 # Store dataframes here
 test_dataset_size: 10_000 # Number of test scenarios to evaluate on
 
 # Environment settings
 train_dir: "/scratch/kj2676/gpudrive/data/processed/training"
 test_dir: "/scratch/kj2676/gpudrive/data/processed/validation"
 
-num_worlds: 100 # Number of parallel environments for evaluation
+num_worlds: 200 # Number of parallel environments for evaluation
 max_controlled_agents: 128 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true

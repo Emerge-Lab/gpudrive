@@ -99,15 +99,28 @@ def rollout(
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
-
+    
+    # Reset episode
+    next_obs = env.reset()
+    
     # Storage
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
     collided = torch.zeros((num_worlds, max_agent_count), device=device)
     off_road = torch.zeros((num_worlds, max_agent_count), device=device)
     active_worlds = np.arange(num_worlds).tolist()
+    
+    # Note: Should be done on C++ side, these are bug fixes 
+    infos = env.get_infos() # Initialize the bugged_agent_mask 
+    bugged_agent_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.bool)
 
-    next_obs = env.reset()
-    live_agent_mask = env.cont_agent_mask.clone()
+    bugged_agent_mask[env.cont_agent_mask] = torch.logical_or(
+        infos.off_road[env.cont_agent_mask],
+        infos.collided[env.cont_agent_mask]
+    )
+    
+    controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
+   
+    live_agent_mask = controlled_agent_mask.clone()
     
     for time_step in range(episode_len):
         logging.debug(f"Time step: {time_step}")
@@ -154,7 +167,7 @@ def rollout(
         off_road[live_agent_mask] += infos.off_road[live_agent_mask]
         collided[live_agent_mask] += infos.collided[live_agent_mask]
         goal_achieved[live_agent_mask] += infos.goal_achieved[live_agent_mask]
-
+        
         logging.debug(f"active_worlds: {active_worlds}")
         logging.debug(f"num_agents_live: {live_agent_mask.sum()}")
 
@@ -162,22 +175,20 @@ def rollout(
         live_agent_mask[dones] = False
 
         # Process completed worlds
-        num_dones_per_world = (dones & env.cont_agent_mask).sum(dim=1)
-        total_controlled_agents = env.cont_agent_mask.sum(dim=1)
+        num_dones_per_world = (dones & controlled_agent_mask).sum(dim=1)
+        total_controlled_agents = controlled_agent_mask.sum(dim=1)
         done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
 
         for world in done_worlds:
             if world in active_worlds:
                 active_worlds.remove(world)
-                logging.debug(
-                    f"World {world} done at time step {time_step}"
-                )
+                logging.debug(f"World {world} done at time step {time_step}")
         
         if not active_worlds:  # Exit early if all worlds are done
             break
 
     # Aggregate metrics to obtain averages across scenes
-    controlled_agents_per_scene = env.cont_agent_mask.sum(dim=1).float()
+    controlled_agents_per_scene = controlled_agent_mask.sum(dim=1).float()
     goal_achieved_per_scene = (goal_achieved > 0).float().sum(axis=1) / controlled_agents_per_scene
     collided_per_scene = (collided > 0).float().sum(axis=1) / controlled_agents_per_scene
     off_road_per_scene =  (off_road > 0).float().sum(axis=1) / controlled_agents_per_scene
@@ -187,7 +198,7 @@ def rollout(
             collided == 0,     # Didn't collide
             torch.logical_and(
                 off_road == 0,  # Didn't go off-road
-                env.cont_agent_mask  # Only count controlled agents
+                controlled_agent_mask  # Only count controlled agents
             )
             )
     )
@@ -314,20 +325,18 @@ def make_env(config, train_loader):
 if __name__ == "__main__":
 
     # Load configurations
-    setting_config = load_config(
-        "examples/experiments/eval/config/setting_config"
-    )
+    eval_config = load_config("examples/experiments/eval/config/eval_config")
     model_config = load_config("examples/experiments/eval/config/model_config")
 
     train_loader = SceneDataLoader(
-        root=setting_config.train_dir,
-        batch_size=setting_config.num_worlds,
-        dataset_size=setting_config.num_worlds,
+        root=eval_config.train_dir,
+        batch_size=eval_config.num_worlds,
+        dataset_size=eval_config.num_worlds,
         sample_with_replacement=False,
     )
 
     # Make environment
-    env = make_env(setting_config, train_loader)
+    env = make_env(eval_config, train_loader)
 
     for model in model_config.models:
 
@@ -337,23 +346,23 @@ if __name__ == "__main__":
         policy = load_policy(
             path_to_cpt=model_config.models_path,
             model_name=model.name,
-            device=setting_config.device,
+            device=eval_config.device,
             env=env,
         )
 
         # Create dataloaders for train and test sets
         train_loader = SceneDataLoader(
-            root=setting_config.train_dir,
-            batch_size=setting_config.num_worlds,
+            root=eval_config.train_dir,
+            batch_size=eval_config.num_worlds,
             dataset_size=model.train_dataset_size if model.name != "random_baseline" else 1000,
             sample_with_replacement=False,
             shuffle=False,
         )
         
         test_loader = SceneDataLoader(
-            root=setting_config.test_dir,
-            batch_size=setting_config.num_worlds,
-            dataset_size=setting_config.test_dataset_size if model.name != "random_baseline" else 1000,
+            root=eval_config.test_dir,
+            batch_size=eval_config.num_worlds,
+            dataset_size=eval_config.test_dataset_size if model.name != "random_baseline" else 1000,
             sample_with_replacement=False,
             shuffle=True,
         )
@@ -380,16 +389,16 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
+        df_res = pd.concat([df_res_train, df_res_test]) 
 
         # Add metadata
         df_res["model_name"] = model.name
         df_res["train_dataset_size"] = model.train_dataset_size
 
         # Store
-        if not os.path.exists(setting_config.res_path):
-            os.makedirs(setting_config.res_path)
+        if not os.path.exists(eval_config.res_path):
+            os.makedirs(eval_config.res_path)
 
-        df_res.to_csv(f"{setting_config.res_path}/{model.name}.csv", index=False)
+        df_res.to_csv(f"{eval_config.res_path}/{model.name}.csv", index=False)
 
-        logging.info(f"Saved at {setting_config.res_path}/{model.name}.csv \n")
+        logging.info(f"Saved at {eval_config.res_path}/{model.name}.csv \n")

@@ -1,4 +1,4 @@
-models_path: examples/experiments/eval/models/scaling_laws
+models_path: examples/experiments/eval/models/0120
 
 models:
   - name: random_baseline
@@ -6,15 +6,15 @@ models:
     wandb: null
     trained_on: null
 
-  - name: model_PPO__R_100__01_10_17_06_33_696_003000
-    train_dataset_size: 100
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_100__01_10_17_06_33_696?nw=nwuserdaphnecor
+  - name: model_PPO__R_1000__01_19_11_15_25_854_002500
+    train_dataset_size: 1000
+    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_1000__01_19_11_15_25_854?nw=nwuserdaphnecor
     trained_on: cluster
   
-  - name: model_PPO__R_1000__01_10_17_06_33_697_003500
-    train_dataset_size: 1000
-    wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_10_17_06_33_697?nw=nwuserdaphnecor
-    trained_on: cluster
+  # - name: model_PPO__R_1000__01_10_17_06_33_697_003500
+  #   train_dataset_size: 1000
+  #   wandb: https://wandb.ai/emerge_/paper_1_self_play/runs/PPO__R_1000__01_10_17_06_33_697?nw=nwuserdaphnecor
+  #   trained_on: cluster
 
   # - name: model_PPO__R_10000__01_10_17_13_39_676
   #   train_dataset_size: 10_000
