@@ -331,6 +331,10 @@ class PufferGPUDrive(PufferEnv):
                     }
                 )
                 # fmt: on
+            
+            # Get obs for the last terminal step (before reset)
+            self.last_obs = self.observations.clone()
+            
             # Asynchronously reset the done worlds and empty storage
             for idx in done_worlds:
                 self.env.sim.reset([idx])

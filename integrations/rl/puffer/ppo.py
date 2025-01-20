@@ -124,7 +124,7 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
-
+        
         with profile.env:
             # Receive data from current timestep
             (
@@ -171,7 +171,20 @@ def evaluate(data):
             value = value.flatten()
             mask = torch.as_tensor(mask)
             obs_device = obs_device if config.cpu_offload else obs_device
+            
+            # Use the terminal observation value to better estimate the reward 
+            done_but_truncated = truncated & terminal
+            if done_but_truncated.any():    
+                terminal_obs = data.vecenv.last_obs[done_but_truncated]
+                
+                # Get terminal (truncated) observation value
+                with torch.no_grad():
+                    _, _, _, terminal_value = policy(terminal_obs)
+                
+                # Add discounted value to reward
+                reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
+            # Add to rollout buffer
             experience.store(
                 obs_device,
                 value,
@@ -182,8 +195,9 @@ def evaluate(data):
                 env_id,
                 mask,
             )
-
-            for i in info:
+        
+            # Add metrics for logging
+            for i in info: 
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     data.infos[k].append(v)
 
