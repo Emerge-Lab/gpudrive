@@ -501,7 +501,7 @@ if __name__ == "__main__":
     scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
     render_config = RenderConfig(
         draw_expert_trajectories=True,
-        draw_only_ego_expert_traj=True,
+        draw_only_controllable_veh=True,
     )
 
     # MAKE ENV

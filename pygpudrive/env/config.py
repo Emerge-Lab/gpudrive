@@ -182,7 +182,7 @@ class RenderConfig:
         line_thickness (int): Thickness of the road lines in the rendering.
         draw_obj_idx (bool): Whether to draw object indices on objects.
         draw_expert_trajectories (bool): Whether to draw expert trajectories.
-        draw_only_ego_expert_traj (bool): Whether to draw only the ego expert trajectory.
+        draw_only_controllable_veh (bool): Whether to draw only the trajectories of controllable vehicles.
         obj_idx_font_size (int): Font size for object indices.
         color_scheme (str): Color mode for the rendering ("light" or "dark").
     """
@@ -193,7 +193,7 @@ class RenderConfig:
     line_thickness: int = 0.7
     draw_obj_idx: bool = False
     draw_expert_trajectories: bool = False
-    draw_only_ego_expert_traj: bool = False
+    draw_only_controllable_veh: bool = False
     obj_idx_font_size: int = 9
     color_scheme: str = "light"
 

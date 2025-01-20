@@ -526,7 +526,7 @@ class MatplotlibVisualizer:
             non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
             mask = (
                 controlled_mask
-                if self.vis_config.draw_only_ego_expert_traj
+                if self.vis_config.draw_only_controllable_veh
                 else controlled_mask | non_controlled_mask
             )
             agent_indices = torch.where(mask)[0]
