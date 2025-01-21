@@ -121,9 +121,6 @@ def rollout(
     logging.info(
         f"Removed {bugged_agent_mask.sum()} bugged agents; {(bugged_agent_mask.sum()/env.cont_agent_mask.sum())*100:.2f}% of controlled agents \n"
     )
-    
-    logging.info(f"Removed {bugged_agent_mask.sum()} bugged agents; {(bugged_agent_mask.sum()/env.cont_agent_mask.sum())*100:.2f}% of controlled agents \n")
-    
 
     controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
 
@@ -363,7 +360,7 @@ if __name__ == "__main__":
 
     for model in model_config.models:
 
-        logging.info(f"Evaluating model {model.name} \n")
+        logging.info(f"Evaluating model {model.name}")
 
         # Load policy
         policy = load_policy(

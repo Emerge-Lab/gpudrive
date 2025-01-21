@@ -182,6 +182,7 @@ def run(
     batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
     minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
     gamma: Annotated[Optional[float], typer.Option(help="The discount factor for rewards")] = None,
+    vf_coef: Annotated[Optional[float], typer.Option(help="Weight for vf_loss")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -228,6 +229,7 @@ def run(
         "minibatch_size": minibatch_size,
         "render": None if render is None else bool(render),
         "gamma": gamma,
+        "vf_coef": vf_coef,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
