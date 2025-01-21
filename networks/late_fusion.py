@@ -109,11 +109,11 @@ class LateFusionTransformer(nn.Module):
         self,
         action_dim,
         input_dim=64,
-        hidden_dim=192,
+        hidden_dim=128,
         pred_heads_arch=[128],
         num_transformer_layers=0,
         dropout=0.00,
-        act_func="relu",
+        act_func="tanh",
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -129,9 +129,9 @@ class LateFusionTransformer(nn.Module):
             pufferlib.pytorch.layer_init(
                 nn.Linear(constants.EGO_FEAT_DIM, input_dim)
             ),
-            #nn.LayerNorm(input_dim),
+            nn.LayerNorm(input_dim),
             self.act_func,
-            #nn.Dropout(self.dropout),
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
@@ -139,9 +139,9 @@ class LateFusionTransformer(nn.Module):
             pufferlib.pytorch.layer_init(
                 nn.Linear(constants.PARTNER_FEAT_DIM, input_dim)
             ),
-            #nn.LayerNorm(input_dim),
+            nn.LayerNorm(input_dim),
             self.act_func,
-            #nn.Dropout(self.dropout),
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
@@ -149,19 +149,16 @@ class LateFusionTransformer(nn.Module):
             pufferlib.pytorch.layer_init(
                 nn.Linear(constants.ROAD_GRAPH_FEAT_DIM, input_dim)
             ),
-            #nn.LayerNorm(input_dim),
+            nn.LayerNorm(input_dim),
             self.act_func,
-            #nn.Dropout(self.dropout),
+            nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
-        '''
         self.shared_embed = nn.Sequential(
             nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
-            #nn.Dropout(self.dropout)
-            self.act_func,
+            nn.Dropout(self.dropout)
         )
-        '''
 
         if self.num_transformer_layers > 0:
             self.transformer_layers = nn.Sequential(
@@ -193,8 +190,7 @@ class LateFusionTransformer(nn.Module):
         if self.num_transformer_layers > 0:
             embed = self.transformer_layers(embed)
 
-        return embed
-        #return self.shared_embed(embed)
+        return self.shared_embed(embed)
 
     def forward(self, obs, action=None, deterministic=False):
 

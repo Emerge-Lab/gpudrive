@@ -333,5 +333,5 @@ def run(
 
 if __name__ == "__main__":
     import cProfile
-    cProfile.run('app()', 'profiled')
-    #app()
+    #cProfile.run('app()', 'profiled')
+    app()

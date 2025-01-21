@@ -27,10 +27,10 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: "jsuarez"
-  project: "self_play_rl_safe"
+  project: "puffer"
   group: "small_experiments"
   mode: "online" # Options: online, offline, disabled
-  tags: ["ppo", "ff", "basic-sweep"]
+  tags: ["ppo", "ff"]
 
 train:
   exp_id: PPO # Set dynamically in the script if needed
@@ -45,27 +45,25 @@ train:
   resample_scenes: false
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 1_000_000
-  resample_criterion: "global_step"
-  resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 50_000_000
+  total_timesteps: 200_000_000
   batch_size: 131_072
-  minibatch_size: 16384
+  minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 1
+  update_epochs: 2
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
   ent_coef: 0.0001
-  vf_coef: 0.5
+  vf_coef: 0.4
   max_grad_norm: 0.5
   target_kl: null
   log_window: 500
