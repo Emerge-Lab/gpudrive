@@ -1,8 +1,8 @@
-mode: "train"
+mode: "sweep"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training"
+data_dir: "data/processed/examples"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
@@ -26,11 +26,11 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
-  entity: ""
+  entity: "jsuarez"
   project: "self_play_rl_safe"
   group: "small_experiments"
   mode: "online" # Options: online, offline, disabled
-  tags: ["ppo", "ff"]
+  tags: ["ppo", "ff", "basic-sweep"]
 
 train:
   exp_id: PPO # Set dynamically in the script if needed
@@ -45,19 +45,21 @@ train:
   resample_scenes: false
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 1_000_000
+  resample_criterion: "global_step"
+  resample_limit: 1000 # Resample until the limit is reached; set to a large number to continue resampling indefinitely
   sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 1_000_000_000
+  total_timesteps: 50_000_000
   batch_size: 131_072
-  minibatch_size: 8192
+  minibatch_size: 16384
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 5
+  update_epochs: 1
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
@@ -71,7 +73,7 @@ train:
   # # # Network # # #
   network:
     input_dim: 64 # Embedding of the input features
-    hidden_dim: 128 # Latent dimension
+    hidden_dim: 192 # Latent dimension
     pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
     num_transformer_layers: 0 # Number of transformer layers
     dropout: 0.01
@@ -90,6 +92,48 @@ train:
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_format: "mp4" # Options: gif, mp4
   render_fps: 15 # Frames per second
+
+sweep:
+  train:
+    learning_rate:
+      distribution: "log_normal"
+      mean: 0.005
+      scale: 1.0
+      clip: 2.0
+
+    ent_coef:
+      distribution: "log_normal"
+      mean: 0.005
+      scale: 0.5
+      clip: 1.0
+
+    gamma:
+      distribution: "logit_normal"
+      mean: 0.98
+      scale: 0.5
+      clip: 1.0
+
+    gae_lambda:
+      distribution: "logit_normal"
+      mean: 0.95
+      scale: 0.5
+      clip: 1.0
+
+  environment:
+    collision_weight:
+      distribution: "uniform"
+      min: -1.0
+      max: 0.0
+
+    off_road_weight:
+      distribution: "uniform"
+      min: -1.0
+      max: 0.0
+
+    goal_achieved_weight:
+      distribution: "uniform"
+      min: 0.0
+      max: 1.0
 
 vec:
   backend: "native" # Only native is currently supported
