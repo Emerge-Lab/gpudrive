@@ -205,33 +205,8 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
-            if time_step is not None and not eval_mode:
-                # Plot rollout statistics
-                num_controlled = controlled.sum().item()
-                num_off_road = is_offroad.sum().item()
-                num_collided = is_collided.sum().item()
-                off_road_rate = (
-                    num_off_road / num_controlled if num_controlled > 0 else 0
-                )
-                collision_rate = (
-                    num_collided / num_controlled if num_controlled > 0 else 0
-                )
 
-                ax.text(
-                    0.5,  # Horizontal center
-                    0.95,  # Vertical location near the top
-                    f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-                    f"off-road: {off_road_rate:.2f}; "
-                    f"collision: {collision_rate:.2f}",
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    transform=ax.transAxes,
-                    fontsize=20 * marker_scale,
-                    color="black",
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-                )
-            else:
-                if eval_mode and results_df is not None:
+            if eval_mode and results_df is not None:
 
                     num_controlled = results_df.iloc[
                         env_idx
@@ -258,6 +233,34 @@ class MatplotlibVisualizer:
                             facecolor="white", edgecolor="none", alpha=0.9
                         ),
                     )
+                    
+            else:
+                # Plot rollout statistics
+                num_controlled = controlled.sum().item()
+                num_off_road = is_offroad.sum().item()
+                num_collided = is_collided.sum().item()
+                off_road_rate = (
+                    num_off_road / num_controlled if num_controlled > 0 else 0
+                )
+                collision_rate = (
+                    num_collided / num_controlled if num_controlled > 0 else 0
+                )
+
+                ax.text(
+                    0.5,  # Horizontal center
+                    0.95,  # Vertical location near the top
+                    f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
+                    f"off-road: {off_road_rate:.2f}; "
+                    f"collision: {collision_rate:.2f}",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                    transform=ax.transAxes,
+                    fontsize=20 * marker_scale,
+                    color="black",
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+                )
+
+                
 
             # Determine center point for zooming
             if center_agent_idx is not None:
