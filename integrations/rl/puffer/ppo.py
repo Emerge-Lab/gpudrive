@@ -173,16 +173,16 @@ def evaluate(data):
             obs_device = obs_device if config.cpu_offload else obs_device
             
             # Use the terminal observation value to better estimate the reward 
-            done_but_truncated = truncated & terminal
-            if done_but_truncated.any():    
-                terminal_obs = data.vecenv.last_obs[done_but_truncated]
+            # done_but_truncated = truncated & terminal
+            # if done_but_truncated.any():    
+            #     terminal_obs = data.vecenv.last_obs[done_but_truncated]
                 
-                # Get terminal (truncated) observation value
-                with torch.no_grad():
-                    _, _, _, terminal_value = policy(terminal_obs)
+            #     # Get terminal (truncated) observation value
+            #     with torch.no_grad():
+            #         _, _, _, terminal_value = policy(terminal_obs)
                 
-                # Add discounted value to reward
-                reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
+            #     # Add discounted value to reward
+            #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
             # Add to rollout buffer
             experience.store(
