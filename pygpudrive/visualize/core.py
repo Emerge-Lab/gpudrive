@@ -178,14 +178,6 @@ class MatplotlibVisualizer:
             ) & controlled_live
             is_ok = ~is_offroad & ~is_collided & controlled_live
 
-            # # Draw the road graph
-            # self._plot_roadgraph(
-            #     road_graph=self.global_roadgraph,
-            #     env_idx=env_idx,
-            #     ax=ax,
-            #     line_width_scale=self.line_width_scale,
-            #     marker_size_scale=self.marker_scale,
-            # )
 
             if plot_log_replay_trajectory:
                 self._plot_log_replay_trajectory(
