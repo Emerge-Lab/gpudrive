@@ -81,8 +81,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.num_agents = self.cont_agent_mask.sum().item()
         self.single_action_space = self.action_space
         # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
-        self.observation_space = pufferlib.spaces.joint_space(
-            self.single_observation_space, self.num_agents
+        # self.observation_space = pufferlib.spaces.joint_space(
+        #     self.single_observation_space, self.num_agents
+        # )
+        self.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
 
         self.info_dim = 5  # Number of info features
@@ -180,6 +183,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.num_worlds,
                 self.max_agent_count,
                 backend=self.backend,
+                device=self.device
             )
 
             # Index log positions at current time steps
@@ -364,6 +368,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
+                device=self.device
             )
             if self.config.norm_obs:
                 ego_state.normalize()
@@ -391,6 +396,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
                 backend=self.backend,
+                device=self.device
             )
 
             if self.config.norm_obs:
@@ -423,6 +429,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
                 backend=self.backend,
+                device=self.device
             )
 
             if self.config.norm_obs:
@@ -613,7 +620,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root="data/processed/examples",
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
