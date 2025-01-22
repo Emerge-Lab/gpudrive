@@ -1,15 +1,10 @@
-models_path: examples/experiments/eval/models/0120
+models_path: wandb/run-20250121_225758-PPO_R_1000__01_21_22_57_53_461/files/runs/PPO_R_1000__01_21_22_57_53_461
 
 models:
-  - name: random_baseline
-    train_dataset_size: null
+  - name: model_PPO_R_1000__01_21_22_57_53_461_001520
+    train_dataset_size: 1000
     wandb: null
     trained_on: null
-
-  - name: model_PPO__R_1000__01_19_11_15_25_854_002500
-    train_dataset_size: 1000
-    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_1000__01_19_11_15_25_854?nw=nwuserdaphnecor
-    trained_on: cluster
   
   # - name: model_PPO__R_1000__01_10_17_06_33_697_003500
   #   train_dataset_size: 1000

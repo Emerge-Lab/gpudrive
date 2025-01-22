@@ -101,7 +101,7 @@ def rollout(
     episode_len = env.config.episode_len
 
     # Reset episode
-    next_obs = env.reset()
+    next_obs = env.reset(env.cont_agent_mask)
 
     # Storage
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
@@ -123,7 +123,6 @@ def rollout(
     )
 
     controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
-
     live_agent_mask = controlled_agent_mask.clone()
 
     for time_step in range(episode_len):
@@ -132,14 +131,14 @@ def rollout(
         # Get actions for active agents
         if live_agent_mask.any():
             action, _, _, _ = policy(
-                next_obs[live_agent_mask], deterministic=deterministic
+                next_obs, deterministic=deterministic
             )
 
             # Insert actions into a template
             action_template = torch.zeros(
                 (num_worlds, max_agent_count), dtype=torch.int64, device=device
             )
-            action_template[live_agent_mask] = action.to(device)
+            action_template[env.cont_agent_mask] = action.to(device)
 
             # Step the environment
             env.step_dynamics(action_template)
@@ -166,7 +165,7 @@ def rollout(
                         )
 
         # Update observations, dones, and infos
-        next_obs = env.get_obs()
+        next_obs = env.get_obs(env.cont_agent_mask)
         dones = env.get_dones().bool()
         infos = env.get_infos()
 
@@ -191,8 +190,8 @@ def rollout(
 
         for world in done_worlds:
             if world in active_worlds:
-                active_worlds.remove(world)
                 logging.debug(f"World {world} done at time step {time_step}")
+                active_worlds.remove(world)
 
         if not active_worlds:  # Exit early if all worlds are done
             break
@@ -374,9 +373,10 @@ if __name__ == "__main__":
         train_loader = SceneDataLoader(
             root=eval_config.train_dir,
             batch_size=eval_config.num_worlds,
-            dataset_size=model.train_dataset_size
-            if model.name != "random_baseline"
-            else 1000,
+            dataset_size=1000, #Below didn't work. Was None
+            #model.train_dataset_size
+            #if model.name != "random_baseline"
+            #else 1000,
             sample_with_replacement=False,
             shuffle=False,
         )
@@ -404,6 +404,10 @@ if __name__ == "__main__":
             deterministic=False,
             render_sim_state=False,
         )
+
+        result = df_res_train.groupby('dataset')[['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']].agg(['mean', 'std'])
+        print('Result: ', result)
+        breakpoint()
 
         df_res_test = evaluate_policy(
             env=env,
