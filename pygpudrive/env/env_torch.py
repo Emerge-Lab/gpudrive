@@ -79,6 +79,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             num_worlds=self.num_worlds,
             render_config=self.render_config,
             env_config=self.config,
+            
         )
 
     def reset(self):
@@ -346,6 +347,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
+                device=self.device
             )
             if self.config.norm_obs:
                 ego_state.normalize()
@@ -373,6 +375,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
                 backend=self.backend,
+                device=self.device
             )
 
             if self.config.norm_obs:
@@ -405,6 +408,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
                 backend=self.backend,
+                device=self.device
             )
 
             if self.config.norm_obs:
@@ -595,7 +599,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root="data/processed/examples",
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
@@ -620,6 +624,7 @@ if __name__ == "__main__":
     agent_obs_frames = []
 
     expert_actions, _, _, _ = env.get_expert_actions()
+
 
     env_idx = 0
 
