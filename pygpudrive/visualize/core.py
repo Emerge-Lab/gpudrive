@@ -24,7 +24,6 @@ from pygpudrive.visualize.color import (
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
 )
-from PIL import Image ## debugging
 OUT_OF_BOUNDS = 1000
 
 
