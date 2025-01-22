@@ -183,7 +183,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.num_worlds,
                 self.max_agent_count,
                 backend=self.backend,
-                device=self.device
+                device=self.device,
             )
 
             # Index log positions at current time steps
@@ -197,6 +197,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
+                device=self.device,
             )
 
             agent_pos = torch.stack(
@@ -396,7 +397,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
                 backend=self.backend,
-                device=self.device
+                device=self.device,
             )
 
             if self.config.norm_obs:
@@ -429,7 +430,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
                 backend=self.backend,
-                device=self.device
+                device=self.device,
             )
 
             if self.config.norm_obs:
@@ -462,6 +463,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             lidar = LidarObs.from_tensor(
                 lidar_tensor=self.sim.lidar_tensor(),
                 backend=self.backend,
+                device=self.device,
             )
 
             return (

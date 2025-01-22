@@ -24,7 +24,7 @@ from pygpudrive.visualize.color import (
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
 )
-
+from PIL import Image ## debugging
 OUT_OF_BOUNDS = 1000
 
 
@@ -45,7 +45,9 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (15, 15)
+        self.figsize = (10, 10)
+        self.marker_scale = max(self.figsize) / 15
+        self.line_width_scale = max(self.figsize) / 25
         self.env_config = env_config
         self.initialize_static_scenario_data(controlled_agent_mask)
 
@@ -74,18 +76,21 @@ class MatplotlibVisualizer:
         )
 
         # Cache pre-rendered road graphs for all environments
-        # self.cached_roadgraphs = []
-        # for env_idx in range(self.controlled_agent_mask.shape[0]):
-        #     fig, ax = plt.subplots(figsize=self.figsize)
-        #     self._plot_roadgraph(
-        #         road_graph=self.global_roadgraph,
-        #         env_idx=env_idx,
-        #         ax=ax,
-        #         line_width_scale=1.0,
-        #         marker_size_scale=1.0,
-        #     )
-        #     self.cached_roadgraphs.append(fig)
-        #     plt.close(fig)
+        self.cached_roadgraphs = []
+        for env_idx in range(self.controlled_agent_mask.shape[0]):
+            fig, ax = plt.subplots(figsize=self.figsize,dpi=300)
+            self._plot_roadgraph(
+                road_graph=self.global_roadgraph,
+                env_idx=env_idx,
+                ax=ax,
+                line_width_scale=self.line_width_scale,
+                marker_size_scale=self.marker_scale,
+            )
+            self.cached_roadgraphs.append(fig)
+            plt.close(fig)
+        
+        self.plot_limits = ax.viewLim.get_points() #[x_min,y_min,xmax,ymax] (bottom left corner -> top right)
+
 
     def plot_simulator_state(
         self,
@@ -132,34 +137,34 @@ class MatplotlibVisualizer:
 
         figs = []
 
-        # Calculate scale factors based on figure size
-        marker_scale = max(self.figsize) / 15
-        line_width_scale = max(self.figsize) / 15
-
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
 
-            # Initialize figure and axes from cached road graph
             fig, ax = plt.subplots(figsize=self.figsize)
-            ax.clear()  # Clear any existing content
+            ax.clear()  
             ax.set_aspect("equal", adjustable="box")
-            figs.append(fig)  # Add the new figure
-            plt.close(fig)  # Close the figure to prevent carryover
+            figs.append(fig)  
+            plt.close(fig)  
 
-            # Render the pre-cached road graph for the current environment
-            # cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
-            # ax.imshow(
-            #     cached_roadgraph_array,
-            #     origin="upper",
-            #     extent=(-100, 100, -100, 100),  # Stretch to full plot
-            #     zorder=0,  # Draw as background
-            # )
+   
+            cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
+            ax.imshow(
+                cached_roadgraph_array,
+                origin="upper",
+                extent=(self.plot_limits[0][0],self.plot_limits[1][0], # X: [x_min,x_max]
+                        self.plot_limits[0][1],self.plot_limits[1][1]),# Y: [y_min, y_max]
+                zorder=0,  
+            )
 
-            # Explicitly set the axis limits to match your coordinates
-            # cached_ax.set_xlim(-100, 100)
-            # cached_ax.set_ylim(-100, 100)
+            # # # Explicitly set the axis limits to match your coordinates
+            ax.set_xlim(self.plot_limits[0][0], self.plot_limits[1][0] )
+            ax.set_ylim(self.plot_limits[0][1], self.plot_limits[1][1])
+  
+
+            # Remove axes
+            # cached_ax.axis('off')
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -173,14 +178,14 @@ class MatplotlibVisualizer:
             ) & controlled_live
             is_ok = ~is_offroad & ~is_collided & controlled_live
 
-            # Draw the road graph
-            self._plot_roadgraph(
-                road_graph=self.global_roadgraph,
-                env_idx=env_idx,
-                ax=ax,
-                line_width_scale=line_width_scale,
-                marker_size_scale=marker_scale,
-            )
+            # # Draw the road graph
+            # self._plot_roadgraph(
+            #     road_graph=self.global_roadgraph,
+            #     env_idx=env_idx,
+            #     ax=ax,
+            #     line_width_scale=self.line_width_scale,
+            #     marker_size_scale=self.marker_scale,
+            # )
 
             if plot_log_replay_trajectory:
                 self._plot_log_replay_trajectory(
@@ -188,7 +193,7 @@ class MatplotlibVisualizer:
                     control_mask=controlled_live,
                     env_idx=env_idx,
                     log_trajectory=self.log_trajectory,
-                    line_width_scale=line_width_scale,
+                    line_width_scale=self.line_width_scale,
                 )
 
             # Draw the agents
@@ -201,8 +206,8 @@ class MatplotlibVisualizer:
                 is_collided_mask=is_collided,
                 response_type=self.response_type,
                 alpha=1.0,
-                line_width_scale=line_width_scale,
-                marker_size_scale=marker_scale,
+                line_width_scale=self.line_width_scale,
+                marker_size_scale=self.marker_scale,
             )
 
 
@@ -255,7 +260,7 @@ class MatplotlibVisualizer:
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
-                    fontsize=20 * marker_scale,
+                    fontsize=20 * self.marker_scale,
                     color="black",
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
                 )
@@ -387,9 +392,10 @@ class MatplotlibVisualizer:
                                 gpudrive.EntityType.RoadEdge
                             ):
                                 line_width = 1.1 * line_width_scale
-                            else:
-                                line_width = 0.75 * line_width_scale
 
+                            else:
+                                line_width = 0.80* line_width_scale
+                                
                             ax.plot(
                                 [start[0], end[0]],
                                 [start[1], end[1]],
@@ -405,6 +411,7 @@ class MatplotlibVisualizer:
                             segment_widths,
                             segment_orientations,
                             ax,
+                            line_width,
                         )
 
                     elif road_point_type == int(gpudrive.EntityType.StopSign):
@@ -416,8 +423,8 @@ class MatplotlibVisualizer:
                                 radius=1.5,
                                 facecolor="#c04000",
                                 edgecolor="none",
-                                linewidth=3.0,
-                                alpha=0.9,
+                                linewidth=3.5,
+                                alpha=0.8,
                             )
                     elif road_point_type == int(gpudrive.EntityType.CrossWalk):
                         for x, y, length, width, orientation in zip(
@@ -436,6 +443,7 @@ class MatplotlibVisualizer:
                                 facecolor="none",
                                 edgecolor="xkcd:bluish grey",
                                 alpha=0.4,
+                                linewidth=1.5*self.line_width_scale
                             )
 
                 else:
@@ -447,6 +455,7 @@ class MatplotlibVisualizer:
                         label=road_point_type,
                         color=ROAD_GRAPH_COLORS[int(road_point_type)],
                     )
+   
 
     def _plot_filtered_agent_bounding_boxes(
         self,
