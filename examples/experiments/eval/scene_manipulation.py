@@ -9,36 +9,6 @@ from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.datatypes.observation import LocalEgoState
 
 import pdb
-
-
-def remove_agents_by_id(env, config):
-    """Delete random agents in scenarios."""
-    
-    # Obtain agent ids
-    agent_ids = LocalEgoState.from_tensor(
-        self_obs_tensor=env.sim.self_observation_tensor(),
-        backend='torch',
-        device=config.device
-    ).id
-
-    controlled_agent_mask = env.cont_agent_mask.clone()
-    
-    for env_idx in range(env.num_worlds):
-        # Get all controlled agent IDs for the current environment
-        scene_agent_ids = agent_ids[env_idx, :][controlled_agent_mask[env_idx]].long()
-
-        if scene_agent_ids.numel() > 0:  # Ensure there are agents to sample
-            # Determine the number of agents to sample (X% of the total agents)
-            num_to_sample = max(1, int(config.perc_to_rmv_per_scene * scene_agent_ids.size(0)))
-
-            # Randomly sample agent IDs to remove using torch
-            sampled_indices = torch.randperm(scene_agent_ids.size(0))[:num_to_sample]
-            sampled_agent_ids = scene_agent_ids[sampled_indices]
-            
-            # Delete the sampled agents from the environment
-            env.sim.deleteAgents({env_idx: sampled_agent_ids.tolist()})
-    
-    return env
     
 def test_policy_robustness(
     env, 
@@ -75,7 +45,7 @@ def test_policy_robustness(
         sim_state_figs_before[1].savefig(f"sim_state_before_1.png")
         
         if remove_random_agents:
-            env = remove_agents_by_id(env, config)
+            env.remove_agents_by_id(config.perc_to_rmv_per_scene)
         
         # Check after
         sim_state_figs_after = env.vis.plot_simulator_state(

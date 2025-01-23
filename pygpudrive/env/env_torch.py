@@ -504,6 +504,46 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
+        
+    def remove_agents_by_id(self, perc_to_rmv_per_scene):
+        """Delete random agents in scenarios."""
+    
+        # Obtain agent ids
+        agent_ids = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend='torch',
+            device=self.device
+        ).id
+
+        controlled_agent_mask = self.cont_agent_mask
+        
+        for env_idx in range(self.num_worlds):
+            # Get all controlled agent IDs for the current environment
+            scene_agent_ids = agent_ids[env_idx, :][controlled_agent_mask[env_idx]].long()
+
+            if scene_agent_ids.numel() > 0:  # Ensure there are agents to sample
+                # Determine the number of agents to sample (X% of the total agents)
+                num_to_sample = max(1, int(perc_to_rmv_per_scene * scene_agent_ids.size(0)))
+
+                # Randomly sample agent IDs to remove using torch
+                sampled_indices = torch.randperm(scene_agent_ids.size(0))[:num_to_sample]
+                sampled_agent_ids = scene_agent_ids[sampled_indices]
+                
+                #print(f'Delete {len(sampled_agent_ids)} agents')
+                
+                # Delete the sampled agents from the environment
+                self.sim.deleteAgents({env_idx: sampled_agent_ids.tolist()})
+    
+        # Reset controlled agent mask and visualizer
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+
+        # Reset static scenario data for the visualizer
+        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+        
 
     def swap_data_batch(self, data_batch=None):
         """
