@@ -11,11 +11,12 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+import pdb
 
 def make_videos(
-    df_results,
     policy,
     eval_config,
+    df_results=None,
     sort_by=None,  # Options: 'goal_achieved',
     show_top_k=100,
     device="cuda",
@@ -35,12 +36,14 @@ def make_videos(
             - not_goal_nor_crashed: Sort by not_goal_nor_crashed in descending order.
             - controlled_agents_in_scene: Sort by controlled_agents_in_scene in descending order.
     """
-
-    base_data_path = (
-        eval_config.train_dir
-        if df_results["dataset"][0] == "train"
-        else eval_config.test_dir
-    )
+    if df_results is not None:
+        base_data_path = (
+            eval_config.train_dir
+            if df_results["dataset"][0] == "train"
+            else eval_config.test_dir
+        )
+    else:
+        base_data_path = eval_config.train_dir
 
     # Make environment
     train_loader = SceneDataLoader(
@@ -85,8 +88,10 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__R_1000__01_19_11_15_25_854_002500"
+    MODEL_TO_LOAD = "model_PPO__R_10000__01_19_17_27_13_052_006750"
     DATASET = "train"
+    SORT_BY = "off_road" #"goal_achieved"
+    SHOW_TOP_K = 25 # Render this many scenes
 
     # Configurations
     eval_config = load_config("examples/experiments/eval/config/eval_config")
@@ -100,9 +105,12 @@ if __name__ == "__main__":
     )
 
     # Load results dataframe
-    df_res = pd.read_csv(f"{eval_config.res_path}/{MODEL_TO_LOAD}.csv")
-    df_res = df_res[df_res["dataset"] == DATASET]
-
+    if SORT_BY is not None:
+        df_res = pd.read_csv(f"{eval_config.res_path}/{MODEL_TO_LOAD}.csv")
+        df_res = df_res[df_res["dataset"] == DATASET]
+    else:
+        df_res = None
+        
     logging.info(
         f"Loaded policy {MODEL_TO_LOAD} and corresponding results df."
     )
@@ -112,8 +120,8 @@ if __name__ == "__main__":
         df_results=df_res,
         policy=policy,
         eval_config=eval_config,
-        sort_by="collided",  # Options: 'goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed', 'controlled_agents_in_scene'
-        show_top_k=1,
+        sort_by=SORT_BY,  # Options: 'goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed', 'controlled_agents_in_scene'
+        show_top_k=SHOW_TOP_K,
         device="cuda",
         zoom_radius=100,
         deterministic=False,
@@ -121,7 +129,9 @@ if __name__ == "__main__":
     )
 
     sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
-    videos_dir = Path(f"videos/{MODEL_TO_LOAD}")
+    
+    SORT_BY = SORT_BY if not None else "random"
+    videos_dir = Path(f"videos/{MODEL_TO_LOAD}/{SORT_BY}_top_{SHOW_TOP_K}")
     videos_dir.mkdir(parents=True, exist_ok=True)
 
     # Save videos locally
@@ -132,7 +142,7 @@ if __name__ == "__main__":
         mediapy.write_video(
             str(video_path),
             frames,
-            fps=8,
+            fps=10,
         )
 
         logging.info(f"Saved video to {video_path}")
