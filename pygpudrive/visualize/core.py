@@ -17,6 +17,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
+from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -94,6 +95,13 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
+        log_trajectory = LogTrajectory.from_tensor(
+            expert_traj_tensor=self.sim_object.expert_trajectory_tensor(),
+            num_worlds=len(env_indices),
+            max_agents=self.controlled_agents.shape[1],
+            backend=self.backend,
+        )
+        expert_trajectories = log_trajectory.pos_xy.to(self.device)
 
         agent_infos = self.sim_object.info_tensor().to_torch().to(self.device)
 
@@ -156,6 +164,14 @@ class MatplotlibVisualizer:
                 ax=ax,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
+            )
+
+            # Draw expert trajectories
+            self._plot_expert_trajectories(
+                ax=ax,
+                env_idx=env_idx,
+                expert_trajectories=expert_trajectories,
+                response_type=response_type,
             )
 
             # Draw the agents
@@ -491,6 +507,44 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
+
+    def _plot_expert_trajectories(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        expert_trajectories: torch.Tensor,
+        response_type: Any,
+    ) -> None:
+        """Plot expert trajectories.
+        Args:
+            ax: Matplotlib axis for plotting.
+            env_idx: Environment index to select specific environment agents.
+            expert_trajectories: The global state of expert from `LogTrajectory`.
+        """
+        if self.vis_config.draw_expert_trajectories:
+            controlled_mask = self.controlled_agents[env_idx, :]
+            non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
+            mask = (
+                controlled_mask
+                if self.vis_config.draw_only_controllable_veh
+                else controlled_mask | non_controlled_mask
+            )
+            agent_indices = torch.where(mask)[0]
+            trajectories = expert_trajectories[env_idx][mask]
+            for idx, trajectory in zip(agent_indices, trajectories):
+                color = AGENT_COLOR_BY_STATE["ok"] if controlled_mask[idx] else AGENT_COLOR_BY_STATE["log_replay"]
+                for step in trajectory:
+                    x, y = step[:2].numpy()
+                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
+                        ax.add_patch(
+                            Circle(
+                                (x, y),
+                                radius=0.3,
+                                color=color,
+                                fill=True,
+                                alpha=0.5,
+                            )
+                        )
 
     def plot_agent_observation(
         self,
