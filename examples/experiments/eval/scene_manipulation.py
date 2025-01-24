@@ -19,6 +19,7 @@ def test_policy_robustness(
     data_loader,
     config,
     remove_random_agents=False,
+    remove_controlled_agents=True,
 ):
     
     res_dict = {
@@ -48,7 +49,10 @@ def test_policy_robustness(
         sim_state_figs_before[1].savefig(f"sim_state_before_1.png")
         
         if remove_random_agents:
-            env.remove_agents_by_id(config.perc_to_rmv_per_scene)
+            env.remove_agents_by_id(
+                config.perc_to_rmv_per_scene,
+                remove_controlled_agents = remove_controlled_agents
+            )
         
         # Check after
         sim_state_figs_after = env.vis.plot_simulator_state(
@@ -126,7 +130,7 @@ if __name__ == "__main__":
         remove_random_agents=False,
     )
     
-    df_perf_perturbed = test_policy_robustness(
+    df_perf_perturbed_controlled = test_policy_robustness(
         env=env, 
         policy=policy,
         data_loader=train_loader,
@@ -134,7 +138,21 @@ if __name__ == "__main__":
         remove_random_agents=True,
     )
 
-    df = pd.concat([df_perf_original, df_perf_perturbed])
+    df_perf_perturbed_static = test_policy_robustness(
+        env=env,
+        policy=policy,
+        data_loader=train_loader,
+        config=config,
+        remove_random_agents=True,
+        remove_controlled_agents=False
+    )
+
+    # Concatenate all three dataframes with a new column to identify the scenario
+    df_perf_original['scenario'] = 'Original'
+    df_perf_perturbed_controlled['scenario'] = 'Removed Controlled'
+    df_perf_perturbed_static['scenario'] = 'Removed Uncontrolled'
+
+    df = pd.concat([df_perf_original, df_perf_perturbed_controlled, df_perf_perturbed_static])
 
     # Calculate mean values for each metric grouped by deleted_agents
     metrics = ['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']
@@ -144,19 +162,20 @@ if __name__ == "__main__":
         df[col] = df[col].astype(float)
 
     # Now calculate means
-    means_by_group = df.groupby('deleted_agents')[metrics].mean()
+    means_by_group = df.groupby('scenario')[metrics].mean()
 
     # Set up the plot
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 6))
     x = np.arange(len(metrics))
-    width = 0.35
+    width = 0.25
 
     # Plot bars for each group
-    original = means_by_group.loc[False]
-    perturbed = means_by_group.loc[True]
-
-    ax.bar(x - width/2, original, width, label='Original', color='skyblue')
-    ax.bar(x + width/2, perturbed, width, label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% agents', color='lightcoral')
+    ax.bar(x - width, means_by_group.loc['Original'], width, 
+        label='Original', color='skyblue')
+    ax.bar(x, means_by_group.loc['Removed Controlled'], width,
+        label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Controlled', color='lightcoral')
+    ax.bar(x + width, means_by_group.loc['Removed Uncontrolled'], width,
+        label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Uncontrolled', color='lightgreen')
 
     # Customize the plot
     ax.set_ylabel('Proportion')
@@ -174,10 +193,6 @@ if __name__ == "__main__":
     if not os.path.exists(config.save_results_path):
         os.makedirs(config.save_results_path)
 
-    df.to_csv(f"{config.save_results_path}/0123.csv", index=False)
+    df.to_csv(f"{config.save_results_path}/combined_results_{int(config.perc_to_rmv_per_scene*100)}pct.csv", index=False)
 
-    logging.info(f"Saved at {config.save_results_path}/0123.csv \n")
-
-    
-
-
+    logging.info(f"Saved results at {config.save_results_path}")
