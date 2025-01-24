@@ -67,6 +67,8 @@ public:
     MGR_EXPORT madrona::py::Tensor infoTensor() const;
     MGR_EXPORT madrona::py::Tensor responseTypeTensor() const;
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
+    MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
+    MGR_EXPORT madrona::py::Tensor metadataTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation

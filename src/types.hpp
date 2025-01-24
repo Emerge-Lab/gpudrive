@@ -37,14 +37,43 @@ namespace gpudrive
         NumTypes,
     };
 
-struct AgentID {
-    int32_t id;
-};
+    enum class MapType : int32_t
+    {
+        LANE_UNDEFINED = 0,
+        LANE_FREEWAY = 1,
+        LANE_SURFACE_STREET = 2,
+        LANE_BIKE_LANE = 3,
+        // Original definition skips 4
+        ROAD_LINE_UNKNOWN = 5,
+        ROAD_LINE_BROKEN_SINGLE_WHITE = 6,
+        ROAD_LINE_SOLID_SINGLE_WHITE = 7,
+        ROAD_LINE_SOLID_DOUBLE_WHITE = 8,
+        ROAD_LINE_BROKEN_SINGLE_YELLOW = 9,
+        ROAD_LINE_BROKEN_DOUBLE_YELLOW = 10,
+        ROAD_LINE_SOLID_SINGLE_YELLOW = 11,
+        ROAD_LINE_SOLID_DOUBLE_YELLOW = 12,
+        ROAD_LINE_PASSING_DOUBLE_YELLOW = 13,
+        ROAD_EDGE_UNKNOWN = 14,
+        ROAD_EDGE_BOUNDARY = 15,
+        ROAD_EDGE_MEDIAN = 16,
+        STOP_SIGN = 17,
+        CROSSWALK = 18,
+        SPEED_BUMP = 19,
+        DRIVEWAY = 20,  // New datatype in v1.2.0: Driveway entrances
+        UNKNOWN = -1,
+        NUM_TYPES = 21,
+    };
+
+    struct AgentID 
+    {
+        int32_t id;
+    };
 
     struct VehicleSize
     {
         float length;
         float width;
+        float height;
     };
 
     struct Goal
@@ -61,10 +90,19 @@ struct AgentID {
         int32_t reset;
     };
 
-struct ResetMap {
-    int32_t reset;
-};   
-     struct ClassicAction
+    struct ResetMap {
+        int32_t reset;
+    };   
+
+    struct WorldMeans {
+        madrona::math::Vector3 mean; // TODO: Z is 0 for now, but can be used for 3D in future
+    };
+
+    const size_t WorldMeansExportSize = 3;
+
+    static_assert(sizeof(WorldMeans) == sizeof(float) * WorldMeansExportSize);
+
+    struct ClassicAction
     {
         float acceleration;
         float steering;
@@ -90,6 +128,12 @@ struct ResetMap {
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
+
+        static inline Action zero()
+        {
+            return Action{
+                .classic = {.acceleration = 0, .steering = 0, .headAngle = 0}};
+        }
     };
 
     const size_t ActionExportSize = 3 + 1 + 6;
@@ -143,19 +187,19 @@ struct ResetMap {
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
-    float id;
+        float id;
         static inline SelfObservation zero()
         {
             return SelfObservation{
                 .speed = 0,
-                .vehicle_size = {0, 0},
+                .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
-            .id = -1};
+                .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 7;
+    const size_t SelfObservationExportSize = 8; // 1 + 3 + 2 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -166,6 +210,7 @@ struct ResetMap {
         float heading;
         float type;
         float id;
+        float mapType;
 
         static inline MapObservation zero()
         {
@@ -174,12 +219,13 @@ struct ResetMap {
                 .scale = madrona::math::Diag3x3{0, 0, 0},
                 .heading = 0,
                 .type = static_cast<float>(EntityType::None),
-                .id = -1
+                .id = -1,
+                .mapType = static_cast<float>(MapType::UNKNOWN)
             };       
         }
     };
 
-    const size_t MapObservationExportSize = 8;
+    const size_t MapObservationExportSize = 9; // 2 + 3 + 1 + 1 + 1 + 1
 
     static_assert(sizeof(MapObservation) == sizeof(float) * MapObservationExportSize);
 
@@ -190,18 +236,29 @@ struct ResetMap {
         float heading;
         VehicleSize vehicle_size;
         float type;
-    float id;
+        float id;
 
-    static inline PartnerObservation zero() {
-        return PartnerObservation{
-            .speed = 0,
-            .position = {0, 0},
-            .heading = 0,
-            .vehicle_size = {0, 0},
-            .type = static_cast<float>(EntityType::None),
-            .id = -1};
-    }
-};
+        static inline PartnerObservation zero() {
+            return PartnerObservation{
+                .speed = 0,
+                .position = {0, 0},
+                .heading = 0,
+                .vehicle_size = {0, 0, 0},
+                .type = static_cast<float>(EntityType::None),
+                .id = -1};
+        }
+    };
+
+    // Egocentric observations of other agents
+    struct PartnerObservations
+    {
+        PartnerObservation obs[consts::kMaxAgentCount - 1];
+    };
+
+    const size_t PartnerObservationExportSize = 9; // 1 + 2 + 1 + 3 + 1 + 1
+
+    static_assert(sizeof(PartnerObservations) == sizeof(float) *
+        (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
 
     struct RoadMapId{
         int32_t id;
@@ -211,23 +268,12 @@ struct ResetMap {
 
     static_assert(sizeof(RoadMapId) == sizeof(int) * RoadMapIdExportSize);
 
-    // Egocentric observations of other agents
-    struct PartnerObservations
-    {
-        PartnerObservation obs[consts::kMaxAgentCount - 1];
-    };
-
-    const size_t PartnerObservationExportSize = 8;
-
-    static_assert(sizeof(PartnerObservations) == sizeof(float) *
-                                                     (consts::kMaxAgentCount - 1) * PartnerObservationExportSize);
-
     struct AgentMapObservations
     {
         MapObservation obs[consts::kMaxAgentMapObservationsCount];
     };
 
-    const size_t AgentMapObservationExportSize = 8;
+    const size_t AgentMapObservationExportSize = MapObservationExportSize;
 
     static_assert(sizeof(AgentMapObservations) ==
                   sizeof(float) * consts::kMaxAgentMapObservationsCount *
@@ -278,6 +324,18 @@ struct ResetMap {
         float headings[consts::kTrajectoryLength];
         float valids[consts::kTrajectoryLength];
         Action inverseActions[consts::kTrajectoryLength];
+
+        static inline void zero(Trajectory& traj)
+        {
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            {
+                traj.positions[i] = {0, 0};
+                traj.velocities[i] = {0, 0};
+                traj.headings[i] = 0;
+                traj.valids[i] = 0;
+                traj.inverseActions[i] = Action::zero();
+            }
+        }
     };
 
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
@@ -302,7 +360,7 @@ struct ResetMap {
 
     struct AbsoluteRotation
     {
-        Rotation rotationAsQuat;
+        Rotation rotationAsQuat; // x, y, z, w
         float rotationFromAxis;
     };
 
@@ -315,9 +373,28 @@ struct ResetMap {
         float id;
     };
 
-    const size_t AbsoluteSelfObservationExportSize = 13; // 3 + 4 + 1 + 2 + 2
+    const size_t AbsoluteSelfObservationExportSize = 14; // 3 + 5 + 2 + 3 + 1
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
+
+    //Metadata struct : using agent IDs.
+    struct MetaData
+    {
+        int32_t isSdc;
+        int32_t isObjectOfInterest;
+        int32_t isTrackToPredict;
+        int32_t difficulty;
+
+        static inline void zero(MetaData& metadata)
+        {
+            metadata.isSdc = -1;
+            metadata.isObjectOfInterest = -1;
+            metadata.isTrackToPredict = -1;
+            metadata.difficulty = -1;
+        }
+    };
+    const size_t MetaDataExportSize = 4;
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
 
     struct AgentInterface : public madrona::Archetype<
                                 Action,
@@ -333,7 +410,8 @@ struct ResetMap {
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
-    AgentID,
+                                AgentID,
+                                MetaData,
 
                                 ControlledState // Drive Logic
 
@@ -414,6 +492,7 @@ struct ResetMap {
                                RoadInterfaceEntity,
                                EntityType,
                                RoadMapId,
+                               MapType,
                                madrona::render::Renderable>
     {
     };

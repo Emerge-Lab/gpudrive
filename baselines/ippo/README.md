@@ -1,21 +1,47 @@
-## Running the IPPO Baseline
+# Using IPPO in GPUDrive
 
-To run the multi-agent IPPO baseline using stable-baselines 3 (SB3):
+## PufferLib implementation
 
-```bash
-python baselines/ippo/run_sb3_ppo.py
+### Dependencies
+
+This implementation is compatible with the `gpudrive` branch of [PufferLib](https://github.com/PufferAI/PufferLib/tree/gpudrive/pufferlib/environments/gpudrive). To install, run:
+
+```
+pip install git+https://github.com/PufferAI/PufferLib.git@gpudrive
 ```
 
-### Resampling the data
+### Example
+
+- Launch a run:
+
+```bash
+python baselines/ippo/ippo_pufferlib.py
+```
+
+- Configs are in `baselines/ippo/config/ippo_ff_puffer.yaml`
+- A small feedforward network is implemented in `integrations/rl/puffer/utils.py`
+
+## Stable baselines 3 implementation
+
+### Example
+
+- Launch a run:
+
+```
+python baselines/ippo/ippo_sb3.py
+```
+
+- Configurations are found in `baselines/ippo/config/ippo_ff_sb3.yaml`
+
+### Details
+
+#### Resampling the data
 
 The configuration for resampling traffic scenarios includes:
 
 - **`resample_scenarios`**: A boolean that enables or disables traffic scenario resampling when set to `True`.
-
 - **`resample_criterion`**: Set to `"global_step"`, indicating resampling occurs based on the global step count.
-
 - **`resample_freq`**: Specifies resampling frequency at `50,000` steps, recommended to align with `num_worlds * n_steps`.
-
 - **`resample_mode`**: Set to `"random"` for random selection of new scenarios.
 
 ```
@@ -26,9 +52,9 @@ resample_freq: int = 100_000 # Resample every k steps (recommended to be a multi
 resample_mode: str = "random" # Options: "random"
 ```
 
-## Implemented networks
+#### Implemented networks
 
-### Classic Observations
+- Classic Observations
 
 For classic observations (e.g., `ego_state`), there is support for a permutation equivariant network (recommended). In `baselines/ippo/config.py`, set the following:
 
@@ -39,6 +65,7 @@ policy = LateFusionPolicy
 ```
 
 The default settings for classic observations are:
+
 ```python
 ego_state: bool = True  # Use ego vehicle state
 road_map_obs: bool = True  # Use road graph data
@@ -46,7 +73,7 @@ partner_obs: bool = True  # Include partner vehicle information
 norm_obs: bool = True  # Normalize observations
 ```
 
-### LiDAR Observations
+- LiDAR Observations
 
 For only LiDAR-based observations, set the following options:
 
@@ -60,6 +87,7 @@ lidar_obs: bool = True  # Use LiDAR in observations
 ```
 
 You can also **mix** classic and LiDAR observations by setting:
+
 ```python
 ego_state: bool = True  # Include ego vehicle state in observations
 road_map_obs: bool = True  # Include road graph in observations
@@ -70,6 +98,7 @@ lidar_obs: bool = True  # Add LiDAR to observations
 ```
 
 In both cases, you can use a feedforward network from `networks/basic_ffn.py`:
+
 ```python
 # NETWORK
 mlp_class = FFN

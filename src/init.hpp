@@ -22,20 +22,21 @@ namespace gpudrive
     struct MapObject
     {
         MapVector2 position[MAX_POSITIONS];
-        float width;
-        float length;
+        VehicleSize vehicle_size;
         float heading[MAX_POSITIONS];
         MapVector2 velocity[MAX_POSITIONS];
         bool valid[MAX_POSITIONS];
         MapVector2 goalPosition;
         EntityType type;
+        MetaData metadata;
 
         uint32_t numPositions;
         uint32_t numHeadings;
         uint32_t numVelocities;
         uint32_t numValid;
+        uint32_t id;
         MapVector2 mean;
-        bool markAsStatic{false};
+        bool markAsExpert{false};
     };
 
     struct MapRoad
@@ -43,6 +44,7 @@ namespace gpudrive
         // std::array<MapPosition, MAX_POSITIONS> geometry;
         MapVector2 geometry[MAX_GEOMETRY];
         uint32_t id;
+        MapType mapType;
         EntityType type;
         uint32_t numPoints;
         MapVector2 mean;

@@ -54,11 +54,14 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<RoadInterfaceEntity>();
     registry.registerComponent<AgentID>();
     registry.registerComponent<RoadMapId>();
+    registry.registerComponent<MapType>();
+    registry.registerComponent<MetaData>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
     registry.registerSingleton<ResetMap>();
+    registry.registerSingleton<WorldMeans>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -70,6 +73,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Shape>((uint32_t)ExportID::Shape);
     registry.exportSingleton<Map>((uint32_t)ExportID::Map);
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
+    registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
+    
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<AgentInterface, SelfObservation>(
@@ -99,6 +104,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::ResponseType);
     registry.exportColumn<AgentInterface, Trajectory>(
         (uint32_t)ExportID::Trajectory);
+    registry.exportColumn<AgentInterface, MetaData>(
+        (uint32_t)ExportID::MetaData);
 }
 
 static inline void cleanupWorld(Engine &ctx) {
@@ -246,7 +253,7 @@ inline void collectMapObservationsSystem(Engine &ctx,
         }
 
         map_obs.obs[arrIndex] = referenceFrame.observationOf(
-            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), static_cast<float>(ctx.get<RoadMapId>(road).id));
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), static_cast<float>(ctx.get<RoadMapId>(road).id), ctx.get<MapType>(road));
         arrIndex++;
     }
     while (arrIndex < consts::kMaxAgentMapObservationsCount) {
@@ -662,6 +669,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
     out.vehicle_size = vehicleSize;
+    out.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
@@ -764,7 +772,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         {clear_tmp});
 
     if (cfg.renderBridge) {
-        RenderingSystem::setupTasks(builder, {done_sys});
+        RenderingSystem::setupTasks(builder, dependencies);
     }
 
     TaskGraphNodeID lidar;

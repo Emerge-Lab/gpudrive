@@ -47,6 +47,7 @@ def select_scenes(config):
             assert (
                 config.k_unique_scenes > 0 or config.k_unique_scenes is None
             ), "K_UNIQUE_N discipline requires specifying positive value for K"
+
             selected_scenes = repeat_to_N(
                 random_sample(config.k_unique_scenes)
             )
@@ -63,7 +64,7 @@ def select_scenes(config):
     ]
 
     print(
-        f"\n--- Ratio unique scenes / number of worls = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
+        f"\n--- Ratio unique scenes / number of worlds = {len(np.unique(scene_paths))} / {len(scene_paths)} ---\n"
     )
 
     return scene_paths

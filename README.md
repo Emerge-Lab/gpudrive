@@ -12,13 +12,14 @@ For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the
 <center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
 </figure>
 
-## Implemented algorithms 🌱
+## ⚙️ Integrations
 
-| Algorithm      | Reference                                                                                                                           | README                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **IPPO** | [Paper](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf) | [Source](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md) |
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br />(`agent steps per second`) |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
 
-## Installation 🛠️
+## 🛠️ Installation
 
 To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
 
@@ -51,7 +52,7 @@ cd gpudrive
 
 ---
 
-Then, you can *choose* between two options for building the simulator:
+Then, you can *choose* between 3 options for building the simulator:
 
 ---
 
@@ -177,15 +178,17 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
-## Getting started 🚀
+## 🚀 Getting started
 
-To get started, see our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+To get started, see these entry points:
+- Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
+- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
 <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p>
 
-## Tests 📈
+## 📈 Tests
 
 To further test the setup, you can run the pytests in the root directory:
 
@@ -200,24 +203,63 @@ cd build
 ./headless CPU 1 # Run on CPU, 1 step
 ```
 
-## Pre-trained policy 🏋🏼‍♀️
+## 🏋🏼‍♀️ Pre-trained policy
 
 We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy [here](https://drive.google.com/file/d/1N4KJrt5PG6Pu-ovBQ-zIp0sJH0AQodKq/view?usp=sharing). You can store the policy in ` models`.
 
-## Dataset `{ 🚦 🚗  🚙  🛣️ }`
+## 📂 Dataset
 
 ### Download the dataset
 
-Two versions of the dataset are readily available:
+- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
+- Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
 
-- a mini-one that is about 1 GB and consists of 1000 training files and 100 validation / test files at: [Dropbox Link](https://www.dropbox.com/sh/8mxue9rdoizen3h/AADGRrHYBb86pZvDnHplDGvXa?dl=0).
-- the full dataset (150 GB) and consists of 134453 training files and 12205 validation / test files: [Dropbox Link](https://www.dropbox.com/sh/wv75pjd8phxizj3/AABfNPWfjQdoTWvdVxsAjUL_a?dl=0)
+<details>
+  <summary>Download the dataset</summary>
 
-The simulator supports initializing scenes from the `Nocturne` dataset (TODO: UPDATE). The input parameter for the simulator `json_path` takes in a path to a directory containing the files in the Nocturne format. The `SceneConfig` dataclass in `pygpudrive/env/config.py` dataclass is used to configure how scenes are selected from a folder with traffic scenarios.
+- To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
+```bash
+pip install huggingface_hub
+```
+Then you can download the dataset using python or just `huggingface-cli`.
 
-### Re-building the dataset
+- **Option 1**: Using Python
+```python
+>>> from huggingface_hub import snapshot_download
+>>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
+```
 
-GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains over 100,000 scenarios. To download new files and create scenarios for the simulator, follow these three steps.
+- **Option 2**: Use the huggingface-cli
+
+1. Log in to your Hugging Face account:
+```bash
+huggingface-cli login
+```
+
+2. Download the dataset:
+```bash
+huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
+```
+
+- **Option 3**: Manual Download
+
+1. Visit https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini
+2. Navigate to the Files and versions tab.
+3. Download the desired files/directories.
+
+_NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectories of 10k files each (according to hugging face constraints). In order for the path to work with GPUDrive, you need to run
+```python
+python data_utils/extract_groups.py #use --help if you've used a custom download path
+```
+
+</details>
+
+### Re-build the dataset
+
+If you wish to manually generate the dataset, GPUDrive is compatible with the complete [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), which contains well over 100,000 scenarios. To download new files and create scenarios for the simulator, follow the steps below.
+
+<details>
+  <summary>Re-build the dataset in 3 steps</summary>
 
 1. First, head to [https://waymo.com/open/](https://waymo.com/open/) and click on the "download" button a the top. After registering, click on the files from `v1.2.1 March 2024`, the newest version of the dataset at the time of wrting (10/2024). This will lead you a Google Cloud page. From here, you should see a folder structure like this:
 
@@ -259,7 +301,7 @@ python data_utils/process_waymo_files.py '<raw-data-path>' '<storage-path>' '<da
 Note: Due to an open [issue](https://github.com/waymo-research/waymo-open-dataset/issues/868), installation of `waymo-open-dataset-tf-2.12.0` fails for Python 3.11. To use the script, in a separate Python 3.10 environment, run
 
 ```bash
-pip install waymo-open-dataset-tf-2-12-0 tqdm
+pip install waymo-open-dataset-tf-2-12-0 trimesh[easy] python-fcl
 ```
 
 Then for example, if you want to process the validation data, run:
@@ -273,9 +315,11 @@ INFO:root:Done!
 
 and that's it!
 
-> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing the entire validation dataset takes about 2 hours because it involves handling around 75,000 traffic scenarios (150 files, each with 500 scenarios).
+> **🧐 Caveat**: A single Waymo tfrecord file contains approximately 500 traffic scenarios. Processing speed is about 250 scenes/min on a 16 core CPU. Trying to process the entire validation set for example (150 tfrecords) is a LOT of time.
 
-## Citations
+</details>
+
+## 📜 Citations
 
 If you use GPUDrive in your work, please cite us:
 
@@ -291,7 +335,7 @@ If you use GPUDrive in your work, please cite us:
 }
 ```
 
-## Contributing and learning benchmark 👷‍♀️
+## Contributing and learning benchmark
 
 If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
 

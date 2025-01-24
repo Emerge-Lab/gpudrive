@@ -6,16 +6,23 @@ from pygpudrive.env.viz import PyGameVisualizer
 from pygpudrive.env.scene_selector import select_scenes
 import abc
 import gpudrive
+import torch
+import jax.numpy as jnp
 
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
-    """Base class for multi-agent environments in GPUDrive.
-
-    Provides common methods for setting up the simulator and handling output.
-    """
-
-    def __init__(self):
+    def __init__(self, backend="torch"):
         super().__init__()
+        self.backend = backend
+        if self.backend not in ["torch", "jax"]:
+            raise ValueError("Unsupported backend; use 'torch' or 'jax'")
+
+    def to_tensor(self, x):
+        """Convert simulator data to the correct tensor type for the specified backend."""
+        if self.backend == "torch":
+            return x.to_torch()
+        elif self.backend == "jax":
+            return x.to_jax()
 
     @abc.abstractmethod
     def reset(self):
@@ -110,9 +117,15 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.config.polyline_reduction_threshold
         )
         params.rewardParams = self._set_reward_params()
-        params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.maxNumControlledAgents = self.max_cont_agents
-        params.isStaticAgentControlled = False
+        if self.config.init_all_objects:
+            params.isStaticAgentControlled = True
+            params.initOnlyValidAgentsAtFirstStep = False
+            params.IgnoreNonVehicles = False
+        else:
+            params.isStaticAgentControlled = False
+            params.initOnlyValidAgentsAtFirstStep = True
+            params.IgnoreNonVehicles = self.config.remove_non_vehicles
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
         ]
@@ -130,27 +143,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else:
                 params.enableLidar = self.config.lidar_obs
                 params.disableClassicalObs = self.config.disable_classic_obs
+                self.config.ego_state = False
+                self.config.road_map_obs = False
+                self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
-
-        # Map entity types to integers
-        self.ENTITY_TYPE_TO_INT = {
-            gpudrive.EntityType._None: 0,
-            gpudrive.EntityType.RoadEdge: 1,
-            gpudrive.EntityType.RoadLine: 2,
-            gpudrive.EntityType.RoadLane: 3,
-            gpudrive.EntityType.CrossWalk: 4,
-            gpudrive.EntityType.SpeedBump: 5,
-            gpudrive.EntityType.StopSign: 6,
-            gpudrive.EntityType.Vehicle: 7,
-            gpudrive.EntityType.Pedestrian: 8,
-            gpudrive.EntityType.Cyclist: 9,
-            gpudrive.EntityType.Padding: 10,
-        }
-        self.MIN_OBJ_ENTITY_ENUM = min(list(self.ENTITY_TYPE_TO_INT.values()))
-        self.MAX_OBJ_ENTITY_ENUM = max(list(self.ENTITY_TYPE_TO_INT.values()))
-        self.ROAD_MAP_OBJECT_TYPES = 7  # (enums 0-6)
-        self.ROAD_OBJECT_TYPES = 4  # (enums 7-10)
 
         return params
 
@@ -169,11 +166,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             else gpudrive.madrona.ExecMode.CUDA
         )
 
-        dataset = select_scenes(scene_config)
+        self.dataset = select_scenes(scene_config)
         sim = gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
-            scenes=dataset,
+            scenes=self.dataset,
             params=params,
             enable_batch_renderer=self.render_config
             and self.render_config.render_mode
@@ -237,39 +234,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             )
         return params
 
-    def render(self, world_render_idx=0, color_objects_by_actor=None):
-        """Renders the environment.
-
-        Args:
-            world_render_idx (int): Index of the world to render.
-
-        Returns:
-            Any: Rendered view of the world, or None if an invalid index is specified.
-        """
-        if world_render_idx >= self.num_worlds:
-            print(f"Invalid world_render_idx: {world_render_idx}")
-            return None
-        if self.render_config.render_mode in {
-            RenderMode.PYGAME_ABSOLUTE,
-            RenderMode.PYGAME_EGOCENTRIC,
-            RenderMode.PYGAME_LIDAR,
-        }:
-            return self.visualizer.getRender(
-                world_render_idx=world_render_idx,
-                cont_agent_mask=self.cont_agent_mask,
-                color_objects_by_actor=color_objects_by_actor,
-            )
-        elif self.render_config.render_mode in {
-            RenderMode.MADRONA_RGB,
-            RenderMode.MADRONA_DEPTH,
-        }:
-            return self.visualizer.getRender()
-
     def reinit_scenarios(self, dataset: List[str]):
         """Resample the scenes.
         Args:
             dataset (List[str]): List of scene names to resample.
-            
+
         Returns:
             None
         """
@@ -287,7 +256,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def close(self):
         """Destroy the simulator and visualizer."""
         del self.sim
-        self.visualizer.destroy()
 
     def normalize_tensor(self, x, min_val, max_val):
         """Normalizes an array of values to the range [-1, 1].
