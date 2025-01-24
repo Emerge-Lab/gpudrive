@@ -1,13 +1,14 @@
 save_results_path: examples/experiments/eval/dataframes/scene_manipulation
-train_path: "/scratch/kj2676/gpudrive/data/processed/training"
+# train_path: "/scratch/kj2676/gpudrive/data/processed/training"
+train_path: "data/processed/training"
 
-cpt_path: examples/experiments/eval/models/sota_paper/
+cpt_path: examples/experiments/eval/models/
 cpt_name: model_PPO__R_10000__01_19_17_27_13_052_007500
 
-perc_to_rmv_per_scene: 0.9
+perc_to_rmv_per_scene: 0.3
 
-num_worlds: 2
-dataset_size: 2
+num_worlds: 10
+dataset_size: 100
 
 device: cuda
 deterministic: false

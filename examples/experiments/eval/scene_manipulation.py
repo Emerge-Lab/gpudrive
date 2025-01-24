@@ -1,7 +1,10 @@
 import os
+import logging
 from tqdm import tqdm
 import pandas as pd
 from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from evaluate import load_policy, rollout, load_config, make_env
 
@@ -115,13 +118,13 @@ if __name__ == "__main__":
     ) 
     
     # Run tests
-    # df_perf_original = test_policy_robustness(
-    #     env=env, 
-    #     policy=policy,
-    #     data_loader=train_loader,
-    #     config=config,
-    #     remove_random_agents=False,
-    # )
+    df_perf_original = test_policy_robustness(
+        env=env, 
+        policy=policy,
+        data_loader=train_loader,
+        config=config,
+        remove_random_agents=False,
+    )
     
     df_perf_perturbed = test_policy_robustness(
         env=env, 
@@ -132,13 +135,46 @@ if __name__ == "__main__":
     )
 
     df = pd.concat([df_perf_original, df_perf_perturbed])
-    
+
+    # Calculate mean values for each metric grouped by deleted_agents
+    metrics = ['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']
+
+    # Convert boolean columns to float for averaging
+    for col in metrics:
+        df[col] = df[col].astype(float)
+
+    # Now calculate means
+    means_by_group = df.groupby('deleted_agents')[metrics].mean()
+
+    # Set up the plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    x = np.arange(len(metrics))
+    width = 0.35
+
+    # Plot bars for each group
+    original = means_by_group.loc[False]
+    perturbed = means_by_group.loc[True]
+
+    ax.bar(x - width/2, original, width, label='Original', color='skyblue')
+    ax.bar(x + width/2, perturbed, width, label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% agents', color='lightcoral')
+
+    # Customize the plot
+    ax.set_ylabel('Proportion')
+    ax.set_title('Policy Performance Comparison')
+    ax.set_xticks(x)
+    ax.set_xticklabels(metrics, rotation=45)
+    ax.legend()
+
+    # Adjust layout and save
+    plt.tight_layout()
+    plt.savefig(f"{config.save_results_path}/metrics_comparison_{int(config.perc_to_rmv_per_scene*100)}pct.png")
+    plt.close()
     
     # Save
-    if not os.path.exists(eval_config.res_path):
-        os.makedirs(eval_config.res_path)
+    if not os.path.exists(config.save_results_path):
+        os.makedirs(config.save_results_path)
 
-    df_res.to_csv(f"{config.save_results_path}/0123.csv", index=False)
+    df.to_csv(f"{config.save_results_path}/0123.csv", index=False)
 
     logging.info(f"Saved at {config.save_results_path}/0123.csv \n")
 
