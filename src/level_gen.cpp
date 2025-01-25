@@ -352,8 +352,13 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
 
 void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
-
     const auto& map = ctx.singleton<Map>();
+
+    auto& mapName = ctx.singleton<MapName>();
+    for (int i = 0; i < sizeof(mapName.mapName); i++) {
+        mapName.mapName[i] = map.mapName[i];
+    }
+
 
     if (ctx.data().enableRender)
     {

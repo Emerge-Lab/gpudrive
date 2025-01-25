@@ -880,11 +880,6 @@ Sim::Sim(Engine &ctx,
         RenderingSystem::init(ctx, cfg.renderBridge);
     }
 
-    auto& mapName = ctx.singleton<MapName>();
-    for (int i = 0; i < sizeof(mapName.mapName); i++) {
-        mapName.mapName[i] = init.map->mapName[i];
-    }
-
     auto& map = ctx.singleton<Map>();
     map = *(init.map);
     // Creates agents, walls, etc.
