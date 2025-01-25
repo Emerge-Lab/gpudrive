@@ -62,6 +62,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerSingleton<Map>();
     registry.registerSingleton<ResetMap>();
     registry.registerSingleton<WorldMeans>();
+    registry.registerSingleton<MapName>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -74,6 +75,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Map>((uint32_t)ExportID::Map);
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
+    registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
@@ -876,6 +878,11 @@ Sim::Sim(Engine &ctx,
 
     if (enableRender) {
         RenderingSystem::init(ctx, cfg.renderBridge);
+    }
+
+    auto& mapName = ctx.singleton<MapName>();
+    for (int i = 0; i < sizeof(mapName.mapName); i++) {
+        mapName.mapName[i] = init.map->mapName[i];
     }
 
     auto& map = ctx.singleton<Map>();
