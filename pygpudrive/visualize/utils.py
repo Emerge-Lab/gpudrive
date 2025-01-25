@@ -347,7 +347,6 @@ def plot_speed_bumps(
     facecolor: str = None,
     edgecolor: str = None,
     alpha: float = None,
-    linewidth: float = 0
 ) -> None:
     facecolor = "xkcd:goldenrod"
     edgecolor = "xkcd:black"
@@ -414,7 +413,6 @@ def plot_crosswalk(
     facecolor: str = None,
     edgecolor: str = None,
     alpha: float = None,
-    linewidth: float=None,
 ):
     if ax is None:
         ax = plt.gca()
@@ -431,7 +429,7 @@ def plot_crosswalk(
         points,
         facecolor=facecolor,
         edgecolor=edgecolor,
-        linewidth=linewidth,
+        linewidth=2,
         alpha=alpha,
         hatch=r"//",
         zorder=2,
