@@ -148,46 +148,46 @@ if __name__ == "__main__":
     )
 
     # Concatenate all three dataframes with a new column to identify the scenario
-    df_perf_original['scenario'] = 'Original'
-    df_perf_perturbed_controlled['scenario'] = 'Removed Controlled'
-    df_perf_perturbed_static['scenario'] = 'Removed Uncontrolled'
+    df_perf_original['Class'] = 'Original'
+    df_perf_perturbed_controlled['Class'] = 'Removed controlled'
+    df_perf_perturbed_static['Class'] = 'Removed other'
 
     df = pd.concat([df_perf_original, df_perf_perturbed_controlled, df_perf_perturbed_static])
 
-    # Calculate mean values for each metric grouped by deleted_agents
-    metrics = ['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']
+    # # Calculate mean values for each metric grouped by deleted_agents
+    # metrics = ['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']
 
-    # Convert boolean columns to float for averaging
-    for col in metrics:
-        df[col] = df[col].astype(float)
+    # # Convert boolean columns to float for averaging
+    # for col in metrics:
+    #     df[col] = df[col].astype(float)
 
-    # Now calculate means
-    means_by_group = df.groupby('scenario')[metrics].mean()
+    # # Now calculate means
+    # means_by_group = df.groupby('scenario')[metrics].mean()
 
-    # Set up the plot
-    fig, ax = plt.subplots(figsize=(12, 6))
-    x = np.arange(len(metrics))
-    width = 0.25
+    # # Set up the plot
+    # fig, ax = plt.subplots(figsize=(12, 6))
+    # x = np.arange(len(metrics))
+    # width = 0.25
 
-    # Plot bars for each group
-    ax.bar(x - width, means_by_group.loc['Original'], width, 
-        label='Original', color='skyblue')
-    ax.bar(x, means_by_group.loc['Removed Controlled'], width,
-        label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Controlled', color='lightcoral')
-    ax.bar(x + width, means_by_group.loc['Removed Uncontrolled'], width,
-        label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Uncontrolled', color='lightgreen')
+    # # Plot bars for each group
+    # ax.bar(x - width, means_by_group.loc['Original'], width, 
+    #     label='Original', color='skyblue')
+    # ax.bar(x, means_by_group.loc['Removed Controlled'], width,
+    #     label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Controlled', color='lightcoral')
+    # ax.bar(x + width, means_by_group.loc['Removed Uncontrolled'], width,
+    #     label=f'Removed {int(config.perc_to_rmv_per_scene*100)}% Uncontrolled', color='lightgreen')
 
-    # Customize the plot
-    ax.set_ylabel('Proportion')
-    ax.set_title('Policy Performance Comparison')
-    ax.set_xticks(x)
-    ax.set_xticklabels(metrics, rotation=45)
-    ax.legend()
+    # # Customize the plot
+    # ax.set_ylabel('Proportion')
+    # ax.set_title('Policy Performance Comparison')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(metrics, rotation=45)
+    # ax.legend()
 
-    # Adjust layout and save
-    plt.tight_layout()
-    plt.savefig(f"{config.save_results_path}/metrics_comparison_{int(config.perc_to_rmv_per_scene*100)}pct.png")
-    plt.close()
+    # # Adjust layout and save
+    # plt.tight_layout()
+    # plt.savefig(f"{config.save_results_path}/metrics_comparison_{int(config.perc_to_rmv_per_scene*100)}pct.png")
+    # plt.close()
     
     # Save
     if not os.path.exists(config.save_results_path):
