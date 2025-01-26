@@ -108,7 +108,6 @@ def rollout(
 
     # Reset episode
     next_obs = env.reset()
-
     # Storage
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)
     collided = torch.zeros((num_worlds, max_agent_count), device=device)
@@ -146,7 +145,6 @@ def rollout(
                 (num_worlds, max_agent_count), dtype=torch.int64, device=device
             )
             action_template[live_agent_mask] = action.to(device)
-
             # Step the environment
             env.step_dynamics(action_template)
 
