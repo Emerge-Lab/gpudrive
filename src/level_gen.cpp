@@ -364,6 +364,12 @@ void createPersistentEntities(Engine &ctx) {
 
     const auto& map = ctx.singleton<Map>();
 
+    auto& mapName = ctx.singleton<MapName>();
+    for (int i = 0; i < sizeof(mapName.mapName); i++) {
+        mapName.mapName[i] = map.mapName[i];
+    }
+
+
     if (ctx.data().enableRender)
     {
         createCameraEntity(ctx);

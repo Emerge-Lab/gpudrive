@@ -140,7 +140,8 @@ namespace gpudrive
 
                 self.deleteAgents(agents_to_delete);
             })
-            .def("deleted_agents_tensor", &Manager::deletedAgentsTensor);
+            .def("deleted_agents_tensor", &Manager::deletedAgentsTensor)
+            .def("map_name_tensor", &Manager::mapNameTensor);
     }
 
 }

@@ -63,6 +63,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerSingleton<ResetMap>();
     registry.registerSingleton<WorldMeans>();
     registry.registerSingleton<DeletedAgents>();
+    registry.registerSingleton<MapName>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -76,6 +77,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
     registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
+    registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);

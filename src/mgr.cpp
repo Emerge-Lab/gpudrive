@@ -868,6 +868,13 @@ Tensor Manager::expertTrajectoryTensor() const {
         {impl_->numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
 }
 
+Tensor Manager::mapNameTensor() const {
+    return impl_->exportTensor(
+        ExportID::MapName, TensorElementType::Int32,
+        {impl_->numWorlds, MapNameExportSize}
+    );
+}
+
 Tensor Manager::metadataTensor() const {
     return impl_->exportTensor(
         ExportID::MetaData, TensorElementType::Int32,
