@@ -381,6 +381,14 @@ namespace gpudrive
 
     static_assert(sizeof(AbsoluteSelfObservation) == sizeof(float) * AbsoluteSelfObservationExportSize);
 
+    struct MapName
+    {
+        char32_t mapName[32];
+    };
+
+    const size_t MapNameExportSize = 32;
+    static_assert(sizeof(MapName) == sizeof(char32_t) * MapNameExportSize);
+
     //Metadata struct : using agent IDs.
     struct MetaData
     {
