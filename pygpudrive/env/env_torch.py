@@ -486,6 +486,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory.vel_xy,
             log_trajectory.yaw,
         )
+        
+    def get_env_filenames(self):
+        """Obtain the tfrecord filename for each world, mapping world indices to map names."""
+        
+        map_name_integers = self.sim.map_name_tensor().to_torch()
+        
+        filenames = {}
+        
+        # Iterate through the number of worlds
+        for i in range(self.num_worlds):
+            tensor = map_name_integers[i]
+            
+            # Convert ints to characters, ignoring zeros
+            map_name = ''.join([chr(i) for i in tensor.tolist() if i != 0])
+            
+            # Map the world index to the corresponding map name
+            filenames[i] = map_name
+        
+        return filenames
 
 
 if __name__ == "__main__":
@@ -515,6 +534,7 @@ if __name__ == "__main__":
 
     # RUN
     obs = env.reset()
+        
     frames = {f"env_{i}": [] for i in range(NUM_WORLDS)}
 
     for t in range(TOTAL_STEPS):
