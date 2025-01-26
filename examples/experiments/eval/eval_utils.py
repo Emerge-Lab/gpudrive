@@ -12,6 +12,7 @@ from pygpudrive.env.config import EnvConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.visualize.utils import img_from_fig
+from pygpudrive.datatypes.observation import GlobalEgoState
 
 from networks.late_fusion import LateFusionTransformer
 
@@ -20,6 +21,9 @@ import torch
 import random
 
 logging.basicConfig(level=logging.INFO)
+
+
+import pdb
 
 
 class RandomPolicy:
@@ -79,6 +83,7 @@ def rollout(
     render_every_n_steps: int = 5,
     zoom_radius: int = 100,
     results_df: pd.DataFrame = None,
+    return_agent_positions: bool = False
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -99,6 +104,7 @@ def rollout(
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
+    agent_positions = torch.zeros((2, episode_len, env.num_worlds, env.max_agent_count))
 
     # Reset episode
     next_obs = env.reset()
@@ -169,6 +175,13 @@ def rollout(
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
+        
+        #pdb.set_trace()
+        
+        if return_agent_positions:
+            global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
+            agent_positions[0, :, :, :] = global_agent_states.pos_x
+            agent_positions[1, :, :, :] = global_agent_states.pos_y            
 
         # Count the collisions, off-road occurrences, and goal achievements
         # at a given time step for living agents
@@ -229,74 +242,8 @@ def rollout(
         controlled_agents_per_scene,
         not_goal_nor_crash_per_scene,
         sim_state_frames,
+        agent_positions,
     )
-
-
-def evaluate_policy(
-    env,
-    policy,
-    data_loader,
-    dataset_name,
-    device="cuda",
-    deterministic=False,
-    render_sim_state=False,
-):
-    """Evaluate policy in the environment."""
-
-    res_dict = {
-        "scene": [],
-        "goal_achieved": [],
-        "collided": [],
-        "off_road": [],
-        "not_goal_nor_crashed": [],
-        "controlled_agents_in_scene": [],
-    }
-
-    for batch in tqdm(
-        data_loader,
-        desc=f"Processing {dataset_name} batches",
-        total=len(data_loader),
-        colour="blue",
-    ):
-
-        # Update simulator with the new batch of data
-        env.swap_data_batch(batch)
-
-        # Rollout policy in the environments
-        (
-            goal_achieved,
-            collided,
-            off_road,
-            controlled_agents_in_scene,
-            not_goal_nor_crashed,
-            _,
-        ) = rollout(
-            env=env,
-            policy=policy,
-            device=device,
-            deterministic=deterministic,
-            render_sim_state=render_sim_state,
-        )
-
-        # Store results for the current batch
-        scenario_names = [Path(path).stem for path in batch]
-        res_dict["scene"].extend(scenario_names)
-        res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
-        res_dict["collided"].extend(collided.cpu().numpy())
-        res_dict["off_road"].extend(off_road.cpu().numpy())
-        res_dict["not_goal_nor_crashed"].extend(
-            not_goal_nor_crashed.cpu().numpy()
-        )
-        res_dict["controlled_agents_in_scene"].extend(
-            controlled_agents_in_scene.cpu().numpy()
-        )
-
-    # Convert to pandas dataframe
-    df_res = pd.DataFrame(res_dict)
-    df_res["dataset"] = dataset_name
-
-    return df_res
-
 
 def load_config(cfg: str) -> Box:
     """Load configurations as a Box object.
@@ -340,91 +287,3 @@ def make_env(config, train_loader):
     )
 
     return env
-
-
-if __name__ == "__main__":
-
-    # Load configurations
-    eval_config = load_config("examples/experiments/eval/config/eval_config")
-    model_config = load_config("examples/experiments/eval/config/model_config")
-
-    train_loader = SceneDataLoader(
-        root=eval_config.train_dir,
-        batch_size=eval_config.num_worlds,
-        dataset_size=eval_config.num_worlds,
-        sample_with_replacement=False,
-    )
-
-    # Make environment
-    env = make_env(eval_config, train_loader)
-
-    for model in model_config.models:
-
-        logging.info(f"Evaluating model {model.name}")
-
-        # Load policy
-        policy = load_policy(
-            path_to_cpt=model_config.models_path,
-            model_name=model.name,
-            device=eval_config.device,
-            env=env,
-        )
-
-        # Create dataloaders for train and test sets
-        train_loader = SceneDataLoader(
-            root=eval_config.train_dir,
-            batch_size=eval_config.num_worlds,
-            dataset_size=model.train_dataset_size
-            if model.name != "random_baseline"
-            else 1000,
-            sample_with_replacement=False,
-            shuffle=False,
-        )
-
-        test_loader = SceneDataLoader(
-            root=eval_config.test_dir,
-            batch_size=eval_config.num_worlds,
-            dataset_size=eval_config.test_dataset_size
-            if model.name != "random_baseline"
-            else 1000,
-            sample_with_replacement=False,
-            shuffle=True,
-        )
-
-        # Rollouts
-        logging.info(
-            f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
-        )
-
-        df_res_train = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=train_loader,
-            dataset_name="train",
-            deterministic=False,
-            render_sim_state=False,
-        )
-
-        df_res_test = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=test_loader,
-            dataset_name="test",
-            deterministic=False,
-            render_sim_state=False,
-        )
-
-        # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
-
-        # Add metadata
-        df_res["model_name"] = model.name
-        df_res["train_dataset_size"] = model.train_dataset_size
-
-        # Store
-        if not os.path.exists(eval_config.res_path):
-            os.makedirs(eval_config.res_path)
-
-        df_res.to_csv(f"{eval_config.res_path}/{model.name}.csv", index=False)
-
-        logging.info(f"Saved at {eval_config.res_path}/{model.name}.csv \n")

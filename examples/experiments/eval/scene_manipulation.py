@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from evaluate import load_policy, rollout, load_config, make_env
+from eval_utils import load_policy, rollout, load_config, make_env
 
 from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.datatypes.observation import LocalEgoState
@@ -69,6 +69,7 @@ def test_policy_robustness(
             off_road,
             controlled_agents_in_scene,
             not_goal_nor_crashed,
+            _,
             _,
         ) = rollout(
             env=env,

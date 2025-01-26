@@ -5,7 +5,7 @@ from pathlib import Path
 import mediapy
 
 from pygpudrive.env.dataset import SceneDataLoader
-from evaluate import load_policy, load_config, make_env, rollout
+from eval_utils import load_policy, load_config, make_env, rollout
 
 import logging
 
@@ -53,7 +53,7 @@ def make_videos(
         sample_with_replacement=False,
         shuffle=False,
     )
-
+    
     env = make_env(eval_config, train_loader)
 
     # Select data batch toi
@@ -71,7 +71,7 @@ def make_videos(
     env.swap_data_batch(data_batch)
 
     # Rollout policy in the environments
-    _, _, _, _, _, sim_state_frames = rollout(
+    _, _, _, _, _, sim_state_frames, global_agent_states = rollout(
         env=env,
         policy=policy,
         device=device,
@@ -88,7 +88,7 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__R_10000__01_19_17_27_13_052_006750"
+    MODEL_TO_LOAD = "model_PPO__R_10000__01_23_21_02_58_770_005500" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
     DATASET = "train"
     SORT_BY = "off_road" #"goal_achieved"
     SHOW_TOP_K = 25 # Render this many scenes
