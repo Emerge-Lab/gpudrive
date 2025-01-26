@@ -64,7 +64,11 @@ def evaluate_policy(
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
-        res_dict["scene"].extend(scenario_names)
+        
+        # Get names from env
+        scenario_to_worlds_dict = env.get_env_filenames()
+        
+        res_dict["scene"].extend(scenario_to_worlds_dict.values())
         res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
         res_dict["collided"].extend(collided.cpu().numpy())
         res_dict["off_road"].extend(off_road.cpu().numpy())
