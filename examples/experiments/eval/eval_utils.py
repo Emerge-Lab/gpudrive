@@ -104,7 +104,7 @@ def rollout(
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
-    agent_positions = torch.zeros((2, episode_len, env.num_worlds, env.max_agent_count))
+    agent_positions = torch.zeros((env.num_worlds, env.max_agent_count, episode_len, 2))
 
     # Reset episode
     next_obs = env.reset()
@@ -165,6 +165,7 @@ def rollout(
                         zoom_radius=zoom_radius,
                         results_df=results_df,
                         eval_mode=True,
+                        agent_positions = agent_positions
                     )
                     for idx, env_id in enumerate(has_live_agent):
                         sim_state_frames[env_id].append(
@@ -180,8 +181,8 @@ def rollout(
         
         if return_agent_positions:
             global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
-            agent_positions[0, :, :, :] = global_agent_states.pos_x
-            agent_positions[1, :, :, :] = global_agent_states.pos_y            
+            agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
+            agent_positions[:, :, time_step, 1] = global_agent_states.pos_y            
 
         # Count the collisions, off-road occurrences, and goal achievements
         # at a given time step for living agents

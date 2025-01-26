@@ -1,5 +1,6 @@
 import os
 import logging
+from PIL import Image
 from tqdm import tqdm
 import pandas as pd
 from pathlib import Path
@@ -20,6 +21,7 @@ def test_policy_robustness(
     config,
     remove_random_agents=False,
     remove_controlled_agents=True,
+    plot_trajectories=False
 ):
     
     res_dict = {
@@ -57,7 +59,7 @@ def test_policy_robustness(
         # Check after
         sim_state_figs_after = env.vis.plot_simulator_state(
             env_indices=[0, 1],
-            time_steps=[0, 0]
+            time_steps=[0, 0],
         )
         sim_state_figs_after[0].savefig(f"sim_state_after_0.png")
         sim_state_figs_after[1].savefig(f"sim_state_after_1.png")
@@ -70,14 +72,25 @@ def test_policy_robustness(
             controlled_agents_in_scene,
             not_goal_nor_crashed,
             _,
-            _,
+            agent_positions,
         ) = rollout(
             env=env,
             policy=policy,
             device=config.device,
             deterministic=config.deterministic,
             render_sim_state=config.render_sim_state,
+            return_agent_positions=plot_trajectories
         )
+        
+        # Save last timestep rollout
+        _ = env.reset()
+        last_sim_state = env.vis.plot_simulator_state(
+            env_indices=[0, 1],
+            time_steps=[-1, -1],
+            agent_positions=agent_positions
+        )
+        last_sim_state[0].savefig(f"last_sim_state_0.png")
+        last_sim_state[1].savefig(f"last_sim_state_1.png")
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
@@ -129,6 +142,7 @@ if __name__ == "__main__":
         data_loader=train_loader,
         config=config,
         remove_random_agents=False,
+        plot_trajectories=True
     )
     
     df_perf_perturbed_controlled = test_policy_robustness(
@@ -137,6 +151,7 @@ if __name__ == "__main__":
         data_loader=train_loader,
         config=config,
         remove_random_agents=True,
+        plot_trajectories=True        
     )
 
     df_perf_perturbed_static = test_policy_robustness(
@@ -145,7 +160,8 @@ if __name__ == "__main__":
         data_loader=train_loader,
         config=config,
         remove_random_agents=True,
-        remove_controlled_agents=False
+        remove_controlled_agents=False,
+        plot_trajectories=True
     )
 
     # Concatenate all three dataframes with a new column to identify the scenario

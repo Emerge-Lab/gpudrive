@@ -96,6 +96,7 @@ class MatplotlibVisualizer:
         results_df: Optional[pd.DataFrame] = None,
         plot_log_replay_trajectory: bool = False,
         eval_mode: bool = False,
+        agent_positions: Optional[torch.Tensor] = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -205,6 +206,27 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
+            if agent_positions is not None:
+                # agent_positions shape is [num_worlds, max_agent_count, episode_len, 2]
+                for agent_idx in range(agent_positions.shape[1]):
+                    if controlled_live[agent_idx]:
+                        # Plot trajectory for this agent
+                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]  # Gets both x,y
+
+                        # Filter out zeros and out of bounds values
+                        valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) & 
+                                    (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) & 
+                                    (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
+                        
+                        ax.plot(
+                            trajectory[valid_mask, 0].cpu(),  # x coordinates
+                            trajectory[valid_mask, 1].cpu(),  # y coordinates
+                            color='green',
+                            alpha=0.5,
+                            linewidth=2.5,
+                            linestyle='-',  # solid line, use '--' for dashed or ':' for dotted
+                        )
+
 
             if eval_mode and results_df is not None:
 
@@ -261,7 +283,6 @@ class MatplotlibVisualizer:
                 )
 
                 
-
             # Determine center point for zooming
             if center_agent_idx is not None:
                 center_x = global_agent_states.pos_x[
