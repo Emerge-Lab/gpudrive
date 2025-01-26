@@ -62,6 +62,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerSingleton<Map>();
     registry.registerSingleton<ResetMap>();
     registry.registerSingleton<WorldMeans>();
+    registry.registerSingleton<DeletedAgents>();
     registry.registerSingleton<MapName>();
 
     registry.registerArchetype<Agent>();
@@ -75,6 +76,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Map>((uint32_t)ExportID::Map);
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
+    registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
     registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     
     registry.exportColumn<AgentInterface, Action>(
@@ -281,15 +283,14 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const CollisionDetectionEvent &collisionEvent,
+                           CollisionDetectionEvent& collisionEvent,
                            const ResponseType &responseType) {
-    
     if (collisionEvent.hasCollided.load_relaxed()) {
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
                 e.get<Done>(agent_iface.e).v = 1;
                 agentZeroVelSystem(e, velocity);
-                 break;
+                break;
 
             case CollisionBehaviour::AgentRemoved:
                 e.get<Done>(agent_iface.e).v = 1;
@@ -298,21 +299,24 @@ inline void movementSystem(Engine &e,
                 break;
 
             case CollisionBehaviour::Ignore:
-                // Do nothing.
+                // Reset collision state at the start of each timestep.
+                // This ensures the collision state is only true if the agent collided in the current timestep.
+                collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
+                Info& info = e.get<Info>(agent_iface.e);
+                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
                 break;
         }
     }
+
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
-    if(responseType == ResponseType::Static)
-    {
+    if (responseType == ResponseType::Static) {
         // Do nothing. The agent is static.
         // Agent can only be static if isStaticAgentControlled is set to true.
         return;
     }
 
-    if(e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static)
-    {
+    if (e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static) {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
         // In that case we teleport the agent. The agent will not collide with anything.
@@ -324,11 +328,9 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if(controlledState.controlled)
-    {
+    if (controlledState.controlled) {
         Action &action = e.get<Action>(agent_iface.e);
-        switch (e.data().params.dynamicsModel)
-        {
+        switch (e.data().params.dynamicsModel) {
 
             case DynamicsModel::InvertibleBicycle:
             {
@@ -351,9 +353,7 @@ inline void movementSystem(Engine &e,
                 break;
             }
         }
-    }
-    else
-    {
+    } else {
         // Follow expert trajectory
         const Trajectory &trajectory = e.get<Trajectory>(agent_iface.e);
         CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
@@ -882,6 +882,11 @@ Sim::Sim(Engine &ctx,
 
     auto& map = ctx.singleton<Map>();
     map = *(init.map);
+
+    auto& deletedAgents = ctx.singleton<DeletedAgents>();
+    for (auto i = 0; i < consts::kMaxAgentCount; i++) {
+        deletedAgents.deletedAgents[i] = -1;
+    }
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
 

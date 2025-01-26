@@ -3,22 +3,23 @@
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
-import gpudrive
-import imageio
 from itertools import product
-
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-
+import gymnasium
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
+    GlobalEgoState,
     PartnerObs,
     LidarObs,
 )
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
+from pygpudrive.env.dataset import SceneDataLoader
+import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -27,7 +28,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def __init__(
         self,
         config,
-        scene_config,
+        data_loader,
         max_cont_agents,
         device="cuda",
         action_type="discrete",
@@ -36,8 +37,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     ):
         # Initialization of environment configurations
         self.config = config
-        self.scene_config = scene_config
-        self.num_worlds = scene_config.num_scenes
+        self.data_loader = data_loader
+        self.num_worlds = data_loader.batch_size
         self.max_cont_agents = max_cont_agents
         self.device = device
         self.render_config = render_config
@@ -46,8 +47,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
-        # Initialize simulator with parameters
-        self.sim = self._initialize_simulator(params, scene_config)
+        # Initialize the iterator once
+        self.data_iterator = iter(self.data_loader)
+
+        # Get the initial data batch (set of traffic scenarios)
+        self.data_batch = next(self.data_iterator)
+
+        # Initialize simulator
+        self.sim = self._initialize_simulator(params, self.data_batch)
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
@@ -60,16 +67,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
+        # self.single_observation_space = Box(
+        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
+        # )
+        self.single_observation_space = gymnasium.spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.observation_space.shape[-1],),
+            dtype=np.float32,
+        )
+
         self._setup_action_space(action_type)
+        self.num_agents = self.cont_agent_mask.sum().item()
+        self.single_action_space = self.action_space
+        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
+        self.observation_space = pufferlib.spaces.joint_space(
+            self.single_observation_space, self.num_agents
+        )
+
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 
         # Rendering setup
         self.vis = MatplotlibVisualizer(
             sim_object=self.sim,
+            controlled_agent_mask=self.cont_agent_mask,
             goal_radius=self.config.dist_to_goal_threshold,
-            vis_config=self.render_config,
             backend=self.backend,
+            num_worlds=self.num_worlds,
+            render_config=self.render_config,
+            env_config=self.config,
         )
 
     def reset(self):
@@ -78,15 +105,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.get_obs()
 
     def get_dones(self):
-        return self.sim.done_tensor().to_torch().squeeze(dim=2).to(torch.float)
-
-    def get_infos(self):
         return (
-            self.sim.info_tensor()
+            self.sim.done_tensor()
             .to_torch()
+            .clone()
             .squeeze(dim=2)
             .to(torch.float)
-            .to(self.device)
+        )
+
+    def get_infos(self):
+        return Info.from_tensor(
+            self.sim.info_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
 
     def get_rewards(
@@ -94,6 +125,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         collision_weight=-0.005,
         goal_achieved_weight=1.0,
         off_road_weight=-0.005,
+        world_time_steps=None,
+        log_distance_weight=0.01,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -104,11 +137,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         The importance of each component is determined by the weights.
         """
         if self.config.reward_type == "sparse_on_goal_achieved":
-            return self.sim.reward_tensor().to_torch().squeeze(dim=2)
+            return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
             # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch()
+            info_tensor = self.sim.info_tensor().to_torch().clone()
+            off_road = info_tensor[:, :, 0].to(torch.float)
+
+            # True if the vehicle is in collision with another road object
+            # (i.e. a cyclist or pedestrian)
+            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+            goal_achieved = info_tensor[:, :, 3].to(torch.float)
+
+            weighted_rewards = (
+                collision_weight * collided
+                + goal_achieved_weight * goal_achieved
+                + off_road_weight * off_road
+            )
+
+            return weighted_rewards
+
+        elif self.config.reward_type == "distance_to_logs":
+            # Reward based on distance to logs and penalty for collision
+
+            # Return the weighted combination of the reward components
+            info_tensor = self.sim.info_tensor().to_torch().clone()
             off_road = info_tensor[:, :, 0].to(torch.float)
 
             # True if the vehicle collided with another road object
@@ -121,6 +174,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
+
+            log_trajectory = LogTrajectory.from_tensor(
+                self.sim.expert_trajectory_tensor(),
+                self.num_worlds,
+                self.max_agent_count,
+                backend=self.backend,
+            )
+
+            # Index log positions at current time steps
+            log_traj_pos = []
+            for i in range(self.num_worlds):
+                log_traj_pos.append(
+                    log_trajectory.pos_xy[i, :, world_time_steps[i], :]
+                )
+            log_traj_pos_tensor = torch.stack(log_traj_pos)
+
+            agent_state = GlobalEgoState.from_tensor(
+                self.sim.absolute_self_observation_tensor(),
+                self.backend,
+            )
+
+            agent_pos = torch.stack(
+                [agent_state.pos_x, agent_state.pos_y], dim=-1
+            )
+
+            # compute euclidean distance between agent and logs
+            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+
+            # add reward based on inverse distance to logs
+            weighted_rewards += log_distance_weight * torch.exp(-dist_to_logs)
 
             return weighted_rewards
 
@@ -418,9 +501,87 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
-        return (self.sim.controlled_state_tensor().to_torch() == 1).squeeze(
-            axis=2
+        return (
+            self.sim.controlled_state_tensor().to_torch().clone() == 1
+        ).squeeze(axis=2)
+        
+    def remove_agents_by_id(self, perc_to_rmv_per_scene, remove_controlled_agents=True):
+        """Delete random agents in scenarios.
+        
+        Args:
+            perc_to_rmv_per_scene (float): Percentage of agents to remove per scene
+            remove_controlled_agents (bool): If True, removes controlled agents. If False, removes uncontrolled agents
+        """
+        # Obtain agent ids
+        agent_ids = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend='torch',
+            device=self.device
+        ).id
+        
+        # Choose the appropriate mask based on whether we're removing controlled or uncontrolled agents
+        if remove_controlled_agents:
+            agent_mask = self.cont_agent_mask
+        else:
+            # Create inverse mask for uncontrolled agents
+            agent_mask = ~self.cont_agent_mask
+        
+        for env_idx in range(self.num_worlds):
+            # Get all relevant agent IDs (controlled or uncontrolled) for the current environment
+            scene_agent_ids = agent_ids[env_idx, :][agent_mask[env_idx]].long()
+            
+            if scene_agent_ids.numel() > 0:  # Ensure there are agents to sample
+                # Determine the number of agents to sample (X% of the total agents)
+                num_to_sample = max(1, int(perc_to_rmv_per_scene * scene_agent_ids.size(0)))
+                
+                # Randomly sample agent IDs to remove using torch
+                sampled_indices = torch.randperm(scene_agent_ids.size(0))[:num_to_sample]
+                sampled_agent_ids = scene_agent_ids[sampled_indices]
+                
+                # Delete the sampled agents from the environment
+                self.sim.deleteAgents({env_idx: sampled_agent_ids.tolist()})
+        
+        # Reset controlled agent mask and visualizer
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
         )
+        
+        # Reset static scenario data for the visualizer
+        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+        
+
+    def swap_data_batch(self, data_batch=None):
+        """
+        Swap the current data batch in the simulator with a new one
+        and reinitialize dependent attributes.
+        """
+
+        if data_batch is None:  # Sample new data batch from the data loader
+            self.data_batch = next(self.data_iterator)
+        else:
+            self.data_batch = data_batch
+
+        # Validate that the number of worlds (envs) matches the batch size
+        if len(self.data_batch) != self.num_worlds:
+            raise ValueError(
+                f"Data batch size ({len(self.data_batch)}) does not match "
+                f"the expected number of worlds ({self.num_worlds})."
+            )
+
+        # Update the simulator with the new data
+        self.sim.set_maps(self.data_batch)
+
+        # Reinitialize the mask for controlled agents
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+
+        # Reset static scenario data for the visualizer
+        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
@@ -511,53 +672,103 @@ if __name__ == "__main__":
     import mediapy
     from pygpudrive.visualize.utils import img_from_fig
 
-    # CONFIGURE
-    TOTAL_STEPS = 90
-    MAX_CONTROLLED_AGENTS = 2
-    NUM_WORLDS = 2
+    from pygpudrive.visualize.utils import img_from_fig
+    import mediapy as media
 
     env_config = EnvConfig(dynamics_model="delta_local")
-    scene_config = SceneConfig("data/processed/examples", NUM_WORLDS)
-    render_config = RenderConfig(
-        draw_expert_trajectories=True,
-        draw_only_controllable_veh=True,
+    render_config = RenderConfig()
+    data_config = SceneConfig(batch_size=2, dataset_size=1000)
+
+    # Create data loader
+    train_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=data_config.batch_size,
+        dataset_size=data_config.dataset_size,
+        sample_with_replacement=True,
+        shuffle=False,
     )
 
-    # MAKE ENV
+    # Make env
     env = GPUDriveTorchEnv(
         config=env_config,
-        scene_config=scene_config,
-        max_cont_agents=MAX_CONTROLLED_AGENTS,  # Number of agents to control
-        action_type="continuous",
-        device="cuda",
+        data_loader=train_loader,
+        max_cont_agents=128,  # Number of agents to control
+        device="cpu",
     )
 
-    # RUN
-    obs = env.reset()
-        
-    frames = {f"env_{i}": [] for i in range(NUM_WORLDS)}
+    print(f"dataset: {env.data_batch}")
 
-    for t in range(TOTAL_STEPS):
+    print(
+        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
+    )
+
+    # Rollout
+    obs = env.reset()
+
+    print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
+
+    sim_frames = []
+    agent_obs_frames = []
+
+    # env.swap_data_batch()
+    # env.reset()
+
+    expert_actions, _, _, _ = env.get_expert_actions()
+
+    env_idx = 0
+
+    for t in range(10):
         print(f"Step: {t}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
 
-        figs = env.vis.plot_simulator_state(
-            env_indices=list(range(NUM_WORLDS)),
-            time_steps=[t]*NUM_WORLDS,
-            figsize=(6, 6),
-            zoom_radius=100,
+        # if (t + 1) % 2 == 0:
+        # env.swap_data_batch()
+        # env.reset()
+        #     print(f"dataset: {env.data_batch}")
+
+        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
+
+        highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
+            -1
+        ].item()
+
+        # Make video
+        sim_states = env.vis.plot_simulator_state(
+            env_indices=[env_idx],
+            zoom_radius=50,
+            time_steps=[t],
+            center_agent_indices=[highlight_agent],
         )
 
-        for i in range(NUM_WORLDS):
-            frames[f"env_{i}"].append(img_from_fig(figs[i]))
+        agent_obs = env.vis.plot_agent_observation(
+            env_idx=env_idx,
+            agent_idx=highlight_agent,
+            figsize=(10, 10),
+        )
+
+        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
+        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
+
+        sim_frames.append(img_from_fig(sim_states[0]))
+        agent_obs_frames.append(img_from_fig(agent_obs))
 
         obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
+        info = env.get_infos()
 
-    for i in range(NUM_WORLDS):
-        mediapy.write_video(f"world{i}.mp4", frames[f"env_{i}"], fps=5)
+        if done[0, highlight_agent].bool():
+            break
+
     env.close()
+
+    media.write_video(
+        "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
+    )
+    media.write_video(
+        "obs_video.gif", np.array(agent_obs_frames), fps=10, codec="gif"
+    )

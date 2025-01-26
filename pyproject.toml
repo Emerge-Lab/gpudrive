@@ -5,7 +5,7 @@ backend-path = ["external/madrona/py"]
 
 [project]
 name = "gpudrive"
-version = "0.0.1"
+version = "0.3.0"
 
 [tool.madrona.packages.gpudrive]
 ext-only = true
@@ -26,7 +26,7 @@ pytest = "^8.2.1"
 
 [tool.poetry]
 name = "gpudrive"
-version = "0.1.0"
+version = "0.3.0"
 description = ""
 authors = ["Saman Kazemkheni <skazemkhani@gmail.com>", "Aarav Pandya <pandya.aarav.97@gmail.com", "Daphne Cornelisse <cor.daphne@gmail.com>", "Eugene Vinitsky <vinitsky.eugene@gmail.com>"]
 readme = "README.md"

@@ -347,6 +347,15 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
         return false;
     }
 
+    auto& deletedAgents = ctx.singleton<DeletedAgents>().deletedAgents;
+    for (CountT i = 0; i < consts::kMaxAgentCount; i++)
+    {
+        if(deletedAgents[i] == agentInit.id)
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 

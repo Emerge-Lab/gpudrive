@@ -25,7 +25,7 @@ data/raw/*
 data/processed/validation/*
 data/processed/testing/*
 data/processed/training/*
-data/formatted_json_v2_no_tl_valid/*
+data/processed/sampled/*
 
 # Logging
 /wandb
@@ -189,7 +189,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 venv/
 ENV/
@@ -238,5 +237,23 @@ poetry.toml
 pyrightconfig.json
 
 *~
+
+# Environment variables
+# To be manually created using .env.template
+.env
+
+# Logs
+examples/experiments/scripts/logs/*
+
+# Sbatch scripts
+*.sh
+
+# Videos
+videos/
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++

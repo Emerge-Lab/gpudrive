@@ -7,45 +7,58 @@ Links
 """
 
 import os
+from typing import Optional
+from typing_extensions import Annotated
 import yaml
 from datetime import datetime
 import torch
+import numpy as np
 import wandb
 from box import Box
+
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
-from integrations.rl.puffer.utils import Policy, LiDARPolicy
+
+from networks.late_fusion import LateFusionTransformer
+from pygpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
 import pufferlib.vector
 import pufferlib.frameworks.cleanrl
 from rich.console import Console
 
+import typer
+from typer import Typer
+
+app = Typer()
+
+
+def get_model_parameters(policy):
+    """Helper function to count the number of trainable parameters."""
+    params = filter(lambda p: p.requires_grad, policy.parameters())
+    return sum([np.prod(p.size()) for p in params])
+
 
 def load_config(config_path):
     """Load the configuration file."""
-    # fmt: off
     with open(config_path, "r") as f:
         config = Box(yaml.safe_load(f))
-
-    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S")
-    config["train"]["exp_id"] = f'{config["train"]["exp_id"]}__S_{str(config["environment"]["k_unique_scenes"])}__{datetime_}'
-    config["train"]["device"] = config["train"].get("device", "cpu")  # Default to 'cpu' if not set
-    if torch.cuda.is_available():
-        config["train"]["device"] = "cuda"  # Set to 'cuda' if available
-    # fmt: on
     return pufferlib.namespace(**config)
 
 
-def make_policy(env):
+def make_policy(env, config):
     """Create a policy based on the environment."""
-    return pufferlib.frameworks.cleanrl.Policy(Policy(env))
+    return LateFusionTransformer(
+        input_dim=config.train.network.input_dim,
+        action_dim=env.single_action_space.n,
+        hidden_dim=config.train.network.hidden_dim,
+        pred_heads_arch=config.train.network.pred_heads_arch,
+        dropout=config.train.network.dropout,
+    ).to(config.train.device)
 
 
-def train(args):
+def train(args, make_env):
     """Main training loop for the PPO agent."""
-    args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
-    args.train.__dict__.update(dict(args.wandb.config.train))
 
     backend_mapping = {
         # Note: Only native backend is currently supported with GPUDrive
@@ -68,9 +81,15 @@ def train(args):
         backend=backend,
     )
 
-    policy = make_policy(vecenv.driver_env).to(args.train.device)
+    policy = make_policy(env=vecenv.driver_env, config=args).to(
+        args.train.device
+    )
 
+    args.train.network.num_parameters = get_model_parameters(policy)
     args.train.env = args.environment.name
+
+    args.wandb = init_wandb(args, args.train.exp_id, id=args.train.exp_id)
+    args.train.__dict__.update(dict(args.wandb.config.train))
 
     data = ppo.create(args.train, vecenv, policy, wandb=args.wandb)
     while data.global_step < args.train.total_timesteps:
@@ -104,8 +123,9 @@ def init_wandb(args, name, id=None, resume=True):
         },
         name=name,
         save_code=True,
-        resume=resume,
+        resume=False,
     )
+
     return wandb
 
 
@@ -131,16 +151,143 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
     wandb.agent(sweep_id, lambda: train(args), count=100)
 
 
-if __name__ == "__main__":
+@app.command()
+def run(
+    config_path: Annotated[
+        str, typer.Argument(help="The path to the default configuration file")
+    ] = "examples/experiments/ippo_ff_p1_self_play.yaml",
+    *,
+    # fmt: off
+    # Environment options
+    num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
+    k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
+    collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
+    off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
+    goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
+    dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
+    sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
+    obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
+    collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
+    remove_non_vehicles: Annotated[Optional[int], typer.Option(help="Remove non-vehicles from the scene; 0 or 1")] = None,
+    # Train options
+    seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
+    learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
+    anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
+    resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
+    resample_interval: Annotated[Optional[int], typer.Option(help="The interval for resampling scenes")] = None,
+    resample_dataset_size: Annotated[Optional[int], typer.Option(help="The size of the dataset to sample from")] = None,
+    total_timesteps: Annotated[Optional[int], typer.Option(help="The total number of training steps")] = None,
+    ent_coef: Annotated[Optional[float], typer.Option(help="Entropy coefficient")] = None,
+    update_epochs: Annotated[Optional[int], typer.Option(help="The number of epochs for updating the policy")] = None,
+    batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
+    minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
+    gamma: Annotated[Optional[float], typer.Option(help="The discount factor for rewards")] = None,
+    vf_coef: Annotated[Optional[float], typer.Option(help="Weight for vf_loss")] = None,
+    # Wandb logging options
+    project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
+    entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
+    group: Annotated[Optional[str], typer.Option(help="WandB group name")] = None,
+    render: Annotated[Optional[int], typer.Option(help="Whether to render the environment; 0 or 1")] = None,
+):
+    """Run PPO training with the given configuration."""
+    # fmt: on
 
-    config = load_config("baselines/ippo/config/ippo_ff_puffer.yaml")
+    # Load default configs
+    config = load_config(config_path)
 
+    # Override configs with command-line arguments
+    env_config = {
+        "num_worlds": num_worlds,
+        "k_unique_scenes": k_unique_scenes,
+        "collision_weight": collision_weight,
+        "off_road_weight": off_road_weight,
+        "goal_achieved_weight": goal_achieved_weight,
+        "dist_to_goal_threshold": dist_to_goal_threshold,
+        "sampling_seed": sampling_seed,
+        "obs_radius": obs_radius,
+        "collision_behavior": collision_behavior,
+        "remove_non_vehicles": None
+        if remove_non_vehicles is None
+        else bool(remove_non_vehicles),
+    }
+    config.environment.update(
+        {k: v for k, v in env_config.items() if v is not None}
+    )
+    train_config = {
+        "seed": seed,
+        "learning_rate": learning_rate,
+        "anneal_lr": None if anneal_lr is None else bool(anneal_lr),
+        "resample_scenes": None
+        if resample_scenes is None
+        else bool(resample_scenes),
+        "resample_interval": resample_interval,
+        "resample_dataset_size": resample_dataset_size,
+        "total_timesteps": total_timesteps,
+        "ent_coef": ent_coef,
+        "update_epochs": update_epochs,
+        "batch_size": batch_size,
+        "minibatch_size": minibatch_size,
+        "render": None if render is None else bool(render),
+        "gamma": gamma,
+        "vf_coef": vf_coef,
+    }
+    config.train.update(
+        {k: v for k, v in train_config.items() if v is not None}
+    )
+
+    wandb_config = {
+        "project": project,
+        "entity": entity,
+        "group": group,
+    }
+    config.wandb.update(
+        {k: v for k, v in wandb_config.items() if v is not None}
+    )
+
+    datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
+
+    if config["train"]["resample_scenes"]:
+        if config["train"]["resample_scenes"]:
+            dataset_size = config["train"]["resample_dataset_size"]
+        config["train"][
+            "exp_id"
+        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+    else:
+        dataset_size = str(config["environment"]["k_unique_scenes"])
+        config["train"][
+            "exp_id"
+        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+
+    config["environment"]["dataset_size"] = dataset_size
+    config["train"]["device"] = config["train"].get(
+        "device", "cpu"
+    )  # Default to 'cpu' if not set
+    if torch.cuda.is_available():
+        config["train"]["device"] = "cuda"  # Set to 'cuda' if available
+
+    # Make dataloader
+    train_loader = SceneDataLoader(
+        root=config.data_dir,
+        batch_size=config.environment.num_worlds,
+        dataset_size=config.train.resample_dataset_size
+        if config.train.resample_scenes
+        else config.environment.k_unique_scenes,
+        sample_with_replacement=config.train.sample_with_replacement,
+        shuffle=config.train.shuffle_dataset,
+    )
+
+    # Make environment
     make_env = env_creator(
-        data_dir=config.data_dir,
+        data_loader=train_loader,
         environment_config=config.environment,
         train_config=config.train,
         device=config.train.device,
     )
 
     if config.mode == "train":
-        train(config)
+        train(config, make_env)
+
+
+if __name__ == "__main__":
+
+    app()
