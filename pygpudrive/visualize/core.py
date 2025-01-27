@@ -675,44 +675,6 @@ class MatplotlibVisualizer:
             label=label,
         )
 
-    def _plot_expert_trajectories(
-        self,
-        ax: matplotlib.axes.Axes,
-        env_idx: int,
-        expert_trajectories: torch.Tensor,
-        response_type: Any,
-    ) -> None:
-        """Plot expert trajectories.
-        Args:
-            ax: Matplotlib axis for plotting.
-            env_idx: Environment index to select specific environment agents.
-            expert_trajectories: The global state of expert from `LogTrajectory`.
-        """
-        if self.vis_config.draw_expert_trajectories:
-            controlled_mask = self.controlled_agents[env_idx, :]
-            non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
-            mask = (
-                controlled_mask
-                if self.vis_config.draw_only_controllable_veh
-                else controlled_mask | non_controlled_mask
-            )
-            agent_indices = torch.where(mask)[0]
-            trajectories = expert_trajectories[env_idx][mask]
-            for idx, trajectory in zip(agent_indices, trajectories):
-                color = AGENT_COLOR_BY_STATE["ok"] if controlled_mask[idx] else AGENT_COLOR_BY_STATE["log_replay"]
-                for step in trajectory:
-                    x, y = step[:2].numpy()
-                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
-                        ax.add_patch(
-                            Circle(
-                                (x, y),
-                                radius=0.3,
-                                color=color,
-                                fill=True,
-                                alpha=0.5,
-                            )
-                        )
-
     def plot_agent_observation(
         self,
         agent_idx: int,
