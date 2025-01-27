@@ -38,7 +38,6 @@ enum class ExportID : uint32_t {
     WorldMeans,
     MetaData,
     DeletedAgents,
-    MapName,
     NumExports
 };
 
