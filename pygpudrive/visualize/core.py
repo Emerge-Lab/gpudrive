@@ -16,6 +16,7 @@ from pygpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
+import time
 from pygpudrive.datatypes.trajectory import LogTrajectory
 from pygpudrive.datatypes.control import ResponseType
 from pygpudrive.visualize.color import (
@@ -51,7 +52,8 @@ class MatplotlibVisualizer:
         self.env_config = env_config
         self.cach_roadgraph = cach_roadgraph
         ax=self.initialize_static_scenario_data(controlled_agent_mask)
-        self.plot_limits = ax.viewLim.get_points() #[x_min,y_min,xmax,ymax] (bottom left corner -> top right)
+        if self.cach_roadgraph:
+            self.plot_limits = ax.viewLim.get_points() #[x_min,y_min,xmax,ymax] (bottom left corner -> top right)
 
     def initialize_static_scenario_data(self, controlled_agent_mask):
         """
@@ -81,7 +83,7 @@ class MatplotlibVisualizer:
         if self.cach_roadgraph:
             self.cached_roadgraphs = []
             for env_idx in range(self.controlled_agent_mask.shape[0]):
-                fig, ax = plt.subplots(figsize=self.figsize,dpi=300) 
+                fig, ax = plt.subplots(figsize=self.figsize,dpi=150) 
                 self._plot_roadgraph(
                     road_graph=self.global_roadgraph,
                     env_idx=env_idx,
@@ -150,7 +152,7 @@ class MatplotlibVisualizer:
             figs.append(fig)  
             plt.close(fig)  
 
-            if self.cach_roadgraph:
+            if self.cach_roadgraph: 
                 cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
                 ax.imshow(
                     cached_roadgraph_array,
@@ -160,9 +162,11 @@ class MatplotlibVisualizer:
                     zorder=0,  
                 )
 
-                # # # Explicitly set the axis limits to match your coordinates
+                    # # # Explicitly set the axis limits to match your coordinates
                 ax.set_xlim(self.plot_limits[0][0], self.plot_limits[1][0] )
                 ax.set_ylim(self.plot_limits[0][1], self.plot_limits[1][1])
+
+
             else:
                 self._plot_roadgraph(
                 road_graph=self.global_roadgraph,
@@ -171,7 +175,7 @@ class MatplotlibVisualizer:
                 line_width_scale=self.line_width_scale,
                 marker_size_scale=self.marker_scale,
             )
-                print(f"generated plot limits {ax.viewLim.get_points()}") 
+         
 
             # Remove axes
             # cached_ax.axis('off')

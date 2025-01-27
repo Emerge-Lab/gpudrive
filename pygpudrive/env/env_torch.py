@@ -3,6 +3,7 @@
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
+import time
 from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
@@ -79,7 +80,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             num_worlds=self.num_worlds,
             render_config=self.render_config,
             env_config=self.config,
-            cach_roadgraph=True
+            cach_roadgraph= True
         )
 
     def reset(self):
@@ -615,9 +616,10 @@ if __name__ == "__main__":
 
     print(f"dataset: {env.data_batch}")
 
+    time_1 =time.perf_counter()
     # Rollout
     obs = env.reset()
-    env.swap_data_batch()
+    # env.swap_data_batch()
 
     print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
 
@@ -674,3 +676,7 @@ if __name__ == "__main__":
     media.write_video(
         "obs_video.gif", np.array(agent_obs_frames), fps=10, codec="gif"
     )
+
+    time_2 = time.perf_counter()
+
+    print(f"time elapsed {time_2-time_1}")
