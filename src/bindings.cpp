@@ -128,6 +128,7 @@ namespace gpudrive
             .def("set_maps", &Manager::setMaps)
             .def("world_means_tensor", &Manager::worldMeansTensor)
             .def("metadata_tensor", &Manager::metadataTensor)
+            .def("map_name_tensor", &Manager::mapNameTensor)
             .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {
                 std::unordered_map<int32_t, std::vector<int32_t>> agents_to_delete;
 
