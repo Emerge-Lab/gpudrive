@@ -246,7 +246,7 @@ if __name__ == "__main__":
     group = "clean_data_0123"
 
     fields = {
-        "time_h": 72,  # Max time per job (job will finish if run is done before)
+        "time_h": 24,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 70,
@@ -259,14 +259,15 @@ if __name__ == "__main__":
         "resample_scenes": [1], # Yes
         "k_unique_scenes": [500], # Sample in batches of 500
         "resample_interval": [2_000_000],
-        "total_timesteps": [2_000_000_000],
-        "resample_dataset_size": [10_000, 100_000],
-        "batch_size": [131_072],
-        "minibatch_size": [8_192],
+        "total_timesteps": [500_000_000],
+        "resample_dataset_size": [100],
+        "batch_size": [262_144, 524_288],
+        "minibatch_size": [65_536, 16_384],
         "update_epochs": [2, 5],
-        "ent_coef": [0.0001],
+        "ent_coef": [0.0001, 0.001],
         "learning_rate": [3e-4],
-        "vf_coef": [0.5],
+        "gamma": [0.99],
+        #"anneal_lr": [0, 1],
         "render": [0],
     }
 

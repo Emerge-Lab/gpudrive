@@ -88,9 +88,9 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__R_10000__01_23_21_02_58_770_005500" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
-    DATASET = "train"
-    SORT_BY = "off_road" #"goal_achieved"
+    MODEL_TO_LOAD = "model_PPO__R_10000__01_23_21_02_58_770_007000" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
+    DATASET = "test"
+    SORT_BY = "collided" #"goal_achieved"
     SHOW_TOP_K = 25 # Render this many scenes
 
     # Configurations

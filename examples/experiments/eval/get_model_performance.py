@@ -12,6 +12,7 @@ from pathlib import Path
 from pygpudrive.env.dataset import SceneDataLoader
 from eval_utils import load_config, make_env, load_policy, rollout
 
+import pdb
 
 logging.basicConfig(level=logging.INFO)
 
@@ -64,7 +65,12 @@ def evaluate_policy(
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
-        res_dict["scene"].extend(scenario_names)
+        
+        # Get names from env
+        pdb.set_trace()
+        scenario_to_worlds_dict = env.get_env_filenames()
+        
+        res_dict["scene"].extend(scenario_to_worlds_dict.values())
         res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
         res_dict["collided"].extend(collided.cpu().numpy())
         res_dict["off_road"].extend(off_road.cpu().numpy())

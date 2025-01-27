@@ -2,12 +2,12 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training"
+data_dir: "/scratch/kj2676/gpudrive/data/processed/training"
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 2 # Number of unique scenes to sample from
+  num_worlds: 2 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -42,15 +42,15 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
-  resample_dataset_size: 500 # Number of unique scenes to sample from
-  resample_interval: 1_000_000
+  resample_scenes: true
+  resample_dataset_size: 100 # Number of unique scenes to sample from
+  resample_interval: 2_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 1_000_000_000
+  total_timesteps: 2_000_000_000
   batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
@@ -66,20 +66,19 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  log_window: 500
+  log_window: 1000
 
   # # # Network # # #
   network:
     input_dim: 64 # Embedding of the input features
     hidden_dim: 128 # Latent dimension
     pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
-    num_transformer_layers: 0 # Number of transformer layers
     dropout: 0.01
-    class_name: "LateFusionTransformer"
+    class_name: "NeuralNet"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 100 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
