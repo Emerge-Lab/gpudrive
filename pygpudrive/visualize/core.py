@@ -144,6 +144,7 @@ class MatplotlibVisualizer:
 
             # Initialize figure and axes from cached road graph
             fig, ax = plt.subplots(figsize=self.figsize)
+            fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             ax.clear()  # Clear any existing content
             ax.set_aspect("equal", adjustable="box")
             figs.append(fig)  # Add the new figure
@@ -268,19 +269,19 @@ class MatplotlibVisualizer:
                     num_collided / num_controlled if num_controlled > 0 else 0
                 )
 
-                ax.text(
-                    0.5,  # Horizontal center
-                    0.95,  # Vertical location near the top
-                    f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-                    f"off-road: {off_road_rate:.2f}; "
-                    f"collision: {collision_rate:.2f}",
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    transform=ax.transAxes,
-                    fontsize=20 * marker_scale,
-                    color="black",
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-                )
+                # ax.text(
+                #     0.5,  # Horizontal center
+                #     0.95,  # Vertical location near the top
+                #     f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
+                #     f"off-road: {off_road_rate:.2f}; "
+                #     f"collision: {collision_rate:.2f}",
+                #     horizontalalignment="center",
+                #     verticalalignment="center",
+                #     transform=ax.transAxes,
+                #     fontsize=20 * marker_scale,
+                #     color="black",
+                #     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+                # )
 
                 
             # Determine center point for zooming
@@ -303,6 +304,8 @@ class MatplotlibVisualizer:
             ax.set_xticks([])
             ax.set_yticks([])
 
+        for fig in figs:
+            fig.tight_layout(pad=0)
         return figs
 
     def _plot_log_replay_trajectory(

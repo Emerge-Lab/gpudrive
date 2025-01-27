@@ -1,7 +1,7 @@
 save_results_path: examples/experiments/eval/dataframes/visualizations
 train_path: "/scratch/kj2676/gpudrive/data/processed/training"
 
-cpt_path: examples/experiments/eval/models
+cpt_path: examples/experiments/eval/models/sota_paper
 cpt_name: model_PPO__R_10000__01_19_17_27_13_052_007500
 
 num_worlds: 10
