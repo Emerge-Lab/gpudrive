@@ -12,8 +12,10 @@ from pathlib import Path
 from pygpudrive.env.dataset import SceneDataLoader
 from eval_utils import load_config, make_env, load_policy, rollout
 
+import pdb
 
 logging.basicConfig(level=logging.INFO)
+
 
 def evaluate_policy(
     env,
@@ -64,10 +66,10 @@ def evaluate_policy(
 
         # Store results for the current batch
         scenario_names = [Path(path).stem for path in batch]
-        
+
         # Get names from env
         scenario_to_worlds_dict = env.get_env_filenames()
-        
+
         res_dict["scene"].extend(scenario_to_worlds_dict.values())
         res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
         res_dict["collided"].extend(collided.cpu().numpy())
@@ -84,6 +86,7 @@ def evaluate_policy(
     df_res["dataset"] = dataset_name
 
     return df_res
+
 
 if __name__ == "__main__":
 
@@ -158,7 +161,7 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        #df_res = pd.concat([df_res_train, df_res_test])
+        # df_res = pd.concat([df_res_train, df_res_test])
 
         # Add metadata
         df_res["model_name"] = model.name

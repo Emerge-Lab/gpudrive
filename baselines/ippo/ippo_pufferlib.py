@@ -19,7 +19,7 @@ from box import Box
 from integrations.rl.puffer import ppo
 from integrations.rl.puffer.puffer_env import env_creator
 
-from networks.late_fusion import LateFusionTransformer
+from networks.late_fusion import NeuralNet
 from pygpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
@@ -48,7 +48,7 @@ def load_config(config_path):
 
 def make_policy(env, config):
     """Create a policy based on the environment."""
-    return LateFusionTransformer(
+    return NeuralNet(
         input_dim=config.train.network.input_dim,
         action_dim=env.single_action_space.n,
         hidden_dim=config.train.network.hidden_dim,

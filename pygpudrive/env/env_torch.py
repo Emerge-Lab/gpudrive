@@ -669,6 +669,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
+    import mediapy
+    from pygpudrive.visualize.utils import img_from_fig
 
     from pygpudrive.visualize.utils import img_from_fig
     import mediapy as media
@@ -719,6 +721,7 @@ if __name__ == "__main__":
         print(f"Step: {t}")
 
         # Step the environment
+        expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
 
         # if (t + 1) % 2 == 0:

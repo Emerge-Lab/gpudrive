@@ -14,7 +14,7 @@ from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.visualize.utils import img_from_fig
 from pygpudrive.datatypes.observation import GlobalEgoState
 
-from networks.late_fusion import LateFusionTransformer
+from networks.late_fusion import NeuralNet
 
 import logging
 import torch
@@ -57,14 +57,12 @@ def load_policy(path_to_cpt, model_name, device, env=None):
         logging.info(f"Load model from {path_to_cpt}/{model_name}.pt")
 
         # Create policy architecture from saved checkpoint
+        #TODO: Change depending on the network
         policy = LateFusionTransformer(
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
             pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
-            num_transformer_layers=saved_cpt["model_arch"][
-                "num_transformer_layers"
-            ],
         ).to(device)
 
         # Load the model parameters
@@ -104,7 +102,7 @@ def rollout(
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
-    agent_positions = torch.zeros((2, episode_len, env.num_worlds, env.max_agent_count))
+    agent_positions = torch.zeros((env.num_worlds, env.max_agent_count, episode_len, 2))
 
     # Reset episode
     next_obs = env.reset()
@@ -165,6 +163,7 @@ def rollout(
                         zoom_radius=zoom_radius,
                         results_df=results_df,
                         eval_mode=True,
+                        agent_positions = agent_positions
                     )
                     for idx, env_id in enumerate(has_live_agent):
                         sim_state_frames[env_id].append(
@@ -180,8 +179,8 @@ def rollout(
         
         if return_agent_positions:
             global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
-            agent_positions[0, :, :, :] = global_agent_states.pos_x
-            agent_positions[1, :, :, :] = global_agent_states.pos_y            
+            agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
+            agent_positions[:, :, time_step, 1] = global_agent_states.pos_y            
 
         # Count the collisions, off-road occurrences, and goal achievements
         # at a given time step for living agents
