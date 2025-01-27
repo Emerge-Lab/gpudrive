@@ -364,7 +364,7 @@ void createPersistentEntities(Engine &ctx) {
     const auto& map = ctx.singleton<Map>();
 
     auto& mapName = ctx.singleton<MapName>();
-    for (int i = 0; i < sizeof(mapName.mapName); i++) {
+    for (int i = 0; i < 32; i++) {
         mapName.mapName[i] = map.mapName[i];
     }
 
