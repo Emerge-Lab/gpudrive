@@ -1,4 +1,4 @@
-"""Base Gym Environment that interfaces with the GPU Drive simulator."""
+"""Troch gymnasium environment that interfaces with the GPU Drive simulator."""
 
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
@@ -6,7 +6,7 @@ import torch
 from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-import gymnasium
+
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -19,7 +19,6 @@ from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 from pygpudrive.env.dataset import SceneDataLoader
-import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -50,7 +49,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize the iterator once
         self.data_iterator = iter(self.data_loader)
 
-        # Get the initial data batch (set of traffic scenarios)
+        # Get the initial data batch
         self.data_batch = next(self.data_iterator)
 
         # Initialize simulator
@@ -67,27 +66,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
-        # self.single_observation_space = Box(
-        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
-        # )
-        self.single_observation_space = gymnasium.spaces.Box(
-            low=0,
-            high=255,
-            shape=(self.observation_space.shape[-1],),
-            dtype=np.float32,
-        )
-
         self._setup_action_space(action_type)
-        self.num_agents = self.cont_agent_mask.sum().item()
-        self.single_action_space = self.action_space
-        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
-        # self.observation_space = pufferlib.spaces.joint_space(
-        #     self.single_observation_space, self.num_agents
-        # )
-        self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
-        )
-
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 
@@ -100,6 +79,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             num_worlds=self.num_worlds,
             render_config=self.render_config,
             env_config=self.config,
+            cach_roadgraph=True
         )
 
     def reset(self):
@@ -183,7 +163,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.num_worlds,
                 self.max_agent_count,
                 backend=self.backend,
-                device=self.device,
             )
 
             # Index log positions at current time steps
@@ -197,7 +176,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
-                device=self.device,
             )
 
             agent_pos = torch.stack(
@@ -369,7 +347,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state = LocalEgoState.from_tensor(
                 self_obs_tensor=self.sim.self_observation_tensor(),
                 backend=self.backend,
-                device=self.device
+                device= self.device
             )
             if self.config.norm_obs:
                 ego_state.normalize()
@@ -397,7 +375,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs = PartnerObs.from_tensor(
                 partner_obs_tensor=self.sim.partner_observations_tensor(),
                 backend=self.backend,
-                device=self.device,
+                device= self.device
             )
 
             if self.config.norm_obs:
@@ -430,7 +408,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             roadgraph = LocalRoadGraphPoints.from_tensor(
                 local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
                 backend=self.backend,
-                device=self.device,
+                device= self.device
             )
 
             if self.config.norm_obs:
@@ -463,7 +441,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             lidar = LidarObs.from_tensor(
                 lidar_tensor=self.sim.lidar_tensor(),
                 backend=self.backend,
-                device=self.device,
             )
 
             return (
@@ -626,7 +603,6 @@ if __name__ == "__main__":
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
-        shuffle=False,
     )
 
     # Make env
@@ -639,20 +615,14 @@ if __name__ == "__main__":
 
     print(f"dataset: {env.data_batch}")
 
-    print(
-        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
-    )
-
     # Rollout
     obs = env.reset()
+    env.swap_data_batch()
 
     print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
 
     sim_frames = []
     agent_obs_frames = []
-
-    # env.swap_data_batch()
-    # env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
@@ -663,14 +633,6 @@ if __name__ == "__main__":
 
         # Step the environment
         env.step_dynamics(expert_actions[:, :, t, :])
-
-        # if (t + 1) % 2 == 0:
-        # env.swap_data_batch()
-        # env.reset()
-        #     print(f"dataset: {env.data_batch}")
-
-        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
-        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
 
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
@@ -690,8 +652,8 @@ if __name__ == "__main__":
             figsize=(10, 10),
         )
 
-        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
-        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
+        # sim_states[0].savefig(f"sim_state.png")
+        # agent_obs.savefig(f"agent_obs.png")
 
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))

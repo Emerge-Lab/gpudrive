@@ -37,6 +37,7 @@ class MatplotlibVisualizer:
         num_worlds: int,
         render_config: Dict[str, Any],
         env_config: Dict[str, Any],
+        cach_roadgraph: bool,
     ):
         self.sim_object = sim_object
         self.backend = backend
@@ -48,7 +49,9 @@ class MatplotlibVisualizer:
         self.marker_scale = max(self.figsize) / 15
         self.line_width_scale = max(self.figsize) / 25
         self.env_config = env_config
-        self.initialize_static_scenario_data(controlled_agent_mask)
+        self.cach_roadgraph = cach_roadgraph
+        ax=self.initialize_static_scenario_data(controlled_agent_mask)
+        self.plot_limits = ax.viewLim.get_points() #[x_min,y_min,xmax,ymax] (bottom left corner -> top right)
 
     def initialize_static_scenario_data(self, controlled_agent_mask):
         """
@@ -75,21 +78,21 @@ class MatplotlibVisualizer:
         )
 
         # Cache pre-rendered road graphs for all environments
-        self.cached_roadgraphs = []
-        for env_idx in range(self.controlled_agent_mask.shape[0]):
-            fig, ax = plt.subplots(figsize=self.figsize,dpi=300)
-            self._plot_roadgraph(
-                road_graph=self.global_roadgraph,
-                env_idx=env_idx,
-                ax=ax,
-                line_width_scale=self.line_width_scale,
-                marker_size_scale=self.marker_scale,
-            )
-            self.cached_roadgraphs.append(fig)
-            plt.close(fig)
-        
-        self.plot_limits = ax.viewLim.get_points() #[x_min,y_min,xmax,ymax] (bottom left corner -> top right)
-
+        if self.cach_roadgraph:
+            self.cached_roadgraphs = []
+            for env_idx in range(self.controlled_agent_mask.shape[0]):
+                fig, ax = plt.subplots(figsize=self.figsize,dpi=300) 
+                self._plot_roadgraph(
+                    road_graph=self.global_roadgraph,
+                    env_idx=env_idx,
+                    ax=ax,
+                    line_width_scale=self.line_width_scale,
+                    marker_size_scale=self.marker_scale,
+                )
+                self.cached_roadgraphs.append(fig)
+                plt.close(fig)
+     
+            return ax
 
     def plot_simulator_state(
         self,
@@ -147,20 +150,28 @@ class MatplotlibVisualizer:
             figs.append(fig)  
             plt.close(fig)  
 
-   
-            cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
-            ax.imshow(
-                cached_roadgraph_array,
-                origin="upper",
-                extent=(self.plot_limits[0][0],self.plot_limits[1][0], # X: [x_min,x_max]
-                        self.plot_limits[0][1],self.plot_limits[1][1]),# Y: [y_min, y_max]
-                zorder=0,  
-            )
+            if self.cach_roadgraph:
+                cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
+                ax.imshow(
+                    cached_roadgraph_array,
+                    origin="upper",
+                    extent=(self.plot_limits[0][0],self.plot_limits[1][0], # X: [x_min,x_max]
+                            self.plot_limits[0][1],self.plot_limits[1][1]),# Y: [y_min, y_max]
+                    zorder=0,  
+                )
 
-            # # # Explicitly set the axis limits to match your coordinates
-            ax.set_xlim(self.plot_limits[0][0], self.plot_limits[1][0] )
-            ax.set_ylim(self.plot_limits[0][1], self.plot_limits[1][1])
-  
+                # # # Explicitly set the axis limits to match your coordinates
+                ax.set_xlim(self.plot_limits[0][0], self.plot_limits[1][0] )
+                ax.set_ylim(self.plot_limits[0][1], self.plot_limits[1][1])
+            else:
+                self._plot_roadgraph(
+                road_graph=self.global_roadgraph,
+                env_idx=env_idx,
+                ax=ax,
+                line_width_scale=self.line_width_scale,
+                marker_size_scale=self.marker_scale,
+            )
+                print(f"generated plot limits {ax.viewLim.get_points()}") 
 
             # Remove axes
             # cached_ax.axis('off')
@@ -223,7 +234,7 @@ class MatplotlibVisualizer:
                         horizontalalignment="center",
                         verticalalignment="center",
                         transform=ax.transAxes,
-                        fontsize=20 * marker_scale,
+                        fontsize=20 * self.marker_scale,
                         color="black",
                         bbox=dict(
                             facecolor="white", edgecolor="none", alpha=0.9

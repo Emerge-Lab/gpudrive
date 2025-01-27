@@ -27,6 +27,11 @@ data/processed/testing/*
 data/processed/training/*
 data/processed/sampled/*
 
+## adaptive driving agent
+adaptive_driving_agent
+##
+obs_video.gif
+sim_video.gif
 # Logging
 /wandb
 /wandb*
