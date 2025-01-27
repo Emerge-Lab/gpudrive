@@ -2,10 +2,10 @@ res_path: examples/experiments/eval/dataframes/sota_paper # Store dataframes her
 test_dataset_size: 1000 # Number of test scenarios to evaluate on
 
 # Environment settings
-train_dir: "/scratch/kj2676/gpudrive/data/processed/training"
-test_dir: "/scratch/kj2676/gpudrive/data/processed/validation"
+train_dir: "data/processed/training"
+test_dir: "data/processed/validation"
 
-num_worlds: 500 # Number of parallel environments for evaluation
+num_worlds: 3 # Number of parallel environments for evaluation
 max_controlled_agents: 128 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true

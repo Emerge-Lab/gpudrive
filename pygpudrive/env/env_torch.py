@@ -669,9 +669,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    import mediapy
-    from pygpudrive.visualize.utils import img_from_fig
-
     from pygpudrive.visualize.utils import img_from_fig
     import mediapy as media
 
@@ -693,7 +690,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=128,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     print(f"dataset: {env.data_batch}")

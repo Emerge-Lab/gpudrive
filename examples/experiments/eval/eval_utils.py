@@ -22,7 +22,6 @@ import random
 
 logging.basicConfig(level=logging.INFO)
 
-
 import pdb
 
 
@@ -58,7 +57,7 @@ def load_policy(path_to_cpt, model_name, device, env=None):
 
         # Create policy architecture from saved checkpoint
         #TODO: Change depending on the network
-        policy = LateFusionTransformer(
+        policy = NeuralNet(
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
