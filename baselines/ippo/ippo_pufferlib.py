@@ -46,22 +46,44 @@ def load_config(config_path):
     return pufferlib.namespace(**config)
 
 
-def make_policy(env, config):
+def make_agent(env, config):
     """Create a policy based on the environment."""
-    return NeuralNet(
-        input_dim=config.train.network.input_dim,
-        action_dim=env.single_action_space.n,
-        hidden_dim=config.train.network.hidden_dim,
-        pred_heads_arch=config.train.network.pred_heads_arch,
-        dropout=config.train.network.dropout,
-    ).to(config.train.device)
+    
+    if config.continue_training:
+        print("Loading checkpoint...")
+        # Load checkpoint
+        saved_cpt = torch.load(
+            f=config.model_cpt,
+            map_location=config.train.device,
+            weights_only=False,
+        )
+        policy = NeuralNet(
+            input_dim=saved_cpt["model_arch"]["input_dim"],
+            action_dim=saved_cpt["action_dim"],
+            hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
+        )
 
+        # Load the model parameters
+        policy.load_state_dict(saved_cpt["parameters"])
+        
+        return policy
+        
+    else:
+        # Start from scratch
+        return NeuralNet(
+            input_dim=config.train.network.input_dim,
+            action_dim=env.single_action_space.n,
+            hidden_dim=config.train.network.hidden_dim,
+            pred_heads_arch=config.train.network.pred_heads_arch,
+            dropout=config.train.network.dropout,
+        )
 
 def train(args, make_env):
     """Main training loop for the PPO agent."""
 
     backend_mapping = {
-        # Note: Only native backend is currently supported with GPUDrive
+        # Note: Only native backend is currently= supported with GPUDrive
         "native": pufferlib.vector.Native,
         "serial": pufferlib.vector.Serial,
         "multiprocessing": pufferlib.vector.Multiprocessing,
@@ -81,7 +103,8 @@ def train(args, make_env):
         backend=backend,
     )
 
-    policy = make_policy(env=vecenv.driver_env, config=args).to(
+    
+    policy = make_agent(env=vecenv.driver_env, config=args).to(
         args.train.device
     )
 
@@ -245,18 +268,23 @@ def run(
     )
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
+    
+    if config["continue_training"]:
+        cont_train = 'C'
+    else:
+        cont_train = ''
 
     if config["train"]["resample_scenes"]:
         if config["train"]["resample_scenes"]:
             dataset_size = config["train"]["resample_dataset_size"]
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__{cont_train}__R_{dataset_size}__{datetime_}'
     else:
         dataset_size = str(config["environment"]["k_unique_scenes"])
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__{cont_train}__S_{dataset_size}__{datetime_}'
 
     config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get(

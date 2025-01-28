@@ -93,9 +93,7 @@ class MatplotlibVisualizer:
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
-        results_df: Optional[pd.DataFrame] = None,
         plot_log_replay_trajectory: bool = False,
-        eval_mode: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
     ):
         """
@@ -226,62 +224,31 @@ class MatplotlibVisualizer:
                             linewidth=2.5,
                             linestyle='-',  # solid line, use '--' for dashed or ':' for dotted
                         )
-
-
-            if eval_mode and results_df is not None:
-
-                    num_controlled = results_df.iloc[
-                        env_idx
-                    ].controlled_agents_in_scene
-                    off_road_rate = results_df.iloc[env_idx].off_road * 100
-                    collision_rate = results_df.iloc[env_idx].collided * 100
-                    goal_rate = results_df.iloc[env_idx].goal_achieved * 100
-                    other = results_df.iloc[env_idx].not_goal_nor_crashed * 100
-
-                    ax.text(
-                        0.5,  # Horizontal center
-                        0.95,  # Vertical location near the top
-                        f"t = {time_step} | $N_c$ = {num_controlled}; "
-                        f"OR: {off_road_rate:.1f}; "
-                        f"CR: {collision_rate:.1f}; "
-                        f"GR: {goal_rate:.1f}; "
-                        f"Other: {other:.1f}",
-                        horizontalalignment="center",
-                        verticalalignment="center",
-                        transform=ax.transAxes,
-                        fontsize=20 * marker_scale,
-                        color="black",
-                        bbox=dict(
-                            facecolor="white", edgecolor="none", alpha=0.9
-                        ),
-                    )
                     
-            else:
-                # Plot rollout statistics
-                num_controlled = controlled.sum().item()
-                num_off_road = is_offroad.sum().item()
-                num_collided = is_collided.sum().item()
-                off_road_rate = (
-                    num_off_road / num_controlled if num_controlled > 0 else 0
-                )
-                collision_rate = (
-                    num_collided / num_controlled if num_controlled > 0 else 0
-                )
+            # Plot rollout statistics
+            num_controlled = controlled.sum().item()
+            num_off_road = is_offroad.sum().item()
+            num_collided = is_collided.sum().item()
+            off_road_rate = (
+                num_off_road / num_controlled if num_controlled > 0 else 0
+            )
+            collision_rate = (
+                num_collided / num_controlled if num_controlled > 0 else 0
+            )
 
-                ax.text(
-                    0.5,  # Horizontal center
-                    0.95,  # Vertical location near the top
-                    f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-                    f"off-road: {off_road_rate:.2f}; "
-                    f"collision: {collision_rate:.2f}",
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    transform=ax.transAxes,
-                    fontsize=20 * marker_scale,
-                    color="black",
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-                )
-
+            ax.text(
+                0.5,  # Horizontal center
+                0.95,  # Vertical location near the top
+                f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
+                f"off-road: {off_road_rate:.2f}; "
+                f"collision: {collision_rate:.2f}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+                fontsize=20 * marker_scale,
+                color="black",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+            )
                 
             # Determine center point for zooming
             if center_agent_idx is not None:

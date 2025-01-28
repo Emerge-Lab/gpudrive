@@ -1,6 +1,11 @@
 models_path: examples/experiments/eval/models/sota_paper
 
 models:
+  - name: model_PPO__C__R_10000__01_28_11_35_12_662_000500
+    train_dataset_size: 10_000
+    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__C__R_10000__01_28_11_35_12_662?nw=nwuserdaphnecor
+    trained_on: cluster
+
   # - name: random_baseline
   #   train_dataset_size: null
   #   wandb: null
@@ -15,16 +20,16 @@ models:
   #   train_dataset_size: 1000
   #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_1000__01_23_21_02_58_768?nw=nwuserdaphnecor
   #   trained_on: cluster
-  
-  - name: model_PPO__R_10000__01_23_21_02_58_770_007000
-    train_dataset_size: 10_000
-    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_10000__01_23_21_02_58_770?nw=nwuserdaphnecor
-    trained_on: cluster
+  # Best model
+  # - name: model_PPO__R_10000__01_23_21_02_58_770_007000
+  #   train_dataset_size: 10_000
+  #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_10000__01_23_21_02_58_770?nw=nwuserdaphnecor
+  #   trained_on: cluster
 
-  - name: model_PPO__R_100000__01_23_21_08_41_367_007500
-    train_dataset_size: 100_000
-    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_100000__01_23_21_08_41_367?nw=nwuserdaphnecor
-    trained_on: cluster
+  # - name: model_PPO__R_100000__01_23_21_08_41_367_007500
+  #   train_dataset_size: 100_000
+  #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_100000__01_23_21_08_41_367?nw=nwuserdaphnecor
+  #   trained_on: cluster
 
   # - name: model_PPO__R_100__01_23_21_02_58_768_005000
   #   train_dataset_size: 100

@@ -64,9 +64,6 @@ def evaluate_policy(
             render_sim_state=render_sim_state,
         )
 
-        # Store results for the current batch
-        scenario_names = [Path(path).stem for path in batch]
-
         # Get names from env
         scenario_to_worlds_dict = env.get_env_filenames()
 
@@ -142,16 +139,16 @@ if __name__ == "__main__":
             f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
         )
 
-        # df_res_train = evaluate_policy(
-        #     env=env,
-        #     policy=policy,
-        #     data_loader=train_loader,
-        #     dataset_name="train",
-        #     deterministic=False,
-        #     render_sim_state=False,
-        # )
+        df_res_train = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=train_loader,
+            dataset_name="train",
+            deterministic=False,
+            render_sim_state=False,
+        )
 
-        df_res = evaluate_policy(
+        df_res_test = evaluate_policy(
             env=env,
             policy=policy,
             data_loader=test_loader,
@@ -161,7 +158,7 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        # df_res = pd.concat([df_res_train, df_res_test])
+        df_res = pd.concat([df_res_train, df_res_test])
 
         # Add metadata
         df_res["model_name"] = model.name

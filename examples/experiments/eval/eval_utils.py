@@ -160,8 +160,6 @@ def rollout(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
-                        results_df=results_df,
-                        eval_mode=True,
                         agent_positions = agent_positions
                     )
                     for idx, env_id in enumerate(has_live_agent):
@@ -173,8 +171,6 @@ def rollout(
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
-        
-        #pdb.set_trace()
         
         if return_agent_positions:
             global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
