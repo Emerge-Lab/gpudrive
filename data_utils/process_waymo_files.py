@@ -367,7 +367,7 @@ def waymo_to_scenario(
             # Calculate pairwise distances in xy plane efficiently
             xy_points = edge_points[:, :2]
             # Use broadcasting for memory efficiency
-            tolerance = 0.1
+            tolerance = 0.2
             has_3d = False
             
             # Process in chunks to avoid memory issues
