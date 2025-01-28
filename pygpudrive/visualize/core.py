@@ -97,6 +97,7 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         eval_mode: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
+        extend_goals: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -126,6 +127,37 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
+
+        if extend_goals:
+            # Initialize random number generator
+            rng = np.random
+    
+            # Define the range for random goal offsets (small range centered around 0)
+            OFFSET_RANGE = 8.0
+
+            # Create extended goals dictionary
+            extended_goals = {
+                'x': torch.zeros_like(global_agent_states.goal_x),
+                'y': torch.zeros_like(global_agent_states.goal_y)
+            }
+            # Generate random offsets for controlled agents
+            for env_idx in env_indices:
+                controlled_mask = self.controlled_agent_mask[env_idx]
+                
+                # Generate random offsets only for controlled agents
+                x_offsets = torch.tensor(rng.uniform(-OFFSET_RANGE, OFFSET_RANGE, size=controlled_mask.sum().item()))
+                y_offsets = torch.tensor(rng.uniform(-OFFSET_RANGE, OFFSET_RANGE, size=controlled_mask.sum().item()))
+                
+                # Store extended goals
+                extended_goals['x'][env_idx] = global_agent_states.goal_x[env_idx].clone()
+                extended_goals['y'][env_idx] = global_agent_states.goal_y[env_idx].clone()
+                
+                # Apply offsets only to controlled agents in the extended goals
+                extended_goals['x'][env_idx, controlled_mask] += x_offsets
+                extended_goals['y'][env_idx, controlled_mask] += y_offsets
+        
+        else:
+            extended_goals = None
 
         agent_infos = (
             self.sim_object.info_tensor().to_torch().clone().to(self.device)
@@ -205,6 +237,7 @@ class MatplotlibVisualizer:
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
+                extended_goals=extended_goals
             )
 
             if agent_positions is not None:
@@ -487,6 +520,7 @@ class MatplotlibVisualizer:
         plot_goal_points: bool = True,
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
+        extended_goals: Optional[Dict[str, torch.Tensor]] = None
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -523,26 +557,70 @@ class MatplotlibVisualizer:
         )
 
         if plot_goal_points:
-            goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
-            goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
-            ax.scatter(
-                goal_x,
-                goal_y,
-                s=5 * marker_size_scale,
-                linewidth=1.5 * line_width_scale,
-                c=AGENT_COLOR_BY_STATE["off_road"],
-                marker="x",
-            )
-
-            for x, y in zip(goal_x, goal_y):
-                circle = Circle(
-                    (x, y),
-                    radius=self.goal_radius,
-                    color=AGENT_COLOR_BY_STATE["off_road"],
-                    fill=False,
-                    linestyle="--",
+            for mask, color in [(is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
+                          (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
+                          (is_collided_mask, AGENT_COLOR_BY_STATE["collided"])]:
+            
+                if not mask.any():
+                    continue
+                    
+                # Plot original goals
+                goal_x = agent_states.goal_x[env_idx, mask].numpy()
+                goal_y = agent_states.goal_y[env_idx, mask].numpy()
+                
+                # Plot original goals with 'o' marker
+                ax.scatter(
+                    goal_x,
+                    goal_y,
+                    s=5 * marker_size_scale,
+                    linewidth=1.5 * line_width_scale,
+                    c=color,
+                    marker="o",
                 )
-                ax.add_patch(circle)
+
+                for x, y in zip(goal_x, goal_y):
+                    circle = Circle(
+                        (x, y),
+                        radius=self.goal_radius,
+                        color=color,
+                        fill=False,
+                        linestyle="--",
+                    )
+                    ax.add_patch(circle)
+                
+                # If we have extended goals, plot them and connect with dotted lines
+                if extended_goals is not None:
+                    ext_x = extended_goals['x'][env_idx, mask].numpy()
+                    ext_y = extended_goals['y'][env_idx, mask].numpy()
+                    
+                    # Plot extended goals with 'x' marker
+                    ax.scatter(
+                        ext_x,
+                        ext_y,
+                        s=5 * marker_size_scale,
+                        linewidth=1.5 * line_width_scale,
+                        c="blue",
+                        marker="x",
+                    )
+                    
+                    # Draw circles around extended goals
+                    for x, y in zip(ext_x, ext_y):
+                        circle = Circle(
+                            (x, y),
+                            radius=self.goal_radius,
+                            color="blue",
+                            fill=False,
+                            linestyle=":"
+                        )
+                        ax.add_patch(circle)
+                    
+                    # Connect original and extended goals with dotted lines
+                    for ox, oy, nx, ny in zip(goal_x, goal_y, ext_x, ext_y):
+                        ax.plot([ox, nx], [oy, ny], 
+                            color=color, 
+                            linestyle=":", 
+                            linewidth=1.0 * line_width_scale,
+                            alpha=0.7)
 
         # Collided agents
         bboxes_controlled_collided = np.stack(
