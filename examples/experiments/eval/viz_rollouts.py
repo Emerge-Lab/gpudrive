@@ -71,14 +71,14 @@ def visualize_rollouts(
         final_states = env.vis.plot_simulator_state(
             env_indices=list(range(len(batch))),
             time_steps=[-1] * len(batch),
-            zoom_radius = 50,
+            zoom_radius = 120,
             agent_positions=agent_positions
         )
         
         # Save final states with trajectories
         for i, fig in enumerate(final_states):
             scene_name = Path(batch[i]).stem
-            fig.savefig(os.path.join(save_path, f"{scene_name}_final.pdf"))
+            fig.savefig(os.path.join(save_path, f"{scene_name}_rollout.png"))
 
 if __name__ == "__main__":
     # Load configuration

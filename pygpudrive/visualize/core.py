@@ -135,6 +135,9 @@ class MatplotlibVisualizer:
             # Define the range for random goal offsets (small range centered around 0)
             OFFSET_RANGE = 8.0
 
+            # Get world means for coordinate transformation
+            means_xy = self.sim_object.world_means_tensor().to_torch()[:, :2].to(self.device)
+
             # Create extended goals dictionary
             extended_goals = {
                 'x': torch.zeros_like(global_agent_states.goal_x),
@@ -144,18 +147,35 @@ class MatplotlibVisualizer:
             for env_idx in env_indices:
                 controlled_mask = self.controlled_agent_mask[env_idx]
                 
-                # Generate random offsets only for controlled agents
-                x_offsets = torch.tensor(rng.uniform(-OFFSET_RANGE, OFFSET_RANGE, size=controlled_mask.sum().item()))
-                y_offsets = torch.tensor(rng.uniform(-OFFSET_RANGE, OFFSET_RANGE, size=controlled_mask.sum().item()))
+                # Calculate direction vectors for each agent (from initial position to original goal)
+                direction_x = global_agent_states.goal_x[env_idx] - global_agent_states.pos_x[env_idx]
+                direction_y = global_agent_states.goal_y[env_idx] - global_agent_states.pos_y[env_idx]
                 
-                # Store extended goals
-                extended_goals['x'][env_idx] = global_agent_states.goal_x[env_idx].clone()
-                extended_goals['y'][env_idx] = global_agent_states.goal_y[env_idx].clone()
-                
-                # Apply offsets only to controlled agents in the extended goals
-                extended_goals['x'][env_idx, controlled_mask] += x_offsets
-                extended_goals['y'][env_idx, controlled_mask] += y_offsets
-        
+                # Store extended goals - place them in opposite direction from current position
+                # For controlled agents, the new goal will be behind them relative to their original goal
+                extended_goals['x'][env_idx] = global_agent_states.pos_x[env_idx] - direction_x
+                extended_goals['y'][env_idx] = global_agent_states.pos_y[env_idx] - direction_y
+
+                # Only modify goals for controlled agents
+                uncontrolled_mask = ~controlled_mask
+                extended_goals['x'][env_idx, uncontrolled_mask] = global_agent_states.goal_x[env_idx, uncontrolled_mask]
+                extended_goals['y'][env_idx, uncontrolled_mask] = global_agent_states.goal_y[env_idx, uncontrolled_mask]
+
+                # Print information for controlled agents
+                for agent_idx in torch.where(controlled_mask)[0]:
+                    # Get original goal in world coordinates
+                    orig_goal_x = global_agent_states.goal_x[env_idx, agent_idx] + means_xy[env_idx, 0]
+                    orig_goal_y = global_agent_states.goal_y[env_idx, agent_idx] + means_xy[env_idx, 1]
+                    
+                    # Get extended goal in world coordinates
+                    ext_goal_x = extended_goals['x'][env_idx, agent_idx] + means_xy[env_idx, 0]
+                    ext_goal_y = extended_goals['y'][env_idx, agent_idx] + means_xy[env_idx, 1]
+
+                    print(f"Agent ID: {global_agent_states.id[env_idx, agent_idx].item()}")
+                    print(f"Original goal (world coords): ({orig_goal_x.item():.6f}, {orig_goal_y.item():.6f})")
+                    print(f"Extended goal (world coords): ({ext_goal_x.item():.6f}, {ext_goal_y.item():.6f})")
+                    print(f"World mean: ({means_xy[env_idx, 0].item():.6f}, {means_xy[env_idx, 1].item():.6f})\n")
+
         else:
             extended_goals = None
 

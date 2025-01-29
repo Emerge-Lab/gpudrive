@@ -54,14 +54,14 @@ def visualize_extended_goals(
         extended_states = env.vis.plot_simulator_state(
             env_indices=list(range(len(batch))),
             time_steps=[0] * len(batch),
-            zoom_radius=100,
+            zoom_radius=150,
             extend_goals=True
         )
         
         # Save extended goal states
-        print(len(extended_states))
         for i, fig in enumerate(extended_states):
             scene_name = Path(batch[i]).stem
+            print(f"Scene: {scene_name}\n")
             fig.savefig(os.path.join(save_path, f"{scene_name}_extended.png"))
             
         scene_count += len(batch)
