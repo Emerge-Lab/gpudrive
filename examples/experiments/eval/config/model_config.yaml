@@ -1,8 +1,8 @@
 models_path: examples/experiments/eval/models/sota_paper
 
 models:
-  - name: model_PPO__C__R_10000__01_28_11_35_12_662_000500
-    train_dataset_size: 10_000
+  - name: model_PPO__C__R_10000__01_28_16_34_46_271_001000
+    train_dataset_size: 9800
     wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__C__R_10000__01_28_11_35_12_662?nw=nwuserdaphnecor
     trained_on: cluster
 
