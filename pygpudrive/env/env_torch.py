@@ -616,7 +616,7 @@ if __name__ == "__main__":
 
     print(f"dataset: {env.data_batch}")
 
-    time_1 =time.perf_counter()
+    #time_1 =time.perf_counter()
     # Rollout
     obs = env.reset()
     # env.swap_data_batch()
@@ -677,6 +677,6 @@ if __name__ == "__main__":
         "obs_video.gif", np.array(agent_obs_frames), fps=10, codec="gif"
     )
 
-    time_2 = time.perf_counter()
+    #time_2 = time.perf_counter()
 
-    print(f"time elapsed {time_2-time_1}")
+    #print(f"time elapsed {time_2-time_1}")
