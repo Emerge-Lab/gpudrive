@@ -115,8 +115,10 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-    # Param to init all objects:
-    init_all_objects: bool = False
+    # Initialization mode
+    init_mode: str = "all_valid" # Options: all_non_trivial, all_objects, all_valid
+    
+    
 
 
 class SelectionDiscipline(Enum):

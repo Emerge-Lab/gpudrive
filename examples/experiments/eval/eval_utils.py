@@ -130,7 +130,7 @@ def rollout(
     live_agent_mask = controlled_agent_mask.clone()
 
     for time_step in range(episode_len):
-        logging.info(f"Time step: {time_step}")
+        #logging.info(f"Time step: {time_step}")
         
         # Get actions for active agents
         if live_agent_mask.any():
@@ -147,7 +147,7 @@ def rollout(
             # Step the environment
             env.step_dynamics(action_template)
 
-            pdb.set_trace()
+            #pdb.set_trace()
             if render_sim_state and len(active_worlds) > 0:
                 print(live_agent_mask.sum(axis=1))
                 
@@ -157,8 +157,8 @@ def rollout(
 
                 if time_step % render_every_n_steps == 0:
 
-                    logging.info(f"Rendering time step {time_step}")
-                    logging.info(f"Rendering worlds: {has_live_agent}")
+                    #logging.info(f"Rendering time step {time_step}")
+                    #logging.info(f"Rendering worlds: {has_live_agent}")
 
                     sim_state_figures = env.vis.plot_simulator_state(
                         env_indices=has_live_agent,

@@ -114,9 +114,7 @@ if __name__ == "__main__":
         tab_agg_perf = df_res.groupby('dataset')[['goal_achieved_frac', 'collided_frac', 'off_road_frac', 'other_frac']].agg(['mean', 'std'])
         tab_agg_perf = tab_agg_perf * 100
         tab_agg_perf = tab_agg_perf.round(1)
-        
-        pdb.set_trace()
-        
+                
         print('Scene-based metrics \n')  
         print(tab_agg_perf)
         print('')  

@@ -46,10 +46,10 @@ def make_videos(
         policy (torch.nn.Module): Policy to select actions.
         eval_config (Box): Configuration for the evaluation.
         sort_by (str): Sample scenarios from dataframe sorted by this column. Options:
-            - goal_achieved: Sort by goal_achieved in descending order (successes first).
-            - collided: Sort by collided in descending order.
-            - off_road: Sort by off_road in descending order.
-            - not_goal_nor_crashed: Sort by not_goal_nor_crashed in descending order.
+            - goal_achieved_frac: Sort by goal_achieved in descending order (successes first).
+            - collided_frac: Sort by collided in descending order.
+            - off_road_frac: Sort by off_road in descending order.
+            - other_frac: Sort by not_goal_nor_crashed in descending order.
             - controlled_agents_in_scene: Sort by controlled_agents_in_scene in descending order.
     """
     
@@ -102,10 +102,10 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_005250" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
+    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_010000" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
     DATASET = "test"
-    SORT_BY = "goal_achieved" #"goal_achieved"
-    SHOW_TOP_K = 50 # Render this many scenes
+    SORT_BY = "collided_frac" #"goal_achieved"
+    SHOW_TOP_K = 20 # Render this many scenes
 
     # Configurations
     eval_config = load_config("examples/experiments/eval/config/eval_config")
@@ -154,9 +154,9 @@ if __name__ == "__main__":
         filename = filenames[env_id]
         
         scene_stats = df_res[df_res["scene"] == filename]
-        goal_achieved = scene_stats.goal_achieved.values.item()
-        collided = scene_stats.collided.values.item()
-        off_road = scene_stats.off_road.values.item()
+        goal_achieved = scene_stats.goal_achieved_frac.values.item()
+        collided = scene_stats.collided_frac.values.item()
+        off_road = scene_stats.off_road_frac.values.item()
         other = scene_stats.not_goal_nor_crashed.values.item()
 
         video_path = videos_dir / f"{filename}_ga_{goal_achieved:.2f}__cr_{collided:.2f}__or_{off_road:.2f}__ot_{other:.2f}.mp4"
