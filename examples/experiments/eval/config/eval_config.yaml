@@ -1,11 +1,11 @@
 res_path: examples/experiments/eval/dataframes/sota_paper # Store dataframes here
-test_dataset_size: 9800 # Number of test scenarios to evaluate on
+test_dataset_size: 5000 # Number of test scenarios to evaluate on
 
 # Environment settings
-train_dir: "data/processed/training"
-test_dir: "data/processed/validation"
+train_dir: /scratch/kj2676/gpudrive/data/processed/training
+test_dir: /scratch/kj2676/gpudrive/data/processed/validation
 
-num_worlds: 100 # Number of parallel environments for evaluation
+num_worlds: 500 # Number of parallel environments for evaluation
 max_controlled_agents: 64 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true
@@ -24,5 +24,9 @@ polyline_reduction_threshold: 0.1 # Rate at which to sample points from the poly
 sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
 obs_radius: 50.0 # Visibility radius of the agents
 init_roadgraph: False
+
+# Number of discretizations in the action space
+action_space_steer_disc: 41 # 11 in smaller act space
+action_space_accel_disc: 17 # 7 in smaller act space
 
 device: "cuda" # Options: "cpu", "cuda"

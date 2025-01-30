@@ -2,8 +2,8 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "data/processed/training"
-continue_training: true
+data_dir: /scratch/kj2676/gpudrive/data/processed/training
+continue_training: false
 model_cpt: examples/experiments/eval/models/sota_paper/model_PPO__R_10000__01_23_21_02_58_770_007000.pt
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
@@ -46,7 +46,7 @@ train:
   # # # Data sampling # # #
   resample_scenes: true
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 500_000
+  resample_interval: 2_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
@@ -80,7 +80,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 250 # Save policy every k iterations
+  checkpoint_interval: 750 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #

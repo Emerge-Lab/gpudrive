@@ -18,6 +18,8 @@
 /zipp*
 .python-version
 /google-cloud-sdk/*
+*.gz
+examples/experiments/logs/*
 
 # Data
 hpc/overlay*
@@ -26,6 +28,7 @@ data/processed/validation/*
 data/processed/testing/*
 data/processed/training/*
 data/processed/sampled/*
+data/processed/hand_designed/*
 
 # Logging
 /wandb

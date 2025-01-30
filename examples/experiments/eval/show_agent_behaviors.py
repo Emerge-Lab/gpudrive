@@ -12,6 +12,21 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 import pdb
+import random
+import torch
+import numpy as np
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # If using CUDA
+    torch.backends.cudnn.deterministic = True
+
+logging.basicConfig(level=logging.INFO)
+SEED = 42  
+set_seed(SEED)
+
 
 def make_videos(
     policy,
@@ -71,7 +86,7 @@ def make_videos(
     env.swap_data_batch(data_batch)
 
     # Rollout policy in the environments
-    _, _, _, _, _, sim_state_frames, global_agent_states = rollout(
+    _, _, _, _, _, _, _, _, _, sim_state_frames, global_agent_states, _ = rollout(
         env=env,
         policy=policy,
         device=device,
@@ -79,7 +94,6 @@ def make_videos(
         render_sim_state=True,
         render_every_n_steps=render_every_n_steps,
         zoom_radius=zoom_radius,
-        results_df=df_results,
     )
 
     return sim_state_frames, env.get_env_filenames()
@@ -88,9 +102,9 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_11_35_12_662_000500" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
+    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_005250" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
     DATASET = "test"
-    SORT_BY = "collided" #"goal_achieved"
+    SORT_BY = "goal_achieved" #"goal_achieved"
     SHOW_TOP_K = 50 # Render this many scenes
 
     # Configurations
@@ -123,9 +137,9 @@ if __name__ == "__main__":
         show_top_k=SHOW_TOP_K,
         dataset=DATASET,
         device=eval_config.device,
-        zoom_radius=100,
+        zoom_radius=90,
         deterministic=False,
-        render_every_n_steps=3,
+        render_every_n_steps=1,
     )
 
     sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
@@ -150,7 +164,7 @@ if __name__ == "__main__":
         mediapy.write_video(
             str(video_path),
             frames,
-            fps=10,
+            fps=15,
         )
 
         logging.info(f"Saved video to {video_path}")

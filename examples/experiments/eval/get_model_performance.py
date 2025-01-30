@@ -10,80 +10,23 @@ import logging
 from pathlib import Path
 
 from pygpudrive.env.dataset import SceneDataLoader
-from eval_utils import load_config, make_env, load_policy, rollout
-
+from eval_utils import load_config, make_env, load_policy, rollout, evaluate_policy
 import pdb
 
+import random
+import torch
+import numpy as np
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # If using CUDA
+    torch.backends.cudnn.deterministic = True
+
 logging.basicConfig(level=logging.INFO)
-
-
-def evaluate_policy(
-    env,
-    policy,
-    data_loader,
-    dataset_name,
-    device="cuda",
-    deterministic=False,
-    render_sim_state=False,
-):
-    """Evaluate policy in the environment."""
-
-    res_dict = {
-        "scene": [],
-        "goal_achieved": [],
-        "collided": [],
-        "off_road": [],
-        "not_goal_nor_crashed": [],
-        "controlled_agents_in_scene": [],
-    }
-
-    for batch in tqdm(
-        data_loader,
-        desc=f"Processing {dataset_name} batches",
-        total=len(data_loader),
-        colour="blue",
-    ):
-
-        # Update simulator with the new batch of data
-        env.swap_data_batch(batch)
-
-        # Rollout policy in the environments
-        (
-            goal_achieved,
-            collided,
-            off_road,
-            controlled_agents_in_scene,
-            not_goal_nor_crashed,
-            _,
-            _,
-        ) = rollout(
-            env=env,
-            policy=policy,
-            device=device,
-            deterministic=deterministic,
-            render_sim_state=render_sim_state,
-        )
-
-        # Get names from env
-        scenario_to_worlds_dict = env.get_env_filenames()
-
-        res_dict["scene"].extend(scenario_to_worlds_dict.values())
-        res_dict["goal_achieved"].extend(goal_achieved.cpu().numpy())
-        res_dict["collided"].extend(collided.cpu().numpy())
-        res_dict["off_road"].extend(off_road.cpu().numpy())
-        res_dict["not_goal_nor_crashed"].extend(
-            not_goal_nor_crashed.cpu().numpy()
-        )
-        res_dict["controlled_agents_in_scene"].extend(
-            controlled_agents_in_scene.cpu().numpy()
-        )
-
-    # Convert to pandas dataframe
-    df_res = pd.DataFrame(res_dict)
-    df_res["dataset"] = dataset_name
-
-    return df_res
-
+SEED = 42  # Set to any fixed value
+set_seed(SEED)
 
 if __name__ == "__main__":
 
@@ -139,14 +82,14 @@ if __name__ == "__main__":
             f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
         )
 
-        df_res_train = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=train_loader,
-            dataset_name="train",
-            deterministic=False,
-            render_sim_state=False,
-        )
+        # df_res_train = evaluate_policy(
+        #     env=env,
+        #     policy=policy,
+        #     data_loader=train_loader,
+        #     dataset_name="train",
+        #     deterministic=False,
+        #     render_sim_state=False,
+        # )
 
         df_res_test = evaluate_policy(
             env=env,
@@ -158,7 +101,7 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
+        df_res = df_res_test #pd.concat([df_res_train, df_res_test])
 
         # Add metadata
         df_res["model_name"] = model.name
@@ -167,6 +110,29 @@ if __name__ == "__main__":
         # Store
         if not os.path.exists(eval_config.res_path):
             os.makedirs(eval_config.res_path)
+            
+        tab_agg_perf = df_res.groupby('dataset')[['goal_achieved_frac', 'collided_frac', 'off_road_frac', 'other_frac']].agg(['mean', 'std'])
+        tab_agg_perf = tab_agg_perf * 100
+        tab_agg_perf = tab_agg_perf.round(1)
+        
+        pdb.set_trace()
+        
+        print('Scene-based metrics \n')  
+        print(tab_agg_perf)
+        print('')  
+        
+        print('Agent-based metrics \n')  
+        total_agents = df_res['controlled_agents_in_scene'].sum() 
+        collision_rate = (df_res['collided_count'].sum() / total_agents)*100
+        offroad_rate = (df_res['off_road_count'].sum() / total_agents)*100
+        goal_rate = (df_res['goal_achieved_count'].sum() / total_agents)*100
+        other_rate = (df_res['other_count'].sum() / total_agents)*100
+        
+        print(f'Total agents: {total_agents} in {df_res.shape[0]} scenes')
+        print(f'Collision rate: {collision_rate}')  
+        print(f'Offroad rate: {offroad_rate}')  
+        print(f'Goal rate: {goal_rate}')  
+        print(f'Other rate: {other_rate}')  
 
         df_res.to_csv(f"{eval_config.res_path}/{model.name}.csv", index=False)
 

@@ -1,10 +1,10 @@
-models_path: examples/experiments/eval/models/sota_paper
+models_path: examples/experiments/models
 
 models:
-  - name: model_PPO__C__R_10000__01_28_16_34_46_271_001000
-    train_dataset_size: 9800
-    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__C__R_10000__01_28_11_35_12_662?nw=nwuserdaphnecor
-    trained_on: cluster
+  - name: model_PPO__C__R_10000__01_28_20_57_35_873_005250
+    train_dataset_size: 10_000
+    wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__C__R_10000__01_28_20_57_35_873?nw=nwuserdaphnecor
+    trained_on: desktop
 
   # - name: random_baseline
   #   train_dataset_size: null
