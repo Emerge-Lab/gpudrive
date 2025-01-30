@@ -60,10 +60,10 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 41), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 11), decimals=3  
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 17), decimals=3
+        torch.linspace(-4.0, 4.0, 7), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -115,8 +115,10 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-    # Param to init all objects:
-    init_all_objects: bool = False
+    # Initialization mode
+    init_mode: str = "all_valid" # Options: all_non_trivial, all_objects, all_valid
+    
+    
 
 
 class SelectionDiscipline(Enum):
@@ -187,4 +189,6 @@ class RenderConfig:
     view_option: Enum = None
     resolution: Tuple[int, int] = (1024, 1024)
     draw_obj_idx: bool = False
+    draw_expert_trajectories: bool = False
+    draw_only_controllable_veh: bool = False
     obj_idx_font_size: int = 9

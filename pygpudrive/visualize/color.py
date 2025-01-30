@@ -24,7 +24,7 @@ ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
 }
 
 AGENT_COLOR_BY_STATE = {
-    "ok": "g",  # Controlled and doing fine
+    "ok": "#4B77BE",  # Controlled and doing fine
     "collided": "r",  # Controlled and collided
     "off_road": "orange",  # Controlled and off-road
     "log_replay": "#c7c7c7",  # Agents marked as expert controlled or static

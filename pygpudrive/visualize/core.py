@@ -102,9 +102,8 @@ class MatplotlibVisualizer:
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
-        results_df: Optional[pd.DataFrame] = None,
         plot_log_replay_trajectory: bool = False,
-        eval_mode: bool = False,
+        agent_positions: Optional[torch.Tensor] = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -217,6 +216,7 @@ class MatplotlibVisualizer:
             )
 
 
+
             if eval_mode and results_df is not None:
 
                     num_controlled = results_df.iloc[
@@ -269,10 +269,54 @@ class MatplotlibVisualizer:
                     fontsize=20 * self.marker_scale,
                     color="black",
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-                )
+              
+            if agent_positions is not None:
+                # agent_positions shape is [num_worlds, max_agent_count, episode_len, 2]
+                for agent_idx in range(agent_positions.shape[1]):
+                    if controlled_live[agent_idx]:
+                        # Plot trajectory for this agent
+                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]  # Gets both x,y
 
+                        # Filter out zeros and out of bounds values
+                        valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) & 
+                                    (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) & 
+                                    (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
+                        
+                        ax.plot(
+                            trajectory[valid_mask, 0].cpu(),  # x coordinates
+                            trajectory[valid_mask, 1].cpu(),  # y coordinates
+                            color='green',
+                            alpha=0.5,
+                            linewidth=2.5,
+                            linestyle='-',  # solid line, use '--' for dashed or ':' for dotted
+                        )
+                    
+            # Plot rollout statistics
+            num_controlled = controlled.sum().item()
+            num_off_road = is_offroad.sum().item()
+            num_collided = is_collided.sum().item()
+            off_road_rate = (
+                num_off_road / num_controlled if num_controlled > 0 else 0
+            )
+            collision_rate = (
+                num_collided / num_controlled if num_controlled > 0 else 0
+            )
+
+
+            ax.text(
+                0.5,  # Horizontal center
+                0.95,  # Vertical location near the top
+                f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
+                f"off-road: {off_road_rate:.2f}; "
+                f"collision: {collision_rate:.2f}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+                fontsize=20 * marker_scale,
+                color="black",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+            )
                 
-
             # Determine center point for zooming
             if center_agent_idx is not None:
                 center_x = global_agent_states.pos_x[
@@ -668,6 +712,44 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
+
+    def _plot_expert_trajectories(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        expert_trajectories: torch.Tensor,
+        response_type: Any,
+    ) -> None:
+        """Plot expert trajectories.
+        Args:
+            ax: Matplotlib axis for plotting.
+            env_idx: Environment index to select specific environment agents.
+            expert_trajectories: The global state of expert from `LogTrajectory`.
+        """
+        if self.vis_config.draw_expert_trajectories:
+            controlled_mask = self.controlled_agents[env_idx, :]
+            non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
+            mask = (
+                controlled_mask
+                if self.vis_config.draw_only_controllable_veh
+                else controlled_mask | non_controlled_mask
+            )
+            agent_indices = torch.where(mask)[0]
+            trajectories = expert_trajectories[env_idx][mask]
+            for idx, trajectory in zip(agent_indices, trajectories):
+                color = AGENT_COLOR_BY_STATE["ok"] if controlled_mask[idx] else AGENT_COLOR_BY_STATE["log_replay"]
+                for step in trajectory:
+                    x, y = step[:2].numpy()
+                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
+                        ax.add_patch(
+                            Circle(
+                                (x, y),
+                                radius=0.3,
+                                color=color,
+                                fill=True,
+                                alpha=0.5,
+                            )
+                        )
 
     def plot_agent_observation(
         self,

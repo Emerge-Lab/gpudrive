@@ -23,8 +23,8 @@ namespace gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
-        m.attr("episodeLen") = consts::episodeLen;  
-        m.attr("numLidarSamples") = consts::numLidarSamples; 
+        m.attr("episodeLen") = consts::episodeLen;
+        m.attr("numLidarSamples") = consts::numLidarSamples;
 
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")
@@ -79,10 +79,10 @@ namespace gpudrive
             .value("CrossWalk", EntityType::CrossWalk)
             .value("SpeedBump", EntityType::SpeedBump)
             .value("StopSign", EntityType::StopSign)
-            .value("Vehicle", EntityType::Vehicle) 
+            .value("Vehicle", EntityType::Vehicle)
             .value("Pedestrian", EntityType::Pedestrian)
             .value("Cyclist", EntityType::Cyclist)
-            .value("Padding", EntityType::Padding) 
+            .value("Padding", EntityType::Padding)
             .value("NumTypes", EntityType::NumTypes);
 
         // Bindings for Manager class
@@ -127,7 +127,22 @@ namespace gpudrive
             .def("expert_trajectory_tensor", &Manager::expertTrajectoryTensor)
             .def("set_maps", &Manager::setMaps)
             .def("world_means_tensor", &Manager::worldMeansTensor)
-            .def("metadata_tensor", &Manager::metadataTensor);
+            .def("metadata_tensor", &Manager::metadataTensor)
+            .def("map_name_tensor", &Manager::mapNameTensor)
+            .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {
+                std::unordered_map<int32_t, std::vector<int32_t>> agents_to_delete;
+
+                // Convert Python dict to C++ unordered_map
+                for (auto item : py_agents_to_delete) {
+                    int32_t key = nb::cast<int32_t>(item.first);
+                    std::vector<int32_t> value = nb::cast<std::vector<int32_t>>(item.second);
+                    agents_to_delete[key] = value;
+                }
+
+                self.deleteAgents(agents_to_delete);
+            })
+            .def("deleted_agents_tensor", &Manager::deletedAgentsTensor)
+            .def("map_name_tensor", &Manager::mapNameTensor);
     }
 
 }

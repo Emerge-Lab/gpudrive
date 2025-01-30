@@ -109,7 +109,8 @@ def evaluate(data):
     if (
         data.config.resample_scenes
         and data.resample_buffer >= data.config.resample_interval
-    ):
+        and data.config.resample_dataset_size > data.vecenv.num_worlds
+    ):  
         print(f"Resampling scenarios at global step {data.global_step}")
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
@@ -173,16 +174,16 @@ def evaluate(data):
             obs_device = obs_device if config.cpu_offload else obs_device
             
             # Use the terminal observation value to better estimate the reward 
-            done_but_truncated = truncated & terminal
-            if done_but_truncated.any():    
-                terminal_obs = data.vecenv.last_obs[done_but_truncated]
+            # done_but_truncated = truncated & terminal
+            # if done_but_truncated.any():    
+            #     terminal_obs = data.vecenv.last_obs[done_but_truncated]
                 
-                # Get terminal (truncated) observation value
-                with torch.no_grad():
-                    _, _, _, terminal_value = policy(terminal_obs)
+            #     # Get terminal (truncated) observation value
+            #     with torch.no_grad():
+            #         _, _, _, terminal_value = policy(terminal_obs)
                 
-                # Add discounted value to reward
-                reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
+            #     # Add discounted value to reward
+            #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
             # Add to rollout buffer
             experience.store(

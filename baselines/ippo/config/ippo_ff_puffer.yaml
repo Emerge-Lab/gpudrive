@@ -39,9 +39,8 @@ wandb:
 network:
     input_dim: 64 # Embedding of the input features
     hidden_dim: 128 # Latent dimension 
-    num_transformer_layers: 0 # Number of transformer layers
     pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
-    class_name: "LateFusionTransformer" 
+    class_name: "NeuralNet" 
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
 train:

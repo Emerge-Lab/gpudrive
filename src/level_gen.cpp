@@ -45,7 +45,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
         ctx.get<Velocity>(agent) = Velocity{Vector3{.x = xVelocity, .y = yVelocity, .z = 0}, Vector3::zero()};
     }
     ctx.get<Action>(agent_iface) = getZeroAction(ctx.data().params.dynamicsModel);
-    
+
     resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent));
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
@@ -148,7 +148,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     return agent;
 }
 
-static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {                    
+static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
     const MapVector2 &p1 = roadInit.geometry[j];
     const MapVector2 &p2 = roadInit.geometry[j+1]; // This is guaranteed to be within bounds
 
@@ -165,7 +165,7 @@ static Entity makeRoadEdge(Engine &ctx, const MapRoad &roadInit, CountT j) {
     auto scale = Diag3x3{.d0 = start.distance(end)/2, .d1 = 0.1, .d2 = 0.1};
     setRoadEntitiesProps(ctx, road_edge, pos, rot, scale, roadInit.type, ObjectID{(int32_t)SimObject::Cube}, ResponseType::Static, roadInit.id, roadInit.mapType);
     registerRigidBodyEntity(ctx, road_edge, SimObject::Cube);
-    
+
     return road_edge;
 }
 
@@ -231,7 +231,7 @@ static Entity makeStopSign(Engine &ctx, const MapRoad &roadInit) {
 
     auto stop_sign = ctx.makeRenderableEntity<PhysicsEntity>();
     ctx.get<RoadInterfaceEntity>(stop_sign).e = ctx.makeEntity<RoadInterface>();
-    
+
     auto pos = Vector3{.x = x1 - ctx.singleton<WorldMeans>().mean.x, .y = y1 - ctx.singleton<WorldMeans>().mean.y, .z = 1};
     auto rot = Quat::angleAxis(0, madrona::math::up);
     auto scale = Diag3x3{.d0 = 0.2, .d1 = 0.2, .d2 = 1};
@@ -347,13 +347,27 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
         return false;
     }
 
+    auto& deletedAgents = ctx.singleton<DeletedAgents>().deletedAgents;
+    for (CountT i = 0; i < consts::kMaxAgentCount; i++)
+    {
+        if(deletedAgents[i] == agentInit.id)
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
 void createPersistentEntities(Engine &ctx) {
     // createFloorPlane(ctx);
-
     const auto& map = ctx.singleton<Map>();
+
+    auto& mapName = ctx.singleton<MapName>();
+    for (int i = 0; i < 32; i++) {
+        mapName.mapName[i] = map.mapName[i];
+    }
+
 
     if (ctx.data().enableRender)
     {
