@@ -3,6 +3,7 @@ import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from matplotlib.collections import LineCollection
 import numpy as np
 import pandas as pd
 import gpudrive
@@ -205,25 +206,40 @@ class MatplotlibVisualizer:
             )
 
             if agent_positions is not None:
-                # agent_positions shape is [num_worlds, max_agent_count, episode_len, 2]
                 for agent_idx in range(agent_positions.shape[1]):
                     if controlled_live[agent_idx]:
-                        # Plot trajectory for this agent
-                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]  # Gets both x,y
+                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]
 
-                        # Filter out zeros and out of bounds values
                         valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) & 
                                     (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) & 
                                     (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
                         
-                        ax.plot(
-                            trajectory[valid_mask, 0].cpu(),  # x coordinates
-                            trajectory[valid_mask, 1].cpu(),  # y coordinates
-                            color='green',
-                            alpha=0.5,
-                            linewidth=2.5,
-                            linestyle='-',  # solid line, use '--' for dashed or ':' for dotted
-                        )
+                        # Get valid trajectory points
+                        valid_trajectory = trajectory[valid_mask]
+                        
+                        if len(valid_trajectory) > 1:
+                            # Convert to numpy and ensure correct shape
+                            points = valid_trajectory.cpu().numpy()
+                            
+                            # Create segments by pairing consecutive points
+                            segments = []
+                            for i in range(len(points) - 1):
+                                segment = np.array([[points[i][0], points[i][1]],
+                                                  [points[i+1][0], points[i+1][1]]])
+                                segments.append(segment)
+                            segments = np.array(segments)
+                            
+                            # Create color gradient
+                            colors = np.zeros((len(segments), 4))  # RGBA colors
+                            colors[:, 0] = np.linspace(0.114, 0.051, len(segments))  # R
+                            colors[:, 1] = np.linspace(0.678, 0.278, len(segments))  # G
+                            colors[:, 2] = np.linspace(0.753, 0.631, len(segments))  # B
+                            colors[:, 3] = np.linspace(0.3, 0.9, len(segments))      # Alpha
+                            
+                            # Create line collection with color gradient
+                            from matplotlib.collections import LineCollection
+                            lc = LineCollection(segments, colors=colors, linewidth=5)
+                            ax.add_collection(lc)
                     
             # Plot rollout statistics
             num_controlled = controlled.sum().item()
@@ -269,6 +285,9 @@ class MatplotlibVisualizer:
             # Remove ticks
             ax.set_xticks([])
             ax.set_yticks([])
+
+        for fig in figs:
+            fig.tight_layout(pad=0)
 
         return figs
 
