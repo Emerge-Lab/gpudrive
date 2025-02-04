@@ -60,6 +60,8 @@ namespace gpudrive
         uint32_t numRoadSegments;
         MapVector2 mean;
 
+        char mapName[32];
+
         // Constructor
         Map() = default;
     };

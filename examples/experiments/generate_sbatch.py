@@ -243,29 +243,35 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "rewards_sweep"
+    group = "arxiv_0203"
 
     fields = {
-        "time_h": 5,  # Max time per job (job will finish if run is done before)
+        "time_h": 36,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
-        "max_sim_jobs": 25,  # Max jobs at the same time
-        "memory": 50,
+        "max_sim_jobs": 30,  # Max jobs at the same time
+        "memory": 70,
         "job_name": group,
     }
 
     hyperparams = {
         "group": [group],  # Group name
         "num_worlds": [500],
-        "k_unique_scenes": [500],  # Sample in batches of 500
-        "seed": [42, 0],
-        "total_timesteps": [1_000_000],
-        "collision_weight": [-0.075, -0.1, -0.5, -1.0],
-        "off_road_weight": [-0.075, -0.1, -0.5, -1.0],
-        "resample_dataset_size": [1000, 5000, 10_000],
+        "resample_scenes": [1], # Yes
+        "k_unique_scenes": [500], # Sample in batches of 500
+        "resample_interval": [2_000_000],
+        "total_timesteps": [2_000_000_000],
+        "resample_dataset_size": [100, 1000, 10_000],
+        "batch_size": [131_072, 262_144],
+        "minibatch_size": [16_384],
+        "update_epochs": [2, 5],
+        "ent_coef": [0.0001, 0.001],
+        "learning_rate": [3e-4],
+        "gamma": [0.995, 0.99],
+        "render": [0],
     }
 
     save_script(
-        file_path="examples/experiments/scripts/sbatch_scripts/",
+        file_path="examples/experiments/sbatch_scripts/",
         filename=f"sbatch_{group}.sh",
         fields=fields,
         params=hyperparams,

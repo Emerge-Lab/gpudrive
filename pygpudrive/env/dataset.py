@@ -83,14 +83,19 @@ class SceneDataLoader:
 
     def __next__(self) -> List[str]:
         if self.sample_with_replacement:
-            # Get the next batch of "deterministic" random indices
-            batch_indices = self.indices[
-                self.current_index : self.current_index + self.batch_size
-            ]
-            self.current_index += self.batch_size
+            # Ensure deterministic behavior
+            random_gen = random.Random(
+                self.seed + self.current_index
+            )  # Changing the seed per batch
 
-            if self.current_index > len(self.indices):
-                raise StopIteration
+            # Determine the batch size using the random generator to shuffle the indices
+            batch_indices = [
+                random_gen.randint(0, len(self.dataset) - 1)
+                for _ in range(self.batch_size)
+            ]
+
+            # Move to the next batch
+            self.current_index += 1
 
             # Retrieve the corresponding scenes
             batch = [self.dataset[i] for i in batch_indices]
@@ -98,14 +103,11 @@ class SceneDataLoader:
             if self.current_index >= len(self.indices):
                 raise StopIteration
 
-            # Get the next batch of indices
             end_index = min(
                 self.current_index + self.batch_size, len(self.indices)
             )
             batch_indices = self.indices[self.current_index : end_index]
             self.current_index = end_index
-
-            # Retrieve the corresponding scenes
             batch = [self.dataset[i] for i in batch_indices]
 
         return batch
@@ -117,19 +119,35 @@ if __name__ == "__main__":
 
     data_loader = SceneDataLoader(
         root="data/processed/training",
-        batch_size=2,
-        dataset_size=2,
+        batch_size=5,
+        dataset_size=15,
         sample_with_replacement=True,  # Sampling with replacement
         shuffle=False,  # Shuffle the dataset before batching
     )
 
-    print("\nDataset")
-    pprint(data_loader.dataset[:5])
+    unique_files_sampled = set()
+    for idx, batch in enumerate(data_loader):
+        unique_files_sampled.update(batch)
+        coverage = len(unique_files_sampled) / len(data_loader.dataset) * 100
+        print(f"coverage: {coverage:.2f}%")
+        if idx > 4:
+            break
 
-    print("\nBatch 1")
-    batch = next(iter(data_loader))
-    pprint(batch)
+    pprint(unique_files_sampled)
 
-    print("\nBatch 2")
-    batch = next(iter(data_loader))
-    pprint(batch)
+    # Now without replacement
+    data_loader = SceneDataLoader(
+        root="data/processed/training",
+        batch_size=5,
+        dataset_size=15,
+        sample_with_replacement=False,  # Sampling with replacement
+        shuffle=False,  # Shuffle the dataset before batching
+    )
+
+    unique_files_sampled = set()
+    for idx, batch in enumerate(data_loader):
+        print(idx)
+        pprint(batch)
+
+        unique_files_sampled.update(batch)
+        coverage = len(unique_files_sampled) / len(data_loader.dataset) * 100

@@ -18,6 +18,8 @@
 /zipp*
 .python-version
 /google-cloud-sdk/*
+*.gz
+examples/experiments/logs/*
 
 # Data
 hpc/overlay*
@@ -26,6 +28,8 @@ data/processed/validation/*
 data/processed/testing/*
 data/processed/training/*
 data/processed/sampled/*
+data/processed/hand_designed/*
+analyze/figures/*
 
 # Logging
 /wandb
@@ -244,5 +248,16 @@ pyrightconfig.json
 
 # Logs
 examples/experiments/scripts/logs/*
+
+# Sbatch scripts
+*.sh
+
+# Videos
+videos/
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++

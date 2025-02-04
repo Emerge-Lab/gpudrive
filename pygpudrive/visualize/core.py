@@ -3,8 +3,9 @@ import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from matplotlib.collections import LineCollection
 import numpy as np
-
+import pandas as pd
 import gpudrive
 from pygpudrive.visualize import utils
 from pygpudrive.datatypes.roadgraph import (
@@ -45,7 +46,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (10, 10)
+        self.figsize = (15, 15)
         self.env_config = env_config
         self.initialize_static_scenario_data(controlled_agent_mask)
 
@@ -94,6 +95,8 @@ class MatplotlibVisualizer:
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
         plot_log_replay_trajectory: bool = False,
+        agent_positions: Optional[torch.Tensor] = None,
+        extend_goals: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -124,6 +127,57 @@ class MatplotlibVisualizer:
             device=self.device,
         )
 
+        if extend_goals:
+            # Initialize random number generator
+            rng = np.random
+
+            # Define the range for random goal offsets (small range centered around 0)
+            OFFSET_RANGE = 8.0
+
+            # Get world means for coordinate transformation
+            means_xy = self.sim_object.world_means_tensor().to_torch()[:, :2].to(self.device)
+
+            # Create extended goals dictionary
+            extended_goals = {
+                'x': torch.zeros_like(global_agent_states.goal_x),
+                'y': torch.zeros_like(global_agent_states.goal_y)
+            }
+            # Generate random offsets for controlled agents
+            for env_idx in env_indices:
+                controlled_mask = self.controlled_agent_mask[env_idx]
+
+                # Calculate direction vectors for each agent (from initial position to original goal)
+                direction_x = global_agent_states.goal_x[env_idx] - global_agent_states.pos_x[env_idx]
+                direction_y = global_agent_states.goal_y[env_idx] - global_agent_states.pos_y[env_idx]
+
+                # Store extended goals - place them in opposite direction from current position
+                # For controlled agents, the new goal will be behind them relative to their original goal
+                extended_goals['x'][env_idx] = global_agent_states.pos_x[env_idx] - direction_x
+                extended_goals['y'][env_idx] = global_agent_states.pos_y[env_idx] - direction_y
+
+                # Only modify goals for controlled agents
+                uncontrolled_mask = ~controlled_mask
+                extended_goals['x'][env_idx, uncontrolled_mask] = global_agent_states.goal_x[env_idx, uncontrolled_mask]
+                extended_goals['y'][env_idx, uncontrolled_mask] = global_agent_states.goal_y[env_idx, uncontrolled_mask]
+
+                # Print information for controlled agents
+                for agent_idx in torch.where(controlled_mask)[0]:
+                    # Get original goal in world coordinates
+                    orig_goal_x = global_agent_states.goal_x[env_idx, agent_idx] + means_xy[env_idx, 0]
+                    orig_goal_y = global_agent_states.goal_y[env_idx, agent_idx] + means_xy[env_idx, 1]
+
+                    # Get extended goal in world coordinates
+                    ext_goal_x = extended_goals['x'][env_idx, agent_idx] + means_xy[env_idx, 0]
+                    ext_goal_y = extended_goals['y'][env_idx, agent_idx] + means_xy[env_idx, 1]
+
+                    print(f"Agent ID: {global_agent_states.id[env_idx, agent_idx].item()}")
+                    print(f"Original goal (world coords): ({orig_goal_x.item():.6f}, {orig_goal_y.item():.6f})")
+                    print(f"Extended goal (world coords): ({ext_goal_x.item():.6f}, {ext_goal_y.item():.6f})")
+                    print(f"World mean: ({means_xy[env_idx, 0].item():.6f}, {means_xy[env_idx, 1].item():.6f})\n")
+
+        else:
+            extended_goals = None
+
         agent_infos = (
             self.sim_object.info_tensor().to_torch().clone().to(self.device)
         )
@@ -141,6 +195,7 @@ class MatplotlibVisualizer:
 
             # Initialize figure and axes from cached road graph
             fig, ax = plt.subplots(figsize=self.figsize)
+            fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
             ax.clear()  # Clear any existing content
             ax.set_aspect("equal", adjustable="box")
             figs.append(fig)  # Add the new figure
@@ -158,9 +213,6 @@ class MatplotlibVisualizer:
             # Explicitly set the axis limits to match your coordinates
             # cached_ax.set_xlim(-100, 100)
             # cached_ax.set_ylim(-100, 100)
-
-            # Remove axes
-            # cached_ax.axis('off')
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -204,27 +256,70 @@ class MatplotlibVisualizer:
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
+                extended_goals=extended_goals
             )
 
+            if agent_positions is not None:
+                for agent_idx in range(agent_positions.shape[1]):
+                    if controlled_live[agent_idx]:
+                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]
+
+                        valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) & 
+                                    (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) & 
+                                    (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
+                        
+                        # Get valid trajectory points
+                        valid_trajectory = trajectory[valid_mask]
+                        
+                        if len(valid_trajectory) > 1:
+                            # Convert to numpy and ensure correct shape
+                            points = valid_trajectory.cpu().numpy()
+                            
+                            # Create segments by pairing consecutive points
+                            segments = []
+                            for i in range(len(points) - 1):
+                                segment = np.array([[points[i][0], points[i][1]],
+                                                  [points[i+1][0], points[i+1][1]]])
+                                segments.append(segment)
+                            segments = np.array(segments)
+                            
+                            # Create color gradient
+                            colors = np.zeros((len(segments), 4))  # RGBA colors
+                            colors[:, 0] = np.linspace(0.114, 0.051, len(segments))  # R
+                            colors[:, 1] = np.linspace(0.678, 0.278, len(segments))  # G
+                            colors[:, 2] = np.linspace(0.753, 0.631, len(segments))  # B
+                            colors[:, 3] = np.linspace(0.3, 0.9, len(segments))      # Alpha
+                            
+                            # Create line collection with color gradient
+                            from matplotlib.collections import LineCollection
+                            lc = LineCollection(segments, colors=colors, linewidth=5)
+                            ax.add_collection(lc)
+                    
             # Plot rollout statistics
             num_controlled = controlled.sum().item()
             num_off_road = is_offroad.sum().item()
             num_collided = is_collided.sum().item()
-            if time_step is not None:
-                ax.text(
-                    0.5,  # Horizontal center
-                    0.95,  # Vertical location near the top
-                    f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-                    f"off-road: {num_off_road/num_controlled:.2f}; "
-                    f"collision: {num_collided/num_controlled:.2f}",
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    transform=ax.transAxes,
-                    fontsize=20 * marker_scale,
-                    color="black",
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-                )
+            off_road_rate = (
+                num_off_road / num_controlled if num_controlled > 0 else 0
+            )
+            collision_rate = (
+                num_collided / num_controlled if num_controlled > 0 else 0
+            )
 
+            ax.text(
+                0.5,  # Horizontal center
+                0.95,  # Vertical location near the top
+                f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
+                f"off-road: {off_road_rate:.2f}; "
+                f"collision: {collision_rate:.2f}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+                fontsize=20 * marker_scale,
+                color="black",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
+            )
+                
             # Determine center point for zooming
             if center_agent_idx is not None:
                 center_x = global_agent_states.pos_x[
@@ -240,6 +335,13 @@ class MatplotlibVisualizer:
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
+
+            # Remove ticks
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        for fig in figs:
+            fig.tight_layout(pad=0)
 
         return figs
 
@@ -373,10 +475,10 @@ class MatplotlibVisualizer:
                                 point=point,
                                 ax=ax,
                                 radius=1.5,
-                                facecolor="xkcd:red",
+                                facecolor="#c04000",
                                 edgecolor="none",
                                 linewidth=3.0,
-                                alpha=0.8,
+                                alpha=0.9,
                             )
                     elif road_point_type == int(gpudrive.EntityType.CrossWalk):
                         for x, y, length, width, orientation in zip(
@@ -422,6 +524,7 @@ class MatplotlibVisualizer:
         plot_goal_points: bool = True,
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
+        extended_goals: Optional[Dict[str, torch.Tensor]] = None,
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -458,26 +561,70 @@ class MatplotlibVisualizer:
         )
 
         if plot_goal_points:
-            goal_x = agent_states.goal_x[env_idx, is_offroad_mask].numpy()
-            goal_y = agent_states.goal_y[env_idx, is_offroad_mask].numpy()
-            ax.scatter(
-                goal_x,
-                goal_y,
-                s=5 * marker_size_scale,
-                linewidth=1.5 * line_width_scale,
-                c=AGENT_COLOR_BY_STATE["off_road"],
-                marker="x",
-            )
+            for mask, color in [(is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
+                          (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
+                          (is_collided_mask, AGENT_COLOR_BY_STATE["collided"])]:
 
-            for x, y in zip(goal_x, goal_y):
-                circle = Circle(
-                    (x, y),
-                    radius=self.goal_radius,
-                    color=AGENT_COLOR_BY_STATE["off_road"],
-                    fill=False,
-                    linestyle="--",
+                if not mask.any():
+                    continue
+
+                # Plot original goals
+                goal_x = agent_states.goal_x[env_idx, mask].numpy()
+                goal_y = agent_states.goal_y[env_idx, mask].numpy()
+
+                # Plot original goals with 'o' marker
+                ax.scatter(
+                    goal_x,
+                    goal_y,
+                    s=5 * marker_size_scale,
+                    linewidth=1.5 * line_width_scale,
+                    c=color,
+                    marker="o",
                 )
-                ax.add_patch(circle)
+
+                for x, y in zip(goal_x, goal_y):
+                    circle = Circle(
+                        (x, y),
+                        radius=self.goal_radius,
+                        color=color,
+                        fill=False,
+                        linestyle="--",
+                    )
+                    ax.add_patch(circle)
+
+                # If we have extended goals, plot them and connect with dotted lines
+                if extended_goals is not None:
+                    ext_x = extended_goals['x'][env_idx, mask].numpy()
+                    ext_y = extended_goals['y'][env_idx, mask].numpy()
+
+                    # Plot extended goals with 'x' marker
+                    ax.scatter(
+                        ext_x,
+                        ext_y,
+                        s=5 * marker_size_scale,
+                        linewidth=1.5 * line_width_scale,
+                        c="blue",
+                        marker="x",
+                    )
+
+                    # Draw circles around extended goals
+                    for x, y in zip(ext_x, ext_y):
+                        circle = Circle(
+                            (x, y),
+                            radius=self.goal_radius,
+                            color="blue",
+                            fill=False,
+                            linestyle=":"
+                        )
+                        ax.add_patch(circle)
+
+                    # Connect original and extended goals with dotted lines
+                    for ox, oy, nx, ny in zip(goal_x, goal_y, ext_x, ext_y):
+                        ax.plot([ox, nx], [oy, ny], 
+                            color=color, 
+                            linestyle=":", 
+                            linewidth=1.0 * line_width_scale,
+                            alpha=0.7)
 
         # Collided agents
         bboxes_controlled_collided = np.stack(
@@ -612,6 +759,44 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
+
+    def _plot_expert_trajectories(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        expert_trajectories: torch.Tensor,
+        response_type: Any,
+    ) -> None:
+        """Plot expert trajectories.
+        Args:
+            ax: Matplotlib axis for plotting.
+            env_idx: Environment index to select specific environment agents.
+            expert_trajectories: The global state of expert from `LogTrajectory`.
+        """
+        if self.vis_config.draw_expert_trajectories:
+            controlled_mask = self.controlled_agents[env_idx, :]
+            non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
+            mask = (
+                controlled_mask
+                if self.vis_config.draw_only_controllable_veh
+                else controlled_mask | non_controlled_mask
+            )
+            agent_indices = torch.where(mask)[0]
+            trajectories = expert_trajectories[env_idx][mask]
+            for idx, trajectory in zip(agent_indices, trajectories):
+                color = AGENT_COLOR_BY_STATE["ok"] if controlled_mask[idx] else AGENT_COLOR_BY_STATE["log_replay"]
+                for step in trajectory:
+                    x, y = step[:2].numpy()
+                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
+                        ax.add_patch(
+                            Circle(
+                                (x, y),
+                                radius=0.3,
+                                color=color,
+                                fill=True,
+                                alpha=0.5,
+                            )
+                        )
 
     def plot_agent_observation(
         self,

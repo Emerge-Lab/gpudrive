@@ -30,6 +30,10 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     norm_obs: bool = True  # Normalize observations
 
+    # Maximum number of controlled agents in the scene
+    max_controlled_agents: int = gpudrive.kMaxAgentCount
+    num_worlds: int = 1  # Number of worlds in the environment
+
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
     # and partner_obs are invalid. This makes the sim 2x faster
     disable_classic_obs: bool = False  # Disable classic observations
@@ -56,10 +60,10 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 42), decimals=3
+        torch.linspace(-torch.pi, torch.pi, 41), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 16), decimals=3
+        torch.linspace(-4.0, 4.0, 17), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -111,8 +115,10 @@ class EnvConfig:
     )  # Length of an episode in the simulator
     num_lidar_samples: int = gpudrive.numLidarSamples
 
-    # Param to init all objects:
-    init_all_objects: bool = False
+    # Initialization mode
+    init_mode: str = (
+        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
+    )
 
 
 class SelectionDiscipline(Enum):
@@ -183,4 +189,6 @@ class RenderConfig:
     view_option: Enum = None
     resolution: Tuple[int, int] = (1024, 1024)
     draw_obj_idx: bool = False
+    draw_expert_trajectories: bool = False
+    draw_only_controllable_veh: bool = False
     obj_idx_font_size: int = 9

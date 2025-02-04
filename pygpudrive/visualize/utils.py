@@ -386,7 +386,7 @@ def plot_stop_sign(
     alpha: float = None,
 ) -> None:
     # Default configurations for the stop sign
-    facecolor = "red" if facecolor is None else facecolor
+    facecolor = "#c04000" if facecolor is None else facecolor
     edgecolor = "white" if edgecolor is None else edgecolor
     linewidth = 1.5 if linewidth is None else linewidth
     radius = 1.0 if radius is None else radius

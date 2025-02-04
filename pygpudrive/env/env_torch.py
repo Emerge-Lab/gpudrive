@@ -1,4 +1,4 @@
-"""Troch gymnasium environment that interfaces with the GPU Drive simulator."""
+"""Base Gym Environment that interfaces with the GPU Drive simulator."""
 
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
@@ -6,7 +6,7 @@ import torch
 from itertools import product
 from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 from pygpudrive.env.base_env import GPUDriveGymEnv
-
+import gymnasium
 from pygpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -19,6 +19,7 @@ from pygpudrive.datatypes.info import Info
 
 from pygpudrive.visualize.core import MatplotlibVisualizer
 from pygpudrive.env.dataset import SceneDataLoader
+import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -49,7 +50,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize the iterator once
         self.data_iterator = iter(self.data_loader)
 
-        # Get the initial data batch
+        # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
 
         # Initialize simulator
@@ -66,7 +67,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
         )
+        # self.single_observation_space = Box(
+        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
+        # )
+        self.single_observation_space = gymnasium.spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.observation_space.shape[-1],),
+            dtype=np.float32,
+        )
+
         self._setup_action_space(action_type)
+        self.num_agents = self.cont_agent_mask.sum().item()
+        self.single_action_space = self.action_space
+        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
+        self.observation_space = pufferlib.spaces.joint_space(
+            self.single_observation_space, self.num_agents
+        )
+
         self.info_dim = 5  # Number of info features
         self.episode_len = self.config.episode_len
 
@@ -486,6 +504,53 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
+        
+    def remove_agents_by_id(self, perc_to_rmv_per_scene, remove_controlled_agents=True):
+        """Delete random agents in scenarios.
+        
+        Args:
+            perc_to_rmv_per_scene (float): Percentage of agents to remove per scene
+            remove_controlled_agents (bool): If True, removes controlled agents. If False, removes uncontrolled agents
+        """
+        # Obtain agent ids
+        agent_ids = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend='torch',
+            device=self.device
+        ).id
+        
+        # Choose the appropriate mask based on whether we're removing controlled or uncontrolled agents
+        if remove_controlled_agents:
+            agent_mask = self.cont_agent_mask
+        else:
+            # Create inverse mask for uncontrolled agents
+            agent_mask = ~self.cont_agent_mask
+        
+        for env_idx in range(self.num_worlds):
+            # Get all relevant agent IDs (controlled or uncontrolled) for the current environment
+            scene_agent_ids = agent_ids[env_idx, :][agent_mask[env_idx]].long()
+            
+            if scene_agent_ids.numel() > 0:  # Ensure there are agents to sample
+                # Determine the number of agents to sample (X% of the total agents)
+                num_to_sample = max(1, int(perc_to_rmv_per_scene * scene_agent_ids.size(0)))
+                
+                # Randomly sample agent IDs to remove using torch
+                sampled_indices = torch.randperm(scene_agent_ids.size(0))[:num_to_sample]
+                sampled_agent_ids = scene_agent_ids[sampled_indices]
+                
+                # Delete the sampled agents from the environment
+                self.sim.deleteAgents({env_idx: sampled_agent_ids.tolist()})
+        
+        # Reset controlled agent mask and visualizer
+        self.cont_agent_mask = self.get_controlled_agents_mask()
+        self.max_agent_count = self.cont_agent_mask.shape[1]
+        self.num_valid_controlled_agents_across_worlds = (
+            self.cont_agent_mask.sum().item()
+        )
+        
+        # Reset static scenario data for the visualizer
+        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+        
 
     def swap_data_batch(self, data_batch=None):
         """
@@ -582,10 +647,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory.vel_xy,
             log_trajectory.yaw,
         )
+        
+    def get_env_filenames(self):
+        """Obtain the tfrecord filename for each world, mapping world indices to map names."""
+        
+        map_name_integers = self.sim.map_name_tensor().to_torch()
+        
+        filenames = {}
+        
+        # Iterate through the number of worlds
+        for i in range(self.num_worlds):
+            tensor = map_name_integers[i]
+            
+            # Convert ints to characters, ignoring zeros
+            map_name = ''.join([chr(i) for i in tensor.tolist() if i != 0])
+            
+            # Map the world index to the corresponding map name
+            filenames[i] = map_name
+        
+        return filenames
 
 
 if __name__ == "__main__":
-
     from pygpudrive.visualize.utils import img_from_fig
     import mediapy as media
 
@@ -599,6 +682,7 @@ if __name__ == "__main__":
         batch_size=data_config.batch_size,
         dataset_size=data_config.dataset_size,
         sample_with_replacement=True,
+        shuffle=False,
     )
 
     # Make env
@@ -606,10 +690,14 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=128,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     print(f"dataset: {env.data_batch}")
+
+    print(
+        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
+    )
 
     # Rollout
     obs = env.reset()
@@ -619,6 +707,9 @@ if __name__ == "__main__":
     sim_frames = []
     agent_obs_frames = []
 
+    # env.swap_data_batch()
+    # env.reset()
+
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
@@ -627,7 +718,16 @@ if __name__ == "__main__":
         print(f"Step: {t}")
 
         # Step the environment
+        expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
+
+        # if (t + 1) % 2 == 0:
+        # env.swap_data_batch()
+        # env.reset()
+        #     print(f"dataset: {env.data_batch}")
+
+        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
+        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
 
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
@@ -647,8 +747,8 @@ if __name__ == "__main__":
             figsize=(10, 10),
         )
 
-        # sim_states[0].savefig(f"sim_state.png")
-        # agent_obs.savefig(f"agent_obs.png")
+        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
+        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
 
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
