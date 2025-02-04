@@ -39,6 +39,7 @@ def make_videos(
     zoom_radius=100,
     deterministic=False,
     render_every_n_steps=10,
+    center_on_ego=False,
 ):
     """Make videos policy rollouts environment.
     Args:
@@ -94,6 +95,7 @@ def make_videos(
         render_sim_state=True,
         render_every_n_steps=render_every_n_steps,
         zoom_radius=zoom_radius,
+        center_on_ego=center_on_ego,
     )
 
     return sim_state_frames, env.get_env_filenames()
@@ -102,10 +104,10 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_010000" #"model_PPO__R_10000__01_23_21_02_58_770_005500"
+    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_011426"
     DATASET = "test"
-    SORT_BY = "collided_frac" #"goal_achieved"
-    SHOW_TOP_K = 20 # Render this many scenes
+    SORT_BY = "goal_achieved_frac" 
+    SHOW_TOP_K = 25 # Render this many scenes
 
     # Configurations
     eval_config = load_config("examples/experiments/eval/config/eval_config")
@@ -123,7 +125,10 @@ if __name__ == "__main__":
         df_res = pd.read_csv(f"{eval_config.res_path}/{MODEL_TO_LOAD}.csv")
     else:
         df_res = None
-        
+    
+    
+    df_res = df_res[df_res['controlled_agents_in_scene'] > 3]
+    
     logging.info(
         f"Loaded policy {MODEL_TO_LOAD} and corresponding results df."
     )
@@ -137,9 +142,10 @@ if __name__ == "__main__":
         show_top_k=SHOW_TOP_K,
         dataset=DATASET,
         device=eval_config.device,
-        zoom_radius=90,
+        zoom_radius=50,
         deterministic=False,
         render_every_n_steps=1,
+        center_on_ego=True,
     )
 
     sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
@@ -157,14 +163,15 @@ if __name__ == "__main__":
         goal_achieved = scene_stats.goal_achieved_frac.values.item()
         collided = scene_stats.collided_frac.values.item()
         off_road = scene_stats.off_road_frac.values.item()
-        other = scene_stats.not_goal_nor_crashed.values.item()
+        other = scene_stats.other_frac.values.item()
 
-        video_path = videos_dir / f"{filename}_ga_{goal_achieved:.2f}__cr_{collided:.2f}__or_{off_road:.2f}__ot_{other:.2f}.mp4"
+        video_path = videos_dir / f"{filename}_ga_{goal_achieved:.2f}__cr_{collided:.2f}__or_{off_road:.2f}__ot_{other:.2f}.gif"
 
         mediapy.write_video(
             str(video_path),
             frames,
             fps=15,
+            codec='gif',
         )
 
         logging.info(f"Saved video to {video_path}")

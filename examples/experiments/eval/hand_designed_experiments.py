@@ -46,105 +46,105 @@ if __name__ == "__main__":
         env=env,
     ) 
     
-    # # Run tests
-    # df_perf_original = evaluate_policy(
-    #     env=env,
-    #     policy=policy,
-    #     data_loader=data_loader_orig,
-    #     dataset_name="test",
-    #     deterministic=False,
-    #     render_sim_state=False,
-    # )
+    # Run tests
+    df_perf_original = evaluate_policy(
+        env=env,
+        policy=policy,
+        data_loader=data_loader_orig,
+        dataset_name="test",
+        deterministic=False,
+        render_sim_state=False,
+    )
     
-    # df_perf_altered = evaluate_policy(
-    #     env=env,
-    #     policy=policy,
-    #     data_loader=data_loader_altered,
-    #     dataset_name="test",
-    #     deterministic=False,
-    #     render_sim_state=False,
-    # )
+    df_perf_altered = evaluate_policy(
+        env=env,
+        policy=policy,
+        data_loader=data_loader_altered,
+        dataset_name="test",
+        deterministic=False,
+        render_sim_state=False,
+    )
    
-    # # Concatenate all three dataframes with a new column to identify the scenario
-    # df_perf_original['Class'] = 'Original'
-    # df_perf_altered['Class'] = 'Altered'
+    # Concatenate all three dataframes with a new column to identify the scenario
+    df_perf_original['Class'] = 'Original'
+    df_perf_altered['Class'] = 'Altered'
 
-    # df = pd.concat([df_perf_original, df_perf_altered])
+    df = pd.concat([df_perf_original, df_perf_altered])
 
-    # metrics = ['goal_achieved', 'collided', 'off_road', 'not_goal_nor_crashed']
+    metrics = ['goal_achieved_frac', 'collided_frac', 'off_road_frac', 'other_frac']
 
-    # tab_agg_perf = df.groupby('Class')[metrics].agg(['mean', 'std'])
-    # tab_agg_perf = tab_agg_perf * 100
-    # tab_agg_perf = tab_agg_perf.round(1)
+    tab_agg_perf = df.groupby('Class')[metrics].agg(['mean', 'std'])
+    tab_agg_perf = tab_agg_perf * 100
+    tab_agg_perf = tab_agg_perf.round(1)
         
-    # print('')  
-    # print(tab_agg_perf)
-    # print('')  
+    print('')  
+    print(tab_agg_perf)
+    print('')  
     
-    # # Save
-    # if not os.path.exists(config.save_results_path):
-    #     os.makedirs(config.save_results_path)
+    # Save
+    if not os.path.exists(config.save_results_path):
+        os.makedirs(config.save_results_path)
 
-    # df.to_csv(f"{config.save_results_path}/combined_results_ood.csv", index=False)
+    df.to_csv(f"{config.save_results_path}/combined_results_ood.csv", index=False)
 
-    # logging.info(f"Saved results at {config.save_results_path}")
+    logging.info(f"Saved results at {config.save_results_path}")
     
-    # Make videos
-    videos_dir = Path(f"videos/{config.cpt_name}/hand_designed")
-    videos_dir.mkdir(parents=True, exist_ok=True)
+    # # Make videos
+    # videos_dir = Path(f"videos/{config.cpt_name}/hand_designed")
+    # videos_dir.mkdir(parents=True, exist_ok=True)
     
-    for data_loader in [data_loader_orig]: #data_loader_altered
+    # for data_loader in [data_loader_orig]: #data_loader_altered
     
-        for batch in tqdm(
-            data_loader,
-            desc=f"Making videos",
-            total=len(data_loader),
-            colour="MAGENTA",
-        ):
+    #     for batch in tqdm(
+    #         data_loader,
+    #         desc=f"Making videos",
+    #         total=len(data_loader),
+    #         colour="MAGENTA",
+    #     ):
 
-            env.swap_data_batch(batch)
+    #         env.swap_data_batch(batch)
             
-            (
-                goal_achieved_count,
-                goal_achieved_frac,
-                collided_count,
-                collided_frac,
-                off_road_count,
-                off_road_frac,
-                other_count,
-                other_frac,
-                controlled_agents_in_scene,
-                sim_state_frames,
-                agent_positions,
-                episode_lengths,
-            ) = rollout(
-                env=env,
-                policy=policy,
-                device=config.device,
-                deterministic=config.device,
-                render_sim_state=config.render_sim_state,
-                render_every_n_steps=1,
-                zoom_radius=config.zoom_radius,
-            )
+    #         (
+    #             goal_achieved_count,
+    #             goal_achieved_frac,
+    #             collided_count,
+    #             collided_frac,
+    #             off_road_count,
+    #             off_road_frac,
+    #             other_count,
+    #             other_frac,
+    #             controlled_agents_in_scene,
+    #             sim_state_frames,
+    #             agent_positions,
+    #             episode_lengths,
+    #         ) = rollout(
+    #             env=env,
+    #             policy=policy,
+    #             device=config.device,
+    #             deterministic=config.device,
+    #             render_sim_state=config.render_sim_state,
+    #             render_every_n_steps=1,
+    #             zoom_radius=config.zoom_radius,
+    #         )
             
-            filenames = env.get_env_filenames()
+    #         filenames = env.get_env_filenames()
             
-            sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
+    #         sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
 
-            # Save videos locally
-            for env_id, frames in sim_state_arrays.items():
+    #         # Save videos locally
+    #         for env_id, frames in sim_state_arrays.items():
                 
-                filename = filenames[env_id]
+    #             filename = filenames[env_id]
                 
-                video_path = videos_dir / f"{filename}.mp4"
+    #             video_path = videos_dir / f"{filename}.mp4"
 
-                mediapy.write_video(
-                    str(video_path),
-                    frames,
-                    fps=15,
-                )
+    #             mediapy.write_video(
+    #                 str(video_path),
+    #                 frames,
+    #                 fps=15,
+    #             )
 
-                logging.info(f"Saved video to {video_path}")
+    #             logging.info(f"Saved video to {video_path}")
 
         
         

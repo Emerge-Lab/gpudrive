@@ -116,10 +116,8 @@ class EnvConfig:
     num_lidar_samples: int = gpudrive.numLidarSamples
 
     # Initialization mode
-    init_mode: str = "all_valid" # Options: all_non_trivial, all_objects, all_valid
+    init_mode: str = "all_non_trivial" # Options: all_non_trivial, all_objects, all_valid
     
-    
-
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""

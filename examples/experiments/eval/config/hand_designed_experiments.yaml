@@ -1,13 +1,13 @@
 save_results_path: examples/experiments/eval/dataframes/hand_designed
 
-data_path_original: data/processed/hand_designed/debug
+data_path_original: data/processed/hand_designed/original
 data_path_altered: data/processed/hand_designed/altered
 
 cpt_path: examples/experiments/models/
-cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_005250
+cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
 
-num_worlds: 2
-dataset_size: 2
+num_worlds: 13
+dataset_size: 13
 
 device: cuda
 deterministic: false

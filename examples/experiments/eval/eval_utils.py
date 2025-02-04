@@ -79,7 +79,8 @@ def rollout(
     render_sim_state: bool = False,
     render_every_n_steps: int = 5,
     zoom_radius: int = 100,
-    return_agent_positions: bool = False
+    return_agent_positions: bool = False,
+    center_on_ego: bool = False,
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -121,10 +122,6 @@ def rollout(
         infos.collided[env.cont_agent_mask],
     )
 
-    logging.info(
-        f"Removed {bugged_agent_mask.sum()} bugged agents; {(bugged_agent_mask.sum()/env.cont_agent_mask.sum())*100:.2f}% of controlled agents \n"
-    )
-
     controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
 
     live_agent_mask = controlled_agent_mask.clone()
@@ -149,7 +146,6 @@ def rollout(
 
             #pdb.set_trace()
             if render_sim_state and len(active_worlds) > 0:
-                print(live_agent_mask.sum(axis=1))
                 
                 has_live_agent = torch.where(
                     live_agent_mask[active_worlds, :].sum(axis=1) > 0
@@ -157,14 +153,21 @@ def rollout(
 
                 if time_step % render_every_n_steps == 0:
 
-                    #logging.info(f"Rendering time step {time_step}")
+                    logging.info(f"Rendering time step {time_step}")
                     #logging.info(f"Rendering worlds: {has_live_agent}")
+                    
+                    if center_on_ego:
+                        #import pdb; pdb.set_trace()
+                        agent_indices = torch.argmax(controlled_agent_mask.to(torch.uint8), dim=1).tolist()
+                    else:
+                        agent_indices = None
 
                     sim_state_figures = env.vis.plot_simulator_state(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
-                        agent_positions = agent_positions
+                        agent_positions = agent_positions,
+                        center_agent_indices=agent_indices,
                     )
                     for idx, env_id in enumerate(has_live_agent):
                         sim_state_frames[env_id].append(
@@ -186,9 +189,6 @@ def rollout(
         off_road[live_agent_mask] += infos.off_road[live_agent_mask]
         collided[live_agent_mask] += infos.collided[live_agent_mask]
         goal_achieved[live_agent_mask] += infos.goal_achieved[live_agent_mask]
-
-        logging.debug(f"active_worlds: {active_worlds}")
-        logging.debug(f"num_agents_live: {live_agent_mask.sum()}")
 
         # Update live agent mask
         live_agent_mask[dones] = False
