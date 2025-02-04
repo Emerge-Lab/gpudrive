@@ -82,14 +82,14 @@ if __name__ == "__main__":
             f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
         )
 
-        # df_res_train = evaluate_policy(
-        #     env=env,
-        #     policy=policy,
-        #     data_loader=train_loader,
-        #     dataset_name="train",
-        #     deterministic=False,
-        #     render_sim_state=False,
-        # )
+        df_res_train = evaluate_policy(
+            env=env,
+            policy=policy,
+            data_loader=train_loader,
+            dataset_name="train",
+            deterministic=False,
+            render_sim_state=False,
+        )
 
         df_res_test = evaluate_policy(
             env=env,
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        df_res = df_res_test #pd.concat([df_res_train, df_res_test])
+        df_res = pd.concat([df_res_train, df_res_test])
 
         # Add metadata
         df_res["model_name"] = model.name

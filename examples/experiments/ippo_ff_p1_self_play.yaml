@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: /scratch/kj2676/gpudrive/data/processed/training
-continue_training: false
+data_dir: data/processed/hand_designed/altered #/scratch/kj2676/gpudrive/data/processed/training
+continue_training: true
 model_cpt: examples/experiments/eval/models/sota_paper/model_PPO__R_10000__01_23_21_02_58_770_007000.pt
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  k_unique_scenes: 13 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -30,7 +30,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "self_play_rl_safe"
-  group: "clean_data_0123"
+  group: "finetune_backwards"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -44,7 +44,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
   sample_with_replacement: true
@@ -52,14 +52,14 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 2_000_000_000
+  total_timesteps: 500_000_000
   batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
-  anneal_lr: false
+  anneal_lr: true
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 2
+  update_epochs: 3
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
@@ -80,13 +80,13 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 750 # Save policy every k iterations
+  checkpoint_interval: 50 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
-  render_interval: 200 # Render every k iterations
-  render_k_scenarios: 2 # Number of scenarios to render
+  render_interval: 50 # Render every k iterations
+  render_k_scenarios: 3 # Number of scenarios to render
   render_simulator_state: true # Plot the simulator state from bird's eye view
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_format: "mp4" # Options: gif, mp4

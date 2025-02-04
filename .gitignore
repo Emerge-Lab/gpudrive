@@ -29,6 +29,7 @@ data/processed/testing/*
 data/processed/training/*
 data/processed/sampled/*
 data/processed/hand_designed/*
+analyze/figures/*
 
 # Logging
 /wandb
