@@ -60,7 +60,7 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 41), decimals=3  
+        torch.linspace(-torch.pi, torch.pi, 41), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 17), decimals=3
@@ -116,8 +116,9 @@ class EnvConfig:
     num_lidar_samples: int = gpudrive.numLidarSamples
 
     # Initialization mode
-    init_mode: str = "all_non_trivial" # Options: all_non_trivial, all_objects, all_valid
-    
+    init_mode: str = (
+        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
+    )
 
 
 class SelectionDiscipline(Enum):

@@ -10,12 +10,19 @@ import logging
 from pathlib import Path
 
 from pygpudrive.env.dataset import SceneDataLoader
-from eval_utils import load_config, make_env, load_policy, rollout, evaluate_policy
+from eval_utils import (
+    load_config,
+    make_env,
+    load_policy,
+    rollout,
+    evaluate_policy,
+)
 import pdb
 
 import random
 import torch
 import numpy as np
+
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -23,6 +30,7 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # If using CUDA
     torch.backends.cudnn.deterministic = True
+
 
 logging.basicConfig(level=logging.INFO)
 SEED = 42  # Set to any fixed value
@@ -110,27 +118,34 @@ if __name__ == "__main__":
         # Store
         if not os.path.exists(eval_config.res_path):
             os.makedirs(eval_config.res_path)
-            
-        tab_agg_perf = df_res.groupby('dataset')[['goal_achieved_frac', 'collided_frac', 'off_road_frac', 'other_frac']].agg(['mean', 'std'])
+
+        tab_agg_perf = df_res.groupby("dataset")[
+            [
+                "goal_achieved_frac",
+                "collided_frac",
+                "off_road_frac",
+                "other_frac",
+            ]
+        ].agg(["mean", "std"])
         tab_agg_perf = tab_agg_perf * 100
         tab_agg_perf = tab_agg_perf.round(1)
-                
-        print('Scene-based metrics \n')  
+
+        print("Scene-based metrics \n")
         print(tab_agg_perf)
-        print('')  
-        
-        print('Agent-based metrics \n')  
-        total_agents = df_res['controlled_agents_in_scene'].sum() 
-        collision_rate = (df_res['collided_count'].sum() / total_agents)*100
-        offroad_rate = (df_res['off_road_count'].sum() / total_agents)*100
-        goal_rate = (df_res['goal_achieved_count'].sum() / total_agents)*100
-        other_rate = (df_res['other_count'].sum() / total_agents)*100
-        
-        print(f'Total agents: {total_agents} in {df_res.shape[0]} scenes')
-        print(f'Collision rate: {collision_rate}')  
-        print(f'Offroad rate: {offroad_rate}')  
-        print(f'Goal rate: {goal_rate}')  
-        print(f'Other rate: {other_rate}')  
+        print("")
+
+        print("Agent-based metrics \n")
+        total_agents = df_res["controlled_agents_in_scene"].sum()
+        collision_rate = (df_res["collided_count"].sum() / total_agents) * 100
+        offroad_rate = (df_res["off_road_count"].sum() / total_agents) * 100
+        goal_rate = (df_res["goal_achieved_count"].sum() / total_agents) * 100
+        other_rate = (df_res["other_count"].sum() / total_agents) * 100
+
+        print(f"Total agents: {total_agents} in {df_res.shape[0]} scenes")
+        print(f"Collision rate: {collision_rate}")
+        print(f"Offroad rate: {offroad_rate}")
+        print(f"Goal rate: {goal_rate}")
+        print(f"Other rate: {other_rate}")
 
         df_res.to_csv(f"{eval_config.res_path}/{model.name}.csv", index=False)
 
