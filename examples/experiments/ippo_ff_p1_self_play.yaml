@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/hand_designed/altered #/scratch/kj2676/gpudrive/data/processed/training
-continue_training: true
-model_cpt: examples/experiments/eval/models/sota_paper/model_PPO__R_10000__01_23_21_02_58_770_007000.pt
+data_dir: data/processed/examples
+continue_training: false
+model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 13 # Number of unique scenes to sample from
+  k_unique_scenes: 3 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -30,7 +30,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "self_play_rl_safe"
-  group: "finetune_backwards"
+  group: "tests"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 

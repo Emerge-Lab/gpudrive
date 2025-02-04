@@ -132,6 +132,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.isStaticAgentControlled = False
             params.initOnlyValidAgentsAtFirstStep = True
             params.IgnoreNonVehicles = self.config.remove_non_vehicles
+        else:
+            raise ValueError(f"Invalid init mode: {self.config.init_mode}")
         
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
