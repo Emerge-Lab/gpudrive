@@ -1,5 +1,6 @@
 import torch
 import matplotlib
+matplotlib.use('Agg')
 from typing import Tuple, Optional, List, Dict, Any, Union
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
@@ -260,6 +261,11 @@ class MatplotlibVisualizer:
             )
 
             if agent_positions is not None:
+                # Create a custom axes for the colorbar
+                cmap = plt.cm.Blues
+                norm = plt.Normalize(vmin=0, vmax=90)
+                sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    
                 for agent_idx in range(agent_positions.shape[1]):
                     if controlled_live[agent_idx]:
                         trajectory = agent_positions[env_idx, agent_idx, :time_step, :]
@@ -283,17 +289,25 @@ class MatplotlibVisualizer:
                                 segments.append(segment)
                             segments = np.array(segments)
                             
-                            # Create color gradient
-                            colors = np.zeros((len(segments), 4))  # RGBA colors
-                            colors[:, 0] = np.linspace(0.114, 0.051, len(segments))  # R
-                            colors[:, 1] = np.linspace(0.678, 0.278, len(segments))  # G
-                            colors[:, 2] = np.linspace(0.753, 0.631, len(segments))  # B
-                            colors[:, 3] = np.linspace(0.3, 0.9, len(segments))      # Alpha
+                            # Create color gradient matching the colorbar
+                            t = np.linspace(0, 1, len(segments))
+                            colors = cmap(norm(t * 90))
+                            colors[:, 3] = np.linspace(0.3, 0.9, len(segments))  # Set alpha
                             
                             # Create line collection with color gradient
-                            from matplotlib.collections import LineCollection
                             lc = LineCollection(segments, colors=colors, linewidth=5)
                             ax.add_collection(lc)
+                
+                # Add the colorbar
+                try:
+                    fig = ax.get_figure()
+                    # fig.subplots_adjust(right=0.9)  # Make room for colorbar
+                    cbar_ax = fig.add_axes([0.92, 0.09, 0.02, 0.8])
+                    cbar = fig.colorbar(sm, cax=cbar_ax)
+                    cbar.set_label('Timestep', fontsize=15 * marker_scale)
+                    cbar.ax.tick_params(labelsize=12 * marker_scale)
+                except Exception as e:
+                    print(f"Warning: Could not add colorbar: {e}")
                     
             # Plot rollout statistics
             num_controlled = controlled.sum().item()
@@ -341,7 +355,7 @@ class MatplotlibVisualizer:
             ax.set_yticks([])
 
         for fig in figs:
-            fig.tight_layout(pad=0)
+            fig.tight_layout(pad=2, rect=[0.00, 0.00, 0.9, 1])
 
         return figs
 
