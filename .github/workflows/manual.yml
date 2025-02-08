@@ -53,7 +53,7 @@ jobs:
 
     - name: Upload core dumps
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: core-dumps
         path: /tmp/core*
