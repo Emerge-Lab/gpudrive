@@ -345,9 +345,14 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .muD = 0.5f,
     });
 
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wmissing-field-initializers"
+
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,
     };
+
+    #pragma clang diagnostic pop
 
     src_objs[(CountT)SimObject::Plane] = {
         .prims = Span<const SourceCollisionPrimitive>(&plane_prim, 1),

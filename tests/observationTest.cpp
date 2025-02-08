@@ -24,6 +24,7 @@ protected:
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
+            .rewardParams = gpudrive::RewardParams(),
             .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
             .roadObservationAlgorithm = gpudrive::FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering
         }
@@ -43,7 +44,6 @@ protected:
 
         std::cout<<"CTEST Mean x: "<<mean.first<<" Mean y: "<<mean.second<<std::endl;
 
-        int64_t n_roads = 0;
         for (const auto &obj : rawJson["roads"]) {
             std::vector<std::pair<float, float>> roadGeom;
             for (const auto &point: obj["geometry"])
@@ -88,17 +88,20 @@ TEST_F(ObservationsTest, TestObservations) {
     auto obs = mgr.mapObservationTensor();
     auto flat_obs = test_utils::flatten_obs(obs);
 
-    int64_t idx = 0;
-    for(int64_t i = 0; i < roadGeoms.size(); i++)
+    size_t idx = 0;
+    for(size_t i = 0; i < roadGeoms.size(); i++)
     {
         std::vector<std::pair<float, float>> roadGeom = roadGeoms[i];
         float roadType = roadTypes[i];
-        for(int64_t j = 0; j < roadGeom.size() - 1; j++)
+        for(size_t j = 0; j < roadGeom.size() - 1; j++)
         {
             if(roadType > (float)gpudrive::EntityType::RoadLane && roadType < (float)gpudrive::EntityType::StopSign)
             {
                 float x = (roadGeom[j].first + roadGeom[j+1].first + roadGeom[j+2].first + roadGeom[j+3].first)/4 - mean.first;
                 float y = (roadGeom[j].second + roadGeom[j+1].second + roadGeom[j+2].second + roadGeom[j+3].second)/4 - mean.second;
+
+                if(idx >= flat_obs.size())
+                    break;
 
                 ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
                 ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);

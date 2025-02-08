@@ -280,16 +280,6 @@ static inline void createRoadEntities(Engine &ctx, const MapRoad &roadInit, Coun
     }
 }
 
-static void createFloorPlane(Engine &ctx)
-{
-    ctx.data().floorPlane = ctx.makeRenderableEntity<PhysicsEntity>();
-    setRoadEntitiesProps(ctx, ctx.data().floorPlane, Vector3{.x = 0, .y = 0, .z = 0},
-                         Quat::angleAxis(0, madrona::math::up),
-                         Diag3x3{.d0 = 100, .d1 = 100, .d2 = 0.1},
-                         EntityType::None, ObjectID{(int32_t)SimObject::Plane}, ResponseType::Static, 0, MapType::UNKNOWN);
-    registerRigidBodyEntity(ctx, ctx.data().floorPlane, SimObject::Plane);
-}
-
 void createPaddingEntities(Engine &ctx) {
     for (CountT agentIdx = ctx.data().numAgents;
          agentIdx < consts::kMaxAgentCount; ++agentIdx) {

@@ -234,7 +234,7 @@ namespace gpudrive
             road.mapType = MapType::UNKNOWN;
         }
 
-        for (int i = 0; i < road.numPoints; i++)
+        for (uint32_t i = 0; i < road.numPoints; i++)
         {
             road.mean.x += (road.geometry[i].x - road.mean.x)/(i+1);
             road.mean.y += (road.geometry[i].y - road.mean.y)/(i+1);
@@ -297,8 +297,8 @@ namespace gpudrive
         const auto& metadata = j.at("metadata");
 
         // Set SDC
-        int sdc_index = metadata.at("sdc_track_index").get<int>();
-        if (sdc_index < 0 || sdc_index >= j.at("objects").size()) {
+        size_t sdc_index = metadata.at("sdc_track_index").get<int>();
+        if (sdc_index >= j.at("objects").size()) {
             std::cerr << "Warning: Invalid sdc_track_index " << sdc_index << " in scene " << j.at("name").get<std::string>() << std::endl;
         } else {
             int sdc_id = j.at("objects")[sdc_index].at("id").get<int>();
@@ -318,7 +318,7 @@ namespace gpudrive
         // Set tracks to predict
         for (const auto& track : metadata.at("tracks_to_predict")) {
             int track_index = track.at("track_index").get<int>();
-            if (track_index < 0 || track_index >= j.at("objects").size()) {
+            if (track_index < 0 || static_cast<size_t>(track_index) >= j.at("objects").size()) {
                 std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
             } else {
                 int track_id = j.at("objects")[track_index].at("id").get<int>();

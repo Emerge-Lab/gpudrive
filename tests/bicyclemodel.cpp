@@ -24,6 +24,7 @@ protected:
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
+            .rewardParams = gpudrive::RewardParams(),
             .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
             .initOnlyValidAgentsAtFirstStep = false,
             .dynamicsModel = gpudrive::DynamicsModel::Classic
@@ -73,9 +74,6 @@ protected:
         acc_distribution = std::uniform_real_distribution<float>(-3.0, 2.0);
         steering_distribution = std::uniform_real_distribution<float>(-0.7, 0.7); 
         generator = std::default_random_engine(42);
-
-        auto shape_tensor = mgr.shapeTensor();
-        int32_t *ptr = static_cast<int32_t *>(shape_tensor.devicePtr());
         num_agents = 1;
     }
 };
@@ -102,30 +100,30 @@ std::tuple<float, float, float, float> StepBicycleModel(float x, float y, float 
 std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, const py::Tensor &self_obs, const std::vector<float> &expected, const uint32_t num_agents)
 {
     int64_t num_elems = 1;
-    for (int i = 0; i < abs_obs.numDims(); i++)
+    for (int64_t i = 0; i < abs_obs.numDims(); i++)
     {
         num_elems *= abs_obs.dims()[i];
     }
 
-    if (num_agents * gpudrive::AbsoluteSelfObservationExportSize > num_elems)
+    if (static_cast<int64_t>(num_agents * gpudrive::AbsoluteSelfObservationExportSize) > num_elems)
     {
         return {false, "Expected number of elements is less than the number of agents."};
     }
 
     num_elems = 1;
-    for (int i = 0; i < self_obs.numDims(); i++)
+    for (int64_t i = 0; i < self_obs.numDims(); i++)
     {
         num_elems *= self_obs.dims()[i];
     }
 
-    if (num_agents * gpudrive::SelfObservationExportSize > num_elems)
+    if (static_cast<int64_t>(num_agents * gpudrive::SelfObservationExportSize) > num_elems)
     {
         return {false, "Expected number of elements is less than the number of agents."};
     }
 
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
 
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    for (int64_t i = 0, agent_idx = 0; i < static_cast<int64_t>(num_agents * gpudrive::AbsoluteSelfObservationExportSize);)
     {
         auto x = static_cast<float>(ptr[i]);
         auto y = static_cast<float>(ptr[i + 1]);
@@ -144,7 +142,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
     }
     
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
+    for (int64_t i = 0, agent_idx = 0; i < static_cast<int64_t>(num_agents * gpudrive::SelfObservationExportSize);)
     {
         auto speed = static_cast<float>(ptr[i]);
         auto speed_exp = expected[agent_idx+3];
@@ -166,7 +164,7 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
     std::vector<float> obs;
     obs.resize(num_agents * 4);
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    for (size_t i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
     {
         obs[agent_idx] = static_cast<float>(ptr[i]);
         obs[agent_idx+1] = static_cast<float>(ptr[i+1]);
@@ -175,7 +173,7 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
         i+=gpudrive::AbsoluteSelfObservationExportSize;
     }
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
+    for (size_t i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
     {
         obs[agent_idx+3] = static_cast<float>(ptr[i]);
         agent_idx += 4;
@@ -201,7 +199,7 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     };
     std::vector<float> expected;
     //Check first step -
-    for(int i = 0; i < num_agents; i++)
+    for(uint32_t i = 0; i < num_agents; i++)
     {
         auto [x_next, y_next, theta_next, speed_next] = StepBicycleModel(initialState[4*i], initialState[4*i+1], initialState[4*i+2], initialState[4*i+3], 0, 0, 0.1, agent_length_map[i]);
         expected.push_back(x_next);
@@ -215,13 +213,13 @@ TEST_F(BicycleKinematicModelTest, TestModelEvolution) {
     ASSERT_TRUE(valid);
     printObs();
     
-    for(int i = 0; i < num_steps; i++)
+    for(int64_t i = 0; i < num_steps; i++)
     {
         expected.clear();
         printObs();
         auto prev_state = parseBicycleModel(abs_obs, self_obs, num_agents); // Due to floating point errors, we cannot use the expected values from the previous step so as not to accumulate errors.
         printVector(prev_state);
-        for(int j = 0; j < num_agents; j++)
+        for(uint32_t j = 0; j < num_agents; j++)
         {
             float acc =  acc_distribution(generator);
             float steering = steering_distribution(generator);

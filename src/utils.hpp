@@ -60,7 +60,7 @@ private:
     return gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
   }
 
-  madrona::math::Vector2 referencePosition;
   madrona::base::Rotation referenceRotation;
+  madrona::math::Vector2 referencePosition;
 };
 }}

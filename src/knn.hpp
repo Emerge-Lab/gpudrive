@@ -23,7 +23,9 @@ void fillZeros(gpudrive::MapObservation *begin,
         gpudrive::MapObservation{.position = {0, 0},
                                  .scale = madrona::math::Diag3x3{0, 0, 0},
                                  .heading = 0.f,
-                                 .type = (float)gpudrive::EntityType::None};
+                                 .type = (float)gpudrive::EntityType::None,
+                                 .id = 0.f,
+                                 .mapType = (float)gpudrive::MapType::UNKNOWN};
   }
 }
 
@@ -42,7 +44,9 @@ relativeObservation(const gpudrive::MapObservation &absoluteObservation,
                       .xy(),
       .scale = absoluteObservation.scale,
       .heading =  gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
-      .type = absoluteObservation.type};
+      .type = absoluteObservation.type,
+      .id = absoluteObservation.id,
+      .mapType = absoluteObservation.mapType};
 }
 
 
