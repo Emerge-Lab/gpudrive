@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Tuple, Optional
 import torch
 
-import gpudrive
+import madrona_gpudrive
 
 
 @dataclass
@@ -31,7 +31,7 @@ class EnvConfig:
     norm_obs: bool = True  # Normalize observations
 
     # Maximum number of controlled agents in the scene
-    max_controlled_agents: int = gpudrive.kMaxAgentCount
+    max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
     num_worlds: int = 1  # Number of worlds in the environment
 
     # NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
@@ -102,18 +102,18 @@ class EnvConfig:
 
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_agents_in_scene: int = (
-        gpudrive.kMaxAgentCount
+        madrona_gpudrive.kMaxAgentCount
     )  # Max number of objects in simulation
     max_num_rg_points: int = (
-        gpudrive.kMaxRoadEntityCount
+        madrona_gpudrive.kMaxRoadEntityCount
     )  # Max number of road graph segments
     roadgraph_top_k: int = (
-        gpudrive.kMaxAgentMapObservationsCount
+        madrona_gpudrive.kMaxAgentMapObservationsCount
     )  # Top-K road graph segments agents can view
     episode_len: int = (
-        gpudrive.episodeLen
+        madrona_gpudrive.episodeLen
     )  # Length of an episode in the simulator
-    num_lidar_samples: int = gpudrive.numLidarSamples
+    num_lidar_samples: int = madrona_gpudrive.numLidarSamples
 
     # Initialization mode
     init_mode: str = (

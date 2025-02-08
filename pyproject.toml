@@ -7,9 +7,10 @@ requires = [
 ]
 build-backend = "madrona-py-build"
 backend-path = ["external/madrona/py"]
+wheel-directory = "build"
 
 [project]
-name = "gpudrive"
+name = "madrona_gpudrive"
 version = "0.3.0"
 authors = [
     {name = "Saman Kazemkheni", email = "skazemkhani@gmail.com"},
@@ -32,10 +33,9 @@ test = [
     "pytest>=8.2.1",
 ]
 
-[tool.madrona.packages.gpudrive]
+[tool.madrona.packages.madrona_gpudrive]
 ext-only = true
 ext-out-dir = "build"
 
-# This module includes the PPO implementation for the training demo
-[tool.madrona.packages.gpudrive_learn]
-path = "train_src/gpudrive_learn"
+#[tool.madrona.packages.gpudrive]
+#path = "gpudrive"

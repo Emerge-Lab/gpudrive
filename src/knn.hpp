@@ -12,23 +12,23 @@
 #endif
 
 namespace {
-bool cmp(const gpudrive::MapObservation &lhs, const gpudrive::MapObservation &rhs) {
+bool cmp(const madrona_gpudrive::MapObservation &lhs, const madrona_gpudrive::MapObservation &rhs) {
   return lhs.position.length2() < rhs.position.length2();
 }
 
-void fillZeros(gpudrive::MapObservation *begin,
-               gpudrive::MapObservation *beyond) {
+void fillZeros(madrona_gpudrive::MapObservation *begin,
+               madrona_gpudrive::MapObservation *beyond) {
   while (begin < beyond) {
     *begin++ =
-        gpudrive::MapObservation{.position = {0, 0},
+        madrona_gpudrive::MapObservation{.position = {0, 0},
                                  .scale = madrona::math::Diag3x3{0, 0, 0},
                                  .heading = 0.f,
-                                 .type = (float)gpudrive::EntityType::None};
+                                 .type = (float)madrona_gpudrive::EntityType::None};
   }
 }
 
-gpudrive::MapObservation
-relativeObservation(const gpudrive::MapObservation &absoluteObservation,
+madrona_gpudrive::MapObservation
+relativeObservation(const madrona_gpudrive::MapObservation &absoluteObservation,
                     const madrona::base::Rotation &referenceRotation,
                     const madrona::math::Vector2 &referencePosition) {
   auto relativePosition =
@@ -36,18 +36,18 @@ relativeObservation(const gpudrive::MapObservation &absoluteObservation,
                              .y = absoluteObservation.position.y} -
       referencePosition;
 
-  return gpudrive::MapObservation{
+  return madrona_gpudrive::MapObservation{
       .position = referenceRotation.inv()
                       .rotateVec({relativePosition.x, relativePosition.y, 0})
                       .xy(),
       .scale = absoluteObservation.scale,
-      .heading =  gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
+      .heading =  madrona_gpudrive::utils::quatToYaw(referenceRotation.inv() * madrona::math::Quat::angleAxis(absoluteObservation.heading,madrona::math::up)),
       .type = absoluteObservation.type};
 }
 
 
-bool isObservationsValid(gpudrive::Engine &ctx,
-                         gpudrive::MapObservation *observations,
+bool isObservationsValid(madrona_gpudrive::Engine &ctx,
+                         madrona_gpudrive::MapObservation *observations,
                          madrona::CountT K,
                          const madrona::base::Rotation &referenceRotation,
                          const madrona::math::Vector2 &referencePosition) {
@@ -56,13 +56,13 @@ bool isObservationsValid(gpudrive::Engine &ctx,
 #else
   const auto roadCount = ctx.data().numRoads;
 
-  std::vector<gpudrive::MapObservation> sortedObservations;
+  std::vector<madrona_gpudrive::MapObservation> sortedObservations;
   sortedObservations.reserve(roadCount);
 
   for (madrona::CountT roadIdx = 0; roadIdx < roadCount; ++roadIdx) {
-    auto &road_iface = ctx.get<gpudrive::RoadInterfaceEntity>(ctx.data().roads[roadIdx]).e;
+    auto &road_iface = ctx.get<madrona_gpudrive::RoadInterfaceEntity>(ctx.data().roads[roadIdx]).e;
     const auto &currentObservation =
-        ctx.get<gpudrive::MapObservation>(road_iface);
+        ctx.get<madrona_gpudrive::MapObservation>(road_iface);
     sortedObservations.emplace_back(relativeObservation(
         currentObservation, referenceRotation, referencePosition));
   }
@@ -72,15 +72,15 @@ bool isObservationsValid(gpudrive::Engine &ctx,
 
   return std::equal(observations, observations + K, sortedObservations.begin(),
                     sortedObservations.begin() + K,
-                    [](const gpudrive::MapObservation &lhs,
-                       const gpudrive::MapObservation &rhs) {
+                    [](const madrona_gpudrive::MapObservation &lhs,
+                       const madrona_gpudrive::MapObservation &rhs) {
                       return lhs.position.x == rhs.position.x &&
                              lhs.position.y == rhs.position.y;
                     });
 #endif
 }
 
-madrona::CountT radiusFilter(gpudrive::MapObservation *heap, madrona::CountT K, float radius) {
+madrona::CountT radiusFilter(madrona_gpudrive::MapObservation *heap, madrona::CountT K, float radius) {
   madrona::CountT newBeyond{K};
 
   madrona::CountT idx{0};
@@ -98,12 +98,12 @@ madrona::CountT radiusFilter(gpudrive::MapObservation *heap, madrona::CountT K, 
 
 } // namespace
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 template <madrona::CountT K>
 void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
                                 const madrona::math::Vector2 &referencePosition,
-                                gpudrive::MapObservation *heap) {
+                                madrona_gpudrive::MapObservation *heap) {
   const Entity *roads = ctx.data().roads;
   const auto roadCount = ctx.data().numRoads;
 
@@ -114,7 +114,7 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
         referenceFrame.observationOf(ctx.get<madrona::base::Position>(roads[i]),
                                      ctx.get<madrona::base::Rotation>(roads[i]),
                                      ctx.get<madrona::base::Scale>(roads[i]),
-                                     ctx.get<gpudrive::EntityType>(roads[i]),
+                                     ctx.get<madrona_gpudrive::EntityType>(roads[i]),
                                      static_cast<float>(ctx.get<RoadMapId>(roads[i]).id),
                                      ctx.get<MapType>(roads[i]));
   }
@@ -132,7 +132,7 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
         ctx.get<madrona::base::Position>(roads[roadIdx]),
         ctx.get<madrona::base::Rotation>(roads[roadIdx]),
         ctx.get<madrona::base::Scale>(roads[roadIdx]),
-        ctx.get<gpudrive::EntityType>(roads[roadIdx]),
+        ctx.get<madrona_gpudrive::EntityType>(roads[roadIdx]),
         static_cast<float>(ctx.get<RoadMapId>(roads[roadIdx]).id),
         ctx.get<MapType>(roads[roadIdx]));
 
@@ -157,4 +157,4 @@ void selectKNearestRoadEntities(Engine &ctx, const Rotation &referenceRotation,
   fillZeros(heap + newBeyond, heap + K);
 }
 
-} // namespace gpudrive
+} // namespace madrona_gpudrive

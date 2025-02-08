@@ -17,7 +17,7 @@
 #include "init.hpp"
 #include "types.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 // The Manager class encapsulates the linkage between the outside training
 // code and the internal simulation state (src/sim.hpp / src/sim.cpp)

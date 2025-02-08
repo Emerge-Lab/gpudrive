@@ -6,19 +6,19 @@ import dataclasses
 import wandb
 import gymnasium
 from collections import Counter
-from pygpudrive.env.config import EnvConfig
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from gpudrive.env.config import EnvConfig
+from gpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
-from pygpudrive.datatypes.observation import (
+from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.datatypes.observation import (
     LocalEgoState,
 )
 
-from pygpudrive.visualize.utils import img_from_fig
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.visualize.utils import img_from_fig
+from gpudrive.env.dataset import SceneDataLoader
 
 from pufferlib.environment import PufferEnv
-from pygpudrive import GPU_DRIVE_DATA_DIR
+from gpudrive import GPU_DRIVE_DATA_DIR
 
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""

@@ -16,7 +16,7 @@ using namespace madrona::phys;
 
 namespace RenderingSystem = madrona::render::RenderingSystem;
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 CountT getCurrentStep(const StepsRemaining &stepsRemaining) {
   return consts::episodeLen - stepsRemaining.t;
