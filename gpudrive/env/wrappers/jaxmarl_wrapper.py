@@ -12,8 +12,8 @@ from functools import partial
 from flax import struct
 from typing import Tuple, Optional
 
-from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
-from pygpudrive.env.env_jax import GPUDriveJaxEnv
+from gpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
+from gpudrive.env.env_jax import GPUDriveJaxEnv
 
 
 @struct.dataclass

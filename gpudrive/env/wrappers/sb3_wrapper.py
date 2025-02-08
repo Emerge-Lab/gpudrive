@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnvStepReturn,
 )
 
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.env_torch import GPUDriveTorchEnv
 
 logging.basicConfig(level=logging.INFO)
 

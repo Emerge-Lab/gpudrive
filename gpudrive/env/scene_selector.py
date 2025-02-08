@@ -2,7 +2,7 @@ import random
 import os
 import numpy as np
 from math import ceil
-from pygpudrive.env.config import SelectionDiscipline
+from gpudrive.env.config import SelectionDiscipline
 
 
 def select_scenes(config):

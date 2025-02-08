@@ -7,19 +7,19 @@ from matplotlib.collections import LineCollection
 import numpy as np
 import pandas as pd
 import gpudrive
-from pygpudrive.visualize import utils
-from pygpudrive.datatypes.roadgraph import (
+from gpudrive.visualize import utils
+from gpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
     GlobalRoadGraphPoints,
 )
-from pygpudrive.datatypes.observation import (
+from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
 )
-from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.control import ResponseType
-from pygpudrive.visualize.color import (
+from gpudrive.datatypes.trajectory import LogTrajectory
+from gpudrive.datatypes.control import ResponseType
+from gpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
     ROAD_GRAPH_TYPE_NAMES,
     REL_OBS_OBJ_COLORS,

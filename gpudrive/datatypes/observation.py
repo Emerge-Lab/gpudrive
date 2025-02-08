@@ -1,8 +1,8 @@
 import torch
 from dataclasses import dataclass
-from pygpudrive.env import constants
-from pygpudrive.utils.geometry import normalize_min_max
-import gpudrive
+from gpudrive.env import constants
+from gpudrive.utils.geometry import normalize_min_max
+import madrona_gpudrive
 
 
 class LocalEgoState:
@@ -35,7 +35,7 @@ class LocalEgoState:
     @classmethod
     def from_tensor(
         cls,
-        self_obs_tensor: gpudrive.madrona.Tensor,
+        self_obs_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
@@ -106,7 +106,7 @@ class GlobalEgoState:
     @classmethod
     def from_tensor(
         cls,
-        abs_self_obs_tensor: gpudrive.madrona.Tensor,
+        abs_self_obs_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
@@ -161,7 +161,7 @@ class PartnerObs:
     @classmethod
     def from_tensor(
         cls,
-        partner_obs_tensor: gpudrive.madrona.Tensor,
+        partner_obs_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
@@ -198,13 +198,13 @@ class PartnerObs:
         self.agent_type = self.agent_type.squeeze(-1)
         # Map to classes 0-3
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Vehicle)
+            self.agent_type == int(madrona_gpudrive.EntityType.Vehicle)
         ] = 1
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Pedestrian)
+            self.agent_type == int(madrona_gpudrive.EntityType.Pedestrian)
         ] = 2
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Cyclist)
+            self.agent_type == int(madrona_gpudrive.EntityType.Cyclist)
         ] = 3
 
         self.agent_type = torch.nn.functional.one_hot(
@@ -236,7 +236,7 @@ class LidarObs:
 
     @classmethod
     def from_tensor(
-        cls, lidar_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls, lidar_tensor: madrona_gpudrive.madrona.Tensor, backend="torch"
     ):
         if backend == "torch":
             return cls(lidar_tensor.to_torch().clone())

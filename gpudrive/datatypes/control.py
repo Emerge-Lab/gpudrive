@@ -1,4 +1,4 @@
-import gpudrive
+import madrona_gpudrive
 import torch
 
 
@@ -16,7 +16,7 @@ class ResponseType:
 
     @classmethod
     def from_tensor(
-        cls, tensor: gpudrive.madrona.Tensor, backend="torch", device="cuda"
+        cls, tensor: madrona_gpudrive.madrona.Tensor, backend="torch", device="cuda"
     ):
         if backend == "torch":
             return cls(tensor.to_torch().clone().to(device))

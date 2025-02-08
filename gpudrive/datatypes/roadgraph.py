@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import torch
 import enum
-import gpudrive
-from pygpudrive.utils.geometry import normalize_min_max
-from pygpudrive.env import constants
+import madrona_gpudrive
+from gpudrive.utils.geometry import normalize_min_max
+from gpudrive.env import constants
 
 
 class MapElementIds(enum.IntEnum):
@@ -70,7 +70,7 @@ class GlobalRoadGraphPoints:
     @classmethod
     def from_tensor(
         cls,
-        roadgraph_tensor: gpudrive.madrona.Tensor,
+        roadgraph_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
@@ -142,7 +142,7 @@ class LocalRoadGraphPoints:
     @classmethod
     def from_tensor(
         cls,
-        local_roadgraph_tensor: gpudrive.madrona.Tensor,
+        local_roadgraph_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
