@@ -15,7 +15,7 @@ namespace gpudrive
 
         auto clipSpeed = [maxSpeed](float speed)
         {
-            return std::max(std::min(speed, maxSpeed), -maxSpeed);
+            return fmaxf(fminf(speed, maxSpeed), -maxSpeed);
         };
         // TODO(samk): hoist into Vector2::PolarToVector2D
         auto polarToVector2D = [](float r, float theta)
