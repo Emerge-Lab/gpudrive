@@ -15,37 +15,52 @@ from pygpudrive.datatypes.observation import (
 )
 
 from pygpudrive.visualize.utils import img_from_fig
+from pygpudrive.env.dataset import SceneDataLoader
 
 from pufferlib.environment import PufferEnv
-
-
-def env_creator(
-    data_loader,
-    environment_config,
-    train_config,
-    device="cuda",
-):
-    return lambda: PufferGPUDrive(
-        data_loader=data_loader,
-        device=device,
-        config=environment_config,
-        train_config=train_config,
-    )
-
+from pygpudrive import GPU_DRIVE_DATA_DIR
 
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
 
-    def __init__(
-        self, data_loader, device, config, train_config=None, buf=None
-    ):
+    def __init__(self, data_loader=None, data_dir=GPU_DRIVE_DATA_DIR, loader_batch_size=128,
+            loader_dataser_size=3, loader_sample_with_replacement=True, loader_shuffle=False,
+            device=None, num_worlds=128, max_controlled_agents=64, dynamics_model='classic',
+            ego_state=True, road_map_obs=True, partner_obs=True, norm_obs=True, lidar_obs=False,
+            reward_type='weighted_combination',
+            collision_behavior='ignore', collision_weight=-0.5, off_road_weight=-0.5,
+            goal_achieved_weight=1, dist_to_goal_threshold=2.0, polyline_reduction_threshold=0.1,
+            remove_non_vehicles=True, obs_radius=50.0, render=False, render_interval=50,
+            render_k_scenarios=3, render_simulator_state=True, render_agent_obs=False,
+            render_format='mp4', render_fps=15, buf=None):
         assert buf is None, "GPUDrive set up only for --vec native"
 
+        if data_loader is None:
+            data_loader = SceneDataLoader(
+                root=data_dir,
+                batch_size=loader_batch_size,
+                dataset_size=loader_dataser_size,
+                sample_with_replacement=loader_sample_with_replacement,
+                shuffle=loader_shuffle
+            )
+
+        if device is None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
         self.device = device
-        self.config = config
-        self.train_config = train_config
-        self.max_cont_agents_per_env = config.max_controlled_agents
-        self.num_worlds = config.num_worlds
+        self.num_worlds = num_worlds
+        self.max_cont_agents_per_env = max_controlled_agents
+        self.collision_weight = collision_weight
+        self.off_road_weight = off_road_weight
+        self.goal_achieved_weight = goal_achieved_weight
+
+        self.render = render
+        self.render_interval = render_interval
+        self.render_k_scenarios = render_k_scenarios
+        self.render_simulator_state = render_simulator_state
+        self.render_agent_obs = render_agent_obs
+        self.render_format = render_format
+        self.render_fps = render_fps
 
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
@@ -54,29 +69,26 @@ class PufferGPUDrive(PufferEnv):
         working_dir = os.path.join(Path.cwd(), "../gpudrive")
         os.chdir(working_dir)
 
-        # Override any default environment settings
-        env_config = dataclasses.replace(
-            EnvConfig(),
-            ego_state=config.ego_state,
-            road_map_obs=config.road_map_obs,
-            partner_obs=config.partner_obs,
-            reward_type=config.reward_type,
-            norm_obs=config.norm_obs,
-            dynamics_model=config.dynamics_model,
-            collision_behavior=config.collision_behavior,
-            dist_to_goal_threshold=config.dist_to_goal_threshold,
-            polyline_reduction_threshold=config.polyline_reduction_threshold,
-            remove_non_vehicles=config.remove_non_vehicles,
-            lidar_obs=config.lidar_obs,
-            disable_classic_obs=True if config.lidar_obs else False,
-            obs_radius=config.obs_radius,
-        )
-
         # Make env
+        env_config = EnvConfig(
+            ego_state=ego_state,
+            road_map_obs=road_map_obs,
+            partner_obs=partner_obs,
+            reward_type=reward_type,
+            norm_obs=norm_obs,
+            dynamics_model=dynamics_model,
+            collision_behavior=collision_behavior,
+            dist_to_goal_threshold=dist_to_goal_threshold,
+            polyline_reduction_threshold=polyline_reduction_threshold,
+            remove_non_vehicles=remove_non_vehicles,
+            lidar_obs=lidar_obs,
+            disable_classic_obs=True if lidar_obs else False,
+            obs_radius=obs_radius,
+        )
         self.env = GPUDriveTorchEnv(
             config=env_config,
             data_loader=data_loader,
-            max_cont_agents=self.max_cont_agents_per_env,
+            max_cont_agents=max_controlled_agents,
             device=device,
         )
 
@@ -107,18 +119,19 @@ class PufferGPUDrive(PufferEnv):
         ).to(self.device)
 
         # Setup rendering storage
-        if self.train_config is not None:
+        # TODO: Fix rendering from train?
+        if render:
             self.rendering_in_progress = {
                 env_idx: False
-                for env_idx in range(self.train_config.render_k_scenarios)
+                for env_idx in range(render_k_scenarios)
             }
             self.was_rendered_in_rollout = {
                 env_idx: True
-                for env_idx in range(self.train_config.render_k_scenarios)
+                for env_idx in range(render_k_scenarios)
             }
             self.frames = {
                 env_idx: []
-                for env_idx in range(self.train_config.render_k_scenarios)
+                for env_idx in range(render_k_scenarios)
             }
 
         self.global_step = 0
@@ -194,13 +207,13 @@ class PufferGPUDrive(PufferEnv):
         self.env.step_dynamics(self.actions)
 
         # Render
-        self.render() if self.train_config.render else None
+        self.render() if self.render else None
 
         # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards(
-            collision_weight=self.config.collision_weight,
-            off_road_weight=self.config.off_road_weight,
-            goal_achieved_weight=self.config.goal_achieved_weight,
+            collision_weight=self.collision_weight,
+            off_road_weight=self.off_road_weight,
+            goal_achieved_weight=self.goal_achieved_weight,
             world_time_steps=self.episode_lengths[:, 0].long(),
         )
         # Flatten rewards; only keep rewards for controlled agents
@@ -257,9 +270,9 @@ class PufferGPUDrive(PufferEnv):
         if len(done_worlds) > 0:
 
             # Log episode videos
-            if self.train_config.render:
+            if self.render:
                 for render_env_idx in range(
-                    self.train_config.render_k_scenarios
+                    self.render_k_scenarios
                 ):
                     self.log_video_to_wandb(render_env_idx, done_worlds)
 
@@ -371,9 +384,9 @@ class PufferGPUDrive(PufferEnv):
         - If the episode has ended, log the video to WandB.
         - Only render env once per rollout.
         """
-        for render_env_idx in range(self.train_config.render_k_scenarios):
+        for render_env_idx in range(self.render_k_scenarios):
             # Start a new rendering if the episode has just started
-            if self.iters % self.train_config.render_interval == 0:
+            if self.iters % self.render_interval == 0:
                 if (
                     self.episode_lengths[render_env_idx, :][0] == 0
                     and not self.was_rendered_in_rollout[render_env_idx]
@@ -381,7 +394,7 @@ class PufferGPUDrive(PufferEnv):
                     self.rendering_in_progress[render_env_idx] = True
 
         # Continue rendering if in progress
-        if self.train_config.render_simulator_state:
+        if self.render_simulator_state:
             envs_to_render = list(
                 np.where(np.array(list(self.rendering_in_progress.values())))[
                     0
@@ -438,7 +451,7 @@ class PufferGPUDrive(PufferEnv):
 
     def clear_render_storage(self):
         """Clear rendering storage."""
-        for env_idx in range(self.train_config.render_k_scenarios):
+        for env_idx in range(self.render_k_scenarios):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
@@ -453,8 +466,8 @@ class PufferGPUDrive(PufferEnv):
                 {
                     f"vis/state/env_{render_env_idx}": wandb.Video(
                         np.moveaxis(frames_array, -1, 1),
-                        fps=self.train_config.render_fps,
-                        format=self.train_config.render_format,
+                        fps=self.render_fps,
+                        format=self.render_format,
                         caption=f"global step: {self.global_step:,}",
                     )
                 }
