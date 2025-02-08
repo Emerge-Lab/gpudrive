@@ -20,6 +20,9 @@ from gpudrive.env.dataset import SceneDataLoader
 from pufferlib.environment import PufferEnv
 from gpudrive import GPU_DRIVE_DATA_DIR
 
+def env_creator(name='gpudrive', **kwargs):
+    return lambda: PufferGPUDrive(**kwargs)
+
 class PufferGPUDrive(PufferEnv):
     """GPUDrive wrapper for PufferEnv."""
 
@@ -32,7 +35,7 @@ class PufferGPUDrive(PufferEnv):
             goal_achieved_weight=1, dist_to_goal_threshold=2.0, polyline_reduction_threshold=0.1,
             remove_non_vehicles=True, obs_radius=50.0, render=False, render_interval=50,
             render_k_scenarios=3, render_simulator_state=True, render_agent_obs=False,
-            render_format='mp4', render_fps=15, buf=None):
+            render_format='mp4', render_fps=15, buf=None, **kwargs):
         assert buf is None, "GPUDrive set up only for --vec native"
 
         if data_loader is None:
@@ -119,20 +122,18 @@ class PufferGPUDrive(PufferEnv):
         ).to(self.device)
 
         # Setup rendering storage
-        # TODO: Fix rendering from train?
-        if render:
-            self.rendering_in_progress = {
-                env_idx: False
-                for env_idx in range(render_k_scenarios)
-            }
-            self.was_rendered_in_rollout = {
-                env_idx: True
-                for env_idx in range(render_k_scenarios)
-            }
-            self.frames = {
-                env_idx: []
-                for env_idx in range(render_k_scenarios)
-            }
+        self.rendering_in_progress = {
+            env_idx: False
+            for env_idx in range(render_k_scenarios)
+        }
+        self.was_rendered_in_rollout = {
+            env_idx: True
+            for env_idx in range(render_k_scenarios)
+        }
+        self.frames = {
+            env_idx: []
+            for env_idx in range(render_k_scenarios)
+        }
 
         self.global_step = 0
         self.iters = 0

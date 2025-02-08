@@ -4,9 +4,9 @@ import torch
 from torch import nn
 from torch.distributions.utils import logits_to_probs
 import pufferlib.models
-from pygpudrive.env import constants
+from gpudrive.env import constants
 
-import gpudrive
+import madrona_gpudrive
 
 def unpack_obs(obs_flat):
     """
@@ -18,7 +18,7 @@ def unpack_obs(obs_flat):
     Returns:
         ego_state, road_objects, road_graph (torch.Tensor).
     """
-    top_k_road_points = gpudrive.kMaxAgentMapObservationsCount
+    top_k_road_points = madrona_gpudrive.kMaxAgentMapObservationsCount
 
     ego_state = obs_flat[:, : constants.EGO_FEAT_DIM]
     vis_state = obs_flat[:, constants.EGO_FEAT_DIM :]

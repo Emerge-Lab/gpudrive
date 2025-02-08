@@ -11,9 +11,9 @@ from torch import nn
 import wandb
 
 # Import env wrapper that makes gym env compatible with stable-baselines3
-from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
-from pygpudrive.env.config import EnvConfig
-from pygpudrive.env import constants
+from gpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
+from gpudrive.env.config import EnvConfig
+from gpudrive.env import constants
 
 
 class LateFusionNet(nn.Module):

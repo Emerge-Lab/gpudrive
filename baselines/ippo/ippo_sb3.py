@@ -6,12 +6,12 @@ from datetime import datetime
 import dataclasses
 from integrations.rl.sb3.ppo.ippo import IPPO
 from integrations.rl.sb3.callbacks import MultiAgentCallback
-from pygpudrive.env.config import EnvConfig, SceneConfig
-from pygpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
+from gpudrive.env.config import EnvConfig, SceneConfig
+from gpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
 from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
 from networks.basic_ffn import FFN, FeedForwardPolicy
-from pygpudrive.env.config import SelectionDiscipline
+from gpudrive.env.config import SelectionDiscipline
 
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
