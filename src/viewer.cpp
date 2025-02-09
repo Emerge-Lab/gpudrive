@@ -77,7 +77,8 @@ int main(int argc, char *argv[])
         .params = {
             .polylineReductionThreshold = 1.0,
             .observationRadius = 100.0,
-            .maxNumControlledAgents = 0
+            .rewardParams = RewardParams(),
+            .maxNumControlledAgents = 0,
         },
         .enableBatchRenderer = enable_batch_renderer,
         .extRenderAPI = wm.gpuAPIManager().backend(),
@@ -133,28 +134,27 @@ int main(int argc, char *argv[])
     auto steps_remaining_printer = mgr.stepsRemainingTensor().makePrinter();
     auto reward_printer = mgr.rewardTensor().makePrinter();
 
-    auto printObs = [&]() {
-        printf("Self\n");
-        self_printer.print();
+    // auto printObs = [&]() {
+    //     printf("Self\n");
+    //     self_printer.print();
 
-        printf("Partner\n");
-        partner_printer.print();
+    //     printf("Partner\n");
+    //     partner_printer.print();
         
-        printf("Lidar\n");
-        lidar_printer.print();
+    //     printf("Lidar\n");
+    //     lidar_printer.print();
 
-        printf("Steps Remaining\n");
-        steps_remaining_printer.print();
+    //     printf("Steps Remaining\n");
+    //     steps_remaining_printer.print();
 
-        printf("Reward\n");
-        reward_printer.print();
+    //     printf("Reward\n");
+    //     reward_printer.print();
 
-        printf("\n");
-    };
+    //     printf("\n");
+    // };
 
     viewer.loop(
     [&mgr](CountT world_idx, const Viewer::UserInput &input) {
-
         using Key = Viewer::KeyboardKey;
         if (input.keyHit(Key::R)) {
             mgr.reset({(int)world_idx});
@@ -170,8 +170,6 @@ int main(int argc, char *argv[])
 
         float acceleration{0};
         const float accelerationDelta{1};
-
-        bool shift_pressed = input.keyPressed(Key::Shift);
 
         if (input.keyPressed(Key::W)) {
             acceleration += accelerationDelta;
