@@ -4,7 +4,7 @@
 #include <madrona/components.hpp>
 #include <madrona/math.hpp>
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 // This code is based on
 // https://www.flipcode.com/archives/2D_OBB_Intersection.shtml
@@ -91,4 +91,4 @@ struct OrientedBoundingBox2D {
   float origin[2];
 };
 
-} // namespace gpudrive
+} // namespace madrona_gpudrive

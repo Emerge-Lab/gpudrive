@@ -1,4 +1,4 @@
-import gpudrive
+import madrona_gpudrive
 import numpy as np
 
 dark_red = np.array([139, 0, 0]) / 255.0
@@ -15,12 +15,12 @@ ROAD_GRAPH_COLORS = {
 }
 
 ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
-    int(gpudrive.EntityType.RoadEdge): "Road edge",
-    int(gpudrive.EntityType.RoadLine): "Road line",
-    int(gpudrive.EntityType.RoadLane): "Lane center",
-    int(gpudrive.EntityType.CrossWalk): "Crosswalk",
-    int(gpudrive.EntityType.SpeedBump): "Speed bump",
-    int(gpudrive.EntityType.StopSign): "Stop sign",
+    int(madrona_gpudrive.EntityType.RoadEdge): "Road edge",
+    int(madrona_gpudrive.EntityType.RoadLine): "Road line",
+    int(madrona_gpudrive.EntityType.RoadLane): "Lane center",
+    int(madrona_gpudrive.EntityType.CrossWalk): "Crosswalk",
+    int(madrona_gpudrive.EntityType.SpeedBump): "Speed bump",
+    int(madrona_gpudrive.EntityType.StopSign): "Stop sign",
 }
 
 AGENT_COLOR_BY_STATE = {

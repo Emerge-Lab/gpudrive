@@ -5,13 +5,13 @@
 
 #include "init.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 struct AgentInit;
 
 class MapReader {
 public:
-  static gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode, float polylineReductionThreshold);
+  static madrona_gpudrive::Map* parseAndWriteOut(const std::string &path, madrona::ExecMode executionMode, float polylineReductionThreshold);
 
 private:
   MapReader(const std::string &pathToFile);
@@ -19,7 +19,7 @@ private:
   void doParse(float polylineReductionThreshold);
 
   std::ifstream in_;
-  gpudrive::Map *map_;
+  madrona_gpudrive::Map *map_;
 };
 
-} // namespace gpudrive
+} // namespace madrona_gpudrive

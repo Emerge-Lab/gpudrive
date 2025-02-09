@@ -99,14 +99,14 @@ lidar_obs: bool = True # Use LiDAR
 
 See the observation and roadgraph data structures at:
 
-- **Agent observations**: [`pygpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/observation.py)
-- **Roadgraph**: [`pygpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/pygpudrive/datatypes/roadgraph.py).
+- **Agent observations**: [`gpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/observation.py)
+- **Roadgraph**: [`gpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/roadgraph.py).
 
 These datastructures are used in `env_torch.py`.
 
 ### Note about LiDAR
 
-> **Using LiDAR only**: If you only want to use the LiDAR data as observation, it is recommended to set `disable_classic_obs = True`. This makes the simulator 2x faster by disabling the construction of the classical observations. To ensure only the LiDAR obs is returned, set all the classical obs flags to false in `pygpudrive/env/config.py`:
+> **Using LiDAR only**: If you only want to use the LiDAR data as observation, it is recommended to set `disable_classic_obs = True`. This makes the simulator 2x faster by disabling the construction of the classical observations. To ensure only the LiDAR obs is returned, set all the classical obs flags to false in `gpudrive/env/config.py`:
 
 ```Python
 ego_state: bool = False
@@ -139,7 +139,7 @@ The `SceneConfig` dataclass is used to configure how scenes are selected from a 
 
 ### Resampling traffic scenarios
 
-The `swap_data_batch()` method in `pygpudrive/env/torch_env.py` reinitializes the simulator with new traffic scenarios as follows:
+The `swap_data_batch()` method in `gpudrive/env/torch_env.py` reinitializes the simulator with new traffic scenarios as follows:
 
 1. **Scene re-initialization:**
    This function updates the simulation maps by calling `self.sim.set_maps(dataset)`, replacing the current scenes with those provided `dataset`, which should be a list with paths to traffic scenarios.
@@ -148,7 +148,7 @@ The `swap_data_batch()` method in `pygpudrive/env/torch_env.py` reinitializes th
 3. **Agent count update:**
    The function updates `self.max_agent_count` to reflect the number of controlled agents and recomputes `self.num_valid_controlled_agents_across_worlds`, indicating the total active controlled agents across all scenarios.
 
-See the `resample_scenario_batch()` method in `pygpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO.
+See the `resample_scenario_batch()` method in `gpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO.
 
 ## Render
 

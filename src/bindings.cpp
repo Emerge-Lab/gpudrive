@@ -8,12 +8,12 @@
 
 namespace nb = nanobind;
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
 
     // This file creates the python bindings used by the learning code.
     // Refer to the nanobind documentation for more details on these functions.
-    NB_MODULE(gpudrive, m)
+    NB_MODULE(madrona_gpudrive, m)
     {
         // Each simulator has a madrona submodule that includes base types
         // like madrona::py::Tensor and madrona::py::PyExecMode.

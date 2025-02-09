@@ -4,9 +4,9 @@ from gymnasium.spaces import Box, Discrete
 import jax
 import jax.numpy as jnp
 
-from pygpudrive.env import constants
-from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
-from pygpudrive.env.base_env import GPUDriveGymEnv
+from gpudrive.env import constants
+from gpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
+from gpudrive.env.base_env import GPUDriveGymEnv
 
 
 class GPUDriveJaxEnv(GPUDriveGymEnv):

@@ -12,7 +12,7 @@ import matplotlib
 from typing import Tuple, Optional, List, Dict, Any, Union
 from matplotlib.patches import Circle, Polygon, RegularPolygon
 
-from pygpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
+from gpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
 
 
 def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:

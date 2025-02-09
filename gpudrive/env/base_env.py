@@ -1,14 +1,12 @@
 import os
 from typing import List, Optional
 import gymnasium as gym
-from pygpudrive.env.config import RenderConfig, RenderMode
-from pygpudrive.env.viz import PyGameVisualizer
-from pygpudrive.env.scene_selector import select_scenes
+from gpudrive.env.config import RenderConfig, RenderMode
+from gpudrive.env.scene_selector import select_scenes
+import madrona_gpudrive
 import abc
-import gpudrive
 import torch
-#import jax.numpy as jnp
-
+import jax.numpy as jnp
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def __init__(self, backend="torch"):
@@ -63,14 +61,14 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         Returns:
             object: Configured reward parameters.
         """
-        reward_params = gpudrive.RewardParams()
+        reward_params = madrona_gpudrive.RewardParams()
 
         if (
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
             or self.config.reward_type == "distance_to_logs"
         ):
-            reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
+            reward_params.rewardType = madrona_gpudrive.RewardType.OnGoalAchieved
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
 
@@ -91,11 +89,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params.observationRadius = self.config.obs_radius
         if self.config.road_obs_algorithm == "k_nearest_roadpoints":
             params.roadObservationAlgorithm = (
-                gpudrive.FindRoadObservationsWith.KNearestEntitiesWithRadiusFiltering
+                madrona_gpudrive.FindRoadObservationsWith.KNearestEntitiesWithRadiusFiltering
             )
         else:  # Default to linear algorithm
             params.roadObservationAlgorithm = (
-                gpudrive.FindRoadObservationsWith.AllEntitiesWithRadiusFiltering
+                madrona_gpudrive.FindRoadObservationsWith.AllEntitiesWithRadiusFiltering
             )
         return params
 
@@ -107,13 +105,13 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         """
         # Dict with supported dynamics models
         self.dynamics_model_dict = dict(
-            classic=gpudrive.DynamicsModel.Classic,
-            delta_local=gpudrive.DynamicsModel.DeltaLocal,
-            bicycle=gpudrive.DynamicsModel.InvertibleBicycle,
-            state=gpudrive.DynamicsModel.State,
+            classic=madrona_gpudrive.DynamicsModel.Classic,
+            delta_local=madrona_gpudrive.DynamicsModel.DeltaLocal,
+            bicycle=madrona_gpudrive.DynamicsModel.InvertibleBicycle,
+            state=madrona_gpudrive.DynamicsModel.State,
         )
 
-        params = gpudrive.Parameters()
+        params = madrona_gpudrive.Parameters()
         
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
@@ -170,12 +168,12 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             SimManager: A simulation manager instance configured with given parameters.
         """
         exec_mode = (
-            gpudrive.madrona.ExecMode.CPU
+            madrona_gpudrive.madrona.ExecMode.CPU
             if self.device == "cpu"
-            else gpudrive.madrona.ExecMode.CUDA
+            else madrona_gpudrive.madrona.ExecMode.CUDA
         )
 
-        sim = gpudrive.SimManager(
+        sim = madrona_gpudrive.SimManager(
             exec_mode=exec_mode,
             gpu_id=0,
             scenes=data_batch,
@@ -192,16 +190,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         return sim
-
-    def _setup_rendering(self):
-        """Sets up the rendering mechanism based on the configuration.
-
-        Returns:
-            PyGameVisualizer: A visualizer instance for rendering the environment.
-        """
-        return PyGameVisualizer(
-            self.sim, self.render_config, self.config.dist_to_goal_threshold
-        )
 
     def _setup_action_space(self, action_type):
         """Sets up the action space based on the specified type.
@@ -229,13 +217,13 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters with collision behavior settings.
         """
         if self.config.collision_behavior == "ignore":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.Ignore
+            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.Ignore
         elif self.config.collision_behavior == "remove":
             params.collisionBehaviour = (
-                gpudrive.CollisionBehaviour.AgentRemoved
+                madrona_gpudrive.CollisionBehaviour.AgentRemoved
             )
         elif self.config.collision_behavior == "stop":
-            params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentStop
+            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.AgentStop
         else:
             raise ValueError(
                 f"Invalid collision behavior: {self.config.collision_behavior}"

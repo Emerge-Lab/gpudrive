@@ -4,7 +4,7 @@
 #include <madrona/math.hpp>
 #include <madrona/types.hpp>
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 namespace consts {
 

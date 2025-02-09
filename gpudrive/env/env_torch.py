@@ -4,21 +4,21 @@ from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 from itertools import product
-from pygpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
-from pygpudrive.env.base_env import GPUDriveGymEnv
+from gpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
+from gpudrive.env.base_env import GPUDriveGymEnv
 import gymnasium
-from pygpudrive.datatypes.observation import (
+from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
     LidarObs,
 )
-from pygpudrive.datatypes.trajectory import LogTrajectory
-from pygpudrive.datatypes.roadgraph import LocalRoadGraphPoints
-from pygpudrive.datatypes.info import Info
+from gpudrive.datatypes.trajectory import LogTrajectory
+from gpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from gpudrive.datatypes.info import Info
 
-from pygpudrive.visualize.core import MatplotlibVisualizer
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.visualize.core import MatplotlibVisualizer
+from gpudrive.env.dataset import SceneDataLoader
 import pufferlib.spaces
 
 
@@ -669,7 +669,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    from pygpudrive.visualize.utils import img_from_fig
+    from gpudrive.visualize.utils import img_from_fig
     import mediapy as media
 
     env_config = EnvConfig(dynamics_model="delta_local")

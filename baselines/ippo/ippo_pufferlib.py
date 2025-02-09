@@ -17,10 +17,10 @@ import wandb
 from box import Box
 
 from integrations.rl.puffer import ppo
-from integrations.rl.puffer.puffer_env import env_creator
+from gpudrive.env.env_puffer import env_creator
 
 from networks.late_fusion import NeuralNet
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
 import pufferlib.vector
@@ -307,9 +307,8 @@ def run(
     # Make environment
     make_env = env_creator(
         data_loader=train_loader,
-        environment_config=config.environment,
-        train_config=config.train,
-        device=config.train.device,
+        **config.environment,
+        **config.train,
     )
 
     if config.mode == "train":

@@ -1,6 +1,6 @@
 import torch
 from dataclasses import dataclass
-import gpudrive
+import madrona_gpudrive
 
 TRAJ_LEN = 91  # Length of the logged trajectory
 
@@ -37,7 +37,7 @@ class LogTrajectory:
     @classmethod
     def from_tensor(
         cls,
-        expert_traj_tensor: gpudrive.madrona.Tensor,
+        expert_traj_tensor: madrona_gpudrive.madrona.Tensor,
         num_worlds: int,
         max_agents: int,
         backend="torch",

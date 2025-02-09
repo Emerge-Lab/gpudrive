@@ -1,6 +1,6 @@
 import torch
 from dataclasses import dataclass
-import gpudrive
+import madrona_gpudrive
 
 
 class Metadata:
@@ -25,7 +25,7 @@ class Metadata:
 
     @classmethod
     def from_tensor(
-        cls, metadata_tensor: gpudrive.madrona.Tensor, backend="torch"
+        cls, metadata_tensor: madrona_gpudrive.madrona.Tensor, backend="torch"
     ):
         """Creates a Metadata object from the metadata_tensor."""
         if backend == "torch":

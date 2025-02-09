@@ -5,7 +5,7 @@
 #include <madrona/components.hpp>
 #include <madrona/mw_gpu_entry.hpp>
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 namespace utils {
 
 template <typename T> inline float NormalizeAngle(T angle) {
@@ -30,11 +30,11 @@ public:
                  const madrona::base::Rotation &rotation)
       : referenceRotation(rotation), referencePosition(position) {}
 
-  gpudrive::MapObservation
+  madrona_gpudrive::MapObservation
   observationOf(const madrona::math::Vector3 &position,
                 const madrona::base::Rotation &rotation, const Scale &scale,
-                gpudrive::EntityType type, float id, MapType mapType = MapType::UNKNOWN) const {
-    return gpudrive::MapObservation{.position = relative(position),
+                madrona_gpudrive::EntityType type, float id, MapType mapType = MapType::UNKNOWN) const {
+    return madrona_gpudrive::MapObservation{.position = relative(position),
                                     .scale = scale,
                                     .heading = relative(rotation),
                                     .type = static_cast<float>(type),
@@ -57,7 +57,7 @@ private:
   }
 
   float relative(const madrona::base::Rotation &absoluteRot) const {
-    return gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
+    return madrona_gpudrive::utils::quatToYaw(referenceRotation.inv() * absoluteRot);
   }
 
   madrona::math::Vector2 referencePosition;
