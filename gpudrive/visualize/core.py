@@ -6,7 +6,7 @@ from matplotlib.patches import Circle
 from matplotlib.collections import LineCollection
 import numpy as np
 import pandas as pd
-import gpudrive
+import madrona_gpudrive
 from gpudrive.visualize import utils
 from gpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
@@ -400,19 +400,19 @@ class MatplotlibVisualizer:
         """Plot the road graph."""
 
         for road_point_type in road_graph.type.unique().tolist():
-            if road_point_type == int(gpudrive.EntityType._None):
+            if road_point_type == int(madrona_gpudrive.EntityType._None):
                 # Skip padding road points
                 continue
             else:
                 road_mask = road_graph.type[env_idx, :] == road_point_type
 
                 if (
-                    road_point_type == int(gpudrive.EntityType.RoadEdge)
-                    or road_point_type == int(gpudrive.EntityType.RoadLine)
-                    or road_point_type == int(gpudrive.EntityType.RoadLane)
-                    or road_point_type == int(gpudrive.EntityType.SpeedBump)
-                    or road_point_type == int(gpudrive.EntityType.StopSign)
-                    or road_point_type == int(gpudrive.EntityType.CrossWalk)
+                    road_point_type == int(madrona_gpudrive.EntityType.RoadEdge)
+                    or road_point_type == int(madrona_gpudrive.EntityType.RoadLine)
+                    or road_point_type == int(madrona_gpudrive.EntityType.RoadLane)
+                    or road_point_type == int(madrona_gpudrive.EntityType.SpeedBump)
+                    or road_point_type == int(madrona_gpudrive.EntityType.StopSign)
+                    or road_point_type == int(madrona_gpudrive.EntityType.CrossWalk)
                 ):
                     # Get coordinates and metadata
                     x_coords = road_graph.x[env_idx, road_mask].tolist()
@@ -428,9 +428,9 @@ class MatplotlibVisualizer:
                     ].tolist()
 
                     if (
-                        road_point_type == int(gpudrive.EntityType.RoadEdge)
-                        or road_point_type == int(gpudrive.EntityType.RoadLine)
-                        or road_point_type == int(gpudrive.EntityType.RoadLane)
+                        road_point_type == int(madrona_gpudrive.EntityType.RoadEdge)
+                        or road_point_type == int(madrona_gpudrive.EntityType.RoadLine)
+                        or road_point_type == int(madrona_gpudrive.EntityType.RoadLane)
                     ):
                         # Compute and draw road edges using start and end points
                         for x, y, length, orientation in zip(
@@ -445,7 +445,7 @@ class MatplotlibVisualizer:
 
                             # Plot the road edge as a line
                             if road_point_type == int(
-                                gpudrive.EntityType.RoadEdge
+                                madrona_gpudrive.EntityType.RoadEdge
                             ):
                                 line_width = 1.1 * line_width_scale
                             else:
@@ -458,7 +458,7 @@ class MatplotlibVisualizer:
                                 linewidth=line_width,
                             )
 
-                    elif road_point_type == int(gpudrive.EntityType.SpeedBump):
+                    elif road_point_type == int(madrona_gpudrive.EntityType.SpeedBump):
                         utils.plot_speed_bumps(
                             x_coords,
                             y_coords,
@@ -468,7 +468,7 @@ class MatplotlibVisualizer:
                             ax,
                         )
 
-                    elif road_point_type == int(gpudrive.EntityType.StopSign):
+                    elif road_point_type == int(madrona_gpudrive.EntityType.StopSign):
                         for x, y in zip(x_coords, y_coords):
                             point = np.array([x, y])
                             utils.plot_stop_sign(
@@ -480,7 +480,7 @@ class MatplotlibVisualizer:
                                 linewidth=3.0,
                                 alpha=0.9,
                             )
-                    elif road_point_type == int(gpudrive.EntityType.CrossWalk):
+                    elif road_point_type == int(madrona_gpudrive.EntityType.CrossWalk):
                         for x, y, length, width, orientation in zip(
                             x_coords,
                             y_coords,
