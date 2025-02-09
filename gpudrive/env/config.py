@@ -157,24 +157,13 @@ class RenderMode(Enum):
     """Enum for specifying rendering mode."""
 
     MATPLOTLIB = "matplotlib"
-    PYGAME_LIDAR = "pygame_lidar"
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
 
-
-class PygameOption(Enum):
-    """Enum for Pygame rendering options."""
-
-    HUMAN = "human"
-    RGB = "rgb"
-
-
 class MadronaOption(Enum):
     """Enum for Madrona rendering options."""
-
     AGENT_VIEW = "agent_view"
     TOP_DOWN = "top_down"
-
 
 @dataclass
 class RenderConfig:

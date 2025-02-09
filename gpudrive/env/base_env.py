@@ -2,13 +2,11 @@ import os
 from typing import List, Optional
 import gymnasium as gym
 from gpudrive.env.config import RenderConfig, RenderMode
-from gpudrive.env.viz import PyGameVisualizer
 from gpudrive.env.scene_selector import select_scenes
 import madrona_gpudrive
 import abc
 import torch
-#import jax.numpy as jnp
-
+import jax.numpy as jnp
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def __init__(self, backend="torch"):
@@ -192,16 +190,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         return sim
-
-    def _setup_rendering(self):
-        """Sets up the rendering mechanism based on the configuration.
-
-        Returns:
-            PyGameVisualizer: A visualizer instance for rendering the environment.
-        """
-        return PyGameVisualizer(
-            self.sim, self.render_config, self.config.dist_to_goal_threshold
-        )
 
     def _setup_action_space(self, action_type):
         """Sets up the action space based on the specified type.
