@@ -319,6 +319,9 @@ and that's it!
 
 </details>
 
+### Post-processing
+- Running `python data_utils/postprocessing.py` filters out corrupted files and undoes hugging face directory grouping.
+
 ## 📜 Citations
 
 If you use GPUDrive in your work, please cite us:
