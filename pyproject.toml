@@ -13,7 +13,7 @@ backend-path = ["external/madrona/py"]
 wheel-directory = "build"
 
 [project]
-name = "madrona_gpudrive"
+name = "gpudrive"
 version = "0.3.0"
 authors = [
     {name = "Saman Kazemkheni", email = "skazemkhani@gmail.com"},
@@ -29,11 +29,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = [
+pufferlib = [
+    "pufferlib>=2.0.6",
     "torch>=2.2.1",
+    "wandb",
 ]
 sb3 = [
     "stable-baselines3==2.3.2",
+    "torch>=2.2.1",
 ]
 jax = [
 
@@ -46,5 +49,5 @@ test = [
 ext-only = true
 ext-out-dir = "build"
 
-#[tool.madrona.packages.gpudrive]
-#path = "gpudrive"
+[tool.madrona.packages.gpudrive]
+path = "gpudrive"

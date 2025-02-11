@@ -1,6 +1,6 @@
 import pufferlib
 
-from pygpudrive.env.env_puffer import PufferGPUDrive
+from gpudrive.env.env_puffer import PufferGPUDrive
 
 env = PufferGPUDrive()
 env.reset()
