@@ -24,3 +24,13 @@ def normalize_min_max(tensor, min_val, max_val):
         np.array: Normalized array of values.
     """
     return 2 * ((tensor - min_val) / (max_val - min_val)) - 1
+
+
+def normalize_min_max_inplace(tensor, min_val, max_val):
+    """Normalizes an array of values to the range [-1, 1].
+    Args:
+        x (np.array): Array of values to normalize.
+        min_val (float): Minimum value for normalization.
+        max_val (float): Maximum value for normalization.
+    """
+    tensor[:] = 2 * ((tensor - min_val) / (max_val - min_val)) - 1
