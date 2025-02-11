@@ -632,26 +632,6 @@ void collisionDetectionSystem(Engine &ctx,
 
 }
 
-// Helper function for sorting nodes in the taskgraph.
-// Sorting is only supported / required on the GPU backend,
-// since the CPU backend currently keeps separate tables for each world.
-// This will likely change in the future with sorting required for both
-// environments
-#ifdef MADRONA_GPU_MODE
-template <typename ArchetypeT>
-TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
-                                   Span<const TaskGraph::NodeID> deps)
-{
-    auto sort_sys =
-        builder.addToGraph<SortArchetypeNode<ArchetypeT, WorldID>>(
-            deps);
-    auto post_sort_reset_tmp =
-        builder.addToGraph<ResetTmpAllocNode>({sort_sys});
-
-    return post_sort_reset_tmp;
-}
-#endif
-
 inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Position &position,
                                               const Rotation &rotation,
@@ -790,33 +770,34 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         >>({clear_tmp});
     }
 
-#ifdef MADRONA_GPU_MODE
-    TaskGraphNodeID sort_agents;
-    if(cfg.enableLidar)
-    {
-        sort_agents = queueSortByWorld<Agent>(builder, {lidar, collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
-    } else {
-        sort_agents = queueSortByWorld<Agent>(builder, {collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
-    }
-    // Sort entities, this could be conditional on reset like the second
+    // Compact entities, this could be conditional on reset like the second
     // BVH build above.
+    
+    TaskGraphNodeID compact_agents;
+    if (cfg.enableLidar) {
+        compact_agents = builder.addToGraph<CompactArchetypeNode<Agent>>(
+              { lidar, collect_self_obs, collect_partner_obs,
+               collect_map_obs, collectAbsoluteSelfObservations });
+    } else {
+        compact_agents = builder.addToGraph<CompactArchetypeNode<Agent>>(
+              { collect_self_obs, collect_partner_obs,
+               collect_map_obs, collectAbsoluteSelfObservations });
+    }
         
-    auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
-        builder, {sort_agents});
+    auto compact_phys_objects = builder.addToGraph<
+        CompactArchetypeNode<PhysicsEntity>>({compact_agents});
 
-    auto sort_agent_ifaces = queueSortByWorld<AgentInterface>(
-        builder, {sort_phys_objects});
+    auto compact_agent_ifaces = builder.addToGraph<
+        CompactArchetypeNode<AgentInterface>>({compact_phys_objects});
 
-    auto sort_road_ifaces = queueSortByWorld<RoadInterface>(
-        builder, {sort_agent_ifaces});
-    (void)sort_road_ifaces;
-#else
-    (void)lidar;
+    auto compact_road_ifaces = builder.addToGraph<
+        CompactArchetypeNode<RoadInterface>>({compact_agent_ifaces});
+    (void)compact_road_ifaces;
+
     (void)collect_self_obs;
     (void)collect_partner_obs;
     (void)collect_map_obs;
     (void)collectAbsoluteSelfObservations;
-#endif
 }
 
 static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {

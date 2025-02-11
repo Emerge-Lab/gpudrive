@@ -221,18 +221,23 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
         (std::filesystem::path(DATA_DIR) / "cube_render.obj").string();
 
     // Define the texture paths
-    const char *texture_paths[] = {
-        (std::filesystem::path(DATA_DIR) / "green_grid.png").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "smile.png").string().c_str()
-    };
-    Span<const char * const> paths(texture_paths, 2);
+    auto texture_paths = std::to_array<std::string>({
+        (std::filesystem::path(DATA_DIR) / "green_grid.png").string(),
+        (std::filesystem::path(DATA_DIR) / "smile.png").string(),
+    });
+
+    std::array<const char *, texture_paths.size()> texture_paths_cstrs;
+    for (size_t i = 0; i < texture_paths.size(); i++) {
+      texture_paths_cstrs[i] = texture_paths[i].c_str();
+    }
 
     imp::AssetImporter asset_importer;
     // Temporary allocator for image data
     StackAlloc tmp_alloc;
 
-    Span<imp::SourceTexture> textures = asset_importer.imageImporter().importImages(tmp_alloc, paths);
-    if(textures.size() != paths.size()) {
+    Span<imp::SourceTexture> textures = asset_importer.imageImporter().importImages(
+        tmp_alloc, texture_paths_cstrs);
+    if(textures.size() != texture_paths.size()) {
         FATAL("Failed to load textures");
     }
 
@@ -362,6 +367,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
 
     SourceCollisionPrimitive plane_prim {
         .type = CollisionPrimitive::Type::Plane,
+        .plane = {},
     };
 
     src_objs[(CountT)SimObject::Plane] = {
@@ -373,7 +379,7 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         },
     };
 
-    StackAlloc tmp_alloc;
+    StackAlloc tmp_alloc {};
     RigidBodyAssets rigid_body_assets;
     CountT num_rigid_body_data_bytes;
     void *rigid_body_data = RigidBodyAssets::processRigidBodyAssets(
@@ -600,6 +606,14 @@ void Manager::reset(std::vector<int32_t> worldsToReset) {
     }
 
     impl_->reset();
+
+    if (impl_->renderMgr.has_value()) {
+        impl_->renderMgr->readECS();
+    }
+
+    if (impl_->cfg.enableBatchRenderer) {
+        impl_->renderMgr->batchRender();
+    }
 }
 
 void Manager::setMaps(const std::vector<std::string> &maps)
