@@ -192,10 +192,16 @@ def evaluate(data):
                 mask,
             )
 
-            # Add metrics for logging
-            for i in info:
-                for k, v in pufferlib.utils.unroll_nested_dict(i):
-                    data.infos[k].append(v)
+            if info:
+                combined = defaultdict(list)
+                for entry in info:
+                    # Unroll each dictionary (even if it's flat)
+                    for k, v in pufferlib.utils.unroll_nested_dict(entry):
+                        combined[k].append(v)
+
+                # Batch update data.infos with the combined values
+                for k, vals in combined.items():
+                    data.infos[k].extend(vals)
 
     with profile.eval_misc:
         data.stats = {}
@@ -207,7 +213,7 @@ def evaluate(data):
                 try:
                     if "num_completed_episodes" in k:
                         data.stats[k] = np.sum(v)
-                    else:  # TODO: Divide by number of episodes instead
+                    else:
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
