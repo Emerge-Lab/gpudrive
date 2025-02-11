@@ -69,9 +69,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             high=np.inf,
             shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
-        # self.single_observation_space = Box(
-        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
-        # )
+      
         self.single_observation_space = gymnasium.spaces.Box(
             low=0,
             high=255,
@@ -82,7 +80,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._setup_action_space(action_type)
         self.num_agents = self.cont_agent_mask.sum().item()
         self.single_action_space = self.action_space
-        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
         self.observation_space = pufferlib.spaces.joint_space(
             self.single_observation_space, self.num_agents
         )
@@ -211,38 +208,34 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def step_dynamics(self, actions):
         if actions is not None:
-            self._apply_actions(actions)
+            self._apply_actions(actions.to(self.device))
         self.sim.step()
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
-        if (
-            self.config.dynamics_model == "classic"
-            or self.config.dynamics_model == "bicycle"
-            or self.config.dynamics_model == "delta_local"
-        ):
+        if self.config.dynamics_model in ["classic", "bicycle", "delta_local"]:
             if actions.dim() == 2:  # (num_worlds, max_agent_count)
                 # Map action indices to action values if indices are provided
                 actions = (
-                    torch.nan_to_num(actions, nan=0).long().to(self.device)
+                    torch.nan_to_num(actions, nan=0).long()
                 )
                 action_value_tensor = self.action_keys_tensor[actions]
 
             elif actions.dim() == 3:
                 if actions.shape[2] == 1:
-                    actions = actions.squeeze(dim=2).to(self.device)
+                    actions = actions.squeeze(dim=2)
                     action_value_tensor = self.action_keys_tensor[actions]
                 elif (
                     actions.shape[2] == 3
                 ):  # Assuming we are given the actual action values
                     # (acceleration, steering, heading)
-                    action_value_tensor = actions.to(self.device)
+                    action_value_tensor = actions
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
 
         else:
-            action_value_tensor = actions.to(self.device)
+            action_value_tensor = actions
 
         # Feed the action values to gpudrive
         self._copy_actions_to_simulator(action_value_tensor)
@@ -453,7 +446,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-        lidar_obs = self._get_lidar_obs(mask)
+
         obs = torch.cat(
             (
                 ego_states,
