@@ -65,7 +65,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Setup action and observation spaces
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(self.get_obs(self.cont_agent_mask).shape[-1],)
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
         # self.single_observation_space = Box(
         #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
@@ -362,44 +364,44 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         if not self.config.ego_state:
             return torch.Tensor().to(self.device)
-        
+
         ego_state = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim.self_observation_tensor(),
             backend=self.backend,
-            mask=mask
-        )  
+            mask=mask,
+        )
         if self.config.norm_obs:
             ego_state.normalize()
 
         return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 0)
-                .to(self.device)
+            torch.stack(
+                [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
             )
+            .permute(1, 0)
+            .to(self.device)
+        )
 
     def _get_partner_obs(self, mask):
         """Get partner observations."""
         if not self.config.partner_obs:
             return torch.Tensor().to(self.device)
-        
+
         partner_obs = PartnerObs.from_tensor(
             partner_obs_tensor=self.sim.partner_observations_tensor(),
             backend=self.backend,
-            mask=mask
+            mask=mask,
         )
 
         if self.config.norm_obs:
             partner_obs.normalize()
-            #partner_obs.one_hot_encode_agent_types()
+            # partner_obs.one_hot_encode_agent_types()
 
         return partner_obs.data.flatten(start_dim=1)
 
@@ -411,18 +413,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         roadgraph = LocalRoadGraphPoints.from_tensor(
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
-            mask=mask
+            mask=mask,
         )
 
         if self.config.norm_obs:
             roadgraph.normalize()
             roadgraph.one_hot_encode_road_point_types()
-            
-        return torch.cat([
-            roadgraph.data,
-            roadgraph.type,
-        ], dim=-1).flatten(start_dim=1)
-        
+
+        return torch.cat(
+            [
+                roadgraph.data,
+                roadgraph.type,
+            ],
+            dim=-1,
+        ).flatten(start_dim=1)
 
     def _get_lidar_obs(self, mask):
         """Get lidar observations."""
@@ -450,9 +454,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
         lidar_obs = self._get_lidar_obs(mask)
-  
-        #import pdb; pdb.set_trace()
-
         obs = torch.cat(
             (
                 ego_states,
@@ -461,7 +462,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
-        
+
         return obs
 
     def get_controlled_agents_mask(self):
@@ -589,15 +590,15 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64, # Number of agents to control
+        max_cont_agents=64,  # Number of agents to control
         device="cuda",
     )
-    
+
     controlled_agent_mask = env.cont_agent_mask.clone()
-    
+
     # Rollout
     obs = env.reset(controlled_agent_mask)
-    
+
     print(f"controlled agents mask: {controlled_agent_mask.sum()}")
 
     sim_frames = []
@@ -607,7 +608,6 @@ if __name__ == "__main__":
     # env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
-    
 
     env_idx = 0
 

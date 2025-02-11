@@ -110,7 +110,7 @@ def evaluate(data):
         data.config.resample_scenes
         and data.resample_buffer >= data.config.resample_interval
         and data.config.resample_dataset_size > data.vecenv.num_worlds
-    ):  
+    ):
         print(f"Resampling scenarios at global step {data.global_step}")
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
@@ -125,7 +125,7 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
-        
+
         with profile.env:
             # Receive data from current timestep
             (
@@ -163,8 +163,6 @@ def evaluate(data):
                 torch.cuda.synchronize()
 
         with profile.env:
-            actions = actions.cpu().numpy()
-
             # Step the environment and reset if done
             data.vecenv.send(actions)
 
@@ -172,16 +170,16 @@ def evaluate(data):
             value = value.flatten()
             mask = torch.as_tensor(mask)
             obs_device = obs_device if config.cpu_offload else obs_device
-            
-            # Use the terminal observation value to better estimate the reward 
+
+            # Use the terminal observation value to better estimate the reward
             # done_but_truncated = truncated & terminal
-            # if done_but_truncated.any():    
+            # if done_but_truncated.any():
             #     terminal_obs = data.vecenv.last_obs[done_but_truncated]
-                
+
             #     # Get terminal (truncated) observation value
             #     with torch.no_grad():
             #         _, _, _, terminal_value = policy(terminal_obs)
-                
+
             #     # Add discounted value to reward
             #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
@@ -196,9 +194,9 @@ def evaluate(data):
                 env_id,
                 mask,
             )
-        
+
             # Add metrics for logging
-            for i in info: 
+            for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     data.infos[k].append(v)
 
@@ -207,10 +205,7 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if (
-            sum(data.infos['num_completed_episodes'])
-            > data.config.log_window
-        ):
+        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
             for k, v in data.infos.items():
                 try:
                     if "num_completed_episodes" in k:
@@ -618,7 +613,7 @@ class Experience:
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
-        self.actions_np[ptr:end] = action[indices]
+        self.actions_np[ptr:end] = action.cpu().numpy()[indices]
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]
         self.rewards_np[ptr:end] = reward.cpu().numpy()[indices]
         self.dones_np[ptr:end] = done.cpu().numpy()[indices]
