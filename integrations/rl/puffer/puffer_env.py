@@ -84,15 +84,15 @@ class PufferGPUDrive(PufferEnv):
         # Number of controlled agents across all worlds
         self.num_agents = self.controlled_agent_mask.sum().item()
 
-        # Reset the environment and get the initial observations
-        self.observations = self.env.reset(self.controlled_agent_mask)
-
         # This assigns a bunch of buffers to self.
         # You can't use them because you want torch, not numpy
         # So I am careful to assign these afterwards
         super().__init__()
 
-        self.masks = np.ones(self.num_agents, dtype=bool)
+        # Reset the environment and get the initial observations
+        self.observations = self.env.reset(self.controlled_agent_mask)
+
+        self.masks = torch.ones(self.num_agents, dtype=bool).to(self.device)
         self.actions = torch.zeros(
             (self.num_worlds, self.max_cont_agents_per_env), dtype=torch.int64
         ).to(self.device)
@@ -211,9 +211,7 @@ class PufferGPUDrive(PufferEnv):
         self.collided_in_episode += info.collided
 
         # Mask used for buffer
-        self.masks = (
-            self.live_agent_mask[self.controlled_agent_mask].cpu().numpy()
-        )
+        self.masks = self.live_agent_mask[self.controlled_agent_mask]
 
         # Set the mask to False for _agents_ that are terminated for the next step
         # Shape: (num_worlds, max_cont_agents_per_env)
@@ -363,7 +361,7 @@ class PufferGPUDrive(PufferEnv):
         # Update controlled agent mask and other masks
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
         self.num_agents = self.controlled_agent_mask.sum().item()
-        self.masks = np.ones(self.num_agents, dtype=bool)
+        self.masks = torch.ones(self.num_agents, dtype=bool)
         self.agent_ids = np.arange(self.num_agents)
 
         self.reset()  # Reset storage

@@ -140,14 +140,12 @@ def evaluate(data):
             env_id = env_id.tolist()
 
         with profile.eval_misc:
-            data.global_step += sum(mask)
+            total_alive_in_batch = sum(mask).item()
+            data.global_step += total_alive_in_batch
             data.global_step_pad += data.vecenv.total_agents
-            data.resample_buffer += sum(mask)
+            data.resample_buffer += total_alive_in_batch
 
-            obs = torch.as_tensor(obs)
             obs_device = obs.to(config.device)
-            reward = torch.as_tensor(reward)
-            terminal = torch.as_tensor(terminal)
 
         with profile.eval_forward, torch.no_grad():
             if lstm_h is not None:
@@ -168,7 +166,6 @@ def evaluate(data):
 
         with profile.eval_misc:
             value = value.flatten()
-            mask = torch.as_tensor(mask)
             obs_device = obs_device if config.cpu_offload else obs_device
 
             # Use the terminal observation value to better estimate the reward
@@ -210,12 +207,12 @@ def evaluate(data):
                 try:
                     if "num_completed_episodes" in k:
                         data.stats[k] = np.sum(v)
-                    else:
+                    else:  # TODO: Divide by number of episodes instead
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
-                    if "goal" in k or "collision" in k or "offroad" in k:
-                        data.stats[f"std_{k}"] = np.std(v)
+                    # if "goal" in k or "collision" in k or "offroad" in k:
+                    #     data.stats[f"std_{k}"] = np.std(v)
                 except:
                     continue
 
@@ -223,7 +220,7 @@ def evaluate(data):
             data.infos = defaultdict(list)
 
     # Increment steps
-    data.vecenv.global_step = data.global_step.copy()
+    data.vecenv.global_step = total_alive_in_batch
     data.vecenv.iters += 1
 
     return data.stats, data.infos
@@ -240,7 +237,6 @@ def train(data):
         dones_np = experience.dones_np[idxs]
         values_np = experience.values_np[idxs]
         rewards_np = experience.rewards_np[idxs]
-        # TODO: bootstrap between segment bounds
         advantages_np = compute_gae(
             dones_np, values_np, rewards_np, config.gamma, config.gae_lambda
         )
@@ -608,7 +604,7 @@ class Experience:
     def store(self, obs, value, action, logprob, reward, done, env_id, mask):
         # Mask learner and Ensure indices do not exceed batch size
         ptr = self.ptr
-        indices = torch.where(mask)[0].numpy()[: self.batch_size - ptr]
+        indices = torch.where(mask)[0].cpu().numpy()[: self.batch_size - ptr]
         end = ptr + len(indices)
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
