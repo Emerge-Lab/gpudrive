@@ -17,14 +17,14 @@ import wandb
 from box import Box
 
 from integrations.rl.puffer import ppo
-from gpudrive.env.env_puffer import env_creator
+from gpudrive.env.env_puffer import PufferGPUDrive
 
 from networks.late_fusion import NeuralNet
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
 import pufferlib.vector
-import pufferlib.frameworks.cleanrl
+import pufferlib.cleanrl
 from rich.console import Console
 
 import typer
@@ -79,31 +79,8 @@ def make_agent(env, config):
             dropout=config.train.network.dropout,
         )
 
-def train(args, make_env):
+def train(args, vecenv):
     """Main training loop for the PPO agent."""
-
-    backend_mapping = {
-        # Note: Only native backend is currently= supported with GPUDrive
-        "native": pufferlib.vector.Native,
-        "serial": pufferlib.vector.Serial,
-        "multiprocessing": pufferlib.vector.Multiprocessing,
-        "ray": pufferlib.vector.Ray,
-    }
-
-    backend = backend_mapping.get(args.vec.backend)
-    if not backend:
-        raise ValueError("Invalid --vec.backend.")
-
-    vecenv = pufferlib.vector.make(
-        make_env,
-        num_envs=1,  # GPUDrive is already batched
-        num_workers=args.vec.num_workers,
-        batch_size=args.vec.env_batch_size,
-        zero_copy=args.vec.zero_copy,
-        backend=backend,
-    )
-
-    
     policy = make_agent(env=vecenv.driver_env, config=args).to(
         args.train.device
     )
@@ -305,14 +282,13 @@ def run(
     )
 
     # Make environment
-    make_env = env_creator(
+    vecenv = PufferGPUDrive(
         data_loader=train_loader,
         **config.environment,
         **config.train,
     )
 
-    if config.mode == "train":
-        train(config, make_env)
+    train(config, vecenv)
 
 
 if __name__ == "__main__":

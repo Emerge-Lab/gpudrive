@@ -4,9 +4,6 @@ requires = [
     "scikit-build>=0.13",
     "cmake>=3.18",
     "ninja",
-    "gymnasium",
-    "pygame",
-    "python-box==7.2.0",
 ]
 build-backend = "madrona-py-build"
 backend-path = ["external/madrona/py"]
@@ -25,7 +22,11 @@ readme = "README.md"
 description = "A GPU-accelerated, multi-agent driving simulator"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.26.4"
+    "numpy>=1.26.4",
+    "gymnasium",
+    "pygame",
+    "python-box==7.2.0",
+    "typer",
 ]
 
 [project.optional-dependencies]
