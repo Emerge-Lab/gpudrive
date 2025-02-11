@@ -1,12 +1,7 @@
-import os
-from typing import List, Optional
 import gymnasium as gym
-from gpudrive.env.config import RenderConfig, RenderMode
-from gpudrive.env.scene_selector import select_scenes
+from gpudrive.env.config import RenderMode
 import madrona_gpudrive
 import abc
-import torch
-import jax.numpy as jnp
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def __init__(self, backend="torch"):

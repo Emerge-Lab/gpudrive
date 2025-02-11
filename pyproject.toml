@@ -4,6 +4,9 @@ requires = [
     "scikit-build>=0.13",
     "cmake>=3.18",
     "ninja",
+    "gymnasium",
+    "pygame",
+    "python-box==7.2.0",
 ]
 build-backend = "madrona-py-build"
 backend-path = ["external/madrona/py"]
@@ -28,6 +31,12 @@ dependencies = [
 [project.optional-dependencies]
 torch = [
     "torch>=2.2.1",
+]
+sb3 = [
+    "stable-baselines3==2.3.2",
+]
+jax = [
+
 ]
 test = [
     "pytest>=8.2.1",
