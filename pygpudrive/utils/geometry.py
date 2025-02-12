@@ -33,4 +33,4 @@ def normalize_min_max_inplace(tensor, min_val, max_val):
         min_val (float): Minimum value for normalization.
         max_val (float): Maximum value for normalization.
     """
-    tensor[:] = 2 * ((tensor - min_val) / (max_val - min_val)) - 1
+    tensor.sub_(min_val).div_(max_val - min_val).mul_(2).sub_(1)

@@ -64,10 +64,11 @@ class LocalEgoState:
 
     def normalize(self):
         """Normalizes the ego state to be between -1 and 1."""
-        self.speed = self.speed / constants.MAX_SPEED
-        self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
-        self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
-        self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
+        self.speed.div_(constants.MAX_SPEED)
+        self.vehicle_length.div_(constants.MAX_VEH_LEN)
+        self.vehicle_width.div_(constants.MAX_VEH_WIDTH)
+        self.vehicle_height.div_(constants.MAX_VEH_HEIGHT)
+        
         self.rel_goal_x = normalize_min_max(
             tensor=self.rel_goal_x,
             min_val=constants.MIN_REL_GOAL_COORD,
@@ -127,7 +128,7 @@ class GlobalEgoState:
     ):
         """Creates an GlobalEgoState from a tensor."""
         if backend == "torch":
-            return cls(abs_self_obs_tensor.to_torch().clone().to(device))
+            return cls(abs_self_obs_tensor.to_torch().clone().to(device, non_blocking=True))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
