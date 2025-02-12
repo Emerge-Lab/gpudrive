@@ -155,7 +155,7 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "examples/experiments/ippo_ff_p1_self_play.yaml",
+    ] = "baselines/ippo/config/ppo_base_puffer.yaml",
     *,
     # fmt: off
     # Environment options
