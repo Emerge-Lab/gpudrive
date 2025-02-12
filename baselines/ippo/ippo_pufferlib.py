@@ -16,7 +16,7 @@ import numpy as np
 import wandb
 from box import Box
 
-from gpudrive.integrations.rl.puffer import ppo
+from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
 from baselines.networks.late_fusion import NeuralNet

@@ -29,8 +29,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: ""
-  project: "self_play_rl_safe"
-  group: "tests"
+  project: "gpudrive"
+  group: "my_experiment"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -80,7 +80,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 50 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
