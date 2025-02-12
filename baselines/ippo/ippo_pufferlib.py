@@ -16,10 +16,10 @@ import numpy as np
 import wandb
 from box import Box
 
-from integrations.rl.puffer import ppo
+from gpudrive.integrations.rl.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
-from networks.late_fusion import NeuralNet
+from baselines.networks.late_fusion import NeuralNet
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib

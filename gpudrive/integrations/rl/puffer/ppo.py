@@ -30,7 +30,7 @@ import pyximport
 pyximport.install(setup_args={"include_dirs": np.get_include()})
 
 from c_gae import compute_gae
-from integrations.rl.puffer.logging import print_dashboard, abbreviate
+from gpudrive.integrations.rl.puffer.logging import print_dashboard, abbreviate
 
 
 def create(config, vecenv, policy, optimizer=None, wandb=None):
