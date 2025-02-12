@@ -67,3 +67,4 @@ dependencies:
       - python-dotenv==1.0.1
       - jax==0.4.0
       - typer==0.9.0
+      - matplotlib==3.9

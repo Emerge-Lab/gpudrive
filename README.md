@@ -1,16 +1,13 @@
 GPUDrive
 ========
 
-![Python version](https://img.shields.io/badge/Python-3.10-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
 
 GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
 
 For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-<figure>
-<img src="assets/GPUDrive_eval_with_humans_control_6.gif" alt="...">
-<center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
-</figure>
+TODO(before release; add videos)
 
 ## ⚙️ Integrations
 
@@ -115,7 +112,7 @@ poetry install
 
 #### Nvidia docker dependency
 
-  To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
 
 #### Pull the image and run the container
 
@@ -167,7 +164,7 @@ The subsequent steps to run and manage the container remain the same as outlined
 Test whether the installation was successful by importing the simulator:
 
 ```Python
-import gpudrive
+import gpudrive_madrona
 ```
 
 To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
@@ -205,13 +202,13 @@ cd build
 
 ## 🏋🏼‍♀️ Pre-trained policy
 
-We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy [here](https://drive.google.com/file/d/1N4KJrt5PG6Pu-ovBQ-zIp0sJH0AQodKq/view?usp=sharing). You can store the policy in ` models`.
+We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy here TODO(before release). You can store the policy in ` models`.
 
 ## 📂 Dataset
 
 ### Download the dataset
 
-- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
+- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes.
 - Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
 
 <details>
@@ -321,7 +318,7 @@ and that's it!
 
 ## 📜 Citations
 
-If you use GPUDrive in your work, please cite us:
+If you use GPUDrive in your work, please cite us: TODO(release; update)
 
 ```
 @misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
@@ -337,7 +334,7 @@ If you use GPUDrive in your work, please cite us:
 
 ## Contributing and learning benchmark
 
-If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
+If you find a bug of are missing features, please feel free to create an issue or start contributing!
 
 ## Timeline
 
