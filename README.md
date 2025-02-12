@@ -335,7 +335,3 @@ If you use GPUDrive in your work, please cite us: TODO(release; update)
 ## Contributing and learning benchmark
 
 If you find a bug of are missing features, please feel free to create an issue or start contributing!
-
-## Timeline
-
-[![GPUDrive](https://api.star-history.com/svg?repos=Emerge-Lab/gpudrive&type=Date)](https://star-history.com/#Emerge-Lab/gpudrive&Date)
