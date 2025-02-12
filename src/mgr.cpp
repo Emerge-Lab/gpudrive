@@ -29,7 +29,7 @@ using namespace madrona::math;
 using namespace madrona::phys;
 using namespace madrona::py;
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 struct RenderGPUState {
     render::APILibHandle apiLib;

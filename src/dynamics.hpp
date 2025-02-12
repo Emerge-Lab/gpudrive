@@ -5,7 +5,7 @@
 
 using namespace madrona;
 using namespace madrona::math;
-namespace gpudrive
+namespace madrona_gpudrive
 {
 
     inline void forwardKinematics(const Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)

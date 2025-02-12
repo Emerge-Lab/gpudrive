@@ -1,4 +1,4 @@
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 template <typename ArchetypeT>
 madrona::Entity Engine::makeRenderableEntity()

@@ -2,7 +2,7 @@
 #include "dynamics.hpp"
 #include "init.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 using namespace madrona;
 using namespace madrona::math;
 using namespace madrona::phys;

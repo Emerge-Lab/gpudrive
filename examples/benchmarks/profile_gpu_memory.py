@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import nvidia_smi
 
-import gpudrive
+import madrona_gpudrive
 
 
 def make_sim(
@@ -15,25 +15,25 @@ def make_sim(
     """Make simulator."""
 
     # Create an instance of RewardParams
-    reward_params = gpudrive.RewardParams()
-    reward_params.rewardType = gpudrive.RewardType.OnGoalAchieved
+    reward_params = madrona_gpudrive.RewardParams()
+    reward_params.rewardType = madrona_gpudrive.RewardType.OnGoalAchieved
     reward_params.distanceToGoalThreshold = 1.0
     reward_params.distanceToExpertThreshold = 1.0
 
     # Create an instance of Parameters
-    params = gpudrive.Parameters()
+    params = madrona_gpudrive.Parameters()
     params.polylineReductionThreshold = 0.5
     params.observationRadius = 10.0
-    params.collisionBehaviour = gpudrive.CollisionBehaviour.AgentRemoved
-    params.datasetInitOptions = gpudrive.DatasetInitOptions.PadN
+    params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.AgentRemoved
+    params.datasetInitOptions = madrona_gpudrive.DatasetInitOptions.PadN
     params.rewardParams = reward_params
     params.IgnoreNonVehicles = True
     params.maxNumControlledAgents = max_num_objects
 
-    sim = gpudrive.SimManager(
-        exec_mode=gpudrive.madrona.ExecMode.CPU
+    sim = madrona_gpudrive.SimManager(
+        exec_mode=madrona_gpudrive.madrona.ExecMode.CPU
         if device == "cpu"
-        else gpudrive.madrona.ExecMode.CUDA,
+        else madrona_gpudrive.madrona.ExecMode.CUDA,
         gpu_id=0,
         num_worlds=num_worlds,
         json_path=data_dir,

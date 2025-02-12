@@ -6,7 +6,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
     void from_json(const nlohmann::json &j, MapVector2 &p)
     {
