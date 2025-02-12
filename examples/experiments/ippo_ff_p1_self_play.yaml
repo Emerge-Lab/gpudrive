@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/examples
+data_dir: /scratch/kj2676/gpudrive/data/processed/training
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 3 # Number of unique scenes to sample from
+  num_worlds: 500 # Number of parallel environments
+  k_unique_scenes: 20 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -29,8 +29,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
 wandb:
   entity: ""
-  project: "self_play_rl_safe"
-  group: "tests"
+  project: "self_play_rl_speed"
+  group: "benchmarking"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -59,7 +59,7 @@ train:
   anneal_lr: true
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 3
+  update_epochs: 5
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
@@ -80,7 +80,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 50 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
