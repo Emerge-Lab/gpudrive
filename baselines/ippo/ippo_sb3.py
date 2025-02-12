@@ -4,13 +4,13 @@ from box import Box
 from typing import Callable
 from datetime import datetime
 import dataclasses
-from integrations.rl.sb3.ppo.ippo import IPPO
-from integrations.rl.sb3.callbacks import MultiAgentCallback
+from gpudrive.integrations.sb3.ppo.ippo import IPPO
+from gpudrive.integrations.sb3.callbacks import MultiAgentCallback
 from gpudrive.env.config import EnvConfig, SceneConfig
 from gpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
-from networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
-from networks.basic_ffn import FFN, FeedForwardPolicy
+from baselines.networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
+from baselines.networks.basic_ffn import FFN, FeedForwardPolicy
 from gpudrive.env.config import SelectionDiscipline
 
 
@@ -119,11 +119,12 @@ def train(exp_config: Box, scene_config: SceneConfig):
 
 if __name__ == "__main__":
 
-    exp_config = load_config("baselines/ippo/config/ippo_ff_sb3.yaml")
+    exp_config = load_config("baselines/ippo/config/ppo_base_sb3.yaml")
 
     scene_config = SceneConfig(
+        batch_size=exp_config.num_worlds,
+        dataset_size=exp_config.k_unique_scenes,
         path=exp_config.data_dir,
-        num_scenes=exp_config.num_worlds,
         discipline=SelectionDiscipline.K_UNIQUE_N
         if exp_config.selection_discipline == "K_UNIQUE_N"
         else SelectionDiscipline.PAD_N,

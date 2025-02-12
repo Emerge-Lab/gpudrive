@@ -5,7 +5,7 @@ import torch
 import wandb
 from stable_baselines3.common.callbacks import BaseCallback
 from time import perf_counter
-from pygpudrive.visualize.utils import img_from_fig
+from gpudrive.visualize.utils import img_from_fig
 
 
 class MultiAgentCallback(BaseCallback):
