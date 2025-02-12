@@ -1,4 +1,4 @@
-# Base image with CUDA and cuDNN support
+# Base image with CUDA and cuDNN support                                                                                      
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -35,16 +35,21 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 11 && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 11
 
+RUN apt-get remove -y cmake && pip3 install --upgrade cmake
+
 # Clone the gpudrive repository
 RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git --branch dev-packaged
 ENV MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
-RUN apt-get remove -y cmake && pip3 install --upgrade cmake
 WORKDIR /gpudrive
 RUN mkdir build
 WORKDIR /gpudrive/build
-RUN cmake .. -DCMAKE_BUILD_TYPE=Release && make -j
+RUN cmake .. -DCMAKE_BUILD_TYPE=Release
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
+RUN LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH make -j
+RUN rm /usr/local/cuda/lib64/stubs/libcuda.so.1
 WORKDIR /gpudrive
+
 RUN pip3 install -e .[pufferlib]
 
 CMD ["/bin/bash"]
