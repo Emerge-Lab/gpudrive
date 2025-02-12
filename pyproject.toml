@@ -25,6 +25,8 @@ dependencies = [
     "numpy>=1.26.4",
     "gymnasium",
     "pygame",
+    "matplotlib==3.9",
+    "pandas",
     "python-box==7.2.0",
     "typer",
 ]

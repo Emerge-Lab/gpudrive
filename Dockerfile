@@ -1,15 +1,11 @@
 # Base image with CUDA and cuDNN support
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-
-# Create a user with the specified UID and GID
-RUN groupadd -g ${GROUP_ID} gpudrive_group && \
-    useradd -m -u ${USER_ID} -g gpudrive_group -s /bin/bash gpudrive_user
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Install essential packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
+	software-properties-common \
         build-essential \
         cmake \
         git \
@@ -29,38 +25,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Miniforge for Conda into /opt/miniforge3
-RUN wget --no-check-certificate https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh && \
-    bash Miniforge3-Linux-x86_64.sh -b -p /opt/miniforge3 && \
-    rm Miniforge3-Linux-x86_64.sh
+# Install Python 3.11
+RUN apt-add-repository -y ppa:deadsnakes/ppa \
+    && apt-get install -y python3.11 python3.11-dev python3.11-distutils
 
-# Set up environment variables for Conda
-RUN echo "#!/bin/bash\n\
-unset -f which\n\
-source /opt/miniforge3/etc/profile.d/conda.sh\n\
-export PATH=/opt/miniforge3/bin:\$PATH\n\
-export PYTHONPATH=/opt/miniforge3/bin:\$PYTHONPATH" > /opt/env.sh
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 11 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 11
 
 # Clone the gpudrive repository
-RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git --branch dev-packaged
+ENV MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
-# Set the working directory
+RUN apt-get remove -y cmake && pip3 install --upgrade cmake
 WORKDIR /gpudrive
+RUN mkdir build
+WORKDIR /gpudrive/build
+RUN cmake .. -DCMAKE_BUILD_TYPE=Release && make -j
+WORKDIR /gpudrive
+RUN pip3 install -e .[pufferlib]
 
-RUN git fetch --all && git checkout main
-
-# Ensure Conda is available and create the environment
-SHELL ["/bin/bash", "-c"]  # Use bash shell for running conda commands
-RUN source /opt/env.sh && conda env create -f environment.yml
-
-# Activate the environment and install project dependencies using Poetry
-RUN echo "source /opt/env.sh && conda activate gpudrive" >> ~/.bashrc
-
-RUN source /opt/env.sh && conda activate gpudrive
-
-# Automatically start in the /gpudrive directory and activate the conda environment
-CMD ["bash", "-c", "source /opt/env.sh && conda activate gpudrive && cd /gpudrive && exec bash"]
-
-USER gpudrive_user
-
-LABEL org.opencontainers.image.source https://github.com/Emerge-Lab/gpudrive
+CMD ["/bin/bash"]
+LABEL org.opencontainers.image.source=https://github.com/Emerge-Lab/gpudrive
