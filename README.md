@@ -11,11 +11,13 @@ An extremely fast, data-driven driving simulator written in C++.
 
 - 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
 
-- 👀 Easily configure the simulation view and the agent's relative, partially observable perspective.
-
 - 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), offering road graphs and 100K+ scenarios with human demonstrations.
 
-- 🎨 Diverse agent types: Vehicles, cyclists and pedestrians
+- 📜 Readily available PPO implementations via [SB3](https://github.com/DLR-RM/stable-baselines3) and [CleanRL](https://github.com/vwxyzjn/cleanrl) / [Pufferlib](https://puffer.ai/).
+
+- 👀 Easily configure the simulator and the agent's relative, partially observable view.
+
+- 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
 
 | Simulator state | Agent observation |
 |-----------------|------------------|
@@ -24,13 +26,6 @@ An extremely fast, data-driven driving simulator written in C++.
 
 For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-
-## ⚙️ Integrations
-
-| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br /> |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
-| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
 
 ## 🛠️ Installation
 
@@ -163,6 +158,15 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 ```
 
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
+
+
+## ⚙️ Integrations
+
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br /> |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
+
 
 ## 🚀 Getting started
 
