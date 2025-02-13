@@ -3,19 +3,26 @@ GPUDrive
 
 ![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
 
-GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
+An extremely fast, data-driven driving simulator written in C++.
 
-For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
+## Highlights
 
-## Key features
+- ⚡️ Fast simulation for agent development and evaluation at 1 million FPS through the [Madrona engine](https://madrona-engine.github.io/).
 
-- Fast simulation for agent training and evaluation at 1 million FPS.
+- 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
 
-- Easily configure the simulation view and the agent's relative, partially observable perspective.
+- 👀 Easily configure the simulation view and the agent's relative, partially observable perspective.
+
+- 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), offering road graphs and 100K+ scenarios with human demonstrations.
+
+- 🎨 Diverse agent types: Vehicles, cyclists and pedestrians
 
 | Simulator state | Agent observation |
 |-----------------|------------------|
 | <img src="assets/sim_video_clear_example.gif" width="300px"> | <img src="assets/obs_video_clear_example.gif" width="300px"> |
+
+
+For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 
 ## ⚙️ Integrations
