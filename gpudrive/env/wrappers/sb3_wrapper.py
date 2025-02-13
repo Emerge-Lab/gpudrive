@@ -12,6 +12,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 )
 
 from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.dataset import SceneDataLoader
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,14 +29,22 @@ class SB3MultiAgentEnv(VecEnv):
         self,
         config,
         exp_config,
-        scene_config,
         max_cont_agents,
         device,
         render_mode="rgb_array",
     ):
+
+        data_loader = SceneDataLoader(
+            root=exp_config.data_dir,
+            batch_size=exp_config.num_worlds,
+            dataset_size=exp_config.resample_dataset_size,
+            sample_with_replacement=exp_config.sample_with_replacement,
+            shuffle=exp_config.shuffle_dataset,
+        )
+
         self._env = GPUDriveTorchEnv(
             config=config,
-            scene_config=scene_config,
+            data_loader=data_loader,
             max_cont_agents=max_cont_agents,
             device=device,
         )
@@ -56,7 +65,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
-        self.obs_dim = self._env.observation_space.shape[0]
+        self.obs_dim = self._env.observation_space.shape[-1]
         self.info_dim = self._env.info_dim
         self.render_mode = render_mode
         self.agent_step = torch.zeros(
@@ -136,7 +145,7 @@ class SB3MultiAgentEnv(VecEnv):
 
         reward = self._env.get_rewards().clone()
         done = self._env.get_dones().clone()
-        info = self._env.get_infos().clone()
+        info = self._env.sim.info_tensor().to_torch()
 
         # CHECK IF A WORLD IS DONE -> RESET
         done_worlds = torch.where(
@@ -210,35 +219,8 @@ class SB3MultiAgentEnv(VecEnv):
 
     def resample_scenario_batch(self):
         """Swap out the dataset."""
-        if self.exp_config.resample_mode == "random":
-            total_unique = len(self.unique_scene_paths)
 
-            # Check if N is greater than the number of unique scenes
-            if self.num_worlds <= total_unique:
-                dataset = random.sample(
-                    self.unique_scene_paths, self.num_worlds
-                )
-
-            # If N is greater, repeat the unique scenes until we get N scenes
-            dataset = []
-            while len(dataset) < self.num_worlds:
-                dataset.extend(
-                    random.sample(self.unique_scene_paths, total_unique)
-                )
-                if len(dataset) > self.num_worlds:
-                    dataset = dataset[
-                        : self.num_worlds
-                    ]  # Trim the result to N scenes
-        else:
-            raise NotImplementedError(
-                f"Resample mode {self.exp_config.resample_mode} is currently not supported."
-            )
-
-        # Re-initialize the simulator with the new dataset
-        print(
-            f"Re-initializing sim with {len(set(dataset))} {self.exp_config.resample_mode} unique scenes.\n"
-        )
-        self._env.swap_data_batch(dataset)
+        self._env.swap_data_batch()
 
         # Update controlled agent mask
         self.controlled_agent_mask = self._env.cont_agent_mask.clone()

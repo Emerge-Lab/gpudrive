@@ -76,7 +76,7 @@ class IPPO(PPO):
         ), "No previous observation was provided"
 
         # Check resampling criterion and resample batch of scenarios if needed
-        if self.env.exp_config.resample_scenarios:
+        if self.env.exp_config.resample_scenes:
             if self.env.exp_config.resample_criterion == "global_step":
                 if self.resample_counter >= self.env.exp_config.resample_freq:
                     print(

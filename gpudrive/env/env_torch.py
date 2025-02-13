@@ -122,9 +122,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_rewards(
         self,
-        collision_weight=-0.005,
+        collision_weight=-0.5,
         goal_achieved_weight=1.0,
-        off_road_weight=-0.005,
+        off_road_weight=-0.5,
         world_time_steps=None,
         log_distance_weight=0.01,
     ):
@@ -504,10 +504,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
-        
-    def remove_agents_by_id(self, perc_to_rmv_per_scene, remove_controlled_agents=True):
+
+    def remove_agents_by_id(
+        self, perc_to_rmv_per_scene, remove_controlled_agents=True
+    ):
         """Delete random agents in scenarios.
-        
+
         Args:
             perc_to_rmv_per_scene (float): Percentage of agents to remove per scene
             remove_controlled_agents (bool): If True, removes controlled agents. If False, removes uncontrolled agents
@@ -515,42 +517,47 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Obtain agent ids
         agent_ids = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim.self_observation_tensor(),
-            backend='torch',
-            device=self.device
+            backend="torch",
+            device=self.device,
         ).id
-        
+
         # Choose the appropriate mask based on whether we're removing controlled or uncontrolled agents
         if remove_controlled_agents:
             agent_mask = self.cont_agent_mask
         else:
             # Create inverse mask for uncontrolled agents
             agent_mask = ~self.cont_agent_mask
-        
+
         for env_idx in range(self.num_worlds):
             # Get all relevant agent IDs (controlled or uncontrolled) for the current environment
             scene_agent_ids = agent_ids[env_idx, :][agent_mask[env_idx]].long()
-            
-            if scene_agent_ids.numel() > 0:  # Ensure there are agents to sample
+
+            if (
+                scene_agent_ids.numel() > 0
+            ):  # Ensure there are agents to sample
                 # Determine the number of agents to sample (X% of the total agents)
-                num_to_sample = max(1, int(perc_to_rmv_per_scene * scene_agent_ids.size(0)))
-                
+                num_to_sample = max(
+                    1, int(perc_to_rmv_per_scene * scene_agent_ids.size(0))
+                )
+
                 # Randomly sample agent IDs to remove using torch
-                sampled_indices = torch.randperm(scene_agent_ids.size(0))[:num_to_sample]
+                sampled_indices = torch.randperm(scene_agent_ids.size(0))[
+                    :num_to_sample
+                ]
                 sampled_agent_ids = scene_agent_ids[sampled_indices]
-                
+
                 # Delete the sampled agents from the environment
                 self.sim.deleteAgents({env_idx: sampled_agent_ids.tolist()})
-        
+
         # Reset controlled agent mask and visualizer
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
-        
+
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
-        
 
     def swap_data_batch(self, data_batch=None):
         """
@@ -647,24 +654,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory.vel_xy,
             log_trajectory.yaw,
         )
-        
+
     def get_env_filenames(self):
         """Obtain the tfrecord filename for each world, mapping world indices to map names."""
-        
+
         map_name_integers = self.sim.map_name_tensor().to_torch()
-        
+
         filenames = {}
-        
+
         # Iterate through the number of worlds
         for i in range(self.num_worlds):
             tensor = map_name_integers[i]
-            
+
             # Convert ints to characters, ignoring zeros
-            map_name = ''.join([chr(i) for i in tensor.tolist() if i != 0])
-            
+            map_name = "".join([chr(i) for i in tensor.tolist() if i != 0])
+
             # Map the world index to the corresponding map name
             filenames[i] = map_name
-        
+
         return filenames
 
 

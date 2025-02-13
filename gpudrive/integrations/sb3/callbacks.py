@@ -186,7 +186,7 @@ class MultiAgentCallback(BaseCallback):
         for step_num in range(self.config.episode_len):
             actions, _ = policy.predict(obs.detach().cpu().numpy())
             actions = torch.Tensor(actions)
-            action_tensor[base_env.cont_agent_mask] = actions
+            action_tensor[base_env.cont_agent_mask] = actions[control_mask]
 
             base_env.step_dynamics(action_tensor)
 

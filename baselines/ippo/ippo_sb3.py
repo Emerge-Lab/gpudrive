@@ -6,12 +6,14 @@ from datetime import datetime
 import dataclasses
 from gpudrive.integrations.sb3.ppo.ippo import IPPO
 from gpudrive.integrations.sb3.callbacks import MultiAgentCallback
-from gpudrive.env.config import EnvConfig, SceneConfig
+from gpudrive.env.config import EnvConfig
 from gpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
-from baselines.networks.perm_eq_late_fusion import LateFusionNet, LateFusionPolicy
+from baselines.networks.perm_eq_late_fusion import (
+    LateFusionNet,
+    LateFusionPolicy,
+)
 from baselines.networks.basic_ffn import FFN, FeedForwardPolicy
-from gpudrive.env.config import SelectionDiscipline
 
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
@@ -29,19 +31,17 @@ def load_config(config_path):
         return Box(yaml.safe_load(f))
 
 
-def train(exp_config: Box, scene_config: SceneConfig):
+def train(exp_config: Box):
     """Run PPO training with stable-baselines3."""
 
     env_config = dataclasses.replace(
         EnvConfig(),
         reward_type=exp_config.reward_type,
-        collision_weight=exp_config.collision_weight,
-        goal_achieved_weight=exp_config.goal_achieved_weight,
-        off_road_weight=exp_config.off_road_weight,
         episode_len=exp_config.episode_len,
         remove_non_vehicles=exp_config.remove_non_vehicles,
         polyline_reduction_threshold=exp_config.polyline_reduction_threshold,
         obs_radius=exp_config.observation_radius,
+        collision_behavior=exp_config.collision_behavior,
     )
 
     # Select model
@@ -59,7 +59,6 @@ def train(exp_config: Box, scene_config: SceneConfig):
     # Make environment
     env = SB3MultiAgentEnv(
         config=env_config,
-        scene_config=scene_config,
         exp_config=exp_config,
         max_cont_agents=env_config.max_num_agents_in_scene,
         device=exp_config.device,
@@ -70,7 +69,7 @@ def train(exp_config: Box, scene_config: SceneConfig):
     ) // exp_config.num_minibatches
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%S")
-    run_id = f"SB3_{datetime_}_{exp_config.k_unique_scenes}scenes"
+    run_id = f"{datetime_}"
     run = wandb.init(
         project=exp_config.project_name,
         name=run_id,
@@ -121,14 +120,4 @@ if __name__ == "__main__":
 
     exp_config = load_config("baselines/ippo/config/ppo_base_sb3.yaml")
 
-    scene_config = SceneConfig(
-        batch_size=exp_config.num_worlds,
-        dataset_size=exp_config.k_unique_scenes,
-        path=exp_config.data_dir,
-        discipline=SelectionDiscipline.K_UNIQUE_N
-        if exp_config.selection_discipline == "K_UNIQUE_N"
-        else SelectionDiscipline.PAD_N,
-        k_unique_scenes=exp_config.k_unique_scenes,
-    )
-
-    train(exp_config, scene_config)
+    train(exp_config)

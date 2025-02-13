@@ -1,25 +1,21 @@
-data_dir: "data/processed/examples" #"data/data_old_debug" #"data/processed/training"
-
+data_dir: "data/processed/examples"
 num_worlds: 100
-
-selection_discipline: "K_UNIQUE_N"  # K_UNIQUE_N / PAD_N
-k_unique_scenes: 1
+k_unique_scenes: 4
 device: "cuda"  # or "cpu"
 
-reward_type: "sparse_on_goal_achieved"
-collision_weight: 0.0
-goal_achieved_weight: 1.0
-off_road_weight: 0.0
+reward_type: "weighted_combination"
 remove_non_vehicles: false
-polyline_reduction_threshold: 0.4
-observation_radius: 60.0
+polyline_reduction_threshold: 0.1
+observation_radius: 50.0
+collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
 
-resample_scenarios: false
-resample_criterion: "global_step"  # Options: "global_step"
-resample_freq: 1_000_000  # Resample every k steps (recommended to be a multiple of num_worlds * n_steps)
-resample_mode: "random"  # Options: "random"
+resample_scenes: false
+resample_dataset_size: 4 # Number of unique scenes to sample from
+resample_interval: 2_000_000
+sample_with_replacement: true
+shuffle_dataset: false
 
-render: true
+render: false
 render_mode: "rgb_array"
 render_freq: 100  # Render every k rollouts
 render_n_worlds: 1  # Number of scenarios to render
@@ -27,15 +23,13 @@ render_n_worlds: 1  # Number of scenarios to render
 track_time_to_solve: false
 
 sync_tensorboard: true
-logging_collection_window: 100  # How many trajectories we average logs over
+logging_collection_window: 100
 log_freq: 100
 project_name: "gpudrive"
-group_name: "algorithm_logic"
+group_name: "my_experiment"
 entity: " "
 tags:
-  - "IPPO"
-  - "LATE_FUSION"
-  - "PERM_EQ"
+  - "ppo"
 wandb_mode: "online"  # Options: online, offline, disabled
 
 episode_len: 91  # Length of an episode in the simulator
