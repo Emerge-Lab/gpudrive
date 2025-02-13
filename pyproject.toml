@@ -35,7 +35,7 @@ dependencies = [
 pufferlib = [
     "pufferlib>=2.0.6",
     "torch>=2.2.1",
-    "wandb",
+    "wandb[media]",
 ]
 sb3 = [
     "stable-baselines3==2.3.2",

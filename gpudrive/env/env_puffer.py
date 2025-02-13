@@ -208,7 +208,7 @@ class PufferGPUDrive(PufferEnv):
         self.env.step_dynamics(self.actions)
 
         # Render
-        self.render() if self.render else None
+        self.render_env() if self.render else None
 
         # (2) Get rewards, terminal (dones) and info
         reward = self.env.get_rewards(
@@ -378,7 +378,7 @@ class PufferGPUDrive(PufferEnv):
             info,
         )
 
-    def render(self):
+    def render_env(self):
         """Render the environment based on conditions.
         - If the episode has just started, start a new rendering.
         - If the episode is in progress, continue rendering.
