@@ -7,11 +7,20 @@ GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 mill
 
 For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-TODO(before release; add videos)
+## Key features
+
+- Fast simulation for agent training and evaluation at 1 million FPS.
+
+- Easily configure the simulation view and the agent's relative, partially observable perspective.
+
+| Simulator state | Agent observation |
+|-----------------|------------------|
+| <img src="assets/sim_video_clear_example.gif" width="300px"> | <img src="assets/obs_video_clear_example.gif" width="300px"> |
+
 
 ## ⚙️ Integrations
 
-| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br />(`agent steps per second`) |
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br /> |
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
 | **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
@@ -49,7 +58,7 @@ cd gpudrive
 
 ---
 
-Then, you can *choose* between 3 options for building the simulator:
+Then, you can choose between two options for building the simulator:
 
 ---
 
@@ -81,34 +90,7 @@ pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_B
 ---
 
 <details>
-  <summary>Option 2️⃣ : Poetry install</summary>
-
-First create a conda environment using `environment.yml`:
-
-```bash
-conda env create -f environment.yml
-```
-
-Activate the environment:
-
-```bash
-conda activate gpudrive
-```
-
-Run:
-
-```bash
-poetry install
-```
-
-</details>
-
----
-
----
-
-<details>
-  <summary>Option 3️⃣ : Docker (GPU Only) </summary>
+  <summary>Option 2️⃣ : Docker </summary>
 
 #### Nvidia docker dependency
 
@@ -202,7 +184,7 @@ cd build
 
 ## 🏋🏼‍♀️ Pre-trained policy
 
-We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy here TODO(before release). You can store the policy in ` models`.
+Download a pre-trained policy from [this paper](TODO: Link to paper), trained on 10,000 randomly sampled scenarios here.
 
 ## 📂 Dataset
 
@@ -321,15 +303,7 @@ and that's it!
 If you use GPUDrive in your work, please cite us: TODO(release; update)
 
 ```
-@misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
-      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
-      author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
-      year={2024},
-      eprint={2408.01584},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2408.01584},
-}
+TODO: Update to ICLR version.
 ```
 
 ## Contributing and learning benchmark
