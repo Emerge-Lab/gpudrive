@@ -45,7 +45,7 @@ Then, there are two options for building the simulator:
 ---
 
 <details>
-  <summary>🔧 Option 1️. Manual install </summary>
+  <summary>🔧 Option 1. Manual install </summary>
 
 For Linux and macOS, use the following commands:
 
