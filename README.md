@@ -209,7 +209,7 @@ Download a pre-trained policy from [this paper](TODO: Link to paper), trained on
 <details>
   <summary>Download the dataset</summary>
 
-- To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
+To download the dataset you need the huggingface_hub library 
 
 ```bash
 pip install huggingface_hub
