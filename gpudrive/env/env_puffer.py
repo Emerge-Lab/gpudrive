@@ -131,12 +131,8 @@ class PufferGPUDrive(PufferEnv):
 
         self.obs_size = self.env.observation_space.shape[-1]
         self.single_action_space = self.env.action_space
-        self.single_observation_space = gymnasium.spaces.Box(
-            low=0, high=255, shape=(self.obs_size,), dtype=np.float32
-        )
-
-        # self.single_observation_space = self.env.single_observation_space
-        # self.observation_space = self.env.observation_space
+        self.single_observation_space = self.env.single_observation_space
+        
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
 
         # Number of controlled agents across all worlds
