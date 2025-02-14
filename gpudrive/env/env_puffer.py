@@ -31,13 +31,15 @@ class PufferGPUDrive(PufferEnv):
         data_loader=None,
         data_dir=GPU_DRIVE_DATA_DIR,
         loader_batch_size=128,
-        loader_dataser_size=3,
+        loader_dataset_size=3,
         loader_sample_with_replacement=True,
         loader_shuffle=False,
         device=None,
         num_worlds=128,
         max_controlled_agents=64,
         dynamics_model="classic",
+        action_space_steer_disc=13,
+        action_space_accel_disc=7,
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -68,7 +70,7 @@ class PufferGPUDrive(PufferEnv):
             data_loader = SceneDataLoader(
                 root=data_dir,
                 batch_size=loader_batch_size,
-                dataset_size=loader_dataser_size,
+                dataset_size=loader_dataset_size,
                 sample_with_replacement=loader_sample_with_replacement,
                 shuffle=loader_shuffle,
             )
@@ -113,6 +115,12 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=lidar_obs,
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
+            steer_actions=torch.round(
+                torch.linspace(-torch.pi, torch.pi, action_space_steer_disc), decimals=3
+            ),
+            accel_actions=torch.round(
+                torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
+            )
         )
         self.env = GPUDriveTorchEnv(
             config=env_config,
