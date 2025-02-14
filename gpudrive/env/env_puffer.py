@@ -24,7 +24,7 @@ def env_creator(name="gpudrive", **kwargs):
 
 
 class PufferGPUDrive(PufferEnv):
-    """GPUDrive wrapper for PufferEnv."""
+    """PufferEnv wrapper for GPUDrive."""
 
     def __init__(
         self,
@@ -139,7 +139,7 @@ class PufferGPUDrive(PufferEnv):
         self.num_agents = self.controlled_agent_mask.sum().item()
 
         # Reset the environment and get the initial observations
-        self.observations = self.env.reset()[self.controlled_agent_mask]
+        self.observations = self.env.reset(self.controlled_agent_mask)
 
         # This assigns a bunch of buffers to self.
         # You can't use them because you want torch, not numpy
@@ -370,7 +370,7 @@ class PufferGPUDrive(PufferEnv):
                 # fmt: on
 
             # Get obs for the last terminal step (before reset)
-            self.last_obs = self.env.get_obs()[self.controlled_agent_mask]
+            self.last_obs = self.env.get_obs(self.controlled_agent_mask)
 
             # Asynchronously reset the done worlds and empty storage
             for idx in done_worlds:
@@ -386,7 +386,7 @@ class PufferGPUDrive(PufferEnv):
 
         # (6) Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
-        next_obs = self.env.get_obs()[self.controlled_agent_mask]
+        next_obs = self.env.get_obs(self.controlled_agent_mask)
 
         self.observations = next_obs
         self.rewards = reward_controlled
@@ -469,7 +469,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.reset()  # Reset storage
         # Get info from new worlds
-        self.observations = self.env.reset()[self.controlled_agent_mask]
+        self.observations = self.env.reset(self.controlled_agent_mask)
 
         self.log_data_coverage()
 

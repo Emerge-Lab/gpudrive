@@ -136,7 +136,7 @@ docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:late
 Test whether the installation was successful by importing the simulator:
 
 ```Python
-import gpudrive_madrona
+import madrona_gpudrive
 ```
 
 To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
