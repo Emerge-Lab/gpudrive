@@ -25,10 +25,12 @@ For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduc
 To build GPUDrive, make sure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (CMake, Python, CUDA Toolkit). See the details below.
 
 <details> <summary>Dependencies</summary>
+
 - CMake >= 3.24
 - Python >= 3.11
 - CUDA Toolkit >= 12.2 and <= 12.4 (We do not support CUDA versions 12.5+ at this time. Verify your CUDA version using nvcc --version.)
 - On macOS and Windows, install the required dependencies for XCode and Visual Studio C++ tools, respectively.
+
 </details>
 
 After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
@@ -43,7 +45,7 @@ Then, there are two options for building the simulator:
 ---
 
 <details>
-  <summary>🔧 Option 1️: Manual install </summary>
+  <summary>🔧 Option 1️. Manual install </summary>
 
 For Linux and macOS, use the following commands:
 
@@ -104,7 +106,7 @@ pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_D
 ---
 
 <details>
-  <summary> 🐳  Option 2: Docker </summary>
+  <summary> 🐳  Option 2. Docker </summary>
 
 To get started quickly, we provide a [Dockerfile]().  
 
@@ -176,9 +178,9 @@ To get started, see these entry points:
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 - The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
-<p align="center">
+<!-- <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
-</p>
+</p> -->
 
 <!-- ## 📈 Tests
 
