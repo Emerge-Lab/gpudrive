@@ -32,16 +32,16 @@ dependencies = [
     "pyyaml", 
     "mediapy",
     "wandb",
+    "torch>=2.2.1",
+    "seaborn",
 ]
 
 [project.optional-dependencies]
 pufferlib = [
     "pufferlib>=2.0.6",
-    "torch>=2.2.1",
 ]
 sb3 = [
     "stable-baselines3==2.3.2",
-    "torch>=2.2.1",
 ]
 
 test = [
@@ -54,3 +54,9 @@ ext-out-dir = "build"
 
 [tool.madrona.packages.gpudrive]
 path = "gpudrive"
+
+[project.packages]
+include = [
+    "baselines",
+    "baselines/*",
+]
