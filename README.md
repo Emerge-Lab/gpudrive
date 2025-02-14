@@ -8,35 +8,30 @@ An extremely fast, data-driven driving simulator written in C++.
 ## Highlights
 
 - ⚡️ Fast simulation for agent development and evaluation at 1 million FPS through the [Madrona engine](https://madrona-engine.github.io/).
-
 - 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
-
-- 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), offering road graphs and 100K+ scenarios with human demonstrations.
-
+- 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), featuring over 100K scenarios with human demonstrations.
 - 📜 Readily available PPO implementations via [SB3](https://github.com/DLR-RM/stable-baselines3) and [CleanRL](https://github.com/vwxyzjn/cleanrl) / [Pufferlib](https://puffer.ai/).
-
 - 👀 Easily configure the simulator and the agent's relative, partially observable view.
-
 - 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
 
-| Simulator state | Agent observation |
-|-----------------|------------------|
-| <img src="assets/sim_video_clear_example.gif" width="300px"> | <img src="assets/obs_video_clear_example.gif" width="300px"> |
-
+| Simulator state                                                  | Agent observation                                                |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `<img src="assets/sim_video_clear_example.gif" width="300px">` | `<img src="assets/obs_video_clear_example.gif" width="300px">` |
 
 For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-
 ## Installation
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
+To build GPUDrive, make sure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (CMake, Python, CUDA Toolkit). See the details below.
 
-1. CMake >= 3.24
-2. Python >= 3.11
-3. CUDA Toolkit >= 12.2 and <=12.4 (Currently we dont support CUDA versions 12.5+. Please check the ouptut of `nvcc --version` to make sure you are using correct CUDA version.)
-4. For MacOS and Windows, you need to install all the dependencies of XCode and Visual Studio C++ tools resepectively.
+<details> <summary>Dependencies</summary>
+- CMake >= 3.24
+- Python >= 3.11
+- CUDA Toolkit >= 12.2 and <= 12.4 (We do not support CUDA versions 12.5+ at this time. Verify your CUDA version using nvcc --version.)
+- On macOS and Windows, install the required dependencies for XCode and Visual Studio C++ tools, respectively.
+</details>
 
-Once you have the required dependencies, clone the repository (don't forget --recursive!):
+After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
 
 ```bash
 git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
@@ -51,6 +46,7 @@ Then, there are two options for building the simulator:
   <summary>Option 1️⃣: Manual install</summary>
 
 For Linux and macOS, use the following commands:
+
 ```bash
 mkdir build
 cd build
@@ -61,17 +57,19 @@ cd ..
 
 For Windows, open the cloned repository in Visual Studio and build the project using the integrated `cmake` functionality.
 
-Next, set up a Python environment 
+Next, set up a Python environment
 
-#### With pyenv (Recommended)  
+#### With pyenv (Recommended)
 
 Create a virtual environment:
+
 ```bash
 pyenv virtualenv 3.11.9 gpudrive
 pyenv activate gpudrive
 ```
 
 Set it for the current project directory (optional):
+
 ```bash
 pyenv local gpudrive
 ```
@@ -83,13 +81,16 @@ conda env create -f ./environment.yml
 conda activate gpudrive
 ```
 
-### Install Python package  
+### Install Python package
 
-Finally, install the Python components of the repository using pip:  
+Finally, install the Python components of the repository using pip:
+
 ```bash
 # macOS and Linux.
 pip install -e . 
 ```
+
+Optional depencies include [pufferlib], [sb3] and [tests].
 
 ```bash
 # On Windows.
@@ -170,7 +171,6 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
-
 ---
 
 <details>
@@ -188,19 +188,17 @@ Please remember that if you make any changes in C++, you need to delete the cach
 
 ---
 
-
-
 ## Integrations
 
-| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br /> |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
-| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
-
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                       |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                    |
 
 ## Getting started
 
 To get started, see these entry points:
+
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 - The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
@@ -238,12 +236,15 @@ Download a pre-trained policy from [this paper](TODO: Link to paper), trained on
   <summary>Download the dataset</summary>
 
 - To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
+
 ```bash
 pip install huggingface_hub
 ```
+
 Then you can download the dataset using python or just `huggingface-cli`.
 
 - **Option 1**: Using Python
+
 ```python
 >>> from huggingface_hub import snapshot_download
 >>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
@@ -252,11 +253,13 @@ Then you can download the dataset using python or just `huggingface-cli`.
 - **Option 2**: Use the huggingface-cli
 
 1. Log in to your Hugging Face account:
+
 ```bash
 huggingface-cli login
 ```
 
 2. Download the dataset:
+
 ```bash
 huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
 ```
@@ -268,6 +271,7 @@ huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --r
 3. Download the desired files/directories.
 
 _NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectories of 10k files each (according to hugging face constraints). In order for the path to work with GPUDrive, you need to run
+
 ```python
 python data_utils/extract_groups.py #use --help if you've used a custom download path
 ```
@@ -347,6 +351,6 @@ If you use GPUDrive in your work, please cite us: TODO(release; update)
 TODO: Update to ICLR version.
 ```
 
-## Contributing 
+## Contributing
 
 If you encounter a bug, notice a missing feature, or want to contribute, feel free to create an issue or reach out! We'd be excited to have you involved in the project.

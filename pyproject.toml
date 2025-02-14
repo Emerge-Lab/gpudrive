@@ -29,21 +29,21 @@ dependencies = [
     "pandas",
     "python-box==7.2.0",
     "typer",
+    "pyyaml", 
+    "mediapy",
+    "wandb",
 ]
 
 [project.optional-dependencies]
 pufferlib = [
     "pufferlib>=2.0.6",
     "torch>=2.2.1",
-    "wandb[media]",
 ]
 sb3 = [
     "stable-baselines3==2.3.2",
     "torch>=2.2.1",
 ]
-jax = [
 
-]
 test = [
     "pytest>=8.2.1",
 ]
