@@ -27,7 +27,7 @@ An extremely fast, data-driven driving simulator written in C++.
 For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 
-## 🛠️ Installation
+## Installation
 
 To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
 
@@ -43,32 +43,14 @@ git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 cd gpudrive
 ```
 
----
-
-<details>
-  <summary>Optional: If you want to use the Madrona viewer in C++ (Not needed to render with pygame)</summary>
-
-#### Extra dependencies to use Madrona viewer
-
-  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
-
-```bash
-  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
-```
-
-</details>
-
----
-
-Then, you can choose between two options for building the simulator:
+Then, there are two options for building the simulator:
 
 ---
 
 <details>
-  <summary>Option 1️⃣ : Manual install</summary>
+  <summary>Option 1️⃣: Manual install</summary>
 
 For Linux and macOS, use the following commands:
-
 ```bash
 mkdir build
 cd build
@@ -79,10 +61,39 @@ cd ..
 
 For Windows, open the cloned repository in Visual Studio and build the project using the integrated `cmake` functionality.
 
-Next, set up the Python components of the repository with pip:
+Next, set up a Python environment 
+
+#### With pyenv (Recommended)  
+
+Create a virtual environment:
+```bash
+pyenv virtualenv 3.11.9 gpudrive
+pyenv activate gpudrive
+```
+
+Set it for the current project directory (optional):
+```bash
+pyenv local gpudrive
+```
+
+### With conda
 
 ```bash
-pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
+conda env create -f ./environment.yml
+conda activate gpudrive
+```
+
+### Install Python package  
+
+Finally, install the Python components of the repository using pip:  
+```bash
+# macOS and Linux.
+pip install -e . 
+```
+
+```bash
+# On Windows.
+pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
 ```
 
 </details>
@@ -92,7 +103,7 @@ pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_B
 ---
 
 <details>
-  <summary>Option 2️⃣ : Docker </summary>
+  <summary>Option 2️⃣: Docker </summary>
 
 #### Nvidia docker dependency
 
@@ -160,7 +171,26 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
 
-## ⚙️ Integrations
+---
+
+<details>
+  <summary>Optional: If you want to use the Madrona viewer in C++</summary>
+
+#### Extra dependencies to use Madrona viewer
+
+  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
+
+```bash
+  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
+```
+
+</details>
+
+---
+
+
+
+## Integrations
 
 | What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br /> |
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -168,7 +198,7 @@ Please remember that if you make any changes in C++, you need to delete the cach
 | **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
 
 
-## 🚀 Getting started
+## Getting started
 
 To get started, see these entry points:
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
@@ -178,7 +208,7 @@ To get started, see these entry points:
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p>
 
-## 📈 Tests
+<!-- ## 📈 Tests
 
 To further test the setup, you can run the pytests in the root directory:
 
@@ -191,13 +221,13 @@ To test if the simulator compiled correctly (and python lib did not), try runnin
 ```bash
 cd build
 ./headless CPU 1 # Run on CPU, 1 step
-```
+``` -->
 
-## 🏋🏼‍♀️ Pre-trained policy
+## Pre-trained policy
 
 Download a pre-trained policy from [this paper](TODO: Link to paper), trained on 10,000 randomly sampled scenarios here.
 
-## 📂 Dataset
+## Dataset
 
 ### Download the dataset
 
@@ -309,7 +339,7 @@ and that's it!
 
 </details>
 
-## 📜 Citations
+## Citing GPUDrive
 
 If you use GPUDrive in your work, please cite us: TODO(release; update)
 
@@ -317,6 +347,6 @@ If you use GPUDrive in your work, please cite us: TODO(release; update)
 TODO: Update to ICLR version.
 ```
 
-## Contributing and learning benchmark
+## Contributing 
 
-If you find a bug of are missing features, please feel free to create an issue or start contributing!
+If you encounter a bug, notice a missing feature, or want to contribute, feel free to create an issue or reach out! We'd be excited to have you involved in the project.
