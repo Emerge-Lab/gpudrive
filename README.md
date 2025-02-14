@@ -43,7 +43,7 @@ Then, there are two options for building the simulator:
 ---
 
 <details>
-  <summary>Option 1️⃣: Manual install</summary>
+  <summary>🔧 Option 1️: Manual install </summary>
 
 For Linux and macOS, use the following commands:
 
@@ -74,7 +74,7 @@ Set it for the current project directory (optional):
 pyenv local gpudrive
 ```
 
-### With conda
+#### With conda
 
 ```bash
 conda env create -f ./environment.yml
@@ -104,54 +104,28 @@ pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_D
 ---
 
 <details>
-  <summary>Option 2️⃣: Docker </summary>
+  <summary> 🐳  Option 2: Docker </summary>
 
-#### Nvidia docker dependency
+To get started quickly, we provide a [Dockerfile]().  
 
-To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+### Prerequisites  
+Ensure you have the following installed:  
+- [Docker](https://docs.docker.com/get-docker/)  
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)  
 
-#### Pull the image and run the container
-
-To pull our pre-built Docker image and begin using GPUDrive, execute the following command (you may need to prepend sudo, depending on your Docker setup):
-
-```bash
-  docker pull ghcr.io/emerge-lab/gpudrive:latest
-```
-
-After pulling the image, you can create and run a new container using the `--gpus all` flag. Currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
+### Building the Docker mage  
+Once installed, you can build the container with:  
 
 ```bash
-  docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
+DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag my_image:latest --progress=plain .
 ```
 
-In case you created the container but exited, to rerun the same container, you can:
+### Running the Container  
+To run the container with GPU support and shared memory:  
 
 ```bash
-docker start gpudrive_container # make sure the container is started
-docker exec -it gpudrive_container /bin/bash
+docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:latest /bin/bash
 ```
-
-Once in the container, it will look like this:
-
-```bash
-(gpudrive) root@8caf35a97e4f:/gpudrive#
-```
-
-The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
-
-```bash
- poetry install
-```
-
-#### Build the image from scratch
-
-If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
-
-```bash
-docker buildx build -t gpudrive .
-```
-
-The subsequent steps to run and manage the container remain the same as outlined above.
 
 </details>
 
