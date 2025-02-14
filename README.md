@@ -1,63 +1,49 @@
 GPUDrive
 ========
 
-![Python version](https://img.shields.io/badge/Python-3.10-blue) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
 
-GPUDrive is a GPU-accelerated, multi-agent driving simulator that runs at 1 million FPS. The simulator is written in C++, built on top of the [Madrona Game Engine](https://madrona-engine.github.io). We provide Python bindings and `gymnasium` wrappers in `torch` and `jax`, allowing you to interface with the simulator in Python using your preferred framework.
+An extremely fast, data-driven driving simulator written in C++.
 
-For more details, see our [paper](https://arxiv.org/abs/2408.01584) 📜 and the 👉 [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
+## Highlights
 
-<figure>
-<img src="assets/GPUDrive_eval_with_humans_control_6.gif" alt="...">
-<center><figcaption>Agents in GPUDrive can be controlled by any user-specified actor.</figcaption></center>
-</figure>
+- ⚡️ Fast simulation for agent development and evaluation at 1 million FPS through the [Madrona engine](https://madrona-engine.github.io/).
+- 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
+- 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), featuring over 100K scenarios with human demonstrations.
+- 📜 Readily available PPO implementations via [SB3](https://github.com/DLR-RM/stable-baselines3) and [CleanRL](https://github.com/vwxyzjn/cleanrl) / [Pufferlib](https://puffer.ai/).
+- 👀 Easily configure the simulator and the agent's relative, partially observable view.
+- 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
 
-## ⚙️ Integrations
+| Simulator state                                                  | Agent observation                                                |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| <img src="assets/sim_video_clear_example.gif" width="320px"> | <img src="assets/obs_video_clear_example.gif" width="320px"> |
 
-| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput<br />(`agent steps per second`) |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                                                         |
-| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                                                      |
+For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
-## 🛠️ Installation
+## Installation
 
-To build GPUDrive, ensure you have all the dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies). Briefly, you'll need
+To build GPUDrive, make sure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (CMake, Python, CUDA Toolkit). See the details below.
 
-1. CMake >= 3.24
-2. Python >= 3.11
-3. CUDA Toolkit >= 12.2 and <=12.4 (Currently we dont support CUDA versions 12.5+. Please check the ouptut of `nvcc --version` to make sure you are using correct CUDA version.)
-4. For MacOS and Windows, you need to install all the dependencies of XCode and Visual Studio C++ tools resepectively.
+<details> <summary>Dependencies</summary>
+- CMake >= 3.24
+- Python >= 3.11
+- CUDA Toolkit >= 12.2 and <= 12.4 (We do not support CUDA versions 12.5+ at this time. Verify your CUDA version using nvcc --version.)
+- On macOS and Windows, install the required dependencies for XCode and Visual Studio C++ tools, respectively.
+</details>
 
-Once you have the required dependencies, clone the repository (don't forget --recursive!):
+After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
 
 ```bash
 git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
 cd gpudrive
 ```
 
----
-
-<details>
-  <summary>Optional: If you want to use the Madrona viewer in C++ (Not needed to render with pygame)</summary>
-
-#### Extra dependencies to use Madrona viewer
-
-  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
-
-```bash
-  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
-```
-
-</details>
-
----
-
-Then, you can *choose* between 3 options for building the simulator:
+Then, there are two options for building the simulator:
 
 ---
 
 <details>
-  <summary>Option 1️⃣ : Manual install</summary>
+  <summary>Option 1️⃣: Manual install</summary>
 
 For Linux and macOS, use the following commands:
 
@@ -71,37 +57,44 @@ cd ..
 
 For Windows, open the cloned repository in Visual Studio and build the project using the integrated `cmake` functionality.
 
-Next, set up the Python components of the repository with pip:
+Next, set up a Python environment
+
+#### With pyenv (Recommended)
+
+Create a virtual environment:
 
 ```bash
-pip install -e . # Add -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
+pyenv virtualenv 3.11.9 gpudrive
+pyenv activate gpudrive
 ```
 
-</details>
-
----
-
----
-
-<details>
-  <summary>Option 2️⃣ : Poetry install</summary>
-
-First create a conda environment using `environment.yml`:
+Set it for the current project directory (optional):
 
 ```bash
-conda env create -f environment.yml
+pyenv local gpudrive
 ```
 
-Activate the environment:
+### With conda
 
 ```bash
+conda env create -f ./environment.yml
 conda activate gpudrive
 ```
 
-Run:
+### Install Python package
+
+Finally, install the Python components of the repository using pip:
 
 ```bash
-poetry install
+# macOS and Linux.
+pip install -e . 
+```
+
+Optional depencies include [pufferlib], [sb3] and [tests].
+
+```bash
+# On Windows.
+pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
 ```
 
 </details>
@@ -111,11 +104,11 @@ poetry install
 ---
 
 <details>
-  <summary>Option 3️⃣ : Docker (GPU Only) </summary>
+  <summary>Option 2️⃣: Docker </summary>
 
 #### Nvidia docker dependency
 
-  To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
 
 #### Pull the image and run the container
 
@@ -167,7 +160,7 @@ The subsequent steps to run and manage the container remain the same as outlined
 Test whether the installation was successful by importing the simulator:
 
 ```Python
-import gpudrive
+import gpudrive_madrona
 ```
 
 To avoid compiling on GPU mode everytime, the following environment variable can be set with any custom path. For example, you can store the compiled program in a cache called `gpudrive_cache`:
@@ -178,9 +171,34 @@ export MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
 
 Please remember that if you make any changes in C++, you need to delete the cache and recompile.
 
-## 🚀 Getting started
+---
+
+<details>
+  <summary>Optional: If you want to use the Madrona viewer in C++</summary>
+
+#### Extra dependencies to use Madrona viewer
+
+  To build the simulator with visualization support on Linux (`build/viewer`), you will need to install X11 and OpenGL development libraries. Equivalent dependencies are already installed by Xcode on macOS. For example, on Ubuntu:
+
+```bash
+  sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libc++1
+```
+
+</details>
+
+---
+
+## Integrations
+
+| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                       |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                    |
+
+## Getting started
 
 To get started, see these entry points:
+
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 - The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
@@ -188,7 +206,7 @@ To get started, see these entry points:
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p>
 
-## 📈 Tests
+<!-- ## 📈 Tests
 
 To further test the setup, you can run the pytests in the root directory:
 
@@ -201,29 +219,32 @@ To test if the simulator compiled correctly (and python lib did not), try runnin
 ```bash
 cd build
 ./headless CPU 1 # Run on CPU, 1 step
-```
+``` -->
 
-## 🏋🏼‍♀️ Pre-trained policy
+## Pre-trained policy
 
-We are open-sourcing a policy trained on 1,000 randomly sampled scenarios. You can download the pre-trained policy [here](https://drive.google.com/file/d/1N4KJrt5PG6Pu-ovBQ-zIp0sJH0AQodKq/view?usp=sharing). You can store the policy in ` models`.
+Download a pre-trained policy from [this paper](TODO: Link to paper), trained on 10,000 randomly sampled scenarios here.
 
-## 📂 Dataset
+## Dataset
 
 ### Download the dataset
 
-- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes. 
+- Two versions of the dataset are available, a [mini version](https://huggingface.co/datasets/EMERGE-lab/GPUDrive_mini) with a 1000 training files and 300 test/validation files, and a [large dataset](https://huggingface.co/datasets/EMERGE-lab/GPUDrive) with 100k unique scenes.
 - Replace 'GPUDrive_mini' with 'GPUDrive' below if you wish to download the full dataset.
 
 <details>
   <summary>Download the dataset</summary>
 
 - To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
+
 ```bash
 pip install huggingface_hub
 ```
+
 Then you can download the dataset using python or just `huggingface-cli`.
 
 - **Option 1**: Using Python
+
 ```python
 >>> from huggingface_hub import snapshot_download
 >>> snapshot_download(repo_id="EMERGE-lab/GPUDrive_mini", repo_type="dataset", local_dir="data/processed")
@@ -232,11 +253,13 @@ Then you can download the dataset using python or just `huggingface-cli`.
 - **Option 2**: Use the huggingface-cli
 
 1. Log in to your Hugging Face account:
+
 ```bash
 huggingface-cli login
 ```
 
 2. Download the dataset:
+
 ```bash
 huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --repo-type "dataset"
 ```
@@ -248,6 +271,7 @@ huggingface-cli download EMERGE-lab/GPUDrive_mini --local-dir data/processed --r
 3. Download the desired files/directories.
 
 _NOTE_: If you downloaded the full-sized dataset, it is grouped to subdirectories of 10k files each (according to hugging face constraints). In order for the path to work with GPUDrive, you need to run
+
 ```python
 python data_utils/extract_groups.py #use --help if you've used a custom download path
 ```
@@ -319,26 +343,14 @@ and that's it!
 
 </details>
 
-## 📜 Citations
+## Citing GPUDrive
 
-If you use GPUDrive in your work, please cite us:
+If you use GPUDrive in your work, please cite us: TODO(release; update)
 
 ```
-@misc{kazemkhani2024gpudrivedatadrivenmultiagentdriving,
-      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
-      author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
-      year={2024},
-      eprint={2408.01584},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2408.01584},
-}
+TODO: Update to ICLR version.
 ```
 
-## Contributing and learning benchmark
+## Contributing
 
-If you find a bug of are missing features, please feel free to [create an issue or start contributing](https://github.com/Emerge-Lab/gpudrive/blob/main/CONTRIBUTING.md)! That link also points to a **learning benchmark** complete with training logs and videos of agent behaviors via `wandb`.
-
-## Timeline
-
-[![GPUDrive](https://api.star-history.com/svg?repos=Emerge-Lab/gpudrive&type=Date)](https://star-history.com/#Emerge-Lab/gpudrive&Date)
+If you encounter a bug, notice a missing feature, or want to contribute, feel free to create an issue or reach out! We'd be excited to have you involved in the project.

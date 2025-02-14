@@ -3,7 +3,7 @@
 #include <madrona/physics.hpp>
 #include "types.hpp"
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;

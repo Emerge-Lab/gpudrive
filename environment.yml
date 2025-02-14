@@ -48,7 +48,6 @@ dependencies:
       - poetry-plugin-export==1.7.1
       - ptyprocess==0.7.0
       - pycparser==2.22
-      - pygame
       - pyproject-hooks==1.0.0
       - rapidfuzz==3.7.0
       - requests==2.31.0
@@ -68,3 +67,4 @@ dependencies:
       - python-dotenv==1.0.1
       - jax==0.4.0
       - typer==0.9.0
+      - matplotlib==3.9

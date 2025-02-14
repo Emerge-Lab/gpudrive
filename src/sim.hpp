@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 class Engine;
 
