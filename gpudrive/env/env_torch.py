@@ -4,22 +4,26 @@ from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
 from itertools import product
-from gpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
-from gpudrive.env.base_env import GPUDriveGymEnv
+import mediapy as media
 import gymnasium
+import pufferlib.spaces
+
 from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
     LidarObs,
 )
+
+from gpudrive.env.config import EnvConfig, RenderConfig
+from gpudrive.env.base_env import GPUDriveGymEnv
 from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.roadgraph import LocalRoadGraphPoints
 from gpudrive.datatypes.info import Info
 
 from gpudrive.visualize.core import MatplotlibVisualizer
+from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
-import pufferlib.spaces
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -676,18 +680,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    from gpudrive.visualize.utils import img_from_fig
-    import mediapy as media
 
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
-    data_config = SceneConfig(batch_size=2, dataset_size=1000)
 
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/training",
-        batch_size=data_config.batch_size,
-        dataset_size=data_config.dataset_size,
+        batch_size=2,
+        dataset_size=100,
         sample_with_replacement=True,
         shuffle=False,
     )
@@ -700,22 +701,11 @@ if __name__ == "__main__":
         device="cuda",
     )
 
-    print(f"dataset: {env.data_batch}")
-
-    print(
-        f"controlled agents mask [before reset]: {env.cont_agent_mask.sum()}"
-    )
-
     # Rollout
     obs = env.reset()
 
-    print(f"controlled agents mask: {env.cont_agent_mask.sum()}")
-
     sim_frames = []
     agent_obs_frames = []
-
-    # env.swap_data_batch()
-    # env.reset()
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
@@ -727,15 +717,7 @@ if __name__ == "__main__":
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
-
-        # if (t + 1) % 2 == 0:
-        # env.swap_data_batch()
-        # env.reset()
-        #     print(f"dataset: {env.data_batch}")
-
-        # sim_state[0].savefig(f"sim_state.png")   # Save the figure to a file
-        # agent_obs_fig.savefig(f"agent_obs.png")  # Save the figure to a file
-
+        
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
         ].item()
@@ -753,10 +735,7 @@ if __name__ == "__main__":
             agent_idx=highlight_agent,
             figsize=(10, 10),
         )
-
-        sim_states[0].savefig(f"sim_state.png")  # Save the figure to a file
-        agent_obs.savefig(f"agent_obs.png")  # Save the figure to a file
-
+        
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 

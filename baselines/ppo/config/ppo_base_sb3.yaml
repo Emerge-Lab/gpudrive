@@ -1,0 +1,71 @@
+data_dir: "data/processed/examples"
+num_worlds: 100
+k_unique_scenes: 4
+device: "cuda"  # or "cpu"
+
+reward_type: "weighted_combination"
+remove_non_vehicles: false
+polyline_reduction_threshold: 0.1
+observation_radius: 50.0
+collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
+
+resample_scenes: false
+resample_dataset_size: 4 # Number of unique scenes to sample from
+resample_interval: 2_000_000
+sample_with_replacement: true
+shuffle_dataset: false
+
+render: false
+render_mode: "rgb_array"
+render_freq: 100  # Render every k rollouts
+render_n_worlds: 1  # Number of scenarios to render
+
+track_time_to_solve: false
+
+sync_tensorboard: true
+logging_collection_window: 100
+log_freq: 100
+project_name: "gpudrive"
+group_name: "my_experiment"
+entity: " "
+tags:
+  - "ppo"
+wandb_mode: "online"  # Options: online, offline, disabled
+
+episode_len: 91  # Length of an episode in the simulator
+
+save_policy: true
+save_policy_freq: 200
+
+seed: 42
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+clip_range_vf: null
+vf_coef: 0.5
+n_steps: 91  # Number of steps per rollout
+num_minibatches: 5  # Used to determine the minibatch size
+verbose: 0
+total_timesteps: 100_000_000
+ent_coef: 0.0001
+lr: 0.0003
+n_epochs: 5
+
+mlp_class: "late_fusion"
+policy: "late_fusion_policy"
+ego_state_layers:
+  - 64
+  - 32
+road_object_layers:
+  - 64
+  - 64
+road_graph_layers:
+  - 64
+  - 64
+shared_layers:
+  - 64
+  - 64
+act_func: "tanh"
+dropout: 0.0
+last_layer_dim_pi: 64
+last_layer_dim_vf: 64

@@ -25,10 +25,12 @@ For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduc
 To build GPUDrive, make sure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (CMake, Python, CUDA Toolkit). See the details below.
 
 <details> <summary>Dependencies</summary>
+
 - CMake >= 3.24
 - Python >= 3.11
 - CUDA Toolkit >= 12.2 and <= 12.4 (We do not support CUDA versions 12.5+ at this time. Verify your CUDA version using nvcc --version.)
 - On macOS and Windows, install the required dependencies for XCode and Visual Studio C++ tools, respectively.
+
 </details>
 
 After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
@@ -43,7 +45,7 @@ Then, there are two options for building the simulator:
 ---
 
 <details>
-  <summary>Option 1️⃣: Manual install</summary>
+  <summary>🔧 Option 1. Manual install </summary>
 
 For Linux and macOS, use the following commands:
 
@@ -74,7 +76,7 @@ Set it for the current project directory (optional):
 pyenv local gpudrive
 ```
 
-### With conda
+#### With conda
 
 ```bash
 conda env create -f ./environment.yml
@@ -104,54 +106,28 @@ pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_D
 ---
 
 <details>
-  <summary>Option 2️⃣: Docker </summary>
+  <summary> 🐳  Option 2. Docker </summary>
 
-#### Nvidia docker dependency
+To get started quickly, we provide a [Dockerfile]().  
 
-To run the Docker image with GPU support, ensure that you have the NVIDIA Container Toolkit installed. Detailed installation instructions can be found here - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html.
+### Prerequisites  
+Ensure you have the following installed:  
+- [Docker](https://docs.docker.com/get-docker/)  
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)  
 
-#### Pull the image and run the container
-
-To pull our pre-built Docker image and begin using GPUDrive, execute the following command (you may need to prepend sudo, depending on your Docker setup):
-
-```bash
-  docker pull ghcr.io/emerge-lab/gpudrive:latest
-```
-
-After pulling the image, you can create and run a new container using the `--gpus all` flag. Currently cpu version in docker is not working (To be fixed soon). This command will create a new container named `gpudrive_container`:
+### Building the Docker mage  
+Once installed, you can build the container with:  
 
 ```bash
-  docker run --gpus all -it --name gpudrive_container ghcr.io/emerge-lab/gpudrive:latest
+DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag my_image:latest --progress=plain .
 ```
 
-In case you created the container but exited, to rerun the same container, you can:
+### Running the Container  
+To run the container with GPU support and shared memory:  
 
 ```bash
-docker start gpudrive_container # make sure the container is started
-docker exec -it gpudrive_container /bin/bash
+docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:latest /bin/bash
 ```
-
-Once in the container, it will look like this:
-
-```bash
-(gpudrive) root@8caf35a97e4f:/gpudrive#
-```
-
-The Docker image includes all necessary dependencies, along with Conda and Poetry. However, a compilation step is still required. Once inside the container, run:
-
-```bash
- poetry install
-```
-
-#### Build the image from scratch
-
-If you want to build the image from scratch, ensure that Docker is installed with the Buildx plugin (though classic builds will still work, they are soon to be deprecated). In the GPUDrive repository, run:
-
-```bash
-docker buildx build -t gpudrive .
-```
-
-The subsequent steps to run and manage the container remain the same as outlined above.
 
 </details>
 
@@ -190,10 +166,12 @@ Please remember that if you make any changes in C++, you need to delete the cach
 
 ## Integrations
 
-| What                                                                                                    | References                                                                                                                                                                     | README                                                                                                                                                                | End-to-end training throughput |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| **IPPO** implementation [Stable Baselines](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf)                                             | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md)                                                                                         | 25 - 50K                       |
-| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                       | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905) | [Use](https://github.com/Emerge-Lab/gpudrive/blob/main/baselines/ippo/README.md), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/rl/puffer) | 200 - 500K                    |
+
+| What                                                                                                    | Info                                                                                                                                                                         | Run                                    | Training SPS |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------ |
+| **IPPO** implementation [SB3](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/ppo/puffer) | `python baselines/ppo/ippo_sb3.py`      | 25 - 50K                       |
+| **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                           | [PPO](https://arxiv.org/pdf/2406.12905)                                                   | `python baselines/ppo/ppo_pufferlib.py`       | 100 - 300K                     |
+
 
 ## Getting started
 
@@ -202,9 +180,9 @@ To get started, see these entry points:
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
 - The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
 
-<p align="center">
+<!-- <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
-</p>
+</p> -->
 
 <!-- ## 📈 Tests
 
@@ -235,7 +213,7 @@ Download a pre-trained policy from [this paper](TODO: Link to paper), trained on
 <details>
   <summary>Download the dataset</summary>
 
-- To download the dataset you need the huggingface_hub library (if you initialized from `environment.yml` then you can skip this step):
+To download the dataset you need the huggingface_hub library 
 
 ```bash
 pip install huggingface_hub
