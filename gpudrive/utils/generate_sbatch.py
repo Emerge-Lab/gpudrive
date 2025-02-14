@@ -19,7 +19,7 @@ SINGULARITY_IMAGE = os.getenv("SINGULARITY_IMAGE")
 OVERLAY_FILE = os.getenv("OVERLAY_FILE")
 
 # Set to python file to run
-RUN_FILE = "baselines/ippo/ippo_pufferlib.py"
+RUN_FILE = "baselines/ppo/ppo_pufferlib.py"
 
 # Default SLURM fields
 DEFAULT_SLURM_FIELDS = {

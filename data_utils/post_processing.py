@@ -58,7 +58,7 @@ def delete_corrupted_file(file_path):
 if __name__ == "__main__":
     
     # 1: Download the dataset
-    #snapshot_download(repo_id="EMERGE-lab/GPUDrive", repo_type="dataset", local_dir="data/processed")
+    snapshot_download(repo_id="EMERGE-lab/GPUDrive", repo_type="dataset", local_dir="data/processed")
 
     # 2: Check the structure of the JSON files and delete any corrupted files
     data_dir = "data/processed/training"
