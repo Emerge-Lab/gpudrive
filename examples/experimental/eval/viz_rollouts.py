@@ -3,10 +3,11 @@ import logging
 from pathlib import Path
 from tqdm import tqdm
 import torch
-from eval_utils import load_policy, rollout, load_config, make_env
-from pygpudrive.env.dataset import SceneDataLoader
 import mediapy
 import numpy as np
+
+from eval_utils import load_policy, rollout, load_config, make_env
+from gpudrive.env.dataset import SceneDataLoader
 
 def visualize_rollouts(
     env,
@@ -102,7 +103,7 @@ def visualize_rollouts(
 
 if __name__ == "__main__":
     # Load configuration
-    config = load_config("examples/experiments/eval/config/visualization_config")
+    config = load_config("examples/experimental/eval/config/visualization_config")
     
     # Initialize data loader
     data_loader = SceneDataLoader(
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     )
     
     # Create environment
-    env = make_env(config, data_loader, render_3d=True)
+    env = make_env(config, data_loader, render_3d=False)
     
     # Load policy
     policy = load_policy(

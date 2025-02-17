@@ -8,11 +8,11 @@ import dataclasses
 import os
 from pathlib import Path
 
-from pygpudrive.env.config import EnvConfig, RenderConfig
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
-from pygpudrive.env.dataset import SceneDataLoader
-from pygpudrive.visualize.utils import img_from_fig
-from pygpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.env.config import EnvConfig, RenderConfig
+from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.visualize.utils import img_from_fig
+from gpudrive.datatypes.observation import GlobalEgoState
 
 from gpudrive.networks.late_fusion import NeuralNet
 

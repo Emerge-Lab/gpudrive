@@ -79,20 +79,6 @@ class MatplotlibVisualizer:
             backend=self.backend,
         )
 
-        # Cache pre-rendered road graphs for all environments
-        # self.cached_roadgraphs = []
-        # for env_idx in range(self.controlled_agent_mask.shape[0]):
-        #     fig, ax = plt.subplots(figsize=self.figsize)
-        #     self._plot_roadgraph(
-        #         road_graph=self.global_roadgraph,
-        #         env_idx=env_idx,
-        #         ax=ax,
-        #         line_width_scale=1.0,
-        #         marker_size_scale=1.0,
-        #     )
-        #     self.cached_roadgraphs.append(fig)
-        #     plt.close(fig)
-
     def plot_simulator_state(
         self,
         env_indices: List[int],
@@ -208,19 +194,6 @@ class MatplotlibVisualizer:
             ax.set_aspect("equal", adjustable="box")
             figs.append(fig)  # Add the new figure
             plt.close(fig)  # Close the figure to prevent carryover
-
-            # Render the pre-cached road graph for the current environment
-            # cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
-            # ax.imshow(
-            #     cached_roadgraph_array,
-            #     origin="upper",
-            #     extent=(-100, 100, -100, 100),  # Stretch to full plot
-            #     zorder=0,  # Draw as background
-            # )
-
-            # Explicitly set the axis limits to match your coordinates
-            # cached_ax.set_xlim(-100, 100)
-            # cached_ax.set_ylim(-100, 100)
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -540,7 +513,7 @@ class MatplotlibVisualizer:
         """Plot the road graph."""
 
         for road_point_type in road_graph.type.unique().tolist():
-            if road_point_type == int(gpudrive.EntityType._None):
+            if road_point_type == int(madrona_gpudrive.EntityType._None):
                 continue
             
             road_mask = road_graph.type[env_idx, :] == road_point_type
@@ -553,9 +526,9 @@ class MatplotlibVisualizer:
             segment_orientations = road_graph.orientation[env_idx, road_mask].tolist()
             
             if road_point_type in [
-                int(gpudrive.EntityType.RoadEdge),
-                int(gpudrive.EntityType.RoadLine),
-                int(gpudrive.EntityType.RoadLane)
+                int(madrona_gpudrive.EntityType.RoadEdge),
+                int(madrona_gpudrive.EntityType.RoadLine),
+                int(madrona_gpudrive.EntityType.RoadLane)
             ]:
                 # Handle road edges, lines, and lanes
                 if self.render_3d:
@@ -565,7 +538,7 @@ class MatplotlibVisualizer:
                         start, end = self._get_endpoints(x, y, length, orientation)
                         
                         # Create 3D road segment
-                        if road_point_type == int(gpudrive.EntityType.RoadEdge):
+                        if road_point_type == int(madrona_gpudrive.EntityType.RoadEdge):
                             # For road edges, create raised borders
                             height = 0.01  # Small height for road edges
                             self._plot_3d_road_segment(
@@ -589,7 +562,7 @@ class MatplotlibVisualizer:
                     ):
                         start, end = self._get_endpoints(x, y, length, orientation)
                         line_width = 1.1 * line_width_scale if road_point_type == int(
-                            gpudrive.EntityType.RoadEdge
+                            madrona_gpudrive.EntityType.RoadEdge
                         ) else 0.75 * line_width_scale
                         
                         ax.plot(
@@ -599,7 +572,7 @@ class MatplotlibVisualizer:
                             linewidth=line_width,
                         )
                         
-            elif road_point_type == int(gpudrive.EntityType.SpeedBump):
+            elif road_point_type == int(madrona_gpudrive.EntityType.SpeedBump):
                 if self.render_3d:
                     for x, y, length, width, orientation in zip(
                         x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
@@ -618,7 +591,7 @@ class MatplotlibVisualizer:
                         segment_widths, segment_orientations, ax
                     )
                     
-            elif road_point_type == int(gpudrive.EntityType.StopSign):
+            elif road_point_type == int(madrona_gpudrive.EntityType.StopSign):
                 if self.render_3d:
                     for x, y in zip(x_coords, y_coords):
                         # Create 3D stop sign
@@ -641,7 +614,7 @@ class MatplotlibVisualizer:
                             alpha=0.9,
                         )
                         
-            elif road_point_type == int(gpudrive.EntityType.CrossWalk):
+            elif road_point_type == int(madrona_gpudrive.EntityType.CrossWalk):
                 if self.render_3d:
                     for x, y, length, width, orientation in zip(
                         x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
