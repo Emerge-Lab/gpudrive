@@ -32,13 +32,23 @@ def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
 
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
-    # Display xticks and yticks and title.
+    # Adjusted margins to better accommodate 3D plots
     fig.subplots_adjust(
-        left=0.08, bottom=0.08, right=0.98, top=0.9, wspace=0.0, hspace=0.0
+        left=0.0,    # Reduce left margin
+        bottom=0.0,  # Reduce bottom margin
+        right=1.0,   # Extend to right edge
+        top=1.0,     # Extend to top edge
+        wspace=0.0, 
+        hspace=0.0
     )
+    
+    # Force render
     fig.canvas.draw()
+    
+    # Convert to numpy array
     data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    
     plt.close(fig)
     return img
 

@@ -8,7 +8,7 @@ import dataclasses
 import os
 from pathlib import Path
 
-from pygpudrive.env.config import EnvConfig
+from pygpudrive.env.config import EnvConfig, RenderConfig
 from pygpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.visualize.utils import img_from_fig
@@ -75,7 +75,7 @@ def rollout(
     device,
     deterministic: bool = False,
     render_sim_state: bool = False,
-    render_every_n_steps: int = 5,
+    render_every_n_steps: int = 1,
     zoom_radius: int = 100,
     return_agent_positions: bool = False,
     center_on_ego: bool = False,
@@ -164,7 +164,7 @@ def rollout(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
-                        agent_positions = agent_positions,
+                        # agent_positions = agent_positions,
                         center_agent_indices=agent_indices,
                     )
                     for idx, env_id in enumerate(has_live_agent):
@@ -259,7 +259,7 @@ def load_config(cfg: str) -> Box:
     return config
 
 
-def make_env(config, train_loader):
+def make_env(config, train_loader, render_3d=False):
     """Make the environment with the given config."""
 
     # Override any default environment settings
@@ -286,11 +286,15 @@ def make_env(config, train_loader):
         ),
     )
 
+    render_config =  RenderConfig()
+    render_config.render_3d = render_3d
+
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=config.max_controlled_agents,
         device=config.device,
+        render_config=render_config
     )
 
     return env

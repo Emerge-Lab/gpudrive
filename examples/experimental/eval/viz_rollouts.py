@@ -5,6 +5,8 @@ from tqdm import tqdm
 import torch
 from eval_utils import load_policy, rollout, load_config, make_env
 from pygpudrive.env.dataset import SceneDataLoader
+import mediapy
+import numpy as np
 
 def visualize_rollouts(
     env,
@@ -13,6 +15,7 @@ def visualize_rollouts(
     config,
     save_path,
     num_scenes=None,
+    make_videos=True,
 ):
     """
     Visualize policy rollouts for specified number of scenes.
@@ -55,7 +58,7 @@ def visualize_rollouts(
             _, _,  # off_road
             _, _,  # not_goal_nor_crashed            
             _,# controlled_agents_in_scene
-            _, # sim state frames
+            sim_state_frames, # sim state frames
             agent_positions,
             _, # episode lengths
         ) = rollout(
@@ -63,8 +66,9 @@ def visualize_rollouts(
             policy=policy,
             device=config.device,
             deterministic=config.deterministic,
-            render_sim_state=config.render_sim_state,
-            return_agent_positions=True
+            render_sim_state=config.render_sim_state if make_videos else False,
+            return_agent_positions=True,
+            zoom_radius=40
         )
         
         # Reset environment to visualize final states with trajectories
@@ -72,14 +76,29 @@ def visualize_rollouts(
         final_states = env.vis.plot_simulator_state(
             env_indices=list(range(len(batch))),
             time_steps=[-1] * len(batch),
-            zoom_radius = 75,
+            zoom_radius = 40,
             agent_positions=agent_positions
         )
         
         # Save final states with trajectories
         for i, fig in enumerate(final_states):
             scene_name = Path(batch[i]).stem
-            fig.savefig(os.path.join(save_path, f"{scene_name}_rollout.png"))
+            fig.savefig(os.path.join(save_path, f"{scene_name}_3d.png"))
+
+        if make_videos:
+            # Save videos
+            sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
+            filenames = env.get_env_filenames()
+            for env_id, frames in sim_state_arrays.items():
+            
+                filename = filenames[env_id]
+
+                mediapy.write_video(
+                    os.path.join(save_path, f"{filename}_3d.gif"),
+                    frames,
+                    fps=15,
+                    codec='gif',
+                )
 
 if __name__ == "__main__":
     # Load configuration
@@ -94,7 +113,7 @@ if __name__ == "__main__":
     )
     
     # Create environment
-    env = make_env(config, data_loader)
+    env = make_env(config, data_loader, render_3d=True)
     
     # Load policy
     policy = load_policy(
