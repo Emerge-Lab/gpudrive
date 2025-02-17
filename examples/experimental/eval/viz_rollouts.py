@@ -114,7 +114,7 @@ if __name__ == "__main__":
     )
     
     # Create environment
-    env = make_env(config, data_loader, render_3d=False)
+    env = make_env(config, data_loader, render_3d=True)
     
     # Load policy
     policy = load_policy(
