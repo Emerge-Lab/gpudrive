@@ -74,7 +74,6 @@ train:
   network:
     input_dim: 64 # Embedding of the input features
     hidden_dim: 128 # Latent dimension
-    pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
     dropout: 0.01
     class_name: "NeuralNet"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime

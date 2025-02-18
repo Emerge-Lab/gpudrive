@@ -61,7 +61,6 @@ def load_policy(path_to_cpt, model_name, device, env=None):
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-            pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
         ).to(device)
 
         # Load the model parameters

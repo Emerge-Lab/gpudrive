@@ -9,7 +9,7 @@ model_cpt: null
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 3 # Number of unique scenes to sample from
+  k_unique_scenes: 20 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -53,12 +53,12 @@ train:
   shuffle_dataset: false
 
   # # # PPO # # #
-  torch_deterministic: true
+  torch_deterministic: false
   total_timesteps: 500_000_000
   batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
-  anneal_lr: true
+  anneal_lr: false
   gamma: 0.99
   gae_lambda: 0.95
   update_epochs: 3
@@ -76,7 +76,6 @@ train:
   network:
     input_dim: 64 # Embedding of the input features
     hidden_dim: 128 # Latent dimension
-    pred_heads_arch: [64] # Arch of the prediction heads (actor and critic)
     dropout: 0.01
     class_name: "NeuralNet"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
