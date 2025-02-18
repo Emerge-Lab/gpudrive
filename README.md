@@ -324,8 +324,7 @@ and that's it!
 
 ## Citing GPUDrive
 
-If you use GPUDrive in your work, please cite us: TODO(release; update)
-
+If you use GPUDrive in your research, please cite our ICLR 2025 paper
 ```bibtex
 @inproceedings{kazemkhani2025gpudrive,
       title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS}, 
