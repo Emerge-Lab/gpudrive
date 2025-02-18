@@ -16,7 +16,8 @@ An extremely fast, data-driven driving simulator written in C++.
 
 | Simulator state                                                  | Agent observation                                                |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| <img src="assets/sim_video_clear_example.gif" width="320px"> | <img src="assets/obs_video_clear_example.gif" width="320px"> |
+| <img src="assets/sim_video_7.gif" width="320px">    | <img src="assets/obs_video_7.gif" width="320px"> |
+| <img src="assets/sim_video_0_10.gif" width="320px"> | <img src="assets/obs_video_0_10.gif" width="320px"> |
 
 For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
