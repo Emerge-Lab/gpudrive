@@ -721,16 +721,71 @@ class MatplotlibVisualizer:
             label: Label for the plotted elements.
         """
 
-        def plot_agent_group_3d(bboxes, color):
+        def plot_agent_group_3d(bboxes, color, alpha=1.0, line_width_scale=1.5):
             """Helper function to plot a group of agents in 3D"""
             for x, y, length, width, angle in bboxes:
                 # Create 3D vehicle box
                 faces = self._create_3d_vehicle_box(x, y, length, width, angle)
+                
+                # Plot the cuboid (vehicle box)
                 poly3d = Poly3DCollection(faces, alpha=alpha)
                 poly3d.set_facecolor(color)
                 poly3d.set_edgecolor('black')
                 poly3d.set_linewidth(0.5 * line_width_scale)
                 ax.add_collection3d(poly3d)
+
+                # Heading arrow (use a small 3D line to indicate the orientation)
+                c = np.cos(angle)
+                s = np.sin(angle)
+                arrow_length = 4.5
+                
+                # Coordinates of the arrow's base (center of the box) and the tip
+                arrow_base = np.array([x, y, 0])  # Starting point (at the top of the box)
+                arrow_tip = arrow_base + np.array([arrow_length * c, arrow_length * s, 0])  # Pointing in the direction of the angle
+                
+                # Plot the heading arrow 
+                ax.plot(
+                    [arrow_base[0], arrow_tip[0]],
+                    [arrow_base[1], arrow_tip[1]],
+                    [arrow_base[2], arrow_tip[2]],
+                    color='black',
+                    linewidth=2,
+                    alpha=alpha
+                )
+                
+                # Add arrowhead (tip)
+                tip_angle = np.pi / 1.5  # Angle of the arrowhead 
+                arrowhead_length = arrow_length / 8  # Length of the arrowhead
+                
+                # Calculate the left and right arrowhead points
+                arrowhead_left = arrow_tip + np.array([
+                    arrowhead_length * (np.cos(angle + tip_angle) - c),
+                    arrowhead_length * (np.sin(angle + tip_angle) - s),
+                    0
+                ])
+                arrowhead_right = arrow_tip + np.array([
+                    arrowhead_length * (np.cos(angle - tip_angle) - c),
+                    arrowhead_length * (np.sin(angle - tip_angle) - s),
+                    0
+                ])
+                
+                # Plot the left and right arrowhead lines
+                ax.plot(
+                    [arrow_tip[0], arrowhead_left[0]],
+                    [arrow_tip[1], arrowhead_left[1]],
+                    [arrow_tip[2], arrowhead_left[2]],
+                    color='black',
+                    linewidth=1.5,
+                    alpha=alpha,
+                )
+                ax.plot(
+                    [arrow_tip[0], arrowhead_right[0]],
+                    [arrow_tip[1], arrowhead_right[1]],
+                    [arrow_tip[2], arrowhead_right[2]],
+                    color='black',
+                    linewidth=1.5,
+                    alpha=alpha
+                )
 
         def plot_agent_group_2d(bboxes, color):
             """Helper function to plot a group of agents in 2D"""
