@@ -14,16 +14,20 @@ An extremely fast, data-driven driving simulator written in C++.
 - 👀 Easily configure the simulator and the agent's relative, partially observable view.
 - 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
 
+<div align="center">
+
 | Simulator state                                                  | Agent observation                                                |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
 | <img src="assets/sim_video_7.gif" width="320px">    | <img src="assets/obs_video_7.gif" width="320px"> |
 | <img src="assets/sim_video_0_10.gif" width="320px"> | <img src="assets/obs_video_0_10.gif" width="320px"> |
 
+</div>
+
 For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 ## Installation
 
-To build GPUDrive, make sure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) (CMake, Python, CUDA Toolkit). See the details below.
+To build GPUDrive, ensure you have all the required dependencies listed [here](https://github.com/shacklettbp/madrona#dependencies) including CMake, Python, and the CUDA Toolkit. See the details below.
 
 <details> <summary>Dependencies</summary>
 
