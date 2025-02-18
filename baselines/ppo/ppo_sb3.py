@@ -9,7 +9,7 @@ from gpudrive.integrations.sb3.callbacks import MultiAgentCallback
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.wrappers.sb3_wrapper import SB3MultiAgentEnv
 
-from baselines.networks.perm_eq_late_fusion import (
+from baselines.gpudrive.perm_eq_late_fusion import (
     LateFusionNet,
     LateFusionPolicy,
 )

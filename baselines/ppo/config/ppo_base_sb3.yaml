@@ -15,11 +15,6 @@ resample_interval: 2_000_000
 sample_with_replacement: true
 shuffle_dataset: false
 
-render: false
-render_mode: "rgb_array"
-render_freq: 100  # Render every k rollouts
-render_n_worlds: 1  # Number of scenarios to render
-
 track_time_to_solve: false
 
 sync_tensorboard: true

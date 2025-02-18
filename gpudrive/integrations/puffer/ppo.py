@@ -110,7 +110,7 @@ def evaluate(data):
         data.config.resample_scenes
         and data.resample_buffer >= data.config.resample_interval
         and data.config.resample_dataset_size > data.vecenv.num_worlds
-    ):  
+    ):
         print(f"Resampling scenarios at global step {data.global_step}")
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
@@ -125,7 +125,7 @@ def evaluate(data):
 
     # Rollout loop
     while not experience.full:
-        
+
         with profile.env:
             # Receive data from current timestep
             (
@@ -140,14 +140,12 @@ def evaluate(data):
             env_id = env_id.tolist()
 
         with profile.eval_misc:
-            data.global_step += sum(mask)
+            total_alive_in_batch = sum(mask).item()
+            data.global_step += total_alive_in_batch
             data.global_step_pad += data.vecenv.total_agents
-            data.resample_buffer += sum(mask)
+            data.resample_buffer += total_alive_in_batch
 
-            obs = torch.as_tensor(obs)
             obs_device = obs.to(config.device)
-            reward = torch.as_tensor(reward)
-            terminal = torch.as_tensor(terminal)
 
         with profile.eval_forward, torch.no_grad():
             if lstm_h is not None:
@@ -163,25 +161,22 @@ def evaluate(data):
                 torch.cuda.synchronize()
 
         with profile.env:
-            actions = actions.cpu().numpy()
-
             # Step the environment and reset if done
             data.vecenv.send(actions)
 
         with profile.eval_misc:
             value = value.flatten()
-            mask = torch.as_tensor(mask)
             obs_device = obs_device if config.cpu_offload else obs_device
-            
-            # Use the terminal observation value to better estimate the reward 
+
+            # Use the terminal observation value to better estimate the reward
             # done_but_truncated = truncated & terminal
-            # if done_but_truncated.any():    
+            # if done_but_truncated.any():
             #     terminal_obs = data.vecenv.last_obs[done_but_truncated]
-                
+
             #     # Get terminal (truncated) observation value
             #     with torch.no_grad():
             #         _, _, _, terminal_value = policy(terminal_obs)
-                
+
             #     # Add discounted value to reward
             #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
@@ -207,10 +202,7 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if (
-            sum(data.infos['num_completed_episodes'])
-            > data.config.log_window
-        ):
+        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
             for k, v in data.infos.items():
                 try:
                     if "num_completed_episodes" in k:
@@ -219,8 +211,8 @@ def evaluate(data):
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
-                    if "goal" in k or "collision" in k or "offroad" in k:
-                        data.stats[f"std_{k}"] = np.std(v)
+                    # if "goal" in k or "collision" in k or "offroad" in k:
+                    #     data.stats[f"std_{k}"] = np.std(v)
                 except:
                     continue
 
@@ -228,7 +220,7 @@ def evaluate(data):
             data.infos = defaultdict(list)
 
     # Increment steps
-    data.vecenv.global_step = data.global_step.copy()
+    data.vecenv.global_step = total_alive_in_batch
     data.vecenv.iters += 1
 
     return data.stats, data.infos
@@ -245,7 +237,6 @@ def train(data):
         dones_np = experience.dones_np[idxs]
         values_np = experience.values_np[idxs]
         rewards_np = experience.rewards_np[idxs]
-        # TODO: bootstrap between segment bounds
         advantages_np = compute_gae(
             dones_np, values_np, rewards_np, config.gamma, config.gae_lambda
         )
@@ -613,12 +604,12 @@ class Experience:
     def store(self, obs, value, action, logprob, reward, done, env_id, mask):
         # Mask learner and Ensure indices do not exceed batch size
         ptr = self.ptr
-        indices = torch.where(mask)[0].numpy()[: self.batch_size - ptr]
+        indices = torch.where(mask)[0].cpu().numpy()[: self.batch_size - ptr]
         end = ptr + len(indices)
 
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
-        self.actions_np[ptr:end] = action[indices]
+        self.actions_np[ptr:end] = action.cpu().numpy()[indices]
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]
         self.rewards_np[ptr:end] = reward.cpu().numpy()[indices]
         self.dones_np[ptr:end] = done.cpu().numpy()[indices]

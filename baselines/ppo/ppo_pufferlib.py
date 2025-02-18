@@ -19,7 +19,7 @@ from box import Box
 from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
-from baselines.networks.late_fusion import NeuralNet
+from gpudrive.networks.late_fusion import NeuralNet
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
@@ -61,7 +61,6 @@ def make_agent(env, config):
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-            pred_heads_arch=saved_cpt["model_arch"]["pred_heads_arch"],
         )
 
         # Load the model parameters
@@ -75,7 +74,6 @@ def make_agent(env, config):
             input_dim=config.train.network.input_dim,
             action_dim=env.single_action_space.n,
             hidden_dim=config.train.network.hidden_dim,
-            pred_heads_arch=config.train.network.pred_heads_arch,
             dropout=config.train.network.dropout,
         )
 

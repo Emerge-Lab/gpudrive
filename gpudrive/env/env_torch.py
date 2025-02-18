@@ -69,27 +69,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Setup action and observation spaces
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(self.get_obs().shape[-1],)
+            low=-1.0, high=1.0, shape=(self.get_obs(self.cont_agent_mask).shape[-1],)
         )
-        # self.single_observation_space = Box(
-        #     low=-np.inf, high=np.inf,  shape=(self.observation_space.shape[-1],), dtype=np.float32
-        # )
+     
         self.single_observation_space = gymnasium.spaces.Box(
-            low=0,
-            high=255,
+            low=-1.0,
+            high=1.0,
             shape=(self.observation_space.shape[-1],),
             dtype=np.float32,
         )
 
         self._setup_action_space(action_type)
-        self.num_agents = self.cont_agent_mask.sum().item()
         self.single_action_space = self.action_space
-        # self.action_space = pufferlib.spaces.joint_space(self.single_action_space, self.num_agents)
-        self.observation_space = pufferlib.spaces.joint_space(
-            self.single_observation_space, self.num_agents
-        )
-
-        self.info_dim = 5  # Number of info features
+        
+        self.num_agents = self.cont_agent_mask.sum().item()
         self.episode_len = self.config.episode_len
 
         # Rendering setup
@@ -103,10 +96,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def reset(self):
+    def reset(self, mask):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
-        return self.get_obs()
+        return self.get_obs(mask)
 
     def get_dones(self):
         return (
@@ -359,149 +352,113 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self) -> torch.Tensor:
-        """Get the ego state.
-        Returns:
-            Shape: (num_worlds, max_agents, num_features)
-        """
-        if self.config.ego_state:
-            ego_state = LocalEgoState.from_tensor(
-                self_obs_tensor=self.sim.self_observation_tensor(),
-                backend=self.backend,
-            )
-            if self.config.norm_obs:
-                ego_state.normalize()
-
-            return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 2, 0)
-                .to(self.device)
-            )
-        else:
+    def _get_ego_state(self, mask) -> torch.Tensor:
+        """Get the ego state."""
+        
+        if not self.config.ego_state:
             return torch.Tensor().to(self.device)
 
-    def _get_partner_obs(self):
+        ego_state = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend=self.backend,
+            mask=mask,
+        )
+        if self.config.norm_obs:
+            ego_state.normalize()
+
+        return (
+            torch.stack(
+                [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
+            )
+            .permute(1, 0)
+            .to(self.device)
+        )
+
+    def _get_partner_obs(self, mask):
         """Get partner observations."""
-        if self.config.partner_obs:
-            partner_obs = PartnerObs.from_tensor(
-                partner_obs_tensor=self.sim.partner_observations_tensor(),
-                backend=self.backend,
-            )
-
-            if self.config.norm_obs:
-                partner_obs.normalize()
-                partner_obs.one_hot_encode_agent_types()
-
-            return (
-                torch.concat(
-                    [
-                        partner_obs.speed,
-                        partner_obs.rel_pos_x,
-                        partner_obs.rel_pos_y,
-                        partner_obs.orientation,
-                        partner_obs.vehicle_length,
-                        partner_obs.vehicle_width,
-                        # partner_obs.agent_type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
-
-        else:
+        
+        if not self.config.partner_obs:
             return torch.Tensor().to(self.device)
 
-    def _get_road_map_obs(self):
+        partner_obs = PartnerObs.from_tensor(
+            partner_obs_tensor=self.sim.partner_observations_tensor(),
+            backend=self.backend,
+            mask=mask,
+        )
+
+        if self.config.norm_obs:
+            partner_obs.normalize()
+            # partner_obs.one_hot_encode_agent_types()
+
+        return partner_obs.data.flatten(start_dim=1)
+
+    def _get_road_map_obs(self, mask):
         """Get road map observations."""
-        if self.config.road_map_obs:
-            roadgraph = LocalRoadGraphPoints.from_tensor(
-                local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
-                backend=self.backend,
-            )
-
-            if self.config.norm_obs:
-                roadgraph.normalize()
-                roadgraph.one_hot_encode_road_point_types()
-
-            return (
-                torch.cat(
-                    [
-                        roadgraph.x.unsqueeze(-1),
-                        roadgraph.y.unsqueeze(-1),
-                        roadgraph.segment_length.unsqueeze(-1),
-                        roadgraph.segment_width.unsqueeze(-1),
-                        roadgraph.segment_height.unsqueeze(-1),
-                        roadgraph.orientation.unsqueeze(-1),
-                        roadgraph.type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
-
-        else:
+        if not self.config.road_map_obs:
             return torch.Tensor().to(self.device)
 
-    def _get_lidar_obs(self):
+        roadgraph = LocalRoadGraphPoints.from_tensor(
+            local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
+            backend=self.backend,
+            mask=mask,
+        )
+
+        if self.config.norm_obs:
+            roadgraph.normalize()
+            roadgraph.one_hot_encode_road_point_types()
+
+        return torch.cat(
+            [
+                roadgraph.data,
+                roadgraph.type,
+            ],
+            dim=-1,
+        ).flatten(start_dim=1)
+
+    def _get_lidar_obs(self, mask):
         """Get lidar observations."""
-        if self.config.lidar_obs:
-            lidar = LidarObs.from_tensor(
-                lidar_tensor=self.sim.lidar_tensor(),
-                backend=self.backend,
-            )
-
-            return (
-                torch.cat(
-                    [
-                        lidar.agent_samples,
-                        lidar.road_edge_samples,
-                        lidar.road_line_samples,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-                .to(self.device)
-            )
-        else:
+        
+        if not self.config.lidar_obs:
             return torch.Tensor().to(self.device)
 
-    def get_obs(self):
+        lidar = LidarObs.from_tensor(
+            lidar_tensor=self.sim.lidar_tensor(),
+            backend=self.backend,
+        )
+
+        return [
+            lidar.agent_samples[mask],
+            lidar.road_edge_samples[mask],
+            lidar.road_line_samples[mask],
+        ]
+
+    def get_obs(self, mask):
         """Get observation: Combine different types of environment information into a single tensor.
 
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
+        ego_states = self._get_ego_state(mask)
+        partner_observations = self._get_partner_obs(mask)
+        road_map_observations = self._get_road_map_obs(mask)
 
-        ego_states = self._get_ego_state()
-
-        partner_observations = self._get_partner_obs()
-
-        road_map_observations = self._get_road_map_obs()
-
-        lidar_obs = self._get_lidar_obs()
-
-        obs_filtered = torch.cat(
+        obs = torch.cat(
             (
                 ego_states,
                 partner_observations,
                 road_map_observations,
-                lidar_obs,
             ),
             dim=-1,
         )
 
-        return obs_filtered
+        return obs
 
     def get_controlled_agents_mask(self):
         """Get the control mask."""
@@ -661,19 +618,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_env_filenames(self):
         """Obtain the tfrecord filename for each world, mapping world indices to map names."""
-
+        
         map_name_integers = self.sim.map_name_tensor().to_torch()
-
         filenames = {}
-
         # Iterate through the number of worlds
         for i in range(self.num_worlds):
             tensor = map_name_integers[i]
-
             # Convert ints to characters, ignoring zeros
             map_name = "".join([chr(i) for i in tensor.tolist() if i != 0])
-
-            # Map the world index to the corresponding map name
             filenames[i] = map_name
 
         return filenames
@@ -700,9 +652,11 @@ if __name__ == "__main__":
         max_cont_agents=128,  # Number of agents to control
         device="cuda",
     )
+    
+    control_mask = env.cont_agent_mask
 
     # Rollout
-    obs = env.reset()
+    obs = env.reset(control_mask)
 
     sim_frames = []
     agent_obs_frames = []
@@ -739,7 +693,7 @@ if __name__ == "__main__":
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
-        obs = env.get_obs()
+        obs = env.get_obs(control_mask)
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()

@@ -141,17 +141,6 @@ class MultiAgentCallback(BaseCallback):
         ).sum()
 
         if (
-            self.config.render
-            and self.num_rollouts % self.config.render_freq == 0
-        ):
-            for world_idx in range(self.config.render_n_worlds):
-                self._create_and_log_video(
-                    render_world_idx=world_idx,
-                    video_title=f"Global step: {self.num_timesteps:,}",
-                    caption=f"Env: {world_idx}",
-                )
-
-        if (
             self.config.save_policy
             and self.num_rollouts % self.config.save_policy_freq == 0
         ):
@@ -162,61 +151,6 @@ class MultiAgentCallback(BaseCallback):
             {
                 "global_step": self.num_timesteps,
                 "metrics/mean_episode_reward_per_agent": rewards / completions,
-            }
-        )
-
-    def _create_and_log_video(
-        self, render_world_idx=0, video_title="Global step", caption="Env"
-    ):
-        """Make a video and log to wandb."""
-        policy = self.model
-        base_env = self.locals["env"]._env
-        action_tensor = torch.zeros(
-            (base_env.num_worlds, base_env.max_agent_count)
-        )
-
-        obs = base_env.reset()
-        control_mask = self.locals["env"].controlled_agent_mask.clone()
-        obs = obs[control_mask].reshape(
-            self.locals["env"].num_envs, self.locals["env"].obs_dim
-        )
-
-        frames = []
-
-        for step_num in range(self.config.episode_len):
-            actions, _ = policy.predict(obs.detach().cpu().numpy())
-            actions = torch.Tensor(actions)
-            action_tensor[base_env.cont_agent_mask] = actions[control_mask]
-
-            base_env.step_dynamics(action_tensor)
-
-            obs = base_env.get_obs()
-            obs = obs[control_mask].reshape(
-                self.locals["env"].num_envs, self.locals["env"].obs_dim
-            )
-            done = base_env.get_dones()
-
-            if step_num % 2 == 0:
-                sim_state_figs = base_env.vis.plot_simulator_state(
-                    env_indices=[render_world_idx],
-                    time_steps=[step_num],
-                    zoom_radius=100,
-                )
-
-                frames.append(img_from_fig(sim_state_figs[0]))
-
-            if done[control_mask].sum() == control_mask.sum():
-                break
-
-        frames = np.array(frames)
-        wandb.log(
-            {
-                f"env_idx: {render_world_idx}": wandb.Video(
-                    np.moveaxis(frames, -1, 1),
-                    fps=15,
-                    format="mp4",
-                    caption=f"Step {self.num_timesteps:,}",
-                )
             }
         )
 

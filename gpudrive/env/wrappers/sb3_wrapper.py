@@ -66,7 +66,7 @@ class SB3MultiAgentEnv(VecEnv):
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
         self.obs_dim = self._env.observation_space.shape[-1]
-        self.info_dim = self._env.info_dim
+        self.info_dim = 5
         self.render_mode = render_mode
         self.agent_step = torch.zeros(
             (self.num_worlds, self.max_agent_count)

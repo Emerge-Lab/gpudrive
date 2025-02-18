@@ -127,31 +127,54 @@ class LocalRoadGraphPoints:
         type: Type of road point (e.g., edge, lane).
     """
 
-    def __init__(self, local_roadgraph_tensor: torch.Tensor):
+    def __init__(self, local_roadgraph_tensor: torch.Tensor, mask=None):
         """Initializes the global road graph points with a tensor."""
-        self.x = local_roadgraph_tensor[:, :, :, 0]
-        self.y = local_roadgraph_tensor[:, :, :, 1]
-        self.segment_length = local_roadgraph_tensor[:, :, :, 2]
-        self.segment_width = local_roadgraph_tensor[:, :, :, 3]
-        self.segment_height = local_roadgraph_tensor[:, :, :, 4]
-        self.orientation = local_roadgraph_tensor[:, :, :, 5]
-        self.id = local_roadgraph_tensor[:, :, :, 7]
-        # TODO(dc): Use map type instead of enum (8 instead of 6)
-        self.type = local_roadgraph_tensor[:, :, :, 6].long()
-
+        
+        if mask is not None:
+            local_roadgraph_tensor = local_roadgraph_tensor[mask]
+            self.x = local_roadgraph_tensor[:, :, 0]
+            self.y = local_roadgraph_tensor[:, :, 1]
+            self.segment_length = local_roadgraph_tensor[:, :, 2]
+            self.segment_width = local_roadgraph_tensor[:, :, 3]
+            self.segment_height = local_roadgraph_tensor[:, :, 4]
+            self.orientation = local_roadgraph_tensor[:, :, 5]
+            self.id = local_roadgraph_tensor[:, :, 7]
+            # Note: To use waymax map type take index 8 instead of 6
+            self.data = local_roadgraph_tensor[:, :, :6]
+            self.type = local_roadgraph_tensor[:, :, 6].long()
+        else:
+            self.x = local_roadgraph_tensor[:, :, :, 0]
+            self.y = local_roadgraph_tensor[:, :, :, 1]
+            self.segment_length = local_roadgraph_tensor[:, :, :, 2]
+            self.segment_width = local_roadgraph_tensor[:, :, :, 3]
+            self.segment_height = local_roadgraph_tensor[:, :, :, 4]
+            self.orientation = local_roadgraph_tensor[:, :, :, 5]
+            # Note: To use waymax map type take index 8 instead of 6
+            self.type = local_roadgraph_tensor[:, :, :, 6].long()
+            self.id = local_roadgraph_tensor[:, :, :, 7]
+      
     @classmethod
     def from_tensor(
         cls,
         local_roadgraph_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
+        mask=None,
     ):
         """Creates a GlobalRoadGraphPoints instance from a tensor."""
         if backend == "torch":
-            return cls(local_roadgraph_tensor.to_torch().clone().to(device))
+            tensor = local_roadgraph_tensor.to_torch().clone().to(device)
+            obj = cls(tensor, mask=mask)
+            obj.norm = torch.Tensor([
+                constants.MAX_ROAD_LINE_SEGMENT_LEN,
+                constants.MAX_ROAD_SCALE,
+                constants.MAX_ROAD_SCALE,
+                constants.MAX_ORIENTATION_RAD
+            ]).to(device)
+            return obj
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
-
+        
     def normalize(self):
         """Normalizes the road graph points to [-1, 1]."""
         self.x = normalize_min_max(
@@ -168,7 +191,7 @@ class LocalRoadGraphPoints:
             self.segment_length / constants.MAX_ROAD_LINE_SEGMENT_LEN
         )
         self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
-        self.segment_height = self.segment_height  # / constants.MAX_ROAD_SCALE
+        self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
         self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
         self.id = self.id
 
