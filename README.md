@@ -326,8 +326,17 @@ and that's it!
 
 If you use GPUDrive in your work, please cite us: TODO(release; update)
 
-```
-TODO: Update to ICLR version.
+```bibtex
+@inproceedings{kazemkhani2025gpudrive,
+      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS}, 
+      author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
+      booktitle={Proceedings of the International Conference on Learning Representations (ICLR)},
+      year={2025},
+      url={https://arxiv.org/abs/2408.01584},
+      eprint={2408.01584},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+}
 ```
 
 ## Contributing
