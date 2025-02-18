@@ -473,7 +473,7 @@ class PufferGPUDrive(PufferEnv):
         # Check how many new files are in the batch
         new_idx = batch_idx - self.cumulative_unique_files
 
-        # Update the cumulative set
+        # Update the cumulative set (coverage)
         self.cumulative_unique_files.update(new_idx)
 
         if self.wandb_obj is not None:

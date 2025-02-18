@@ -140,10 +140,14 @@ def evaluate(data):
             env_id = env_id.tolist()
 
         with profile.eval_misc:
-            total_alive_in_batch = sum(mask).item()
-            data.global_step += total_alive_in_batch
+            total_alive = mask.sum().item()
+        
+            data.global_step += total_alive
             data.global_step_pad += data.vecenv.total_agents
-            data.resample_buffer += total_alive_in_batch
+            data.resample_buffer += total_alive
+            
+            data.vecenv.global_step = data.global_step
+            data.vecenv.iters += 1
 
             obs_device = obs.to(config.device)
 
@@ -211,17 +215,13 @@ def evaluate(data):
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
-                    # if "goal" in k or "collision" in k or "offroad" in k:
-                    #     data.stats[f"std_{k}"] = np.std(v)
+                    if "goal" in k:
+                        data.stats[f"std_{k}"] = np.std(v)
                 except:
                     continue
 
             # Reset info dict
             data.infos = defaultdict(list)
-
-    # Increment steps
-    data.vecenv.global_step = total_alive_in_batch
-    data.vecenv.iters += 1
 
     return data.stats, data.infos
 
