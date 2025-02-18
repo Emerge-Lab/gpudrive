@@ -8,7 +8,7 @@ from pygpudrive.env.config import (
     SelectionDiscipline,
     RenderMode,
 )
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.env_torch import GPUDriveTorchEnv
 from pygpudrive.agents.random_actor import RandomActor
 from pygpudrive.agents.policy_actor import PolicyActor
 from pygpudrive.agents.core import merge_actions

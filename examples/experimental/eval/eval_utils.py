@@ -14,7 +14,7 @@ from pygpudrive.env.dataset import SceneDataLoader
 from pygpudrive.visualize.utils import img_from_fig
 from pygpudrive.datatypes.observation import GlobalEgoState
 
-from networks.late_fusion import NeuralNet
+from gpudrive.networks.late_fusion import NeuralNet
 
 import logging
 import torch
@@ -56,7 +56,6 @@ def load_policy(path_to_cpt, model_name, device, env=None):
         logging.info(f"Load model from {path_to_cpt}/{model_name}.pt")
 
         # Create policy architecture from saved checkpoint
-        #TODO: Change depending on the network
         policy = NeuralNet(
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],

@@ -1,196 +1,140 @@
-# GPU Drive Multi-Agent Environment
-
-This repository provides base gymnasium environments for multi-agent reinforcement learning using `torch` and `jax` in to interface with the `gpudrive` simulator. It follows the `gymnasium` environment standards as closely as possible.
+# `gpudrive` gym environments
 
 ## Quick Start
 
-To get started we use the readily available data in the `data/processed/examples` folder. See [here](https://github.com/Emerge-Lab/gpudrive/tree/main?tab=readme-ov-file#dataset-------%EF%B8%8F-) for how to download more data (traffic scenarios).
+To get started, you can use the example data available in the `data/processed/examples` folder. For instructions on downloading more traffic scenarios, refer to [this link](https://github.com/Emerge-Lab/gpudrive/tree/main?tab=readme-ov-file#dataset-------%EF%B8%8F-).
 
-Configure the environment using the basic settings in `config`:
+Configure the environment using the default settings in `config`:
 
 ```Python
 config = EnvConfig()
 ```
 
-This `config` contains all environment parameters. One important configuration is the dynamics model, which determines how a successor state is computed (e.g. position, yaw, velocity) of one or more objects given an action (e.g. steering and acceleration).
+The `config` object holds all environment parameters. A key configuration is the dynamics model, which determines how the successor state (e.g., position, yaw, velocity) is computed for one or more objects given an action (e.g., steering, acceleration).
 
-The following dynamics models are currently implemented:
+The following dynamics models are available:
 
-- `Classic`: A kinematic bicycle model uses the center of gravity as reference point with 2D action (acceleration, steering curvature). It was used for [Nocturne](https://arxiv.org/pdf/2206.09889).
-- `InvertibleBicycleModel`. A kinematically realistic model using a 2D action: acceleration, steering curvature (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
-- `DeltaLocal`. A position-based model using a 3D action (dx, dy, dyaw) representing the displacement of an object relative to the current position and orientation. This model does not check for infeasible actions, and large displacements may lead to unrealistic behavior (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
-- `StateDynamics`. A position-based model using a 10D action (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z) that directly sets values in the state in global coordinates. This model does not check for infeasible actions (taken from [source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics)).
+- **Classic**: A kinematic bicycle model using the center of gravity as the reference point, with 2D actions (acceleration, steering curvature). Used in [Nocturne](https://arxiv.org/pdf/2206.09889).
+- **InvertibleBicycleModel**: A kinematically realistic model using 2D actions (acceleration, steering curvature) based on [this source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
+- **DeltaLocal**: A position-based model using a 3D action (dx, dy, dyaw) to represent displacement relative to current position and orientation. This model doesn't check for infeasible actions, and large displacements can cause unrealistic behavior. Based on [this source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
+- **StateDynamics**: A position-based model using a 10D action (x, y, z, yaw, velocities, angular velocities) that directly sets global coordinates. This model doesn't check for infeasible actions, as referenced [here](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
 
-For example, this creates an environment with one world and a maximum of three controllable agents per scenario:
+Example of creating an environment with one world and a maximum of three controllable agents per scenario:
 
 ```Python
 env = GPUDriveTorchEnv(
     config=config,
-    num_worlds=1, # parallelism
-    max_cont_agents=3, # maximum number of agents to control per scene
-    data_dir="data/processed/examples", # Path to data folder
+    num_worlds=1,  # Number of parallel environments
+    max_cont_agents=3,  # Maximum number of agents to control per scene
+    data_dir="data/processed/examples",  # Path to data folder
 )
 ```
 
-Step the environment using:
+To step through the environment:
 
 ```Python
 env.step_dynamics(actions)
 
-# Extract info
+# Extract information
 obs = env.get_obs()
 reward = env.get_rewards()
 done = env.get_dones()
 ```
 
-Further configuration details are available in `config.py`.
+For additional configuration details, see `config.py`.
 
 ---
 
-> **❗️** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask is of shape `(num_worlds, max_agents_in_scene)`, where kMaxAgentCount defaults to 128 and is set in `consts.hpp`. It marks True for agents under your control and False for all others.
+> **Note:** You can filter the information from the agents you control using `env.cont_agent_mask`. This boolean mask has the shape `(num_worlds, max_agents_in_scene)` where `kMaxAgentCount` (default 64) is set in `consts.hpp`. It marks `True` for agents under your control and `False` for all others.
 
 ---
 
 ## Action Space
 
-### Discrete (default; `action_type='discrete'`)
+### Discrete (default: `action_type='discrete'`)
 
-Generates a grid of possible actions. The action space depends on the `dynamics_model`.
+This generates a grid of possible actions, with the action space depending on the `dynamics_model`.
 
-For example, with the `dynamics_model: str = "classic"` the default is:
+For instance, with `dynamics_model: str = "classic"`, the default action space is:
 
 ```Python
 # Action space (joint discrete)
 head_tilt_actions: torch.Tensor = torch.Tensor([0])
-steer_actions: torch.Tensor = torch.round(
-    torch.linspace(-1.0, 1.0, 13), decimals=3
-)
-accel_actions: torch.Tensor = torch.round(
-    torch.linspace(-3, 3, 7), decimals=3
-)
+steer_actions: torch.Tensor = torch.round(torch.linspace(-1.0, 1.0, 13), decimals=3)
+accel_actions: torch.Tensor = torch.round(torch.linspace(-3, 3, 7), decimals=3)
 ```
 
 ### Continuous
 
-To use a continuous action space, set `action_type='continuous`
+To use a continuous action space, set `action_type='continuous'`.
 
 ## Observation Space
 
-In short, key observation flags include:
+Key observation flags include:
 
 ```
 ego_state: bool = True  # Indicates ego vehicle state
 road_map_obs: bool = True  # Provides road graph data
 partner_obs: bool = True  # Includes partner vehicle information
 norm_obs: bool = True  # Normalizes observations if true
-lidar_obs: bool = True # Use LiDAR
+lidar_obs: bool = True # Use LiDAR data
 ```
 
-| Observation Feature                     | Shape                                                  | Description                                                                                                                 | Features                                                                                                                                                                                                                             |
-| --------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **ego_state** 🚘                  | `(max_num_agents_in_scene, 7)`                       | Basic ego information.                                                                                                      | vehicle speed, vehicle length, vehicle width, relative goal position (xy), collision state (1 if collided, 0 otherwise), agent id                                                                                                    |
-| **partner_obs**  🚗 🚴🏻‍♀️ 🚶 | `(max_num_agents_in_scene, max_num_objects - 1, 11)` | Information about the other agents in the environment (vehicles, pedestrians, cyclists) within a certain visibility radius. | speed of other vehicles, relative position of other vehicles (xy), relative orientation of other vehicles, length and width of other vehicles, type of other vehicle `(0: _None, 1: Vehicle, 2: Pedestrian, 3: Cyclist)`, agent id |
-| **road_map_obs** 🛣️ 🛑          | `(max_num_agents_in_scene, top_k_road_points, 13)`   | Information about the road graph  and other static road objects.                                                            | road segment position (xy), road segment length , road point scale (xy), road point orientation, road point type `(0: _None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)`                      |
-| **lidar_obs**                     | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)` | LiDAR rays                                                                                                                  | The number of LiDAR points can be set by changing `numLidarSamples` in `src/consts.hpp`. The default is 30 points.                                                                                                               |
+| Observation Feature                     | Shape                                                  | Description                                                                                                                | Features                                                                                                                                                                                                                             |
+| --------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **ego_state** 🚘                        | `(max_num_agents_in_scene, 7)`                          | Basic ego vehicle information.                                                                                               | Speed, length, width, relative goal position (xy), collision state (1 if collided, 0 otherwise), agent ID                                                                                                                            |
+| **partner_obs** 🚗 🚴🏻‍♀️ 🚶          | `(max_num_agents_in_scene, max_num_objects - 1, 11)`    | Information about other agents (vehicles, pedestrians, cyclists) within a certain visibility radius.                         | Speed, relative position (xy), relative orientation, length and width, type (0: None, 1: Vehicle, 2: Pedestrian, 3: Cyclist), agent ID                                                                                                  |
+| **road_map_obs** 🛣️ 🛑                 | `(max_num_agents_in_scene, top_k_road_points, 13)`      | Information about the road graph and static road objects.                                                                    | Road segment position (xy), segment length, road point scale (xy), orientation, point type (0: None, 1: RoadLine, 2: RoadEdge, 3: RoadLane, 4: CrossWalk, 5: SpeedBump, 6: StopSign)                                                    |
+| **lidar_obs**                          | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)`    | LiDAR data                                                                                                                 | LiDAR rays; number of points can be set by adjusting `numLidarSamples` in `src/consts.hpp`. Default is 30 points.                                                                                                                    |
 
 ---
 
-### Data structures
+### Data Structures
 
-See the observation and roadgraph data structures at:
+For detailed structures, refer to:
 
-- **Agent observations**: [`gpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/observation.py)
-- **Roadgraph**: [`gpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/roadgraph.py).
+- **Agent Observations**: [`gpudrive/datatypes/observation.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/observation.py)
+- **Roadgraph**: [`gpudrive/datatypes/roadgraph.py`](https://github.com/Emerge-Lab/gpudrive/blob/main/gpudrive/datatypes/roadgraph.py)
 
-These datastructures are used in `env_torch.py`.
+These structures are used in `env_torch.py`.
 
-### Note about LiDAR
+### LiDAR Usage
 
-> **Using LiDAR only**: If you only want to use the LiDAR data as observation, it is recommended to set `disable_classic_obs = True`. This makes the simulator 2x faster by disabling the construction of the classical observations. To ensure only the LiDAR obs is returned, set all the classical obs flags to false in `gpudrive/env/config.py`:
+> **Using LiDAR only**: If you want to use LiDAR data exclusively as the observation, set `disable_classic_obs = True` to improve simulation performance by disabling classical observations. To ensure only LiDAR observations are returned, set all other flags to `False` in `gpudrive/env/config.py`:
 
 ```Python
 ego_state: bool = False
 road_map_obs: bool = False
-partner_obs: bool = False  # Include partner vehicle info in observations
-norm_obs: bool = False  # Normalize observations
+partner_obs: bool = False  # Do not include partner vehicle info
+norm_obs: bool = False  # Disable observation normalization
 
-# NOTE: If disable_classic_obs is True, ego_state, road_map_obs,
-# and partner_obs are invalid. This makes the sim 2x faster
-disable_classic_obs: bool = True  # Disable classic observations
-lidar_obs: bool = True  # Use LiDAR in observations
+# NOTE: If disable_classic_obs is True, the other flags will be ignored.
+disable_classic_obs: bool = True  # Disable classical observations
+lidar_obs: bool = True  # Use LiDAR observations
 ```
 
 ## Rewards
 
-A reward of +1 is assigned when an agent is within the `dist_to_goal_threshold` from the goal, marking the end of the expert trajectory for that vehicle.
+A reward of +1 is given when an agent is within the `dist_to_goal_threshold` from the goal, marking the end of the expert trajectory for that vehicle.
 
 ## Starting State
 
-Upon initialization, every vehicle starts at the beginning of the expert trajectory.
+Each vehicle begins at the start of the expert trajectory when the environment is initialized.
 
 ## Dataset
 
-The `SceneConfig` dataclass is used to configure how scenes are selected from a dataset. It has four attributes:
+For detailed instructions, refer to tutorial `01`.
 
-- `path`: The path to the dataset.
-- `num_scenes`: The number of scenes to select.
-- `discipline`: The method for selecting scenes, defaulting to `SelectionDiscipline.PAD_N`. (See options in Table below)
-- `k_unique_scenes`: Specifies the number of unique scenes to select, if applicable.
+### Iterating Through the Waymo Open Motion Dataset
 
-### Resampling traffic scenarios
+The `swap_data_batch()` method in `gpudrive/env/env_torch.py` reinitializes the simulator with new traffic scenarios:
 
-The `swap_data_batch()` method in `gpudrive/env/torch_env.py` reinitializes the simulator with new traffic scenarios as follows:
+1. **Scene Re-initialization**: This function updates the simulation maps by calling `self.sim.set_maps(dataset)`, replacing the current scenes with those provided in `dataset`, a list of paths to traffic scenarios.
+2. **Controlled Agent Mask Re-initialization**: The controlled agents' mask is updated using `self.get_controlled_agents_mask()`, marking which agents are user-controlled. This depends on the selected traffic scenarios.
+3. **Agent Count Update**: The function updates `self.max_agent_count` to reflect the number of controlled agents, recalculating `self.num_valid_controlled_agents_across_worlds`, which indicates the active controlled agents across all scenarios.
 
-1. **Scene re-initialization:**
-   This function updates the simulation maps by calling `self.sim.set_maps(dataset)`, replacing the current scenes with those provided `dataset`, which should be a list with paths to traffic scenarios.
-2. **Controlled agent mask re-nitialization:**
-   It reinitializes the controlled agents' mask using `self.get_controlled_agents_mask()`, determining which agents are user-controlled (this will change based on the specific traffic scenes used).
-3. **Agent count update:**
-   The function updates `self.max_agent_count` to reflect the number of controlled agents and recomputes `self.num_valid_controlled_agents_across_worlds`, indicating the total active controlled agents across all scenarios.
+For an example of how to use this with IPPO, see the `resample_scenario_batch()` method in `gpudrive/env/wrappers/sb3_wrapper.py`.
 
-See the `resample_scenario_batch()` method in `gpudrive/env/wrappers/sb3_wrapper.py` for an example of how you can use this method with IPPO.
+## Visualization
 
-## Render
-
-Render settings can be changed using the `RenderConfig`.
-
-| `Render Mode`             | Description                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **PYGAME_ABSOLUTE**   | Renders the absolute view of the scene with all the agents. Returns a single frame for a world.                    |
-| **PYGAME_EGOCENTRIC** | Renders the egocentric view for each agent in a scene. Returns `num_agents` frames for each world.               |
-| **PYGAME_LIDAR**      | Renders the Lidar views for an egent in a scene if Lidar is enabled. Returns `num_agents` frames for each world. |
-
-Resolution of the frames can be specified using the `resolution` param which takes in a tuple of (W,H).
-
-Below are the renders for each mode
-
-<table>
-  <tr>
-    <td>
-      <figure>
-        <img src="../../assets/absolute.gif" alt="Absolute">
-        <center><figcaption>Absolute</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="../../assets/Egocentric.gif" alt="Egocentric">
-        <center><figcaption>Egocentric</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <figure>
-        <img src="../../assets/Lidar360.gif" alt="Lidar with 360 FOV">
-        <center><figcaption>Lidar with 360 FOV</figcaption></center>
-      </figure>
-    </td>
-    <td>
-      <figure>
-        <img src="../../assets/Lidar120.gif" alt="Lidar with 120 FOV">
-        <center><figcaption>Lidar with 120 FOV</figcaption></center>
-      </figure>
-    </td>
-  </tr>
-</table>
+Refer to the visualizer tutorial for more information.

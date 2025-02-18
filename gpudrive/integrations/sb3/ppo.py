@@ -13,7 +13,7 @@ from torch import nn
 
 # Import masked rollout buffer class
 from gpudrive.integrations.sb3.rollout_buffer import MaskedRolloutBuffer
-from baselines.networks.perm_eq_late_fusion import LateFusionNet
+from gpudrive.networks.perm_eq_late_fusion import LateFusionNet
 
 # From stable baselines
 def explained_variance(
