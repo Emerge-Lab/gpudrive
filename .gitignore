@@ -19,7 +19,6 @@
 .python-version
 /google-cloud-sdk/*
 *.gz
-examples/experiments/logs/*
 
 # Data
 hpc/overlay*
@@ -247,7 +246,7 @@ pyrightconfig.json
 .env
 
 # Logs
-examples/experiments/scripts/logs/*
+examples/experimental/logs/*
 
 # Sbatch scripts
 *.sh
