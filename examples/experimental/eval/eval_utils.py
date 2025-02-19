@@ -7,12 +7,11 @@ import numpy as np
 import dataclasses
 import os
 from pathlib import Path
-
-from pygpudrive.env.config import EnvConfig
-from pygpudrive.env.env_torch import GPUDriveTorchEnv
-from pygpudrive.env.dataset import SceneDataLoader
-from pygpudrive.visualize.utils import img_from_fig
-from pygpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.env.config import EnvConfig
+from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.visualize.utils import img_from_fig
+from gpudrive.datatypes.observation import GlobalEgoState
 
 from gpudrive.networks.late_fusion import NeuralNet
 
@@ -66,7 +65,7 @@ def load_policy(path_to_cpt, model_name, device, env=None):
         policy.load_state_dict(saved_cpt["parameters"])
 
         logging.info("Load model parameters")
-
+        
         return policy.eval()
 
 def rollout(

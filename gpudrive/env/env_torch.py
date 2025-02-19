@@ -190,6 +190,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
+                device=self.device
             )
 
             agent_pos = torch.stack(
@@ -362,6 +363,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self_obs_tensor=self.sim.self_observation_tensor(),
             backend=self.backend,
             mask=mask,
+            device=self.device
         )
         if self.config.norm_obs:
             ego_state.normalize()
@@ -391,6 +393,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs_tensor=self.sim.partner_observations_tensor(),
             backend=self.backend,
             mask=mask,
+            device=self.device
         )
 
         if self.config.norm_obs:
@@ -408,6 +411,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
             mask=mask,
+            device=self.device
         )
 
         if self.config.norm_obs:
@@ -431,6 +435,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         lidar = LidarObs.from_tensor(
             lidar_tensor=self.sim.lidar_tensor(),
             backend=self.backend,
+            
         )
 
         return [

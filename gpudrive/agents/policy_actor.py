@@ -1,6 +1,6 @@
 import torch
 from pathlib import Path
-from integrations.rl.sb3.ppo import IPPO
+from gpudrive.integrations.sb3.ppo import IPPO
 
 
 class PolicyActor:
@@ -21,7 +21,8 @@ class PolicyActor:
         self,
         is_controlled_func,
         valid_agent_mask,
-        saved_model_path,
+        saved_model_path=None,
+        policy=None,
         model_class=IPPO,
         deterministic=True,
         device="cuda",
@@ -30,7 +31,15 @@ class PolicyActor:
         self.device = device
         self.deterministic = deterministic
         self.model_class = model_class
-        self.policy = self.load_model(saved_model_path)
+
+        if policy:
+            self.policy = policy
+        elif saved_model_path:
+            self.policy = policy
+        else:
+            raise
+
+        #self.policy = self.load_model(saved_model_path)
         self.valid_and_controlled_mask = self.get_valid_actor_mask(
             is_controlled_func, valid_agent_mask
         )
@@ -56,26 +65,10 @@ class PolicyActor:
 
         obs (torch.Tensor): Observation tensor.
         """
+        
 
-        assert (
-            obs.dim() == 3
-        ), f"Expected obs to be of shape (num_worlds, max_agents, obs_dim), but got {obs.dim()}."
-
-        action_lists = []
-        for world_idx in range(len(self.actor_ids)):
-            observations = obs[world_idx, self.actor_ids[world_idx], :]
-            if (
-                len(observations) == 0
-            ):  # Append empty tensor if no agents in this world are controlled
-                actions = torch.tensor([]).to(self.device)
-            else:
-                actions = self.policy._predict(
-                    obs[world_idx, self.actor_ids[world_idx], :],
-                    deterministic=self.deterministic,
-                )
-            action_lists.append(actions)
-
-        return action_lists
+        action, logprob, entropy, value = self.policy.forward(obs)
+        return action
 
     def get_distribution(self, obs):
         """Get policy distribution for given observation."""
