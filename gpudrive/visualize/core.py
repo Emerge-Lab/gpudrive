@@ -579,11 +579,11 @@ class MatplotlibVisualizer:
                     ):
                         # Create 3D speed bump with height
                         points = self._get_corners_polygon(x, y, length, width, orientation)
-                        height = 0.01  # Height of speed bump
+                        height = 0.0  # Height of speed bump
                         self._plot_3d_polygon(
                             ax, points, height,
                             facecolor=ROAD_GRAPH_COLORS[road_point_type],
-                            alpha=0.7
+                            alpha=0.6
                         )
                 else:
                     utils.plot_speed_bumps(
@@ -620,7 +620,7 @@ class MatplotlibVisualizer:
                         x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
                     ):
                         points = self._get_corners_polygon(x, y, length, width, orientation)
-                        height = 0.01  # Slight elevation for crosswalk
+                        height = 0.0  # Slight elevation for crosswalk
                         self._plot_3d_polygon(
                             ax, points, height,
                             facecolor="white",

@@ -85,8 +85,7 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_interval: 50 # Render every k iterations
-  render_k_scenarios: 3 # Number of scenarios to render
-  render_simulator_state: true # Plot the simulator state from bird's eye view
+  render_k_scenarios: 1 # Number of scenarios to render
   render_agent_obs: false # Debugging tool, plot what an agent is seing
   render_format: "mp4" # Options: gif, mp4
   render_fps: 15 # Frames per second

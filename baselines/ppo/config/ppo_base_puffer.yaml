@@ -85,13 +85,12 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
-  render_interval: 50 # Render every k iterations
-  render_k_scenarios: 3 # Number of scenarios to render
-  render_simulator_state: true # Plot the simulator state from bird's eye view
-  render_agent_obs: false # Debugging tool, plot what an agent is seing
+  render: true # Determines whether to render the environment (note: will slow down training)
+  render_3d: true # Render simulator state in 3d or 2d
+  render_interval: 1 # Render every k iterations
+  render_k_scenarios: 10 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
-  render_fps: 15 # Frames per second
+  render_fps: 20 # Frames per second
 
 vec:
   backend: "native" # Only native is currently supported

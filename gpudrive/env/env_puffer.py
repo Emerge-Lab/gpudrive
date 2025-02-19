@@ -5,7 +5,7 @@ import torch
 import wandb
 import gymnasium
 from collections import Counter
-from gpudrive.env.config import EnvConfig
+from gpudrive.env.config import EnvConfig, RenderConfig
 
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.datatypes.observation import (
@@ -55,9 +55,9 @@ class PufferGPUDrive(PufferEnv):
         remove_non_vehicles=True,
         obs_radius=50.0,
         render=False,
+        render_3d=True,
         render_interval=50,
         render_k_scenarios=3,
-        render_simulator_state=True,
         render_agent_obs=False,
         render_format="mp4",
         render_fps=15,
@@ -88,7 +88,6 @@ class PufferGPUDrive(PufferEnv):
         self.render = render
         self.render_interval = render_interval
         self.render_k_scenarios = render_k_scenarios
-        self.render_simulator_state = render_simulator_state
         self.render_agent_obs = render_agent_obs
         self.render_format = render_format
         self.render_fps = render_fps
@@ -122,8 +121,14 @@ class PufferGPUDrive(PufferEnv):
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
             )
         )
+        
+        render_config = RenderConfig(
+            render_3d=render_3d,
+        )
+        
         self.env = GPUDriveTorchEnv(
             config=env_config,
+            render_config=render_config,
             data_loader=data_loader,
             max_cont_agents=max_controlled_agents,
             device=device,
@@ -386,31 +391,31 @@ class PufferGPUDrive(PufferEnv):
         - If the episode has just started, start a new rendering.
         - If the episode is in progress, continue rendering.
         - If the episode has ended, log the video to WandB.
-        - Only render env once per rollout.
+        - Only render env once per rollout
         """
         for render_env_idx in range(self.render_k_scenarios):
             # Start a new rendering if the episode has just started
-            if self.iters % self.render_interval == 0:
+            if (self.iters - 1)  % self.render_interval == 0:
                 if (
                     self.episode_lengths[render_env_idx, :][0] == 0
                     and not self.was_rendered_in_rollout[render_env_idx]
                 ):
                     self.rendering_in_progress[render_env_idx] = True
 
-        # Continue rendering if in progress
-        if self.render_simulator_state:
-            envs_to_render = list(
-                np.where(np.array(list(self.rendering_in_progress.values())))[
-                    0
-                ]
-            )
-            time_steps = list(self.episode_lengths[envs_to_render, 0])
-
+        envs_to_render = list(
+            np.where(np.array(list(self.rendering_in_progress.values())))[
+                0
+            ]
+        )
+        time_steps = list(self.episode_lengths[envs_to_render, 0])
+        
+        if len(envs_to_render) > 0:
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
-                zoom_radius=100,
+                zoom_radius=50,
             )
+            
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
                     img_from_fig(sim_state_figures[idx])
@@ -442,6 +447,7 @@ class PufferGPUDrive(PufferEnv):
             self.was_rendered_in_rollout[env_idx] = False
 
     def log_video_to_wandb(self, render_env_idx, done_worlds):
+        """Log arrays as videos to wandb."""
         if (
             render_env_idx in done_worlds
             and len(self.frames[render_env_idx]) > 0
