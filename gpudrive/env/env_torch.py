@@ -445,9 +445,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-        ego_states = self._get_ego_state(mask)
-        partner_observations = self._get_partner_obs(mask)
-        road_map_observations = self._get_road_map_obs(mask)
+        ego_states = self._get_ego_state(mask).to(self.device)
+        partner_observations = self._get_partner_obs(mask).to(self.device)
+        road_map_observations = self._get_road_map_obs(mask).to(self.device)
 
         obs = torch.cat(
             (

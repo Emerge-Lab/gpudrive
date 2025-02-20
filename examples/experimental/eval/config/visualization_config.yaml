@@ -1,15 +1,15 @@
-save_results_path: examples/experiments/eval/dataframes/visualizations
-train_path: "data/processed/examples"
+save_results_path: examples/experimental/eval/visualizations
+train_path: "data/processed/training"
 
-cpt_path: examples/experiments/eval/models/sota_paper
+cpt_path: examples/experimental/eval/models
 cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
 
-num_worlds: 100
-dataset_size: 1000
+num_worlds: 1
+dataset_size: 3
 
 device: cpu
 deterministic: false
-render_sim_state: false
+render_sim_state: true
 
 # Environment settings
 max_controlled_agents: 64 

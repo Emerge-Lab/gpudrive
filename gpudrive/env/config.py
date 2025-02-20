@@ -181,3 +181,5 @@ class RenderConfig:
     draw_expert_trajectories: bool = False
     draw_only_controllable_veh: bool = False
     obj_idx_font_size: int = 9
+    render_3d: bool = True
+    vehicle_height: float = 0.06
