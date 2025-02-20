@@ -87,7 +87,7 @@ class MatplotlibVisualizer:
         zoom_radius: int = 100,
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
-        extend_goals: bool = False,
+        backward_goals: bool = False,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -98,8 +98,9 @@ class MatplotlibVisualizer:
             center_agent_indices: Optional list of center agent indices for zooming.
             figsize: Tuple for figure size of each subplot.
             zoom_radius: Radius for zooming in around the center agent.
-            return_single_figure: If True, plots all environments in a single figure.
-                                Otherwise, returns a list of figures.
+            plot_log_replay_trajectory: If True, plots the log replay trajectory.
+            agent_positions: Optional tensor to plot rolled out agent positions.
+            backward_goals: If True, plots backward goals for controlled agents.
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -118,7 +119,7 @@ class MatplotlibVisualizer:
             device=self.device,
         )
 
-        if extend_goals:
+        if backward_goals:
 
             # Get world means for coordinate transformation
             means_xy = self.sim_object.world_means_tensor().to_torch()[:, :2].to(self.device)
@@ -373,6 +374,7 @@ class MatplotlibVisualizer:
         log_trajectory: LogTrajectory,
         line_width_scale: int = 1.0,
     ):
+        """Plot the log replay trajectory for controlled agents."""
         ax.scatter(
             log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
             log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
@@ -711,13 +713,20 @@ class MatplotlibVisualizer:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
         Args:
+            env_idx: Environment indices to select specific environments.
             ax: Matplotlib axis for plotting.
-            global_agent_state: The global state of agents from `GlobalEgoState`.
-            env_idx: Environment index to select specific environment agents.
-            response_type: Mask to filter agents.
+            agent_state: The global state of agents from `GlobalEgoState`.
+            is_ok_mask: Mask for agents that are in a valid state.
+            is_offroad_mask: Mask for agents that are off-road.
+            is_collided_mask: Mask for agents that have collided.
+            response_type: Mask to filter static agents.
             alpha: Alpha value for drawing, i.e., 0 means fully transparent.
             as_center_pts: If True, only plot center points instead of full boxes.
             label: Label for the plotted elements.
+            plot_goal_points: If True, plot goal points for agents.
+            line_width_scale: Scale factor for line width.
+            marker_size_scale: Scale factor for marker size.
+            extended_goals: Optional dictionary of backward goals for controlled agents.
         """
 
         def plot_agent_group_3d(bboxes, color, alpha=1.0, line_width_scale=1.5):
@@ -727,7 +736,7 @@ class MatplotlibVisualizer:
                 faces = self._create_3d_vehicle_box(x, y, length, width, angle)
                 
                 # Plot the cuboid (vehicle box)
-                poly3d = Poly3DCollection(faces, alpha=alpha)
+                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=3)
                 poly3d.set_facecolor(color)
                 poly3d.set_edgecolor('black')
                 poly3d.set_linewidth(0.5 * line_width_scale)
@@ -749,7 +758,7 @@ class MatplotlibVisualizer:
                     [arrow_base[2], arrow_tip[2]],
                     color='black',
                     linewidth=2,
-                    alpha=alpha
+                    alpha=alpha,
                 )
                 
                 # Add arrowhead (tip)
@@ -783,7 +792,7 @@ class MatplotlibVisualizer:
                     [arrow_tip[2], arrowhead_right[2]],
                     color='black',
                     linewidth=1.5,
-                    alpha=alpha
+                    alpha=alpha,
                 )
 
         def plot_agent_group_2d(bboxes, color):
@@ -969,8 +978,6 @@ class MatplotlibVisualizer:
         Args:
             agent_idx (int): Index of the agent whose observation is to be plotted.
             env_idx (int): Index of the environment in the batch.
-            x_lim (Tuple[float, float], optional): x-axis limits. Defaults to (-100, 100).
-            y_lim (Tuple[float, float], optional): y-axis limits. Defaults to (-100, 100).
         """
         observation_ego = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim_object.self_observation_tensor(),
