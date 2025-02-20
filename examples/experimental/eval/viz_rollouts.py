@@ -73,7 +73,7 @@ def visualize_rollouts(
         )
         
         # Reset environment to visualize final states with trajectories
-        _ = env.reset()
+        _ = env.reset(env.cont_agent_mask)
         final_states = env.vis.plot_simulator_state(
             env_indices=list(range(len(batch))),
             time_steps=[-1] * len(batch),

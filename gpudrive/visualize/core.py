@@ -119,11 +119,6 @@ class MatplotlibVisualizer:
         )
 
         if extend_goals:
-            # Initialize random number generator
-            rng = np.random
-
-            # Define the range for random goal offsets (small range centered around 0)
-            OFFSET_RANGE = 8.0
 
             # Get world means for coordinate transformation
             means_xy = self.sim_object.world_means_tensor().to_torch()[:, :2].to(self.device)
@@ -133,7 +128,7 @@ class MatplotlibVisualizer:
                 'x': torch.zeros_like(global_agent_states.goal_x),
                 'y': torch.zeros_like(global_agent_states.goal_y)
             }
-            # Generate random offsets for controlled agents
+            # Generate reverse offsets for controlled agents
             for env_idx in env_indices:
                 controlled_mask = self.controlled_agent_mask[env_idx]
 
@@ -350,15 +345,19 @@ class MatplotlibVisualizer:
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
-            ax.set_zlim(0, zoom_radius * 0.05)
 
             # Remove ticks
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_zticks([])
-            ax.xaxis.pane.fill = False
-            ax.yaxis.pane.fill = False
-            ax.zaxis.pane.fill = False
+            
+            # 3d plot settings
+            if self.render_3d:
+                ax.set_zlim(0, zoom_radius * 0.05)
+                ax.set_zticks([])
+                ax.xaxis.pane.fill = False
+                ax.yaxis.pane.fill = False
+                ax.zaxis.pane.fill = False
+
             ax.set_axis_off()
 
         for fig in figs:
