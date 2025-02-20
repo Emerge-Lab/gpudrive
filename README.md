@@ -23,7 +23,7 @@ An extremely fast, data-driven driving simulator written in C++.
 
 </div>
 
-For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials]https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
+For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 ## Installation
 
