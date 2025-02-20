@@ -374,15 +374,61 @@ class MatplotlibVisualizer:
         log_trajectory: LogTrajectory,
         line_width_scale: int = 1.0,
     ):
-        """Plot the log replay trajectory for controlled agents."""
-        ax.scatter(
-            log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
-            log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
-            color="lightgreen",
-            linewidth=0.35 * line_width_scale,
-            alpha=0.35,
-            zorder=0,
-        )
+        """Plot the log replay trajectory for controlled agents in either 2D or 3D."""
+        if self.render_3d:
+            # Get trajectory points
+            trajectory_points = log_trajectory.pos_xy[env_idx, control_mask, :, :].numpy()
+            
+            # Set a fixed height for trajectory visualization
+            trajectory_height = 0.05  # Small height above ground
+            
+            # Plot trajectories for each controlled agent
+            for agent_trajectory in trajectory_points:
+                # Filter out invalid points (zeros or out of bounds)
+                valid_mask = ((agent_trajectory[:, 0] != 0) & 
+                            (agent_trajectory[:, 1] != 0) &
+                            (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS) &
+                            (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS))
+                valid_points = agent_trajectory[valid_mask]
+                
+                if len(valid_points) > 1:
+                    # Create segments for the trajectory
+                    segments = []
+                    for i in range(len(valid_points) - 1):
+                        segment = np.array([
+                            [valid_points[i, 0], valid_points[i, 1], trajectory_height],
+                            [valid_points[i+1, 0], valid_points[i+1, 1], trajectory_height]
+                        ])
+                        segments.append(segment)
+                    
+                    # Create line collection with fade effect
+                    colors = np.zeros((len(segments), 4))
+                    colors[:, 1] = 0.9  # Green component
+                    colors[:, 3] = np.linspace(0.2, 0.6, len(segments))  # Alpha gradient
+                    
+                    lc = Line3DCollection(segments, colors=colors, linewidth=2 * line_width_scale)
+                    ax.add_collection3d(lc)
+                    
+                    # Add points at trajectory positions
+                    ax.scatter3D(
+                        valid_points[:, 0],
+                        valid_points[:, 1],
+                        np.full_like(valid_points[:, 0], trajectory_height),
+                        color="lightgreen",
+                        s=10,
+                        alpha=0.5,
+                        zorder=0
+                    )
+        else:
+            # Original 2D plotting
+            ax.scatter(
+                log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
+                log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+                color="lightgreen",
+                linewidth=0.35 * line_width_scale,
+                alpha=0.35,
+                zorder=0,
+            )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
