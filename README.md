@@ -23,7 +23,7 @@ An extremely fast, data-driven driving simulator written in C++.
 
 </div>
 
-For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
+For details, see our [paper](https://arxiv.org/abs/2408.01584) and the [introduction tutorials]https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials), which guide you through the basic usage.
 
 ## Installation
 
@@ -183,7 +183,7 @@ Please remember that if you make any changes in C++, you need to delete the cach
 To get started, see these entry points:
 
 - Our [intro tutorials](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tutorials). These tutorials take approximately 30-60 minutes to complete and will guide you through the dataset, simulator, and how to populate the simulator with different types of actors.
-- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/pygpudrive/env) provide detailed info on environment settings and supported features.
+- The [environment docs](https://github.com/Emerge-Lab/gpudrive/tree/main/gpudrive/env) provide detailed info on environment settings and supported features.
 
 <!-- <p align="center">
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
