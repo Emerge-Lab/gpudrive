@@ -326,7 +326,10 @@ and that's it!
 
 </details>
 
-## Citing GPUDrive
+### Post-processing
+- Running `python data_utils/postprocessing.py` filters out corrupted files and undoes hugging face directory grouping.
+
+## 📜 Citing GPUDrive
 
 If you use GPUDrive in your research, please cite our ICLR 2025 paper
 ```bibtex

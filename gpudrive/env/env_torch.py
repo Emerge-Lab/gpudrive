@@ -632,7 +632,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-
     env_config = EnvConfig(dynamics_model="delta_local")
     render_config = RenderConfig()
 

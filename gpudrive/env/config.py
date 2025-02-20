@@ -170,8 +170,15 @@ class RenderConfig:
     """
     Configuration settings for rendering the environment.
     Attributes:
-        render_mode (RenderMode): The mode used for rendering the environment. Default is MATPLOTLIB.
-        view_option (MadronaOption): Rendering view option used for the Madrona viewer (e.g., agent or top-down view).
+        render_mode (RenderMode): The mode used for rendering the environment.
+        view_option (Enum): Rendering view option (e.g., RGB, human view).
+        resolution (Tuple[int, int]): Resolution of the rendered image.
+        draw_obj_idx (bool): Whether to draw object indices on objects.
+        draw_expert_trajectories (bool): Whether to draw expert trajectories.
+        draw_only_controllable_veh (bool): Whether to draw only the trajectories of controllable vehicles.
+        obj_idx_font_size (int): Font size for object indices.
+        render_3d (bool): Whether to render the scene in 3D.
+        vehicle_height (float): Height of the vehicle for 3D rendering.
     """
 
     render_mode: RenderMode = RenderMode.MATPLOTLIB
