@@ -11,7 +11,7 @@ An extremely fast, data-driven driving simulator written in C++.
 - 🐍 Provides Python bindings and `gymnasium` wrappers in `torch` and `jax`.
 - 🏃‍➡️ Compatible with the [Waymo Open Motion Dataset](https://github.com/waymo-research/waymo-open-dataset), featuring over 100K scenarios with human demonstrations.
 - 📜 Readily available PPO implementations via [SB3](https://github.com/DLR-RM/stable-baselines3) and [CleanRL](https://github.com/vwxyzjn/cleanrl) / [Pufferlib](https://puffer.ai/).
-- 👀 Easily configure the simulator and the agent's relative, partially observable view.
+- 👀 Easily configure the simulator and agent views.
 - 🎨 Diverse agent types: Vehicles, cyclists and pedestrians.
 
 <div align="center">
@@ -71,7 +71,7 @@ Next, set up a Python environment
 Create a virtual environment:
 
 ```bash
-pyenv virtualenv 3.11.9 gpudrive
+pyenv virtualenv 3.11 gpudrive
 pyenv activate gpudrive
 ```
 
@@ -113,7 +113,7 @@ pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_D
 <details>
   <summary> 🐳  Option 2. Docker </summary>
 
-To get started quickly, we provide a [Dockerfile]().  
+To get started quickly, we provide a Dockerfile in the root directory.  
 
 ### Prerequisites  
 Ensure you have the following installed:  
@@ -174,7 +174,7 @@ Please remember that if you make any changes in C++, you need to delete the cach
 
 | What                                                                                                    | Info                                                                                                                                                                         | Run                                    | Training SPS |
 | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------ |
-| **IPPO** implementation [SB3](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/ppo/puffer) | `python baselines/ppo/ippo_sb3.py`      | 25 - 50K                       |
+| **IPPO** implementation [SB3](https://github.com/DLR-RM/stable-baselines3/tree/master) | [IPPO](https://proceedings.neurips.cc/paper_files/paper/2022/file/9c1535a02f0ce079433344e14d910597-Paper-Datasets_and_Benchmarks.pdf), [PufferLib](https://arxiv.org/pdf/2406.12905), [Implementation](https://github.com/Emerge-Lab/gpudrive/blob/main/integrations/ppo/puffer) | `python baselines/ppo/ppo_sb3.py`      | 25 - 50K                       |
 | **IPPO** implementation [PufferLib](https://github.com/PufferAI/PufferLib) 🐡                           | [PPO](https://arxiv.org/pdf/2406.12905)                                                   | `python baselines/ppo/ppo_pufferlib.py`       | 100 - 300K                     |
 
 
@@ -206,7 +206,7 @@ cd build
 
 ## Pre-trained policy
 
-Download a pre-trained policy from [this paper](TODO: Link to paper), trained on 10,000 randomly sampled scenarios here.
+Coming soon! We will open-source a pre-trained policy from trained on 10,000 randomly sampled scenarios here.
 
 ## Dataset
 

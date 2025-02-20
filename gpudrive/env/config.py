@@ -184,9 +184,7 @@ class RenderConfig:
     render_mode: RenderMode = RenderMode.MATPLOTLIB
     view_option: Enum = None
     resolution: Tuple[int, int] = (1024, 1024)
-    draw_obj_idx: bool = False
     draw_expert_trajectories: bool = False
     draw_only_controllable_veh: bool = False
-    obj_idx_font_size: int = 9
-    render_3d: bool = True
+    render_3d: bool = False
     vehicle_height: float = 0.06
