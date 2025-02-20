@@ -6,7 +6,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
     void from_json(const nlohmann::json &j, MapVector2 &p)
     {
@@ -279,6 +279,9 @@ namespace gpudrive
 
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
+        std::string name = j.at("name").get<std::string>();
+        std::strncpy(map.mapName, name.c_str(), sizeof(map.mapName));
+
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
