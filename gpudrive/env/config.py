@@ -173,7 +173,6 @@ class RenderConfig:
         render_mode (RenderMode): The mode used for rendering the environment.
         view_option (Enum): Rendering view option (e.g., RGB, human view).
         resolution (Tuple[int, int]): Resolution of the rendered image.
-        draw_obj_idx (bool): Whether to draw object indices on objects.
         draw_expert_trajectories (bool): Whether to draw expert trajectories.
         draw_only_controllable_veh (bool): Whether to draw only the trajectories of controllable vehicles.
         obj_idx_font_size (int): Font size for object indices.
