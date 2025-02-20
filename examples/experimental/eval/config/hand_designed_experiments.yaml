@@ -1,0 +1,38 @@
+save_results_path: examples/experiments/eval/dataframes/hand_designed
+
+data_path_original: data/processed/hand_designed/original
+data_path_altered: data/processed/hand_designed/altered
+
+cpt_path: examples/experiments/models/
+cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
+
+num_worlds: 13
+dataset_size: 13
+
+device: cuda
+deterministic: false
+render_sim_state: true
+zoom_radius: 90
+
+# Environment settings
+max_controlled_agents: 64 
+ego_state: true
+road_map_obs: true
+partner_obs: true
+norm_obs: true
+remove_non_vehicles: true 
+lidar_obs: false
+reward_type: "weighted_combination"
+collision_weight: -0.5
+off_road_weight: -0.5
+goal_achieved_weight: 1.0
+dynamics_model: "classic"
+collision_behavior: "ignore" 
+dist_to_goal_threshold: 2.0
+polyline_reduction_threshold: 0.1 
+sampling_seed: 42 
+obs_radius: 50.0 
+
+# Number of discretizations in the action space
+action_space_steer_disc: 41 # 11 in smaller act space
+action_space_accel_disc: 17 # 7 in smaller act space

@@ -15,7 +15,7 @@ using namespace madrona;
 
 int main(int argc, char *argv[])
 {
-    using namespace gpudrive;
+    using namespace madrona_gpudrive;
 
     if (argc < 3) {
         fprintf(stderr, "%s TYPE NUM_STEPS [--rand-actions]\n", argv[0]);

@@ -1,0 +1,33 @@
+save_results_path: examples/experiments/eval/dataframes/scene_manipulation
+train_path: "/scratch/kj2676/gpudrive/data/processed/training"
+
+cpt_path: examples/experiments/eval/models/sota_paper
+cpt_name: model_PPO__R_10000__01_19_17_27_13_052_007500
+
+perc_to_rmv_per_scene: 0.5
+
+num_worlds: 100
+dataset_size: 1000
+
+device: cuda
+deterministic: false
+render_sim_state: false
+
+# Environment settings
+max_controlled_agents: 64 
+ego_state: true
+road_map_obs: true
+partner_obs: true
+norm_obs: true
+remove_non_vehicles: true 
+lidar_obs: false
+reward_type: "weighted_combination"
+collision_weight: -0.5
+off_road_weight: -0.5
+goal_achieved_weight: 1.0
+dynamics_model: "classic"
+collision_behavior: "ignore" 
+dist_to_goal_threshold: 2.0
+polyline_reduction_threshold: 0.1 
+sampling_seed: 42 
+obs_radius: 50.0 

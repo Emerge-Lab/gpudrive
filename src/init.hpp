@@ -3,7 +3,7 @@
 #include <madrona/physics.hpp>
 #include "types.hpp"
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;
@@ -59,6 +59,8 @@ namespace gpudrive
         uint32_t numRoads;
         uint32_t numRoadSegments;
         MapVector2 mean;
+
+        char mapName[32];
 
         // Constructor
         Map() = default;

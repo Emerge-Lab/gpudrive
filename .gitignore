@@ -9,7 +9,7 @@
 .vscode/settings.json
 .vscode/tasks.json
 /examples/benchmarks/results/
-/baselines/ippo/logs/*
+/baselines/ppo/logs/*
 *.sif
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
@@ -18,6 +18,7 @@
 /zipp*
 .python-version
 /google-cloud-sdk/*
+*.gz
 
 # Data
 hpc/overlay*
@@ -25,7 +26,9 @@ data/raw/*
 data/processed/validation/*
 data/processed/testing/*
 data/processed/training/*
-data/formatted_json_v2_no_tl_valid/*
+data/processed/sampled/*
+data/processed/hand_designed/*
+analyze/figures/*
 
 # Logging
 /wandb
@@ -189,7 +192,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 venv/
 ENV/
@@ -238,5 +240,23 @@ poetry.toml
 pyrightconfig.json
 
 *~
+
+# Environment variables
+# To be manually created using .env.template
+.env
+
+# Logs
+examples/experimental/logs/*
+
+# Sbatch scripts
+*.sh
+
+# Videos
+videos/
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++

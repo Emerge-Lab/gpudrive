@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 class Engine;
 
@@ -37,6 +37,8 @@ enum class ExportID : uint32_t {
     ResetMap,
     WorldMeans,
     MetaData,
+    DeletedAgents,
+    MapName,
     NumExports
 };
 

@@ -17,21 +17,21 @@ using nlohmann::json;
 
 class BicycleKinematicModelTest : public ::testing::Test {
 protected:    
-    gpudrive::Manager mgr = gpudrive::Manager({
+    madrona_gpudrive::Manager mgr = madrona_gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
         .scenes = {"testJsons/test.json"},
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
-            .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
+            .collisionBehaviour = madrona_gpudrive::CollisionBehaviour::Ignore,
             .initOnlyValidAgentsAtFirstStep = false,
-            .dynamicsModel = gpudrive::DynamicsModel::Classic
+            .dynamicsModel = madrona_gpudrive::DynamicsModel::Classic
         }
     });
     
-    uint32_t num_agents = gpudrive::consts::kMaxAgentCount;
-    int64_t num_roads = gpudrive::consts::kMaxRoadEntityCount;
+    uint32_t num_agents = madrona_gpudrive::consts::kMaxAgentCount;
+    int64_t num_roads = madrona_gpudrive::consts::kMaxRoadEntityCount;
     int64_t num_steps = 10;
     int64_t num_worlds = 1;
     int64_t numEntities = 0;
@@ -107,7 +107,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
         num_elems *= abs_obs.dims()[i];
     }
 
-    if (num_agents * gpudrive::AbsoluteSelfObservationExportSize > num_elems)
+    if (num_agents * madrona_gpudrive::AbsoluteSelfObservationExportSize > num_elems)
     {
         return {false, "Expected number of elements is less than the number of agents."};
     }
@@ -118,14 +118,14 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
         num_elems *= self_obs.dims()[i];
     }
 
-    if (num_agents * gpudrive::SelfObservationExportSize > num_elems)
+    if (num_agents * madrona_gpudrive::SelfObservationExportSize > num_elems)
     {
         return {false, "Expected number of elements is less than the number of agents."};
     }
 
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
 
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    for (int64_t i = 0, agent_idx = 0; i < num_agents * madrona_gpudrive::AbsoluteSelfObservationExportSize;)
     {
         auto x = static_cast<float>(ptr[i]);
         auto y = static_cast<float>(ptr[i + 1]);
@@ -134,7 +134,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
         auto y_exp = expected[agent_idx + 1];
         auto rot_exp = expected[agent_idx + 2];
 
-        i += gpudrive::AbsoluteSelfObservationExportSize;
+        i += madrona_gpudrive::AbsoluteSelfObservationExportSize;
         agent_idx += 4;
 
         if (std::abs(x - x_exp) > test_utils::EPSILON || std::abs(y - y_exp) > test_utils::EPSILON || std::abs(rot - rot_exp) > test_utils::EPSILON)
@@ -144,7 +144,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
     }
     
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int64_t i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
+    for (int64_t i = 0, agent_idx = 0; i < num_agents * madrona_gpudrive::SelfObservationExportSize;)
     {
         auto speed = static_cast<float>(ptr[i]);
         auto speed_exp = expected[agent_idx+3];
@@ -155,7 +155,7 @@ std::pair<bool, std::string> validateBicycleModel(const py::Tensor &abs_obs, con
         }
 
         agent_idx += 4;
-        i += gpudrive::SelfObservationExportSize;
+        i += madrona_gpudrive::SelfObservationExportSize;
     }
 
     return {true, ""};
@@ -166,20 +166,20 @@ std::vector<float> parseBicycleModel(const py::Tensor &abs_obs, const py::Tensor
     std::vector<float> obs;
     obs.resize(num_agents * 4);
     float *ptr = static_cast<float *>(abs_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::AbsoluteSelfObservationExportSize;)
+    for (int i = 0, agent_idx = 0; i < num_agents * madrona_gpudrive::AbsoluteSelfObservationExportSize;)
     {
         obs[agent_idx] = static_cast<float>(ptr[i]);
         obs[agent_idx+1] = static_cast<float>(ptr[i+1]);
         obs[agent_idx+2] = static_cast<float>(ptr[i+7]);
         agent_idx += 4;
-        i+=gpudrive::AbsoluteSelfObservationExportSize;
+        i+=madrona_gpudrive::AbsoluteSelfObservationExportSize;
     }
     ptr = static_cast<float *>(self_obs.devicePtr());
-    for (int i = 0, agent_idx = 0; i < num_agents * gpudrive::SelfObservationExportSize;)
+    for (int i = 0, agent_idx = 0; i < num_agents * madrona_gpudrive::SelfObservationExportSize;)
     {
         obs[agent_idx+3] = static_cast<float>(ptr[i]);
         agent_idx += 4;
-        i+=gpudrive::SelfObservationExportSize;
+        i+=madrona_gpudrive::SelfObservationExportSize;
     }
     return obs;
 }

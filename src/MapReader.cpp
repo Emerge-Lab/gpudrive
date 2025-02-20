@@ -6,14 +6,14 @@
 #endif
 
 namespace {
-gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
+madrona_gpudrive::Map *copyToArrayOnHostOrDevice(const madrona_gpudrive::Map *in,
                              madrona::ExecMode hostOrDevice) {
-  gpudrive::Map *map = nullptr;
+  madrona_gpudrive::Map *map = nullptr;
 
   if (hostOrDevice == madrona::ExecMode::CUDA) {
 #ifdef MADRONA_CUDA_SUPPORT
-    map = static_cast<gpudrive::Map*>(madrona::cu::allocGPU(sizeof(gpudrive::Map)));
-    cudaMemcpy(map, in, sizeof(gpudrive::Map), cudaMemcpyHostToDevice);
+    map = static_cast<madrona_gpudrive::Map*>(madrona::cu::allocGPU(sizeof(madrona_gpudrive::Map)));
+    cudaMemcpy(map, in, sizeof(madrona_gpudrive::Map), cudaMemcpyHostToDevice);
     auto error = cudaGetLastError();
     assert (error == cudaSuccess);
     
@@ -26,19 +26,19 @@ gpudrive::Map *copyToArrayOnHostOrDevice(const gpudrive::Map *in,
     // This is a copy from CPU to CPU and can be avoided by extracting and
     // releasing in's backing array. For the sake of symmetry with the CUDA
     // scenario, we nevertheless opt to copy the data.
-    map = new gpudrive::Map();
-    std::memcpy(map, in, sizeof(gpudrive::Map));
+    map = new madrona_gpudrive::Map();
+    std::memcpy(map, in, sizeof(madrona_gpudrive::Map));
   }
 
   return map;
 }
 } // namespace
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 MapReader::MapReader(const std::string &pathToFile) : in_(pathToFile) {
   assert(in_.is_open());
-  map_ = new gpudrive::Map();
+  map_ = new madrona_gpudrive::Map();
 }
 
 MapReader::~MapReader() {
@@ -52,7 +52,7 @@ void MapReader::doParse(float polylineReductionThreshold) {
   from_json(rawJson, *map_, polylineReductionThreshold);
 }
 
-gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
+madrona_gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
                             madrona::ExecMode executionMode, float polylineReductionThreshold) {
   MapReader reader(path);
   reader.doParse(polylineReductionThreshold);
@@ -60,4 +60,4 @@ gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
   return copyToArrayOnHostOrDevice(reader.map_, executionMode);
 
 } 
-} // namespace gpudrive
+} // namespace madrona_gpudrive

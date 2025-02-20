@@ -6,7 +6,7 @@
 using namespace madrona;
 using namespace madrona::base;
 using namespace madrona::math;
-using gpudrive::OrientedBoundingBox2D;
+using madrona_gpudrive::OrientedBoundingBox2D;
 
 TEST(CollisionDetectionAxisAligned, Colliding) {
   Position origin{{.x = 0, .y = 0, .z = 0}};
