@@ -18,8 +18,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination" #"distance_to_logs"
-  collision_weight: -0.6
-  off_road_weight: -0.6
+  collision_weight: -0.75
+  off_road_weight: -0.75
   goal_achieved_weight: 1.0
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
@@ -32,7 +32,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "reproduce_paper_results"
+  group: "perfect_scores_0221"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -46,7 +46,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
   sample_with_replacement: true
@@ -54,14 +54,14 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 4_000_000_000
-  batch_size: 131_072
-  minibatch_size: 8192
+  total_timesteps: 1_000_000_000
+  batch_size: 262_144
+  minibatch_size: 16_384
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 5
+  update_epochs: 4
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
@@ -81,7 +81,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 1000 # Save policy every k iterations
+  checkpoint_interval: 200 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
