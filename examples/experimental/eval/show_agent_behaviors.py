@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 import mediapy
 
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.dataset import SceneDataLoader
 from eval_utils import load_policy, load_config, make_env, rollout
 
 import logging
@@ -27,7 +27,6 @@ logging.basicConfig(level=logging.INFO)
 SEED = 42  
 set_seed(SEED)
 
-
 def make_videos(
     policy,
     eval_config,
@@ -40,6 +39,7 @@ def make_videos(
     deterministic=False,
     render_every_n_steps=10,
     center_on_ego=False,
+    render_3d=True,
 ):
     """Make videos policy rollouts environment.
     Args:
@@ -52,14 +52,15 @@ def make_videos(
             - off_road_frac: Sort by off_road in descending order.
             - other_frac: Sort by not_goal_nor_crashed in descending order.
             - controlled_agents_in_scene: Sort by controlled_agents_in_scene in descending order.
-    """/
+    """
     
     base_data_path = (
         eval_config.train_dir if dataset == "train"
         else eval_config.test_dir
     )
   
-    df_results = df_results[df_results["dataset"] == dataset]
+    if df_results is not None:
+        df_results = df_results[df_results["dataset"] == dataset]
 
     # Make environment
     train_loader = SceneDataLoader(
@@ -70,7 +71,7 @@ def make_videos(
         shuffle=False,
     )
     
-    env = make_env(eval_config, train_loader)
+    env = make_env(eval_config, train_loader, render_3d)
 
     # Select data batch to
     if sort_by is not None and sort_by in df_results.columns:
@@ -104,14 +105,14 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_011426"
+    MODEL_TO_LOAD = "model_PPO__C__R_10000__01_28_20_57_35_873_011426" #"model_PPO____R_10000__02_20_09_07_57_249_006000" #"model_PPO__C__R_10000__01_28_20_57_35_873_011426"
     DATASET = "test"
-    SORT_BY = "goal_achieved_frac" 
-    SHOW_TOP_K = 25 # Render this many scenes
+    SORT_BY = None #"goal_achieved_frac" 
+    SHOW_TOP_K = 30 # Render this many scenes
 
     # Configurations
-    eval_config = load_config("examples/experiments/eval/config/eval_config")
-    model_config = load_config("examples/experiments/eval/config/model_config")
+    eval_config = load_config("examples/experimental/eval/config/eval_config")
+    model_config = load_config("examples/experimental/eval/config/model_config")
 
     # Load policy
     policy = load_policy(
@@ -123,11 +124,9 @@ if __name__ == "__main__":
     # Load results dataframe
     if SORT_BY is not None:
         df_res = pd.read_csv(f"{eval_config.res_path}/{MODEL_TO_LOAD}.csv")
+        df_res = df_res[df_res['controlled_agents_in_scene'] > 3]
     else:
         df_res = None
-    
-    
-    df_res = df_res[df_res['controlled_agents_in_scene'] > 3]
     
     logging.info(
         f"Loaded policy {MODEL_TO_LOAD} and corresponding results df."
@@ -145,13 +144,14 @@ if __name__ == "__main__":
         zoom_radius=50,
         deterministic=False,
         render_every_n_steps=1,
-        center_on_ego=True,
+        #center_on_ego=True,
+        render_3d=True,
     )
 
     sim_state_arrays = {k: np.array(v) for k, v in sim_state_frames.items()}
     
     SORT_BY = SORT_BY if not None else "random"
-    videos_dir = Path(f"videos/{MODEL_TO_LOAD}/{SORT_BY}_top_{SHOW_TOP_K}")
+    videos_dir = Path(f"videos/{MODEL_TO_LOAD}/project_page") # Path(f"videos/{MODEL_TO_LOAD}/{SORT_BY}_top_{SHOW_TOP_K}")
     videos_dir.mkdir(parents=True, exist_ok=True)
 
     # Save videos locally
@@ -159,13 +159,16 @@ if __name__ == "__main__":
         
         filename = filenames[env_id]
         
-        scene_stats = df_res[df_res["scene"] == filename]
-        goal_achieved = scene_stats.goal_achieved_frac.values.item()
-        collided = scene_stats.collided_frac.values.item()
-        off_road = scene_stats.off_road_frac.values.item()
-        other = scene_stats.other_frac.values.item()
+        if df_res:
+            scene_stats = df_res[df_res["scene"] == filename]
+            goal_achieved = scene_stats.goal_achieved_frac.values.item()
+            collided = scene_stats.collided_frac.values.item()
+            off_road = scene_stats.off_road_frac.values.item()
+            other = scene_stats.other_frac.values.item()
 
-        video_path = videos_dir / f"{filename}_ga_{goal_achieved:.2f}__cr_{collided:.2f}__or_{off_road:.2f}__ot_{other:.2f}.gif"
+            video_path = videos_dir / f"{filename}_ga_{goal_achieved:.2f}__cr_{collided:.2f}__or_{off_road:.2f}__ot_{other:.2f}.gif"
+        else:
+            video_path = videos_dir / f"{filename}.gif"
 
         mediapy.write_video(
             str(video_path),

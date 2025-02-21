@@ -9,7 +9,7 @@ import os
 import logging
 from pathlib import Path
 
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.dataset import SceneDataLoader
 from eval_utils import (
     load_config,
     make_env,
@@ -39,8 +39,8 @@ set_seed(SEED)
 if __name__ == "__main__":
 
     # Load configurations
-    eval_config = load_config("examples/experiments/eval/config/eval_config")
-    model_config = load_config("examples/experiments/eval/config/model_config")
+    eval_config = load_config("examples/experimental/eval/config/eval_config")
+    model_config = load_config("examples/experimental/eval/config/model_config")
 
     train_loader = SceneDataLoader(
         root=eval_config.train_dir,
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         train_loader = SceneDataLoader(
             root=eval_config.train_dir,
             batch_size=eval_config.num_worlds,
-            dataset_size=model.train_dataset_size
+            dataset_size=1000
             if model.name != "random_baseline"
             else 1000,
             sample_with_replacement=False,
