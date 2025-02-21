@@ -782,7 +782,7 @@ class MatplotlibVisualizer:
                 faces = self._create_3d_vehicle_box(x, y, length, width, angle)
                 
                 # Plot the cuboid (vehicle box)
-                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=3)
+                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=5)
                 poly3d.set_facecolor(color)
                 poly3d.set_edgecolor('black')
                 poly3d.set_linewidth(0.5 * line_width_scale)
@@ -805,6 +805,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=2,
                     alpha=alpha,
+                    zorder=2,
                 )
                 
                 # Add arrowhead (tip)
@@ -831,6 +832,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=1.5,
                     alpha=alpha,
+                    zorder=2,
                 )
                 ax.plot(
                     [arrow_tip[0], arrowhead_right[0]],
@@ -839,6 +841,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=1.5,
                     alpha=alpha,
+                    zorder=2,
                 )
 
         def plot_agent_group_2d(bboxes, color):
