@@ -93,7 +93,13 @@ class NeuralNet(nn.Module):
 
         self.partner_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
-                nn.Linear(constants.PARTNER_FEAT_DIM, input_dim)
+                nn.Linear(constants.PARTNER_FEAT_DIM, 128)
+            ),
+            nn.LayerNorm(128),
+            self.act_func,
+            nn.Dropout(self.dropout),
+            pufferlib.pytorch.layer_init(
+                nn.Linear(128, input_dim)
             ),
             nn.LayerNorm(input_dim),
             self.act_func,

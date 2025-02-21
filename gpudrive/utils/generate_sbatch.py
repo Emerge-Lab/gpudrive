@@ -255,18 +255,18 @@ if __name__ == "__main__":
 
     hyperparams = {
         "group": [group],  # Group name
-        "num_worlds": [500],
+        "num_worlds": [800],
         "resample_scenes": [1], # Yes
-        "k_unique_scenes": [500], # Sample in batches of 500
+        "k_unique_scenes": [800], # Sample in batches of 500
         "resample_interval": [2_000_000],
-        "total_timesteps": [2_000_000_000],
+        "total_timesteps": [3_000_000_000],
         "resample_dataset_size": [10_000],
         "batch_size": [262_144],
         "minibatch_size": [16_384],
         "update_epochs": [2, 5],
         "ent_coef": [0.0001, 0.001],
         "learning_rate": [3e-4],
-        "gamma": [0.995, 0.99],
+        "gamma": [0.99],
         "render": [0],
     }
 
@@ -276,3 +276,6 @@ if __name__ == "__main__":
         fields=fields,
         params=hyperparams,
     )
+
+
+
