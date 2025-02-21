@@ -68,7 +68,7 @@ def visualize_extended_goals(
 
 if __name__ == "__main__":
     # Load configuration
-    config = load_config("examples/experiments/eval/config/visualization_config")
+    config = load_config("examples/experimental/eval/config/visualization_config")
 
     # Initialize data loader
     data_loader = SceneDataLoader(
