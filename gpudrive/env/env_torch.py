@@ -361,6 +361,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_state = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim.self_observation_tensor(),
             backend=self.backend,
+            device=self.device,
             mask=mask,
         )
         if self.config.norm_obs:
@@ -391,6 +392,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             partner_obs_tensor=self.sim.partner_observations_tensor(),
             backend=self.backend,
             mask=mask,
+            device=self.device,
         )
 
         if self.config.norm_obs:
@@ -408,6 +410,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
             mask=mask,
+            device=self.device,
         )
 
         if self.config.norm_obs:
