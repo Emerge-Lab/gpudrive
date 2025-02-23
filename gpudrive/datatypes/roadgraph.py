@@ -129,8 +129,8 @@ class LocalRoadGraphPoints:
 
     def __init__(self, local_roadgraph_tensor: torch.Tensor, mask=None):
         """Initializes the global road graph points with a tensor."""
-        
-        if mask is not None:
+        self.mask = mask:
+        if self.mask is not None:
             local_roadgraph_tensor = local_roadgraph_tensor[mask]
             self.x = local_roadgraph_tensor[:, :, 0]
             self.y = local_roadgraph_tensor[:, :, 1]

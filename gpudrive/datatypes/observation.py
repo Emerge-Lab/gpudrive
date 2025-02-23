@@ -164,8 +164,9 @@ class PartnerObs:
 
     def __init__(self, partner_obs_tensor: torch.Tensor, mask=None):
         """Initializes the partner observation from a tensor."""
-        if mask is not None: # Used for training
-            self.data = partner_obs_tensor[mask][:, :, :7]
+        self.mask = mask
+        if self.mask is not None: # Used for training
+            self.data = partner_obs_tensor[self.mask][:, :, :7]
         else:
             self.speed = partner_obs_tensor[:, :, :, 0].unsqueeze(-1)
             self.rel_pos_x = partner_obs_tensor[:, :, :, 1].unsqueeze(-1)
@@ -202,18 +203,36 @@ class PartnerObs:
 
     def normalize(self):
         """Normalizes the partner observation."""
-        self.data[:, :, 0] /= constants.MAX_SPEED
-        normalize_min_max_inplace(
-            tensor=self.data[:, :, 1],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-        normalize_min_max_inplace(
-            tensor=self.data[:, :, 2],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-        self.data[:, :, 3:7] /= self.norm
+        if self.mask is not None:
+            self.data[:, :, 0] /= constants.MAX_SPEED
+            normalize_min_max_inplace(
+                tensor=self.data[:, :, 1],
+                min_val=constants.MIN_REL_GOAL_COORD,
+                max_val=constants.MAX_REL_GOAL_COORD,
+            )
+            normalize_min_max_inplace(
+                tensor=self.data[:, :, 2],
+                min_val=constants.MIN_REL_GOAL_COORD,
+                max_val=constants.MAX_REL_GOAL_COORD,
+            )
+            self.data[:, :, 3:7] /= self.norm
+        else:
+            self.speed = self.speed / constants.MAX_SPEED
+            self.rel_pos_x = normalize_min_max(
+                tensor=self.rel_pos_x,
+                min_val=constants.MIN_REL_GOAL_COORD,
+                max_val=constants.MAX_REL_GOAL_COORD,
+            )
+            self.rel_pos_y = normalize_min_max(
+                tensor=self.rel_pos_y,
+                min_val=constants.MIN_REL_GOAL_COORD,
+                max_val=constants.MAX_REL_GOAL_COORD,
+            )
+            self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
+            self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
+            self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
+            self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
+            
 
     def one_hot_encode_agent_types(self):
         """One-hot encodes the agent types. This operation increases the
