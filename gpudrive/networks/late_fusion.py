@@ -5,6 +5,7 @@ from torch import nn
 from torch.distributions.utils import logits_to_probs
 import pufferlib.models
 from gpudrive.env import constants
+from huggingface_hub import PyTorchModelHubMixin
 
 import madrona_gpudrive
 
@@ -64,10 +65,15 @@ def sample_logits(
 
     return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
     
-class NeuralNet(nn.Module):
+class NeuralNet(
+    nn.Module,
+    PyTorchModelHubMixin,
+    repo_url="https://github.com/Emerge-Lab/gpudrive",
+    docs_url="https://arxiv.org/abs/2502.14706",
+):
     def __init__(
         self,
-        action_dim,
+        action_dim=91, # Default: 7 * 13
         input_dim=64,
         hidden_dim=128,
         dropout=0.00,
