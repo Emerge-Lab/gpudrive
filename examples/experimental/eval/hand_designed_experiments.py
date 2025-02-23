@@ -17,7 +17,7 @@ import pdb
     
 if __name__ == "__main__":
     
-    config = load_config("examples/experiments/eval/config/hand_designed_experiments")
+    config = load_config("examples/experimental/eval/config/hand_designed_experiments")
     
     # Load original scenes
     data_loader_orig = SceneDataLoader(
