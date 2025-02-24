@@ -426,7 +426,7 @@ def plot_crosswalk(
         linewidth=2,
         alpha=alpha,
         hatch=r"//",
-        zorder=2,
+        zorder=1,
     )
 
     ax.add_patch(p)
