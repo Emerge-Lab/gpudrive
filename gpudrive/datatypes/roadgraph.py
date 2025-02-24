@@ -177,23 +177,36 @@ class LocalRoadGraphPoints:
         
     def normalize(self):
         """Normalizes the road graph points to [-1, 1]."""
-        self.x = normalize_min_max(
-            self.x,
-            min_val=constants.MIN_RG_COORD,
-            max_val=constants.MAX_RG_COORD,
-        )
-        self.y = normalize_min_max(
-            self.y,
-            min_val=constants.MIN_RG_COORD,
-            max_val=constants.MAX_RG_COORD,
-        )
-        self.segment_length = (
-            self.segment_length / constants.MAX_ROAD_LINE_SEGMENT_LEN
-        )
-        self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
-        self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
-        self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
-        self.id = self.id
+        
+        if self.mask is not None:
+            self.data[:, :, 0] = normalize_min_max(
+                self.data[:, :, 0],
+                min_val=constants.MIN_RG_COORD,
+                max_val=constants.MAX_RG_COORD,
+            )
+            self.data[:, :, 1] = normalize_min_max(
+                self.data[:, :, 1],
+                min_val=constants.MIN_RG_COORD,
+                max_val=constants.MAX_RG_COORD,
+            )
+            self.data[:, :, 2:6] /= self.norm
+        else:
+            self.x = normalize_min_max(
+                self.x,
+                min_val=constants.MIN_RG_COORD,
+                max_val=constants.MAX_RG_COORD,
+            )
+            self.y = normalize_min_max(
+                self.y,
+                min_val=constants.MIN_RG_COORD,
+                max_val=constants.MAX_RG_COORD,
+            )
+            self.segment_length = (
+                self.segment_length / constants.MAX_ROAD_LINE_SEGMENT_LEN
+            )
+            self.segment_width = self.segment_width / constants.MAX_ROAD_SCALE
+            self.segment_height = self.segment_height / constants.MAX_ROAD_SCALE
+            self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
 
     def one_hot_encode_road_point_types(self):
         """One-hot encodes the type of road point."""

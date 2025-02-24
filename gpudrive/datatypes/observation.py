@@ -166,7 +166,7 @@ class PartnerObs:
         """Initializes the partner observation from a tensor."""
         self.mask = mask
         if self.mask is not None: # Used for training
-            self.data = partner_obs_tensor[self.mask][:, :, :7]
+            self.data = partner_obs_tensor[self.mask][:, :, :6]
         else:
             self.speed = partner_obs_tensor[:, :, :, 0].unsqueeze(-1)
             self.rel_pos_x = partner_obs_tensor[:, :, :, 1].unsqueeze(-1)
@@ -194,7 +194,6 @@ class PartnerObs:
                 constants.MAX_ORIENTATION_RAD,
                 constants.MAX_VEH_LEN,
                 constants.MAX_VEH_WIDTH,
-                constants.MAX_VEH_HEIGHT
             ], device=device)
             return obj
     
@@ -215,7 +214,7 @@ class PartnerObs:
                 min_val=constants.MIN_REL_GOAL_COORD,
                 max_val=constants.MAX_REL_GOAL_COORD,
             )
-            self.data[:, :, 3:7] /= self.norm
+            self.data[:, :, 3:6] /= self.norm
         else:
             self.speed = self.speed / constants.MAX_SPEED
             self.rel_pos_x = normalize_min_max(

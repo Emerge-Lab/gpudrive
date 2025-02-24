@@ -430,7 +430,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 .flatten(start_dim=2)
             )
 
-    def _get_road_map_obs(self, mask):
+    def _get_road_map_obs(self, mask=None):
         """Get road map observations."""
         if not self.config.road_map_obs:
             return torch.Tensor().to(self.device)
@@ -511,7 +511,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-
+        lidar_observations = self._get_lidar_obs(mask)
+    
         obs = torch.cat(
             (
                 ego_states,
@@ -719,6 +720,11 @@ if __name__ == "__main__":
 
     # Rollout
     obs = env.reset()
+    
+    obs_masked = env.get_obs(control_mask)
+    
+    obs = env.get_obs()
+
 
     sim_frames = []
     agent_obs_frames = []
