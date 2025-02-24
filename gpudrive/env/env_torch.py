@@ -96,7 +96,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def reset(self, mask):
+    def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
         return self.get_obs(mask)
@@ -352,7 +352,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self, mask) -> torch.Tensor:
+    def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
         
         if not self.config.ego_state:
@@ -367,22 +367,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.norm_obs:
             ego_state.normalize()
 
-        return (
-            torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
+        if mask is None:
+            return (
+                torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                )
+                .permute(1, 2, 0)
             )
-            .permute(1, 0)
-            .to(self.device)
-        )
+        else: 
+            return (
+                torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                )
+                .permute(1, 0)
+            )
 
-    def _get_partner_obs(self, mask):
+    def _get_partner_obs(self, mask=None):
         """Get partner observations."""
         
         if not self.config.partner_obs:
@@ -391,17 +405,32 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_obs = PartnerObs.from_tensor(
             partner_obs_tensor=self.sim.partner_observations_tensor(),
             backend=self.backend,
-            mask=mask,
             device=self.device,
+            mask=mask,
         )
 
         if self.config.norm_obs:
             partner_obs.normalize()
-            # partner_obs.one_hot_encode_agent_types()
+            
+        if mask is not None: 
+            return partner_obs.data.flatten(start_dim=1)
+        else:
+            return (
+                torch.concat(
+                    [
+                        partner_obs.speed,
+                        partner_obs.rel_pos_x,
+                        partner_obs.rel_pos_y,
+                        partner_obs.orientation,
+                        partner_obs.vehicle_length,
+                        partner_obs.vehicle_width,
+                    ],
+                    dim=-1,
+                )
+                .flatten(start_dim=2)
+            )
 
-        return partner_obs.data.flatten(start_dim=1)
-
-    def _get_road_map_obs(self, mask):
+    def _get_road_map_obs(self, mask=None):
         """Get road map observations."""
         if not self.config.road_map_obs:
             return torch.Tensor().to(self.device)
@@ -409,23 +438,40 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         roadgraph = LocalRoadGraphPoints.from_tensor(
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
-            mask=mask,
             device=self.device,
+            mask=mask,
         )
 
         if self.config.norm_obs:
             roadgraph.normalize()
             roadgraph.one_hot_encode_road_point_types()
 
-        return torch.cat(
-            [
-                roadgraph.data,
-                roadgraph.type,
-            ],
-            dim=-1,
-        ).flatten(start_dim=1)
+        if mask is not None:
+            return torch.cat(
+                [
+                    roadgraph.data,
+                    roadgraph.type,
+                ],
+                dim=-1,
+            ).flatten(start_dim=1)
+        else:
+            return (
+                torch.cat(
+                    [
+                        roadgraph.x.unsqueeze(-1),
+                        roadgraph.y.unsqueeze(-1),
+                        roadgraph.segment_length.unsqueeze(-1),
+                        roadgraph.segment_width.unsqueeze(-1),
+                        roadgraph.segment_height.unsqueeze(-1),
+                        roadgraph.orientation.unsqueeze(-1),
+                        roadgraph.type,
+                    ],
+                    dim=-1,
+                )
+                .flatten(start_dim=2)
+            )
 
-    def _get_lidar_obs(self, mask):
+    def _get_lidar_obs(self, mask=None):
         """Get lidar observations."""
         
         if not self.config.lidar_obs:
@@ -434,24 +480,39 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         lidar = LidarObs.from_tensor(
             lidar_tensor=self.sim.lidar_tensor(),
             backend=self.backend,
+            device=self.device,
         )
 
-        return [
-            lidar.agent_samples[mask],
-            lidar.road_edge_samples[mask],
-            lidar.road_line_samples[mask],
-        ]
+        if mask is not None:
+            return [
+                lidar.agent_samples[mask],
+                lidar.road_edge_samples[mask],
+                lidar.road_line_samples[mask],
+            ]
+        else:
+            return (
+                torch.cat(
+                    [
+                        lidar.agent_samples,
+                        lidar.road_edge_samples,
+                        lidar.road_line_samples,
+                    ],
+                    dim=-1,
+                )
+                .flatten(start_dim=2)
+            )
 
-    def get_obs(self, mask):
+    def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
 
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-        ego_states = self._get_ego_state(mask).to(self.device)
-        partner_observations = self._get_partner_obs(mask).to(self.device)
-        road_map_observations = self._get_road_map_obs(mask).to(self.device)
-
+        ego_states = self._get_ego_state(mask)
+        partner_observations = self._get_partner_obs(mask)
+        road_map_observations = self._get_road_map_obs(mask)
+        lidar_observations = self._get_lidar_obs(mask)
+    
         obs = torch.cat(
             (
                 ego_states,
@@ -640,7 +701,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/training",
+        root="data/processed/examples",
         batch_size=2,
         dataset_size=100,
         sample_with_replacement=True,
@@ -651,14 +712,19 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=128,  # Number of agents to control
-        device="cuda",
+        max_cont_agents=64,  # Number of agents to control
+        device="cpu",
     )
     
     control_mask = env.cont_agent_mask
 
     # Rollout
-    obs = env.reset(control_mask)
+    obs = env.reset()
+    
+    obs_masked = env.get_obs(control_mask)
+    
+    obs = env.get_obs()
+
 
     sim_frames = []
     agent_obs_frames = []
