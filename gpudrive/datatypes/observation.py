@@ -278,10 +278,13 @@ class LidarObs:
 
     @classmethod
     def from_tensor(
-        cls, lidar_tensor: madrona_gpudrive.madrona.Tensor, backend="torch"
+        cls, 
+        lidar_tensor: madrona_gpudrive.madrona.Tensor, 
+        backend="torch",
+        device="cuda",
     ):
         if backend == "torch":
-            return cls(lidar_tensor.to_torch().clone())
+            return cls(lidar_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 

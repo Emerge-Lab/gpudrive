@@ -361,6 +361,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_state = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim.self_observation_tensor(),
             backend=self.backend,
+            device=self.device,
             mask=mask,
         )
         if self.config.norm_obs:
@@ -379,7 +380,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                 )
                 .permute(1, 2, 0)
-                .to(self.device)
             )
         else: 
             return (
@@ -394,7 +394,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                 )
                 .permute(1, 0)
-                .to(self.device)
             )
 
     def _get_partner_obs(self, mask=None):
@@ -406,6 +405,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_obs = PartnerObs.from_tensor(
             partner_obs_tensor=self.sim.partner_observations_tensor(),
             backend=self.backend,
+            device=self.device,
             mask=mask,
         )
 
@@ -428,7 +428,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     dim=-1,
                 )
                 .flatten(start_dim=2)
-                .to(self.device)
             )
 
     def _get_road_map_obs(self, mask):
@@ -439,6 +438,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         roadgraph = LocalRoadGraphPoints.from_tensor(
             local_roadgraph_tensor=self.sim.agent_roadmap_tensor(),
             backend=self.backend,
+            device=self.device,
             mask=mask,
         )
 
@@ -469,7 +469,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     dim=-1,
                 )
                 .flatten(start_dim=2)
-                .to(self.device)
             )
 
     def _get_lidar_obs(self, mask=None):
@@ -481,6 +480,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         lidar = LidarObs.from_tensor(
             lidar_tensor=self.sim.lidar_tensor(),
             backend=self.backend,
+            device=self.device,
         )
 
         if mask is not None:
@@ -500,7 +500,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     dim=-1,
                 )
                 .flatten(start_dim=2)
-                .to(self.device)
             )
 
     def get_obs(self, mask=None):
@@ -509,9 +508,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-        ego_states = self._get_ego_state(mask).to(self.device)
-        partner_observations = self._get_partner_obs(mask).to(self.device)
-        road_map_observations = self._get_road_map_obs(mask).to(self.device)
+        ego_states = self._get_ego_state(mask)
+        partner_observations = self._get_partner_obs(mask)
+        road_map_observations = self._get_road_map_obs(mask)
 
         obs = torch.cat(
             (
