@@ -23,14 +23,12 @@ import random
 import torch
 import numpy as np
 
-
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # If using CUDA
     torch.backends.cudnn.deterministic = True
-
 
 logging.basicConfig(level=logging.INFO)
 SEED = 42  # Set to any fixed value
@@ -68,7 +66,7 @@ if __name__ == "__main__":
         train_loader = SceneDataLoader(
             root=eval_config.train_dir,
             batch_size=eval_config.num_worlds,
-            dataset_size=1000
+            dataset_size=100
             if model.name != "random_baseline"
             else 1000,
             sample_with_replacement=False,
@@ -97,6 +95,7 @@ if __name__ == "__main__":
             dataset_name="train",
             deterministic=False,
             render_sim_state=False,
+            mask_obs=eval_config.mask_obs
         )
 
         df_res_test = evaluate_policy(
@@ -106,6 +105,7 @@ if __name__ == "__main__":
             dataset_name="test",
             deterministic=False,
             render_sim_state=False,
+            mask_obs=eval_config.mask_obs,
         )
 
         # Concatenate train/test results

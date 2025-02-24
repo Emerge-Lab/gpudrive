@@ -7,7 +7,7 @@ from transformers import PretrainedConfig
 login()
 
 # Define the checkpoint path
-checkpoint_path = "/home/dc4971/gpudrive/examples/experimental/eval/models/model_PPO____R_10000__02_21_19_25_40_572_003600.pt"
+checkpoint_path = "examples/experimental/eval/models/model_PPO____R_10000__02_23_13_59_35_797_000500.pt"
 
 # Load the checkpoint
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,4 +47,4 @@ policy.config = config
 
 # Push to Hugging Face Hub
 print('Pushing model to Hugging Face...')
-policy.push_to_hub("daphne-cornelisse/policy_test")
+policy.push_to_hub("daphne-cornelisse/policy_S10_000")

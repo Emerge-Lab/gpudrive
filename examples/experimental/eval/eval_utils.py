@@ -101,6 +101,8 @@ def rollout(
     episode_len = env.config.episode_len
     agent_positions = torch.zeros((env.num_worlds, env.max_agent_count, episode_len, 2))
 
+    control_mask = env.cont_agent_mask.clone()
+    
     # Reset episode
     next_obs = env.reset()
 
@@ -113,16 +115,18 @@ def rollout(
 
     # Note: Should be done on C++ side, these are bug fixes
     infos = env.get_infos()  # Initialize the bugged_agent_mask
-    bugged_agent_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.bool)
+    # bugged_agent_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.bool)
 
-    bugged_agent_mask[env.cont_agent_mask] = torch.logical_or(
-        infos.off_road[env.cont_agent_mask],
-        infos.collided[env.cont_agent_mask],
-    )
+    # bugged_agent_mask[env.cont_agent_mask] = torch.logical_or(
+    #     infos.off_road[env.cont_agent_mask],
+    #     infos.collided[env.cont_agent_mask],
+    # )
 
-    controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
+    #control_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
 
-    live_agent_mask = controlled_agent_mask.clone()
+    live_agent_mask = control_mask.clone()
+    
+   # T()
 
     for time_step in range(episode_len):
         #logging.info(f"Time step: {time_step}")
@@ -142,7 +146,6 @@ def rollout(
             # Step the environment
             env.step_dynamics(action_template)
 
-            #pdb.set_trace()
             if render_sim_state and len(active_worlds) > 0:
                 
                 has_live_agent = torch.where(
@@ -151,12 +154,10 @@ def rollout(
 
                 if time_step % render_every_n_steps == 0:
 
-                    logging.info(f"Rendering time step {time_step}")
-                    #logging.info(f"Rendering worlds: {has_live_agent}")
+                    print(f"Rendering time step {time_step}")
                     
                     if center_on_ego:
-                        #import pdb; pdb.set_trace()
-                        agent_indices = torch.argmax(controlled_agent_mask.to(torch.uint8), dim=1).tolist()
+                        agent_indices = torch.argmax(control_mask.to(torch.uint8), dim=1).tolist()
                     else:
                         agent_indices = None
 
@@ -164,7 +165,6 @@ def rollout(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
-                        # agent_positions = agent_positions,
                         center_agent_indices=agent_indices,
                     )
                     for idx, env_id in enumerate(has_live_agent):
@@ -192,8 +192,8 @@ def rollout(
         live_agent_mask[dones] = False
 
         # Process completed worlds
-        num_dones_per_world = (dones & controlled_agent_mask).sum(dim=1)
-        total_controlled_agents = controlled_agent_mask.sum(dim=1)
+        num_dones_per_world = (dones & control_mask).sum(dim=1)
+        total_controlled_agents = control_mask.sum(dim=1)
         done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(
             as_tuple=True
         )[0]
@@ -208,7 +208,7 @@ def rollout(
             break
 
     # Aggregate metrics to obtain averages across scenes
-    controlled_agents_per_scene = controlled_agent_mask.sum(dim=1).float()
+    controlled_agents_per_scene = control_mask.sum(dim=1).float()
    
     # Counts
     goal_achieved_count = (goal_achieved > 0).float().sum(axis=1)
@@ -220,7 +220,7 @@ def rollout(
             collided == 0,  # Didn't collide
             torch.logical_and(
                 off_road == 0,  # Didn't go off-road
-                controlled_agent_mask,  # Only count controlled agents
+                control_mask,  # Only count controlled agents
             ),
         ),
     ).float().sum(dim=1)
@@ -308,6 +308,7 @@ def evaluate_policy(
     device="cuda",
     deterministic=False,
     render_sim_state=False,
+    mask_obs=False,
 ):
     """Evaluate policy in the environment."""
 
@@ -355,6 +356,7 @@ def evaluate_policy(
             device=device,
             deterministic=deterministic,
             render_sim_state=render_sim_state,
+            mask_obs=mask_obs
         )
 
         # Get names from env
