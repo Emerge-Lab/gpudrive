@@ -35,7 +35,7 @@ class PufferGPUDrive(PufferEnv):
         loader_sample_with_replacement=True,
         loader_shuffle=False,
         device=None,
-        num_worlds=128,
+        num_worlds=64,
         max_controlled_agents=64,
         dynamics_model="classic",
         action_space_steer_disc=13,
