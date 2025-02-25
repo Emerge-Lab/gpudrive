@@ -97,7 +97,7 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         extend_goals: bool = False,
-        policy_mask: torch.Tensor = None,
+        policy_masks: dict = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -226,8 +226,6 @@ class MatplotlibVisualizer:
                 agent_infos[env_idx, :, 1:3].sum(axis=1) == 1
             ) & controlled_live
 
-            
-
             is_ok = ~is_offroad & ~is_collided & controlled_live ## make mask with policies
 
             # Draw the road graph
@@ -249,8 +247,10 @@ class MatplotlibVisualizer:
                 )
 
             # Draw the agents
-            if policy_mask:
-                policy_mask_world = policy_mask[idx] 
+            if policy_masks:
+                policy_mask = policy_masks[idx] 
+            else:
+                policy_mask = None
             
             self._plot_filtered_agent_bounding_boxes(
                 ax=ax,
@@ -264,7 +264,7 @@ class MatplotlibVisualizer:
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
                 extended_goals=extended_goals,
-                policy_mask=policy_mask_world
+                policy_mask=policy_mask
             )
 
             if agent_positions is not None:

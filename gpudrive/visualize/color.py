@@ -23,12 +23,6 @@ ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
     int(madrona_gpudrive.EntityType.StopSign): "Stop sign",
 }
 
-AGENT_COLOR_BY_POLICY = {
-     "policy1" : 'o',
-     "policy2" : 'y',
-     "policy3" :'g',
-
-}
 
 AGENT_COLOR_BY_STATE = {
                 "ok": "#4B77BE" ,  # Controlled and doing fine
@@ -36,7 +30,6 @@ AGENT_COLOR_BY_STATE = {
                 "off_road": "orange",  # Controlled and off-road
                 "log_replay": "#c7c7c7",  # Agents marked as expert controlled or static
             }
-
 
 
 
