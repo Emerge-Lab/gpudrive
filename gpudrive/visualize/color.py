@@ -23,7 +23,6 @@ ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
     int(madrona_gpudrive.EntityType.StopSign): "Stop sign",
 }
 
-
 AGENT_COLOR_BY_STATE = {
                 "ok": "#4B77BE" ,  # Controlled and doing fine
                 "collided": "r",  # Controlled and collided

@@ -1,6 +1,5 @@
 import torch
 from pathlib import Path
-from gpudrive.integrations.sb3.ppo import IPPO
 
 
 class PolicyActor:
@@ -23,21 +22,20 @@ class PolicyActor:
         valid_agent_mask,
         saved_model_path=None,
         policy=None,
-        model_class=IPPO,
         deterministic=True,
         device="cuda",
     ):
         self.is_controlled_func = is_controlled_func
         self.device = device
         self.deterministic = deterministic
-        self.model_class = model_class
+        
 
         if policy:
             self.policy = policy
         elif saved_model_path:
             self.policy = policy
         else:
-            raise
+            raise Exception("You must pass a policy or a path to a policy as an argument")
 
         #self.policy = self.load_model(saved_model_path)
         self.valid_and_controlled_mask = self.get_valid_actor_mask(

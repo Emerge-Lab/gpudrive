@@ -155,7 +155,7 @@ if __name__ == "__main__":
                 env_indices=list(range(NUM_WORLDS)),
                 time_steps=[time_step]*NUM_WORLDS,
                 zoom_radius=70,
-                policy_mask=policy_masks
+                policy_masks=policy_masks
             )
 
             for i in range(NUM_WORLDS):
