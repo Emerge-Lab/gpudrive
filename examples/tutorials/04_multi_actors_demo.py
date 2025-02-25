@@ -16,10 +16,28 @@ from gpudrive.agents.core import merge_actions
 from examples.experimental.eval.eval_utils import load_policy
 from gpudrive.visualize.utils import img_from_fig
 
+
+def create_policy_masks(env, num_policies=2):
+    policy_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.int)
+    agent_indices = env.cont_agent_mask.nonzero(as_tuple=True)
+    
+    for i, (world_idx, agent_idx) in enumerate(zip(*agent_indices)):
+        policy_mask[world_idx, agent_idx] = (i % num_policies) + 1
+    
+    policy_mask = {f'pi_{int(policy.item())}': (policy_mask == policy)
+            for policy in policy_mask.unique() if policy.item() != 0}
+    
+
+    policy_world_mask = {
+        world: {f'pi_{p+1}': policy_mask[f'pi_{p+1}'][world] for p in range(NUM_POLICIES)}
+        for world in range(env.cont_agent_mask.shape[0])
+    }
+    return policy_world_mask
+
 if __name__ == "__main__":
 
     # Constants
-    EPISODE_LENGTH = 90
+    EPISODE_LENGTH = 30
     MAX_CONTROLLED_AGENTS = 64 # Number of agents to control per scene
     NUM_WORLDS = 2
     DEVICE = "cpu"
@@ -41,7 +59,7 @@ if __name__ == "__main__":
     sample_with_replacement=False, 
     seed=42, 
     shuffle=True,   
-)
+    )
 
     # Make environment
     env = GPUDriveTorchEnv(
@@ -76,10 +94,14 @@ if __name__ == "__main__":
     policy_actor2 = PolicyActor(
         is_controlled_func=(obj_idx == 1),
         valid_agent_mask=env.cont_agent_mask,
-        policy=policy1,
+        policy=policy2,
         device=DEVICE,
     )
-    
+    NUM_POLICIES = 2
+
+
+    policy_masks= create_policy_masks(env,NUM_POLICIES)
+
 
     obs = env.reset(env.cont_agent_mask)
 
@@ -92,23 +114,33 @@ if __name__ == "__main__":
         print(f"Step {time_step}/{EPISODE_LENGTH}")
 
         # SELECT ACTIONS
-        rand_actions = policy_actor1.select_action(obs)
-        policy_actions = policy_actor2.select_action(obs)
+        actions1 = policy_actor1.select_action(obs)
+        actions2 = policy_actor2.select_action(obs)
 
+
+
+        actor_actions_dict = {
+                "pi_1": actions1,
+                "pi_2": actions2,
+
+                }
+        
+        actor_ids_dict={
+                "pi_1": policy_actor1.actor_ids,
+                "pi_2": policy_actor2.actor_ids,
+            }
+        
+
+                
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
         actions = merge_actions(
-            actor_actions_dict={
-                "pi_1": rand_actions,
-                "pi_2": policy_actions,
-            },
-            actor_ids_dict={
-                "pi_1": policy_actor1.actor_ids,
-                "pi_2": policy_actor2.actor_ids,
-            },
+            actor_actions_dict=actor_actions_dict,
             reference_action_tensor=env.cont_agent_mask,
+            policy_masks=policy_masks,
             device=DEVICE,
         )
+
         ## map actions ussing maks
         # STEP
         env.step_dynamics(actions)
@@ -116,23 +148,22 @@ if __name__ == "__main__":
         # GET NEXT OBS
         obs = env.get_obs(env.cont_agent_mask)
 
-        # RENDER
 
-        for world_idx in range(NUM_WORLDS):
-            if time_step % 5 == 0:
-                imgs = env.vis.plot_simulator_state(
-                    env_indices=list(range(NUM_WORLDS)),
-                    time_steps=[time_step]*NUM_WORLDS,
-                    zoom_radius=70,
-                )
-    
+        ## RENDER 
+        if time_step % 5 == 0:
+            imgs = env.vis.plot_simulator_state(
+                env_indices=list(range(NUM_WORLDS)),
+                time_steps=[time_step]*NUM_WORLDS,
+                zoom_radius=70,
+                policy_mask=policy_masks
+            )
+
             for i in range(NUM_WORLDS):
                 frames_dict[f"scene_{i}"].append(img_from_fig(imgs[i])) 
 
-            
- 
-    # # # # # # # #
-    # Done. Save videos
+
+
+
     for scene_name, frames_list in frames_dict.items():
         frames_arr = np.array(frames_list)
         save_path = f"{VIDEO_PATH}{scene_name}.gif"

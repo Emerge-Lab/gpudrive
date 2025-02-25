@@ -97,6 +97,7 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         extend_goals: bool = False,
+        policy_mask: torch.Tensor = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -224,7 +225,10 @@ class MatplotlibVisualizer:
             is_collided = (
                 agent_infos[env_idx, :, 1:3].sum(axis=1) == 1
             ) & controlled_live
-            is_ok = ~is_offroad & ~is_collided & controlled_live
+
+            
+
+            is_ok = ~is_offroad & ~is_collided & controlled_live ## make mask with policies
 
             # Draw the road graph
             self._plot_roadgraph(
@@ -245,6 +249,9 @@ class MatplotlibVisualizer:
                 )
 
             # Draw the agents
+            if policy_mask:
+                policy_mask_world = policy_mask[idx] 
+            
             self._plot_filtered_agent_bounding_boxes(
                 ax=ax,
                 env_idx=env_idx,
@@ -256,7 +263,8 @@ class MatplotlibVisualizer:
                 alpha=1.0,
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
-                extended_goals=extended_goals
+                extended_goals=extended_goals,
+                policy_mask=policy_mask_world
             )
 
             if agent_positions is not None:
@@ -525,6 +533,7 @@ class MatplotlibVisualizer:
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
+        policy_mask : torch.Tensor = None
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -559,7 +568,7 @@ class MatplotlibVisualizer:
             as_center_pts=as_center_pts,
             label=label,
         )
-
+      
         if plot_goal_points:
             for mask, color in [(is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
                           (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
@@ -567,7 +576,7 @@ class MatplotlibVisualizer:
 
                 if not mask.any():
                     continue
-
+   
                 # Plot original goals
                 goal_x = agent_states.goal_x[env_idx, mask].numpy()
                 goal_y = agent_states.goal_y[env_idx, mask].numpy()
@@ -670,27 +679,64 @@ class MatplotlibVisualizer:
                 )
                 ax.add_patch(circle)
 
-        # Living agents
-        bboxes_controlled_ok = np.stack(
-            (
-                agent_states.pos_x[env_idx, is_ok_mask].numpy(),
-                agent_states.pos_y[env_idx, is_ok_mask].numpy(),
-                agent_states.vehicle_length[env_idx, is_ok_mask].numpy(),
-                agent_states.vehicle_width[env_idx, is_ok_mask].numpy(),
-                agent_states.rotation_angle[env_idx, is_ok_mask].numpy(),
-            ),
-            axis=1,
-        )
 
-        utils.plot_numpy_bounding_boxes(
-            ax=ax,
-            bboxes=bboxes_controlled_ok,
-            color=AGENT_COLOR_BY_STATE["ok"],
-            alpha=alpha,
-            line_width_scale=line_width_scale,
-            as_center_pts=as_center_pts,
-            label=label,
-        )
+        if not policy_mask:
+            # Living agents
+            bboxes_controlled_ok = np.stack(
+                (
+                    agent_states.pos_x[env_idx, is_ok_mask].numpy(),
+                    agent_states.pos_y[env_idx, is_ok_mask].numpy(),
+                    agent_states.vehicle_length[env_idx, is_ok_mask].numpy(),
+                    agent_states.vehicle_width[env_idx, is_ok_mask].numpy(),
+                    agent_states.rotation_angle[env_idx, is_ok_mask].numpy(),
+                ),
+                axis=1,
+            )
+
+            
+
+            utils.plot_numpy_bounding_boxes(
+                ax=ax,
+                bboxes=bboxes_controlled_ok,
+                color=AGENT_COLOR_BY_STATE["ok"],#color,#
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+            )
+        else:
+            color_list = ['g','b']
+            # color_zip = zip(policy_mask.keys(),color_list)
+
+            # for policy_name,color in color_zip:
+            bboxes = []
+
+            for policy_name,mask in policy_mask.items():
+          
+                bboxes_controlled_ok = np.stack(
+                    (
+                        agent_states.pos_x[env_idx, mask].numpy(),
+                        agent_states.pos_y[env_idx, mask].numpy(),
+                        agent_states.vehicle_length[env_idx, mask].numpy(),
+                        agent_states.vehicle_width[env_idx, mask].numpy(),
+                        agent_states.rotation_angle[env_idx, mask].numpy(),
+                    ),
+                    axis=1,
+                    )
+                bboxes.append(bboxes_controlled_ok)
+
+            
+
+
+            utils.plot_numpy_bounding_boxes_multiple_policy(
+                ax=ax,
+                bboxes_s=bboxes,
+                colors=color_list,#AGENT_COLOR_BY_STATE["ok"],
+                alpha=alpha,
+                line_width_scale=line_width_scale,
+                as_center_pts=as_center_pts,
+                label=label,
+            )
 
         if plot_goal_points:
             goal_x = agent_states.goal_x[env_idx, is_ok_mask].numpy()
