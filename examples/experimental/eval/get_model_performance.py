@@ -66,7 +66,7 @@ if __name__ == "__main__":
         train_loader = SceneDataLoader(
             root=eval_config.train_dir,
             batch_size=eval_config.num_worlds,
-            dataset_size=100
+            dataset_size=model.train_dataset_size
             if model.name != "random_baseline"
             else 1000,
             sample_with_replacement=False,
@@ -95,7 +95,6 @@ if __name__ == "__main__":
             dataset_name="train",
             deterministic=False,
             render_sim_state=False,
-            mask_obs=eval_config.mask_obs
         )
 
         df_res_test = evaluate_policy(
@@ -105,7 +104,6 @@ if __name__ == "__main__":
             dataset_name="test",
             deterministic=False,
             render_sim_state=False,
-            mask_obs=eval_config.mask_obs,
         )
 
         # Concatenate train/test results
