@@ -291,7 +291,6 @@ def evaluate_policy(
     device="cuda",
     deterministic=False,
     render_sim_state=False,
-    mask_obs=False,
 ):
     """Evaluate policy in the environment."""
 
