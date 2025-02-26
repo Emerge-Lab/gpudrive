@@ -10,7 +10,7 @@
 .vscode/tasks.json
 
 /examples/benchmarks/results/
-/baselines/ippo/logs/*
+/baselines/ppo/logs/*
 *.sif
 /cloudpickle
 /cloudpickle-3.0.0.dist-info
@@ -19,6 +19,7 @@
 /zipp*
 .python-version
 /google-cloud-sdk/*
+*.gz
 
 # Data
 hpc/overlay*
@@ -26,6 +27,9 @@ data/raw/*
 data/processed/validation/*
 data/processed/training/*
 data/processed/testing/*
+data/processed/sampled/*
+data/processed/hand_designed/*
+analyze/figures/*
 
 # Logging
 /wandb
@@ -243,6 +247,17 @@ pyrightconfig.json
 .env
 
 # Logs
-examples/experiments/scripts/logs/*
+examples/experimental/logs/*
+
+# Sbatch scripts
+*.sh
+
+# Videos
+videos/
+output_videos_larger_dataset/
+output_videos_small_dataset/
+
+# Trained models
+models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++

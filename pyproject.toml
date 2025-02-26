@@ -1,36 +1,62 @@
 [build-system]
-requires = ["poetry-core"]
+requires = [
+    "setuptools>=42",
+    "scikit-build>=0.13",
+    "cmake>=3.18",
+    "ninja",
+]
 build-backend = "madrona-py-build"
 backend-path = ["external/madrona/py"]
+wheel-directory = "build"
 
 [project]
 name = "gpudrive"
 version = "0.3.0"
+authors = [
+    {name = "Saman Kazemkheni", email = "skazemkhani@gmail.com"},
+    {name = "Aarav Pandya", email = "pandya.aarav.97@gmail.com"},
+    {name = "Daphne Cornelisse", email = "cor.daphne@gmail.com"},
+    {name = "Eugene Vinitsky", email ="vinitsky.eugene@gmail.com"},
+]
+readme = "README.md"
+description = "A GPU-accelerated, multi-agent driving simulator"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26.4",
+    "gymnasium",
+    "pygame",
+    "matplotlib==3.9",
+    "pandas",
+    "python-box==7.2.0",
+    "typer",
+    "pyyaml", 
+    "mediapy",
+    "wandb",
+    "torch>=2.2.1",
+    "seaborn",
+]
 
-[tool.madrona.packages.gpudrive]
+[project.optional-dependencies]
+pufferlib = [
+    "pufferlib>=2.0.6",
+]
+sb3 = [
+    "stable-baselines3==2.3.2",
+]
+
+test = [
+    "pytest>=8.2.1",
+]
+
+[tool.madrona.packages.madrona_gpudrive]
 ext-only = true
 ext-out-dir = "build"
 
-# This module includes the PPO implementation for the training demo
-[tool.madrona.packages.gpudrive_learn]
-path = "train_src/gpudrive_learn"
+[tool.madrona.packages.gpudrive]
+path = "gpudrive"
 
-[tool.poetry.build]
-script = "build_gpudrive.py"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-torch = "^2.2.1"
-numpy = "^1.23.3"
-pytest = "^8.2.1"
-
-[tool.poetry]
-name = "gpudrive"
-version = "0.3.0"
-description = ""
-authors = ["Saman Kazemkheni <skazemkhani@gmail.com>", "Aarav Pandya <pandya.aarav.97@gmail.com", "Daphne Cornelisse <cor.daphne@gmail.com>", "Eugene Vinitsky <vinitsky.eugene@gmail.com>"]
-readme = "README.md"
-packages = [
-    {include = "gpudrive.cpython-31*-*.so", from = "build", to = "gpudrive"},
-    {include = "pygpudrive"}
+[project.packages]
+include = [
+    "baselines",
+    "baselines/*",
 ]
