@@ -132,7 +132,7 @@ namespace madrona_gpudrive
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
-
+        
         static inline Action zero()
         {
             return Action{
@@ -225,7 +225,7 @@ namespace madrona_gpudrive
                 .type = static_cast<float>(EntityType::None),
                 .id = -1,
                 .mapType = static_cast<float>(MapType::UNKNOWN)
-            };       
+            };
         }
     };
 

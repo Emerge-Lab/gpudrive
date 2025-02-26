@@ -8,6 +8,7 @@
 .vscode/launch.json
 .vscode/settings.json
 .vscode/tasks.json
+
 /examples/benchmarks/results/
 /baselines/ppo/logs/*
 *.sif
@@ -24,8 +25,8 @@
 hpc/overlay*
 data/raw/*
 data/processed/validation/*
-data/processed/testing/*
 data/processed/training/*
+data/processed/testing/*
 data/processed/sampled/*
 data/processed/hand_designed/*
 analyze/figures/*

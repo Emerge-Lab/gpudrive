@@ -93,12 +93,18 @@ class EnvConfig:
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
+    # Initialization steps: Number of steps to take before the episode starts
+    init_steps: int = 0
+    
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
         2.0  # Radius around goal considered as "goal achieved"
     )
+
+    # Integrations: Enable pre-trained Versatile Behavior Diffusion model
+    return_vbd_data: bool = False
 
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_agents_in_scene: int = (
@@ -119,6 +125,7 @@ class EnvConfig:
     init_mode: str = (
         "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
     )
+
 
 
 class SelectionDiscipline(Enum):
@@ -185,5 +192,6 @@ class RenderConfig:
     resolution: Tuple[int, int] = (1024, 1024)
     draw_expert_trajectories: bool = False
     draw_only_controllable_veh: bool = False
+    obj_idx_font_size: int = 9
     render_3d: bool = False
     vehicle_height: float = 0.06
