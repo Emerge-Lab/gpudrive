@@ -6,7 +6,6 @@ import torch
 from itertools import product
 import mediapy as media
 import gymnasium
-import pufferlib.spaces
 
 from gpudrive.datatypes.observation import (
     LocalEgoState,
