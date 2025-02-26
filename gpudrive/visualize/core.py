@@ -24,6 +24,7 @@ from gpudrive.visualize.color import (
     ROAD_GRAPH_TYPE_NAMES,
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
+    AGENT_COLOR_BY_POLICY,
 )
 
 OUT_OF_BOUNDS = 1000
@@ -705,10 +706,9 @@ class MatplotlibVisualizer:
                 label=label,
             )
         else:
-            color_list = ['g','b']
-            # color_zip = zip(policy_mask.keys(),color_list)
+            
 
-            # for policy_name,color in color_zip:
+
             bboxes = []
 
             for policy_name,mask in policy_mask.items():
@@ -731,7 +731,7 @@ class MatplotlibVisualizer:
             utils.plot_numpy_bounding_boxes_multiple_policy(
                 ax=ax,
                 bboxes_s=bboxes,
-                colors=color_list,#AGENT_COLOR_BY_STATE["ok"],
+                colors=AGENT_COLOR_BY_POLICY,#AGENT_COLOR_BY_STATE["ok"],
                 alpha=alpha,
                 line_width_scale=line_width_scale,
                 as_center_pts=as_center_pts,
