@@ -130,8 +130,7 @@ if __name__ == "__main__":
                 "pi_2": policy_actor2.actor_ids,
             }
         
-
-                
+      
 
         # MERGE ACTIONS FROM DIFFERENT SIM AGENTS
         actions = merge_actions(
@@ -150,7 +149,7 @@ if __name__ == "__main__":
 
 
         ## RENDER 
-        if time_step % 5 == 0:
+        if time_step % 2 == 0:
             imgs = env.vis.plot_simulator_state(
                 env_indices=list(range(NUM_WORLDS)),
                 time_steps=[time_step]*NUM_WORLDS,
