@@ -117,7 +117,7 @@ class EnvConfig:
 
     # Initialization mode
     init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
+        "all_valid"  # Options: all_non_trivial, all_objects, all_valid
     )
 
 

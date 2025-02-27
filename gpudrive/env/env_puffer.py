@@ -344,7 +344,6 @@ class PufferGPUDrive(PufferEnv):
                         "total_controlled_agents": self.num_agents,
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
-                        "num_truncated": num_truncated,
                         "perc_truncated": num_truncated / num_finished_agents,
                         "num_completed_episodes": len(done_worlds),
                         "total_collisions": total_collisions.item(),
