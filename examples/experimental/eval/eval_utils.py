@@ -115,7 +115,6 @@ def rollout(
     live_agent_mask = control_mask.clone()
 
     for time_step in range(episode_len):
-        logging.info(f"Time step: {time_step}")
         
         # Get actions for active agents
         if live_agent_mask.any():
@@ -179,7 +178,6 @@ def rollout(
             if world in active_worlds:
                 active_worlds.remove(world)
                 episode_lengths[world] = time_step
-                logging.debug(f"World {world} done at time step {time_step}")
 
         if return_agent_positions:
             global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())

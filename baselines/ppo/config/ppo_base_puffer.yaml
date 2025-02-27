@@ -32,7 +32,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "gpudrive"
-  group: "perfect_scores_0221"
+  group: "test"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -81,7 +81,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 200 # Save policy every k iterations
+  checkpoint_interval: 400 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
