@@ -33,6 +33,31 @@ def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     
+
+def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
+    """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
+    fig.subplots_adjust(
+        left=0.0, bottom=0.0, right=1.0, top=1.0, wspace=0.0, hspace=0.0
+    )
+    fig.canvas.draw()
+
+    # Extract image data
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    plt.close(fig)  # Close the figure
+    return img
+
+
+def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
+    """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
+    # Display xticks and yticks and title.
+    fig.subplots_adjust(
+        left=0.08, bottom=0.08, right=0.98, top=0.9, wspace=0.0, hspace=0.0
+    )
+    fig.canvas.draw()
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close(fig)
     return img
 
@@ -231,7 +256,6 @@ def plot_numpy_bounding_boxes_multiple_policy(
                 linewidth=1.5 * line_width_scale,
                 label=label,
             )
-
 
 
 

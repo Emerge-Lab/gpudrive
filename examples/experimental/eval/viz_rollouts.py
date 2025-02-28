@@ -3,11 +3,16 @@ import logging
 from pathlib import Path
 from tqdm import tqdm
 import torch
+<<<<<<< HEAD
 import mediapy
 import numpy as np
 
 from eval_utils import load_policy, rollout, load_config, make_env
 from gpudrive.env.dataset import SceneDataLoader
+=======
+from eval_utils import load_policy, rollout, load_config, make_env
+from pygpudrive.env.dataset import SceneDataLoader
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
 
 def visualize_rollouts(
     env,
@@ -16,7 +21,10 @@ def visualize_rollouts(
     config,
     save_path,
     num_scenes=None,
+<<<<<<< HEAD
     make_videos=True,
+=======
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
 ):
     """
     Visualize policy rollouts for specified number of scenes.
@@ -59,7 +67,11 @@ def visualize_rollouts(
             _, _,  # off_road
             _, _,  # not_goal_nor_crashed            
             _,# controlled_agents_in_scene
+<<<<<<< HEAD
             sim_state_frames, # sim state frames
+=======
+            _, # sim state frames
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
             agent_positions,
             _, # episode lengths
         ) = rollout(
@@ -67,6 +79,7 @@ def visualize_rollouts(
             policy=policy,
             device=config.device,
             deterministic=config.deterministic,
+<<<<<<< HEAD
             render_sim_state=config.render_sim_state if make_videos else False,
             return_agent_positions=True,
             zoom_radius=40
@@ -78,12 +91,25 @@ def visualize_rollouts(
             env_indices=list(range(len(batch))),
             time_steps=[-1] * len(batch),
             zoom_radius = 40,
+=======
+            render_sim_state=config.render_sim_state,
+            return_agent_positions=True
+        )
+        
+        # Reset environment to visualize final states with trajectories
+        _ = env.reset()
+        final_states = env.vis.plot_simulator_state(
+            env_indices=list(range(len(batch))),
+            time_steps=[-1] * len(batch),
+            zoom_radius = 75,
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
             agent_positions=agent_positions
         )
         
         # Save final states with trajectories
         for i, fig in enumerate(final_states):
             scene_name = Path(batch[i]).stem
+<<<<<<< HEAD
             fig.savefig(os.path.join(save_path, f"{scene_name}_3d.png"))
 
         if make_videos:
@@ -104,6 +130,13 @@ def visualize_rollouts(
 if __name__ == "__main__":
     # Load configuration
     config = load_config("examples/experimental/eval/config/visualization_config")
+=======
+            fig.savefig(os.path.join(save_path, f"{scene_name}_rollout.png"))
+
+if __name__ == "__main__":
+    # Load configuration
+    config = load_config("examples/experiments/eval/config/visualization_config")
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
     
     # Initialize data loader
     data_loader = SceneDataLoader(
@@ -114,7 +147,11 @@ if __name__ == "__main__":
     )
     
     # Create environment
+<<<<<<< HEAD
     env = make_env(config, data_loader, render_3d=True)
+=======
+    env = make_env(config, data_loader)
+>>>>>>> 659f38b991ec318339d4566726c854d1a8493e91
     
     # Load policy
     policy = load_policy(
