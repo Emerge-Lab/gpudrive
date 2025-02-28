@@ -90,6 +90,7 @@ class MatplotlibVisualizer:
         zoom_radius: int = 100,
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
+        backward_goals: bool = False,
         extend_goals: bool = False,
         policy_masks: dict = None,
     ):
@@ -104,6 +105,8 @@ class MatplotlibVisualizer:
             zoom_radius: Radius for zooming in around the center agent.
             return_single_figure: If True, plots all environments in a single figure.
                                 Otherwise, returns a list of figures.
+
+            policy mask is a dictionary seperated into world->policy->agent_controll_mask
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -195,19 +198,6 @@ class MatplotlibVisualizer:
             ax.set_aspect("equal", adjustable="box")
             figs.append(fig)  # Add the new figure
             plt.close(fig)  # Close the figure to prevent carryover
-
-            # Render the pre-cached road graph for the current environment
-            # cached_roadgraph_array = utils.bg_img_from_fig(self.cached_roadgraphs[env_idx])
-            # ax.imshow(
-            #     cached_roadgraph_array,
-            #     origin="upper",
-            #     extent=(-100, 100, -100, 100),  # Stretch to full plot
-            #     zorder=0,  # Draw as background
-            # )
-
-            # Explicitly set the axis limits to match your coordinates
-            # cached_ax.set_xlim(-100, 100)
-            # cached_ax.set_ylim(-100, 100)
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
