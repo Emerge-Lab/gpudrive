@@ -30,7 +30,7 @@ from gpudrive.visualize.color import (
     ROAD_GRAPH_TYPE_NAMES,
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
-    AGENT_COLOR_BY_POLICY
+    AGENT_COLOR_BY_POLICY,
 )
 
 OUT_OF_BOUNDS = 1000
@@ -143,6 +143,7 @@ class MatplotlibVisualizer:
         )
 
         if backward_goals:
+
 
             # Get world means for coordinate transformation
             means_xy = (
@@ -277,7 +278,8 @@ class MatplotlibVisualizer:
             is_collided = (
                 agent_infos[env_idx, :, 1:3].sum(axis=1) == 1
             ) & controlled_live
-            is_ok = ~is_offroad & ~is_collided & controlled_live
+
+            is_ok = ~is_offroad & ~is_collided & controlled_live ## make mask with policies
 
             # Draw the road graph
             self._plot_roadgraph(
@@ -299,6 +301,11 @@ class MatplotlibVisualizer:
 
             
             # Draw the agents
+            if policy_masks:
+                policy_mask = policy_masks[idx] 
+            else:
+                policy_mask = None
+            
             self._plot_filtered_agent_bounding_boxes(
                 ax=ax,
                 env_idx=env_idx,
@@ -315,8 +322,6 @@ class MatplotlibVisualizer:
             )
 
             if agent_positions is not None:
-                # First calculate the maximum valid trajectory length across all agents for this env_idx
-                max_valid_length = 0
                 for agent_idx in range(agent_positions.shape[1]):
                     if controlled_live[agent_idx]:
                         trajectory = agent_positions[
@@ -353,6 +358,7 @@ class MatplotlibVisualizer:
                         valid_trajectory = trajectory[valid_mask]
 
                         if len(valid_trajectory) > 1:
+                            # Convert to numpy and ensure correct shape
                             points = valid_trajectory.cpu().numpy()
 
                             if self.render_3d:
@@ -466,6 +472,7 @@ class MatplotlibVisualizer:
             fig.tight_layout(pad=2, rect=[0.00, 0.00, 0.9, 1])
 
         return figs
+
 
     def _plot_log_replay_trajectory(
         self,
@@ -1228,57 +1235,57 @@ class MatplotlibVisualizer:
                 bboxes_controlled_ok.append(bboxes)
 
 
-        if self.render_3d:
-            plot_agent_group_3d(
+            if self.render_3d:
+                plot_agent_group_3d(
                 bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
             )
-        else:
+
             if not policy_mask:
                 plot_agent_group_2d(bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"])
             else:
                 plot_agent_group_2d(bboxes_controlled_ok,AGENT_COLOR_BY_POLICY,by_policy=True)
 
-        # Plot log replay agents
-        log_replay = (
-            response_type.static[env_idx, :] | response_type.moving[env_idx, :]
-        ) & ~self.controlled_agent_mask[env_idx, :]
+            # Plot log replay agents
+            log_replay = (
+                response_type.static[env_idx, :] | response_type.moving[env_idx, :]
+            ) & ~self.controlled_agent_mask[env_idx, :]
 
-        pos_x = agent_states.pos_x[env_idx, log_replay]
-        pos_y = agent_states.pos_y[env_idx, log_replay]
-        rotation_angle = agent_states.rotation_angle[env_idx, log_replay]
-        vehicle_length = agent_states.vehicle_length[env_idx, log_replay]
-        vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
+            pos_x = agent_states.pos_x[env_idx, log_replay]
+            pos_y = agent_states.pos_y[env_idx, log_replay]
+            rotation_angle = agent_states.rotation_angle[env_idx, log_replay]
+            vehicle_length = agent_states.vehicle_length[env_idx, log_replay]
+            vehicle_width = agent_states.vehicle_width[env_idx, log_replay]
 
-        valid_mask = (
-            (torch.abs(pos_x) < OUT_OF_BOUNDS)
-            & (torch.abs(pos_y) < OUT_OF_BOUNDS)
-            & (
-                (vehicle_length > 0.5)
-                & (vehicle_length < 15)
-                & (vehicle_width > 0.5)
-                & (vehicle_width < 15)
+            valid_mask = (
+                (torch.abs(pos_x) < OUT_OF_BOUNDS)
+                & (torch.abs(pos_y) < OUT_OF_BOUNDS)
+                & (
+                    (vehicle_length > 0.5)
+                    & (vehicle_length < 15)
+                    & (vehicle_width > 0.5)
+                    & (vehicle_width < 15)
+                )
             )
-        )
 
-        bboxes_static = np.stack(
-            (
-                pos_x[valid_mask].numpy(),
-                pos_y[valid_mask].numpy(),
-                vehicle_length[valid_mask].numpy(),
-                vehicle_width[valid_mask].numpy(),
-                rotation_angle[valid_mask].numpy(),
-            ),
-            axis=1,
-        )
+            bboxes_static = np.stack(
+                (
+                    pos_x[valid_mask].numpy(),
+                    pos_y[valid_mask].numpy(),
+                    vehicle_length[valid_mask].numpy(),
+                    vehicle_width[valid_mask].numpy(),
+                    rotation_angle[valid_mask].numpy(),
+                ),
+                axis=1,
+            )
 
-        if self.render_3d:
-            plot_agent_group_3d(
+            if self.render_3d:
+                plot_agent_group_3d(
                 bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
             )
-        else:
-            plot_agent_group_2d(
+            else:
+                plot_agent_group_2d(
                 bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
-            )
+                              )
 
     def _plot_expert_trajectories(
         self,
