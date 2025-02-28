@@ -105,10 +105,10 @@ def make_videos(
 if __name__ == "__main__":
 
     # Specify which model to load and the dataset to evaluate
-    MODEL_TO_LOAD = "model_PPO____S_800__02_24_15_17_45_245_002400" #"model_PPO____R_10000__02_20_09_07_57_249_006000" #"model_PPO__C__R_10000__01_28_20_57_35_873_011426"
+    MODEL_TO_LOAD = "model_PPO____S_1000__02_26_08_54_58_359_009200"
     DATASET = "train"
     SORT_BY = None #"goal_achieved_frac" 
-    SHOW_TOP_K = 10 # Render this many scenes
+    SHOW_TOP_K = 50 # Render this many scenes
 
     # Configurations
     eval_config = load_config("examples/experimental/eval/config/eval_config")
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         show_top_k=SHOW_TOP_K,
         dataset=DATASET,
         device=eval_config.device,
-        zoom_radius=50,
+        zoom_radius=40,
         deterministic=False,
         render_every_n_steps=1,
         #center_on_ego=True,
@@ -173,7 +173,7 @@ if __name__ == "__main__":
         mediapy.write_video(
             str(video_path),
             frames,
-            fps=15,
+            fps=17,
             codec='gif',
         )
 

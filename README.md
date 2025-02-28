@@ -211,6 +211,12 @@ Several pre-trained policies are available via the `PyTorchModelHubMixin` class 
 - **Best Policy (10,000 Scenarios).** The best policy from [Building reliable sim driving agents by scaling self-play](https://arxiv.org/abs/2502.14706) is available here [here](https://huggingface.co/daphne-cornelisse/policy_S10_000_02_27). This policy was trained on 10,000 randomly sampled scenarios from the WOMD training dataset. 
 - **Alternative Policy (1,000 Scenarios).** A policy trained on 1,000 scenarios can be found [here](https://huggingface.co/daphne-cornelisse/policy_S1000_02_27).
 
+---
+
+> Note: These models were trained with the environment configurations in `baselines/ppo/config/ppo_base_puffer.yaml`, changing these configurations will affect performance. 
+
+---
+
 ### Usage
 
 To load a pre-trained policy, use the following:

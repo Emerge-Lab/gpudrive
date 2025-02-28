@@ -526,7 +526,7 @@ class MatplotlibVisualizer:
             ])
         
         # Create 3D collection and add to axis
-        poly3d = Poly3DCollection(faces, alpha=alpha)
+        poly3d = Poly3DCollection(faces, alpha=alpha, zorder=1)
         poly3d.set_facecolor(facecolor)
         if edgecolor:
             poly3d.set_edgecolor(edgecolor)
@@ -675,7 +675,7 @@ class MatplotlibVisualizer:
                             ax, points, height,
                             facecolor="white",
                             edgecolor="xkcd:bluish grey",
-                            alpha=0.4
+                            alpha=0.4,
                         )
                 else:
                     for x, y, length, width, orientation in zip(
