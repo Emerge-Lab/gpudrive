@@ -30,6 +30,8 @@ AGENT_COLOR_BY_STATE = {
     "log_replay": "#c7c7c7",  # Agents marked as expert controlled or static
 }
 
+AGENT_COLOR_BY_POLICY= ['g','b']
+
 REL_OBS_OBJ_COLORS = {
     "ego": "#0066ff",
     "ego_goal": "#0099cc",

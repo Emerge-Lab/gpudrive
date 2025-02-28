@@ -149,6 +149,91 @@ def plot_numpy_bounding_boxes(
             label=label,
         )
 
+def plot_numpy_bounding_boxes_multiple_policy(
+    ax: matplotlib.axes.Axes,
+    bboxes_s: List[np.ndarray],
+    colors: List[np.ndarray],
+    alpha: Optional[float] = 1.0,
+    line_width_scale: float = 1.5,
+    as_center_pts: bool = False,
+    label: Optional[str] = None,
+) -> None:
+    """Plots multiple bounding boxes.
+
+    Args:
+      ax: Fig handles.
+      bboxes: Shape (num_bbox, 5), with last dimension as (x, y, length, width,
+        yaw).
+      color: Shape (3,), represents RGB color for drawing.
+      alpha: Alpha value for drawing, i.e. 0 means fully transparent.
+      as_center_pts: If set to True, bboxes will be drawn as center points,
+        instead of full bboxes.
+      label: String, represents the meaning of the color for different boxes.
+    """
+
+    for bboxes,color in zip(bboxes_s,colors):
+        if bboxes.ndim != 2 or bboxes.shape[1] != 5:
+            raise ValueError(
+                (
+                    "Expect bboxes rank 2, last dimension of bbox 5"
+                    " got{}, {}, {} respectively"
+                ).format(bboxes.ndim, bboxes.shape[1], color.shape)
+            )
+
+        if as_center_pts:
+            ax.plot(
+                bboxes[:, 0],
+                bboxes[:, 1],
+                "o",
+                color=color,
+                ms=2,
+                alpha=alpha,
+                linewidth=1.7 * line_width_scale,
+                label=label,
+            )
+        else:
+            c = np.cos(bboxes[:, 4])
+            s = np.sin(bboxes[:, 4])
+            pt = np.array((bboxes[:, 0], bboxes[:, 1]))  # (2, N)
+            length, width = bboxes[:, 2], bboxes[:, 3]
+            u = np.array((c, s))
+            ut = np.array((s, -c))
+
+            # Compute box corner coordinates.
+            tl = pt + length / 2 * u - width / 2 * ut
+            tr = pt + length / 2 * u + width / 2 * ut
+            br = pt - length / 2 * u + width / 2 * ut
+            bl = pt - length / 2 * u - width / 2 * ut
+
+            # Compute heading arrow using center left/right/front.
+            cl = pt - width / 2 * ut
+            cr = pt + width / 2 * ut
+            cf = pt + length / 2 * u
+
+            # Draw bboxes.
+            ax.plot(
+                [tl[0, :], tr[0, :], br[0, :], bl[0, :], tl[0, :]],
+                [tl[1, :], tr[1, :], br[1, :], bl[1, :], tl[1, :]],
+                color=color,
+                zorder=4,
+                linewidth=1.7 * line_width_scale,
+                alpha=alpha,
+                label=label,
+            )
+
+            # Draw heading arrow.
+            ax.plot(
+                [cl[0, :], cr[0, :], cf[0, :], cl[0, :]],
+                [cl[1, :], cr[1, :], cf[1, :], cl[1, :]],
+                color=color,
+                zorder=4,
+                alpha=alpha,
+                linewidth=1.5 * line_width_scale,
+                label=label,
+            )
+
+
+
 
 def plot_bounding_box(
     ax: matplotlib.axes.Axes,
