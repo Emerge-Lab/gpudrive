@@ -214,7 +214,7 @@ Several pre-trained policies are available via the `PyTorchModelHubMixin` class 
 
 ---
 
-> Note: These models were trained with the environment configurations in `baselines/ppo/config/ppo_base_puffer.yaml`, changing these configurations will affect performance. 
+> Note: These models were trained with the environment configurations defined in `examples/experimental/config/reliable_agents_params.yaml`, changing environment/observation configurations will affect performance. 
 
 ---
 
