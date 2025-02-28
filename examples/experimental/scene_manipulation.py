@@ -115,7 +115,7 @@ def test_policy_robustness(
 
 if __name__ == "__main__":
     
-    config = load_config("examples/experiments/eval/config/scene_manipulation_config")
+    config = load_config("examples/experimental/eval/config/scene_manipulation_config")
     
     train_loader = SceneDataLoader(
         root=config.train_path,

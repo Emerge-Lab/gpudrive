@@ -20,8 +20,8 @@ norm_obs: true
 remove_non_vehicles: true 
 lidar_obs: false
 reward_type: "weighted_combination"
-collision_weight: -0.5
-off_road_weight: -0.5
+collision_weight: -0.75
+off_road_weight: -0.75
 goal_achieved_weight: 1.0
 dynamics_model: "classic"
 collision_behavior: "ignore" 

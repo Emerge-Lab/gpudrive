@@ -5,6 +5,7 @@ from torch import nn
 from torch.distributions.utils import logits_to_probs
 import pufferlib.models
 from gpudrive.env import constants
+from huggingface_hub import PyTorchModelHubMixin
 
 import madrona_gpudrive
 
@@ -64,22 +65,37 @@ def sample_logits(
 
     return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
     
-class NeuralNet(nn.Module):
+class NeuralNet(
+    nn.Module,
+    PyTorchModelHubMixin,
+    repo_url="https://github.com/Emerge-Lab/gpudrive",
+    docs_url="https://arxiv.org/abs/2502.14706",
+    tags=["ffn"]
+):
     def __init__(
         self,
-        action_dim,
+        action_dim=91, # Default: 7 * 13
         input_dim=64,
         hidden_dim=128,
         dropout=0.00,
         act_func="tanh",
+        max_controlled_agents=64,
+        obs_dim=2984, # Size of the flattened observation vector 
     ):
         super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.action_dim = action_dim
+        self.max_controlled_agents = max_controlled_agents
+        self.max_observable_agents = max_controlled_agents - 1
+        self.obs_dim = obs_dim
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
+          
+        # Indices for unpacking the observation
+        self.ego_state_idx = constants.EGO_FEAT_DIM
+        self.partner_obs_idx = constants.PARTNER_FEAT_DIM * self.max_controlled_agents
     
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -160,18 +176,16 @@ class NeuralNet(nn.Module):
             ego_state, road_objects, road_graph (torch.Tensor).
         """
 
-        ego_state = obs_flat[:, : constants.EGO_FEAT_DIM]
-        vis_state = obs_flat[:, constants.EGO_FEAT_DIM :]
-
-        ro_end_idx = constants.PARTNER_FEAT_DIM * constants.ROAD_GRAPH_FEAT_DIM
-        rg_end_idx = ro_end_idx + (
-            constants.ROAD_GRAPH_FEAT_DIM * TOP_K_ROAD_POINTS
+        # Unpack modalities
+        ego_state = obs_flat[:, : self.ego_state_idx]
+        partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
+        roadgraph_obs = obs_flat[:, self.partner_obs_idx:]
+        
+        # Reshape
+        road_objects = partner_obs.view(
+            -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
         )
-
-        road_objects = vis_state[:, :ro_end_idx].reshape(
-            -1, constants.ROAD_GRAPH_FEAT_DIM, constants.PARTNER_FEAT_DIM
-        )
-        road_graph = vis_state[:, ro_end_idx:rg_end_idx].reshape(
+        road_graph = roadgraph_obs.view(
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
 
