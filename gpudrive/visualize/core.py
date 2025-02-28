@@ -2,11 +2,13 @@ import torch
 import matplotlib
 matplotlib.use('Agg')
 from typing import Tuple, Optional, List, Dict, Any, Union
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+from matplotlib.colors import ListedColormap
 import numpy as np
 import pandas as pd
 import madrona_gpudrive
@@ -247,8 +249,9 @@ class MatplotlibVisualizer:
                                     (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
                         max_valid_length = max(max_valid_length, valid_mask.sum().item())
 
-                # Create a custom axes for the colorbar with the new max length
-                cmap = plt.cm.Blues
+                # Create color palette
+                palette = sns.light_palette(AGENT_COLOR_BY_STATE["ok"])
+                cmap = ListedColormap(palette)
                 norm = plt.Normalize(vmin=0, vmax=max_valid_length)
                 sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -279,7 +282,7 @@ class MatplotlibVisualizer:
                                 colors = cmap(norm(t))
                                 colors[:, 3] = np.linspace(0.3, 0.9, len(segments_3d))
                                 
-                                lc = Line3DCollection(segments_3d, colors=colors, linewidth=5)
+                                lc = Line3DCollection(segments_3d, colors=colors, linewidth=5, zorder=1)
                                 ax.add_collection3d(lc)
                             else:
                                 segments = []
@@ -293,7 +296,7 @@ class MatplotlibVisualizer:
                                 colors = cmap(norm(t))
                                 colors[:, 3] = np.linspace(0.3, 0.9, len(segments))
                                 
-                                lc = LineCollection(segments, colors=colors, linewidth=5)
+                                lc = LineCollection(segments, colors=colors, linewidth=5, zorder=1)
                                 ax.add_collection(lc)
 
                 # Add the colorbar
@@ -523,7 +526,7 @@ class MatplotlibVisualizer:
             ])
         
         # Create 3D collection and add to axis
-        poly3d = Poly3DCollection(faces, alpha=alpha)
+        poly3d = Poly3DCollection(faces, alpha=alpha, zorder=1)
         poly3d.set_facecolor(facecolor)
         if edgecolor:
             poly3d.set_edgecolor(edgecolor)
@@ -672,7 +675,7 @@ class MatplotlibVisualizer:
                             ax, points, height,
                             facecolor="white",
                             edgecolor="xkcd:bluish grey",
-                            alpha=0.4
+                            alpha=0.4,
                         )
                 else:
                     for x, y, length, width, orientation in zip(
@@ -782,7 +785,7 @@ class MatplotlibVisualizer:
                 faces = self._create_3d_vehicle_box(x, y, length, width, angle)
                 
                 # Plot the cuboid (vehicle box)
-                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=3)
+                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=6)
                 poly3d.set_facecolor(color)
                 poly3d.set_edgecolor('black')
                 poly3d.set_linewidth(0.5 * line_width_scale)
@@ -805,6 +808,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=2,
                     alpha=alpha,
+                    zorder=5,
                 )
                 
                 # Add arrowhead (tip)
@@ -831,6 +835,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=1.5,
                     alpha=alpha,
+                    zorder=5,
                 )
                 ax.plot(
                     [arrow_tip[0], arrowhead_right[0]],
@@ -839,6 +844,7 @@ class MatplotlibVisualizer:
                     color='black',
                     linewidth=1.5,
                     alpha=alpha,
+                    zorder=5,
                 )
 
         def plot_agent_group_2d(bboxes, color):

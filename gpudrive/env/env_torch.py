@@ -719,11 +719,6 @@ if __name__ == "__main__":
 
     # Rollout
     obs = env.reset()
-    
-    obs_masked = env.get_obs(control_mask)
-    
-    obs = env.get_obs()
-
 
     sim_frames = []
     agent_obs_frames = []
@@ -760,7 +755,7 @@ if __name__ == "__main__":
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
-        obs = env.get_obs(control_mask)
+        obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()

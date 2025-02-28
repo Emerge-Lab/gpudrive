@@ -1,28 +1,20 @@
 import torch
 import pandas as pd
-from tqdm import tqdm
-import yaml
 from box import Box
 import numpy as np
-import dataclasses
 import os
 import logging
-from pathlib import Path
-
-from pygpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.dataset import SceneDataLoader
 from eval_utils import (
     load_config,
     make_env,
     load_policy,
-    rollout,
     evaluate_policy,
 )
-import pdb
 
 import random
 import torch
 import numpy as np
-
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -31,7 +23,6 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)  # If using CUDA
     torch.backends.cudnn.deterministic = True
 
-
 logging.basicConfig(level=logging.INFO)
 SEED = 42  # Set to any fixed value
 set_seed(SEED)
@@ -39,8 +30,8 @@ set_seed(SEED)
 if __name__ == "__main__":
 
     # Load configurations
-    eval_config = load_config("examples/experiments/eval/config/eval_config")
-    model_config = load_config("examples/experiments/eval/config/model_config")
+    eval_config = load_config("examples/experimental/eval/config/eval_config")
+    model_config = load_config("examples/experimental/eval/config/model_config")
 
     train_loader = SceneDataLoader(
         root=eval_config.train_dir,
