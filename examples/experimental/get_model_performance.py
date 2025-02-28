@@ -1,23 +1,16 @@
 import torch
 import pandas as pd
-from tqdm import tqdm
-import yaml
 from box import Box
 import numpy as np
-import dataclasses
 import os
 import logging
-from pathlib import Path
-
 from gpudrive.env.dataset import SceneDataLoader
 from eval_utils import (
     load_config,
     make_env,
     load_policy,
-    rollout,
     evaluate_policy,
 )
-import pdb
 
 import random
 import torch
