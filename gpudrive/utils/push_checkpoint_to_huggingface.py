@@ -8,7 +8,7 @@ login()
 checkpoint_path = "examples/experimental/eval/models/model_PPO____R_10000__02_27_09_19_10_626_003200.pt"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-saved_cpt = torch.load(checkpoint_path, map_location=device)
+saved_cpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
 # Reconstruct the model
 policy = NeuralNet(

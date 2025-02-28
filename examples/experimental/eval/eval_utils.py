@@ -5,8 +5,6 @@ import yaml
 from box import Box
 import numpy as np
 import dataclasses
-import os
-from pathlib import Path
 
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
@@ -18,7 +16,6 @@ from gpudrive.networks.late_fusion import NeuralNet
 
 import logging
 import torch
-import random
 
 logging.basicConfig(level=logging.INFO)
 
