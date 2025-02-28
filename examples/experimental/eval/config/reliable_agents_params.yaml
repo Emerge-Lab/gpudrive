@@ -1,35 +1,21 @@
-res_path: examples/experimental/eval/dataframes # Store dataframes here
-test_dataset_size: 10_000 # Number of test scenarios to evaluate on
-
-# Environment settings
-train_dir: data/processed/training 
-test_dir: data/processed/validation 
-
-num_worlds: 50 # Number of parallel environments for evaluation
-max_controlled_agents: 64 # Maximum number of agents controlled by the model.
+# Overrides default environment configs (see pygpudrive/env/config.py)
+max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
 ego_state: true
 road_map_obs: true
 partner_obs: true
 norm_obs: true
 remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
 lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-reward_type: "weighted_combination"
+reward_type: "weighted_combination" 
 collision_weight: -0.75
 off_road_weight: -0.75
 goal_achieved_weight: 1.0
 dynamics_model: "classic"
-collision_behavior: "ignore" # Options: "remove", "stop"
+collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
 dist_to_goal_threshold: 2.0
 polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
 sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
 obs_radius: 50.0 # Visibility radius of the agents
-init_roadgraph: False
-render_3d: True
-
-# Number of discretizations in the action space
-# Note: Make sure that this equals the discretizations that the policy
-# has been trained with
-action_space_steer_disc: 13  
-action_space_accel_disc: 7 
-
-device: "cuda" # Options: "cpu", "cuda"
+action_space_steer_disc: 13
+action_space_accel_disc: 7
+init_mode: all_non_trivial

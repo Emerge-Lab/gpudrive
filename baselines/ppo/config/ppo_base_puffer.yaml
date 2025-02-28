@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: /scratch/kj2676/gpudrive/data/processed/training
+data_dir: data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination" #"distance_to_logs"
+  reward_type: "weighted_combination" 
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -67,7 +67,7 @@ train:
   clip_vloss: false
   vf_clip_coef: 0.2
   ent_coef: 0.0001
-  vf_coef: 0.5
+  vf_coef: 0.3
   max_grad_norm: 0.5
   target_kl: null
   log_window: 1000
@@ -85,11 +85,11 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: True # Determines whether to render the environment (note: will slow down training)
-  render_interval: 10 # Render every k iterations
-  render_k_scenarios: 15 # Number of scenarios to render
-  render_3d: True
-  render_format: "gif" # Options: gif, mp4
+  render: false # Determines whether to render the environment (note: will slow down training)
+  render_3d: true # Render simulator state in 3d or 2d
+  render_interval: 1 # Render every k iterations
+  render_k_scenarios: 10 # Number of scenarios to render
+  render_format: "mp4" # Options: gif, mp4
   render_fps: 15 # Frames per second
   zoom_radius: 50
 
