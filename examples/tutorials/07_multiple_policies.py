@@ -31,7 +31,7 @@ def create_policy_masks(env, num_sim_agents=2):
     }
     return policy_world_mask
 # Configs model has been trained with
-config = load_config("/home/charliemolony/Desktop/gpudrive/examples/experimental/config/reliable_agents_params")
+config = load_config("../../examples/experimental/eval/config/reliable_agents_params")
 
 
 
@@ -50,7 +50,7 @@ card = ModelCard.load("daphne-cornelisse/policy_S10_000_02_27")
 
 # Create data loader
 train_loader = SceneDataLoader(
-    root='/home/charliemolony/Desktop/gpudrive/data/processed/examples',
+    root='../../gpudrive/data/processed/examples',
     batch_size=num_envs,
     dataset_size=100,
     sample_with_replacement=False,
@@ -99,7 +99,6 @@ action1, logprob1, entropy1, value1 = sim_agent1(
 action2, logprob2, entropy2, value2 = sim_agent2(
     next_obs[control_mask], deterministic=False
 )
-env.episode_len =15
 
 
 if __name__ == "__main__":
