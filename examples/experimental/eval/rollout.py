@@ -20,7 +20,6 @@ if __name__ == "__main__":
     NUM_WORLDS = eval_config.num_worlds
     MAX_AGENTS = eval_config.max_controlled_agents
     
-
     # Create data loader
     train_loader = SceneDataLoader(
         root=eval_config.train_dir,
@@ -36,7 +35,7 @@ if __name__ == "__main__":
     # Load policy
     policy = load_policy(
         path_to_cpt="examples/experimental/eval/models",
-        model_name="model_PPO____S_800__02_24_15_17_45_245_002400",
+        model_name="model_PPO____S_1000__02_26_08_54_58_359_009200",
         device=device,
         env=env,
     )
@@ -57,7 +56,7 @@ if __name__ == "__main__":
         print(f"Step: {t}")
 
         action, _, _, _ = policy(
-            next_obs[control_mask], deterministic=False
+            next_obs[control_mask], deterministic=True
         )
 
         # Insert actions into a template

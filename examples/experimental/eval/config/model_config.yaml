@@ -1,22 +1,7 @@
 models_path: examples/experimental/eval/models
 
 models:
-  - name: model_PPO____R_10000__02_26_11_02_54_752_002800
+  - name: model_PPO____R_10000__02_27_09_19_10_626_003200
     train_dataset_size: 10_000
-    wandb: https://wandb.ai/emerge_/gpudrive/runs/PPO____S_800__02_24_15_17_45_245?nw=nwuserdaphnecor
+    wandb: https://wandb.ai/emerge_/gpudrive/runs/PPO____R_10000__02_27_09_19_10_626/workspace?nw=nwuserdaphnecor
     trained_on: null
-
-  # - name: model_PPO__R_100__01_23_21_28_06_645_006500
-  #   train_dataset_size: 100
-  #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_100__01_23_21_28_06_645?nw=nwuserdaphnecor
-  #   trained_on: cluster
-
-  # - name: model_PPO__R_1000__01_23_22_34_47_084_007500
-  #   train_dataset_size: 1000
-  #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__R_1000__01_23_22_34_47_084?nw=nwuserdaphnecor
-  #   trained_on: cluster
-
-  # - name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
-  #   train_dataset_size: 1000
-  #   wandb: https://wandb.ai/emerge_/self_play_rl_safe/runs/PPO__C__R_10000__01_28_20_57_35_873?nw=nwuserdaphnecor
-  #   trained_on: desktop

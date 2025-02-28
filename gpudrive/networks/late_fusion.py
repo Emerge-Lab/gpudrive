@@ -70,6 +70,7 @@ class NeuralNet(
     PyTorchModelHubMixin,
     repo_url="https://github.com/Emerge-Lab/gpudrive",
     docs_url="https://arxiv.org/abs/2502.14706",
+    tags=["ffn"]
 ):
     def __init__(
         self,
@@ -79,6 +80,7 @@ class NeuralNet(
         dropout=0.00,
         act_func="tanh",
         max_controlled_agents=64,
+        obs_dim=2984, # Size of the flattened observation vector 
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -86,6 +88,7 @@ class NeuralNet(
         self.action_dim = action_dim
         self.max_controlled_agents = max_controlled_agents
         self.max_observable_agents = max_controlled_agents - 1
+        self.obs_dim = obs_dim
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()

@@ -5,7 +5,7 @@ test_dataset_size: 10_000 # Number of test scenarios to evaluate on
 train_dir: /scratch/kj2676/gpudrive/data/processed/training
 test_dir: /scratch/kj2676/gpudrive/data/processed/validation
 
-num_worlds: 100 # Number of parallel environments for evaluation
+num_worlds: 2 # Number of parallel environments for evaluation
 max_controlled_agents: 64 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true

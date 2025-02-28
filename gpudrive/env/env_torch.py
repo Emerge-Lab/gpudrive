@@ -719,11 +719,6 @@ if __name__ == "__main__":
 
     # Rollout
     obs = env.reset()
-    
-    obs_masked = env.get_obs(control_mask)
-    
-    obs = env.get_obs()
-
 
     sim_frames = []
     agent_obs_frames = []

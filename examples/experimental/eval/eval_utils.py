@@ -116,6 +116,8 @@ def rollout(
 
     for time_step in range(episode_len):
         
+        print(f't: {time_step}')
+        
         # Get actions for active agents
         if live_agent_mask.any():
             action, _, _, _ = policy(
