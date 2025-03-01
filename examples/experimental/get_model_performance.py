@@ -30,8 +30,8 @@ set_seed(SEED)
 if __name__ == "__main__":
 
     # Load configurations
-    eval_config = load_config("examples/experimental/eval/config/eval_config")
-    model_config = load_config("examples/experimental/eval/config/model_config")
+    eval_config = load_config("examples/experimental/config/eval_config")
+    model_config = load_config("examples/experimental/config/model_config")
 
     train_loader = SceneDataLoader(
         root=eval_config.train_dir,
