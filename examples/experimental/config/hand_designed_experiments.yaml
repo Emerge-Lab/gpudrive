@@ -1,4 +1,4 @@
-save_results_path: examples/experiments/eval/dataframes/hand_designed
+save_results_path: examples/experiments/dataframes/hand_designed
 
 data_path_original: data/processed/hand_designed/original
 data_path_altered: data/processed/hand_designed/altered
