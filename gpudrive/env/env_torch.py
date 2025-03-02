@@ -1,4 +1,4 @@
-"""Base Gym Environment that interfaces with the GPU Drive simulator."""
+"""Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
@@ -46,6 +46,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.device = device
         self.render_config = render_config
         self.backend = backend
+        self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
+        self.sample_batch = None
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -98,6 +100,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
+
+        # Advance the simulator with log playback if warmup steps are provided
+        if self.config.init_steps > 0:
+            self.advance_sim_with_log_playback(
+                init_steps=self.config.init_steps,
+                # render_init=self.render_config.render_init,
+            )
+
         return self.get_obs(mask)
 
     def get_dones(self):
@@ -254,7 +264,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
         elif self.config.dynamics_model == "state":
             # Following the StateAction struct in types.hpp
-            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
+            # Need to provide:
+            # (x, y, z, yaw, vel x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
             self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
         else:
             raise ValueError(
@@ -528,6 +539,94 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
+    
+    def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
+        """Advances the simulator by stepping the objects with the logged human trajectories.
+
+        Args:
+            init_steps (int): Number of warmup steps.
+        """
+        if init_steps >= self.config.episode_len:
+            raise ValueError(
+                "The length of the expert trajectory is 91,"
+                f"so init_steps = {init_steps} should be < than 91."
+            )
+        elif self.config.return_vbd_data and self.num_worlds > 1:
+            raise ValueError(
+                f"VBD expects only a single world, given {self.num_worlds}."
+            )
+
+        self.init_frames = []
+
+        self.log_playback_traj, _, _, _ = self.get_expert_actions()
+
+        means_xy = (
+            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        )
+
+        # Get the logged trajectory and restore the mean
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
+        log_trajectory.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+
+        # Get global road graph and restore the mean
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        global_road_graph.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+        global_road_graph.restore_xy()
+
+        # Get global agent observations and restore the mean
+        global_agent_obs = GlobalEgoState.from_tensor(
+            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        global_agent_obs.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+
+        for time_step in range(init_steps):
+            self.step_dynamics(
+                actions=self.log_playback_traj[:, :, time_step, :]
+            )
+            if render_init:  # Render the initial frames
+                fig = self.vis.plot_simulator_state(
+                    env_indices=[0],
+                    time_steps=[time_step],
+                )[0]
+                self.init_frames.append(img_from_fig(fig))
+
+        metadata =  Metadata.from_tensor(
+            metadata_tensor=self.sim.metadata_tensor(),
+            backend=self.backend,
+        )
+
+        if self.config.return_vbd_data:
+
+            from data_utils.vbd_data import process_scenario_data
+
+            self.sample_batch = process_scenario_data(
+                max_controlled_agents=self.max_cont_agents,
+                controlled_agent_mask=self.cont_agent_mask[0],
+                global_agent_obs=global_agent_obs,
+                global_road_graph=global_road_graph,
+                log_trajectory=log_trajectory,
+                episode_len=self.episode_len,
+                init_steps=init_steps,
+                raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
+                metadata=metadata
+            )
 
     def remove_agents_by_id(
         self, perc_to_rmv_per_scene, remove_controlled_agents=True
@@ -632,7 +731,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory.inferred_actions[..., :3]
+            inferred_actions = log_trajectory.inferred_actions[:, :3]
             inferred_actions[..., 0] = torch.clamp(
                 inferred_actions[..., 0], -6, 6
             )
