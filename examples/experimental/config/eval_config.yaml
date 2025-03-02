@@ -1,4 +1,4 @@
-res_path: examples/experimental/eval/dataframes # Store dataframes here
+res_path: examples/experimental/dataframes # Store dataframes here
 test_dataset_size: 10_000 # Number of test scenarios to evaluate on
 
 # Environment settings

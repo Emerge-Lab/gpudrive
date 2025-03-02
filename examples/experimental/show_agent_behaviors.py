@@ -111,8 +111,8 @@ if __name__ == "__main__":
     SHOW_TOP_K = 50 # Render this many scenes
 
     # Configurations
-    eval_config = load_config("examples/experimental/eval/config/eval_config")
-    model_config = load_config("examples/experimental/eval/config/model_config")
+    eval_config = load_config("examples/experimental/config/eval_config")
+    model_config = load_config("examples/experimental/config/model_config")
 
     # Load policy
     policy = load_policy(
