@@ -1,11 +1,11 @@
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
-
+import torch
 import jax
 import jax.numpy as jnp
 
 from itertools import product
-import mediapy as media
+import mediapy
 import gymnasium
 
 from gpudrive.env.config import EnvConfig, RenderConfig
@@ -29,7 +29,7 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         device="cuda",
         action_type="discrete",
         render_config: RenderConfig = RenderConfig(),
-        backend="torch",
+        backend="jax",
     ):
         # Initialization of environment configurations
         self.config = config
@@ -137,14 +137,45 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
 
-        # Nan actions will be ignored, but we need to replace them with zeros
-        actions = jnp.nan_to_num(actions, nan=0)
+        if self.config.dynamics_model in {"classic", "bicycle", "delta_local"}:
+            if actions.ndim == 2:  # (num_worlds, max_agent_count)
+                # Map action indices to action values if indices are provided
+                actions = jnp.nan_to_num(actions, nan=0).astype(jnp.int32)
+                action_value_tensor = self.action_keys_tensor[actions]
 
-        # Map action indices to action values
-        action_values = self.action_keys_tensor[actions]
+            elif actions.ndim == 3:
+                if actions.shape[2] == 1:
+                    actions = actions.squeeze(axis=2)
+                    action_value_tensor = self.action_keys_tensor[actions]
+                elif (
+                    actions.shape[2] == 3
+                ):  # Assuming actual action values are given
+                    action_value_tensor = actions
+            else:
+                raise ValueError(f"Invalid action shape: {actions.shape}")
+        else:
+            action_value_tensor = actions
 
-        # Feed the actual action values to gpudrive
-        self.sim.action_tensor().to_jax().at[:, :, :].set(action_values)
+        # Feed the action values to gpudrive
+        self._copy_actions_to_simulator(action_value_tensor)
+
+    def _copy_actions_to_simulator(self, actions):
+        """Copy the provided actions to the simulator."""
+
+        # Convert to torch Tensor (tmp solution)
+        actions = torch.from_numpy(np.array(actions))
+
+        if self.config.dynamics_model in {"classic", "bicycle", "delta_local"}:
+            # Action space: (acceleration, steering, heading) or (dx, dy, dyaw)
+            self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
+        elif self.config.dynamics_model == "state":
+            # Following the StateAction struct in types.hpp
+            # Need to provide: (x, y, z, yaw, velocity x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
+            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
+        else:
+            raise ValueError(
+                f"Invalid dynamics model: {self.config.dynamics_model}"
+            )
 
     def _set_discrete_action_space(self) -> None:
         """Configure the discrete action space."""
@@ -234,16 +265,10 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
             jnp.array: (num_worlds, max_agent_count, num_features)
         """
 
-        # EGO STATE
         ego_states = self._get_ego_state()
-
-        # PARTNER OBSERVATION
         partner_observations = self._get_partner_obs()
-
-        # ROAD MAP OBSERVATION
         road_map_observations = self._get_road_map_obs()
 
-        # Combine the observations
         obs_filtered = jnp.concatenate(
             (
                 ego_states,
@@ -363,14 +388,18 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    # CONFIGURE
-    env_config = EnvConfig(reward_type="weighted_combination")
+    env_config = EnvConfig(
+        dynamics_model="classic", reward_type="weighted_combination"
+    )
     render_config = RenderConfig()
+
+    num_worlds = 2
+    max_agents = 64
 
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/examples",
-        batch_size=2,
+        batch_size=num_worlds,
         dataset_size=100,
         sample_with_replacement=True,
         shuffle=False,
@@ -380,19 +409,29 @@ if __name__ == "__main__":
     env = GPUDriveJaxEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,  # Number of agents to control
-        device="cpu",
+        max_cont_agents=max_agents,  # Number of agents to control
+        device="cuda",
     )
+
+    sim_frames = []
 
     control_mask = env.cont_agent_mask
 
-    env.get_rewards()
+    next_obs = env.reset()
 
-    for _ in range(10):
+    for time_step in range(env.episode_len):
+        print(f"Time step: {time_step}")
+
+        sim_states = env.vis.plot_simulator_state(
+            env_indices=[0],
+            zoom_radius=50,
+            time_steps=[time_step],
+        )
+        sim_frames.append(img_from_fig(sim_states[0]))
 
         rand_action = jax.random.randint(
             key=jax.random.PRNGKey(0),
-            shape=(2, 64),
+            shape=(num_worlds, max_agents),
             minval=0,
             maxval=env.action_space.n,
         )
@@ -400,8 +439,13 @@ if __name__ == "__main__":
         # Step the environment
         env.step_dynamics(rand_action)
 
-        obs = env.get_obs()
+        # Get info
+        next_obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
 
     env.close()
+
+    mediapy.write_video(
+        "sim_video.gif", np.array(sim_frames), fps=20, codec="gif"
+    )
