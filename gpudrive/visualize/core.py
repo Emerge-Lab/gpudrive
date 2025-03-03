@@ -2,6 +2,8 @@ import torch
 import matplotlib
 
 matplotlib.use("Agg")
+
+matplotlib.use("Agg")
 from typing import Tuple, Optional, List, Dict, Any, Union
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -10,6 +12,7 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 from matplotlib.colors import ListedColormap
+from jaxlib.xla_extension import ArrayImpl
 from jaxlib.xla_extension import ArrayImpl
 import numpy as np
 import madrona_gpudrive
