@@ -17,7 +17,8 @@ from gpudrive.datatypes.observation import (
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.base_env import GPUDriveGymEnv
 from gpudrive.datatypes.trajectory import LogTrajectory
-from gpudrive.datatypes.roadgraph import LocalRoadGraphPoints
+from gpudrive.datatypes.roadgraph import LocalRoadGraphPoints, GlobalRoadGraphPoints
+from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
 
 from gpudrive.visualize.core import MatplotlibVisualizer
@@ -252,7 +253,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._copy_actions_to_simulator(action_value_tensor)
 
     def _copy_actions_to_simulator(self, actions):
-        """Copy the provived actions to the simulator."""
+        """Copy the provided actions to the simulator."""
         if (
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"

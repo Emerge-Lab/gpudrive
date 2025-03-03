@@ -1019,11 +1019,15 @@ class MatplotlibVisualizer:
         agent_idx: int,
         env_idx: int,
         figsize: Tuple[int, int] = (10, 10),
+        trajectory: Optional[np.ndarray] = None,
     ):
         """Plot observation from agent POV to inspect the information available to the agent.
         Args:
             agent_idx (int): Index of the agent whose observation is to be plotted.
             env_idx (int): Index of the environment in the batch.
+            trajectory (Optional[np.ndarray], optional): Array of trajectory points to plot.
+                Should be of shape (N, 2) where N is the number of points and each point
+                is an (x, y) coordinate. Defaults to None.
         """
         observation_ego = LocalEgoState.from_tensor(
             self_obs_tensor=self.sim_object.self_observation_tensor(),
@@ -1223,6 +1227,20 @@ class MatplotlibVisualizer:
             )
             ax.add_patch(observation_radius)
             plt.axis("off")
+
+        if trajectory is not None and len(trajectory) > 0:
+            # Plot the trajectory as a line
+            ax.plot(
+                trajectory[:, 0],  # x coordinates
+                trajectory[:, 1],  # y coordinates
+                color='blue',      # trajectory color
+                linestyle='-',     # solid line
+                linewidth=1.0,     # line width
+                marker='o',        # circular markers at each point
+                markersize=1,      # size of markers
+                alpha=0.7,         # slight transparency
+                label='Trajectory' # label for legend
+            )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))

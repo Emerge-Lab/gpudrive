@@ -1,8 +1,8 @@
 """Functions used for processing roadgraph data and other features for VBD."""
 import torch
 import numpy as np
-import gpudrive
-from pygpudrive.datatypes.roadgraph import GlobalRoadGraphPoints
+import madrona_gpudrive
+from gpudrive.datatypes.roadgraph import GlobalRoadGraphPoints
 
 def wrap_to_pi(angle):
     """
@@ -228,9 +228,9 @@ def data_process_agent(
 
     # Type of agents: 0 for None, 1 for Vehicle, 2 for Pedestrian, 3 for Cyclist
     mapped_agents_type = np.zeros_like(agents_type)
-    mapped_agents_type[agents_type == int(gpudrive.EntityType.Vehicle)] = 1    # Vehicle
-    mapped_agents_type[agents_type == int(gpudrive.EntityType.Pedestrian)] = 2 # Pedestrian
-    mapped_agents_type[agents_type == int(gpudrive.EntityType.Cyclist)] = 3    # Cyclist
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Vehicle)] = 1    # Vehicle
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Pedestrian)] = 2 # Pedestrian
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Cyclist)] = 3    # Cyclist
 
 
     # Zero out the agents that are not controlled

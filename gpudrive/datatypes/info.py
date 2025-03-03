@@ -1,9 +1,5 @@
 import torch
-<<<<<<< HEAD:pygpudrive/datatypes/info.py
-import gpudrive
-=======
 import madrona_gpudrive
->>>>>>> main:gpudrive/datatypes/info.py
 
 
 class Info:
@@ -21,11 +17,7 @@ class Info:
     @classmethod
     def from_tensor(
         cls,
-<<<<<<< HEAD:pygpudrive/datatypes/info.py
-        info_tensor: gpudrive.madrona.Tensor,
-=======
         info_tensor: madrona_gpudrive.madrona.Tensor,
->>>>>>> main:gpudrive/datatypes/info.py
         backend="torch",
         device="cuda",
     ):
