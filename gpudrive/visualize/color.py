@@ -36,4 +36,4 @@ REL_OBS_OBJ_COLORS = {
     "other_agents": "#ff884d",
 }
 
-AGENT_COLOR_BY_POLICY= ['g','b']
+AGENT_COLOR_BY_POLICY= ['g','b','p']
