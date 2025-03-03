@@ -1,5 +1,3 @@
-"""Base Gym Environment that interfaces with the GPU Drive simulator."""
-
 from gymnasium.spaces import Box, Discrete, Tuple
 import numpy as np
 import torch
@@ -68,9 +66,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Setup action and observation spaces
         self.observation_space = Box(
-            low=-1.0, high=1.0, shape=(self.get_obs(self.cont_agent_mask).shape[-1],)
+            low=-1.0,
+            high=1.0,
+            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
-     
+
         self.single_observation_space = gymnasium.spaces.Box(
             low=-1.0,
             high=1.0,
@@ -80,7 +80,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
-        
+
         self.num_agents = self.cont_agent_mask.sum().item()
         self.episode_len = self.config.episode_len
 
@@ -353,7 +353,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
-        
+
         if not self.config.ego_state:
             return torch.Tensor().to(self.device)
 
@@ -367,37 +367,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 2, 0)
-            )
-        else: 
-            return (
-                torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                )
-                .permute(1, 0)
-            )
+            return torch.stack(
+                [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
+            ).permute(1, 2, 0)
+        else:
+            return torch.stack(
+                [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
+            ).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
-        
+
         if not self.config.partner_obs:
             return torch.Tensor().to(self.device)
 
@@ -410,24 +404,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if self.config.norm_obs:
             partner_obs.normalize()
-            
-        if mask is not None: 
+
+        if mask is not None:
             return partner_obs.data.flatten(start_dim=1)
         else:
-            return (
-                torch.concat(
-                    [
-                        partner_obs.speed,
-                        partner_obs.rel_pos_x,
-                        partner_obs.rel_pos_y,
-                        partner_obs.orientation,
-                        partner_obs.vehicle_length,
-                        partner_obs.vehicle_width,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.concat(
+                [
+                    partner_obs.speed,
+                    partner_obs.rel_pos_x,
+                    partner_obs.rel_pos_y,
+                    partner_obs.orientation,
+                    partner_obs.vehicle_length,
+                    partner_obs.vehicle_width,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
 
     def _get_road_map_obs(self, mask=None):
         """Get road map observations."""
@@ -454,25 +445,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 dim=-1,
             ).flatten(start_dim=1)
         else:
-            return (
-                torch.cat(
-                    [
-                        roadgraph.x.unsqueeze(-1),
-                        roadgraph.y.unsqueeze(-1),
-                        roadgraph.segment_length.unsqueeze(-1),
-                        roadgraph.segment_width.unsqueeze(-1),
-                        roadgraph.segment_height.unsqueeze(-1),
-                        roadgraph.orientation.unsqueeze(-1),
-                        roadgraph.type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.cat(
+                [
+                    roadgraph.x.unsqueeze(-1),
+                    roadgraph.y.unsqueeze(-1),
+                    roadgraph.segment_length.unsqueeze(-1),
+                    roadgraph.segment_width.unsqueeze(-1),
+                    roadgraph.segment_height.unsqueeze(-1),
+                    roadgraph.orientation.unsqueeze(-1),
+                    roadgraph.type,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
 
     def _get_lidar_obs(self, mask=None):
         """Get lidar observations."""
-        
+
         if not self.config.lidar_obs:
             return torch.Tensor().to(self.device)
 
@@ -489,17 +477,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 lidar.road_line_samples[mask],
             ]
         else:
-            return (
-                torch.cat(
-                    [
-                        lidar.agent_samples,
-                        lidar.road_edge_samples,
-                        lidar.road_line_samples,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.cat(
+                [
+                    lidar.agent_samples,
+                    lidar.road_edge_samples,
+                    lidar.road_line_samples,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
 
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
@@ -511,7 +496,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
         lidar_observations = self._get_lidar_obs(mask)
-    
+
         obs = torch.cat(
             (
                 ego_states,
@@ -681,7 +666,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_env_filenames(self):
         """Obtain the tfrecord filename for each world, mapping world indices to map names."""
-        
+
         map_name_integers = self.sim.map_name_tensor().to_torch()
         filenames = {}
         # Iterate through the number of worlds
@@ -714,7 +699,7 @@ if __name__ == "__main__":
         max_cont_agents=64,  # Number of agents to control
         device="cpu",
     )
-    
+
     control_mask = env.cont_agent_mask
 
     # Rollout
@@ -733,7 +718,7 @@ if __name__ == "__main__":
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
-        
+
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
         ].item()
@@ -751,7 +736,7 @@ if __name__ == "__main__":
             agent_idx=highlight_agent,
             figsize=(10, 10),
         )
-        
+
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
