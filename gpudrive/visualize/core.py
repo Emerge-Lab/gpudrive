@@ -1,6 +1,7 @@
 import torch
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 from typing import Tuple, Optional, List, Dict, Any, Union
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -9,8 +10,8 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 from matplotlib.colors import ListedColormap
+from jaxlib.xla_extension import ArrayImpl
 import numpy as np
-import pandas as pd
 import madrona_gpudrive
 from gpudrive.visualize import utils
 from gpudrive.datatypes.roadgraph import (
@@ -47,7 +48,7 @@ class MatplotlibVisualizer:
         env_config: Dict[str, Any],
     ):
         self.sim_object = sim_object
-        self.backend = backend
+        self.backend = "torch"  # Always use torch or np for plotting
         self.device = "cpu"
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
@@ -55,7 +56,9 @@ class MatplotlibVisualizer:
         self.figsize = (15, 15)
         self.env_config = env_config
         self.render_3d = render_config.render_3d
-        self.vehicle_height = render_config.vehicle_height  # Default vehicle height
+        self.vehicle_height = (
+            render_config.vehicle_height
+        )  # Default vehicle height
         self.initialize_static_scenario_data(controlled_agent_mask)
 
     def initialize_static_scenario_data(self, controlled_agent_mask):
@@ -73,7 +76,14 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
-        self.controlled_agent_mask = controlled_agent_mask.to(self.device)
+        self.controlled_agent_mask = controlled_agent_mask
+
+        if isinstance(controlled_agent_mask, ArrayImpl):
+            self.controlled_agent_mask = torch.from_numpy(
+                np.array(controlled_agent_mask)
+            )
+
+        self.controlled_agent_mask = self.controlled_agent_mask.to(self.device)
 
         self.log_trajectory = LogTrajectory.from_tensor(
             self.sim_object.expert_trajectory_tensor(),
@@ -135,45 +145,83 @@ class MatplotlibVisualizer:
         if backward_goals:
 
             # Get world means for coordinate transformation
-            means_xy = self.sim_object.world_means_tensor().to_torch()[:, :2].to(self.device)
+            means_xy = (
+                self.sim_object.world_means_tensor()
+                .to_torch()[:, :2]
+                .to(self.device)
+            )
 
             # Create extended goals dictionary
             extended_goals = {
-                'x': torch.zeros_like(global_agent_states.goal_x),
-                'y': torch.zeros_like(global_agent_states.goal_y)
+                "x": torch.zeros_like(global_agent_states.goal_x),
+                "y": torch.zeros_like(global_agent_states.goal_y),
             }
             # Generate reverse offsets for controlled agents
             for env_idx in env_indices:
                 controlled_mask = self.controlled_agent_mask[env_idx]
 
                 # Calculate direction vectors for each agent (from initial position to original goal)
-                direction_x = global_agent_states.goal_x[env_idx] - global_agent_states.pos_x[env_idx]
-                direction_y = global_agent_states.goal_y[env_idx] - global_agent_states.pos_y[env_idx]
+                direction_x = (
+                    global_agent_states.goal_x[env_idx]
+                    - global_agent_states.pos_x[env_idx]
+                )
+                direction_y = (
+                    global_agent_states.goal_y[env_idx]
+                    - global_agent_states.pos_y[env_idx]
+                )
 
                 # Store extended goals - place them in opposite direction from current position
                 # For controlled agents, the new goal will be behind them relative to their original goal
-                extended_goals['x'][env_idx] = global_agent_states.pos_x[env_idx] - direction_x
-                extended_goals['y'][env_idx] = global_agent_states.pos_y[env_idx] - direction_y
+                extended_goals["x"][env_idx] = (
+                    global_agent_states.pos_x[env_idx] - direction_x
+                )
+                extended_goals["y"][env_idx] = (
+                    global_agent_states.pos_y[env_idx] - direction_y
+                )
 
                 # Only modify goals for controlled agents
                 uncontrolled_mask = ~controlled_mask
-                extended_goals['x'][env_idx, uncontrolled_mask] = global_agent_states.goal_x[env_idx, uncontrolled_mask]
-                extended_goals['y'][env_idx, uncontrolled_mask] = global_agent_states.goal_y[env_idx, uncontrolled_mask]
+                extended_goals["x"][
+                    env_idx, uncontrolled_mask
+                ] = global_agent_states.goal_x[env_idx, uncontrolled_mask]
+                extended_goals["y"][
+                    env_idx, uncontrolled_mask
+                ] = global_agent_states.goal_y[env_idx, uncontrolled_mask]
 
                 # Print information for controlled agents
                 for agent_idx in torch.where(controlled_mask)[0]:
                     # Get original goal in world coordinates
-                    orig_goal_x = global_agent_states.goal_x[env_idx, agent_idx] + means_xy[env_idx, 0]
-                    orig_goal_y = global_agent_states.goal_y[env_idx, agent_idx] + means_xy[env_idx, 1]
+                    orig_goal_x = (
+                        global_agent_states.goal_x[env_idx, agent_idx]
+                        + means_xy[env_idx, 0]
+                    )
+                    orig_goal_y = (
+                        global_agent_states.goal_y[env_idx, agent_idx]
+                        + means_xy[env_idx, 1]
+                    )
 
                     # Get extended goal in world coordinates
-                    ext_goal_x = extended_goals['x'][env_idx, agent_idx] + means_xy[env_idx, 0]
-                    ext_goal_y = extended_goals['y'][env_idx, agent_idx] + means_xy[env_idx, 1]
+                    ext_goal_x = (
+                        extended_goals["x"][env_idx, agent_idx]
+                        + means_xy[env_idx, 0]
+                    )
+                    ext_goal_y = (
+                        extended_goals["y"][env_idx, agent_idx]
+                        + means_xy[env_idx, 1]
+                    )
 
-                    print(f"Agent ID: {global_agent_states.id[env_idx, agent_idx].item()}")
-                    print(f"Original goal (world coords): ({orig_goal_x.item():.6f}, {orig_goal_y.item():.6f})")
-                    print(f"Extended goal (world coords): ({ext_goal_x.item():.6f}, {ext_goal_y.item():.6f})")
-                    print(f"World mean: ({means_xy[env_idx, 0].item():.6f}, {means_xy[env_idx, 1].item():.6f})\n")
+                    print(
+                        f"Agent ID: {global_agent_states.id[env_idx, agent_idx].item()}"
+                    )
+                    print(
+                        f"Original goal (world coords): ({orig_goal_x.item():.6f}, {orig_goal_y.item():.6f})"
+                    )
+                    print(
+                        f"Extended goal (world coords): ({ext_goal_x.item():.6f}, {ext_goal_y.item():.6f})"
+                    )
+                    print(
+                        f"World mean: ({means_xy[env_idx, 0].item():.6f}, {means_xy[env_idx, 1].item():.6f})\n"
+                    )
 
         else:
             extended_goals = None
@@ -207,8 +255,10 @@ class MatplotlibVisualizer:
         ):
 
             # Initialize figure and axes from cached road graph
-            fig, ax = plt.subplots(figsize=self.figsize, 
-                          subplot_kw={'projection': '3d'} if self.render_3d else {})
+            fig, ax = plt.subplots(
+                figsize=self.figsize,
+                subplot_kw={"projection": "3d"} if self.render_3d else {},
+            )
             if self.render_3d:
                 ax.view_init(elev=30, azim=45)  # Set default 3D view angle
             fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
@@ -269,11 +319,18 @@ class MatplotlibVisualizer:
                 max_valid_length = 0
                 for agent_idx in range(agent_positions.shape[1]):
                     if controlled_live[agent_idx]:
-                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]
-                        valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) &
-                                    (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) &
-                                    (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
-                        max_valid_length = max(max_valid_length, valid_mask.sum().item())
+                        trajectory = agent_positions[
+                            env_idx, agent_idx, :time_step, :
+                        ]
+                        valid_mask = (
+                            (trajectory[:, 0] != 0)
+                            & (trajectory[:, 1] != 0)
+                            & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
+                            & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
+                        )
+                        max_valid_length = max(
+                            max_valid_length, valid_mask.sum().item()
+                        )
 
                 # Create color palette
                 palette = sns.light_palette(AGENT_COLOR_BY_STATE["ok"])
@@ -283,46 +340,86 @@ class MatplotlibVisualizer:
 
                 for agent_idx in range(agent_positions.shape[1]):
                     if controlled_live[agent_idx]:
-                        trajectory = agent_positions[env_idx, agent_idx, :time_step, :]
-                        valid_mask = ((trajectory[:, 0] != 0) & (trajectory[:, 1] != 0) &
-                                    (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS) &
-                                    (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS))
+                        trajectory = agent_positions[
+                            env_idx, agent_idx, :time_step, :
+                        ]
+                        valid_mask = (
+                            (trajectory[:, 0] != 0)
+                            & (trajectory[:, 1] != 0)
+                            & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
+                            & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
+                        )
                         # Get valid trajectory points
                         valid_trajectory = trajectory[valid_mask]
-                        
+
                         if len(valid_trajectory) > 1:
                             points = valid_trajectory.cpu().numpy()
-                            
+
                             if self.render_3d:
                                 trajectory_height = 0.05
                                 segments_3d = []
                                 for i in range(len(points) - 1):
-                                    segment = np.array([
-                                        [points[i][0], points[i][1], trajectory_height],
-                                        [points[i+1][0], points[i+1][1], trajectory_height]
-                                    ])
+                                    segment = np.array(
+                                        [
+                                            [
+                                                points[i][0],
+                                                points[i][1],
+                                                trajectory_height,
+                                            ],
+                                            [
+                                                points[i + 1][0],
+                                                points[i + 1][1],
+                                                trajectory_height,
+                                            ],
+                                        ]
+                                    )
                                     segments_3d.append(segment)
-                                
+
                                 # Adjust color mapping to use actual position in the valid trajectory
-                                t = np.linspace(0, len(segments_3d), len(segments_3d))
+                                t = np.linspace(
+                                    0, len(segments_3d), len(segments_3d)
+                                )
                                 colors = cmap(norm(t))
-                                colors[:, 3] = np.linspace(0.3, 0.9, len(segments_3d))
-                                
-                                lc = Line3DCollection(segments_3d, colors=colors, linewidth=5, zorder=1)
+                                colors[:, 3] = np.linspace(
+                                    0.3, 0.9, len(segments_3d)
+                                )
+
+                                lc = Line3DCollection(
+                                    segments_3d,
+                                    colors=colors,
+                                    linewidth=5,
+                                    zorder=1,
+                                )
                                 ax.add_collection3d(lc)
                             else:
                                 segments = []
                                 for i in range(len(points) - 1):
-                                    segment = np.array([[points[i][0], points[i][1]],
-                                                    [points[i+1][0], points[i+1][1]]])
+                                    segment = np.array(
+                                        [
+                                            [points[i][0], points[i][1]],
+                                            [
+                                                points[i + 1][0],
+                                                points[i + 1][1],
+                                            ],
+                                        ]
+                                    )
                                     segments.append(segment)
-                                
+
                                 # Adjust color mapping to use actual position in the valid trajectory
-                                t = np.linspace(0, len(segments), len(segments))
+                                t = np.linspace(
+                                    0, len(segments), len(segments)
+                                )
                                 colors = cmap(norm(t))
-                                colors[:, 3] = np.linspace(0.3, 0.9, len(segments))
-                                
-                                lc = LineCollection(segments, colors=colors, linewidth=5, zorder=1)
+                                colors[:, 3] = np.linspace(
+                                    0.3, 0.9, len(segments)
+                                )
+
+                                lc = LineCollection(
+                                    segments,
+                                    colors=colors,
+                                    linewidth=5,
+                                    zorder=1,
+                                )
                                 ax.add_collection(lc)
 
                 # Add the colorbar
@@ -330,36 +427,11 @@ class MatplotlibVisualizer:
                     fig = ax.get_figure()
                     cbar_ax = fig.add_axes([0.92, 0.09, 0.02, 0.8])
                     cbar = fig.colorbar(sm, cax=cbar_ax)
-                    cbar.set_label('Timestep', fontsize=15 * marker_scale)
+                    cbar.set_label("Timestep", fontsize=15 * marker_scale)
                     cbar.ax.tick_params(labelsize=12 * marker_scale)
                 except Exception as e:
                     print(f"Warning: Could not add colorbar: {e}")
-                    
-            # Plot rollout statistics
-            num_controlled = controlled.sum().item()
-            num_off_road = is_offroad.sum().item()
-            num_collided = is_collided.sum().item()
-            off_road_rate = (
-                num_off_road / num_controlled if num_controlled > 0 else 0
-            )
-            collision_rate = (
-                num_collided / num_controlled if num_controlled > 0 else 0
-            )
 
-            # ax.text(
-            #     0.5,  # Horizontal center
-            #     0.95,  # Vertical location near the top
-            #     f"$t$ = {time_step}  | $N_c$ = {num_controlled}; "
-            #     f"off-road: {off_road_rate:.2f}; "
-            #     f"collision: {collision_rate:.2f}",
-            #     horizontalalignment="center",
-            #     verticalalignment="center",
-            #     transform=ax.transAxes,
-            #     fontsize=20 * marker_scale,
-            #     color="black",
-            #     bbox=dict(facecolor="white", edgecolor="none", alpha=0.9),
-            # )
-                
             # Determine center point for zooming
             if center_agent_idx is not None:
                 center_x = global_agent_states.pos_x[
@@ -379,7 +451,7 @@ class MatplotlibVisualizer:
             # Remove ticks
             ax.set_xticks([])
             ax.set_yticks([])
-            
+
             # 3d plot settings
             if self.render_3d:
                 ax.set_zlim(0, zoom_radius * 0.05)
@@ -406,38 +478,56 @@ class MatplotlibVisualizer:
         """Plot the log replay trajectory for controlled agents in either 2D or 3D."""
         if self.render_3d:
             # Get trajectory points
-            trajectory_points = log_trajectory.pos_xy[env_idx, control_mask, :, :].numpy()
-            
+            trajectory_points = log_trajectory.pos_xy[
+                env_idx, control_mask, :, :
+            ].numpy()
+
             # Set a fixed height for trajectory visualization
             trajectory_height = 0.05  # Small height above ground
-            
+
             # Plot trajectories for each controlled agent
             for agent_trajectory in trajectory_points:
                 # Filter out invalid points (zeros or out of bounds)
-                valid_mask = ((agent_trajectory[:, 0] != 0) & 
-                            (agent_trajectory[:, 1] != 0) &
-                            (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS) &
-                            (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS))
+                valid_mask = (
+                    (agent_trajectory[:, 0] != 0)
+                    & (agent_trajectory[:, 1] != 0)
+                    & (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS)
+                    & (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS)
+                )
                 valid_points = agent_trajectory[valid_mask]
-                
+
                 if len(valid_points) > 1:
                     # Create segments for the trajectory
                     segments = []
                     for i in range(len(valid_points) - 1):
-                        segment = np.array([
-                            [valid_points[i, 0], valid_points[i, 1], trajectory_height],
-                            [valid_points[i+1, 0], valid_points[i+1, 1], trajectory_height]
-                        ])
+                        segment = np.array(
+                            [
+                                [
+                                    valid_points[i, 0],
+                                    valid_points[i, 1],
+                                    trajectory_height,
+                                ],
+                                [
+                                    valid_points[i + 1, 0],
+                                    valid_points[i + 1, 1],
+                                    trajectory_height,
+                                ],
+                            ]
+                        )
                         segments.append(segment)
-                    
+
                     # Create line collection with fade effect
                     colors = np.zeros((len(segments), 4))
                     colors[:, 1] = 0.9  # Green component
-                    colors[:, 3] = np.linspace(0.2, 0.6, len(segments))  # Alpha gradient
-                    
-                    lc = Line3DCollection(segments, colors=colors, linewidth=2 * line_width_scale)
+                    colors[:, 3] = np.linspace(
+                        0.2, 0.6, len(segments)
+                    )  # Alpha gradient
+
+                    lc = Line3DCollection(
+                        segments, colors=colors, linewidth=2 * line_width_scale
+                    )
                     ax.add_collection3d(lc)
-                    
+
                     # Add points at trajectory positions
                     ax.scatter3D(
                         valid_points[:, 0],
@@ -446,7 +536,7 @@ class MatplotlibVisualizer:
                         color="lightgreen",
                         s=10,
                         alpha=0.5,
-                        zorder=0
+                        zorder=0,
                     )
         else:
             # Original 2D plotting
@@ -485,28 +575,48 @@ class MatplotlibVisualizer:
         bl = pt - (length / 2) * u - (width / 2) * ut
 
         return [tl.tolist(), tr.tolist(), br.tolist(), bl.tolist()]
-    
-    def _plot_3d_road_segment(self, ax, start, end, width, height, color, line_width=1.0):
+
+    def _plot_3d_road_segment(
+        self, ax, start, end, width, height, color, line_width=1.0
+    ):
         """Helper method to plot 3D road segment with width and height."""
         # Calculate direction vector
         direction = np.array([end[0] - start[0], end[1] - start[1]])
         length = np.linalg.norm(direction)
         if length == 0:
             return
-        
+
         direction = direction / length
         perpendicular = np.array([-direction[1], direction[0]])
-        
+
         # Create vertices for 3D box
         vertices = []
         for z in [0, height]:  # Bottom and top faces
-            vertices.extend([
-                [start[0] - perpendicular[0] * width/2, start[1] - perpendicular[1] * width/2, z],
-                [start[0] + perpendicular[0] * width/2, start[1] + perpendicular[1] * width/2, z],
-                [end[0] + perpendicular[0] * width/2, end[1] + perpendicular[1] * width/2, z],
-                [end[0] - perpendicular[0] * width/2, end[1] - perpendicular[1] * width/2, z]
-            ])
-        
+            vertices.extend(
+                [
+                    [
+                        start[0] - perpendicular[0] * width / 2,
+                        start[1] - perpendicular[1] * width / 2,
+                        z,
+                    ],
+                    [
+                        start[0] + perpendicular[0] * width / 2,
+                        start[1] + perpendicular[1] * width / 2,
+                        z,
+                    ],
+                    [
+                        end[0] + perpendicular[0] * width / 2,
+                        end[1] + perpendicular[1] * width / 2,
+                        z,
+                    ],
+                    [
+                        end[0] - perpendicular[0] * width / 2,
+                        end[1] - perpendicular[1] * width / 2,
+                        z,
+                    ],
+                ]
+            )
+
         # Create faces
         faces = [
             [vertices[0], vertices[1], vertices[2], vertices[3]],  # Bottom
@@ -514,27 +624,29 @@ class MatplotlibVisualizer:
             [vertices[0], vertices[1], vertices[5], vertices[4]],  # Side 1
             [vertices[1], vertices[2], vertices[6], vertices[5]],  # Side 2
             [vertices[2], vertices[3], vertices[7], vertices[6]],  # Side 3
-            [vertices[3], vertices[0], vertices[4], vertices[7]]   # Side 4
+            [vertices[3], vertices[0], vertices[4], vertices[7]],  # Side 4
         ]
-        
+
         # Create 3D collection and add to axis
         poly3d = Poly3DCollection(faces, alpha=0.7)
         poly3d.set_facecolor(color)
         ax.add_collection3d(poly3d)
 
-    def _plot_3d_polygon(self, ax, points, height, facecolor, edgecolor=None, alpha=1.0):
+    def _plot_3d_polygon(
+        self, ax, points, height, facecolor, edgecolor=None, alpha=1.0
+    ):
         """Helper method to plot 3D polygon with height."""
         points = np.array(points)
         vertices = []
-        
+
         # Create bottom and top faces
         for z in [0, height]:
             for point in points:
                 vertices.append([point[0], point[1], z])
-        
+
         vertices = np.array(vertices)
         n_points = len(points)
-        
+
         # Create faces
         faces = []
         # Bottom face
@@ -544,13 +656,15 @@ class MatplotlibVisualizer:
         # Side faces
         for i in range(n_points):
             next_i = (i + 1) % n_points
-            faces.append([
-                vertices[i],
-                vertices[next_i],
-                vertices[next_i + n_points],
-                vertices[i + n_points]
-            ])
-        
+            faces.append(
+                [
+                    vertices[i],
+                    vertices[next_i],
+                    vertices[next_i + n_points],
+                    vertices[i + n_points],
+                ]
+            )
+
         # Create 3D collection and add to axis
         poly3d = Poly3DCollection(faces, alpha=alpha, zorder=1)
         poly3d.set_facecolor(facecolor)
@@ -558,25 +672,32 @@ class MatplotlibVisualizer:
             poly3d.set_edgecolor(edgecolor)
         ax.add_collection3d(poly3d)
 
-    def _plot_3d_stop_sign(self, ax, x, y, radius, height, facecolor, alpha=1.0):
+    def _plot_3d_stop_sign(
+        self, ax, x, y, radius, height, facecolor, alpha=1.0
+    ):
         """Helper method to plot 3D stop sign."""
         # Create octagon points
         n_sides = 8
-        angles = np.linspace(0, 2*np.pi, n_sides, endpoint=False)
-        points = [[x + radius * np.cos(angle), y + radius * np.sin(angle)] for angle in angles]
-        
+        angles = np.linspace(0, 2 * np.pi, n_sides, endpoint=False)
+        points = [
+            [x + radius * np.cos(angle), y + radius * np.sin(angle)]
+            for angle in angles
+        ]
+
         # Plot as 3D polygon
         self._plot_3d_polygon(ax, points, height, facecolor, alpha=alpha)
-        
+
         # Add pole
         pole_radius = radius * 0.1
         pole_points = [
             [x - pole_radius, y - pole_radius],
             [x + pole_radius, y - pole_radius],
             [x + pole_radius, y + pole_radius],
-            [x - pole_radius, y + pole_radius]
+            [x - pole_radius, y + pole_radius],
         ]
-        self._plot_3d_polygon(ax, pole_points, height * 0.8, facecolor="#808080", alpha=alpha)
+        self._plot_3d_polygon(
+            ax, pole_points, height * 0.8, facecolor="#808080", alpha=alpha
+        )
 
     def _plot_roadgraph(
         self,
@@ -591,36 +712,54 @@ class MatplotlibVisualizer:
         for road_point_type in road_graph.type.unique().tolist():
             if road_point_type == int(madrona_gpudrive.EntityType._None):
                 continue
-            
+
             road_mask = road_graph.type[env_idx, :] == road_point_type
-            
+
             # Get coordinates and metadata for the current road type
             x_coords = road_graph.x[env_idx, road_mask].tolist()
             y_coords = road_graph.y[env_idx, road_mask].tolist()
-            segment_lengths = road_graph.segment_length[env_idx, road_mask].tolist()
-            segment_widths = road_graph.segment_width[env_idx, road_mask].tolist()
-            segment_orientations = road_graph.orientation[env_idx, road_mask].tolist()
-            
+            segment_lengths = road_graph.segment_length[
+                env_idx, road_mask
+            ].tolist()
+            segment_widths = road_graph.segment_width[
+                env_idx, road_mask
+            ].tolist()
+            segment_orientations = road_graph.orientation[
+                env_idx, road_mask
+            ].tolist()
+
             if road_point_type in [
                 int(madrona_gpudrive.EntityType.RoadEdge),
                 int(madrona_gpudrive.EntityType.RoadLine),
-                int(madrona_gpudrive.EntityType.RoadLane)
+                int(madrona_gpudrive.EntityType.RoadLane),
             ]:
                 # Handle road edges, lines, and lanes
                 if self.render_3d:
                     for x, y, length, width, orientation in zip(
-                        x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_widths,
+                        segment_orientations,
                     ):
-                        start, end = self._get_endpoints(x, y, length, orientation)
-                        
+                        start, end = self._get_endpoints(
+                            x, y, length, orientation
+                        )
+
                         # Create 3D road segment
-                        if road_point_type == int(madrona_gpudrive.EntityType.RoadEdge):
+                        if road_point_type == int(
+                            madrona_gpudrive.EntityType.RoadEdge
+                        ):
                             # For road edges, create raised borders
                             height = 0.01  # Small height for road edges
                             self._plot_3d_road_segment(
-                                ax, start, end, width, height,
+                                ax,
+                                start,
+                                end,
+                                width,
+                                height,
                                 ROAD_GRAPH_COLORS[road_point_type],
-                                line_width=1.1 * line_width_scale
+                                line_width=1.1 * line_width_scale,
                             )
                         else:
                             # For lanes and lines, plot at ground level
@@ -629,44 +768,64 @@ class MatplotlibVisualizer:
                                 [start[1], end[1]],
                                 [0, 0],  # Ground level
                                 color=ROAD_GRAPH_COLORS[road_point_type],
-                                linewidth=1.25 * line_width_scale
+                                linewidth=1.25 * line_width_scale,
                             )
                 else:
                     # Original 2D plotting
                     for x, y, length, orientation in zip(
-                        x_coords, y_coords, segment_lengths, segment_orientations
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_orientations,
                     ):
-                        start, end = self._get_endpoints(x, y, length, orientation)
-                        line_width = 1.1 * line_width_scale if road_point_type == int(
-                            madrona_gpudrive.EntityType.RoadEdge
-                        ) else 0.75 * line_width_scale
-                        
+                        start, end = self._get_endpoints(
+                            x, y, length, orientation
+                        )
+                        line_width = (
+                            1.1 * line_width_scale
+                            if road_point_type
+                            == int(madrona_gpudrive.EntityType.RoadEdge)
+                            else 0.75 * line_width_scale
+                        )
+
                         ax.plot(
                             [start[0], end[0]],
                             [start[1], end[1]],
                             color=ROAD_GRAPH_COLORS[road_point_type],
                             linewidth=line_width,
                         )
-                        
+
             elif road_point_type == int(madrona_gpudrive.EntityType.SpeedBump):
                 if self.render_3d:
                     for x, y, length, width, orientation in zip(
-                        x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_widths,
+                        segment_orientations,
                     ):
                         # Create 3D speed bump with height
-                        points = self._get_corners_polygon(x, y, length, width, orientation)
+                        points = self._get_corners_polygon(
+                            x, y, length, width, orientation
+                        )
                         height = 0.0  # Height of speed bump
                         self._plot_3d_polygon(
-                            ax, points, height,
+                            ax,
+                            points,
+                            height,
                             facecolor=ROAD_GRAPH_COLORS[road_point_type],
-                            alpha=0.6
+                            alpha=0.6,
                         )
                 else:
                     utils.plot_speed_bumps(
-                        x_coords, y_coords, segment_lengths,
-                        segment_widths, segment_orientations, ax
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_widths,
+                        segment_orientations,
+                        ax,
                     )
-                    
+
             elif road_point_type == int(madrona_gpudrive.EntityType.StopSign):
                 if self.render_3d:
                     for x, y in zip(x_coords, y_coords):
@@ -674,9 +833,13 @@ class MatplotlibVisualizer:
                         height = 0.1  # Standard stop sign height
                         radius = 0.3
                         self._plot_3d_stop_sign(
-                            ax, x, y, radius, height,
+                            ax,
+                            x,
+                            y,
+                            radius,
+                            height,
                             facecolor="#c04000",
-                            alpha=0.9
+                            alpha=0.9,
                         )
                 else:
                     for x, y in zip(x_coords, y_coords):
@@ -689,25 +852,39 @@ class MatplotlibVisualizer:
                             linewidth=3.0,
                             alpha=0.9,
                         )
-                        
+
             elif road_point_type == int(madrona_gpudrive.EntityType.CrossWalk):
                 if self.render_3d:
                     for x, y, length, width, orientation in zip(
-                        x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_widths,
+                        segment_orientations,
                     ):
-                        points = self._get_corners_polygon(x, y, length, width, orientation)
+                        points = self._get_corners_polygon(
+                            x, y, length, width, orientation
+                        )
                         height = 0.0  # Slight elevation for crosswalk
                         self._plot_3d_polygon(
-                            ax, points, height,
+                            ax,
+                            points,
+                            height,
                             facecolor="white",
                             edgecolor="xkcd:bluish grey",
                             alpha=0.4,
                         )
                 else:
                     for x, y, length, width, orientation in zip(
-                        x_coords, y_coords, segment_lengths, segment_widths, segment_orientations
+                        x_coords,
+                        y_coords,
+                        segment_lengths,
+                        segment_widths,
+                        segment_orientations,
                     ):
-                        points = self._get_corners_polygon(x, y, length, width, orientation)
+                        points = self._get_corners_polygon(
+                            x, y, length, width, orientation
+                        )
                         utils.plot_crosswalk(
                             points=points,
                             ax=ax,
@@ -721,7 +898,9 @@ class MatplotlibVisualizer:
                     ax.scatter3D(
                         road_graph.x[env_idx, road_mask],
                         road_graph.y[env_idx, road_mask],
-                        np.zeros_like(road_graph.x[env_idx, road_mask]),  # Ground level
+                        np.zeros_like(
+                            road_graph.x[env_idx, road_mask]
+                        ),  # Ground level
                         s=5 * marker_size_scale,
                         label=road_point_type,
                         color=ROAD_GRAPH_COLORS[int(road_point_type)],
@@ -740,34 +919,43 @@ class MatplotlibVisualizer:
         # Rotation matrix
         c, s = np.cos(orientation), np.sin(orientation)
         R = np.array([[c, -s], [s, c]])
-        
+
         # Define base points for cuboid
-        base_points = np.array([
-            [-length/2, -width/2],  # Back left
-            [length/2, -width/2],   # Front left
-            [length/2, width/2],    # Front right
-            [-length/2, width/2],   # Back right
-        ])
-        
+        base_points = np.array(
+            [
+                [-length / 2, -width / 2],  # Back left
+                [length / 2, -width / 2],  # Front left
+                [length / 2, width / 2],  # Front right
+                [-length / 2, width / 2],  # Back right
+            ]
+        )
+
         # Rotate and translate points
         transformed_points = base_points @ R.T + np.array([x, y])
-        
+
         # Create 3D points
-        bottom = np.column_stack([transformed_points, np.zeros_like(transformed_points[:, 0])])
-        top = np.column_stack([transformed_points, np.full_like(transformed_points[:, 0], self.vehicle_height)])
-        
+        bottom = np.column_stack(
+            [transformed_points, np.zeros_like(transformed_points[:, 0])]
+        )
+        top = np.column_stack(
+            [
+                transformed_points,
+                np.full_like(transformed_points[:, 0], self.vehicle_height),
+            ]
+        )
+
         # Define faces (6 faces for cuboid)
         faces = [
             bottom,  # Bottom face
-            top,     # Top face
+            top,  # Top face
             np.array([bottom[0], bottom[1], top[1], top[0]]),  # Left side
             np.array([bottom[1], bottom[2], top[2], top[1]]),  # Front
             np.array([bottom[2], bottom[3], top[3], top[2]]),  # Right side
-            np.array([bottom[3], bottom[0], top[0], top[3]])   # Back
+            np.array([bottom[3], bottom[0], top[0], top[3]]),  # Back
         ]
-        
+
         return faces
-    
+
     def _plot_filtered_agent_bounding_boxes(
         self,
         env_idx: int,
@@ -806,16 +994,20 @@ class MatplotlibVisualizer:
             policy_mask: Optional dictionary which maps each policy to a policy mask
         """
 
-        def plot_agent_group_3d(bboxes, color, alpha=1.0, line_width_scale=1.5):
+        def plot_agent_group_3d(
+            bboxes, color, alpha=1.0, line_width_scale=1.5
+        ):
             """Helper function to plot a group of agents in 3D"""
             for x, y, length, width, angle in bboxes:
                 # Create 3D vehicle box
                 faces = self._create_3d_vehicle_box(x, y, length, width, angle)
-                
+
                 # Plot the cuboid (vehicle box)
-                poly3d = Poly3DCollection(faces, alpha=alpha, zsort='max', zorder=6)
+                poly3d = Poly3DCollection(
+                    faces, alpha=alpha, zsort="max", zorder=6
+                )
                 poly3d.set_facecolor(color)
-                poly3d.set_edgecolor('black')
+                poly3d.set_edgecolor("black")
                 poly3d.set_linewidth(0.5 * line_width_scale)
                 ax.add_collection3d(poly3d)
 
@@ -823,44 +1015,52 @@ class MatplotlibVisualizer:
                 c = np.cos(angle)
                 s = np.sin(angle)
                 arrow_length = 4.5
-                
+
                 # Coordinates of the arrow's base (center of the box) and the tip
-                arrow_base = np.array([x, y, 0])  # Starting point (at the top of the box)
-                arrow_tip = arrow_base + np.array([arrow_length * c, arrow_length * s, 0])  # Pointing in the direction of the angle
-                
-                # Plot the heading arrow 
+                arrow_base = np.array(
+                    [x, y, 0]
+                )  # Starting point (at the top of the box)
+                arrow_tip = arrow_base + np.array(
+                    [arrow_length * c, arrow_length * s, 0]
+                )  # Pointing in the direction of the angle
+
+                # Plot the heading arrow
                 ax.plot(
                     [arrow_base[0], arrow_tip[0]],
                     [arrow_base[1], arrow_tip[1]],
                     [arrow_base[2], arrow_tip[2]],
-                    color='black',
+                    color="black",
                     linewidth=2,
                     alpha=alpha,
                     zorder=5,
                 )
-                
+
                 # Add arrowhead (tip)
-                tip_angle = np.pi / 1.5  # Angle of the arrowhead 
+                tip_angle = np.pi / 1.5  # Angle of the arrowhead
                 arrowhead_length = arrow_length / 8  # Length of the arrowhead
-                
+
                 # Calculate the left and right arrowhead points
-                arrowhead_left = arrow_tip + np.array([
-                    arrowhead_length * (np.cos(angle + tip_angle) - c),
-                    arrowhead_length * (np.sin(angle + tip_angle) - s),
-                    0
-                ])
-                arrowhead_right = arrow_tip + np.array([
-                    arrowhead_length * (np.cos(angle - tip_angle) - c),
-                    arrowhead_length * (np.sin(angle - tip_angle) - s),
-                    0
-                ])
-                
+                arrowhead_left = arrow_tip + np.array(
+                    [
+                        arrowhead_length * (np.cos(angle + tip_angle) - c),
+                        arrowhead_length * (np.sin(angle + tip_angle) - s),
+                        0,
+                    ]
+                )
+                arrowhead_right = arrow_tip + np.array(
+                    [
+                        arrowhead_length * (np.cos(angle - tip_angle) - c),
+                        arrowhead_length * (np.sin(angle - tip_angle) - s),
+                        0,
+                    ]
+                )
+
                 # Plot the left and right arrowhead lines
                 ax.plot(
                     [arrow_tip[0], arrowhead_left[0]],
                     [arrow_tip[1], arrowhead_left[1]],
                     [arrow_tip[2], arrowhead_left[2]],
-                    color='black',
+                    color="black",
                     linewidth=1.5,
                     alpha=alpha,
                     zorder=5,
@@ -869,7 +1069,7 @@ class MatplotlibVisualizer:
                     [arrow_tip[0], arrowhead_right[0]],
                     [arrow_tip[1], arrowhead_right[1]],
                     [arrow_tip[2], arrowhead_right[2]],
-                    color='black',
+                    color="black",
                     linewidth=1.5,
                     alpha=alpha,
                     zorder=5,
@@ -912,16 +1112,20 @@ class MatplotlibVisualizer:
         )
 
         if self.render_3d:
-            plot_agent_group_3d(bboxes_controlled_offroad, AGENT_COLOR_BY_STATE["off_road"])
+            plot_agent_group_3d(
+                bboxes_controlled_offroad, AGENT_COLOR_BY_STATE["off_road"]
+            )
         else:
-            plot_agent_group_2d(bboxes_controlled_offroad, AGENT_COLOR_BY_STATE["off_road"])
+            plot_agent_group_2d(
+                bboxes_controlled_offroad, AGENT_COLOR_BY_STATE["off_road"]
+            )
 
         # Plot goals
         if plot_goal_points:
             for mask, color in [
                 (is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
                 (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
-                (is_collided_mask, AGENT_COLOR_BY_STATE["collided"])
+                (is_collided_mask, AGENT_COLOR_BY_STATE["collided"]),
             ]:
                 if not mask.any():
                     continue
@@ -932,22 +1136,45 @@ class MatplotlibVisualizer:
                 if self.render_3d:
                     # Plot goals as vertical lines in 3D
                     for x, y in zip(goal_x, goal_y):
-                        ax.plot3D([x, x], [y, y], [0, self.vehicle_height], 
-                                color=color, linestyle='--', linewidth=2 * line_width_scale)
+                        ax.plot3D(
+                            [x, x],
+                            [y, y],
+                            [0, self.vehicle_height],
+                            color=color,
+                            linestyle="--",
+                            linewidth=2 * line_width_scale,
+                        )
                         # Add goal circle on the ground
-                        circle_points = np.linspace(0, 2*np.pi, 32)
+                        circle_points = np.linspace(0, 2 * np.pi, 32)
                         circle_x = x + self.goal_radius * np.cos(circle_points)
                         circle_y = y + self.goal_radius * np.sin(circle_points)
                         circle_z = np.zeros_like(circle_points)
-                        ax.plot3D(circle_x, circle_y, circle_z, 
-                                color=color, linestyle='--', linewidth=2 * line_width_scale)
+                        ax.plot3D(
+                            circle_x,
+                            circle_y,
+                            circle_z,
+                            color=color,
+                            linestyle="--",
+                            linewidth=2 * line_width_scale,
+                        )
                 else:
                     # Original 2D goal plotting
-                    ax.scatter(goal_x, goal_y, s=5 * marker_size_scale,
-                            linewidth=1.5 * line_width_scale, c=color, marker="o")
+                    ax.scatter(
+                        goal_x,
+                        goal_y,
+                        s=5 * marker_size_scale,
+                        linewidth=1.5 * line_width_scale,
+                        c=color,
+                        marker="o",
+                    )
                     for x, y in zip(goal_x, goal_y):
-                        circle = Circle((x, y), radius=self.goal_radius,
-                                    color=color, fill=False, linestyle="--")
+                        circle = Circle(
+                            (x, y),
+                            radius=self.goal_radius,
+                            color=color,
+                            fill=False,
+                            linestyle="--",
+                        )
                         ax.add_patch(circle)
 
         # Collided agents
@@ -963,9 +1190,13 @@ class MatplotlibVisualizer:
         )
 
         if self.render_3d:
-            plot_agent_group_3d(bboxes_controlled_collided, AGENT_COLOR_BY_STATE["collided"])
+            plot_agent_group_3d(
+                bboxes_controlled_collided, AGENT_COLOR_BY_STATE["collided"]
+            )
         else:
-            plot_agent_group_2d(bboxes_controlled_collided, AGENT_COLOR_BY_STATE["collided"])
+            plot_agent_group_2d(
+                bboxes_controlled_collided, AGENT_COLOR_BY_STATE["collided"]
+            )
 
         if not policy_world_mask: ## controlled by the same policy
             # Living agents
@@ -998,7 +1229,9 @@ class MatplotlibVisualizer:
 
 
         if self.render_3d:
-            plot_agent_group_3d(bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"])
+            plot_agent_group_3d(
+                bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
+            )
         else:
             if not policy_mask:
                 plot_agent_group_2d(bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"])
@@ -1039,9 +1272,13 @@ class MatplotlibVisualizer:
         )
 
         if self.render_3d:
-            plot_agent_group_3d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+            plot_agent_group_3d(
+                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+            )
         else:
-            plot_agent_group_2d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+            plot_agent_group_2d(
+                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+            )
 
     def _plot_expert_trajectories(
         self,
@@ -1058,7 +1295,11 @@ class MatplotlibVisualizer:
         """
         if self.vis_config.draw_expert_trajectories:
             controlled_mask = self.controlled_agents[env_idx, :]
-            non_controlled_mask = ~response_type.static[env_idx, :] & response_type.moving[env_idx, :] & ~controlled_mask
+            non_controlled_mask = (
+                ~response_type.static[env_idx, :]
+                & response_type.moving[env_idx, :]
+                & ~controlled_mask
+            )
             mask = (
                 controlled_mask
                 if self.vis_config.draw_only_controllable_veh
@@ -1067,7 +1308,11 @@ class MatplotlibVisualizer:
             agent_indices = torch.where(mask)[0]
             trajectories = expert_trajectories[env_idx][mask]
             for idx, trajectory in zip(agent_indices, trajectories):
-                color = AGENT_COLOR_BY_STATE["ok"] if controlled_mask[idx] else AGENT_COLOR_BY_STATE["log_replay"]
+                color = (
+                    AGENT_COLOR_BY_STATE["ok"]
+                    if controlled_mask[idx]
+                    else AGENT_COLOR_BY_STATE["log_replay"]
+                )
                 for step in trajectory:
                     x, y = step[:2].numpy()
                     if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
@@ -1087,7 +1332,9 @@ class MatplotlibVisualizer:
         env_idx: int,
         figsize: Tuple[int, int] = (10, 10),
     ):
-        """Plot observation from agent POV to inspect the information available to the agent.
+        """
+        Plot observation from agent POV to inspect the information available 
+        to the agent.
         Args:
             agent_idx (int): Index of the agent whose observation is to be plotted.
             env_idx (int): Index of the environment in the batch.
