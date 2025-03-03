@@ -36,3 +36,22 @@ def merge_actions(
                             break
     
     return action_tensor
+
+
+
+def create_policy_masks(env, num_sim_agents=2):
+    policy_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.int)
+    agent_indices = env.cont_agent_mask.nonzero(as_tuple=True)
+
+    for i, (world_idx, agent_idx) in enumerate(zip(*agent_indices)):
+        policy_mask[world_idx, agent_idx] = (i % num_sim_agents) + 1
+
+    policy_mask = {f'pi_{int(policy.item())}': (policy_mask == policy)
+            for policy in policy_mask.unique() if policy.item() != 0}
+
+
+    policy_world_mask = {
+        world: {f'pi_{p+1}': policy_mask[f'pi_{p+1}'][world] for p in range(num_sim_agents)}
+        for world in range(env.cont_agent_mask.shape[0])
+    }
+    return policy_world_mask
