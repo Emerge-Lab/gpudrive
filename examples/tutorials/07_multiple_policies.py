@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
             # # Save first frame as an image
             # imageio.imwrite(save_img_path, frames_arr[0])
-            print(f"Saved first frame at {save_img_path}")
+            #print(f"Saved first frame at {save_img_path}")
 
         except Exception as e:
             print(f"Error saving files: {e}")
