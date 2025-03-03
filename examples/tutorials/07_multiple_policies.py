@@ -41,7 +41,7 @@ device = "cpu" # cpu just because we're in a notebook
 NUM_SIM_AGENTS = 2
 
 sim_agent1 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27")
-sim_agent2 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27")
+sim_agent2 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S1000_02_27")
 
 # Some other info
 card = ModelCard.load("daphne-cornelisse/policy_S10_000_02_27")
