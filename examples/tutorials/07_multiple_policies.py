@@ -17,7 +17,7 @@ import os
 
 
 # Configs model has been trained with
-config = load_config("/home/charliemolony/Desktop/gpudrive/examples/experimental/config/reliable_agents_params")
+config = load_config("../../examples/experimental/config/reliable_agents_params")
 
 
 
