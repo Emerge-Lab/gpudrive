@@ -91,7 +91,7 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
-        policy_masks: dict = None,
+        policy_masks: Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -105,7 +105,14 @@ class MatplotlibVisualizer:
             plot_log_replay_trajectory: If True, plots the log replay trajectory.
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
-            policy_mask: If multiple policies, mask of matching agent to policy
+            policy_mask: dict
+            A dictionary that maps worlds to policies and specifies which agents are assigned to each policy.
+            The structure follows the format: {World: {Policy: Mask}}, where:
+                - World  (int): The identifier for the simulation environment.
+                - Policy (str): The policy assigned to agents within the world.
+                - Mask (torch.Tensor): A boolean or index-based mask indicating which agents follow the given policy.
+                
+            This is used when multiple policies are present to ensure correct agent-policy mapping.
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -766,7 +773,7 @@ class MatplotlibVisualizer:
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
-        policy_mask : dict = None
+        policy_mask : Optional[Dict[str,torch.Tensor]] = None
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -785,6 +792,7 @@ class MatplotlibVisualizer:
             line_width_scale: Scale factor for line width.
             marker_size_scale: Scale factor for marker size.
             extended_goals: Optional dictionary of backward goals for controlled agents.
+            policy_mask: Optional dictionary which maps each policy to a policy mask
         """
 
         def plot_agent_group_3d(bboxes, color, alpha=1.0, line_width_scale=1.5):

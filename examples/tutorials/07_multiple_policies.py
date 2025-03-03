@@ -12,6 +12,7 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.config import load_config
 import imageio
 import numpy as np
+import os
 
 
 def create_policy_masks(env, num_sim_agents=2):
@@ -175,13 +176,24 @@ if __name__ == "__main__":
             break
 
     env.close()
+
+
     for scene_name, frames_list in frames.items():
         frames_arr = np.array(frames_list)
-        save_path = f"{VIDEO_PATH}{scene_name}.gif"
-        print(f"Saving video at {save_path}")
+        save_gif_path = f"{VIDEO_PATH}{scene_name}.gif"
+        save_img_path = f"{VIDEO_PATH}{scene_name}_first_frame.png"
+
+        print(f"Saving video at {save_gif_path}")
+
         try:
-            imageio.mimwrite(save_path, frames_arr, fps=FPS, loop=0)
-        except:
-            import os
-            os.mkdir(VIDEO_PATH)
-            imageio.mimwrite(save_path, frames_arr, fps=FPS, loop=0)
+            os.makedirs(VIDEO_PATH, exist_ok=True)  # Ensure the directory exists
+
+            # Save GIF
+            imageio.mimwrite(save_gif_path, frames_arr, fps=FPS, loop=0)
+
+            # # Save first frame as an image
+            # imageio.imwrite(save_img_path, frames_arr[0])
+            print(f"Saved first frame at {save_img_path}")
+
+        except Exception as e:
+            print(f"Error saving files: {e}")
