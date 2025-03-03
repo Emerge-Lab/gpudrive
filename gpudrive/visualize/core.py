@@ -106,7 +106,8 @@ class MatplotlibVisualizer:
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
             policy_mask: dict
-            A dictionary that maps worlds to policies and specifies which agents are assigned to each policy.
+            A dictionary that maps worlds to policies and specifies which agents are assigned to each policy. 
+            For now maximum number of policies is 3 as there are only 3 colors in COLOR_AGENT_BY_POLICY
             The structure follows the format: {World: {Policy: Mask}}, where:
                 - World  (int): The identifier for the simulation environment.
                 - Policy (str): The policy assigned to agents within the world.
