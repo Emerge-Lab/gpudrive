@@ -1284,9 +1284,13 @@ class MatplotlibVisualizer:
         )
 
         if self.render_3d:
-            plot_agent_group_3d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+            plot_agent_group_3d(
+                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+            )
         else:
-            plot_agent_group_2d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+            plot_agent_group_2d(
+                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+            )
 
     def _plot_expert_trajectories(
         self,

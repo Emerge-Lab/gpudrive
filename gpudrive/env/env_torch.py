@@ -82,7 +82,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             low=-1.0,
             high=1.0,
             shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
+            low=-1.0,
+            high=1.0,
+            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
+
 
         self.single_observation_space = gymnasium.spaces.Box(
             low=-1.0,
