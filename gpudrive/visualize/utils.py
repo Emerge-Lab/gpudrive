@@ -445,8 +445,10 @@ def plot_numpy_bounding_boxes_multiple_policy(
 
     Args:
       ax: Fig handles.
+      bboxes_s: Shape (num_policies,bboxes)
       bboxes: Shape (num_bbox, 5), with last dimension as (x, y, length, width,
         yaw).
+      colors: (num_policies,color)
       color: Shape (3,), represents RGB color for drawing.
       alpha: Alpha value for drawing, i.e. 0 means fully transparent.
       as_center_pts: If set to True, bboxes will be drawn as center points,

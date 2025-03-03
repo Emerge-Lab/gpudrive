@@ -31,7 +31,7 @@ def create_policy_masks(env, num_sim_agents=2):
     }
     return policy_world_mask
 # Configs model has been trained with
-config = load_config("../../examples/experimental/eval/config/reliable_agents_params")
+config = load_config("/home/charliemolony/Desktop/gpudrive/examples/experimental/config/reliable_agents_params")
 
 
 
@@ -41,7 +41,7 @@ device = "cpu" # cpu just because we're in a notebook
 NUM_SIM_AGENTS = 2
 
 sim_agent1 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27")
-sim_agent2 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27")
+sim_agent2 = NeuralNet.from_pretrained("daphne-cornelisse/policy_S1000_02_27")
 
 # Some other info
 card = ModelCard.load("daphne-cornelisse/policy_S10_000_02_27")
