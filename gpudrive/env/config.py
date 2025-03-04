@@ -97,7 +97,7 @@ class EnvConfig:
     init_steps: int = 0
     
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
+    reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs"
 
     dist_to_goal_threshold: float = (
         2.0  # Radius around goal considered as "goal achieved"

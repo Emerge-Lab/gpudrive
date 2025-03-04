@@ -149,7 +149,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
         )
 
-    # TODO: Implement VBD deviation penalty
     def get_rewards(
         self,
         collision_weight=-0.5,
@@ -166,19 +165,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         The importance of each component is determined by the weights.
         """
+        
+        info_tensor = self.sim.info_tensor().to_torch().clone()
+        
+        # True if the agents bounding box touches a road edge
+        off_road = info_tensor[:, :, 0].to(torch.float)
+
+        # True if the vehicle is in collision with another agent, such as 
+        # a vehicle, cyclist, or pedestrian
+        collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+        
+        # True if the agent is within dist_to_goal_threshold
+        goal_achieved = info_tensor[:, :, 3].to(torch.float)
+        
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
-            # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch().clone()
-            off_road = info_tensor[:, :, 0].to(torch.float)
-
-            # True if the vehicle is in collision with another road object
-            # (i.e. a cyclist or pedestrian)
-            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-            goal_achieved = info_tensor[:, :, 3].to(torch.float)
-
+    
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
@@ -186,19 +190,37 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             return weighted_rewards
+        
+        elif self.config.reward_type == "distance_to_vdb_trajs":
+            # Reward based on distance to VBD predicted trajectories
+            # (i.e. the deviation from the predicted trajectory)
+            weighted_rewards = (
+                collision_weight * collided
+                + goal_achieved_weight * goal_achieved
+                + off_road_weight * off_road
+            )
 
+            # TODO: Pseudocode below; Replace with self.vbd_trajectories
+            agent_states = GlobalEgoState.from_tensor(
+                self.sim.absolute_self_observation_tensor(),
+                self.backend,
+                self.device,
+            )
+
+            agent_pos = torch.stack(
+                [agent_states.pos_x, agent_states.pos_y], dim=-1
+            )
+
+            # Compute euclidean distance between agent and logs
+            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+
+            # Add reward based on inverse distance to logs
+            weighted_rewards += self.vbd_trajectory_weight * torch.exp(-dist_to_logs)
+
+            return weighted_rewards
+            
         elif self.config.reward_type == "distance_to_logs":
             # Reward based on distance to logs and penalty for collision
-
-            # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch().clone()
-            off_road = info_tensor[:, :, 0].to(torch.float)
-
-            # True if the vehicle collided with another road object
-            # (i.e. a cyclist or pedestrian)
-            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-            goal_achieved = info_tensor[:, :, 3].to(torch.float)
-
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
