@@ -126,6 +126,10 @@ class EnvConfig:
         "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
     )
 
+    # VBD model settings
+    use_vbd: bool = False,
+    vbd_model_path: str = None,
+    vbd_trajectory_weight = 0.1,
 
 
 class SelectionDiscipline(Enum):

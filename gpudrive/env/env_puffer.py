@@ -54,6 +54,9 @@ class PufferGPUDrive(PufferEnv):
         polyline_reduction_threshold=0.1,
         remove_non_vehicles=True,
         obs_radius=50.0,
+        use_vbd=False,
+        vbd_model_path=None,
+        vbd_trajectory_weight=0.1,
         render=False,
         render_3d=True,
         render_interval=50,
@@ -119,7 +122,10 @@ class PufferGPUDrive(PufferEnv):
             ),
             accel_actions=torch.round(
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
-            )
+            ),
+            use_vbd=use_vbd,
+            vbd_model_path=vbd_model_path,
+            vbd_trajectory_weight=vbd_trajectory_weight,
         )
         
         render_config = RenderConfig(

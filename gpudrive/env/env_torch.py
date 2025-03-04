@@ -98,6 +98,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
+        # Initialize VBD model if enabled
+        self.use_vbd = config.use_vbd
+        self.vbd_trajectory_weight = config.vbd_trajectory_weight
+        if self.use_vbd and config.vbd_model_path:
+            self.vbd_model = self._load_vbd_model(config.vbd_model_path)
+            self.vbd_trajectories = None # TODO: What to init vbd_trajectories to? torch tensor of zeros?
+            # Generate VBD trajectories for initial batch of scenes
+            self._generate_vbd_trajectories()
+        else:
+            self.vbd_model = None
+            self.vbd_trajectories = None
+
+    # TODO: Implement VBD model initialization
+    def _load_vbd_model(self, model_path):
+        """Load the VBD model from checkpoint."""
+        # Pseudocode:
+        # model = VBDModel()
+        # model.load_state_dict(torch.load(model_path))
+        # model.to(self.device)
+        # model.eval()
+        # return model
+
     def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
@@ -127,6 +149,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
         )
 
+    # TODO: Implement VBD deviation penalty
     def get_rewards(
         self,
         collision_weight=-0.5,
@@ -513,6 +536,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 .flatten(start_dim=2)
             )
 
+    # TODO: Augment VBD predictions with other observations
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
 
@@ -711,8 +735,58 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        # Generate VBD trajectories for the new batch if VBD is enabled
+        if self.use_vbd and self.vbd_model is not None:
+            self._generate_vbd_trajectories()
+
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+
+    # TODO: Implement VBD trajectory generation
+    def _generate_vbd_trajectories(self):
+        """Generate and store trajectory predictions for all scenes using VBD model."""
+        if not self.use_vbd or self.vbd_model is None:
+            return
+        
+        # Clear previous predictions
+        self.vbd_trajectories = {}
+        
+        # Get scene features needed for VBD model
+        global_agent_states = GlobalEgoState.from_tensor(
+            self.sim.absolute_self_observation_tensor(),
+            self.backend,
+            device=self.device
+        )
+        
+        # Get road graph information
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            self.sim.map_observation_tensor(),
+            self.backend,
+            device=self.device
+        )
+        
+        # Restore means if needed (similar to how it's done in advance_sim_with_log_playback)
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        global_agent_states.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        global_road_graph.restore_xy()
+        
+        # Predict trajectories for each world
+        for world_idx in range(self.num_worlds):
+            scene_features = {
+                'agent_states': global_agent_states[world_idx],
+                'road_graph': global_road_graph[world_idx],
+                'agent_mask': self.cont_agent_mask[world_idx]
+            }
+            
+            # Run VBD model to get predicted trajectories
+            with torch.no_grad():
+                # (Pseudocode) predicted_trajectories shape: [num_agents, horizon, features]
+                # where features typically include x, y positions, velocities, headings, etc.
+                predicted_trajectories = self.vbd_model.predict(scene_features)
+            
+            # Store trajectories for this world
+            self.vbd_trajectories[world_idx] = predicted_trajectories
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
