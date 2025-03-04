@@ -138,7 +138,10 @@ class GlobalEgoState:
         return self.pos_x.shape
     
     def restore_mean(self, mean_x, mean_y):
-        """Reapplies the mean to revert back to the original coordinates."""
+        """Reapplies the mean to revert back to the original coordinates.
+        - self.pos_x and self.pos_y are modified in place are of shape (num_worlds, num_agents).
+        - mean_x and mean_y are expected to be of shape (num_worlds, 1).
+        """
         self.pos_x += mean_x
         self.pos_y += mean_y
 

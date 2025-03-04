@@ -25,6 +25,9 @@ from gpudrive.visualize.core import MatplotlibVisualizer
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 
+# Versatile Behavior Diffusion model
+from integrations.models.vbd.sim_agent.sim_actor import VBDTest, sample_to_action
+
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -103,22 +106,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.vbd_trajectory_weight = config.vbd_trajectory_weight
         if self.use_vbd and config.vbd_model_path:
             self.vbd_model = self._load_vbd_model(config.vbd_model_path)
-            self.vbd_trajectories = None # TODO: What to init vbd_trajectories to? torch tensor of zeros?
+            self.vbd_trajectories = torch.Tensor([]) 
             # Generate VBD trajectories for initial batch of scenes
             self._generate_vbd_trajectories()
         else:
             self.vbd_model = None
             self.vbd_trajectories = None
 
-    # TODO: Implement VBD model initialization
     def _load_vbd_model(self, model_path):
-        """Load the VBD model from checkpoint."""
-        # Pseudocode:
-        # model = VBDModel()
-        # model.load_state_dict(torch.load(model_path))
-        # model.to(self.device)
-        # model.eval()
-        # return model
+        """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
+        model = VBDTest.load_from_checkpoint(model_path, torch.device(self.device))
+        _ = model.cpu()
+        _ = model.eval()
+        return model
 
     def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
@@ -766,7 +766,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         
         # Restore means if needed (similar to how it's done in advance_sim_with_log_playback)
-        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].unsqueeze(dim=-1).to(self.device)
         global_agent_states.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
         global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
         global_road_graph.restore_xy()
@@ -869,7 +869,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    env_config = EnvConfig(dynamics_model="delta_local")
+    
+    env_config = EnvConfig(
+        dynamics_model="classic",
+        use_vbd=True,
+        vbd_model_path="integrations/models/vbd/weights/epoch=18.ckpt",
+    )
     render_config = RenderConfig()
 
     # Create data loader
