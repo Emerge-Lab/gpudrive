@@ -72,6 +72,7 @@ class NeuralNet(nn.Module):
         hidden_dim=128,
         dropout=0.00,
         act_func="tanh",
+        vbd_in_obs=False,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -80,6 +81,7 @@ class NeuralNet(nn.Module):
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
+        self.vbd_in_obs = vbd_in_obs
     
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -159,7 +161,7 @@ class NeuralNet(nn.Module):
         Returns:
             ego_state, road_objects, road_graph (torch.Tensor).
         """
-
+    
         ego_state = obs_flat[:, : constants.EGO_FEAT_DIM]
         vis_state = obs_flat[:, constants.EGO_FEAT_DIM :]
 
@@ -174,5 +176,9 @@ class NeuralNet(nn.Module):
         road_graph = vis_state[:, ro_end_idx:rg_end_idx].reshape(
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
-
-        return ego_state, road_objects, road_graph
+        
+        if self.vbd_in_obs:
+            # Assume that the last n elements of the observation vecor are VBD-predicted trajectories
+            return ego_state, road_objects, road_graph, vis_state[:, rg_end_idx:]
+        else: 
+            return ego_state, road_objects, road_graph

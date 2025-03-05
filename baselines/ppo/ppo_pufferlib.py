@@ -61,6 +61,7 @@ def make_agent(env, config):
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            vbd_in_obs=saved_cpt["model_arch"]["vbd_in_obs"], 
         )
 
         # Load the model parameters
@@ -74,6 +75,7 @@ def make_agent(env, config):
             input_dim=config.train.network.input_dim,
             action_dim=env.single_action_space.n,
             hidden_dim=config.train.network.hidden_dim,
+            vbd_in_obs=config.environment.vbd_in_obs,
             dropout=config.train.network.dropout,
         )
 

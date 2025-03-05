@@ -74,6 +74,7 @@ train:
   network:
     input_dim: 64 # Embedding of the input features
     hidden_dim: 128 # Latent dimension
+    vbd_in_obs: false
     dropout: 0.01
     class_name: "NeuralNet"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
