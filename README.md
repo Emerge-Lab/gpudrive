@@ -41,7 +41,7 @@ To build GPUDrive, ensure you have all the required dependencies listed [here](h
 After installing the necessary dependencies, clone the repository (don't forget the --recursive flag!):
 
 ```bash
-git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+git clone --recursive https://github.com/sounakban/gpudrive-CoDec.git
 cd gpudrive
 ```
 
