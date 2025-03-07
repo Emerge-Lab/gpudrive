@@ -32,6 +32,10 @@ class SB3MultiAgentEnv(VecEnv):
         max_cont_agents,
         device,
         render_mode="rgb_array",
+        collision_weight=-.5,
+        goal_achieved_weight=1,
+        off_road_weight=-.5,        
+        log_distance_weight=.01,
     ):
 
         data_loader = SceneDataLoader(
@@ -88,6 +92,11 @@ class SB3MultiAgentEnv(VecEnv):
 
         self.num_episodes = 0
 
+        self.collision_weight = collision_weight
+        self.goal_achieved_weight = goal_achieved_weight
+        self.off_road_weight = off_road_weight
+        self.log_distance_weight = log_distance_weight
+
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
         self._seeds = None
@@ -143,7 +152,10 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         self._env.step_dynamics(self.actions_tensor)
 
-        reward = self._env.get_rewards().clone()
+        reward = self._env.get_rewards(collision_weight=self.collision_weight,
+                                       goal_achieved_weight=self.goal_achieved_weight,
+                                       off_road_weight=self.off_road_weight,
+                                       log_distance_weight=self.log_distance_weight).clone()
         done = self._env.get_dones().clone()
         info = self._env.sim.info_tensor().to_torch()
 
@@ -287,3 +299,4 @@ class SB3MultiAgentEnv(VecEnv):
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
         frames = [self._env.render()]
         return frames
+
