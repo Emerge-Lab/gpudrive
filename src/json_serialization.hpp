@@ -282,6 +282,9 @@ namespace madrona_gpudrive
         std::string name = j.at("name").get<std::string>();
         std::strncpy(map.mapName, name.c_str(), sizeof(map.mapName));
 
+        std::string scenario_id = j.at("scenario_id").get<std::string>();
+        std::strncpy(map.scenarioId, scenario_id.c_str(), sizeof(map.scenarioId));
+    
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
