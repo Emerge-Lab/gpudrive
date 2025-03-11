@@ -677,6 +677,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             filenames[i] = map_name
 
         return filenames
+    
+    def get_scenario_ids(self):
+        """Obtain the scenario ID for each world."""
+        scenario_id_integers = self.sim.scenario_id_tensor().to_torch()
+        scenario_ids = {}
+        
+        # Iterate through the number of worlds
+        for i in range(self.num_worlds):
+            tensor = scenario_id_integers[i]
+            # Convert ints to characters, ignoring zeros
+            scenario_id = "".join([chr(i) for i in tensor.tolist() if i != 0])
+            scenario_ids[i] = scenario_id
+        
+        return scenario_ids
 
 
 if __name__ == "__main__":

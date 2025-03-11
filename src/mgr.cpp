@@ -875,6 +875,13 @@ Tensor Manager::mapNameTensor() const {
     );
 }
 
+Tensor Manager::scenarioIdTensor() const {
+    return impl_->exportTensor(
+        ExportID::ScenarioId, TensorElementType::Int32,
+        {impl_->numWorlds, ScenarioIdExportSize}
+    );
+}
+
 Tensor Manager::metadataTensor() const {
     return impl_->exportTensor(
         ExportID::MetaData, TensorElementType::Int32,

@@ -368,6 +368,10 @@ void createPersistentEntities(Engine &ctx) {
         mapName.mapName[i] = map.mapName[i];
     }
 
+    auto& scenarioId = ctx.singleton<ScenarioId>();
+    for (int i = 0; i < 32; i++) {
+        scenarioId.scenarioId[i] = map.scenarioId[i]; 
+    }
 
     if (ctx.data().enableRender)
     {
