@@ -713,10 +713,6 @@ if __name__ == "__main__":
         max_cont_agents=64,  # Number of agents to control
         device="cpu",
     )
-    
-    
-    test = env.get_scenario_ids()
-
 
     control_mask = env.cont_agent_mask
 

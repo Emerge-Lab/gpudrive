@@ -129,7 +129,6 @@ namespace madrona_gpudrive
             .def("world_means_tensor", &Manager::worldMeansTensor)
             .def("metadata_tensor", &Manager::metadataTensor)
             .def("map_name_tensor", &Manager::mapNameTensor)
-            .def("scenario_id_tensor", &Manager::scenarioIdTensor)
             .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {
                 std::unordered_map<int32_t, std::vector<int32_t>> agents_to_delete;
 
