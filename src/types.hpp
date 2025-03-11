@@ -389,6 +389,14 @@ namespace madrona_gpudrive
     const size_t MapNameExportSize = 32;
     static_assert(sizeof(MapName) == sizeof(char32_t) * MapNameExportSize);
 
+    struct ScenarioId
+    {
+        char32_t scenarioId[32];
+    };
+
+    const size_t ScenarioIdExportSize = 32;
+    static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
+
     //Metadata struct : using agent IDs.
     struct MetaData
     {
