@@ -94,16 +94,7 @@ class EnvConfig:
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "distance_to_logs", "random_weighted_combination"
-
-    # Define upper and lower bounds for reward components if using random_weighted_combination
-    collision_weight_lb: float = -1.0
-    collision_weight_ub: float = 0.0
-    goal_achieved_weight_lb: float = 1.0
-    goal_achieved_weight_ub: float = 2.0
-    off_road_weight_lb: float = -1.0
-    off_road_weight_ub: float = 0.0
+    reward_type: str = "sparse_on_goal_achieved"  # Alternatively, "weighted_combination", "distance_to_logs"
 
     dist_to_goal_threshold: float = (
         2.0  # Radius around goal considered as "goal achieved"
@@ -169,13 +160,10 @@ class RenderMode(Enum):
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
 
-
 class MadronaOption(Enum):
     """Enum for Madrona rendering options."""
-
     AGENT_VIEW = "agent_view"
     TOP_DOWN = "top_down"
-
 
 @dataclass
 class RenderConfig:
