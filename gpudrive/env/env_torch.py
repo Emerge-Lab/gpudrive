@@ -44,7 +44,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.device = device
         self.render_config = render_config
         self.backend = backend
-        
+
         # Initialize reward weights tensor if using random_weighted_combination
         self.reward_weights_tensor = None
         if (
@@ -52,7 +52,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             and self.config.reward_type == "random_weighted_combination"
         ):
             self._get_random_reward_weights()
-        
+
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
@@ -91,7 +91,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self.num_agents = self.cont_agent_mask.sum().item()
         self.episode_len = self.config.episode_len
-        
+
         # Rendering setup
         self.vis = MatplotlibVisualizer(
             sim_object=self.sim,
@@ -102,7 +102,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             render_config=self.render_config,
             env_config=self.config,
         )
-        
+
     def _get_random_reward_weights(self, env_idx_list=None):
         """Initialize random reward weights for all or specific environments.
 
@@ -213,7 +213,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         The importance of each component is determined by the weights.
         """
-        
+
         # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
         off_road = info_tensor[:, :, 0].to(torch.float)
@@ -222,7 +222,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # (i.e. a cyclist or pedestrian)
         collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
         goal_achieved = info_tensor[:, :, 3].to(torch.float)
-        
+
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
@@ -250,7 +250,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + self.reward_weights_tensor[:, :, 1] * goal_achieved
                 + self.reward_weights_tensor[:, :, 2] * off_road
             )
-            
+
             return weighted_rewards
 
         elif self.config.reward_type == "distance_to_logs":
@@ -467,19 +467,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            return torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
-            ).permute(1, 2, 0)
-        
-        else:
-            if not self.config.reward_type == "random_weighted_combination":
+            if self.config.reward_type == "random_weighted_combination":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        self.reward_weights_tensor[:, :, 0],
+                        self.reward_weights_tensor[:, :, 1],
+                        self.reward_weights_tensor[:, :, 2],
+                    ]
+                ).permute(1, 2, 0)
+
+            else:
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -489,16 +492,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
                     ]
-                ).permute(1, 0)
-            else:
-                if not hasattr(self, "reward_weights_tensor"):
-                    self._get_random_reward_weights()
+                ).permute(1, 2, 0)
 
-                
-                collision_weight=self.reward_weights_tensor[:, :, 0][ self.cont_agent_mask]
-                goal_achived_weight = self.reward_weights_tensor[:, :, 1][self.cont_agent_mask]
-                off_road_weight =  self.reward_weights_tensor[:, :, 2] [self.cont_agent_mask]
-
+        else:
+            if self.config.reward_type == "random_weighted_combination":
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -507,9 +504,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_x,
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
-                        collision_weight,
-                        goal_achived_weight,
-                        off_road_weight
+                        self.reward_weights_tensor[mask][:, 0],
+                        self.reward_weights_tensor[mask][:, 1],
+                        self.reward_weights_tensor[mask][:, 2],
+                    ]
+                ).permute(1, 0)
+            else:
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
                     ]
                 ).permute(1, 0)
 
@@ -801,24 +809,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             filenames[i] = map_name
 
         return filenames
-    
+
     def get_scenario_ids(self):
         """Obtain the scenario ID for each world."""
         scenario_id_integers = self.sim.scenario_id_tensor().to_torch()
         scenario_ids = {}
-        
+
         # Iterate through the number of worlds
         for i in range(self.num_worlds):
             tensor = scenario_id_integers[i]
             # Convert ints to characters, ignoring zeros
             scenario_id = "".join([chr(i) for i in tensor.tolist() if i != 0])
             scenario_ids[i] = scenario_id
-        
+
         return scenario_ids
 
 
 if __name__ == "__main__":
-    env_config = EnvConfig(reward_type="weighted_combination", dynamics_model="delta_local")
+    env_config = EnvConfig(
+        reward_type="weighted_combination", dynamics_model="delta_local"
+    )
     render_config = RenderConfig()
 
     # Create data loader

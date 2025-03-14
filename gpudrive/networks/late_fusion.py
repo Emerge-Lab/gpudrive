@@ -11,6 +11,7 @@ import madrona_gpudrive
 
 TOP_K_ROAD_POINTS = madrona_gpudrive.kMaxAgentMapObservationsCount
 
+
 def log_prob(logits, value):
     value = value.long().unsqueeze(-1)
     value, log_pmf = torch.broadcast_tensors(value, logits)
@@ -31,16 +32,14 @@ def sample_logits(
     deterministic=False,
 ):
     """Sample logits: Supports deterministic sampling."""
-    
+
     normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
     logits = [logits]
 
     if action is None:
         if deterministic:
             # Select the action with the maximum probability
-            action = torch.stack(
-                [l.argmax(dim=-1) for l in logits]
-            )
+            action = torch.stack([l.argmax(dim=-1) for l in logits])
         else:
             # Sample actions stochastically from the logits
             action = torch.stack(
@@ -64,24 +63,25 @@ def sample_logits(
     ).T.sum(1)
 
     return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
-    
+
+
 class NeuralNet(
     nn.Module,
     PyTorchModelHubMixin,
     repo_url="https://github.com/Emerge-Lab/gpudrive",
     docs_url="https://arxiv.org/abs/2502.14706",
-    tags=["ffn"]
+    tags=["ffn"],
 ):
     def __init__(
         self,
-        action_dim=91, # Default: 7 * 13
+        action_dim=91,  # Default: 7 * 13
         input_dim=64,
         hidden_dim=128,
         dropout=0.00,
         act_func="tanh",
         max_controlled_agents=64,
-        obs_dim=2984, # Size of the flattened observation vector 
-        reward_type = "weighted_combination"
+        obs_dim=2984,  # Size of the flattened observation vector
+        config=None,  # Optional config
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -93,14 +93,18 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
-          
+
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
-        self.partner_obs_idx = constants.PARTNER_FEAT_DIM * self.max_controlled_agents
-        if reward_type == "random_weighted_combination":
-            self.ego_state_idx += 3
-            self.partner_obs_idx += 3 
-    
+        self.partner_obs_idx = (
+            constants.PARTNER_FEAT_DIM * self.max_controlled_agents
+        )
+        if config is not None:
+            self.config = config
+            if self.config.reward_type == "random_weighted_combination":
+                self.ego_state_idx += 3
+                self.partner_obs_idx += 3
+
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
                 nn.Linear(self.ego_state_idx, input_dim)
@@ -133,7 +137,7 @@ class NeuralNet(
 
         self.shared_embed = nn.Sequential(
             nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
-            nn.Dropout(self.dropout)
+            nn.Dropout(self.dropout),
         )
 
         self.actor = pufferlib.pytorch.layer_init(
@@ -147,13 +151,13 @@ class NeuralNet(
         ego_state, road_objects, road_graph = self.unpack_obs(observation)
 
         ego_embed = self.ego_embed(ego_state)
-        
+
         # Max pool
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
 
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
-        
+
         return self.shared_embed(embed)
 
     def forward(self, obs, action=None, deterministic=False):
@@ -166,9 +170,9 @@ class NeuralNet(
         logits = self.actor(hidden)
 
         action, logprob, entropy = sample_logits(logits, action, deterministic)
-        
+
         return action, logprob, entropy, value
-    
+
     def unpack_obs(self, obs_flat):
         """
         Unpack the flattened observation into the ego state, visible simulator state.
@@ -183,8 +187,8 @@ class NeuralNet(
         # Unpack modalities
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
-        roadgraph_obs = obs_flat[:, self.partner_obs_idx:]
-        
+        roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
+
         # Reshape
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
