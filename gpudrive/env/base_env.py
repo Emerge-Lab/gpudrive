@@ -3,6 +3,7 @@ from gpudrive.env.config import RenderMode
 import madrona_gpudrive
 import abc
 
+
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def __init__(self, backend="torch"):
         super().__init__()
@@ -62,8 +63,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
             or self.config.reward_type == "distance_to_logs"
+            or self.config.reward_type == "random_weighted_combination"
         ):
-            reward_params.rewardType = madrona_gpudrive.RewardType.OnGoalAchieved
+            reward_params.rewardType = (
+                madrona_gpudrive.RewardType.OnGoalAchieved
+            )
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
 
@@ -107,7 +111,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         params = madrona_gpudrive.Parameters()
-        
+
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
         )
@@ -117,8 +121,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False
             params.IgnoreNonVehicles = False
-        elif self.config.init_mode == "all_valid": 
-            params.isStaticAgentControlled = True    
+        elif self.config.init_mode == "all_valid":
+            params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = True
             params.IgnoreNonVehicles = self.config.remove_non_vehicles
         elif self.config.init_mode == "all_non_trivial":
@@ -127,7 +131,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.IgnoreNonVehicles = self.config.remove_non_vehicles
         else:
             raise ValueError(f"Invalid init mode: {self.config.init_mode}")
-        
+
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
         ]
@@ -212,13 +216,17 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters with collision behavior settings.
         """
         if self.config.collision_behavior == "ignore":
-            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.Ignore
+            params.collisionBehaviour = (
+                madrona_gpudrive.CollisionBehaviour.Ignore
+            )
         elif self.config.collision_behavior == "remove":
             params.collisionBehaviour = (
                 madrona_gpudrive.CollisionBehaviour.AgentRemoved
             )
         elif self.config.collision_behavior == "stop":
-            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.AgentStop
+            params.collisionBehaviour = (
+                madrona_gpudrive.CollisionBehaviour.AgentStop
+            )
         else:
             raise ValueError(
                 f"Invalid collision behavior: {self.config.collision_behavior}"
