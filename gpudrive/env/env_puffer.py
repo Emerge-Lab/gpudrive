@@ -20,6 +20,7 @@ from gpudrive import GPU_DRIVE_DATA_DIR
 
 
 def env_creator(name="gpudrive", **kwargs):
+
     return lambda: PufferGPUDrive(**kwargs)
 
 
@@ -109,6 +110,7 @@ class PufferGPUDrive(PufferEnv):
             reward_type=reward_type,
             norm_obs=norm_obs,
             dynamics_model=dynamics_model,
+            collision_weight=self.collision_weight,
             collision_behavior=collision_behavior,
             dist_to_goal_threshold=dist_to_goal_threshold,
             polyline_reduction_threshold=polyline_reduction_threshold,
@@ -123,7 +125,7 @@ class PufferGPUDrive(PufferEnv):
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
             )
         )
-        
+        self.reward_type =reward_type
         render_config = RenderConfig(
             render_3d=render_3d,
         )
@@ -229,7 +231,7 @@ class PufferGPUDrive(PufferEnv):
         # Set the action for the controlled agents
         self.actions[self.controlled_agent_mask] = action
 
-        # Step the simulator with controlled agents actions
+        # Step the simulator with controlled age`nts actions
         self.env.step_dynamics(self.actions)
 
         # Get rewards, terminal (dones) and info
@@ -369,6 +371,24 @@ class PufferGPUDrive(PufferEnv):
             ]
             self.offroad_in_episode[done_worlds, :] = 0
             self.collided_in_episode[done_worlds, :] = 0
+
+            if self.reward_type == "variable_collision":
+                print(f"weight mask before :{self.env.collision_mask}")
+                for world_idx in done_worlds:
+                    # Generate random values for the specific world
+                    random_values = torch.empty_like(
+                        self.env.collision_mask[world_idx], dtype=torch.float
+                    ).uniform_(self.collision_weight[0], self.collision_weight[1])
+
+                    # Update only the corresponding world in collision_mask
+                    self.env.collision_mask[world_idx] = torch.where(
+                        self.controlled_agent_mask[world_idx],  # Apply changes only where 'dones' is True in this world
+                        random_values,
+                        self.env.collision_mask[world_idx]  # Keep existing values unchanged elsewhere
+                    )
+                print(f"weight mask after: {self.env.collision_mask}")
+
+
 
         # Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation

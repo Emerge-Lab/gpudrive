@@ -52,7 +52,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.data_iterator = iter(self.data_loader)
 
         # Get the initial data batch (set of traffic scenarios)
-        self.data_batch = next(self.data_iterator)
+        self.data_batch= next(self.data_iterator)
 
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
@@ -83,6 +83,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self.num_agents = self.cont_agent_mask.sum().item()
         self.episode_len = self.config.episode_len
+
+        if self.config.reward_type == "variable_collision":
+            random_values = torch.empty_like(
+                self.cont_agent_mask, dtype=torch.float).uniform_(
+                    self.config.collision_weight[0], 
+                    self.config.collision_weight[1]
+                    )
+            self.collision_mask = torch.where(
+                self.cont_agent_mask, random_values,
+                torch.zeros_like(random_values)
+                  )   ### need to change this when all are done
 
         # Rendering setup
         self.vis = MatplotlibVisualizer(
@@ -152,6 +163,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             return weighted_rewards
+        
+        elif self.config.reward_type == "variable_collision":
+
+            # Return the weighted combination of the reward components
+            info_tensor = self.sim.info_tensor().to_torch().clone()
+            off_road = info_tensor[:, :, 0].to(torch.float)
+
+            # True if the vehicle is in collision with another road object
+            # (i.e. a cyclist or pedestrian)
+            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+            collision_reward_mask = collided * self.collision_mask
+            collision_reward = collision_reward_mask.sum()
+            
+
+            goal_achieved = info_tensor[:, :, 3].to(torch.float)
+
+            weighted_rewards = (
+                collision_reward
+                + goal_achieved_weight * goal_achieved
+                + off_road_weight * off_road
+            )
+
+            return weighted_rewards
+
 
         elif self.config.reward_type == "distance_to_logs":
             # Reward based on distance to logs and penalty for collision
@@ -189,6 +224,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
+                device=self.device
             )
 
             agent_pos = torch.stack(
@@ -378,16 +414,32 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ]
             ).permute(1, 2, 0)
         else:
-            return torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
-            ).permute(1, 0)
+            if not self.config.reward_type == "variable_collision":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                ).permute(1, 0)
+            else:
+                if not hasattr(self, "collision_mask"):
+                    self.collision_mask = torch.zeros((self.cont_agent_mask.shape[0], self.cont_agent_mask.shape[1]))
+                collision_weight = self.collision_mask[self.cont_agent_mask] 
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        collision_weight
+                    ]
+                ).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -747,6 +799,7 @@ if __name__ == "__main__":
 
         if done[0, highlight_agent].bool():
             break
+
 
     env.close()
 
