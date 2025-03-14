@@ -62,6 +62,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
             or self.config.reward_type == "distance_to_logs"
+            or self.config.reward_type == "random_weighted_combination"
         ):
             reward_params.rewardType = madrona_gpudrive.RewardType.OnGoalAchieved
         else:
