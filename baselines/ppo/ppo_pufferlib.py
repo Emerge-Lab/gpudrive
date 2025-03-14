@@ -61,6 +61,7 @@ def make_agent(env, config):
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            reward_type=config.environment.reward_type
         )
 
         # Load the model parameters
@@ -75,6 +76,7 @@ def make_agent(env, config):
             action_dim=env.single_action_space.n,
             hidden_dim=config.train.network.hidden_dim,
             dropout=config.train.network.dropout,
+            reward_type= config.environment.reward_type
         )
 
 def train(args, vecenv):

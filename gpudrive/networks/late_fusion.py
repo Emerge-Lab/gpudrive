@@ -81,6 +81,7 @@ class NeuralNet(
         act_func="tanh",
         max_controlled_agents=64,
         obs_dim=2984, # Size of the flattened observation vector 
+        reward_type = "weighted_combination"
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -96,10 +97,13 @@ class NeuralNet(
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
         self.partner_obs_idx = constants.PARTNER_FEAT_DIM * self.max_controlled_agents
+        if reward_type == "random_weighted_combination":
+            self.ego_state_idx += 3
+            self.partner_obs_idx += 3 
     
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
-                nn.Linear(constants.EGO_FEAT_DIM, input_dim)
+                nn.Linear(self.ego_state_idx, input_dim)
             ),
             nn.LayerNorm(input_dim),
             self.act_func,

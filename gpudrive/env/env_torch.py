@@ -477,17 +477,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ego_state.is_collided,
                 ]
             ).permute(1, 2, 0)
+        
         else:
-            return torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
-            ).permute(1, 0)
+            if not self.config.reward_type == "random_weighted_combination":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                ).permute(1, 0)
+            else:
+                if not hasattr(self, "reward_weights_tensor"):
+                    self._get_random_reward_weights()
+
+                
+                collision_weight=self.reward_weights_tensor[:, :, 0][ self.cont_agent_mask]
+                goal_achived_weight = self.reward_weights_tensor[:, :, 1][self.cont_agent_mask]
+                off_road_weight =  self.reward_weights_tensor[:, :, 2] [self.cont_agent_mask]
+
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        collision_weight,
+                        goal_achived_weight,
+                        off_road_weight
+                    ]
+                ).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
