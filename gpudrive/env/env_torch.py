@@ -45,6 +45,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
 
+        # Initialize reward weights tensor if using random_weighted_combination
+        self.reward_weights_tensor = None
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "random_weighted_combination"
+        ):
+            self._get_random_reward_weights()
+
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
@@ -95,9 +103,82 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def reset(self, mask=None):
+    def _get_random_reward_weights(self, env_idx_list=None):
+        """Initialize random reward weights for all or specific environments.
+
+        Args:
+            env_idx_list: List of environment indices to generate new weights for.
+                        If None, all environments are updated.
+        """
+        if self.reward_weights_tensor is None:
+            self.reward_weights_tensor = torch.zeros(
+                self.num_worlds,
+                self.max_cont_agents,
+                3,  # collision, goal_achieved, off_road
+                device=self.device,
+            )
+
+        # Read bounds for the three reward components
+        lower_bounds = torch.tensor(
+            [
+                self.config.collision_weight_lb,
+                self.config.goal_achieved_weight_lb,
+                self.config.off_road_weight_lb,
+            ],
+            device=self.device,
+        )
+
+        upper_bounds = torch.tensor(
+            [
+                self.config.collision_weight_ub,
+                self.config.goal_achieved_weight_ub,
+                self.config.off_road_weight_ub,
+            ],
+            device=self.device,
+        )
+        bounds_range = upper_bounds - lower_bounds
+
+        if env_idx_list is None or len(env_idx_list) == self.num_worlds:
+            # Generate random values for all environments at once
+            random_values = torch.rand(
+                self.num_worlds, self.max_cont_agents, 3, device=self.device
+            )
+
+            # Scale to fit within bounds and update the tensor
+            self.reward_weights_tensor = (
+                lower_bounds + random_values * bounds_range
+            )
+        else:
+            # For specific environments, we update them individually
+            env_indices = torch.tensor(env_idx_list, device=self.device)
+
+            # Generate random values for all specified environments at once
+            random_values = torch.rand(
+                len(env_indices), self.max_cont_agents, 3, device=self.device
+            )
+
+            # Scale to fit within bounds
+            scaled_values = lower_bounds + random_values * bounds_range
+
+            # Update the specific environments
+            for i, env_idx in enumerate(env_indices):
+                self.reward_weights_tensor[env_idx] = scaled_values[i]
+
+    def reset(self, mask=None, env_idx_list=None):
         """Reset the worlds and return the initial observations."""
-        self.sim.reset(list(range(self.num_worlds)))
+        if env_idx_list is not None:  # Reset specific worlds
+            self.sim.reset(env_idx_list)
+        else:  # Reset all worlds
+            env_idx_list = list(range(self.num_worlds))
+            self.sim.reset(env_idx_list)
+
+        # Re-initialize random reward weights if using random_weighted_combination
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "random_weighted_combination"
+        ):
+            self._get_random_reward_weights(env_idx_list)
+
         return self.get_obs(mask)
 
     def get_dones(self):
@@ -132,23 +213,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         The importance of each component is determined by the weights.
         """
+        # Return the weighted combination of the reward components
+        info_tensor = self.sim.info_tensor().to_torch().clone()
+        off_road = info_tensor[:, :, 0].to(torch.float)
+
+        # True if the vehicle is in collision with another road object
+        # (i.e. a cyclist or pedestrian)
+        collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+        goal_achieved = info_tensor[:, :, 3].to(torch.float)
+
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
-            # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch().clone()
-            off_road = info_tensor[:, :, 0].to(torch.float)
-
-            # True if the vehicle is in collision with another road object
-            # (i.e. a cyclist or pedestrian)
-            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-            goal_achieved = info_tensor[:, :, 3].to(torch.float)
-
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
+            )
+
+            return weighted_rewards
+
+        elif self.config.reward_type == "random_weighted_combination":
+            # Extract individual weight components from the tensor
+            # Shape: [num_worlds, max_agents, 3]
+            if self.reward_weights_tensor is None:
+                # Initialize if not already done (fallback, should rarely happen)
+                self._initialize_random_reward_weights()
+
+            # Apply the weights in a vectorized manner
+            # Each index in dimension 2 corresponds to a specific weight:
+            # 0: collision, 1: goal_achieved, 2: off_road
+            weighted_rewards = (
+                self.reward_weights_tensor[:, :, 0] * collided
+                + self.reward_weights_tensor[:, :, 1] * goal_achieved
+                + self.reward_weights_tensor[:, :, 2] * off_road
             )
 
             return weighted_rewards
@@ -694,7 +793,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    env_config = EnvConfig(dynamics_model="delta_local")
+    env_config = EnvConfig(
+        dynamics_model="delta_local", reward_type="random_weighted_combination"
+    )
     render_config = RenderConfig()
 
     # Create data loader
