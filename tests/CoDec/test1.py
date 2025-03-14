@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Set working directory to the base directory 'gpudrive'
 working_dir = Path.cwd()
-while working_dir.name != 'gpudrive':
+while working_dir.name != 'gpudrive-CoDec':
     working_dir = working_dir.parent
     if working_dir == Path.home():
         raise FileNotFoundError("Base directory 'gpudrive' not found")
@@ -25,7 +25,7 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.config import load_config
 
 
-
+'''
 
 ############################ SET UP CONFIG AND ENVIRONMENT ############################
 
@@ -155,3 +155,5 @@ for const_num in range(int(max_agents/construal_size)):
     mediapy.show_videos(frames, fps=15, width=500, height=500, columns=2, codec='gif')
 
 env.close()
+
+'''
