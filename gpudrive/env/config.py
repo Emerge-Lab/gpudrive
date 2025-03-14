@@ -103,9 +103,6 @@ class EnvConfig:
         2.0  # Radius around goal considered as "goal achieved"
     )
 
-    # Integrations: Enable pre-trained Versatile Behavior Diffusion model
-    return_vbd_data: bool = False
-
     # C++ and Python shared settings (modifiable via C++ codebase)
     max_num_agents_in_scene: int = (
         madrona_gpudrive.kMaxAgentCount
@@ -129,7 +126,7 @@ class EnvConfig:
     # VBD model settings
     use_vbd: bool = False,
     vbd_model_path: str = None,
-    vbd_trajectory_weight = 0.1,
+    vbd_trajectory_weight = 0.01,
 
 
 class SelectionDiscipline(Enum):

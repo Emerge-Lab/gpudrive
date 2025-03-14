@@ -7,6 +7,8 @@ from itertools import product
 import mediapy as media
 import gymnasium
 
+from data_utils.vbd_data import process_scenario_data
+
 from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -51,7 +53,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
-        self.sample_batch = None
+        self.world_time_steps = torch.zeros(self.num_worlds, dtype=torch.short, device=self.device)
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -100,13 +102,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             render_config=self.render_config,
             env_config=self.config,
         )
-
+        
         # Initialize VBD model if enabled
         self.use_vbd = config.use_vbd
         self.vbd_trajectory_weight = config.vbd_trajectory_weight
-        if self.use_vbd and config.vbd_model_path:
+        # Initial sample batch for VBD
+        if self.use_vbd and self.config.vbd_model_path:
             self.vbd_model = self._load_vbd_model(config.vbd_model_path)
-            self.vbd_trajectories = torch.Tensor([]) 
+            self.vbd_trajectories = torch.zeros((self.num_worlds, self.max_agent_count, self.episode_len-self.config.init_steps, 5), device=self.device)
             # Generate VBD trajectories for initial batch of scenes
             self._generate_vbd_trajectories()
         else:
@@ -116,13 +119,67 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _load_vbd_model(self, model_path):
         """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
         model = VBDTest.load_from_checkpoint(model_path, torch.device(self.device))
-        _ = model.cpu()
         _ = model.eval()
         return model
+
+    def _generate_sample_batch(self, init_steps=10):
+        """Generate a sample batch for the VBD model."""
+        means_xy = (
+            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        )
+
+        # Get the logged trajectory and restore the mean
+        log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
+        log_trajectory.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+
+        # Get global road graph and restore the mean
+        global_road_graph = GlobalRoadGraphPoints.from_tensor(
+            roadgraph_tensor=self.sim.map_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        global_road_graph.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+        global_road_graph.restore_xy()
+
+        # Get global agent observations and restore the mean
+        global_agent_obs = GlobalEgoState.from_tensor(
+            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        global_agent_obs.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+        metadata =  Metadata.from_tensor(
+            metadata_tensor=self.sim.metadata_tensor(),
+            backend=self.backend,
+        )
+        sample_batch = process_scenario_data(
+                max_controlled_agents=self.max_cont_agents,
+                controlled_agent_mask=self.cont_agent_mask,
+                global_agent_obs=global_agent_obs,
+                global_road_graph=global_road_graph,
+                log_trajectory=log_trajectory,
+                episode_len=self.episode_len,
+                init_steps=init_steps,
+                raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
+                metadata=metadata
+            )
+        return sample_batch
 
     def reset(self, mask=None):
         """Reset the worlds and return the initial observations."""
         self.sim.reset(list(range(self.num_worlds)))
+        self.world_time_steps.zero_()
 
         # Advance the simulator with log playback if warmup steps are provided
         if self.config.init_steps > 0:
@@ -191,6 +248,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
         
+        # Q: Currently only penalizing x and y distance, not yaw, vel_x, vel_y.
         elif self.config.reward_type == "distance_to_vdb_trajs":
             # Reward based on distance to VBD predicted trajectories
             # (i.e. the deviation from the predicted trajectory)
@@ -200,7 +258,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + off_road_weight * off_road
             )
 
-            # TODO: Pseudocode below; Replace with self.vbd_trajectories
             agent_states = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
@@ -211,11 +268,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 [agent_states.pos_x, agent_states.pos_y], dim=-1
             )
 
+            # Extract VBD positions at current time steps for each world
+            vbd_pos = []
+            for i in range(self.num_worlds):
+                current_time = self.world_time_steps[i].item() - self.config.init_steps
+                # Make sure we don't exceed trajectory length
+                current_time = min(current_time, self.vbd_trajectories.shape[2]-1)
+                vbd_pos.append(self.vbd_trajectories[i, :, current_time, :2])
+            vbd_pos_tensor = torch.stack(vbd_pos)
+
             # Compute euclidean distance between agent and logs
-            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+            dist_to_vbd = torch.norm(vbd_pos_tensor - agent_pos, dim=-1)
 
             # Add reward based on inverse distance to logs
-            weighted_rewards += self.vbd_trajectory_weight * torch.exp(-dist_to_logs)
+            weighted_rewards += self.vbd_trajectory_weight * torch.exp(-dist_to_vbd)
 
             return weighted_rewards
             
@@ -263,6 +329,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
+        not_done_worlds = ~self.get_dones().any(dim=1)  # Check if any agent in world is done
+        self.world_time_steps[not_done_worlds] += 1
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
@@ -558,7 +626,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 .flatten(start_dim=2)
             )
 
-    # TODO: Augment VBD predictions with other observations
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
 
@@ -568,16 +635,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-        lidar_observations = self._get_lidar_obs(mask)
-    
-        obs = torch.cat(
-            (
-                ego_states,
-                partner_observations,
-                road_map_observations,
-            ),
-            dim=-1,
-        )
+        lidar_observations = self._get_lidar_obs(mask) # Q: Unused Lidar obs?
+
+        if self.use_vbd and self.vbd_model is not None:
+            # Flatten the time_steps and features dimensions
+            vbd_trajectories = self.vbd_trajectories.reshape(self.num_worlds, self.max_agent_count, -1)
+            obs = torch.cat(
+                (
+                    ego_states,
+                    partner_observations,
+                    road_map_observations,
+                    vbd_trajectories,
+                ),
+                dim=-1,
+            )
+        else:
+            obs = torch.cat(
+                (
+                    ego_states,
+                    partner_observations,
+                    road_map_observations,
+                ),
+                dim=-1,
+            )
 
         return obs
 
@@ -587,7 +667,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
     
-    def advance_sim_with_log_playback(self, init_steps=0, render_init=False):
+    def advance_sim_with_log_playback(self, init_steps=0):
         """Advances the simulator by stepping the objects with the logged human trajectories.
 
         Args:
@@ -598,81 +678,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 "The length of the expert trajectory is 91,"
                 f"so init_steps = {init_steps} should be < than 91."
             )
-        elif self.config.return_vbd_data and self.num_worlds > 1:
-            raise ValueError(
-                f"VBD expects only a single world, given {self.num_worlds}."
-            )
 
         self.init_frames = []
 
         self.log_playback_traj, _, _, _ = self.get_expert_actions()
 
-        means_xy = (
-            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
-        )
-
-        # Get the logged trajectory and restore the mean
-        log_trajectory = LogTrajectory.from_tensor(
-            self.sim.expert_trajectory_tensor(),
-            self.num_worlds,
-            self.max_agent_count,
-            backend=self.backend,
-        )
-        log_trajectory.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-
-        # Get global road graph and restore the mean
-        global_road_graph = GlobalRoadGraphPoints.from_tensor(
-            roadgraph_tensor=self.sim.map_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
-        global_road_graph.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-        global_road_graph.restore_xy()
-
-        # Get global agent observations and restore the mean
-        global_agent_obs = GlobalEgoState.from_tensor(
-            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
-        global_agent_obs.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-
         for time_step in range(init_steps):
             self.step_dynamics(
                 actions=self.log_playback_traj[:, :, time_step, :]
-            )
-            if render_init:  # Render the initial frames
-                fig = self.vis.plot_simulator_state(
-                    env_indices=[0],
-                    time_steps=[time_step],
-                )[0]
-                self.init_frames.append(img_from_fig(fig))
-
-        metadata =  Metadata.from_tensor(
-            metadata_tensor=self.sim.metadata_tensor(),
-            backend=self.backend,
-        )
-
-        if self.config.return_vbd_data:
-
-            from data_utils.vbd_data import process_scenario_data
-
-            self.sample_batch = process_scenario_data(
-                max_controlled_agents=self.max_cont_agents,
-                controlled_agent_mask=self.cont_agent_mask[0],
-                global_agent_obs=global_agent_obs,
-                global_road_graph=global_road_graph,
-                log_trajectory=log_trajectory,
-                episode_len=self.episode_len,
-                init_steps=init_steps,
-                raw_agent_types=self.sim.info_tensor().to_torch()[0, :, 4],
-                metadata=metadata
             )
 
     def remove_agents_by_id(
@@ -764,51 +777,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
-    # TODO: Implement VBD trajectory generation
     def _generate_vbd_trajectories(self):
         """Generate and store trajectory predictions for all scenes using VBD model."""
         if not self.use_vbd or self.vbd_model is None:
             return
-        
-        # Clear previous predictions
-        self.vbd_trajectories = {}
-        
-        # Get scene features needed for VBD model
-        global_agent_states = GlobalEgoState.from_tensor(
-            self.sim.absolute_self_observation_tensor(),
-            self.backend,
-            device=self.device
-        )
-        
-        # Get road graph information
-        global_road_graph = GlobalRoadGraphPoints.from_tensor(
-            self.sim.map_observation_tensor(),
-            self.backend,
-            device=self.device
-        )
-        
-        # Restore means if needed (similar to how it's done in advance_sim_with_log_playback)
-        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].unsqueeze(dim=-1).to(self.device)
-        global_agent_states.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-        global_road_graph.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-        global_road_graph.restore_xy()
-        
-        # Predict trajectories for each world
+
+        _ = self.reset()
+        sample_batch = self._generate_sample_batch(init_steps=self.config.init_steps)
+        predictions = self.vbd_model.sample_denoiser(sample_batch)
+        vbd_trajectories = predictions['denoised_trajs'].to(self.device).numpy()
+        agent_indices = sample_batch['agents_id']
+
+        self.vbd_trajectories.zero_()
+        # Process each world separately
         for world_idx in range(self.num_worlds):
-            scene_features = {
-                'agent_states': global_agent_states[world_idx],
-                'road_graph': global_road_graph[world_idx],
-                'agent_mask': self.cont_agent_mask[world_idx]
-            }
+            world_agent_indices = agent_indices[world_idx]
             
-            # Run VBD model to get predicted trajectories
-            with torch.no_grad():
-                # (Pseudocode) predicted_trajectories shape: [num_agents, horizon, features]
-                # where features typically include x, y positions, velocities, headings, etc.
-                predicted_trajectories = self.vbd_model.predict(scene_features)
-            
-            # Store trajectories for this world
-            self.vbd_trajectories[world_idx] = predicted_trajectories
+            # Update vbd_trajectories(x, y, yaw, vel_x, vel_y) for this world's agents
+            self.vbd_trajectories[world_idx, world_agent_indices, :, :2] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, :2])
+            self.vbd_trajectories[world_idx, world_agent_indices, :, :2] -= self.sim.world_means_tensor().to_torch()[world_idx, :2] # subtract mean
+            self.vbd_trajectories[world_idx, world_agent_indices, :, 2] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 2])
+            self.vbd_trajectories[world_idx, world_agent_indices, :, 3:] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 3:5])
+
+
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
