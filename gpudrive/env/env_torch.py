@@ -153,6 +153,24 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
+        elif self.config.reward_type == "random_weighted_combination":
+            # Extract individual weight components from the tensor
+            # Shape: [num_worlds, max_agents, 3]
+            if self.reward_weights_tensor is None:
+                # Initialize if not already done (fallback, should rarely happen)
+                self._get_random_reward_weights()
+
+            # Apply the weights in a vectorized manner
+            # Each index in dimension 2 corresponds to a specific weight:
+            # 0: collision, 1: goal_achieved, 2: off_road
+            weighted_rewards = (
+                self.reward_weights_tensor[:, :, 0] * collided
+                + self.reward_weights_tensor[:, :, 1] * goal_achieved
+                + self.reward_weights_tensor[:, :, 2] * off_road
+            )
+
+            return weighted_rewards
+
         elif self.config.reward_type == "distance_to_logs":
             # Reward based on distance to logs and penalty for collision
 
