@@ -794,7 +794,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 if __name__ == "__main__":
-    env_config = EnvConfig(reward_type="random_weighted_combination", dynamics_model="delta_local")
+    env_config = EnvConfig(reward_type="weighted_combination", dynamics_model="delta_local")
     render_config = RenderConfig()
 
     # Create data loader
