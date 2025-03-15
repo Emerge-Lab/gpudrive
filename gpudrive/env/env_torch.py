@@ -45,11 +45,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
 
-        # Initialize reward weights tensor if using random_weighted_combination
+        # Initialize reward weights tensor if using reward_conditioned
         self.reward_weights_tensor = None
         if (
             hasattr(self.config, "reward_type")
-            and self.config.reward_type == "random_weighted_combination"
+            and self.config.reward_type == "reward_conditioned"
         ):
             self._get_random_reward_weights()
 
@@ -157,12 +157,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 len(env_indices), self.max_cont_agents, 3, device=self.device
             )
 
-            # Scale to fit within bounds
+            # Scale 
             scaled_values = lower_bounds + random_values * bounds_range
-
-            # Update the specific environments
-            for i, env_idx in enumerate(env_indices):
-                self.reward_weights_tensor[env_idx] = scaled_values[i]
+            self.reward_weights_tensor[env_indices.cpu()] = scaled_values
 
     def reset(self, mask=None, env_idx_list=None):
         """Reset the worlds and return the initial observations."""
@@ -172,10 +169,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_idx_list = list(range(self.num_worlds))
             self.sim.reset(env_idx_list)
 
-        # Re-initialize random reward weights if using random_weighted_combination
+        # Re-initialize random reward weights if using reward_conditioned
         if (
             hasattr(self.config, "reward_type")
-            and self.config.reward_type == "random_weighted_combination"
+            and self.config.reward_type == "reward_conditioned"
         ):
             self._get_random_reward_weights(env_idx_list)
 
@@ -235,12 +232,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-        elif self.config.reward_type == "random_weighted_combination":
+        elif self.config.reward_type == "reward_conditioned":
             # Extract individual weight components from the tensor
             # Shape: [num_worlds, max_agents, 3]
             if self.reward_weights_tensor is None:
-                # Initialize if not already done (fallback, should rarely happen)
-                self._initialize_random_reward_weights()
+                self._get_random_reward_weights()
 
             # Apply the weights in a vectorized manner
             # Each index in dimension 2 corresponds to a specific weight:
@@ -467,7 +463,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            if self.config.reward_type == "random_weighted_combination":
+            if self.config.reward_type == "reward_conditioned":
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -495,7 +491,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ).permute(1, 2, 0)
 
         else:
-            if self.config.reward_type == "random_weighted_combination":
+            if self.config.reward_type == "reward_conditioned":
                 return torch.stack(
                     [
                         ego_state.speed,

@@ -101,8 +101,10 @@ class NeuralNet(
         )
         if config is not None:
             self.config = config
-            if self.config.reward_type == "random_weighted_combination":
-                self.ego_state_idx += 3
+            if self.config.reward_type == "reward_conditioned":
+                # Agents know their "type", consisting of three weights
+                # that determine the reward (collision, goal, off-road)
+                self.ego_state_idx += 3 
                 self.partner_obs_idx += 3
 
         self.ego_embed = nn.Sequential(

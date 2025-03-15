@@ -95,9 +95,9 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"  
-    # Alternatively, "weighted_combination", "distance_to_logs", "random_weighted_combination"
+    # Alternatively, "weighted_combination", "distance_to_logs", "reward_conditioned"
 
-    # Define upper and lower bounds for reward components if using random_weighted_combination
+    # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
     goal_achieved_weight_lb: float = 1.0
