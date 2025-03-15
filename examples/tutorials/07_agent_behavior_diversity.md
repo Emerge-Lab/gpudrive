@@ -117,4 +117,4 @@ For the policy to adapt its behavior based on reward conditioning, the reward we
 
 ## Conclusion
 
-Reward conditioning is a simple but powerful technique for creating diverse agent behaviors in simulation. By conditioning agents on different reward weights, we can create a spectrum of behaviors from a single policy, resulting in more realistic and varied simulations. We showed how you can get started with this with `gpudrive`.
+Reward conditioning is a simple but powerful technique for creating diverse agent behaviors in simulation. By conditioning agents on different reward weights, we can create a spectrum of behaviors from a single policy, resulting in more varied simulations. We showed how you can get started with reward conditioning in `gpudrive`.
