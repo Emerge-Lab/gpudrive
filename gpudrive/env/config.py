@@ -94,8 +94,10 @@ class EnvConfig:
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"  
+    reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "distance_to_logs", "reward_conditioned"
+
+    condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
@@ -169,10 +171,13 @@ class RenderMode(Enum):
     MADRONA_RGB = "madrona_rgb"
     MADRONA_DEPTH = "madrona_depth"
 
+
 class MadronaOption(Enum):
     """Enum for Madrona rendering options."""
+
     AGENT_VIEW = "agent_view"
     TOP_DOWN = "top_down"
+
 
 @dataclass
 class RenderConfig:

@@ -51,7 +51,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             hasattr(self.config, "reward_type")
             and self.config.reward_type == "reward_conditioned"
         ):
-            self._get_random_reward_weights()
+            # Use default condition_mode from config or fall back to "random"
+            condition_mode = getattr(self.config, "condition_mode", "random")
+            agent_type = getattr(self.config, "agent_type", None)
+            self._set_reward_weights(
+                condition_mode=condition_mode, agent_type=agent_type
+            )
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -103,12 +108,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def _get_random_reward_weights(self, env_idx_list=None):
-        """Initialize random reward weights for all or specific environments.
+    def _set_reward_weights(
+        self, env_idx_list=None, condition_mode="random", agent_type=None
+    ):
+        """Set agent reward weights for all or specific environments.
 
         Args:
             env_idx_list: List of environment indices to generate new weights for.
                         If None, all environments are updated.
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use if condition_mode is "preset" or "fixed"
+                    If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
+                    If condition_mode is "fixed", should be a tensor of shape [3] with weight values
         """
         if self.reward_weights_tensor is None:
             self.reward_weights_tensor = torch.zeros(
@@ -138,43 +152,156 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         bounds_range = upper_bounds - lower_bounds
 
-        if env_idx_list is None or len(env_idx_list) == self.num_worlds:
-            # Generate random values for all environments at once
+        # Preset agent personality types
+        agent_presets = {
+            "cautious": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.9,  # Strong collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.7,  # Moderate goal reward
+                    self.config.off_road_weight_lb
+                    * 0.9,  # Strong off-road penalty
+                ],
+                device=self.device,
+            ),
+            "aggressive": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.5,  # Lower collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.9,  # Higher goal reward
+                    self.config.off_road_weight_lb
+                    * 0.6,  # Moderate off-road penalty
+                ],
+                device=self.device,
+            ),
+            "balanced": torch.tensor(
+                [
+                    (
+                        self.config.collision_weight_lb
+                        + self.config.collision_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.goal_achieved_weight_lb
+                        + self.config.goal_achieved_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.off_road_weight_lb
+                        + self.config.off_road_weight_ub
+                    )
+                    / 2,
+                ],
+                device=self.device,
+            ),
+            "risk_taker": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.3,  # Minimal collision penalty
+                    self.config.goal_achieved_weight_ub,  # Maximum goal reward
+                    self.config.off_road_weight_lb
+                    * 0.4,  # Low off-road penalty
+                ],
+                device=self.device,
+            ),
+        }
+
+        # Determine which environments to update
+        if env_idx_list is None:
+            env_idx_list = list(range(self.num_worlds))
+
+        env_indices = torch.tensor(env_idx_list, device=self.device)
+        num_envs = len(env_indices)
+
+        if condition_mode == "random":
+            # Traditional random sampling within bounds
             random_values = torch.rand(
-                self.num_worlds, self.max_cont_agents, 3, device=self.device
+                num_envs, self.max_cont_agents, 3, device=self.device
             )
-
-            # Scale to fit within bounds and update the tensor
-            self.reward_weights_tensor = (
-                lower_bounds + random_values * bounds_range
-            )
-        else:
-            # For specific environments, we update them individually
-            env_indices = torch.tensor(env_idx_list, device=self.device)
-
-            # Generate random values for all specified environments at once
-            random_values = torch.rand(
-                len(env_indices), self.max_cont_agents, 3, device=self.device
-            )
-
-            # Scale 
             scaled_values = lower_bounds + random_values * bounds_range
-            self.reward_weights_tensor[env_indices.cpu()] = scaled_values
 
-    def reset(self, mask=None, env_idx_list=None):
-        """Reset the worlds and return the initial observations."""
-        if env_idx_list is not None:  # Reset specific worlds
+        elif condition_mode == "preset":
+            # Use a predefined agent type
+            if agent_type not in agent_presets:
+                raise ValueError(
+                    f"Unknown agent_type: {agent_type}. Available types: {list(agent_presets.keys())}"
+                )
+
+            # Create a tensor with the preset weights for all agents in the specified environments
+            preset_weights = agent_presets[agent_type]
+            scaled_values = (
+                preset_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        elif condition_mode == "fixed":
+            # Use custom provided weights
+            if agent_type is None or not isinstance(agent_type, torch.Tensor):
+                raise ValueError(
+                    "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
+                )
+
+            custom_weights = agent_type.to(device=self.device)
+            if custom_weights.shape != (3,):
+                raise ValueError(
+                    f"agent_type tensor must have shape [3], got {custom_weights.shape}"
+                )
+
+            scaled_values = (
+                custom_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        else:
+            raise ValueError(f"Unknown condition_mode: {condition_mode}")
+
+        # Update the weights tensor for the specified environments
+        self.reward_weights_tensor[env_indices.cpu()] = scaled_values
+
+        return self.reward_weights_tensor
+
+    def reset(
+        self,
+        mask=None,
+        env_idx_list=None,
+        condition_mode=None,
+        agent_type=None,
+    ):
+        """Reset the worlds and return the initial observations.
+
+        Args:
+            mask: Optional mask indicating which agents to return observations for
+            env_idx_list: Optional list of environment indices to reset
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use or custom weights
+        """
+        if env_idx_list is not None:
             self.sim.reset(env_idx_list)
-        else:  # Reset all worlds
+        else:
             env_idx_list = list(range(self.num_worlds))
             self.sim.reset(env_idx_list)
 
-        # Re-initialize random reward weights if using reward_conditioned
+        # Re-initialize reward weights if using reward_conditioned
         if (
             hasattr(self.config, "reward_type")
             and self.config.reward_type == "reward_conditioned"
         ):
-            self._get_random_reward_weights(env_idx_list)
+            # Use the specified condition_mode or default to the config setting
+            mode = (
+                condition_mode
+                if condition_mode is not None
+                else getattr(self.config, "condition_mode", "random")
+            )
+            self._set_reward_weights(
+                env_idx_list, condition_mode=mode, agent_type=agent_type
+            )
 
         return self.get_obs(mask)
 
@@ -236,7 +363,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Extract individual weight components from the tensor
             # Shape: [num_worlds, max_agents, 3]
             if self.reward_weights_tensor is None:
-                self._get_random_reward_weights()
+                self._set_reward_weights()
 
             # Apply the weights in a vectorized manner
             # Each index in dimension 2 corresponds to a specific weight:
