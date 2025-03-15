@@ -45,6 +45,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
 
+        # Initialize reward weights tensor if using reward_conditioned
+        self.reward_weights_tensor = None
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use default condition_mode from config or fall back to "random"
+            condition_mode = getattr(self.config, "condition_mode", "random")
+            agent_type = getattr(self.config, "agent_type", None)
+            self._set_reward_weights(
+                condition_mode=condition_mode, agent_type=agent_type
+            )
+
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
@@ -95,9 +108,201 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
 
-    def reset(self, mask=None):
-        """Reset the worlds and return the initial observations."""
-        self.sim.reset(list(range(self.num_worlds)))
+    def _set_reward_weights(
+        self, env_idx_list=None, condition_mode="random", agent_type=None
+    ):
+        """Set agent reward weights for all or specific environments.
+
+        Args:
+            env_idx_list: List of environment indices to generate new weights for.
+                        If None, all environments are updated.
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use if condition_mode is "preset" or "fixed"
+                    If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
+                    If condition_mode is "fixed", should be a tensor of shape [3] with weight values
+        """
+        if self.reward_weights_tensor is None:
+            self.reward_weights_tensor = torch.zeros(
+                self.num_worlds,
+                self.max_cont_agents,
+                3,  # collision, goal_achieved, off_road
+                device=self.device,
+            )
+
+        # Read bounds for the three reward components
+        lower_bounds = torch.tensor(
+            [
+                self.config.collision_weight_lb,
+                self.config.goal_achieved_weight_lb,
+                self.config.off_road_weight_lb,
+            ],
+            device=self.device,
+        )
+
+        upper_bounds = torch.tensor(
+            [
+                self.config.collision_weight_ub,
+                self.config.goal_achieved_weight_ub,
+                self.config.off_road_weight_ub,
+            ],
+            device=self.device,
+        )
+        bounds_range = upper_bounds - lower_bounds
+
+        # Preset agent personality types
+        agent_presets = {
+            "cautious": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.9,  # Strong collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.7,  # Moderate goal reward
+                    self.config.off_road_weight_lb
+                    * 0.9,  # Strong off-road penalty
+                ],
+                device=self.device,
+            ),
+            "aggressive": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.5,  # Lower collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.9,  # Higher goal reward
+                    self.config.off_road_weight_lb
+                    * 0.6,  # Moderate off-road penalty
+                ],
+                device=self.device,
+            ),
+            "balanced": torch.tensor(
+                [
+                    (
+                        self.config.collision_weight_lb
+                        + self.config.collision_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.goal_achieved_weight_lb
+                        + self.config.goal_achieved_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.off_road_weight_lb
+                        + self.config.off_road_weight_ub
+                    )
+                    / 2,
+                ],
+                device=self.device,
+            ),
+            "risk_taker": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.3,  # Minimal collision penalty
+                    self.config.goal_achieved_weight_ub,  # Maximum goal reward
+                    self.config.off_road_weight_lb
+                    * 0.4,  # Low off-road penalty
+                ],
+                device=self.device,
+            ),
+        }
+
+        # Determine which environments to update
+        if env_idx_list is None:
+            env_idx_list = list(range(self.num_worlds))
+
+        env_indices = torch.tensor(env_idx_list, device=self.device)
+        num_envs = len(env_indices)
+
+        if condition_mode == "random":
+            # Traditional random sampling within bounds
+            random_values = torch.rand(
+                num_envs, self.max_cont_agents, 3, device=self.device
+            )
+            scaled_values = lower_bounds + random_values * bounds_range
+
+        elif condition_mode == "preset":
+            # Use a predefined agent type
+            if agent_type not in agent_presets:
+                raise ValueError(
+                    f"Unknown agent_type: {agent_type}. Available types: {list(agent_presets.keys())}"
+                )
+
+            # Create a tensor with the preset weights for all agents in the specified environments
+            preset_weights = agent_presets[agent_type]
+            scaled_values = (
+                preset_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        elif condition_mode == "fixed":
+            # Use custom provided weights
+            if agent_type is None or not isinstance(agent_type, torch.Tensor):
+                raise ValueError(
+                    "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
+                )
+
+            custom_weights = agent_type.to(device=self.device)
+            if custom_weights.shape != (3,):
+                raise ValueError(
+                    f"agent_type tensor must have shape [3], got {custom_weights.shape}"
+                )
+
+            scaled_values = (
+                custom_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        else:
+            raise ValueError(f"Unknown condition_mode: {condition_mode}")
+
+        # Update the weights tensor for the specified environments
+        self.reward_weights_tensor[env_indices.cpu()] = scaled_values
+
+        return self.reward_weights_tensor
+
+    def reset(
+        self,
+        mask=None,
+        env_idx_list=None,
+        condition_mode=None,
+        agent_type=None,
+    ):
+        """Reset the worlds and return the initial observations.
+
+        Args:
+            mask: Optional mask indicating which agents to return observations for
+            env_idx_list: Optional list of environment indices to reset
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use or custom weights
+        """
+        if env_idx_list is not None:
+            self.sim.reset(env_idx_list)
+        else:
+            env_idx_list = list(range(self.num_worlds))
+            self.sim.reset(env_idx_list)
+
+        # Re-initialize reward weights if using reward_conditioned
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use the specified condition_mode or default to the config setting
+            mode = (
+                condition_mode
+                if condition_mode is not None
+                else getattr(self.config, "condition_mode", "random")
+            )
+            self._set_reward_weights(
+                env_idx_list, condition_mode=mode, agent_type=agent_type
+            )
+
         return self.get_obs(mask)
 
     def get_dones(self):
@@ -132,23 +337,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         The importance of each component is determined by the weights.
         """
+
+        # Return the weighted combination of the reward components
+        info_tensor = self.sim.info_tensor().to_torch().clone()
+        off_road = info_tensor[:, :, 0].to(torch.float)
+
+        # True if the vehicle is in collision with another road object
+        # (i.e. a cyclist or pedestrian)
+        collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+        goal_achieved = info_tensor[:, :, 3].to(torch.float)
+
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
-            # Return the weighted combination of the reward components
-            info_tensor = self.sim.info_tensor().to_torch().clone()
-            off_road = info_tensor[:, :, 0].to(torch.float)
-
-            # True if the vehicle is in collision with another road object
-            # (i.e. a cyclist or pedestrian)
-            collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-            goal_achieved = info_tensor[:, :, 3].to(torch.float)
-
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
+            )
+
+            return weighted_rewards
+
+        elif self.config.reward_type == "reward_conditioned":
+            # Extract individual weight components from the tensor
+            # Shape: [num_worlds, max_agents, 3]
+            if self.reward_weights_tensor is None:
+                self._set_reward_weights()
+
+            # Apply the weights in a vectorized manner
+            # Each index in dimension 2 corresponds to a specific weight:
+            # 0: collision, 1: goal_achieved, 2: off_road
+            weighted_rewards = (
+                self.reward_weights_tensor[:, :, 0] * collided
+                + self.reward_weights_tensor[:, :, 1] * goal_achieved
+                + self.reward_weights_tensor[:, :, 2] * off_road
             )
 
             return weighted_rewards
@@ -367,27 +590,59 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            return torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
-            ).permute(1, 2, 0)
+            if self.config.reward_type == "reward_conditioned":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        self.reward_weights_tensor[:, :, 0],
+                        self.reward_weights_tensor[:, :, 1],
+                        self.reward_weights_tensor[:, :, 2],
+                    ]
+                ).permute(1, 2, 0)
+
+            else:
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                ).permute(1, 2, 0)
+
         else:
-            return torch.stack(
-                [
-                    ego_state.speed,
-                    ego_state.vehicle_length,
-                    ego_state.vehicle_width,
-                    ego_state.rel_goal_x,
-                    ego_state.rel_goal_y,
-                    ego_state.is_collided,
-                ]
-            ).permute(1, 0)
+            if self.config.reward_type == "reward_conditioned":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        self.reward_weights_tensor[mask][:, 0],
+                        self.reward_weights_tensor[mask][:, 1],
+                        self.reward_weights_tensor[mask][:, 2],
+                    ]
+                ).permute(1, 0)
+            else:
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                    ]
+                ).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -677,24 +932,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             filenames[i] = map_name
 
         return filenames
-    
+
     def get_scenario_ids(self):
         """Obtain the scenario ID for each world."""
         scenario_id_integers = self.sim.scenario_id_tensor().to_torch()
         scenario_ids = {}
-        
+
         # Iterate through the number of worlds
         for i in range(self.num_worlds):
             tensor = scenario_id_integers[i]
             # Convert ints to characters, ignoring zeros
             scenario_id = "".join([chr(i) for i in tensor.tolist() if i != 0])
             scenario_ids[i] = scenario_id
-        
+
         return scenario_ids
 
 
 if __name__ == "__main__":
-    env_config = EnvConfig(dynamics_model="delta_local")
+    env_config = EnvConfig(
+        reward_type="weighted_combination", dynamics_model="delta_local"
+    )
     render_config = RenderConfig()
 
     # Create data loader
