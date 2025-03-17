@@ -297,10 +297,7 @@ class MatplotlibVisualizer:
                     log_trajectory=self.log_trajectory,
                     line_width_scale=line_width_scale,
                 )
-            if policy_masks:
-                policy_mask = policy_masks[idx]
-            else:
-                policy_mask = None
+
             
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -1098,27 +1095,12 @@ class MatplotlibVisualizer:
                 ax=ax,
                 bboxes_s=bboxes,
                 colors=color[:num_policies],
-            if not by_policy:
-                utils.plot_numpy_bounding_boxes(
-                    ax=ax,
-                    bboxes=bboxes,
-                    color=color,
-                    alpha=alpha,
-                    line_width_scale=line_width_scale,
-                    as_center_pts=as_center_pts,
-                    label=label,
-                )
-            else:
-                num_policies = len(bboxes)
-                utils.plot_numpy_bounding_boxes_multiple_policy(            
-                ax=ax,
-                bboxes_s=bboxes,
-                colors=color[:num_policies],
                 alpha=alpha,
                 line_width_scale=line_width_scale,
                 as_center_pts=as_center_pts,
                 label=label,
-            )
+                    )
+
 
         # Off-road agents
         bboxes_controlled_offroad = np.stack(
@@ -1233,7 +1215,7 @@ class MatplotlibVisualizer:
             )
         else:
             bboxes_controlled_ok = []
-
+            policy_mask = policy_world_mask[env_idx]
             for policy_name,mask in policy_mask.items():
 
                 bboxes = np.stack(
@@ -1291,19 +1273,19 @@ class MatplotlibVisualizer:
             ),
             axis=1,
         )
-
-        if self.render_3d:
-            plot_agent_group_3d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
-        else:
-            plot_agent_group_2d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+        if policy_mask:
             if self.render_3d:
-                plot_agent_group_3d(
-                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
-            )
+                plot_agent_group_3d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
             else:
-                plot_agent_group_2d(
-                bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
-                              )
+                plot_agent_group_2d(bboxes_static, AGENT_COLOR_BY_STATE["log_replay"])
+                if self.render_3d:
+                    plot_agent_group_3d(
+                    bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+                )
+                else:
+                    plot_agent_group_2d(
+                    bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
+                                  )
 
     def _plot_expert_trajectories(
         self,
