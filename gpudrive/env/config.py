@@ -124,9 +124,9 @@ class EnvConfig:
     )
 
     # VBD model settings
-    use_vbd: bool = False,
-    vbd_model_path: str = None,
-    vbd_trajectory_weight = 0.01,
+    use_vbd: bool = False
+    vbd_model_path: str = None
+    vbd_trajectory_weight = 0.01
 
 
 class SelectionDiscipline(Enum):

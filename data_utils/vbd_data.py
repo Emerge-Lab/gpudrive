@@ -145,104 +145,187 @@ def calculate_relations(agents, polylines, traffic_lights):
     return relations
 
 
-def data_process_agent(
-    init_steps,
-    max_cont_agents,
-    global_agent_obs,
-    log_trajectory,
-    metadata,
-    agent_types,
-):
+def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_agent_obs, log_trajectory, metadata, raw_agent_types):
     """
-    Process the data for surrounding agents in a given scenario.
-
-    Args:
-        
-    Returns:
-        tuple: A tuple containing the processed agent data, including:
-            - agents_history (ndarray): The history of agent trajectories. Shape: (max_object, history_length, 8)
-            - agents_future (ndarray): The future agent trajectories. Shape: (max_object, future_length, 5)
-            - agents_interested (ndarray): The interest level of agents. Shape: (max_object,)
-            - agents_type (ndarray): The type of agents. Shape: (max_object,)
+    Vectorized function to process agent data across multiple worlds.
     """
-
-    sdc_index = np.where(metadata.isSdc[0] == 1)[0][0]
-    sdc_position = np.asarray(log_trajectory.pos_xy[0, sdc_index, init_steps, :])
-    agent_positions = np.asarray(log_trajectory.pos_xy[0, :, init_steps])
-    distance_to_sdc = np.linalg.norm( agent_positions - sdc_position, axis=-1)
-    agent_indices = np.argsort(distance_to_sdc)[:max_cont_agents]
-    sorted_agent_indices = np.sort(agent_indices)
-
-    agents_history = np.zeros(
-        (max_cont_agents, init_steps + 1, 8), dtype=np.float32
-    )
-    agents_type = np.zeros((max_cont_agents,), dtype=np.int32)
-    agents_interested = np.zeros((max_cont_agents,), dtype=np.int32)
+    # Initialize output arrays with batch dimension
+    agents_history = np.zeros((num_worlds, max_cont_agents, init_steps + 1, 8), dtype=np.float32)
+    agents_type = np.zeros((num_worlds, max_cont_agents), dtype=np.int32)
+    agents_interested = np.zeros((num_worlds, max_cont_agents), dtype=np.int32)
     agents_future = np.zeros(
-        (max_cont_agents, log_trajectory.pos_xy.shape[-2] - init_steps, 5),
-        dtype=np.float32,
+        (num_worlds, max_cont_agents, log_trajectory.pos_xy.shape[2] - init_steps, 5),
+        dtype=np.float32
     )
-
-    for i, a in enumerate(sorted_agent_indices):
-        agent_type = agent_types[a]
-        valid = log_trajectory.valids[0, a, init_steps]
-
-        if valid.item() != 1:
-            agents_interested[i] = 0
-            continue
-
-        if metadata.isModeled[0, a] or metadata.isOfInterest[0, a]:
-            agents_interested[i] = 10
-        else:
-            agents_interested[i] = 1
+    agents_id = np.zeros((num_worlds, max_cont_agents), dtype=np.int32)
+    
+    # Find SDC indices and compute distances for all worlds
+    for w in range(num_worlds):
+        # Find SDC index
+        sdc_index = np.where(metadata.isSdc[w] == 1)[0][0]
+        sdc_position = np.asarray(log_trajectory.pos_xy[w, sdc_index, init_steps, :])
         
-        agents_type[i] = agent_type
-        agents_history[i] = torch.column_stack(
-            [
-                log_trajectory.pos_xy[0, a, :init_steps+1, 0],
-                log_trajectory.pos_xy[0, a, :init_steps+1, 1],
-                log_trajectory.yaw[0, a, :init_steps+1, 0],
-                log_trajectory.vel_xy[0, a, :init_steps+1, 0],
-                log_trajectory.vel_xy[0, a, :init_steps+1, 1],
-                global_agent_obs.vehicle_length[0, a].repeat(init_steps + 1),
-                global_agent_obs.vehicle_width[0, a].repeat(init_steps + 1),
-                global_agent_obs.vehicle_height[0, a].repeat(init_steps + 1),
-            ],
-        ).numpy()
-
-        mask = log_trajectory.valids[0, a, :init_steps+1].numpy()
-        agents_history[i] *= mask
-
-        agents_future[i] = torch.column_stack(
-            [
-                log_trajectory.pos_xy[0, a, init_steps:, 0],
-                log_trajectory.pos_xy[0, a, init_steps:, 1],
-                log_trajectory.yaw[0, a, init_steps:, 0],
-                log_trajectory.vel_xy[0, a, init_steps:, 0],
-                log_trajectory.vel_xy[0, a, init_steps:, 1],
-            ],
-        ).numpy()
-
-        mask = log_trajectory.valids[0, a, init_steps:].numpy()
-        agents_future[i] *= mask
-
-    # Type of agents: 0 for None, 1 for Vehicle, 2 for Pedestrian, 3 for Cyclist
+        # Calculate distances from SDC
+        agent_positions = np.asarray(log_trajectory.pos_xy[w, :, init_steps])
+        distance_to_sdc = np.linalg.norm(agent_positions - sdc_position, axis=-1)
+        agent_indices = np.argsort(distance_to_sdc)[:max_cont_agents]
+        sorted_agent_indices = np.sort(agent_indices)
+        
+        # Store agent indices
+        agents_id[w] = sorted_agent_indices
+        
+        # Process each agent for this world
+        for i, a in enumerate(sorted_agent_indices):
+            agent_type = raw_agent_types[w][a] if isinstance(raw_agent_types, list) else raw_agent_types[w, a]
+            valid = log_trajectory.valids[w, a, init_steps]
+            
+            if valid.item() != 1:
+                agents_interested[w, i] = 0
+                continue
+                
+            if metadata.isModeled[w, a] or metadata.isOfInterest[w, a]:
+                agents_interested[w, i] = 10
+            else:
+                agents_interested[w, i] = 1
+            
+            agents_type[w, i] = agent_type
+            agents_history[w, i] = torch.column_stack(
+                [
+                    log_trajectory.pos_xy[w, a, :init_steps+1, 0],
+                    log_trajectory.pos_xy[w, a, :init_steps+1, 1],
+                    log_trajectory.yaw[w, a, :init_steps+1, 0],
+                    log_trajectory.vel_xy[w, a, :init_steps+1, 0],
+                    log_trajectory.vel_xy[w, a, :init_steps+1, 1],
+                    global_agent_obs.vehicle_length[w, a].repeat(init_steps + 1),
+                    global_agent_obs.vehicle_width[w, a].repeat(init_steps + 1),
+                    global_agent_obs.vehicle_height[w, a].repeat(init_steps + 1),
+                ],
+            ).numpy()
+            
+            mask = log_trajectory.valids[w, a, :init_steps+1].numpy()
+            agents_history[w, i] *= mask
+            
+            agents_future[w, i] = torch.column_stack(
+                [
+                    log_trajectory.pos_xy[w, a, init_steps:, 0],
+                    log_trajectory.pos_xy[w, a, init_steps:, 1],
+                    log_trajectory.yaw[w, a, init_steps:, 0],
+                    log_trajectory.vel_xy[w, a, init_steps:, 0],
+                    log_trajectory.vel_xy[w, a, init_steps:, 1],
+                ],
+            ).numpy()
+            
+            mask = log_trajectory.valids[w, a, init_steps:].numpy()
+            agents_future[w, i] *= mask
+    
+    # Map agent types for all worlds at once (this is vectorized)
     mapped_agents_type = np.zeros_like(agents_type)
-    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Vehicle)] = 1    # Vehicle
-    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Pedestrian)] = 2 # Pedestrian
-    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Cyclist)] = 3    # Cyclist
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Vehicle)] = 1
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Pedestrian)] = 2
+    mapped_agents_type[agents_type == int(madrona_gpudrive.EntityType.Cyclist)] = 3
+    
+    return agents_history, agents_future, agents_interested, mapped_agents_type, agents_id
 
+def process_world_roadgraph(global_road_graph, world_idx, agents_history, agents_interested, max_polylines, num_points_polyline):
+    """
+    Process the roadgraph for a single world.
+    """
+    # Extract the world's roadgraph data
+    world_road_graph = extract_world_data(global_road_graph, world_idx)
+    
+    # Get map IDs based on agent positions
+    map_ids = []
+    current_valid = agents_interested > 0
+    
+    for agent_idx in range(agents_history.shape[0]):
+        if not current_valid[agent_idx]:
+            continue
+        agent_position = agents_history[agent_idx, -1, :2]
+        nearby_roadgraph_points = filter_topk_roadgraph_points(
+            world_road_graph, agent_position, 3000
+        )
+        map_ids.append(nearby_roadgraph_points.id[0].tolist())
+    
+    # Sort map IDs
+    sorted_map_ids = []
+    if map_ids and len(map_ids[0]) > 0:
+        for i in range(len(map_ids[0])):
+            for j in range(len(map_ids)):
+                if i < len(map_ids[j]) and map_ids[j][i] > 0 and map_ids[j][i] not in sorted_map_ids:
+                    sorted_map_ids.append(map_ids[j][i])
+    
+    # Extract roadgraph properties
+    roadgraph_points_x = np.asarray(global_road_graph.x[world_idx])
+    roadgraph_points_y = np.asarray(global_road_graph.y[world_idx])
+    roadgraph_points_heading = np.asarray(global_road_graph.orientation[world_idx])
+    roadgraph_points_types = np.asarray(global_road_graph.vbd_type[world_idx])
+    road_graph_points_ids = np.asarray(global_road_graph.id[world_idx])
+    
+    # Build polylines
+    polylines = []
+    for id in sorted_map_ids:
+        id_mask = road_graph_points_ids == id
+        p_x = roadgraph_points_x[id_mask]
+        p_y = roadgraph_points_y[id_mask]
+        heading = roadgraph_points_heading[id_mask]
+        lane_type = roadgraph_points_types[id_mask]
+        traffic_light_state = np.zeros_like(lane_type)
+        
+        polyline = np.stack([p_x, p_y, heading, traffic_light_state, lane_type], axis=1)
+        polyline_len = polyline.shape[0]
+        
+        # Sample points evenly
+        sampled_points = np.linspace(0, polyline_len - 1, num_points_polyline, dtype=np.int32)
+        cur_polyline = np.take(polyline, sampled_points, axis=0)
+        polylines.append(cur_polyline)
+    
+    # Post-processing polylines
+    if len(polylines) > 0:
+        polylines = np.stack(polylines, axis=0)
+        polylines_valid = np.ones((polylines.shape[0],), dtype=np.int32)
+    else:
+        polylines = np.zeros((1, num_points_polyline, 5), dtype=np.float32)
+        polylines_valid = np.zeros((1,), dtype=np.int32)
+    
+    # Ensure polylines fit max_polylines limit
+    if polylines.shape[0] >= max_polylines:
+        polylines = polylines[:max_polylines]
+        polylines_valid = polylines_valid[:max_polylines]
+    else:
+        polylines = np.pad(
+            polylines,
+            ((0, max_polylines - polylines.shape[0]), (0, 0), (0, 0))
+        )
+        polylines_valid = np.pad(
+            polylines_valid, (0, max_polylines - polylines_valid.shape[0])
+        )
+    
+    return polylines, polylines_valid
 
-    # Zero out the agents that are not controlled
-    # agents_history[~controlled_agent_mask, :, :] = 0.0
-
-    return (
-        agents_history,
-        agents_future,
-        agents_interested,
-        mapped_agents_type,
-        sorted_agent_indices,
-    )
+def extract_world_data(data, world_idx):
+    """
+    Extract data for a specific world from batched inputs.
+    """
+    # For simple tensor attributes
+    if isinstance(data, torch.Tensor):
+        return data[world_idx:world_idx+1]  # Keep dimension for compatibility
+    
+    # For custom objects with tensor attributes
+    if hasattr(data, 'x') and hasattr(data, 'y'):  # GlobalRoadGraphPoints-like object
+        world_data = type(data).__new__(type(data))
+        # Copy tensor attributes with slicing for world_idx
+        for attr_name in dir(data):
+            if attr_name.startswith('__'):
+                continue
+            attr = getattr(data, attr_name)
+            if isinstance(attr, torch.Tensor) and attr.dim() > 0:
+                setattr(world_data, attr_name, attr[world_idx:world_idx+1])
+            else:
+                setattr(world_data, attr_name, attr)
+        return world_data
+    
+    # For other types, return as is
+    return data
 
 def process_scenario_data(
     max_controlled_agents,
@@ -257,123 +340,63 @@ def process_scenario_data(
     max_polylines=256,
     num_points_polyline=30,
 ):
-    """Process the scenario data for Versatile Behavior Diffusion."""
-
-    (
-        agents_history,
-        agents_future,
-        agents_interested,
-        agents_type,
-        agents_id,
-    ) = data_process_agent(
-        init_steps=init_steps,
-        max_cont_agents=max_controlled_agents,
-        global_agent_obs=global_agent_obs,
-        log_trajectory=log_trajectory,
-        metadata=metadata,
-        agent_types=raw_agent_types
-    )
-
-    # Set all invalid agent values to zero
-    # agents_future[~controlled_agent_mask, :, :] = 0
-
-    # Global polylines tensor: Shape (256, 30, 5)
-    map_ids = []
-    current_valid = agents_interested > 0
-
-    for agent in range(agents_history.shape[0]):
-        if not current_valid[agent]:
-            continue
-        agent_position = agents_history[agent, -1, :2]
-        nearby_roadgraph_points = filter_topk_roadgraph_points(
-            global_road_graph, agent_position, 3000
-        )
-        map_ids.append(nearby_roadgraph_points.id[0].tolist())
-
-    # sort map ids
-    sorted_map_ids = []
-    for i in range(nearby_roadgraph_points.num_points):
-        for j in range(len(map_ids)):
-            if map_ids[j][i] > 0 and map_ids[j][i] not in sorted_map_ids:
-                sorted_map_ids.append(map_ids[j][i])
-
-    # get shared map polylines
-    # polyline feature: x, y, heading, traffic_light, type
-    polylines = []
-    roadgraph_points_x = np.asarray(global_road_graph.x[0])
-    roadgraph_points_y = np.asarray(global_road_graph.y[0])
-    roadgraph_points_heading = np.asarray(global_road_graph.orientation[0])
-    roadgraph_points_types = np.asarray(global_road_graph.vbd_type[0])
-    road_graph_points_ids = np.asarray(global_road_graph.id[0])
+    """
+    Process scenario data for multiple worlds in parallel where possible.
+    First dim of all inputs and outputs is num_worlds.
+    """
+    num_worlds = global_agent_obs.vehicle_length.shape[0]
     
-    for id in sorted_map_ids:
-        p_x = roadgraph_points_x[road_graph_points_ids == id]
-        p_y = roadgraph_points_y[road_graph_points_ids == id]
-        heading = roadgraph_points_heading[road_graph_points_ids == id]
-        lane_type = roadgraph_points_types[road_graph_points_ids == id]
-        traffic_light_state = np.zeros_like(lane_type)
-        polyline = np.stack(
-            [p_x, p_y, heading, traffic_light_state, lane_type], axis=1
-        )
-        # sample points and fill into fixed-size array
-        polyline_len = polyline.shape[0]
-        sampled_points = np.linspace(
-            0, polyline_len  - 1, num_points_polyline, dtype=np.int32
-        )
-        cur_polyline = np.take(polyline, sampled_points, axis=0)
-        polylines.append(cur_polyline)
-
-    #post processing polylines
-    if len(polylines) > 0:
-        polylines = np.stack(polylines, axis=0)
-        polylines_valid = np.ones((polylines.shape[0],), dtype=np.int32)
-    else:
-        polylines = np.zeros((1, num_points_polyline, 5), dtype=np.float32)
-        polylines_valid = np.zeros((1,), dtype=np.int32)
-    
-    if polylines.shape[0] >= max_polylines:
-        polylines = polylines[:max_polylines]
-        polylines_valid = polylines_valid[:max_polylines]
-    else:
-        polylines = np.pad(
-            polylines,
-            ((0, max_polylines - polylines.shape[0]), (0, 0), (0, 0))
-        )
-        polylines_valid = np.pad(
-            polylines_valid, (0, max_polylines - polylines_valid.shape[0])
-        )
-
-    # Empty (16, 3)
-    traffic_light_points = np.zeros((16, 3))
-
-    # Compute relations at the end
-    relations = calculate_relations(
-        agents_history,
-        polylines,
-        traffic_light_points,
+    # Process all agents across all worlds in a vectorized way
+    agents_history, agents_future, agents_interested, agents_type, agents_id = process_agents_vectorized(
+        num_worlds, max_controlled_agents, init_steps, 
+        global_agent_obs, log_trajectory, metadata, raw_agent_types
     )
-    relations = np.asarray(relations)
-
+    
+    # Initialize output tensors with batch dimension
+    all_polylines = np.zeros((num_worlds, max_polylines, num_points_polyline, 5), dtype=np.float32)
+    all_polylines_valid = np.zeros((num_worlds, max_polylines), dtype=np.int32)
+    all_traffic_light_points = np.zeros((num_worlds, 16, 3), dtype=np.float32)
+    all_relations = np.zeros((num_worlds, agents_history.shape[1] + max_polylines + 16, 
+                             agents_history.shape[1] + max_polylines + 16, 3), dtype=np.float32)
+    
+    # Process roadgraph data for each world (parallel processing isn't efficient here due to variable data dependencies)
+    for w in range(num_worlds):
+        world_polylines, world_polylines_valid = process_world_roadgraph(
+            global_road_graph, w, agents_history[w], agents_interested[w],
+            max_polylines, num_points_polyline
+        )
+        
+        all_polylines[w] = world_polylines
+        all_polylines_valid[w] = world_polylines_valid
+        
+        # Calculate relations for this world
+        all_relations[w] = calculate_relations(
+            agents_history[w],
+            all_polylines[w],
+            all_traffic_light_points[w]
+        )
+    
+    # Prepare the output dictionary with batch dimensions
     data_dict = {
-        "agents_history": np.float32(np.expand_dims(agents_history, axis=0)),
-        "agents_interested": np.int32(np.expand_dims(agents_interested, axis=0)),
-        "agents_type": np.int32(np.expand_dims(agents_type, axis=0)),
-        "agents_future": np.float32(np.expand_dims(agents_future, axis=0)),
-        "traffic_light_points": np.float32(np.expand_dims(traffic_light_points, axis=0)),
-        "polylines": np.float32(np.expand_dims(polylines, axis=0)),
-        "polylines_valid": np.int32(np.expand_dims(polylines_valid, axis=0)),
-        "relations": np.float32(np.expand_dims(relations, axis=0)),
-        "agents_id": np.int32(np.expand_dims(agents_id, axis=0)),
+        "agents_history": np.float32(agents_history),
+        "agents_interested": np.int32(agents_interested),
+        "agents_type": np.int32(agents_type),
+        "agents_future": np.float32(agents_future),
+        "traffic_light_points": np.float32(all_traffic_light_points),
+        "polylines": np.float32(all_polylines),
+        "polylines_valid": np.int32(all_polylines_valid),
+        "relations": np.float32(all_relations),
+        "agents_id": np.int32(agents_id),
     }
-
+    
+    # Convert to PyTorch tensors
     torch_dict = {
         key: torch.from_numpy(value) 
         for key, value in data_dict.items()
     }
-    torch_dict["anchors"] = torch.zeros(1, 32, 64, 2) # Placeholder, not used
-
+    torch_dict["anchors"] = torch.zeros(num_worlds, 32, 64, 2)  # Batch-sized placeholder
+    
     return torch_dict
-
 
 def sample_to_action():
     """Todo: Implement this function."""

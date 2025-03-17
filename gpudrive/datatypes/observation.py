@@ -142,8 +142,12 @@ class GlobalEgoState:
         - self.pos_x and self.pos_y are modified in place are of shape (num_worlds, num_agents).
         - mean_x and mean_y are expected to be of shape (num_worlds, 1).
         """
-        self.pos_x += mean_x
-        self.pos_y += mean_y
+        # Reshape the mean to broadcast
+        mean_x_reshaped = mean_x.view(-1, 1)
+        mean_y_reshaped = mean_y.view(-1, 1)
+        
+        self.pos_x += mean_x_reshaped
+        self.pos_y += mean_y_reshaped
 
 @dataclass
 class PartnerObs:

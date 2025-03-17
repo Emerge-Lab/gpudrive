@@ -107,8 +107,12 @@ class GlobalRoadGraphPoints:
 
     def restore_mean(self, mean_x, mean_y):
         """Reapplies the mean to revert back to the original coordinates."""
-        self.x += mean_x
-        self.y += mean_y
+        # Reshape for broadcasting
+        mean_x_reshaped = mean_x.view(-1, 1)
+        mean_y_reshaped = mean_y.view(-1, 1)
+        
+        self.x += mean_x_reshaped
+        self.y += mean_y_reshaped
 
     def restore_xy(self):
         """Shifts x, y from the midpoint to the starting point of a segment, along the heading angle."""

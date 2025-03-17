@@ -16,6 +16,7 @@ from gpudrive.datatypes.observation import (
     LidarObs,
 )
 
+from gpudrive.env import constants
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.base_env import GPUDriveGymEnv
 from gpudrive.datatypes.trajectory import LogTrajectory
@@ -26,9 +27,10 @@ from gpudrive.datatypes.info import Info
 from gpudrive.visualize.core import MatplotlibVisualizer
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.utils.geometry import normalize_min_max
 
 # Versatile Behavior Diffusion model
-from integrations.models.vbd.sim_agent.sim_actor import VBDTest, sample_to_action
+from integrations.models.vbd.sim_agent.sim_actor import VBDTest
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -74,6 +76,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        self.episode_len = self.config.episode_len
+        # Initialize VBD model if enabled
+        self.use_vbd = config.use_vbd
+        self.vbd_trajectory_weight = config.vbd_trajectory_weight
+        # Initial sample batch for VBD
+        if self.use_vbd and self.config.vbd_model_path:
+            self.vbd_model = self._load_vbd_model(config.vbd_model_path)
+            self.vbd_trajectories = torch.zeros((self.num_worlds, self.max_agent_count, self.episode_len-self.config.init_steps, 5), device=self.device)
+            # Generate VBD trajectories for initial batch of scenes
+            self._generate_vbd_trajectories()
+        else:
+            self.vbd_model = None
+            self.vbd_trajectories = None
+
         # Setup action and observation spaces
         self.observation_space = Box(
             low=-1.0, high=1.0, shape=(self.get_obs(self.cont_agent_mask).shape[-1],)
@@ -90,7 +106,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.single_action_space = self.action_space
         
         self.num_agents = self.cont_agent_mask.sum().item()
-        self.episode_len = self.config.episode_len
 
         # Rendering setup
         self.vis = MatplotlibVisualizer(
@@ -103,18 +118,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_config=self.config,
         )
         
-        # Initialize VBD model if enabled
-        self.use_vbd = config.use_vbd
-        self.vbd_trajectory_weight = config.vbd_trajectory_weight
-        # Initial sample batch for VBD
-        if self.use_vbd and self.config.vbd_model_path:
-            self.vbd_model = self._load_vbd_model(config.vbd_model_path)
-            self.vbd_trajectories = torch.zeros((self.num_worlds, self.max_agent_count, self.episode_len-self.config.init_steps, 5), device=self.device)
-            # Generate VBD trajectories for initial batch of scenes
-            self._generate_vbd_trajectories()
-        else:
-            self.vbd_model = None
-            self.vbd_trajectories = None
 
     def _load_vbd_model(self, model_path):
         """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
@@ -248,7 +251,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
         
-        # Q: Currently only penalizing x and y distance, not yaw, vel_x, vel_y.
+        # Question: Currently only penalizing x and y distance, not yaw, vel_x, vel_y.
         elif self.config.reward_type == "distance_to_vdb_trajs":
             # Reward based on distance to VBD predicted trajectories
             # (i.e. the deviation from the predicted trajectory)
@@ -635,20 +638,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-        lidar_observations = self._get_lidar_obs(mask) # Q: Unused Lidar obs?
+        lidar_observations = self._get_lidar_obs(mask) # Question: Unused Lidar obs?
 
         if self.use_vbd and self.vbd_model is not None:
-            # Flatten the time_steps and features dimensions
-            vbd_trajectories = self.vbd_trajectories.reshape(self.num_worlds, self.max_agent_count, -1)
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                    vbd_trajectories,
-                ),
-                dim=-1,
-            )
+            if mask is not None:
+                # Reshape vbd_trajectories for consistent flattening with other tensors
+                flattened_vbd = self.vbd_trajectories.reshape(self.num_worlds * self.max_agent_count, -1)
+                # Convert 2D mask to 1D for indexing the flattened tensor
+                flat_mask = mask.reshape(-1)
+                filtered_vbd = flattened_vbd[flat_mask]
+                obs = torch.cat(
+                    (
+                        ego_states,
+                        partner_observations,
+                        road_map_observations,
+                        filtered_vbd,
+                    ),
+                    dim=-1,
+                )
+            else:
+                # Flatten the time_steps and features dimensions
+                vbd_trajectories = self.vbd_trajectories.reshape(self.num_worlds, self.max_agent_count, -1)
+                obs = torch.cat(
+                    (
+                        ego_states,
+                        partner_observations,
+                        road_map_observations,
+                        vbd_trajectories,
+                    ),
+                    dim=-1,
+                )
         else:
             obs = torch.cat(
                 (
@@ -777,7 +796,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
-    def _generate_vbd_trajectories(self):
+    def _generate_vbd_trajectories(self, normalize=True):
         """Generate and store trajectory predictions for all scenes using VBD model."""
         if not self.use_vbd or self.vbd_model is None:
             return
@@ -798,6 +817,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.vbd_trajectories[world_idx, world_agent_indices, :, :2] -= self.sim.world_means_tensor().to_torch()[world_idx, :2] # subtract mean
             self.vbd_trajectories[world_idx, world_agent_indices, :, 2] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 2])
             self.vbd_trajectories[world_idx, world_agent_indices, :, 3:] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 3:5])
+        
+        if normalize:
+            self._normalize_vbd_trajectories()
+    
+    # TODO: This is incorrect, need to figure out better norm function 
+    def _normalize_vbd_trajectories(self):
+        """Normalize VBD trajectory values to be between -1 and 1."""
+        # Normalize x, y coordinates similar to other position normalizations
+        self.vbd_trajectories[:, :, :, 0] = normalize_min_max(
+            tensor=self.vbd_trajectories[:, :, :, 0],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+        self.vbd_trajectories[:, :, :, 1] = normalize_min_max(
+            tensor=self.vbd_trajectories[:, :, :, 1],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+        
+        # Normalize yaw angle (orientation) similar to other orientation normalizations
+        self.vbd_trajectories[:, :, :, 2] /= constants.MAX_ORIENTATION_RAD
+        
+        # Normalize velocities similar to other speed normalizations
+        self.vbd_trajectories[:, :, :, 3] /= constants.MAX_SPEED
+        self.vbd_trajectories[:, :, :, 4] /= constants.MAX_SPEED
 
 
 
@@ -903,7 +947,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,  # Number of agents to control
+        max_cont_agents=32,  # Number of agents to control
         device="cpu",
     )
     

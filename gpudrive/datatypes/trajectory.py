@@ -56,5 +56,10 @@ class LogTrajectory:
 
     def restore_mean(self, mean_x, mean_y):
         """Reapplies the mean to revert back to the original coordinates."""
-        self.pos_xy[:, :, :, 0] += mean_x
-        self.pos_xy[:, :, :, 1] += mean_y
+        # Reshape for broadcasting: [num_worlds, agents, time_steps]
+        mean_x_reshaped = mean_x.view(-1, 1, 1)
+        mean_y_reshaped = mean_y.view(-1, 1, 1)
+        
+        # Apply to x and y coordinates
+        self.pos_xy[:, :, :, 0] += mean_x_reshaped
+        self.pos_xy[:, :, :, 1] += mean_y_reshaped
