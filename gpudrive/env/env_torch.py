@@ -23,6 +23,8 @@ from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 
 
+
+
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -677,6 +679,75 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             filenames[i] = map_name
 
         return filenames
+
+
+
+
+class GPUDriveConstrualEnv(GPUDriveTorchEnv):
+    """Torch Gym (Construed) Environment that interfaces with the GPU Drive simulator."""
+
+    def get_obs(self, mask=None, partner_mask=None):
+        """Get observation: Combine different types of environment information into a single tensor.
+
+        Returns:
+            torch.Tensor: (num_worlds, max_agent_count, num_features)
+        """
+        ego_states = self._get_ego_state(mask)
+        partner_observations = self._get_partner_obs(mask, partner_mask)
+        road_map_observations = self._get_road_map_obs(mask)
+        lidar_observations = self._get_lidar_obs(mask)
+
+        obs = torch.cat(
+            (
+                ego_states,
+                partner_observations,
+                road_map_observations,
+            ),
+            dim=-1,
+        )
+
+        return obs
+
+    def _get_partner_obs(self, mask=None, partner_mask=None):
+        """Get partner observations."""
+
+        if not self.config.partner_obs:
+            return torch.Tensor().to(self.device)
+
+        partner_obs = PartnerObs.from_tensor(
+            partner_obs_tensor=self.sim.partner_observations_tensor(),
+            backend=self.backend,
+            device=self.device,
+            mask=mask,
+        )
+
+        if self.config.norm_obs:
+            partner_obs.normalize()
+            
+        if mask is not None:
+            result = partner_obs.data.flatten(start_dim=1)
+        else:
+            result = torch.concat(
+                [
+                    partner_obs.speed,
+                    partner_obs.rel_pos_x,
+                    partner_obs.rel_pos_y,
+                    partner_obs.orientation,
+                    partner_obs.vehicle_length,
+                    partner_obs.vehicle_width,
+                ],
+                dim=-1,
+            )
+            if partner_mask:
+                masked_values = torch.tensor([0]*result.shape[-1], dtype=result.dtype)
+                result[:, :, partner_mask] = masked_values
+            result = result.flatten(start_dim=2)
+        
+        return result
+
+
+
+
 
 
 if __name__ == "__main__":

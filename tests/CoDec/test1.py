@@ -11,6 +11,7 @@ while working_dir.name != 'gpudrive-CoDec':
         raise FileNotFoundError("Base directory 'gpudrive' not found")
 os.chdir(working_dir)
 
+
 import torch
 import dataclasses
 import mediapy
@@ -19,26 +20,24 @@ from huggingface_hub import ModelCard
 from gpudrive.networks.late_fusion import NeuralNet
 
 from gpudrive.env.config import EnvConfig
-from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.env.env_torch import GPUDriveTorchEnv, GPUDriveConstrualEnv
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.config import load_config
 
 
-'''
-
 ############################ SET UP CONFIG AND ENVIRONMENT ############################
 
 # Configs model has been trained with
 config = load_config("examples/experimental/config/reliable_agents_params")
-config.max_controlled_agents = 1
-
 # print(config)
 
 max_agents = config.max_controlled_agents
-num_envs = 1
-device = "cpu" # cpu just because we're in a notebook
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+num_envs = 2
+# device = "cpu" # cpu just because we're in a notebook
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+config.max_controlled_agents = 1
 
 
 
@@ -56,7 +55,7 @@ sim_agent.obs_dim
 
 # Make Environment
 
-## Create data loader
+# Create data loader
 train_loader = SceneDataLoader(
     root='data/processed/examples',
     batch_size=num_envs,
@@ -64,7 +63,7 @@ train_loader = SceneDataLoader(
     sample_with_replacement=False,
 )
 
-## Set params
+# Set params
 env_config = dataclasses.replace(
     EnvConfig(),
     ego_state=config.ego_state,
@@ -88,72 +87,98 @@ env_config = dataclasses.replace(
     ),
 )
 
-## Make env
-env = GPUDriveTorchEnv(
+# |Make env
+# env = GPUDriveTorchEnv(
+#     config=env_config,
+#     data_loader=train_loader,
+#     max_cont_agents=config.max_controlled_agents,
+#     device=device,
+# )
+
+# |Make env
+env = GPUDriveConstrualEnv(
     config=env_config,
     data_loader=train_loader,
     max_cont_agents=config.max_controlled_agents,
     device=device,
 )
+env.data_batch
 
 
 
 
 ############################ ROLL OUT POLICY ############################
 
-construal_size = 16
-for const_num in range(int(max_agents/construal_size)):
-    # Repeat rollout for each construal size
+# import math
 
-    ## Defnie observation mask for construal
-    obs_mask = [False]*max_agents
-    obs_start_indx = int(const_num*construal_size)
-    obs_end_indx = int((const_num+1)*construal_size)
-    obs_mask[obs_start_indx:obs_end_indx] = [True]*construal_size
+# construal_size = 5
+# observed_agents = max_agents - 1    # Agents observed except self (used for vector sizes)
+# limit_observed_agents = 40          # Maximum nember of agents to observe (used for vector loops)
+# expected_utility = {}               # Dictionary that contains the expected utility per construal
+# sample_size = 5                     # Number of samples to calculate expected utility of a construal
+# for const_num in range(math.ceil(limit_observed_agents/construal_size)):
+#     # Repeat rollout for each construal size
 
-    next_obs = env.reset()
-    control_mask = env.cont_agent_mask
-    print("Observation shape: ", next_obs.shape)
-    frames = {f"env_{i}-constr_{const_num}": [] for i in range(num_envs)}
+#     next_obs = env.reset()
+#     control_mask = env.cont_agent_mask
+#     # print("Observation shape: ", next_obs.shape)
+#     frames = {f"env_{i}-constr_{const_num}": [] for i in range(num_envs)}
+
+#     ## Define observation mask for construal
+#     construal_mask = [False]*observed_agents
+#     mask_start_indx = int(const_num*construal_size)
+#     mask_end_indx = min(observed_agents, int((const_num+1)*construal_size))
+#     # if mask_end_indx >= limit_observed_agents:
+#     #     break
+#     print("Construal indices: ", mask_start_indx, "-", mask_end_indx)
+#     construal_mask[mask_start_indx:mask_end_indx] = [True]*(mask_end_indx-mask_start_indx)
     
-    for time_step in range(env.episode_len):
-        ## Roll out policy for a specific construal
-        print(f"\rStep: {time_step}", end="", flush=True)
+#     curr_samples = []
+#     for i in range(sample_size):
+#         print("\tsample ", i)
+#         next_obs = env.reset()
+#         for time_step in range(env.episode_len):
+#             ## Roll out policy for a specific construal
+#             print(f"\r\t\tStep: {time_step}", end="", flush=True)
 
-        ### Predict actions
-        action, _, _, _ = sim_agent(
-            next_obs[control_mask], deterministic=False
-        )
-        action_template = torch.zeros(
-            (num_envs, max_agents), dtype=torch.int64, device=device
-        )
-        action_template[control_mask] = action.to(device)
+#             ### Predict actions
+#             action, _, _, _ = sim_agent(
+#                 next_obs[control_mask], deterministic=False
+#             )
+#             action_template = torch.zeros(
+#                 (num_envs, max_agents), dtype=torch.int64, device=device
+#             )
+#             action_template[control_mask] = action.to(device)
 
-        ### Step
-        env.step_dynamics(action_template)
+#             ### Step
+#             env.step_dynamics(action_template)
 
-        ### Render    
-        sim_states = env.vis.plot_simulator_state(
-            env_indices=list(range(num_envs)),
-            time_steps=[time_step]*num_envs,
-            zoom_radius=70,
-        )
-        
-        for i in range(num_envs):
-            frames[f"env_{i}"].append(img_from_fig(sim_states[i])) 
+#             ### Render
+#             sim_states = env.vis.plot_simulator_state(
+#                 env_indices=list(range(num_envs)),
+#                 time_steps=[time_step]*num_envs,
+#                 zoom_radius=70,
+#             )
+            
+#             for i in range(num_envs):
+#                 frames[f"env_{i}-constr_{const_num}"].append(img_from_fig(sim_states[i])) 
 
-        next_obs = env.get_obs(obs_mask)
-        reward = env.get_rewards()
-        done = env.get_dones()
-        info = env.get_infos()
-        
-        if done.all():
-            break
+#             # next_obs = env.get_obs(obs_mask)
+#             next_obs = env.get_obs(partner_mask=construal_mask)
+#             reward = env.get_rewards()
+#             done = env.get_dones()
+#             info = env.get_infos()
+            
+#             if done.all():
+#                 break
+#         print() # Change to new line after step prints
+            
+#         curr_samples.append(reward[control_mask].tolist())
+#     expected_utility[(mask_start_indx,mask_end_indx)] = [sum(x)/sample_size for x in zip(*curr_samples)]
 
-    ## Save animations
-    mediapy.set_show_save_dir('./sim_vids')
-    mediapy.show_videos(frames, fps=15, width=500, height=500, columns=2, codec='gif')
+#     ## Save animations
+#     # mediapy.set_show_save_dir('./sim_vids')
+#     # mediapy.show_videos(frames, fps=15, width=500, height=500, columns=2, codec='gif')
 
-env.close()
-
-'''
+# # env.close()
+# print("\nExpected utility by contrual: ", expected_utility)
