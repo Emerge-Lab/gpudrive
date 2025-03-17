@@ -30,6 +30,7 @@ from gpudrive.visualize.color import (
     ROAD_GRAPH_TYPE_NAMES,
     REL_OBS_OBJ_COLORS,
     AGENT_COLOR_BY_STATE,
+    AGENT_COLOR_BY_POLICY,
 )
 
 OUT_OF_BOUNDS = 1000
@@ -100,6 +101,7 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
+        policy_masks: Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -113,6 +115,15 @@ class MatplotlibVisualizer:
             plot_log_replay_trajectory: If True, plots the log replay trajectory.
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
+            policy_mask: dict
+            A dictionary that maps policies to world and specifies which agents are assigned to each policy. 
+            For now maximum number of policies is 3 as there are only 3 colors in COLOR_AGENT_BY_POLICY
+            The structure follows the format: {Policy Name: (Policy Function,mask) }, where:
+                - Policy (str): The policy assigned to agents within the world.
+
+                - Policy Function  (Neural Network): The identifier for the simulation environment.
+                
+                - Mask (torch.Tensor): A boolean or index-based mask indicating which agents follow the given policy, for all worlds. 
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -225,6 +236,20 @@ class MatplotlibVisualizer:
         marker_scale = max(self.figsize) / 15
         line_width_scale = max(self.figsize) / 15
 
+
+        if policy_masks:
+
+            world_based_policy_mask = {}
+            
+            for policy_name, (fn,mask) in policy_masks.items():
+                for world in range(mask.shape[0]):
+                    if world not in world_based_policy_mask:
+                        world_based_policy_mask[world] = {}
+                    world_based_policy_mask[world][policy_name] = mask[world]                   
+
+        else:
+            world_based_policy_mask = None
+
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
@@ -286,6 +311,7 @@ class MatplotlibVisualizer:
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
                 extended_goals=extended_goals,
+                world_based_policy_mask=world_based_policy_mask,
             )
 
             if agent_positions is not None:
@@ -946,6 +972,7 @@ class MatplotlibVisualizer:
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
+        world_based_policy_mask : Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -1047,18 +1074,30 @@ class MatplotlibVisualizer:
                     zorder=5,
                 )
 
-        def plot_agent_group_2d(bboxes, color):
+
+        def plot_agent_group_2d(bboxes, color,by_policy = False):
             """Helper function to plot a group of agents in 2D"""
-            utils.plot_numpy_bounding_boxes(
+            if not by_policy:
+                utils.plot_numpy_bounding_boxes(
+                    ax=ax,
+                    bboxes=bboxes,
+                    color=color,
+                    alpha=alpha,
+                    line_width_scale=line_width_scale,
+                    as_center_pts=as_center_pts,
+                    label=label,
+                )
+            else:
+                num_policies = len(bboxes)
+                utils.plot_numpy_bounding_boxes_multiple_policy(            
                 ax=ax,
-                bboxes=bboxes,
-                color=color,
+                bboxes_s=bboxes,
+                colors=color[:num_policies],
                 alpha=alpha,
                 line_width_scale=line_width_scale,
                 as_center_pts=as_center_pts,
                 label=label,
-            )
-
+                    )
         # Off-road agents
         bboxes_controlled_offroad = np.stack(
             (
@@ -1170,15 +1209,47 @@ class MatplotlibVisualizer:
             axis=1,
         )
 
-        if self.render_3d:
-            plot_agent_group_3d(
-                bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
+        if not world_based_policy_mask: ## controlled by the same policy
+            # Living agents
+            bboxes_controlled_ok = np.stack(
+                (
+                    agent_states.pos_x[env_idx, is_ok_mask].numpy(),
+                    agent_states.pos_y[env_idx, is_ok_mask].numpy(),
+                    agent_states.vehicle_length[env_idx, is_ok_mask].numpy(),
+                    agent_states.vehicle_width[env_idx, is_ok_mask].numpy(),
+                    agent_states.rotation_angle[env_idx, is_ok_mask].numpy(),
+                ),
+                axis=1,
             )
-        else:
-            plot_agent_group_2d(
-                bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
-            )
+            if self.render_3d:
+                plot_agent_group_3d(
+                    bboxes_controlled_collided, AGENT_COLOR_BY_STATE["ok"]
+                )
+            else:
+                plot_agent_group_2d(
+                    bboxes_controlled_collided, AGENT_COLOR_BY_STATE["ok"]
+                )
 
+        else:
+            bboxes_controlled_ok = []
+            policy_mask = world_based_policy_mask[env_idx]
+            for policy_name,mask in policy_mask.items():
+
+                bboxes = np.stack(
+                    (
+                        agent_states.pos_x[env_idx, mask].numpy(),
+                        agent_states.pos_y[env_idx, mask].numpy(),
+                        agent_states.vehicle_length[env_idx, mask].numpy(),
+                        agent_states.vehicle_width[env_idx, mask].numpy(),
+                        agent_states.rotation_angle[env_idx, mask].numpy(),
+                    ),
+                    axis=1,
+                    )
+                bboxes_controlled_ok.append(bboxes)
+
+            plot_agent_group_2d(
+                bboxes_controlled_ok, AGENT_COLOR_BY_POLICY,by_policy=True
+            )
         # Plot log replay agents
         log_replay = (
             response_type.static[env_idx, :] | response_type.moving[env_idx, :]
