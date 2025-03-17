@@ -188,6 +188,19 @@ class MatplotlibVisualizer:
         marker_scale = max(self.figsize) / 15
         line_width_scale = max(self.figsize) / 15
 
+        if policy_masks:
+
+            world_based_policy_mask = {}
+            
+            for policy_name, (fn,mask) in policy_masks.items():
+                for world in range(mask.shape[0]):
+                    if world not in world_based_policy_mask:
+                        world_based_policy_mask[world] = {}
+                    world_based_policy_mask[world][policy_name] = mask[world]                   
+
+        else:
+            world_based_policy_mask = None
+
         # Iterate over each environment index
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
@@ -233,10 +246,7 @@ class MatplotlibVisualizer:
                     log_trajectory=self.log_trajectory,
                     line_width_scale=line_width_scale,
                 )
-            if policy_masks:
-                policy_mask = policy_masks[idx]
-            else:
-                policy_mask = None
+
             
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -251,7 +261,7 @@ class MatplotlibVisualizer:
                 line_width_scale=line_width_scale,
                 marker_size_scale=marker_scale,
                 extended_goals=extended_goals,
-                policy_mask = policy_mask
+                policy_world_mask = world_based_policy_mask
             )
 
             if agent_positions is not None:
@@ -774,7 +784,7 @@ class MatplotlibVisualizer:
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
-        policy_mask : Optional[Dict[str,torch.Tensor]] = None
+        policy_world_mask : Optional[Dict[int,Dict[str,torch.Tensor]]] = None
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -957,7 +967,7 @@ class MatplotlibVisualizer:
         else:
             plot_agent_group_2d(bboxes_controlled_collided, AGENT_COLOR_BY_STATE["collided"])
 
-        if not policy_mask: ## controlled by the same policy
+        if not policy_world_mask: ## controlled by the same policy
             # Living agents
             bboxes_controlled_ok = np.stack(
                 (
@@ -971,7 +981,7 @@ class MatplotlibVisualizer:
             )
         else:
             bboxes_controlled_ok = []
-
+            policy_mask = policy_world_mask[env_idx]
             for policy_name,mask in policy_mask.items():
 
                 bboxes = np.stack(
