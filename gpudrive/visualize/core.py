@@ -313,10 +313,7 @@ class MatplotlibVisualizer:
                     log_trajectory=self.log_trajectory,
                     line_width_scale=line_width_scale,
                 )
-            if policy_masks:
-                policy_mask = policy_masks[idx]
-            else:
-                policy_mask = None
+
             
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
