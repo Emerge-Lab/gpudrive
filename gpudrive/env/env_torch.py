@@ -684,7 +684,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 
 class GPUDriveConstrualEnv(GPUDriveTorchEnv):
-    """Torch Gym (Construed) Environment that interfaces with the GPU Drive simulator."""
+    """Torch Gym (Construed) Environment that interfaces with the GPU Drive simulator. Rebase"""
 
     def get_obs(self, mask=None, partner_mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
