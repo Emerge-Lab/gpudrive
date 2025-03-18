@@ -628,10 +628,163 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
                 .flatten(start_dim=2)
             )
+        
+    def _get_vbd_obs(self, mask=None):
+        """
+        Get ego-centric VBD trajectory observations for controlled agents using matrix operations.
+        
+        Args:
+            mask: Optional mask to filter agents
+            
+        Returns:
+            Tensor of ego-centric VBD trajectories
+        """
+        if not self.use_vbd or self.vbd_model is None:
+            return torch.Tensor().to(self.device)
+        
+        # Get current agent positions and orientations
+        agent_state = GlobalEgoState.from_tensor(
+            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        
+        # Initialize output tensor
+        traj_feature_dim = self.vbd_trajectories.shape[2] * self.vbd_trajectories.shape[3]
+        
+        if mask is not None:
+            # Count valid agents for output tensor size
+            valid_count = mask.sum().item()
+            ego_vbd_trajectories = torch.zeros((valid_count, traj_feature_dim), device=self.device)
+            
+            # Track which output index we're filling
+            out_idx = 0
+            
+            # Process each world
+            for w in range(self.num_worlds):
+                # Get valid agent indices for this world
+                world_mask = mask[w]
+                agent_indices = torch.where(world_mask)[0]
+                
+                if len(agent_indices) == 0:
+                    continue
+                    
+                # Extract ego positions and yaws for these agents
+                ego_pos_x = agent_state.pos_x[w, agent_indices]
+                ego_pos_y = agent_state.pos_y[w, agent_indices]
+                ego_yaw = agent_state.rotation_angle[w, agent_indices]
+                
+                # Process each agent in this world
+                for i, agent_idx in enumerate(agent_indices):
+                    # Get global trajectory for this agent
+                    global_traj = self.vbd_trajectories[w, agent_idx]
+                    
+                    # Create 2D rotation matrix for this agent
+                    cos_yaw = torch.cos(ego_yaw[i])
+                    sin_yaw = torch.sin(ego_yaw[i])
+                    rotation_matrix = torch.tensor([
+                        [cos_yaw, sin_yaw],
+                        [-sin_yaw, cos_yaw]
+                    ], device=self.device)
+                    
+                    # Transform positions using matrix multiplication
+                    pos_xy = global_traj[:, :2]
+                    ego_pos = torch.tensor([ego_pos_x[i], ego_pos_y[i]], device=self.device).reshape(1, 2)
+                    translated_pos = pos_xy - ego_pos  # Broadcasting to subtract from all timesteps
+                    rotated_pos = torch.matmul(translated_pos, rotation_matrix.T)
+                    
+                    # Transform velocities (only rotation, no translation)
+                    vel_xy = global_traj[:, 3:5]
+                    rotated_vel = torch.matmul(vel_xy, rotation_matrix.T)
+                    
+                    # Create transformed trajectory
+                    transformed_traj = torch.zeros_like(global_traj)
+                    transformed_traj[:, :2] = rotated_pos
+                    transformed_traj[:, 2] = global_traj[:, 2] - ego_yaw[i]  # Adjust heading
+                    transformed_traj[:, 3:5] = rotated_vel
+                    
+                    # Flatten and add to output
+                    ego_vbd_trajectories[out_idx] = transformed_traj.reshape(-1)
+                    out_idx += 1
+                    
+            return ego_vbd_trajectories
+        
+        else:
+            # Without mask, process all agents in all worlds
+            ego_vbd_trajectories = torch.zeros((self.num_worlds, self.max_agent_count, traj_feature_dim), device=self.device)
+            
+            # Process each world
+            for w in range(self.num_worlds):
+                # Get controlled agent indices for this world
+                valid_mask = self.cont_agent_mask[w]
+                world_agent_indices = torch.where(valid_mask)[0]
+                
+                if len(world_agent_indices) == 0:
+                    continue
+                    
+                # Extract ego positions and yaws
+                ego_pos_x = agent_state.pos_x[w]
+                ego_pos_y = agent_state.pos_y[w]
+                ego_yaw = agent_state.rotation_angle[w]
+                
+                # Process each agent in this world
+                for agent_idx in world_agent_indices:
+                    # Get global trajectory
+                    global_traj = self.vbd_trajectories[w, agent_idx]
+                    
+                    # Create 2D rotation matrix for this agent
+                    cos_yaw = torch.cos(ego_yaw[agent_idx])
+                    sin_yaw = torch.sin(ego_yaw[agent_idx])
+                    rotation_matrix = torch.tensor([
+                        [cos_yaw, sin_yaw],
+                        [-sin_yaw, cos_yaw]
+                    ], device=self.device)
+                    
+                    # Transform positions
+                    pos_xy = global_traj[:, :2]
+                    ego_pos = torch.tensor([ego_pos_x[agent_idx], ego_pos_y[agent_idx]], device=self.device).reshape(1, 2)
+                    translated_pos = pos_xy - ego_pos
+                    rotated_pos = torch.matmul(translated_pos, rotation_matrix.T)
+                    
+                    # Transform velocities
+                    vel_xy = global_traj[:, 3:5]
+                    rotated_vel = torch.matmul(vel_xy, rotation_matrix.T)
+                    
+                    # Create transformed trajectory
+                    transformed_traj = torch.zeros_like(global_traj)
+                    transformed_traj[:, :2] = rotated_pos
+                    transformed_traj[:, 2] = global_traj[:, 2] - ego_yaw[agent_idx]
+                    transformed_traj[:, 3:5] = rotated_vel
+                    
+                    # Flatten and add to output
+                    ego_vbd_trajectories[w, agent_idx] = transformed_traj.reshape(-1)
+            
+            return ego_vbd_trajectories
+    
+    # TODO: This is incorrect, need to figure out better norm function 
+    def _normalize_vbd_obs(self):
+        """Normalize VBD trajectory values to be between -1 and 1."""
+        # Normalize x, y coordinates similar to other position normalizations
+        self.vbd_trajectories[:, :, :, 0] = normalize_min_max(
+            tensor=self.vbd_trajectories[:, :, :, 0],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+        self.vbd_trajectories[:, :, :, 1] = normalize_min_max(
+            tensor=self.vbd_trajectories[:, :, :, 1],
+            min_val=constants.MIN_REL_GOAL_COORD,
+            max_val=constants.MAX_REL_GOAL_COORD,
+        )
+        
+        # Normalize yaw angle (orientation) similar to other orientation normalizations
+        self.vbd_trajectories[:, :, :, 2] /= constants.MAX_ORIENTATION_RAD
+        
+        # Normalize velocities similar to other speed normalizations
+        self.vbd_trajectories[:, :, :, 3] /= constants.MAX_SPEED
+        self.vbd_trajectories[:, :, :, 4] /= constants.MAX_SPEED
 
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
-
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
@@ -641,33 +794,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         lidar_observations = self._get_lidar_obs(mask) # Question: Unused Lidar obs?
 
         if self.use_vbd and self.vbd_model is not None:
-            if mask is not None:
-                # Reshape vbd_trajectories for consistent flattening with other tensors
-                flattened_vbd = self.vbd_trajectories.reshape(self.num_worlds * self.max_agent_count, -1)
-                # Convert 2D mask to 1D for indexing the flattened tensor
-                flat_mask = mask.reshape(-1)
-                filtered_vbd = flattened_vbd[flat_mask]
-                obs = torch.cat(
-                    (
-                        ego_states,
-                        partner_observations,
-                        road_map_observations,
-                        filtered_vbd,
-                    ),
-                    dim=-1,
-                )
-            else:
-                # Flatten the time_steps and features dimensions
-                vbd_trajectories = self.vbd_trajectories.reshape(self.num_worlds, self.max_agent_count, -1)
-                obs = torch.cat(
-                    (
-                        ego_states,
-                        partner_observations,
-                        road_map_observations,
-                        vbd_trajectories,
-                    ),
-                    dim=-1,
-                )
+            # Get ego-centric VBD trajectories
+            vbd_observations = self._get_vbd_obs(mask)
+            
+            obs = torch.cat(
+                (
+                    ego_states,
+                    partner_observations,
+                    road_map_observations,
+                    vbd_observations,
+                ),
+                dim=-1,
+            )
         else:
             obs = torch.cat(
                 (
@@ -796,7 +934,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
-    def _generate_vbd_trajectories(self, normalize=False):
+    def _generate_vbd_trajectories(self):
         """Generate and store trajectory predictions for all scenes using VBD model."""
         if not self.use_vbd or self.vbd_model is None:
             return
@@ -817,39 +955,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             world_agent_indices = agent_indices[world_idx]
 
             # Filter out negative indices (they're our padding)
-            valid_agent_indices = [idx for idx in world_agent_indices if idx >= 0]
+            valid_mask = world_agent_indices >= 0  # Boolean mask of valid indices
+            valid_agent_indices = world_agent_indices[valid_mask]  # Filtered tensor
+            
             if len(valid_agent_indices) > 0:
                 # Update vbd_trajectories(x, y, yaw, vel_x, vel_y) for this world's agents
                 self.vbd_trajectories[world_idx, valid_agent_indices, :, :2] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, :2])
                 self.vbd_trajectories[world_idx, valid_agent_indices, :, :2] -= self.sim.world_means_tensor().to_torch()[world_idx, :2] # subtract mean
                 self.vbd_trajectories[world_idx, valid_agent_indices, :, 2] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, 2])
                 self.vbd_trajectories[world_idx, valid_agent_indices, :, 3:] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, 3:5])
-        if normalize:
-            self._normalize_vbd_trajectories()
-    
-    # TODO: This is incorrect, need to figure out better norm function 
-    def _normalize_vbd_trajectories(self):
-        """Normalize VBD trajectory values to be between -1 and 1."""
-        # Normalize x, y coordinates similar to other position normalizations
-        self.vbd_trajectories[:, :, :, 0] = normalize_min_max(
-            tensor=self.vbd_trajectories[:, :, :, 0],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-        self.vbd_trajectories[:, :, :, 1] = normalize_min_max(
-            tensor=self.vbd_trajectories[:, :, :, 1],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-        
-        # Normalize yaw angle (orientation) similar to other orientation normalizations
-        self.vbd_trajectories[:, :, :, 2] /= constants.MAX_ORIENTATION_RAD
-        
-        # Normalize velocities similar to other speed normalizations
-        self.vbd_trajectories[:, :, :, 3] /= constants.MAX_SPEED
-        self.vbd_trajectories[:, :, :, 4] /= constants.MAX_SPEED
-
-
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
