@@ -681,7 +681,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return obs
 
     def get_controlled_agents_mask(self):
-        """Get the control mask."""
+        """Get the control mask. Shape: [num_worlds, max_agent_count]"""
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
@@ -796,13 +796,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
-    def _generate_vbd_trajectories(self, normalize=True):
+    def _generate_vbd_trajectories(self, normalize=False):
         """Generate and store trajectory predictions for all scenes using VBD model."""
         if not self.use_vbd or self.vbd_model is None:
             return
 
         _ = self.reset()
+        
+        # Generate sample batch using the limited mask
         sample_batch = self._generate_sample_batch(init_steps=self.config.init_steps)
+        
+        # VBD model prediction
         predictions = self.vbd_model.sample_denoiser(sample_batch)
         vbd_trajectories = predictions['denoised_trajs'].to(self.device).numpy()
         agent_indices = sample_batch['agents_id']
@@ -811,13 +815,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Process each world separately
         for world_idx in range(self.num_worlds):
             world_agent_indices = agent_indices[world_idx]
-            
-            # Update vbd_trajectories(x, y, yaw, vel_x, vel_y) for this world's agents
-            self.vbd_trajectories[world_idx, world_agent_indices, :, :2] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, :2])
-            self.vbd_trajectories[world_idx, world_agent_indices, :, :2] -= self.sim.world_means_tensor().to_torch()[world_idx, :2] # subtract mean
-            self.vbd_trajectories[world_idx, world_agent_indices, :, 2] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 2])
-            self.vbd_trajectories[world_idx, world_agent_indices, :, 3:] = torch.Tensor(vbd_trajectories[world_idx, :len(world_agent_indices), :, 3:5])
-        
+
+            # Filter out negative indices (they're our padding)
+            valid_agent_indices = [idx for idx in world_agent_indices if idx >= 0]
+            if len(valid_agent_indices) > 0:
+                # Update vbd_trajectories(x, y, yaw, vel_x, vel_y) for this world's agents
+                self.vbd_trajectories[world_idx, valid_agent_indices, :, :2] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, :2])
+                self.vbd_trajectories[world_idx, valid_agent_indices, :, :2] -= self.sim.world_means_tensor().to_torch()[world_idx, :2] # subtract mean
+                self.vbd_trajectories[world_idx, valid_agent_indices, :, 2] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, 2])
+                self.vbd_trajectories[world_idx, valid_agent_indices, :, 3:] = torch.Tensor(vbd_trajectories[world_idx, :len(valid_agent_indices), :, 3:5])
         if normalize:
             self._normalize_vbd_trajectories()
     

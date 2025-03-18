@@ -145,9 +145,10 @@ def calculate_relations(agents, polylines, traffic_lights):
     return relations
 
 
-def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_agent_obs, log_trajectory, metadata, raw_agent_types):
+def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_agent_obs, log_trajectory, metadata, raw_agent_types, controlled_agent_mask):
     """
     Vectorized function to process agent data across multiple worlds.
+    Using controlled_agent_mask instead of SDC proximity.
     """
     # Initialize output arrays with batch dimension
     agents_history = np.zeros((num_worlds, max_cont_agents, init_steps + 1, 8), dtype=np.float32)
@@ -159,23 +160,28 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
     )
     agents_id = np.zeros((num_worlds, max_cont_agents), dtype=np.int32)
     
-    # Find SDC indices and compute distances for all worlds
+    # Process each world using controlled_agent_mask
     for w in range(num_worlds):
-        # Find SDC index
-        sdc_index = np.where(metadata.isSdc[w] == 1)[0][0]
-        sdc_position = np.asarray(log_trajectory.pos_xy[w, sdc_index, init_steps, :])
+        # Get indices of controlled agents
+        controlled_indices = np.where(controlled_agent_mask[w])[0]
         
-        # Calculate distances from SDC
-        agent_positions = np.asarray(log_trajectory.pos_xy[w, :, init_steps])
-        distance_to_sdc = np.linalg.norm(agent_positions - sdc_position, axis=-1)
-        agent_indices = np.argsort(distance_to_sdc)[:max_cont_agents]
-        sorted_agent_indices = np.sort(agent_indices)
-        
+        # Sort by agent ID for consistency
+        sorted_agent_indices = np.sort(controlled_indices)
+
+        # Handle case where we have fewer controlled agents than max_cont_agents
+        if len(sorted_agent_indices) < max_cont_agents:
+            # Pad with -1 i.e. invalid agent index
+            padded_indices = np.full(max_cont_agents, -1, dtype=np.int32)
+            padded_indices[:len(sorted_agent_indices)] = sorted_agent_indices
+            sorted_agent_indices = padded_indices
+
         # Store agent indices
         agents_id[w] = sorted_agent_indices
         
         # Process each agent for this world
         for i, a in enumerate(sorted_agent_indices):
+            if a == -1:
+                break
             agent_type = raw_agent_types[w][a] if isinstance(raw_agent_types, list) else raw_agent_types[w, a]
             valid = log_trajectory.valids[w, a, init_steps]
             
@@ -348,8 +354,8 @@ def process_scenario_data(
     
     # Process all agents across all worlds in a vectorized way
     agents_history, agents_future, agents_interested, agents_type, agents_id = process_agents_vectorized(
-        num_worlds, max_controlled_agents, init_steps, 
-        global_agent_obs, log_trajectory, metadata, raw_agent_types
+        num_worlds, max_controlled_agents, init_steps, global_agent_obs, 
+        log_trajectory, metadata, raw_agent_types, controlled_agent_mask
     )
     
     # Initialize output tensors with batch dimension
