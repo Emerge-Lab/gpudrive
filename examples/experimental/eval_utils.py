@@ -528,4 +528,30 @@ def compute_metrics(policy_metrics,policy_live_masks,controlled_per_scene):
             policy_metrics[policy_name]['frac_goal_achieved'] = policy_metrics[policy_name]['goal_achieved_count'] / controlled_per_scene
           
 
-    return policy_metrics
+    return policy_metrics#
+
+
+def create_data_table(data):
+    # Extract unique policies
+    policies = sorted(set(policy for pair in data.keys() for policy in pair))
+
+    # Create empty DataFrames
+    collisions_table = pd.DataFrame(index=policies, columns=policies)
+    off_roads_table = pd.DataFrame(index=policies, columns=policies)
+    goal_achieved_table = pd.DataFrame(index=policies, columns=policies)
+
+    # Populate DataFrames
+    for (p1, p2), metrics in data.items():
+        collisions_table.loc[p1, p2] = metrics['frac_collided'].item()
+        off_roads_table.loc[p1, p2] = metrics['frac_off_road'].item()
+        goal_achieved_table.loc[p1, p2] = metrics['frac_goal_achieved'].item()
+
+    # Print Tables
+    print("Average Collisions Table:")
+    print(collisions_table, "\n")
+
+    print("Average Off Roads Table:")
+    print(off_roads_table, "\n")
+
+    print("Average Goal Achieved Table:")
+    print(goal_achieved_table, "\n")
