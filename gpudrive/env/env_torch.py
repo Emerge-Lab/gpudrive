@@ -707,6 +707,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ego_vbd_trajectories[out_idx] = transformed_traj.reshape(-1)
                     out_idx += 1
                     
+            if self.config.norm_obs:
+                traj_len = self.vbd_trajectories.shape[2]
+                ego_vbd_trajectories = self._normalize_vbd_obs(ego_vbd_trajectories, traj_len)
+
             return ego_vbd_trajectories
         
         else:
@@ -759,29 +763,60 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     # Flatten and add to output
                     ego_vbd_trajectories[w, agent_idx] = transformed_traj.reshape(-1)
             
+            if self.config.norm_obs:
+                traj_len = self.vbd_trajectories.shape[2]
+                ego_vbd_trajectories = self._normalize_vbd_obs(ego_vbd_trajectories, traj_len)
+            
             return ego_vbd_trajectories
     
-    # TODO: This is incorrect, need to figure out better norm function 
-    def _normalize_vbd_obs(self):
-        """Normalize VBD trajectory values to be between -1 and 1."""
-        # Normalize x, y coordinates similar to other position normalizations
-        self.vbd_trajectories[:, :, :, 0] = normalize_min_max(
-            tensor=self.vbd_trajectories[:, :, :, 0],
+    def _normalize_vbd_obs(self, trajectories_flat, traj_len):
+        """
+        Normalize flattened VBD trajectory values to be between -1 and 1, with clipping.
+        
+        Args:
+            trajectories_flat: Flattened tensor containing trajectory data
+            traj_len: Number of trajectory steps
+            
+        Returns:
+            Normalized flattened trajectories tensor
+        """
+        # Get original shape for proper reshaping
+        original_shape = trajectories_flat.shape
+        
+        # Calculate feature dimension
+        feature_dim = 5  # x, y, yaw, vel_x, vel_y
+        
+        # Reshape to separate the features
+        if len(original_shape) == 2:  # (num_agents, flattened_features)
+            traj_features = trajectories_flat.reshape(-1, traj_len, feature_dim)
+        else:  # (num_worlds, max_agents, flattened_features)
+            traj_features = trajectories_flat.reshape(original_shape[0], original_shape[1], traj_len, feature_dim)
+        
+        # Normalize each feature
+        # x, y positions
+        traj_features[..., 0] = normalize_min_max(
+            tensor=traj_features[..., 0],
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
-        self.vbd_trajectories[:, :, :, 1] = normalize_min_max(
-            tensor=self.vbd_trajectories[:, :, :, 1],
+        traj_features[..., 1] = normalize_min_max(
+            tensor=traj_features[..., 1],
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
         
-        # Normalize yaw angle (orientation) similar to other orientation normalizations
-        self.vbd_trajectories[:, :, :, 2] /= constants.MAX_ORIENTATION_RAD
+        # Normalize yaw angle
+        traj_features[..., 2] = traj_features[..., 2] / constants.MAX_ORIENTATION_RAD
         
-        # Normalize velocities similar to other speed normalizations
-        self.vbd_trajectories[:, :, :, 3] /= constants.MAX_SPEED
-        self.vbd_trajectories[:, :, :, 4] /= constants.MAX_SPEED
+        # Normalize velocities
+        traj_features[..., 3] = traj_features[..., 3] / constants.MAX_SPEED
+        traj_features[..., 4] = traj_features[..., 4] / constants.MAX_SPEED
+        
+        # Clip all values to the [-1, 1] range
+        traj_features = torch.clamp(traj_features, min=-1.0, max=1.0)
+        
+        # Reshape back to original format
+        return traj_features.reshape(original_shape)
 
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
