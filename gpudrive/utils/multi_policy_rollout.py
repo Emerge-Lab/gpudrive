@@ -166,7 +166,7 @@ def compute_metrics(policy_metrics,policy_live_masks,controlled_per_scene):
             policy_metrics[policy_name]['frac_goal_achieved'] = policy_metrics[policy_name]['goal_achieved_count'] / controlled_per_scene
           
 
-    return policy_metrics#
+    return policy_metrics
 
 
 def create_data_table(data):
