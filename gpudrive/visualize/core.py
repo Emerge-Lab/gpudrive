@@ -1223,11 +1223,11 @@ class MatplotlibVisualizer:
             )
             if self.render_3d:
                 plot_agent_group_3d(
-                    bboxes_controlled_collided, AGENT_COLOR_BY_STATE["ok"]
+                    bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
                 )
             else:
                 plot_agent_group_2d(
-                    bboxes_controlled_collided, AGENT_COLOR_BY_STATE["ok"]
+                    bboxes_controlled_ok, AGENT_COLOR_BY_STATE["ok"]
                 )
 
         else:
