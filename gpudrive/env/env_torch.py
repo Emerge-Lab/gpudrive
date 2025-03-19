@@ -30,7 +30,7 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.geometry import normalize_min_max
 
 # Versatile Behavior Diffusion model
-from integrations.models.vbd.sim_agent.sim_actor import VBDTest
+from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
