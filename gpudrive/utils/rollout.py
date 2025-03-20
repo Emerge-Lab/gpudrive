@@ -12,7 +12,6 @@ import numpy as np
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.datatypes.observation import GlobalEgoState
 
-
 def rollout(
     env,
     policy,
@@ -20,11 +19,12 @@ def rollout(
     deterministic: bool = False,
     render_sim_state: bool = False,
     render_every_n_steps: int = 1,
-    zoom_radius: int = 100,
     return_agent_positions: bool = False,
-    center_on_ego: bool = False,
+    return_behavior_metrics: bool = False,
     set_agent_type: bool = False,
     agent_weights: torch.Tensor = None,
+    center_on_ego: bool = False,
+    zoom_radius: int = 100,
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -38,13 +38,14 @@ def rollout(
         render_every_n_steps (int): Render every N steps.
         zoom_radius (int): Radius for zoom in visualization.
         return_agent_positions (bool): Whether to return agent positions.
+        return_behavior_metrics (bool): Whether to collect behavioral metrics.
         center_on_ego (bool): Whether to center visualization on ego vehicle.
         set_agent_type (bool): Whether to set agent type during reset.
         agent_weights (torch.Tensor): Agent weights tensor for condition_mode="fixed".
 
     Returns:
         tuple: Averages for goal achieved, collisions, off-road occurrences,
-               controlled agents count, and simulation state frames.
+               controlled agents count, simulation state frames, and (if requested) behavioral metrics.
     """
     # Initialize storage
     sim_state_frames = {env_id: [] for env_id in range(env.num_worlds)}
@@ -54,6 +55,14 @@ def rollout(
     agent_positions = torch.zeros(
         (env.num_worlds, env.max_agent_count, episode_len, 2)
     )
+
+    # Initialize behavioral metrics storage if requested
+    if return_behavior_metrics:
+        situation_responses = {}
+        entropy_values = torch.zeros((num_worlds, max_agent_count, episode_len), device=device)
+        logprob_values = torch.zeros((num_worlds, max_agent_count, episode_len), device=device)
+    else:
+        situation_responses, entropy_values, logprob_values = None, None, None
 
     # Reset episode
     if set_agent_type and agent_weights is not None:
@@ -73,10 +82,9 @@ def rollout(
     live_agent_mask = control_mask.clone()
 
     for time_step in range(episode_len):
-
         # Get actions for active agents
         if live_agent_mask.any():
-            action, _, _, _ = policy(
+            action, logprob, entropy, value = policy(
                 next_obs[live_agent_mask], deterministic=deterministic
             )
 
@@ -86,12 +94,64 @@ def rollout(
             )
             action_template[live_agent_mask] = action.to(device)
 
+            # Store policy outputs if requested
+            if return_behavior_metrics and live_agent_mask.any():
+                # Check if entropy and logprob are scalar or vector
+                is_scalar_entropy = entropy.dim() == 0
+                is_scalar_logprob = logprob.dim() == 0
+                
+                # For each agent, store responses and metrics
+                for world_idx in range(num_worlds):
+                    for agent_idx in range(max_agent_count):
+                        if live_agent_mask[world_idx, agent_idx]:
+                            # Store entropy and logprob values
+                            # If they're scalars, we'll use them directly
+                            # If they're vectors, we need to match them with the right agent
+                            # We'll use a simple counter to track position in the flat action tensor
+                            
+                            # Calculate position in the flattened tensor if needed
+                            mask_before = live_agent_mask[:world_idx].sum() + live_agent_mask[world_idx, :agent_idx].sum()
+                            position = mask_before.item()
+                            
+                            # Store entropy (either scalar value or indexed)
+                            if is_scalar_entropy:
+                                entropy_values[world_idx, agent_idx, time_step] = entropy.item()
+                                current_entropy = entropy.item()
+                            else:
+                                entropy_values[world_idx, agent_idx, time_step] = entropy[position].item()
+                                current_entropy = entropy[position].item()
+                            
+                            # Store logprob (either scalar value or indexed)
+                            if is_scalar_logprob:
+                                logprob_values[world_idx, agent_idx, time_step] = logprob.item()
+                                current_logprob = logprob.item()
+                            else:
+                                logprob_values[world_idx, agent_idx, time_step] = logprob[position].item()
+                                current_logprob = logprob[position].item()
+                            
+                            # Create a simple hash of observation to identify similar situations
+                            obs_flat = next_obs[world_idx, agent_idx].cpu().flatten()
+                            # Use first N elements as a simple way to create situation identifier 
+                            situation_key = tuple(obs_flat[:20].numpy().tolist())
+                            
+                            if situation_key not in situation_responses:
+                                situation_responses[situation_key] = []
+                            
+                            # Store the action as an item (not a tensor) to avoid issues
+                            situation_responses[situation_key].append({
+                                'world_idx': world_idx,
+                                'agent_idx': agent_idx,
+                                'action': action_template[world_idx, agent_idx].item(),
+                                'entropy': current_entropy,
+                                'logprob': current_logprob,
+                                'time_step': time_step
+                            })
+
             # Step the environment
             env.step_dynamics(action_template)
 
             # Render
             if render_sim_state and len(active_worlds) > 0:
-
                 has_live_agent = torch.where(
                     live_agent_mask[active_worlds, :].sum(axis=1) > 0
                 )[0].tolist()
@@ -179,7 +239,8 @@ def rollout(
         not_goal_nor_crash_count / controlled_per_scene
     )
 
-    return (
+    # Prepare return values
+    base_metrics = (
         goal_achieved_count,
         frac_goal_achieved,
         collided_count,
@@ -193,6 +254,18 @@ def rollout(
         agent_positions,
         episode_lengths,
     )
+    
+    # Return behavioral metrics if requested
+    if return_behavior_metrics:
+        behavior_metrics = {
+            'situation_responses': situation_responses,
+            'entropy_values': entropy_values,
+            'logprob_values': logprob_values
+        }
+        return base_metrics + (behavior_metrics,)
+    
+    return base_metrics
+
 
 
 def multi_policy_rollout(
