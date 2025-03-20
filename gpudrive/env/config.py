@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 import torch
 
 import madrona_gpudrive
@@ -99,11 +99,14 @@ class EnvConfig:
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
+    # If condition_mode is "fixed", set the agent weights here
+    agent_type: Optional[Union[str, torch.Tensor]] = None
+
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
     goal_achieved_weight_lb: float = 1.0
-    goal_achieved_weight_ub: float = 2.0
+    goal_achieved_weight_ub: float = 3.0
     off_road_weight_lb: float = -1.0
     off_road_weight_ub: float = 0.0
 

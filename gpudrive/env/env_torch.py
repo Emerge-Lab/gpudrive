@@ -45,18 +45,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
 
-        # Initialize reward weights tensor if using reward_conditioned
+        # Initialize reward weights tensor to None initially
         self.reward_weights_tensor = None
-        if (
-            hasattr(self.config, "reward_type")
-            and self.config.reward_type == "reward_conditioned"
-        ):
-            # Use default condition_mode from config or fall back to "random"
-            condition_mode = getattr(self.config, "condition_mode", "random")
-            agent_type = getattr(self.config, "agent_type", None)
-            self._set_reward_weights(
-                condition_mode=condition_mode, agent_type=agent_type
-            )
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -76,6 +66,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
+
+        # Now initialize reward weights tensor if using reward_conditioned reward type
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use default condition_mode from config or fall back to "random"
+            condition_mode = getattr(self.config, "condition_mode", "random")
+            self.agent_type = getattr(self.config, "agent_type", None)
+            self._set_reward_weights(
+                condition_mode=condition_mode, agent_type=self.agent_type
+            )
 
         # Setup action and observation spaces
         self.observation_space = Box(
@@ -124,12 +126,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
                     If condition_mode is "fixed", should be a tensor of shape [3] with weight values
         """
+        # Initialize the reward weights tensor if it doesn't exist yet
+        # Use the shape from controlled agent mask to ensure consistency
         if self.reward_weights_tensor is None:
             self.reward_weights_tensor = torch.zeros(
-                self.num_worlds,
-                self.max_cont_agents,
+                self.cont_agent_mask.shape[0],  # num_worlds
+                self.cont_agent_mask.shape[1],  # max_agent_count from mask
                 3,  # collision, goal_achieved, off_road
                 device=self.device,
+                dtype=torch.float16,
             )
 
         # Read bounds for the three reward components
@@ -140,6 +145,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.config.off_road_weight_lb,
             ],
             device=self.device,
+            dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
         )
 
         upper_bounds = torch.tensor(
@@ -149,6 +155,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.config.off_road_weight_ub,
             ],
             device=self.device,
+            dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
         )
         bounds_range = upper_bounds - lower_bounds
 
@@ -164,6 +171,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.9,  # Strong off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
             ),
             "aggressive": torch.tensor(
                 [
@@ -175,6 +183,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.6,  # Moderate off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
             ),
             "balanced": torch.tensor(
                 [
@@ -195,6 +204,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     / 2,
                 ],
                 device=self.device,
+                dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
             ),
             "risk_taker": torch.tensor(
                 [
@@ -205,6 +215,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.4,  # Low off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,  # Ensure same dtype as reward_weights_tensor
             ),
         }
 
@@ -215,10 +226,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         env_indices = torch.tensor(env_idx_list, device=self.device)
         num_envs = len(env_indices)
 
+        # Get the max agents dimension from the controlled agent mask
+        max_agents = self.cont_agent_mask.shape[1]
+
         if condition_mode == "random":
             # Traditional random sampling within bounds
             random_values = torch.rand(
-                num_envs, self.max_cont_agents, 3, device=self.device
+                num_envs,
+                max_agents,
+                3,
+                device=self.device,
+                dtype=torch.float16,  # Create directly as float16
             )
             scaled_values = lower_bounds + random_values * bounds_range
 
@@ -234,8 +252,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             scaled_values = (
                 preset_weights.unsqueeze(0)
                 .unsqueeze(0)
-                .expand(num_envs, self.max_cont_agents, 3)
-            )
+                .expand(num_envs, max_agents, 3)
+            )  # Already float16 from agent_presets
 
         elif condition_mode == "fixed":
             # Use custom provided weights
@@ -244,7 +262,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
                 )
 
-            custom_weights = agent_type.to(device=self.device)
+            custom_weights = agent_type.to(
+                device=self.device, dtype=torch.float16
+            )  # Ensure float16
             if custom_weights.shape != (3,):
                 raise ValueError(
                     f"agent_type tensor must have shape [3], got {custom_weights.shape}"
@@ -253,8 +273,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             scaled_values = (
                 custom_weights.unsqueeze(0)
                 .unsqueeze(0)
-                .expand(num_envs, self.max_cont_agents, 3)
-            )
+                .expand(num_envs, max_agents, 3)
+            )  # Already float16 from conversion above
 
         else:
             raise ValueError(f"Unknown condition_mode: {condition_mode}")
@@ -299,8 +319,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if condition_mode is not None
                 else getattr(self.config, "condition_mode", "random")
             )
+            self.agent_type = agent_type
             self._set_reward_weights(
-                env_idx_list, condition_mode=mode, agent_type=agent_type
+                env_idx_list, condition_mode=mode, agent_type=self.agent_type
             )
 
         return self.get_obs(mask)
