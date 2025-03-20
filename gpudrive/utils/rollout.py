@@ -12,6 +12,7 @@ import numpy as np
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.datatypes.observation import GlobalEgoState
 
+
 def rollout(
     env,
     policy,
@@ -59,8 +60,12 @@ def rollout(
     # Initialize behavioral metrics storage if requested
     if return_behavior_metrics:
         situation_responses = {}
-        entropy_values = torch.zeros((num_worlds, max_agent_count, episode_len), device=device)
-        logprob_values = torch.zeros((num_worlds, max_agent_count, episode_len), device=device)
+        entropy_values = torch.zeros(
+            (num_worlds, max_agent_count, episode_len), device=device
+        )
+        logprob_values = torch.zeros(
+            (num_worlds, max_agent_count, episode_len), device=device
+        )
     else:
         situation_responses, entropy_values, logprob_values = None, None, None
 
@@ -99,7 +104,7 @@ def rollout(
                 # Check if entropy and logprob are scalar or vector
                 is_scalar_entropy = entropy.dim() == 0
                 is_scalar_logprob = logprob.dim() == 0
-                
+
                 # For each agent, store responses and metrics
                 for world_idx in range(num_worlds):
                     for agent_idx in range(max_agent_count):
@@ -108,44 +113,63 @@ def rollout(
                             # If they're scalars, we'll use them directly
                             # If they're vectors, we need to match them with the right agent
                             # We'll use a simple counter to track position in the flat action tensor
-                            
+
                             # Calculate position in the flattened tensor if needed
-                            mask_before = live_agent_mask[:world_idx].sum() + live_agent_mask[world_idx, :agent_idx].sum()
+                            mask_before = (
+                                live_agent_mask[:world_idx].sum()
+                                + live_agent_mask[world_idx, :agent_idx].sum()
+                            )
                             position = mask_before.item()
-                            
+
                             # Store entropy (either scalar value or indexed)
                             if is_scalar_entropy:
-                                entropy_values[world_idx, agent_idx, time_step] = entropy.item()
+                                entropy_values[
+                                    world_idx, agent_idx, time_step
+                                ] = entropy.item()
                                 current_entropy = entropy.item()
                             else:
-                                entropy_values[world_idx, agent_idx, time_step] = entropy[position].item()
+                                entropy_values[
+                                    world_idx, agent_idx, time_step
+                                ] = entropy[position].item()
                                 current_entropy = entropy[position].item()
-                            
+
                             # Store logprob (either scalar value or indexed)
                             if is_scalar_logprob:
-                                logprob_values[world_idx, agent_idx, time_step] = logprob.item()
+                                logprob_values[
+                                    world_idx, agent_idx, time_step
+                                ] = logprob.item()
                                 current_logprob = logprob.item()
                             else:
-                                logprob_values[world_idx, agent_idx, time_step] = logprob[position].item()
+                                logprob_values[
+                                    world_idx, agent_idx, time_step
+                                ] = logprob[position].item()
                                 current_logprob = logprob[position].item()
-                            
+
                             # Create a simple hash of observation to identify similar situations
-                            obs_flat = next_obs[world_idx, agent_idx].cpu().flatten()
-                            # Use first N elements as a simple way to create situation identifier 
-                            situation_key = tuple(obs_flat[:20].numpy().tolist())
-                            
+                            obs_flat = (
+                                next_obs[world_idx, agent_idx].cpu().flatten()
+                            )
+                            # Use first N elements as a simple way to create situation identifier
+                            situation_key = tuple(
+                                obs_flat[:20].numpy().tolist()
+                            )
+
                             if situation_key not in situation_responses:
                                 situation_responses[situation_key] = []
-                            
+
                             # Store the action as an item (not a tensor) to avoid issues
-                            situation_responses[situation_key].append({
-                                'world_idx': world_idx,
-                                'agent_idx': agent_idx,
-                                'action': action_template[world_idx, agent_idx].item(),
-                                'entropy': current_entropy,
-                                'logprob': current_logprob,
-                                'time_step': time_step
-                            })
+                            situation_responses[situation_key].append(
+                                {
+                                    "world_idx": world_idx,
+                                    "agent_idx": agent_idx,
+                                    "action": action_template[
+                                        world_idx, agent_idx
+                                    ].item(),
+                                    "entropy": current_entropy,
+                                    "logprob": current_logprob,
+                                    "time_step": time_step,
+                                }
+                            )
 
             # Step the environment
             env.step_dynamics(action_template)
@@ -254,18 +278,17 @@ def rollout(
         agent_positions,
         episode_lengths,
     )
-    
+
     # Return behavioral metrics if requested
     if return_behavior_metrics:
         behavior_metrics = {
-            'situation_responses': situation_responses,
-            'entropy_values': entropy_values,
-            'logprob_values': logprob_values
+            "situation_responses": situation_responses,
+            "entropy_values": entropy_values,
+            "logprob_values": logprob_values,
         }
         return base_metrics + (behavior_metrics,)
-    
-    return base_metrics
 
+    return base_metrics
 
 
 def multi_policy_rollout(

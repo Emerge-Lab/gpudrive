@@ -8,19 +8,31 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  num_worlds: 75 # Number of parallel environments
+  k_unique_scenes: 75 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
+  remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination" 
+  reward_type: "reward_conditioned" #"weighted_combination"
+
+  # If reward_type is "weighted_combination", the following weights are used
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
+
+  # If reward_type is "reward_conditioned", the following parameters are used
+  condition_mode: random
+  collision_weight_lb: -3.0
+  collision_weight_ub: 0.5
+  goal_achieved_weight_lb: 1.0
+  goal_achieved_weight_ub: 3.0
+  off_road_weight_lb: -3.0
+  off_road_weight_ub: 0.0
+
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
   dist_to_goal_threshold: 2.0
@@ -29,10 +41,11 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 13
   action_space_accel_disc: 7
+
 wandb:
   entity: ""
-  project: "gpudrive"
-  group: "test"
+  project: "kshotagents"
+  group: "reward_conditioned"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -46,7 +59,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: true
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
   sample_with_replacement: true
@@ -54,8 +67,8 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 1_000_000_000
-  batch_size: 262_144
+  total_timesteps: 2_000_000_000
+  batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: false
@@ -81,7 +94,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 400 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
