@@ -64,6 +64,12 @@ def collect_rollout_for_agent_type(
         # Extract behavioral metrics from rollout (last element of returned tuple)
         behavior_metrics = rollout_results[-1]
 
+        # Extract goal and collision rates (these are earlier in the returned tuple)
+        goal_achieved_count = rollout_results[0]
+        frac_goal_achieved = rollout_results[1]
+        collided_count = rollout_results[2]
+        frac_collided = rollout_results[3]
+
         # Store data for this rollout
         all_data.append(
             {
@@ -73,6 +79,10 @@ def collect_rollout_for_agent_type(
                 "entropy": behavior_metrics["entropy"],
                 "logprob": behavior_metrics["logprob"],
                 "actions": behavior_metrics["actions"],
+                "goal_achieved_count": goal_achieved_count,
+                "frac_goal_achieved": frac_goal_achieved,
+                "collided_count": collided_count,
+                "frac_collided": frac_collided,
             }
         )
 
@@ -137,6 +147,9 @@ def create_dataframe_from_rollouts(rollout_data):
     """
     rows = []
 
+    # Create a separate dataframe to store aggregated metrics per rollout
+    rollout_metrics = []
+
     # Process each rollout
     for data in rollout_data:
         agent_type = data["agent_type"]
@@ -150,10 +163,33 @@ def create_dataframe_from_rollouts(rollout_data):
             "actions"
         ]  # Shape: [num_envs, max_agents, episode_len, action_dim]
 
+        # Get goal and collision metrics
+        goal_achieved_count = data["goal_achieved_count"]
+        frac_goal_achieved = data["frac_goal_achieved"]
+        collided_count = data["collided_count"]
+        frac_collided = data["frac_collided"]
+
         # Get dimensions
         num_envs = actions.shape[0]
         max_agents = actions.shape[1]
         episode_len = actions.shape[2]
+
+        # Store aggregated metrics for this rollout
+        for env_idx in range(num_envs):
+            rollout_metrics.append(
+                {
+                    "agent_type": agent_type,
+                    "rollout_idx": rollout_idx,
+                    "scenario": env_idx,
+                    "goal_achieved_count": goal_achieved_count[env_idx].item(),
+                    "frac_goal_achieved": frac_goal_achieved[env_idx].item(),
+                    "collided_count": collided_count[env_idx].item(),
+                    "frac_collided": frac_collided[env_idx].item(),
+                    "collision_weight": weights[0],
+                    "goal_weight": weights[1],
+                    "off_road_weight": weights[2],
+                }
+            )
 
         # Create rows for all non-zero entries
         for env_idx in range(num_envs):
@@ -188,8 +224,9 @@ def create_dataframe_from_rollouts(rollout_data):
                     }
                     rows.append(row)
 
-    # Create DataFrame
+    # Create main DataFrame and metrics DataFrame
     df = pd.DataFrame(rows)
+    metrics_df = pd.DataFrame(rollout_metrics)
 
     # Print summary
     print(f"Created DataFrame with {len(df)} rows")
@@ -201,8 +238,18 @@ def create_dataframe_from_rollouts(rollout_data):
     print("\nRows per agent type:")
     print(df.groupby("agent_type").size())
 
+    # Print goal and collision statistics
+    print("\nGoal Achievement Rate by Agent Type:")
+    print(metrics_df.groupby("agent_type")["frac_goal_achieved"].mean())
+
+    print("\nCollision Rate by Agent Type:")
+    print(metrics_df.groupby("agent_type")["frac_collided"].mean())
+
     print("\nSample of DataFrame:")
     print(df.head())
+
+    # Add the metrics to the main dataframe as a separate attribute
+    df.metrics = metrics_df
 
     return df
 
@@ -243,10 +290,7 @@ def compare_agent_types(df):
     )
     results["entropy_stats"] = entropy_by_agent
 
-    # 3. Create a measure of behavior diversity for each agent type
-    # Higher entropy and more diverse action choices indicate more diverse behavior
-
-    # Calculate action diversity based on unique combinations of acceleration and steering
+    # 3. Calculate action diversity based on unique combinations of acceleration and steering
     df["action_combo"] = (
         df["acceleration"].astype(str) + "_" + df["steering"].astype(str)
     )
@@ -256,52 +300,7 @@ def compare_agent_types(df):
         .reset_index()
     )
     action_diversity = df_grouped.groupby("agent_type")["action_combo"].mean()
-
-    # Calculate entropy diversity
-    entropy_diversity = entropy_by_agent["mean"]
-
-    # Combine measures into overall behavior diversity
-    behavior_diversity = pd.DataFrame(
-        {
-            "mean_entropy": entropy_by_agent["mean"],
-            "action_diversity": action_diversity,
-        }
-    )
-
-    # Normalize and combine (handle case where min = max)
-    entropy_range = (
-        behavior_diversity["mean_entropy"].max()
-        - behavior_diversity["mean_entropy"].min()
-    )
-    action_range = (
-        behavior_diversity["action_diversity"].max()
-        - behavior_diversity["action_diversity"].min()
-    )
-
-    if entropy_range > 1e-10:
-        behavior_diversity["norm_entropy"] = (
-            behavior_diversity["mean_entropy"]
-            - behavior_diversity["mean_entropy"].min()
-        ) / entropy_range
-    else:
-        behavior_diversity["norm_entropy"] = 0.5  # Constant value if all equal
-
-    if action_range > 1e-10:
-        behavior_diversity["norm_action_div"] = (
-            behavior_diversity["action_diversity"]
-            - behavior_diversity["action_diversity"].min()
-        ) / action_range
-    else:
-        behavior_diversity[
-            "norm_action_div"
-        ] = 0.5  # Constant value if all equal
-
-    behavior_diversity["overall_diversity"] = (
-        behavior_diversity["norm_entropy"]
-        + behavior_diversity["norm_action_div"]
-    ) / 2
-
-    results["behavior_diversity"] = behavior_diversity
+    results["action_diversity"] = action_diversity
 
     # 4. Calculate additional metrics
     # Average logprob by agent type (measure of confidence)
@@ -314,14 +313,29 @@ def compare_agent_types(df):
     ].mean()
     results["time_series"] = time_series
 
+    # 5. Goal and collision rate analysis
+    try:
+        # Try to load separate metrics file
+        metrics_df = pd.read_csv(
+            "/home/emerge/gpudrive/agent_type_metrics.csv"
+        )
+        goal_rate = metrics_df.groupby("agent_type")[
+            "frac_goal_achieved"
+        ].mean()
+        collision_rate = metrics_df.groupby("agent_type")[
+            "frac_collided"
+        ].mean()
+
+        results["goal_rate"] = goal_rate
+        results["collision_rate"] = collision_rate
+    except Exception as e:
+        print(f"Error loading metrics data: {e}")
+        print("Goal and collision rates won't be included in the results.")
+
     # Print summary of comparison
     print("\n=== Agent Type Comparison ===")
-    print("\nBehavioral Diversity (higher = more diverse):")
-    print(
-        behavior_diversity[
-            ["mean_entropy", "action_diversity", "overall_diversity"]
-        ].sort_values("overall_diversity", ascending=False)
-    )
+    print("\nPolicy Entropy by Agent Type (higher = more uncertain):")
+    print(entropy_by_agent["mean"].sort_values(ascending=False))
 
     print("\nAverage Log Probability (higher = more confident):")
     print(logprob_by_agent)
@@ -343,6 +357,14 @@ def compare_agent_types(df):
         .sort_values(ascending=False)
     )
 
+    # Goal and collision rates
+    if "goal_rate" in results:
+        print("\nAverage Goal Achievement Rate by Agent Type:")
+        print(results["goal_rate"].sort_values(ascending=False))
+
+        print("\nAverage Collision Rate by Agent Type:")
+        print(results["collision_rate"].sort_values(ascending=False))
+
     # Analyze variation across scenarios
     scenario_variation = (
         df.groupby(["agent_type", "scenario"])[["acceleration", "steering"]]
@@ -362,16 +384,16 @@ if __name__ == "__main__":
         "/home/emerge/gpudrive/baselines/ppo/config/ppo_base_puffer"
     )
 
-    num_envs = 20
+    num_envs = 50
     device = "cpu"
-    max_agents = 2
+    max_agents = 64
 
     config.environment.reward_type = "reward_conditioned"
     config.environment.condition_mode = "fixed"
     config.environment.agent_type = torch.Tensor([-0.2, 1.0, -0.2])
 
     agent = load_policy(
-        model_name="model_PPO____R_10000__03_20_17_01_59_614_007000",
+        model_name="rew_conditioned_0321",
         path_to_cpt="/home/emerge/gpudrive/examples/experimental/models",
         env_config=config.environment,
         device=device,
@@ -428,7 +450,9 @@ if __name__ == "__main__":
         "Risk-averse": torch.tensor([-2.0, 0.5, -2.0], device=device),
     }
 
-    print("Collecting rollout data for all agent types...")
+    print(
+        f"Collecting rollout data for all agent types... N = {env.max_cont_agents}"
+    )
 
     # Collect data for all agent types
     all_rollout_data = collect_data_for_agent_types(
@@ -436,12 +460,17 @@ if __name__ == "__main__":
         agent=agent,
         agent_configs=agent_configs,
         device=device,
-        num_rollouts_per_agent=10,  # Number of times we rollout in the same scenes
+        num_rollouts_per_agent=3,  # Number of times we rollout in the same scenes
     )
 
     # Convert to DataFrame for analysis
     df = create_dataframe_from_rollouts(all_rollout_data)
 
+    # Analyze agent types
     comparison_results = compare_agent_types(df)
 
+    # Save the data
     df.to_csv("agent_type_comparison_data.csv", index=False)
+    df.metrics.to_csv("agent_type_metrics.csv", index=False)
+
+    print("\n Analysis done! Data saved to csv file.")
