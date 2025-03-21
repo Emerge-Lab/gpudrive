@@ -89,10 +89,10 @@ def rollout(
     live_agent_mask = control_mask.clone()
 
     for time_step in range(episode_len):
-        
+
         time_mask = torch.zeros(episode_len, dtype=torch.bool, device=device)
         time_mask[time_step] = True
-        
+
         # Get actions for active agents
         if live_agent_mask.any():
             action, logprob, entropy, value = policy(
@@ -106,10 +106,12 @@ def rollout(
             action_template[live_agent_mask] = action.to(device)
 
             if return_behavior_metrics:
-                mask = live_agent_mask.unsqueeze(2) & time_mask.unsqueeze(0).unsqueeze(0)
+                mask = live_agent_mask.unsqueeze(2) & time_mask.unsqueeze(
+                    0
+                ).unsqueeze(0)
                 entropy_values[mask] = entropy
                 logprob_values[mask] = logprob
-    
+
                 action_values = env.action_keys_tensor[action]
                 action_history[mask] = action_values
 
@@ -226,7 +228,7 @@ def rollout(
         behavior_metrics = {
             "entropy": entropy_values,
             "logprob": logprob_values,
-            "actions": action_history
+            "actions": action_history,
         }
         return base_metrics + (behavior_metrics,)
 
