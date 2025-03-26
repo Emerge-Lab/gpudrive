@@ -28,6 +28,7 @@ class EnvConfig:
     ego_state: bool = True  # Include ego vehicle state in observations
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
+    bev_obs: bool = False # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
 
     # Maximum number of controlled agents in the scene
