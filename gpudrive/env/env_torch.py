@@ -1082,8 +1082,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
+        # Base observations
         ego_states = self._get_ego_state(mask)
-        if self.config.bev_obs:
+        partner_observations = self._get_partner_obs(mask)
+        road_map_observations = self._get_road_map_obs(mask)
+
+        # Rasterized observation, see https://github.com/Emerge-Lab/gpudrive/pull/390
+        if self.config.bev_obs: 
             bev_observations = self._get_bev_obs(mask)
             obs = torch.cat(
                 (
@@ -1092,24 +1097,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 dim=-1,
             )
-        else:
-            partner_observations = self._get_partner_obs(mask)
-            road_map_observations = self._get_road_map_obs(mask)
 
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                ),
-                dim=-1,
-            )
-        partner_observations = self._get_partner_obs(mask)
-        road_map_observations = self._get_road_map_obs(mask)
-        lidar_observations = self._get_lidar_obs(mask)
-
-        if self.use_vbd and self.vbd_model is not None and self.config.vbd_in_obs:
-            # Get ego-centric VBD trajectories
+        elif self.use_vbd and self.vbd_model is not None and self.config.vbd_in_obs:
+            # Add ego-centric VBD trajectories
             vbd_observations = self._get_vbd_obs(mask)
             
             obs = torch.cat(
