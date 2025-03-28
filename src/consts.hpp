@@ -45,6 +45,9 @@ inline constexpr float lidarRoadLineOffset = -0.1f;
 inline constexpr float lidarDistance = 200.f;
 inline constexpr float lidarAngle = madrona::math::pi / 3; // The angle between the normal and the lidar ray in the extreme. By default we define a 120 degree view cone.
 
+// Bev observation constants
+inline constexpr int bev_rasterization_resolution = 200;
+
 // Time (seconds) per step
 inline constexpr float deltaT = 0.04f;
 

@@ -10,6 +10,7 @@ from gpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
     LidarObs,
+    BevObs,
 )
 
 from gpudrive.env.config import EnvConfig, RenderConfig
@@ -740,6 +741,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ],
                 dim=-1,
             ).flatten(start_dim=2)
+        
+    def _get_bev_obs(self, mask=None):
+        """Get BEV segmentation map observation.
+
+        Returns:
+            torch.Tensor: (num_worlds, max_agent_count, resolution, resolution, 1)
+        """
+        if not self.config.bev_obs:
+            return torch.Tensor().to(self.device)
+
+        bev = BevObs.from_tensor(
+            bev_tensor=self.sim.bev_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        bev.one_hot_encode_bev_map()
+
+        if mask is not None:
+            return bev.bev_segmentation_map[mask].flatten(start_dim=1)
+        else:
+            return bev.bev_segmentation_map.flatten(start_dim=2)
+        
 
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
@@ -748,18 +771,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
         ego_states = self._get_ego_state(mask)
-        partner_observations = self._get_partner_obs(mask)
-        road_map_observations = self._get_road_map_obs(mask)
-        lidar_observations = self._get_lidar_obs(mask)
+        if self.config.bev_obs:
+            bev_observations = self._get_bev_obs(mask)
+            obs = torch.cat(
+                (
+                    ego_states,
+                    bev_observations,
+                ),
+                dim=-1,
+            )
+        else:
+            partner_observations = self._get_partner_obs(mask)
+            road_map_observations = self._get_road_map_obs(mask)
 
-        obs = torch.cat(
-            (
-                ego_states,
-                partner_observations,
-                road_map_observations,
-            ),
-            dim=-1,
-        )
+            obs = torch.cat(
+                (
+                    ego_states,
+                    partner_observations,
+                    road_map_observations,
+                ),
+                dim=-1,
+            )
 
         return obs
 

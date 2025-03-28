@@ -5,6 +5,7 @@ set(SIMULATOR_SRCS
     level_gen.hpp level_gen.cpp
     obb.hpp
     utils.hpp
+    rasterizer.hpp
     binary_heap.hpp
     knn.hpp
     dynamics.hpp

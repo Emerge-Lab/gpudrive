@@ -23,6 +23,7 @@ enum class ExportID : uint32_t {
     PartnerObservations,
     AgentMapObservations,
     Lidar,
+    BevObservations,
     StepsRemaining,
     BicycleModel,
     MapObservation,

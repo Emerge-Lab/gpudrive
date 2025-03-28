@@ -301,6 +301,20 @@ namespace madrona_gpudrive
     const size_t LidarExportSize = 3 * consts::numLidarSamples * 4;
 
     static_assert(sizeof(Lidar) == sizeof(float) * LidarExportSize);
+
+    struct BevObservation
+    {
+        float type;
+    };
+    struct BevObservations
+    {
+        BevObservation obs[consts::bev_rasterization_resolution][consts::bev_rasterization_resolution];
+    };
+    
+    const size_t BevObservationExportSize = 1;
+
+    static_assert(sizeof(BevObservations) == BevObservationExportSize * sizeof(float) * consts::bev_rasterization_resolution * consts::bev_rasterization_resolution);
+
     // Number of steps remaining in the episode. Allows non-recurrent policies
     // to track the progression of time.
     struct StepsRemaining
@@ -427,6 +441,7 @@ namespace madrona_gpudrive
                                 PartnerObservations,
                                 AgentMapObservations,
                                 Lidar,
+                                BevObservations,
                                 StepsRemaining,
                                 ResponseType,
                                 Trajectory,
