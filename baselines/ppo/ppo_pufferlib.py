@@ -48,7 +48,7 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
-    
+
     if config.continue_training:
         print("Loading checkpoint...")
         # Load checkpoint
@@ -61,14 +61,15 @@ def make_agent(env, config):
             input_dim=saved_cpt["model_arch"]["input_dim"],
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            config=config.environment,
             vbd_in_obs=saved_cpt["model_arch"]["vbd_in_obs"], 
         )
 
         # Load the model parameters
         policy.load_state_dict(saved_cpt["parameters"])
-        
+
         return policy
-        
+
     else:
         # Start from scratch
         return NeuralNet(
@@ -77,7 +78,10 @@ def make_agent(env, config):
             hidden_dim=config.train.network.hidden_dim,
             vbd_in_obs=config.environment.vbd_in_obs,
             dropout=config.train.network.dropout,
+            config=config.environment,
+            vbd_in_obs=saved_cpt["model_arch"]["vbd_in_obs"]
         )
+
 
 def train(args, vecenv):
     """Main training loop for the PPO agent."""
@@ -253,11 +257,11 @@ def run(
     )
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
-    
+
     if config["continue_training"]:
-        cont_train = 'C'
+        cont_train = "C"
     else:
-        cont_train = ''
+        cont_train = ""
 
     if config["train"]["resample_scenes"]:
         if config["train"]["resample_scenes"]:

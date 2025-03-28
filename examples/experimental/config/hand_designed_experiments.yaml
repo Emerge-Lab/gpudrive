@@ -1,15 +1,18 @@
-save_results_path: examples/experimental/eval/visualizations
-train_path: "data/processed/training"
+save_results_path: examples/experiments/dataframes/hand_designed
 
-cpt_path: examples/experimental/eval/models
+data_path_original: data/processed/hand_designed/original
+data_path_altered: data/processed/hand_designed/altered
+
+cpt_path: examples/experiments/models/
 cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
 
-num_worlds: 1
-dataset_size: 3
+num_worlds: 13
+dataset_size: 13
 
-device: cpu
+device: cuda
 deterministic: false
 render_sim_state: true
+zoom_radius: 90
 
 # Environment settings
 max_controlled_agents: 64 

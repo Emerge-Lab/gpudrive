@@ -35,7 +35,7 @@ class PufferGPUDrive(PufferEnv):
         loader_sample_with_replacement=True,
         loader_shuffle=False,
         device=None,
-        num_worlds=128,
+        num_worlds=64,
         max_controlled_agents=64,
         dynamics_model="classic",
         action_space_steer_disc=13,
@@ -45,6 +45,7 @@ class PufferGPUDrive(PufferEnv):
         partner_obs=True,
         norm_obs=True,
         lidar_obs=False,
+        bev_obs=False,
         reward_type="weighted_combination",
         collision_behavior="ignore",
         collision_weight=-0.5,
@@ -64,6 +65,7 @@ class PufferGPUDrive(PufferEnv):
         render_agent_obs=False,
         render_format="mp4",
         render_fps=15,
+        zoom_radius=50,
         buf=None,
         **kwargs,
     ):
@@ -94,6 +96,7 @@ class PufferGPUDrive(PufferEnv):
         self.render_agent_obs = render_agent_obs
         self.render_format = render_format
         self.render_fps = render_fps
+        self.zoom_radius = zoom_radius
 
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
@@ -109,6 +112,7 @@ class PufferGPUDrive(PufferEnv):
             partner_obs=partner_obs,
             reward_type=reward_type,
             norm_obs=norm_obs,
+            bev_obs=bev_obs,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
             dist_to_goal_threshold=dist_to_goal_threshold,
@@ -350,7 +354,6 @@ class PufferGPUDrive(PufferEnv):
                         "total_controlled_agents": self.num_agents,
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
-                        "num_truncated": num_truncated,
                         "perc_truncated": num_truncated / num_finished_agents,
                         "num_completed_episodes": len(done_worlds),
                         "total_collisions": total_collisions.item(),
@@ -363,7 +366,7 @@ class PufferGPUDrive(PufferEnv):
             self.last_obs = self.env.get_obs(self.controlled_agent_mask)
 
             # Asynchronously reset the done worlds and empty storage
-            self.env.sim.reset(done_worlds_cpu)
+            self.env.reset(env_idx_list=done_worlds_cpu)
             self.episode_returns[done_worlds] = 0
             self.agent_episode_returns[done_worlds, :] = 0
             self.episode_lengths[done_worlds, :] = 0
@@ -419,7 +422,7 @@ class PufferGPUDrive(PufferEnv):
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
-                zoom_radius=50,
+                zoom_radius=self.zoom_radius,
             )
             
             for idx, render_env_idx in enumerate(envs_to_render):

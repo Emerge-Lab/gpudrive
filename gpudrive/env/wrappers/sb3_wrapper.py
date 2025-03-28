@@ -1,5 +1,6 @@
 """Vectorized environment wrapper for multi-agent environments."""
 import logging
+import wandb
 from typing import Optional, Sequence
 import torch
 import os
@@ -13,6 +14,8 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.config import RenderConfig
+from gpudrive.visualize.utils import img_from_fig
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,7 +35,36 @@ class SB3MultiAgentEnv(VecEnv):
         max_cont_agents,
         device,
         render_mode="rgb_array",
+        collision_weight=-.5,
+        goal_achieved_weight=1,
+        off_road_weight=-.5,        
+        log_distance_weight=.01,
+        render = False,
+        render_3d=True,
+        render_interval=2,
+        render_k_scenarios=2,
+        render_agent_obs=False,
+        render_format="mp4",
+        render_fps=15,
+        zoom_radius=50,
+        wandb_obj=None,
     ):
+        #for rendering
+        self.wandb_obj = wandb_obj
+        self.render = render
+        if self.render:
+            assert self.wandb_obj != None
+        self.render_interval = render_interval
+        self.render_k_scenarios = render_k_scenarios
+        self.render_agent_obs = render_agent_obs
+        self.render_format = render_format
+        self.render_fps = render_fps
+        self.zoom_radius = zoom_radius
+        self.iters = 0
+
+        render_config = RenderConfig(
+            render_3d=render_3d,
+        )
 
         data_loader = SceneDataLoader(
             root=exp_config.data_dir,
@@ -44,6 +76,7 @@ class SB3MultiAgentEnv(VecEnv):
 
         self._env = GPUDriveTorchEnv(
             config=config,
+            render_config=render_config,
             data_loader=data_loader,
             max_cont_agents=max_cont_agents,
             device=device,
@@ -65,6 +98,7 @@ class SB3MultiAgentEnv(VecEnv):
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, self._env.observation_space.shape, np.float32
         )
+
         self.obs_dim = self._env.observation_space.shape[-1]
         self.info_dim = 5
         self.render_mode = render_mode
@@ -88,6 +122,20 @@ class SB3MultiAgentEnv(VecEnv):
 
         self.num_episodes = 0
 
+        self.collision_weight = collision_weight
+        self.goal_achieved_weight = goal_achieved_weight
+        self.off_road_weight = off_road_weight
+        self.log_distance_weight = log_distance_weight
+
+        # Setup rendering storage
+        self.rendering_in_progress = {
+            env_idx: False for env_idx in range(render_k_scenarios)
+        }
+        self.was_rendered_in_rollout = {
+            env_idx: True for env_idx in range(render_k_scenarios)
+        }
+        self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
+
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
         self._seeds = None
@@ -100,7 +148,7 @@ class SB3MultiAgentEnv(VecEnv):
             torch.Tensor (max_agent_count * num_worlds, obs_dim):
                 Initial observation.
         """
-
+        self.episode_lengths = torch.zeros(self.num_envs, dtype=torch.int32)
         if world_idx is None:
             self._env.reset()
             obs = self._env.get_obs()
@@ -143,7 +191,10 @@ class SB3MultiAgentEnv(VecEnv):
         # Step the environment
         self._env.step_dynamics(self.actions_tensor)
 
-        reward = self._env.get_rewards().clone()
+        reward = self._env.get_rewards(collision_weight=self.collision_weight,
+                                       goal_achieved_weight=self.goal_achieved_weight,
+                                       off_road_weight=self.off_road_weight,
+                                       log_distance_weight=self.log_distance_weight).clone()
         done = self._env.get_dones().clone()
         info = self._env.sim.info_tensor().to_torch()
 
@@ -152,12 +203,18 @@ class SB3MultiAgentEnv(VecEnv):
             (done.nan_to_num(0) * self.controlled_agent_mask).sum(dim=1)
             == self.controlled_agent_mask.sum(dim=1)
         )[0]
-
+        self.render_env() if self.render else None
         if len(done_worlds) > 0:
+            if self.render:
+                for render_env_idx in range(self.render_k_scenarios):
+                    self.log_video_to_wandb(render_env_idx, done_worlds)
             self._update_info_dict(info, done_worlds)
             self.num_episodes += len(done_worlds)
             self._env.sim.reset(done_worlds.tolist())
-
+            self.episode_lengths[done_worlds] = -1
+        
+        if self.render:
+            self.episode_lengths += 1
         # Override nan placeholders for alive agents
         self.buf_rews[self.dead_agent_mask] = torch.nan
         self.buf_rews[~self.dead_agent_mask] = reward[~self.dead_agent_mask]
@@ -287,3 +344,67 @@ class SB3MultiAgentEnv(VecEnv):
     def get_images(self, policy=None) -> Sequence[Optional[np.ndarray]]:
         frames = [self._env.render()]
         return frames
+    
+    def render_env(self):
+        """Render the environment based on conditions.
+        - If the episode has just started, start a new rendering.
+        - If the episode is in progress, continue rendering.
+        - If the episode has ended, log the video to WandB.
+        - Only render env once per rollout
+        """
+        for render_env_idx in range(self.render_k_scenarios):
+            # Start a new rendering if the episode has just started
+            if (self.iters - 1)  % self.render_interval == 0:
+                if (
+                    self.episode_lengths[render_env_idx] == 0
+                    and not self.was_rendered_in_rollout[render_env_idx]
+                ):
+                    self.rendering_in_progress[render_env_idx] = True
+
+        envs_to_render = list(
+            np.where(np.array(list(self.rendering_in_progress.values())))[
+                0
+            ]
+        )
+        time_steps = list(self.episode_lengths[envs_to_render])
+        
+        if len(envs_to_render) > 0:
+            sim_state_figures = self._env.vis.plot_simulator_state(
+                env_indices=envs_to_render,
+                time_steps=time_steps,
+                zoom_radius=self.zoom_radius,
+            )
+            
+            for idx, render_env_idx in enumerate(envs_to_render):
+                self.frames[render_env_idx].append(
+                    img_from_fig(sim_state_figures[idx])
+                    )
+    
+    def clear_render_storage(self):
+        """Clear rendering storage."""
+        for env_idx in range(self.render_k_scenarios):
+            self.frames[env_idx] = []
+            self.rendering_in_progress[env_idx] = False
+            self.was_rendered_in_rollout[env_idx] = False
+
+    def log_video_to_wandb(self, render_env_idx, done_worlds):
+        """Log arrays as videos to wandb."""
+        if (
+            render_env_idx in done_worlds
+            and len(self.frames[render_env_idx]) > 0
+        ):
+            frames_array = np.array(self.frames[render_env_idx])
+            self.wandb_obj.log(
+                {
+                    f"vis/state/env_{render_env_idx}": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),
+                        fps=self.render_fps,
+                        format=self.render_format,
+                    )
+                }
+            )
+                
+            # Reset rendering storage
+            self.frames[render_env_idx] = []
+            self.rendering_in_progress[render_env_idx] = False
+            self.was_rendered_in_rollout[render_env_idx] = True

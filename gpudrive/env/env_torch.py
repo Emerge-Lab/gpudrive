@@ -14,6 +14,7 @@ from gpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
     LidarObs,
+    BevObs,
 )
 
 from gpudrive.env import constants
@@ -57,6 +58,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
         self.world_time_steps = torch.zeros(self.num_worlds, dtype=torch.short, device=self.device)
 
+        # Initialize reward weights tensor if using reward_conditioned
+        self.reward_weights_tensor = None
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use default condition_mode from config or fall back to "random"
+            condition_mode = getattr(self.config, "condition_mode", "random")
+            agent_type = getattr(self.config, "agent_type", None)
+            self._set_reward_weights(
+                condition_mode=condition_mode, agent_type=agent_type
+            )
+
         # Environment parameter setup
         params = self._setup_environment_parameters()
 
@@ -92,9 +106,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Setup action and observation spaces
         self.observation_space = Box(
-            low=-1.0, high=1.0, shape=(self.get_obs(self.cont_agent_mask).shape[-1],)
+            low=-1.0,
+            high=1.0,
+            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
         )
-     
+
         self.single_observation_space = gymnasium.spaces.Box(
             low=-1.0,
             high=1.0,
@@ -104,7 +120,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
-        
+
         self.num_agents = self.cont_agent_mask.sum().item()
 
         # Rendering setup
@@ -179,9 +195,201 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
         return sample_batch
 
-    def reset(self, mask=None):
-        """Reset the worlds and return the initial observations."""
-        self.sim.reset(list(range(self.num_worlds)))
+    def _set_reward_weights(
+        self, env_idx_list=None, condition_mode="random", agent_type=None
+    ):
+        """Set agent reward weights for all or specific environments.
+
+        Args:
+            env_idx_list: List of environment indices to generate new weights for.
+                        If None, all environments are updated.
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use if condition_mode is "preset" or "fixed"
+                    If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
+                    If condition_mode is "fixed", should be a tensor of shape [3] with weight values
+        """
+        if self.reward_weights_tensor is None:
+            self.reward_weights_tensor = torch.zeros(
+                self.num_worlds,
+                self.max_cont_agents,
+                3,  # collision, goal_achieved, off_road
+                device=self.device,
+            )
+
+        # Read bounds for the three reward components
+        lower_bounds = torch.tensor(
+            [
+                self.config.collision_weight_lb,
+                self.config.goal_achieved_weight_lb,
+                self.config.off_road_weight_lb,
+            ],
+            device=self.device,
+        )
+
+        upper_bounds = torch.tensor(
+            [
+                self.config.collision_weight_ub,
+                self.config.goal_achieved_weight_ub,
+                self.config.off_road_weight_ub,
+            ],
+            device=self.device,
+        )
+        bounds_range = upper_bounds - lower_bounds
+
+        # Preset agent personality types
+        agent_presets = {
+            "cautious": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.9,  # Strong collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.7,  # Moderate goal reward
+                    self.config.off_road_weight_lb
+                    * 0.9,  # Strong off-road penalty
+                ],
+                device=self.device,
+            ),
+            "aggressive": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.5,  # Lower collision penalty
+                    self.config.goal_achieved_weight_ub
+                    * 0.9,  # Higher goal reward
+                    self.config.off_road_weight_lb
+                    * 0.6,  # Moderate off-road penalty
+                ],
+                device=self.device,
+            ),
+            "balanced": torch.tensor(
+                [
+                    (
+                        self.config.collision_weight_lb
+                        + self.config.collision_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.goal_achieved_weight_lb
+                        + self.config.goal_achieved_weight_ub
+                    )
+                    / 2,
+                    (
+                        self.config.off_road_weight_lb
+                        + self.config.off_road_weight_ub
+                    )
+                    / 2,
+                ],
+                device=self.device,
+            ),
+            "risk_taker": torch.tensor(
+                [
+                    self.config.collision_weight_lb
+                    * 0.3,  # Minimal collision penalty
+                    self.config.goal_achieved_weight_ub,  # Maximum goal reward
+                    self.config.off_road_weight_lb
+                    * 0.4,  # Low off-road penalty
+                ],
+                device=self.device,
+            ),
+        }
+
+        # Determine which environments to update
+        if env_idx_list is None:
+            env_idx_list = list(range(self.num_worlds))
+
+        env_indices = torch.tensor(env_idx_list, device=self.device)
+        num_envs = len(env_indices)
+
+        if condition_mode == "random":
+            # Traditional random sampling within bounds
+            random_values = torch.rand(
+                num_envs, self.max_cont_agents, 3, device=self.device
+            )
+            scaled_values = lower_bounds + random_values * bounds_range
+
+        elif condition_mode == "preset":
+            # Use a predefined agent type
+            if agent_type not in agent_presets:
+                raise ValueError(
+                    f"Unknown agent_type: {agent_type}. Available types: {list(agent_presets.keys())}"
+                )
+
+            # Create a tensor with the preset weights for all agents in the specified environments
+            preset_weights = agent_presets[agent_type]
+            scaled_values = (
+                preset_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        elif condition_mode == "fixed":
+            # Use custom provided weights
+            if agent_type is None or not isinstance(agent_type, torch.Tensor):
+                raise ValueError(
+                    "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
+                )
+
+            custom_weights = agent_type.to(device=self.device)
+            if custom_weights.shape != (3,):
+                raise ValueError(
+                    f"agent_type tensor must have shape [3], got {custom_weights.shape}"
+                )
+
+            scaled_values = (
+                custom_weights.unsqueeze(0)
+                .unsqueeze(0)
+                .expand(num_envs, self.max_cont_agents, 3)
+            )
+
+        else:
+            raise ValueError(f"Unknown condition_mode: {condition_mode}")
+
+        # Update the weights tensor for the specified environments
+        self.reward_weights_tensor[env_indices.cpu()] = scaled_values
+
+        return self.reward_weights_tensor
+
+    def reset(
+        self,
+        mask=None,
+        env_idx_list=None,
+        condition_mode=None,
+        agent_type=None,
+    ):
+        """Reset the worlds and return the initial observations.
+
+        Args:
+            mask: Optional mask indicating which agents to return observations for
+            env_idx_list: Optional list of environment indices to reset
+            condition_mode: Determines how reward weights are sampled:
+                        - "random": Random sampling within bounds (default for training)
+                        - "fixed": Use predefined agent_type weights (for testing)
+                        - "preset": Use a specific preset from agent_type parameter
+            agent_type: Specifies which preset weights to use or custom weights
+        """
+        if env_idx_list is not None:
+            self.sim.reset(env_idx_list)
+        else:
+            env_idx_list = list(range(self.num_worlds))
+            self.sim.reset(env_idx_list)
+
+        # Re-initialize reward weights if using reward_conditioned
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use the specified condition_mode or default to the config setting
+            mode = (
+                condition_mode
+                if condition_mode is not None
+                else getattr(self.config, "condition_mode", "random")
+            )
+            self._set_reward_weights(
+                env_idx_list, condition_mode=mode, agent_type=agent_type
+            )
+
         self.world_time_steps.zero_()
 
         # Advance the simulator with log playback if warmup steps are provided
@@ -225,24 +433,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         The importance of each component is determined by the weights.
         """
-        
+
+        # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
-        
-        # True if the agents bounding box touches a road edge
         off_road = info_tensor[:, :, 0].to(torch.float)
 
-        # True if the vehicle is in collision with another agent, such as 
-        # a vehicle, cyclist, or pedestrian
+        # True if the vehicle is in collision with another road object
+        # (i.e. a cyclist or pedestrian)
         collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-        
-        # True if the agent is within dist_to_goal_threshold
         goal_achieved = info_tensor[:, :, 3].to(torch.float)
-        
+
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
         elif self.config.reward_type == "weighted_combination":
-    
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
@@ -251,6 +455,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
         
+        elif self.config.reward_type == "reward_conditioned":
+            # Extract individual weight components from the tensor
+            # Shape: [num_worlds, max_agents, 3]
+            if self.reward_weights_tensor is None:
+                self._set_reward_weights()
+
+            # Apply the weights in a vectorized manner
+            # Each index in dimension 2 corresponds to a specific weight:
+            # 0: collision, 1: goal_achieved, 2: off_road
+            weighted_rewards = (
+                self.reward_weights_tensor[:, :, 0] * collided
+                + self.reward_weights_tensor[:, :, 1] * goal_achieved
+                + self.reward_weights_tensor[:, :, 2] * off_road
+            )
+
+            return weighted_rewards
+
         elif self.config.reward_type == "distance_to_vdb_trajs":
             # Reward based on distance to VBD predicted trajectories
             # (i.e. the deviation from the predicted trajectory)
@@ -480,7 +701,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
-        
+
         if not self.config.ego_state:
             return torch.Tensor().to(self.device)
 
@@ -494,8 +715,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            return (
-                torch.stack(
+            if self.config.reward_type == "reward_conditioned":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        self.reward_weights_tensor[:, :, 0],
+                        self.reward_weights_tensor[:, :, 1],
+                        self.reward_weights_tensor[:, :, 2],
+                    ]
+                ).permute(1, 2, 0)
+
+            else:
+                return torch.stack(
                     [
                         ego_state.speed,
                         ego_state.vehicle_length,
@@ -504,12 +740,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
                     ]
-                )
-                .permute(1, 2, 0)
-            )
-        else: 
-            return (
-                torch.stack(
+                ).permute(1, 2, 0)
+
+        else:
+            if self.config.reward_type == "reward_conditioned":
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        self.reward_weights_tensor[mask][:, 0],
+                        self.reward_weights_tensor[mask][:, 1],
+                        self.reward_weights_tensor[mask][:, 2],
+                    ]
+                ).permute(1, 0)
+            else:
+                return torch.stack(
                     [
                         ego_state.speed,
                         ego_state.vehicle_length,
@@ -518,13 +767,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
                     ]
-                )
-                .permute(1, 0)
-            )
+                ).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
-        
+
         if not self.config.partner_obs:
             return torch.Tensor().to(self.device)
 
@@ -537,24 +784,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if self.config.norm_obs:
             partner_obs.normalize()
-            
-        if mask is not None: 
+
+        if mask is not None:
             return partner_obs.data.flatten(start_dim=1)
         else:
-            return (
-                torch.concat(
-                    [
-                        partner_obs.speed,
-                        partner_obs.rel_pos_x,
-                        partner_obs.rel_pos_y,
-                        partner_obs.orientation,
-                        partner_obs.vehicle_length,
-                        partner_obs.vehicle_width,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.concat(
+                [
+                    partner_obs.speed,
+                    partner_obs.rel_pos_x,
+                    partner_obs.rel_pos_y,
+                    partner_obs.orientation,
+                    partner_obs.vehicle_length,
+                    partner_obs.vehicle_width,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
 
     def _get_road_map_obs(self, mask=None):
         """Get road map observations."""
@@ -581,25 +825,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 dim=-1,
             ).flatten(start_dim=1)
         else:
-            return (
-                torch.cat(
-                    [
-                        roadgraph.x.unsqueeze(-1),
-                        roadgraph.y.unsqueeze(-1),
-                        roadgraph.segment_length.unsqueeze(-1),
-                        roadgraph.segment_width.unsqueeze(-1),
-                        roadgraph.segment_height.unsqueeze(-1),
-                        roadgraph.orientation.unsqueeze(-1),
-                        roadgraph.type,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.cat(
+                [
+                    roadgraph.x.unsqueeze(-1),
+                    roadgraph.y.unsqueeze(-1),
+                    roadgraph.segment_length.unsqueeze(-1),
+                    roadgraph.segment_width.unsqueeze(-1),
+                    roadgraph.segment_height.unsqueeze(-1),
+                    roadgraph.orientation.unsqueeze(-1),
+                    roadgraph.type,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
 
     def _get_lidar_obs(self, mask=None):
         """Get lidar observations."""
-        
+
         if not self.config.lidar_obs:
             return torch.Tensor().to(self.device)
 
@@ -616,17 +857,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 lidar.road_line_samples[mask],
             ]
         else:
-            return (
-                torch.cat(
-                    [
-                        lidar.agent_samples,
-                        lidar.road_edge_samples,
-                        lidar.road_line_samples,
-                    ],
-                    dim=-1,
-                )
-                .flatten(start_dim=2)
-            )
+            return torch.cat(
+                [
+                    lidar.agent_samples,
+                    lidar.road_edge_samples,
+                    lidar.road_line_samples,
+                ],
+                dim=-1,
+            ).flatten(start_dim=2)
+        
+    def _get_bev_obs(self, mask=None):
+        """Get BEV segmentation map observation.
+
+        Returns:
+            torch.Tensor: (num_worlds, max_agent_count, resolution, resolution, 1)
+        """
+        if not self.config.bev_obs:
+            return torch.Tensor().to(self.device)
+
+        bev = BevObs.from_tensor(
+            bev_tensor=self.sim.bev_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
+        bev.one_hot_encode_bev_map()
+
+        if mask is not None:
+            return bev.bev_segmentation_map[mask].flatten(start_dim=1)
+        else:
+            return bev.bev_segmentation_map.flatten(start_dim=2)
+        
         
     def _get_vbd_obs(self, mask=None):
         """
@@ -823,6 +1083,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
         ego_states = self._get_ego_state(mask)
+        if self.config.bev_obs:
+            bev_observations = self._get_bev_obs(mask)
+            obs = torch.cat(
+                (
+                    ego_states,
+                    bev_observations,
+                ),
+                dim=-1,
+            )
+        else:
+            partner_observations = self._get_partner_obs(mask)
+            road_map_observations = self._get_road_map_obs(mask)
+
+            obs = torch.cat(
+                (
+                    ego_states,
+                    partner_observations,
+                    road_map_observations,
+                ),
+                dim=-1,
+            )
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
         lidar_observations = self._get_lidar_obs(mask)
@@ -1066,7 +1347,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_env_filenames(self):
         """Obtain the tfrecord filename for each world, mapping world indices to map names."""
-        
+
         map_name_integers = self.sim.map_name_tensor().to_torch()
         filenames = {}
         # Iterate through the number of worlds
@@ -1077,6 +1358,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             filenames[i] = map_name
 
         return filenames
+
+    def get_scenario_ids(self):
+        """Obtain the scenario ID for each world."""
+        scenario_id_integers = self.sim.scenario_id_tensor().to_torch()
+        scenario_ids = {}
+
+        # Iterate through the number of worlds
+        for i in range(self.num_worlds):
+            tensor = scenario_id_integers[i]
+            # Convert ints to characters, ignoring zeros
+            scenario_id = "".join([chr(i) for i in tensor.tolist() if i != 0])
+            scenario_ids[i] = scenario_id
+
+        return scenario_ids
 
 
 if __name__ == "__main__":
@@ -1104,16 +1399,11 @@ if __name__ == "__main__":
         max_cont_agents=32,  # Number of agents to control
         device="cpu",
     )
-    
+
     control_mask = env.cont_agent_mask
 
     # Rollout
     obs = env.reset()
-    
-    obs_masked = env.get_obs(control_mask)
-    
-    obs = env.get_obs()
-
 
     sim_frames = []
     agent_obs_frames = []
@@ -1128,7 +1418,7 @@ if __name__ == "__main__":
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
-        
+
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
             -1
         ].item()
@@ -1146,11 +1436,11 @@ if __name__ == "__main__":
             agent_idx=highlight_agent,
             figsize=(10, 10),
         )
-        
+
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
-        obs = env.get_obs(control_mask)
+        obs = env.get_obs()
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()

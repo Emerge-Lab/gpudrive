@@ -1,7 +1,10 @@
 import torch
 from dataclasses import dataclass
 from gpudrive.env import constants
-from gpudrive.utils.geometry import normalize_min_max, normalize_min_max_inplace
+from gpudrive.utils.geometry import (
+    normalize_min_max,
+    normalize_min_max_inplace,
+)
 import madrona_gpudrive
 
 
@@ -22,7 +25,7 @@ class LocalEgoState:
     """
 
     def __init__(self, self_obs_tensor: torch.Tensor, mask=None):
-        """Initializes the ego state with an observation tensor."""    
+        """Initializes the ego state with an observation tensor."""
         if mask is not None:
             self_obs_tensor = self_obs_tensor[mask]
             self.speed = self_obs_tensor[:, 0]
@@ -42,7 +45,7 @@ class LocalEgoState:
             self.rel_goal_y = self_obs_tensor[:, :, 5]
             self.is_collided = self_obs_tensor[:, :, 6]
             self.id = self_obs_tensor[:, :, 7]
-        
+
     @classmethod
     def from_tensor(
         cls,
@@ -58,17 +61,17 @@ class LocalEgoState:
             tensor = self_obs_tensor.to_torch().clone().to(device)
             obj = cls(tensor, mask=mask)
             return obj
-        
+
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
     def normalize(self):
         """Normalizes the ego state to be between -1 and 1."""
-        self.speed /= (constants.MAX_SPEED)
+        self.speed /= constants.MAX_SPEED
         self.vehicle_length /= constants.MAX_VEH_LEN
         self.vehicle_width /= constants.MAX_VEH_WIDTH
         self.vehicle_height /= constants.MAX_VEH_HEIGHT
-        
+
         self.rel_goal_x = normalize_min_max(
             tensor=self.rel_goal_x,
             min_val=constants.MIN_REL_GOAL_COORD,
@@ -84,8 +87,8 @@ class LocalEgoState:
     def shape(self) -> tuple[int, ...]:
         """Shape (num_worlds, num_agents) of the ego state tensor."""
         return self.speed.shape
-    
-    
+
+
 class GlobalEgoState:
     """A class to represent the ego state of the agent in global coordinates.
     Initialized from absolute_self_observation_tensor (src/bindings). For details, see
@@ -171,7 +174,7 @@ class PartnerObs:
     def __init__(self, partner_obs_tensor: torch.Tensor, mask=None):
         """Initializes the partner observation from a tensor."""
         self.mask = mask
-        if self.mask is not None: # Used for training
+        if self.mask is not None:  # Used for training
             self.data = partner_obs_tensor[self.mask][:, :, :6]
         else:
             self.speed = partner_obs_tensor[:, :, :, 0].unsqueeze(-1)
@@ -180,8 +183,10 @@ class PartnerObs:
             self.orientation = partner_obs_tensor[:, :, :, 3].unsqueeze(-1)
             self.vehicle_length = partner_obs_tensor[:, :, :, 4].unsqueeze(-1)
             self.vehicle_width = partner_obs_tensor[:, :, :, 5].unsqueeze(-1)
-            self.vehicle_height = partner_obs_tensor[:, :, :, 6].unsqueeze(-1)        
-            self.agent_type = partner_obs_tensor[:, :, :, 7].unsqueeze(-1).long()
+            self.vehicle_height = partner_obs_tensor[:, :, :, 6].unsqueeze(-1)
+            self.agent_type = (
+                partner_obs_tensor[:, :, :, 7].unsqueeze(-1).long()
+            )
             self.ids = partner_obs_tensor[:, :, :, 8].unsqueeze(-1)
 
     @classmethod
@@ -196,13 +201,16 @@ class PartnerObs:
         if backend == "torch":
             tensor = partner_obs_tensor.to_torch().clone().to(device)
             obj = cls(tensor, mask=mask)
-            obj.norm = torch.tensor([
-                constants.MAX_ORIENTATION_RAD,
-                constants.MAX_VEH_LEN,
-                constants.MAX_VEH_WIDTH,
-            ], device=device)
+            obj.norm = torch.tensor(
+                [
+                    constants.MAX_ORIENTATION_RAD,
+                    constants.MAX_VEH_LEN,
+                    constants.MAX_VEH_WIDTH,
+                ],
+                device=device,
+            )
             return obj
-    
+
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -236,8 +244,9 @@ class PartnerObs:
             self.orientation = self.orientation / constants.MAX_ORIENTATION_RAD
             self.vehicle_length = self.vehicle_length / constants.MAX_VEH_LEN
             self.vehicle_width = self.vehicle_width / constants.MAX_VEH_WIDTH
-            self.vehicle_height = self.vehicle_height / constants.MAX_VEH_HEIGHT
-            
+            self.vehicle_height = (
+                self.vehicle_height / constants.MAX_VEH_HEIGHT
+            )
 
     def one_hot_encode_agent_types(self):
         """One-hot encodes the agent types. This operation increases the
@@ -246,13 +255,13 @@ class PartnerObs:
         self.agent_type = self.agent_type.squeeze(-1)
         # Map to classes 0-3
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Vehicle)
+            self.agent_type == int(madrona_gpudrive.EntityType.Vehicle)
         ] = 1
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Pedestrian)
+            self.agent_type == int(madrona_gpudrive.EntityType.Pedestrian)
         ] = 2
         self.agent_type[
-            self.agent_type == int(gpudrive.EntityType.Cyclist)
+            self.agent_type == int(madrona_gpudrive.EntityType.Cyclist)
         ] = 3
 
         self.agent_type = torch.nn.functional.one_hot(
@@ -263,6 +272,7 @@ class PartnerObs:
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, num_agents, num_agents-1)."""
         return self.speed.shape
+
 
 @dataclass
 class LidarObs:
@@ -283,8 +293,8 @@ class LidarObs:
 
     @classmethod
     def from_tensor(
-        cls, 
-        lidar_tensor: madrona_gpudrive.madrona.Tensor, 
+        cls,
+        lidar_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
     ):
@@ -297,3 +307,40 @@ class LidarObs:
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, num_agents, 3, num_lidar_points, 4)."""
         return self.all_lidar_samples.shape
+
+
+@dataclass
+class BevObs:
+    """Dataclass representing the scenario view through LiDAR sensors.
+        - Shape: (num_worlds, num_agents, 200, 200, num_classes).
+    Initialized from bev_observation_tensor (src/bindings).
+    For details, see `BevObservation` and `BevObservations` in src/types.hpp.
+    """
+
+    def __init__(self, bev_observation_tensor: torch.Tensor):
+        self.bev_segmentation_map = bev_observation_tensor
+
+    @classmethod
+    def from_tensor(
+        cls,
+        bev_tensor: madrona_gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
+    ):
+        if backend == "torch":
+            return cls(bev_tensor.to_torch().clone().to(device))
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape: (num_worlds, num_agents, resolution, resolution, 1)."""
+        return self.bev_segmentation_map.shape
+    
+    def one_hot_encode_bev_map(self):
+        """One-hot encodes the agent types. This operation increases the
+        number of features by 10.
+        """     
+        self.bev_segmentation_map = torch.nn.functional.one_hot(
+            self.bev_segmentation_map.long(), num_classes=constants.NUM_MADRONA_ENTITY_TYPES # From size of Madrona EntityType
+        )

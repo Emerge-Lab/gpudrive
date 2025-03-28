@@ -5,8 +5,6 @@ import yaml
 from box import Box
 import numpy as np
 import dataclasses
-import os
-from pathlib import Path
 
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
@@ -18,7 +16,6 @@ from gpudrive.networks.late_fusion import NeuralNet
 
 import logging
 import torch
-import random
 
 logging.basicConfig(level=logging.INFO)
 
@@ -100,7 +97,7 @@ def rollout(
     max_agent_count = env.max_agent_count
     episode_len = env.config.episode_len
     agent_positions = torch.zeros((env.num_worlds, env.max_agent_count, episode_len, 2))
-
+    
     # Reset episode
     next_obs = env.reset()
 
@@ -110,22 +107,13 @@ def rollout(
     off_road = torch.zeros((num_worlds, max_agent_count), device=device)
     active_worlds = np.arange(num_worlds).tolist()
     episode_lengths = torch.zeros(num_worlds)
-
-    # Note: Should be done on C++ side, these are bug fixes
-    infos = env.get_infos()  # Initialize the bugged_agent_mask
-    bugged_agent_mask = torch.zeros_like(env.cont_agent_mask, dtype=torch.bool)
-
-    bugged_agent_mask[env.cont_agent_mask] = torch.logical_or(
-        infos.off_road[env.cont_agent_mask],
-        infos.collided[env.cont_agent_mask],
-    )
-
-    controlled_agent_mask = env.cont_agent_mask.clone() & ~bugged_agent_mask
-
-    live_agent_mask = controlled_agent_mask.clone()
+    
+    control_mask = env.cont_agent_mask
+    live_agent_mask = control_mask.clone()
 
     for time_step in range(episode_len):
-        #logging.info(f"Time step: {time_step}")
+        
+        print(f't: {time_step}')
         
         # Get actions for active agents
         if live_agent_mask.any():
@@ -142,7 +130,7 @@ def rollout(
             # Step the environment
             env.step_dynamics(action_template)
 
-            #pdb.set_trace()
+            # Render
             if render_sim_state and len(active_worlds) > 0:
                 
                 has_live_agent = torch.where(
@@ -150,13 +138,8 @@ def rollout(
                 )[0].tolist()
 
                 if time_step % render_every_n_steps == 0:
-
-                    logging.info(f"Rendering time step {time_step}")
-                    #logging.info(f"Rendering worlds: {has_live_agent}")
-                    
                     if center_on_ego:
-                        #import pdb; pdb.set_trace()
-                        agent_indices = torch.argmax(controlled_agent_mask.to(torch.uint8), dim=1).tolist()
+                        agent_indices = torch.argmax(control_mask.to(torch.uint8), dim=1).tolist()
                     else:
                         agent_indices = None
 
@@ -164,7 +147,6 @@ def rollout(
                         env_indices=has_live_agent,
                         time_steps=[time_step] * len(has_live_agent),
                         zoom_radius=zoom_radius,
-                        # agent_positions = agent_positions,
                         center_agent_indices=agent_indices,
                     )
                     for idx, env_id in enumerate(has_live_agent):
@@ -177,13 +159,6 @@ def rollout(
         dones = env.get_dones().bool()
         infos = env.get_infos()
         
-        if return_agent_positions:
-            global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
-            agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
-            agent_positions[:, :, time_step, 1] = global_agent_states.pos_y            
-
-        # Count the collisions, off-road occurrences, and goal achievements
-        # at a given time step for living agents
         off_road[live_agent_mask] += infos.off_road[live_agent_mask]
         collided[live_agent_mask] += infos.collided[live_agent_mask]
         goal_achieved[live_agent_mask] += infos.goal_achieved[live_agent_mask]
@@ -192,8 +167,8 @@ def rollout(
         live_agent_mask[dones] = False
 
         # Process completed worlds
-        num_dones_per_world = (dones & controlled_agent_mask).sum(dim=1)
-        total_controlled_agents = controlled_agent_mask.sum(dim=1)
+        num_dones_per_world = (dones & control_mask).sum(dim=1)
+        total_controlled_agents = control_mask.sum(dim=1)
         done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(
             as_tuple=True
         )[0]
@@ -202,13 +177,18 @@ def rollout(
             if world in active_worlds:
                 active_worlds.remove(world)
                 episode_lengths[world] = time_step
-                logging.debug(f"World {world} done at time step {time_step}")
+
+        if return_agent_positions:
+            global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
+            agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
+            agent_positions[:, :, time_step, 1] = global_agent_states.pos_y            
+
 
         if not active_worlds:  # Exit early if all worlds are done
             break
 
     # Aggregate metrics to obtain averages across scenes
-    controlled_agents_per_scene = controlled_agent_mask.sum(dim=1).float()
+    controlled_per_scene = control_mask.sum(dim=1).float()
    
     # Counts
     goal_achieved_count = (goal_achieved > 0).float().sum(axis=1)
@@ -220,16 +200,16 @@ def rollout(
             collided == 0,  # Didn't collide
             torch.logical_and(
                 off_road == 0,  # Didn't go off-road
-                controlled_agent_mask,  # Only count controlled agents
+                control_mask,  # Only count controlled agents
             ),
         ),
     ).float().sum(dim=1)
     
     # Fractions per scene
-    frac_goal_achieved =  goal_achieved_count / controlled_agents_per_scene
-    frac_collided = collided_count / controlled_agents_per_scene
-    frac_off_road = off_road_count / controlled_agents_per_scene
-    frac_not_goal_nor_crash_per_scene = not_goal_nor_crash_count / controlled_agents_per_scene
+    frac_goal_achieved =  goal_achieved_count / controlled_per_scene
+    frac_collided = collided_count / controlled_per_scene
+    frac_off_road = off_road_count / controlled_per_scene
+    frac_not_goal_nor_crash_per_scene = not_goal_nor_crash_count / controlled_per_scene
 
     return (
         goal_achieved_count,
@@ -240,7 +220,7 @@ def rollout(
         frac_off_road,
         not_goal_nor_crash_count,
         frac_not_goal_nor_crash_per_scene,
-        controlled_agents_per_scene,
+        controlled_per_scene,
         sim_state_frames,
         agent_positions,
         episode_lengths,
@@ -382,3 +362,4 @@ def evaluate_policy(
     df_res["dataset"] = dataset_name
 
     return df_res
+

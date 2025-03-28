@@ -1,18 +1,15 @@
-save_results_path: examples/experiments/eval/dataframes/hand_designed
+save_results_path: examples/experimental/visualizations
+train_path: "data/processed/training"
 
-data_path_original: data/processed/hand_designed/original
-data_path_altered: data/processed/hand_designed/altered
-
-cpt_path: examples/experiments/models/
+cpt_path: examples/experimental/models
 cpt_name: model_PPO__C__R_10000__01_28_20_57_35_873_011426
 
-num_worlds: 13
-dataset_size: 13
+num_worlds: 1
+dataset_size: 3
 
-device: cuda
+device: cpu
 deterministic: false
 render_sim_state: true
-zoom_radius: 90
 
 # Environment settings
 max_controlled_agents: 64 
@@ -23,8 +20,8 @@ norm_obs: true
 remove_non_vehicles: true 
 lidar_obs: false
 reward_type: "weighted_combination"
-collision_weight: -0.5
-off_road_weight: -0.5
+collision_weight: -0.75
+off_road_weight: -0.75
 goal_achieved_weight: 1.0
 dynamics_model: "classic"
 collision_behavior: "ignore" 

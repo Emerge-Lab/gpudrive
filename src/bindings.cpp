@@ -119,6 +119,7 @@ namespace madrona_gpudrive
             .def("agent_roadmap_tensor", &Manager::agentMapObservationsTensor)
             .def("absolute_self_observation_tensor",
                  &Manager::absoluteSelfObservationTensor)
+            .def("bev_observation_tensor", &Manager::bevObservationTensor)
             .def("valid_state_tensor", &Manager::validStateTensor)
             .def("info_tensor", &Manager::infoTensor)
             .def("rgb_tensor", &Manager::rgbTensor)
@@ -142,7 +143,8 @@ namespace madrona_gpudrive
                 self.deleteAgents(agents_to_delete);
             })
             .def("deleted_agents_tensor", &Manager::deletedAgentsTensor)
-            .def("map_name_tensor", &Manager::mapNameTensor);
+            .def("map_name_tensor", &Manager::mapNameTensor)
+            .def("scenario_id_tensor", &Manager::scenarioIdTensor);
     }
 
 }

@@ -62,6 +62,8 @@ namespace madrona_gpudrive
 
         char mapName[32];
 
+        char scenarioId[32];
+
         // Constructor
         Map() = default;
     };
