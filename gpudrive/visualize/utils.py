@@ -14,21 +14,6 @@ from matplotlib.patches import Circle, Polygon, RegularPolygon
 
 from gpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
 
-def bg_img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
-    """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
-    fig.subplots_adjust(
-        left=0.0, bottom=0.0, right=1.0, top=1.0, wspace=0.0, hspace=0.0
-    )
-    fig.canvas.draw()
-
-    # Extract image data
-    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-
-    plt.close(fig)  # Close the figure
-    return img
-
-
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
     # Adjusted margins to better accommodate 3D plots
