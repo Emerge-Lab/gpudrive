@@ -7,7 +7,7 @@ from itertools import product
 import mediapy as media
 import gymnasium
 
-from data_utils.vbd_data import process_scenario_data
+from gpudrive.integrations.vbd.data_utils import process_scenario_data
 
 from gpudrive.datatypes.observation import (
     LocalEgoState,
@@ -251,7 +251,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
         
-        # Question: Currently only penalizing x and y distance, not yaw, vel_x, vel_y.
         elif self.config.reward_type == "distance_to_vdb_trajs":
             # Reward based on distance to VBD predicted trajectories
             # (i.e. the deviation from the predicted trajectory)
@@ -826,9 +825,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-        lidar_observations = self._get_lidar_obs(mask) # Question: Unused Lidar obs?
+        lidar_observations = self._get_lidar_obs(mask)
 
-        if self.use_vbd and self.vbd_model is not None:
+        if self.use_vbd and self.vbd_model is not None and self.config.vbd_in_obs:
             # Get ego-centric VBD trajectories
             vbd_observations = self._get_vbd_obs(mask)
             

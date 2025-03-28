@@ -127,6 +127,7 @@ class EnvConfig:
     use_vbd: bool = False
     vbd_model_path: str = None
     vbd_trajectory_weight = 0.01
+    vbd_in_obs: bool = False
 
 
 class SelectionDiscipline(Enum):

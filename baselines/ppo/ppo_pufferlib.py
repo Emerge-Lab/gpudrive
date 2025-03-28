@@ -172,6 +172,7 @@ def run(
     use_vbd: Annotated[Optional[bool], typer.Option(help="Use VBD model for trajectory predictions")] = False,
     vbd_model_path: Annotated[Optional[str], typer.Option(help="Path to VBD model checkpoint")] = None,
     vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
+    vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in observation")] = False,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -215,6 +216,7 @@ def run(
         "use_vbd": use_vbd,
         "vbd_model_path": vbd_model_path,
         "vbd_trajectory_weight": vbd_trajectory_weight,
+        "vbd_in_obs": vbd_in_obs,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}

@@ -3,10 +3,10 @@ from torch import nn
 from typing import Dict, Tuple
 import numpy as np
 from tqdm import tqdm
-from integrations.models.vbd.model.VBD import VBD
-from integrations.models.vbd.sim_agent.utils import *
-from integrations.models.vbd.model.model_utils import roll_out
-from integrations.models.vbd.sim_agent.guidance_metrics import *
+from gpudrive.integrations.vbd.model.VBD import VBD
+from gpudrive.integrations.vbd.sim_agent.utils import *
+from gpudrive.integrations.vbd.model.model_utils import roll_out
+from gpudrive.integrations.vbd.sim_agent.guidance_metrics import *
 
 
 class VBDTest(VBD):
