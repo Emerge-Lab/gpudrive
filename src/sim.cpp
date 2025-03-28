@@ -7,6 +7,7 @@
 #include "obb.hpp"
 #include "sim.hpp"
 #include "utils.hpp"
+#include "rasterizer.hpp"
 #include "knn.hpp"
 #include "dynamics.hpp"
 
@@ -41,6 +42,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
     registry.registerComponent<Lidar>();
+    registry.registerComponent<BevObservations>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
     registry.registerComponent<VehicleSize>();
@@ -94,6 +96,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::PartnerObservations);
     registry.exportColumn<AgentInterface, Lidar>(
         (uint32_t)ExportID::Lidar);
+    registry.exportColumn<AgentInterface, BevObservations>(
+        (uint32_t)ExportID::BevObservations);
     registry.exportColumn<AgentInterface, StepsRemaining>(
         (uint32_t)ExportID::StepsRemaining);
     registry.exportColumn<AgentInterface, Reward>(
@@ -447,6 +451,101 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 #endif
 }
 
+inline void collectBevObservationsSystem(Engine &ctx,
+                        const Position &pos,
+                        const Rotation &rot,
+                        const OtherAgents &other_agents,
+                        const AgentInterfaceEntity &agent_iface) 
+{
+    if(ctx.data().params.disableClassicalObs)
+        return;
+
+    auto &bev_obs = ctx.get<BevObservations>(agent_iface.e);
+
+    for (size_t i = 0; i < consts::bev_rasterization_resolution; i++)
+    {
+        for (size_t j = 0; j < consts::bev_rasterization_resolution; j++)
+        {
+            bev_obs.obs[i][j].type = 0;
+        }
+    }
+
+    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
+    
+    // Roads
+    CountT roadIdx = 0;
+    CountT arrIndex = 0;
+    while (roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount)
+    {
+        Entity road = ctx.data().roads[roadIdx++];
+        auto roadPos = ctx.get<Position>(road);
+        auto roadRot = ctx.get<Rotation>(road);
+        const MapObservation &map_obs = referenceFrame.observationOf(
+            roadPos, 
+            roadRot, 
+            ctx.get<Scale>(road), 
+            ctx.get<EntityType>(road), 
+            static_cast<float>(ctx.get<RoadMapId>(road).id), 
+            ctx.get<MapType>(road)
+        );        
+        
+        auto dist = referenceFrame.distanceTo(roadPos);
+        if (dist > ctx.data().params.observationRadius)
+            continue;
+
+        madrona::math::Vector2 rel_pos = map_obs.position;
+        float rel_yaw = map_obs.heading;
+        auto new_scale = map_obs.scale;
+        new_scale.d1 = std::max( //Ensure minimum segment width
+            map_obs.scale.d1, 
+            (2 * ctx.data().params.observationRadius / consts::bev_rasterization_resolution)
+        ); 
+
+        rasterizer::rasterizeRotatedRectangle(
+            bev_obs,
+            rel_pos,
+            rel_yaw,
+            new_scale.d0,
+            new_scale.d1,
+            map_obs.type,
+            ctx.data().params.observationRadius,
+            consts::bev_rasterization_resolution
+        );
+        arrIndex++;
+    }
+    
+    // Other agents
+    CountT agentIdx = 0;
+    while (agentIdx < ctx.data().numAgents - 1)
+    {
+        Entity other = other_agents.e[agentIdx++];
+    
+        const Position &other_position = ctx.get<Position>(other);
+        const Rotation &other_rot = ctx.get<Rotation>(other);
+        const VehicleSize &other_size = ctx.get<VehicleSize>(other);
+        const auto type = static_cast<size_t>(ctx.get<EntityType>(other));
+        Vector2 relative_pos = (other_position - pos).xy();
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        Rotation relative_orientation = rot.inv() * other_rot;
+
+        float relative_heading = utils::quatToYaw(relative_orientation);
+
+        if(relative_pos.length() > ctx.data().params.observationRadius)
+            continue;
+    
+        rasterizer::rasterizeRotatedRectangle(
+            bev_obs,
+            relative_pos,
+            relative_heading,
+            other_size.length,
+            other_size.width,
+            type,
+            ctx.data().params.observationRadius,
+            consts::bev_rasterization_resolution
+        );
+    }
+}
+
 // Computes reward for each agent and keeps track of the max distance achieved
 // so far through the challenge. Continuous reward is provided for any new
 // distance achieved.
@@ -769,6 +868,13 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         Rotation,
         AgentInterfaceEntity>>({clear_tmp});
 
+    auto collect_bev_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectBevObservationsSystem,
+        Position,
+        Rotation,
+        OtherAgents,
+        AgentInterfaceEntity>>({clear_tmp});
+
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
                         Rotation, Goal, VehicleSize, AgentInterfaceEntity>>(
@@ -824,6 +930,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     (void)collect_partner_obs;
     (void)collect_map_obs;
     (void)collectAbsoluteSelfObservations;
+    (void)collect_bev_obs;
 #endif
 }
 

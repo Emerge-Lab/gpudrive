@@ -824,6 +824,18 @@ Tensor Manager::lidarTensor() const
                                });
 }
 
+Tensor Manager::bevObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::BevObservations, TensorElementType::Float32,
+                                {
+                                    impl_->numWorlds,
+                                    consts::kMaxAgentCount,
+                                    consts::bev_rasterization_resolution,
+                                    consts::bev_rasterization_resolution,
+                                    BevObservationExportSize,
+                                });
+}
+
 Tensor Manager::stepsRemainingTensor() const
 {
     return impl_->exportTensor(ExportID::StepsRemaining,
