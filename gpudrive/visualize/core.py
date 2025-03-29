@@ -101,7 +101,13 @@ class MatplotlibVisualizer:
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
-        policy_masks: Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
+        policy_masks: Optional[Dict[int, Dict[str, torch.Tensor]]] = None,
+        colorbar: bool = False,
+        multiple_rollouts: bool = False,
+        line_color="#1f77b4",
+        line_alpha: float = 0.3,
+        line_width: float = 1.0,
+        weights: Optional[Dict[str, torch.Tensor]] = None,
     ):
         """
         Plot simulator states for one or multiple environments.
@@ -116,14 +122,14 @@ class MatplotlibVisualizer:
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
             policy_mask: dict
-            A dictionary that maps policies to world and specifies which agents are assigned to each policy. 
+            A dictionary that maps policies to world and specifies which agents are assigned to each policy.
             For now maximum number of policies is 3 as there are only 3 colors in COLOR_AGENT_BY_POLICY
             The structure follows the format: {Policy Name: (Policy Function,mask) }, where:
                 - Policy (str): The policy assigned to agents within the world.
 
                 - Policy Function  (Neural Network): The identifier for the simulation environment.
-                
-                - Mask (torch.Tensor): A boolean or index-based mask indicating which agents follow the given policy, for all worlds. 
+
+                - Mask (torch.Tensor): A boolean or index-based mask indicating which agents follow the given policy, for all worlds.
         """
         if not isinstance(env_indices, list):
             env_indices = [env_indices]  # Ensure env_indices is a list
@@ -141,6 +147,12 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
+
+        self.multi_rollouts = multiple_rollouts
+        self.line_color = line_color
+        self.line_alpha = line_alpha
+        self.line_width = line_width
+        self.weights = weights
 
         if backward_goals:
 
@@ -236,16 +248,15 @@ class MatplotlibVisualizer:
         marker_scale = max(self.figsize) / 15
         line_width_scale = max(self.figsize) / 15
 
-
         if policy_masks:
 
             world_based_policy_mask = {}
-            
-            for policy_name, (fn,mask) in policy_masks.items():
+
+            for policy_name, (fn, mask) in policy_masks.items():
                 for world in range(mask.shape[0]):
                     if world not in world_based_policy_mask:
                         world_based_policy_mask[world] = {}
-                    world_based_policy_mask[world][policy_name] = mask[world]                   
+                    world_based_policy_mask[world][policy_name] = mask[world]
 
         else:
             world_based_policy_mask = None
@@ -315,122 +326,21 @@ class MatplotlibVisualizer:
             )
 
             if agent_positions is not None:
-                # First calculate the maximum valid trajectory length across all agents for this env_idx
-                max_valid_length = 0
-                for agent_idx in range(agent_positions.shape[1]):
-                    if controlled_live[agent_idx]:
-                        trajectory = agent_positions[
-                            env_idx, agent_idx, :time_step, :
-                        ]
-                        valid_mask = (
-                            (trajectory[:, 0] != 0)
-                            & (trajectory[:, 1] != 0)
-                            & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
-                            & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
-                        )
-                        max_valid_length = max(
-                            max_valid_length, valid_mask.sum().item()
-                        )
-
-                # Create color palette
-                palette = sns.light_palette(AGENT_COLOR_BY_STATE["ok"])
-                cmap = ListedColormap(palette)
-                norm = plt.Normalize(vmin=0, vmax=max_valid_length)
-                sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-
-                for agent_idx in range(agent_positions.shape[1]):
-                    if controlled_live[agent_idx]:
-                        trajectory = agent_positions[
-                            env_idx, agent_idx, :time_step, :
-                        ]
-                        valid_mask = (
-                            (trajectory[:, 0] != 0)
-                            & (trajectory[:, 1] != 0)
-                            & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
-                            & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
-                        )
-                        # Get valid trajectory points
-                        valid_trajectory = trajectory[valid_mask]
-
-                        if len(valid_trajectory) > 1:
-                            points = valid_trajectory.cpu().numpy()
-
-                            if self.render_3d:
-                                trajectory_height = 0.05
-                                segments_3d = []
-                                for i in range(len(points) - 1):
-                                    segment = np.array(
-                                        [
-                                            [
-                                                points[i][0],
-                                                points[i][1],
-                                                trajectory_height,
-                                            ],
-                                            [
-                                                points[i + 1][0],
-                                                points[i + 1][1],
-                                                trajectory_height,
-                                            ],
-                                        ]
-                                    )
-                                    segments_3d.append(segment)
-
-                                # Adjust color mapping to use actual position in the valid trajectory
-                                t = np.linspace(
-                                    0, len(segments_3d), len(segments_3d)
-                                )
-                                colors = cmap(norm(t))
-                                colors[:, 3] = np.linspace(
-                                    0.3, 0.9, len(segments_3d)
-                                )
-
-                                lc = Line3DCollection(
-                                    segments_3d,
-                                    colors=colors,
-                                    linewidth=5,
-                                    zorder=1,
-                                )
-                                ax.add_collection3d(lc)
-                            else:
-                                segments = []
-                                for i in range(len(points) - 1):
-                                    segment = np.array(
-                                        [
-                                            [points[i][0], points[i][1]],
-                                            [
-                                                points[i + 1][0],
-                                                points[i + 1][1],
-                                            ],
-                                        ]
-                                    )
-                                    segments.append(segment)
-
-                                # Adjust color mapping to use actual position in the valid trajectory
-                                t = np.linspace(
-                                    0, len(segments), len(segments)
-                                )
-                                colors = cmap(norm(t))
-                                colors[:, 3] = np.linspace(
-                                    0.3, 0.9, len(segments)
-                                )
-
-                                lc = LineCollection(
-                                    segments,
-                                    colors=colors,
-                                    linewidth=5,
-                                    zorder=1,
-                                )
-                                ax.add_collection(lc)
-
-                # Add the colorbar
-                try:
-                    fig = ax.get_figure()
-                    cbar_ax = fig.add_axes([0.92, 0.09, 0.02, 0.8])
-                    cbar = fig.colorbar(sm, cax=cbar_ax)
-                    cbar.set_label("Timestep", fontsize=15 * marker_scale)
-                    cbar.ax.tick_params(labelsize=12 * marker_scale)
-                except Exception as e:
-                    print(f"Warning: Could not add colorbar: {e}")
+                self.plot_agent_trajectories(
+                    ax=ax,
+                    agent_positions=agent_positions,
+                    env_idx=env_idx,
+                    time_step=time_step,
+                    controlled_live=controlled_live,
+                    render_3d=self.render_3d,
+                    colorbar=colorbar,
+                    marker_scale=marker_scale,
+                    multiple_rollouts=self.multi_rollouts,
+                    line_color=self.line_color,
+                    line_alpha=self.line_alpha,
+                    line_width=self.line_width,
+                    weights=self.weights,
+                )
 
             # Determine center point for zooming
             if center_agent_idx is not None:
@@ -466,6 +376,238 @@ class MatplotlibVisualizer:
             fig.tight_layout(pad=2, rect=[0.00, 0.00, 0.9, 1])
 
         return figs
+
+    def plot_agent_trajectories(
+        self,
+        ax,
+        agent_positions,
+        env_idx=0,
+        time_step=None,
+        controlled_live=None,
+        render_3d=False,
+        colorbar=True,
+        marker_scale=1,
+        line_color=None,
+        line_alpha=None,
+        line_width=None,
+        multiple_rollouts=True,
+        weights=None,
+    ):
+        """
+        Plot agent trajectories on the given matplotlib axis.
+
+        Parameters:
+        -----------
+        ax : matplotlib.axes.Axes
+            The axis to plot on
+        agent_positions : torch.Tensor
+            Tensor of shape [env, rollouts, agent, time, 2] or
+            [rollouts, agent, time, 2] (legacy format)
+        env_idx : int, default=0
+            Index of the environment to plot
+        time_step : int, optional
+            Current time step to plot trajectories up to. If None, uses all timesteps.
+        controlled_live : list or tensor, optional
+            Boolean mask indicating which agents are controlled and alive.
+            If None, assumes all agents are active.
+        render_3d : bool, default=False
+            Whether to render in 3D
+        colorbar : bool, default=True
+            Whether to add a colorbar
+        marker_scale : float, default=1
+            Scale factor for markers and text
+        line_color : str, optional
+            Color for trajectory lines (only used for multiple rollouts mode without weights)
+        line_alpha : float, optional
+            Transparency of trajectory lines
+        line_width : float, optional
+            Width of trajectory lines
+        multiple_rollouts : bool, default=True
+            Whether agent_positions contains multiple rollouts
+        weights : list, optional
+            Used to color lines by the absolute magnitude of weights.
+
+        Returns:
+        --------
+        matplotlib.cm.ScalarMappable or None: Returns the color mapper
+        """
+        import torch
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from matplotlib.colors import ListedColormap
+        from matplotlib.collections import LineCollection
+
+        if render_3d:
+            try:
+                from mpl_toolkits.mplot3d.art3d import Line3DCollection
+            except ImportError:
+                print(
+                    "Warning: 3D rendering requested but mplot3d not available. Falling back to 2D."
+                )
+                render_3d = False
+
+        if agent_positions is None:
+            return None
+
+        # Determine shape format and extract appropriate data
+        if len(agent_positions.shape) == 5:  # [env, rollouts, agent, time, 2]
+            # New format with environment dimension first
+            if env_idx >= agent_positions.shape[0]:
+                print(
+                    f"Warning: env_idx {env_idx} out of range. Using env_idx=0"
+                )
+                env_idx = 0
+
+            # Extract the specific environment data
+            positions_to_plot = agent_positions[
+                env_idx
+            ]  # Shape: [rollouts, agent, time, 2]
+            n_rollouts, n_agents, n_steps, _ = positions_to_plot.shape
+
+        elif len(agent_positions.shape) == 4:  # [rollouts, agent, time, 2]
+            # Legacy format without environment dimension
+            positions_to_plot = agent_positions
+            n_rollouts, n_agents, n_steps, _ = positions_to_plot.shape
+            print("Warning: Using legacy format without environment dimension")
+        else:
+            raise ValueError(
+                f"Unexpected shape for agent_positions: {agent_positions.shape}"
+            )
+
+        # Set defaults for multiple rollouts mode
+        line_color = line_color or "#1f77b4"  # Default blue
+        line_alpha = 0.3 if line_alpha is None else line_alpha
+        line_width = 1 if line_width is None else line_width
+
+        # If time_step is not provided, use all timesteps
+        if time_step is None:
+            time_step = n_steps
+
+        # If controlled_live is not provided, assume all agents are active
+        if controlled_live is None:
+            controlled_live = [True] * n_agents
+
+        # Setup for weight-based coloring
+        if weights is not None:
+            weight_values = np.array(
+                weights
+            )  # Use absolute values for coloring
+
+            # Set up a colormap for weights
+            weight_cmap = plt.cm.coolwarm
+            weight_norm = plt.Normalize(
+                vmin=weight_values.min().item(),
+                vmax=weight_values.max().item(),
+            )
+            weight_sm = plt.cm.ScalarMappable(
+                cmap=weight_cmap, norm=weight_norm
+            )
+
+        # Process each rollout and each agent
+        for rollout_idx in range(n_rollouts):
+            for agent_idx in range(n_agents):
+                if not controlled_live[agent_idx]:
+                    continue
+
+                # Get trajectory for this rollout and agent
+                trajectory = positions_to_plot[
+                    rollout_idx, agent_idx, :time_step, :
+                ]
+
+                # Create valid mask
+                valid_mask = (
+                    (trajectory[:, 0] != 0)
+                    & (trajectory[:, 1] != 0)
+                    & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
+                    & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
+                )
+
+                # Get valid trajectory points
+                valid_trajectory = trajectory[valid_mask]
+
+                # Only proceed if we have at least 2 points
+                if len(valid_trajectory) > 1:
+                    points = valid_trajectory.cpu().numpy()
+
+                    # Determine color based on weights or fixed color
+                    if weights is not None:
+                        # Use the weight value for this rollout
+                        weight_value = weight_values[rollout_idx].item()
+                        segment_color = weight_cmap(weight_norm(weight_value))
+                    else:
+                        segment_color = line_color
+
+                    if render_3d:
+                        trajectory_height = 0.05
+                        segments_3d = []
+                        for i in range(len(points) - 1):
+                            segment = np.array(
+                                [
+                                    [
+                                        points[i][0],
+                                        points[i][1],
+                                        trajectory_height,
+                                    ],
+                                    [
+                                        points[i + 1][0],
+                                        points[i + 1][1],
+                                        trajectory_height,
+                                    ],
+                                ]
+                            )
+                            segments_3d.append(segment)
+
+                        # Create line collection for 3D
+                        lc = Line3DCollection(
+                            segments_3d,
+                            colors=segment_color,
+                            linewidths=line_width,
+                            alpha=line_alpha,
+                            zorder=1,
+                        )
+                        ax.add_collection3d(lc)
+                    else:
+                        segments = []
+                        for i in range(len(points) - 1):
+                            segment = np.array(
+                                [
+                                    [points[i][0], points[i][1]],
+                                    [points[i + 1][0], points[i + 1][1]],
+                                ]
+                            )
+                            segments.append(segment)
+
+                        # Create line collection for 2D
+                        lc = LineCollection(
+                            segments,
+                            colors=segment_color,
+                            linewidths=line_width,
+                            alpha=line_alpha,
+                            zorder=1,
+                        )
+                        ax.add_collection(lc)
+
+        # Add colorbar for weight-based coloring - outside the loops
+        if weights is not None and colorbar:
+            try:
+                fig = ax.get_figure()
+                # Create horizontal colorbar at the bottom
+                # Parameters: [left, bottom, width, height]
+                cbar_ax = fig.add_axes([0.15, 0.05, 0.7, 0.03])
+                cbar = fig.colorbar(
+                    weight_sm, cax=cbar_ax, orientation="horizontal"
+                )
+                cbar.set_label(
+                    f"Conditioning param value", fontsize=15 * marker_scale
+                )
+                cbar.ax.tick_params(labelsize=12 * marker_scale)
+            except Exception as e:
+                print(f"Warning: Could not add colorbar: {e}")
+
+            return weight_sm
+
+        return None
 
     def _plot_log_replay_trajectory(
         self,
@@ -972,7 +1114,9 @@ class MatplotlibVisualizer:
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
-        world_based_policy_mask : Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
+        world_based_policy_mask: Optional[
+            Dict[int, Dict[str, torch.Tensor]]
+        ] = None,
     ) -> None:
         """Plots bounding boxes for agents filtered by environment index and mask.
 
@@ -1074,8 +1218,7 @@ class MatplotlibVisualizer:
                     zorder=5,
                 )
 
-
-        def plot_agent_group_2d(bboxes, color,by_policy = False):
+        def plot_agent_group_2d(bboxes, color, by_policy=False):
             """Helper function to plot a group of agents in 2D"""
             if not by_policy:
                 utils.plot_numpy_bounding_boxes(
@@ -1089,15 +1232,16 @@ class MatplotlibVisualizer:
                 )
             else:
                 num_policies = len(bboxes)
-                utils.plot_numpy_bounding_boxes_multiple_policy(            
-                ax=ax,
-                bboxes_s=bboxes,
-                colors=color[:num_policies],
-                alpha=alpha,
-                line_width_scale=line_width_scale,
-                as_center_pts=as_center_pts,
-                label=label,
-                    )
+                utils.plot_numpy_bounding_boxes_multiple_policy(
+                    ax=ax,
+                    bboxes_s=bboxes,
+                    colors=color[:num_policies],
+                    alpha=alpha,
+                    line_width_scale=line_width_scale,
+                    as_center_pts=as_center_pts,
+                    label=label,
+                )
+
         # Off-road agents
         bboxes_controlled_offroad = np.stack(
             (
@@ -1209,7 +1353,7 @@ class MatplotlibVisualizer:
             axis=1,
         )
 
-        if not world_based_policy_mask: ## controlled by the same policy
+        if not world_based_policy_mask:  ## controlled by the same policy
             # Living agents
             bboxes_controlled_ok = np.stack(
                 (
@@ -1233,7 +1377,7 @@ class MatplotlibVisualizer:
         else:
             bboxes_controlled_ok = []
             policy_mask = world_based_policy_mask[env_idx]
-            for policy_name,mask in policy_mask.items():
+            for policy_name, mask in policy_mask.items():
 
                 bboxes = np.stack(
                     (
@@ -1244,11 +1388,11 @@ class MatplotlibVisualizer:
                         agent_states.rotation_angle[env_idx, mask].numpy(),
                     ),
                     axis=1,
-                    )
+                )
                 bboxes_controlled_ok.append(bboxes)
 
             plot_agent_group_2d(
-                bboxes_controlled_ok, AGENT_COLOR_BY_POLICY,by_policy=True
+                bboxes_controlled_ok, AGENT_COLOR_BY_POLICY, by_policy=True
             )
         # Plot log replay agents
         log_replay = (
@@ -1345,7 +1489,7 @@ class MatplotlibVisualizer:
         figsize: Tuple[int, int] = (10, 10),
     ):
         """
-        Plot observation from agent POV to inspect the information available 
+        Plot observation from agent POV to inspect the information available
         to the agent.
         Args:
             agent_idx (int): Index of the agent whose observation is to be plotted.
