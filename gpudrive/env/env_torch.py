@@ -1369,7 +1369,7 @@ if __name__ == "__main__":
     env_config = EnvConfig(
         dynamics_model="classic",
         use_vbd=True,
-        vbd_model_path="integrations/models/vbd/weights/epoch=18.ckpt",
+        vbd_model_path="gpudrive/integrations/vbd/weights/epoch=18.ckpt",
     )
     render_config = RenderConfig()
 
