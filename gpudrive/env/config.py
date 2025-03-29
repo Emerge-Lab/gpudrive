@@ -28,7 +28,7 @@ class EnvConfig:
     ego_state: bool = True  # Include ego vehicle state in observations
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
-    bev_obs: bool = False # Include rasterized Bird's Eye View observations centered on ego vehicle
+    bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
 
     # Maximum number of controlled agents in the scene
@@ -96,7 +96,7 @@ class EnvConfig:
 
     # Initialization steps: Number of steps to take before the episode starts
     init_steps: int = 0
-    
+
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
@@ -138,7 +138,7 @@ class EnvConfig:
     # VBD model settings
     use_vbd: bool = False
     vbd_model_path: str = None
-    vbd_trajectory_weight = 0.01
+    vbd_trajectory_weight: float = 0.01
     vbd_in_obs: bool = False
 
 

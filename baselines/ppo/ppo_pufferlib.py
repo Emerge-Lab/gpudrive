@@ -62,7 +62,6 @@ def make_agent(env, config):
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
             config=config.environment,
-            vbd_in_obs=saved_cpt["model_arch"]["vbd_in_obs"],
         )
 
         # Load the model parameters
@@ -76,7 +75,6 @@ def make_agent(env, config):
             input_dim=config.train.network.input_dim,
             action_dim=env.single_action_space.n,
             hidden_dim=config.train.network.hidden_dim,
-            vbd_in_obs=config.environment.vbd_in_obs,
             dropout=config.train.network.dropout,
             config=config.environment,
         )
@@ -175,7 +173,8 @@ def run(
     use_vbd: Annotated[Optional[bool], typer.Option(help="Use VBD model for trajectory predictions")] = False,
     vbd_model_path: Annotated[Optional[str], typer.Option(help="Path to VBD model checkpoint")] = None,
     vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
-    vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in observation")] = False,
+    vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
+    init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -220,10 +219,12 @@ def run(
         "vbd_model_path": vbd_model_path,
         "vbd_trajectory_weight": vbd_trajectory_weight,
         "vbd_in_obs": vbd_in_obs,
+        "init_steps": init_steps,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
     )
+
     train_config = {
         "seed": seed,
         "learning_rate": learning_rate,

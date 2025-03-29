@@ -98,6 +98,12 @@ class PufferGPUDrive(PufferEnv):
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
 
+        # VBD
+        self.vbd_model_path = vbd_model_path
+        self.vbd_trajectory_weight = vbd_trajectory_weight
+        self.use_vbd = use_vbd
+        self.vbd_trajectory_weight = vbd_trajectory_weight
+
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -122,7 +128,8 @@ class PufferGPUDrive(PufferEnv):
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
             steer_actions=torch.round(
-                torch.linspace(-torch.pi, torch.pi, action_space_steer_disc), decimals=3
+                torch.linspace(-torch.pi, torch.pi, action_space_steer_disc),
+                decimals=3,
             ),
             accel_actions=torch.round(
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
@@ -131,11 +138,11 @@ class PufferGPUDrive(PufferEnv):
             vbd_model_path=vbd_model_path,
             vbd_trajectory_weight=vbd_trajectory_weight,
         )
-        
+
         render_config = RenderConfig(
             render_3d=render_3d,
         )
-        
+
         self.env = GPUDriveTorchEnv(
             config=env_config,
             render_config=render_config,
@@ -147,7 +154,7 @@ class PufferGPUDrive(PufferEnv):
         self.obs_size = self.env.observation_space.shape[-1]
         self.single_action_space = self.env.action_space
         self.single_observation_space = self.env.single_observation_space
-        
+
         self.controlled_agent_mask = self.env.cont_agent_mask.clone()
 
         # Number of controlled agents across all worlds
@@ -157,7 +164,7 @@ class PufferGPUDrive(PufferEnv):
         # You can't use them because you want torch, not numpy
         # So I am careful to assign these afterwards
         super().__init__()
-        
+
         # Reset the environment and get the initial observations
         self.observations = self.env.reset(self.controlled_agent_mask)
 
@@ -404,7 +411,7 @@ class PufferGPUDrive(PufferEnv):
         """
         for render_env_idx in range(self.render_k_scenarios):
             # Start a new rendering if the episode has just started
-            if (self.iters - 1)  % self.render_interval == 0:
+            if (self.iters - 1) % self.render_interval == 0:
                 if (
                     self.episode_lengths[render_env_idx, :][0] == 0
                     and not self.was_rendered_in_rollout[render_env_idx]
@@ -412,19 +419,17 @@ class PufferGPUDrive(PufferEnv):
                     self.rendering_in_progress[render_env_idx] = True
 
         envs_to_render = list(
-            np.where(np.array(list(self.rendering_in_progress.values())))[
-                0
-            ]
+            np.where(np.array(list(self.rendering_in_progress.values())))[0]
         )
         time_steps = list(self.episode_lengths[envs_to_render, 0])
-        
+
         if len(envs_to_render) > 0:
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
                 zoom_radius=self.zoom_radius,
             )
-            
+
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
                     img_from_fig(sim_state_figures[idx])

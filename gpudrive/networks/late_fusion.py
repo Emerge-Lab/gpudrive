@@ -80,9 +80,8 @@ class NeuralNet(
         dropout=0.00,
         act_func="tanh",
         max_controlled_agents=64,
-        obs_dim=2984,  # Size of the flattened observation vector
+        obs_dim=2984,  # Size of the flattened observation vector (hardcoded)
         config=None,  # Optional config
-        vbd_in_obs=False,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -94,7 +93,6 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
-        self.vbd_in_obs = vbd_in_obs
 
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
@@ -103,12 +101,17 @@ class NeuralNet(
         )
         if config is not None:
             self.config = config
-            if 'reward_type' in self.config:
+            if "reward_type" in self.config:
                 if self.config.reward_type == "reward_conditioned":
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
-                    self.ego_state_idx += 3 
+                    self.ego_state_idx += 3
                     self.partner_obs_idx += 3
+
+            self.vbd_in_obs = self.config.vbd_in_obs
+
+        # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
+        self.vbd_size = 91 * 5
 
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -140,6 +143,17 @@ class NeuralNet(
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
+        if self.vbd_in_obs:
+            self.vbd_embed = nn.Sequential(
+                pufferlib.pytorch.layer_init(
+                    nn.Linear(self.vbd_size, input_dim)
+                ),
+                nn.LayerNorm(input_dim),
+                self.act_func,
+                nn.Dropout(self.dropout),
+                pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
+            )
+
         self.shared_embed = nn.Sequential(
             nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
             nn.Dropout(self.dropout),
@@ -153,14 +167,30 @@ class NeuralNet(
         )
 
     def encode_observations(self, observation):
-        ego_state, road_objects, road_graph = self.unpack_obs(observation)
 
+        if self.vbd_in_obs:
+            (
+                ego_state,
+                road_objects,
+                road_graph,
+                vbd_predictions,
+            ) = self.unpack_obs(observation)
+        else:
+            ego_state, road_objects, road_graph = self.unpack_obs(observation)
+
+        # Embed the ego state
         ego_embed = self.ego_embed(ego_state)
+
+        if self.vbd_in_obs:
+            vbd_embed = self.vbd_embed(vbd_predictions)
+            # Concatenate the VBD predictions with the ego state embedding
+            ego_embed = torch.cat([ego_embed, vbd_embed], dim=1)
 
         # Max pool
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
 
+        # Concatenate the embeddings
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
 
         return self.shared_embed(embed)
@@ -186,25 +216,32 @@ class NeuralNet(
             obs_flat (torch.Tensor): Flattened observation tensor of shape (batch_size, obs_dim).
 
         Returns:
-            ego_state, road_objects, road_graph (torch.Tensor).
+            tuple: If vbd_in_obs is True, returns (ego_state, road_objects, road_graph, vbd_predictions).
+                Otherwise, returns (ego_state, road_objects, road_graph).
         """
-    
+
         # Unpack modalities
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
-        roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
-        
 
-        # Reshape
+        if self.vbd_in_obs:
+            # Extract the VBD predictions (last 455 elements)
+            vbd_predictions = obs_flat[:, -self.vbd_size :]
+
+            # The rest (excluding ego_state and partner_obs) is the road graph
+            roadgraph_obs = obs_flat[:, self.partner_obs_idx : -self.vbd_size]
+        else:
+            # Without VBD, all remaining elements are road graph observations
+            roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
+
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
         )
         road_graph = roadgraph_obs.view(
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
-        
+
         if self.vbd_in_obs:
-            # Assume that the last n elements of the observation vector are VBD-predicted trajectories
-            return ego_state, road_objects, road_graph, vis_state[:, rg_end_idx:]
-        else: 
+            return ego_state, road_objects, road_graph, vbd_predictions
+        else:
             return ego_state, road_objects, road_graph
