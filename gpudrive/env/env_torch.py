@@ -1370,6 +1370,7 @@ if __name__ == "__main__":
         dynamics_model="classic",
         use_vbd=True,
         vbd_model_path="gpudrive/integrations/vbd/weights/epoch=18.ckpt",
+        init_steps=11
     )
     render_config = RenderConfig()
 
