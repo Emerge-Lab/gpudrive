@@ -40,6 +40,8 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
+    if vecenv.use_vbd:
+        msg += f" | Using VBD"
     print_dashboard(
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )
@@ -141,11 +143,11 @@ def evaluate(data):
 
         with profile.eval_misc:
             total_alive = mask.sum().item()
-        
+
             data.global_step += total_alive
             data.global_step_pad += data.vecenv.total_agents
             data.resample_buffer += total_alive
-            
+
             data.vecenv.global_step = data.global_step
             data.vecenv.iters += 1
 
@@ -195,9 +197,9 @@ def evaluate(data):
                 env_id,
                 mask,
             )
-        
+
             # Add metrics for logging
-            for i in info: 
+            for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     data.infos[k].append(v)
 

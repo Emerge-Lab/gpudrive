@@ -8,8 +8,8 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  num_worlds: 75 # Number of parallel environments
+  k_unique_scenes: 75 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination" 
+  reward_type: "weighted_combination"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -29,6 +29,13 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 13
   action_space_accel_disc: 7
+  # Versatile Behavior Diffusion (VBD): This will slow down training
+  use_vbd: false
+  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+  init_steps: 11
+  vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
+  vbd_in_obs: false
+
 wandb:
   entity: ""
   project: "gpudrive"
@@ -55,7 +62,7 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 1_000_000_000
-  batch_size: 262_144
+  batch_size: 131_072
   minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: false
