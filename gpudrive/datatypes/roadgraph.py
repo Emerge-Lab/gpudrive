@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import numpy as np
 import torch
 import enum
 import madrona_gpudrive
@@ -41,14 +42,15 @@ class MapElementIds(enum.IntEnum):
 @dataclass
 class GlobalRoadGraphPoints:
     """A class to represent global road graph points. All information is
-    global but demeaned, that is, centered at zero.
+    global but demeaned, that is, centered at zero. Takes in
+    map_observation_tensor of shape (num_worlds, num_road_points, 9).
 
     Attributes:
         x: x-coordinate of the road point.
         y: y-coordinate of the road point.
         segment_length: Length of the road segment.
         segment_width: Scale of the road segment.
-        segment_heigth: Height of the road segment.
+        segment_height: Height of the road segment.
         orientation: Orientation of the road segment.
         type: Type of road point (e.g., intersection, straight road).
         id: Unique identifier of the road point (road id).
@@ -58,14 +60,15 @@ class GlobalRoadGraphPoints:
         """Initializes the global road graph points with a tensor."""
         self.x = roadgraph_tensor[:, :, 0]
         self.y = roadgraph_tensor[:, :, 1]
+        self.xy = torch.stack((self.x, self.y), dim=-1)
         self.segment_length = roadgraph_tensor[:, :, 2]
         self.segment_width = roadgraph_tensor[:, :, 3]
         self.segment_height = roadgraph_tensor[:, :, 4]
         self.orientation = roadgraph_tensor[:, :, 5]
-        # Skipping the map element type for now (redundant with the map type).
+        self.type = roadgraph_tensor[:, :, 6] # Original GPUDrive road types, used for plotting
         self.id = roadgraph_tensor[:, :, 7]
-        # TODO: Use map type instead of enum (8 instead of 6)
-        self.type = roadgraph_tensor[:, :, 6]
+        self.vbd_type = roadgraph_tensor[:, :, 8] # VBD map types aligned with Waymax
+        self.num_points = roadgraph_tensor.shape[1]
 
     @classmethod
     def from_tensor(
@@ -104,8 +107,156 @@ class GlobalRoadGraphPoints:
 
     def restore_mean(self, mean_x, mean_y):
         """Reapplies the mean to revert back to the original coordinates."""
-        self.x += mean_x
-        self.y += mean_y
+        # Reshape for broadcasting
+        mean_x_reshaped = mean_x.view(-1, 1)
+        mean_y_reshaped = mean_y.view(-1, 1)
+        
+        self.x += mean_x_reshaped
+        self.y += mean_y_reshaped
+
+    def restore_xy(self):
+        """Shifts x, y from the midpoint to the starting point of a segment, along the heading angle."""
+        self.x -= self.segment_length * np.cos(self.orientation)
+        self.y -= self.segment_length * np.sin(self.orientation)
+
+        # Get the dimensions
+        num_worlds, num_road_points = self.x.shape
+        device = self.x.device
+
+        # Lists to collect new tensors for each batch
+        new_x_batches = []
+        new_y_batches = []
+        new_segment_length_batches = []
+        new_orientation_batches = []
+        new_id_batches = []
+        new_type_batches = []
+
+        # Process each world in the batch
+        for batch_idx in range(num_worlds):
+            x_batch = self.x[batch_idx]
+            y_batch = self.y[batch_idx]
+            segment_length_batch = self.segment_length[batch_idx]
+            orientation_batch = self.orientation[batch_idx]
+            id_batch = self.id[batch_idx]
+            type_batch = self.type[batch_idx]
+
+            # Find the indices where ids change
+            id_shifted = torch.cat(
+                [id_batch[1:], id_batch.new_tensor([id_batch[-1] + 1])]
+            )
+            id_change = id_shifted != id_batch
+            last_indices = torch.nonzero(id_change).squeeze(-1)
+
+            # Lists to collect new tensors for the current batch
+            new_x_list = []
+            new_y_list = []
+            new_segment_length_list = []
+            new_orientation_list = []
+            new_id_list = []
+            new_type_list = []
+
+            prev_idx = 0
+            for idx in last_indices:
+                idx = idx.item()
+                # Get the slices up to idx+1 (inclusive)
+                x_slice = x_batch[prev_idx : idx + 1]
+                y_slice = y_batch[prev_idx : idx + 1]
+                segment_length_slice = segment_length_batch[prev_idx : idx + 1]
+                orientation_slice = orientation_batch[prev_idx : idx + 1]
+                id_slice = id_batch[prev_idx : idx + 1]
+                type_slice = type_batch[prev_idx : idx + 1]
+
+                # Compute end_x and end_y for the last point in this id
+                start_x_last = x_slice[-1]
+                start_y_last = y_slice[-1]
+                segment_length_last = segment_length_slice[-1]
+                orientation_last = orientation_slice[-1]
+
+                end_x = start_x_last + 2 * segment_length_last * torch.cos(
+                    orientation_last
+                )
+                end_y = start_y_last + 2 * segment_length_last * torch.sin(
+                    orientation_last
+                )
+
+                # Orientation is set to zero for the final point
+                end_orientation = torch.tensor(0.0, device=device)
+                # Segment length is zero for the final point
+                end_segment_length = torch.tensor(0.0, device=device)
+                # Id remains the same
+                end_id = id_slice[-1]
+                # Type remains the same
+                end_type = type_slice[-1]
+
+                # Append the slices and the new point to the lists
+                new_x_list.append(x_slice)
+                new_y_list.append(y_slice)
+                new_segment_length_list.append(segment_length_slice)
+                new_orientation_list.append(orientation_slice)
+                new_id_list.append(id_slice)
+                new_type_list.append(type_slice)
+
+                # Append the new point
+                new_x_list.append(end_x.unsqueeze(0))
+                new_y_list.append(end_y.unsqueeze(0))
+                new_segment_length_list.append(end_segment_length.unsqueeze(0))
+                new_orientation_list.append(end_orientation.unsqueeze(0))
+                new_id_list.append(end_id.unsqueeze(0))
+                new_type_list.append(end_type.unsqueeze(0))
+
+                prev_idx = idx + 1
+
+            # Concatenate the lists to form the new tensors for the current batch
+            new_x_batch = torch.cat(new_x_list)
+            new_y_batch = torch.cat(new_y_list)
+            new_segment_length_batch = torch.cat(new_segment_length_list)
+            new_orientation_batch = torch.cat(new_orientation_list)
+            new_id_batch = torch.cat(new_id_list)
+            new_type_batch = torch.cat(new_type_list)
+
+            # Ensure that the tensors have size num_points by padding or truncating
+            total_points = new_x_batch.size(0)
+            if total_points < self.num_points:
+                # Pad with zeros to reach num_points
+                pad_size = self.num_points - total_points
+                pad_tensor = lambda t: torch.cat(
+                    [t, torch.zeros(pad_size, device=device)]
+                )
+                new_x_batch = pad_tensor(new_x_batch)
+                new_y_batch = pad_tensor(new_y_batch)
+                new_segment_length_batch = pad_tensor(new_segment_length_batch)
+                new_orientation_batch = pad_tensor(new_orientation_batch)
+                new_id_batch = pad_tensor(new_id_batch)
+                new_type_batch = pad_tensor(new_type_batch)
+            elif total_points > self.num_points:
+                # Truncate to num_points
+                new_x_batch = new_x_batch[: self.num_points]
+                new_y_batch = new_y_batch[: self.num_points]
+                new_segment_length_batch = new_segment_length_batch[
+                    : self.num_points
+                ]
+                new_orientation_batch = new_orientation_batch[
+                    : self.num_points
+                ]
+                new_id_batch = new_id_batch[: self.num_points]
+                new_type_batch = new_type_batch[: self.num_points]
+
+            # Collect the new batch tensors
+            new_x_batches.append(new_x_batch)
+            new_y_batches.append(new_y_batch)
+            new_segment_length_batches.append(new_segment_length_batch)
+            new_orientation_batches.append(new_orientation_batch)
+            new_id_batches.append(new_id_batch)
+            new_type_batches.append(new_type_batch)
+
+        # Stack the new tensors across the batch dimension
+        self.x = torch.stack(new_x_batches, dim=0)
+        self.y = torch.stack(new_y_batches, dim=0)
+        self.xy = torch.stack((self.x, self.y), dim=-1)
+        self.segment_length = torch.stack(new_segment_length_batches, dim=0)
+        self.orientation = torch.stack(new_orientation_batches, dim=0)
+        self.id = torch.stack(new_id_batches, dim=0)
+        self.type = torch.stack(new_type_batches, dim=0)
 
 
 @dataclass
@@ -121,7 +272,7 @@ class LocalRoadGraphPoints:
         y: y-coordinate of the road point relative to each agent.
         segment_length: Length of the road segment.
         segment_width: Scale of the road segment.
-        segment_heigth: Height of the road segment.
+        segment_height: Height of the road segment.
         orientation: Orientation of the road segment.
         id: Unique identifier of the road point (road id).
         type: Type of road point (e.g., edge, lane).

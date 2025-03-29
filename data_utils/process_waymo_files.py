@@ -13,7 +13,8 @@ import logging
 import psutil
 from pathlib import Path
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from pdb import set_trace as T
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2, map_pb2
 from datatypes import MapElementIds
@@ -132,10 +133,10 @@ def _parse_object_state(
         "width": final_state.width,
         "length": final_state.length,
         "height": final_state.height,
-        "heading": [
-            wrap_yaws(state.heading) if state.valid else ERR_VAL
+        "heading": [ # In radians between [-pi, pi]
+            (state.heading + np.pi) % (2 * np.pi) - np.pi if state.valid else ERR_VAL
             for state in states
-        ],
+        ], 
         "velocity": [
             {"x": state.velocity_x, "y": state.velocity_y}
             if state.valid
@@ -668,7 +669,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Convert TFRecord files to JSON. \
-            Note: This takes about 45 seconds per tfrecord file (=50 traffic scenes)."
+            Note: This takes about 45 seconds per tfrecord file (=500 traffic scenes)."
     )
     parser.add_argument(
         "tfrecord_dir", help="Path to the directory containing TFRecord files"
