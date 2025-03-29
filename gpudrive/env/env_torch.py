@@ -132,7 +132,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _initialize_vbd(self):
         """
-        Initialize the Versatile Motion Diffusion (VBD) model and related components.
+        Initialize the Versatile Behavior Diffusion (VBD) model and related components.
 
         Args:
             config: Configuration object containing VBD settings.
