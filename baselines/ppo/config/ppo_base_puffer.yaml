@@ -15,7 +15,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
+  remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
   collision_weight: -0.75
