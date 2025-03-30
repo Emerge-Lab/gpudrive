@@ -102,10 +102,9 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
 static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     
-    // If readFromTracksToPredict is true, we need to consider the new logic
-    if (ctx.data().params.readFromTracksToPredict) {
-        // Static agents are those that are not tracks to predict
-        return ctx.get<MetaData>(agent_iface).isTrackToPredict == -1;
+   // Static agents are those that are not tracks to predict
+    if (ctx.data().params.readFromTracksToPredict and ctx.get<MetaData>(agent_iface).isTrackToPredict != -1) {
+        return false;
     }
     
     // Original logic for other initialization modes
