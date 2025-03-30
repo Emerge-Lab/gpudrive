@@ -625,10 +625,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if actions.shape[2] == 1:
                     actions = actions.squeeze(dim=2).to(self.device)
                     action_value_tensor = self.action_keys_tensor[actions]
-                elif (
-                    actions.shape[2] == 3
-                ):  # Assuming we are given the actual action values
-                    # (acceleration, steering, heading)
+                else:  # Assuming we are given the actual action values
                     action_value_tensor = actions.to(self.device)
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
@@ -1406,7 +1403,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         if self.config.dynamics_model == "delta_local":
-            inferred_actions = log_trajectory.inferred_actions[:, :3]
+            inferred_actions = log_trajectory.inferred_actions[..., :3]
             inferred_actions[..., 0] = torch.clamp(
                 inferred_actions[..., 0], -6, 6
             )
@@ -1485,7 +1482,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        reward_type="weighted_combination",
         dynamics_model="delta_local",
     )
     render_config = RenderConfig()
@@ -1503,7 +1499,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=32,  # Number of agents to control
+        max_cont_agents=64,  # Number of agents to control
         device="cpu",
     )
 
