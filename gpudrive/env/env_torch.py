@@ -982,7 +982,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
     env_config = EnvConfig(
-        reward_type="weighted_combination", dynamics_model="delta_local"
+        reward_type="weighted_combination", 
+        dynamics_model="delta_local", 
+        init_mode="womd_tracks_to_predict",
     )
     render_config = RenderConfig()
 
