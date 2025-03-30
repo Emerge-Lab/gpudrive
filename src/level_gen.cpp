@@ -119,10 +119,7 @@ static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExp
     // If readFromTracksToPredict is true, base controllability on isTrackToPredict flag
     if (ctx.data().params.readFromTracksToPredict) {
         return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
-               ctx.get<Trajectory>(agent_iface).valids[0] &&
-               ctx.get<ResponseType>(agent) == ResponseType::Dynamic &&
-               ctx.get<MetaData>(agent_iface).isTrackToPredict != -1 &&
-               !markAsExpert;
+               ctx.get<MetaData>(agent_iface).isTrackToPredict != -1;
     }
     
     // Original logic for other initialization modes
