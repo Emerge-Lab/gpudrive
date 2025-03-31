@@ -123,6 +123,7 @@ namespace madrona_gpudrive
         bool enableLidar = false;
         bool disableClassicalObs = false;
         DynamicsModel dynamicsModel = DynamicsModel::Classic;
+        bool readFromTracksToPredict = false;       // Default: false - for womd_tracks_to_predict initialization mode
     };
 
     struct WorldInit
