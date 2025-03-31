@@ -57,7 +57,8 @@ namespace madrona_gpudrive
             .def_rw("dynamicsModel", &Parameters::dynamicsModel)
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
-            .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled);
+            .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled)
+            .def_rw("readFromTracksToPredict", &Parameters::readFromTracksToPredict);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
