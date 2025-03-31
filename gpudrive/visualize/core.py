@@ -1703,13 +1703,13 @@ class MatplotlibVisualizer:
             ax.plot(
                 trajectory[:, 0],  # x coordinates
                 trajectory[:, 1],  # y coordinates
-                color='blue',      # trajectory color
-                linestyle='-',     # solid line
-                linewidth=1.0,     # line width
-                marker='o',        # circular markers at each point
-                markersize=1,      # size of markers
-                alpha=0.7,         # slight transparency
-                label='Trajectory' # label for legend
+                color="blue",  # trajectory color
+                linestyle="-",  # solid line
+                linewidth=1.0,  # line width
+                marker="o",  # circular markers at each point
+                markersize=1,  # size of markers
+                alpha=0.7,  # slight transparency
+                label="Trajectory",  # label for legend
             )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
