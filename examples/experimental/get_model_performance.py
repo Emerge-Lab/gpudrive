@@ -33,15 +33,23 @@ if __name__ == "__main__":
     eval_config = load_config("examples/experimental/config/eval_config")
     model_config = load_config("examples/experimental/config/model_config")
 
-    train_loader = SceneDataLoader(
-        root=eval_config.train_dir,
+    # train_loader = SceneDataLoader(
+    #     root=eval_config.train_dir,
+    #     batch_size=eval_config.num_worlds,
+    #     dataset_size=eval_config.num_worlds,
+    #     sample_with_replacement=False,
+    # )
+    test_loader = SceneDataLoader(
+        root=eval_config.test_dir,
         batch_size=eval_config.num_worlds,
-        dataset_size=eval_config.num_worlds,
+        dataset_size=eval_config.test_dataset_size,
         sample_with_replacement=False,
+        shuffle=True,
     )
 
+
     # Make environment
-    env = make_env(eval_config, train_loader)
+    env = make_env(eval_config, test_loader)
 
     for model in model_config.models:
 
@@ -56,15 +64,15 @@ if __name__ == "__main__":
         )
 
         # Create dataloaders for train and test sets
-        train_loader = SceneDataLoader(
-            root=eval_config.train_dir,
-            batch_size=eval_config.num_worlds,
-            dataset_size=model.train_dataset_size
-            if model.name != "random_baseline"
-            else 1000,
-            sample_with_replacement=False,
-            shuffle=False,
-        )
+        # train_loader = SceneDataLoader(
+        #     root=eval_config.train_dir,
+        #     batch_size=eval_config.num_worlds,
+        #     dataset_size=model.train_dataset_size
+        #     if model.name != "random_baseline"
+        #     else 1000,
+        #     sample_with_replacement=False,
+        #     shuffle=False,
+        # )
 
         test_loader = SceneDataLoader(
             root=eval_config.test_dir,
@@ -78,17 +86,17 @@ if __name__ == "__main__":
 
         # Rollouts
         logging.info(
-            f"Rollouts on {len(set(train_loader.dataset))} train scenes / {len(set(test_loader.dataset))} test scenes"
+            f"Rollouts on {len(set(test_loader.dataset))} test scenes"
         )
 
-        df_res_train = evaluate_policy(
-            env=env,
-            policy=policy,
-            data_loader=train_loader,
-            dataset_name="train",
-            deterministic=False,
-            render_sim_state=False,
-        )
+        # df_res_train = evaluate_policy(
+        #     env=env,
+        #     policy=policy,
+        #     data_loader=train_loader,
+        #     dataset_name="train",
+        #     deterministic=False,
+        #     render_sim_state=False,
+        # )
 
         df_res_test = evaluate_policy(
             env=env,
@@ -100,7 +108,8 @@ if __name__ == "__main__":
         )
 
         # Concatenate train/test results
-        df_res = pd.concat([df_res_train, df_res_test])
+        # df_res = pd.concat([df_res_train, df_res_test])
+        df_res = df_res_test
 
         # Add metadata
         df_res["model_name"] = model.name

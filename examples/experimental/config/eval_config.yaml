@@ -1,9 +1,9 @@
 res_path: examples/experimental/dataframes # Store dataframes here
-test_dataset_size: 10_000 # Number of test scenarios to evaluate on
+test_dataset_size: 5400 # Number of test scenarios to evaluate on
 
 # Environment settings
 train_dir: data/processed/training 
-test_dir: data/processed/validation 
+test_dir: /Users/aaravpandya/dev/ScenarioMax/output_dataset/nuplan
 
 num_worlds: 50 # Number of parallel environments for evaluation
 max_controlled_agents: 64 # Maximum number of agents controlled by the model.
@@ -32,4 +32,4 @@ render_3d: True
 action_space_steer_disc: 13  
 action_space_accel_disc: 7 
 
-device: "cuda" # Options: "cpu", "cuda"
+device: "cpu" # Options: "cpu", "cuda"

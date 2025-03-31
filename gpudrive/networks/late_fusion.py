@@ -6,7 +6,7 @@ from torch.distributions.utils import logits_to_probs
 import pufferlib.models
 from gpudrive.env import constants
 from huggingface_hub import PyTorchModelHubMixin
-
+from box import Box
 import madrona_gpudrive
 
 TOP_K_ROAD_POINTS = madrona_gpudrive.kMaxAgentMapObservationsCount
@@ -101,6 +101,7 @@ class NeuralNet(
         )
         if config is not None:
             self.config = config
+            self.config = Box(config)
             if "reward_type" in self.config:
                 if self.config.reward_type == "reward_conditioned":
                     # Agents know their "type", consisting of three weights
