@@ -114,7 +114,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
         params.rewardParams = self._set_reward_params()
         params.maxNumControlledAgents = self.max_cont_agents
-        if self.config.init_mode == "all_objects":
+        if self.config.init_mode == "womd_tracks_to_predict":
+            # Bypasses all gpudrive initialization rules and directly reads from the tracks_to_predict 
+            # flag in the WOMD dataset metadata
+            params.readFromTracksToPredict = True
+        elif self.config.init_mode == "all_objects":
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False
             params.IgnoreNonVehicles = False

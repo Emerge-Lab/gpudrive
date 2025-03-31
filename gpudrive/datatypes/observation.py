@@ -139,12 +139,18 @@ class GlobalEgoState:
     def shape(self) -> tuple[int, ...]:
         """Shape (num_worlds, num_agents) of the ego state tensor."""
         return self.pos_x.shape
-
+    
     def restore_mean(self, mean_x, mean_y):
-        """Reapplies the mean to revert back to the original coordinates."""
-        self.pos_x += mean_x
-        self.pos_y += mean_y
-
+        """Reapplies the mean to revert back to the original coordinates.
+        - self.pos_x and self.pos_y are modified in place are of shape (num_worlds, num_agents).
+        - mean_x and mean_y are expected to be of shape (num_worlds, 1).
+        """
+        # Reshape the mean to broadcast
+        mean_x_reshaped = mean_x.view(-1, 1)
+        mean_y_reshaped = mean_y.view(-1, 1)
+        
+        self.pos_x += mean_x_reshaped
+        self.pos_y += mean_y_reshaped
 
 @dataclass
 class PartnerObs:
@@ -301,3 +307,40 @@ class LidarObs:
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, num_agents, 3, num_lidar_points, 4)."""
         return self.all_lidar_samples.shape
+
+
+@dataclass
+class BevObs:
+    """Dataclass representing the scenario view through LiDAR sensors.
+        - Shape: (num_worlds, num_agents, 200, 200, num_classes).
+    Initialized from bev_observation_tensor (src/bindings).
+    For details, see `BevObservation` and `BevObservations` in src/types.hpp.
+    """
+
+    def __init__(self, bev_observation_tensor: torch.Tensor):
+        self.bev_segmentation_map = bev_observation_tensor
+
+    @classmethod
+    def from_tensor(
+        cls,
+        bev_tensor: madrona_gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
+    ):
+        if backend == "torch":
+            return cls(bev_tensor.to_torch().clone().to(device))
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape: (num_worlds, num_agents, resolution, resolution, 1)."""
+        return self.bev_segmentation_map.shape
+    
+    def one_hot_encode_bev_map(self):
+        """One-hot encodes the agent types. This operation increases the
+        number of features by 10.
+        """     
+        self.bev_segmentation_map = torch.nn.functional.one_hot(
+            self.bev_segmentation_map.long(), num_classes=constants.NUM_MADRONA_ENTITY_TYPES # From size of Madrona EntityType
+        )

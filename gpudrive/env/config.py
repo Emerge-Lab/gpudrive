@@ -28,6 +28,7 @@ class EnvConfig:
     ego_state: bool = True  # Include ego vehicle state in observations
     road_map_obs: bool = True  # Include road graph in observations
     partner_obs: bool = True  # Include partner vehicle info in observations
+    bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
 
     # Maximum number of controlled agents in the scene
@@ -93,9 +94,12 @@ class EnvConfig:
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
 
+    # Initialization steps: Number of steps to take before the episode starts
+    init_steps: int = 0
+
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "distance_to_logs", "reward_conditioned"
+    # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
@@ -133,6 +137,12 @@ class EnvConfig:
     init_mode: str = (
         "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
     )
+
+    # VBD model settings
+    use_vbd: bool = False
+    vbd_model_path: str = None
+    vbd_trajectory_weight: float = 0.01
+    vbd_in_obs: bool = False
 
 
 class SelectionDiscipline(Enum):
@@ -202,5 +212,6 @@ class RenderConfig:
     resolution: Tuple[int, int] = (1024, 1024)
     draw_expert_trajectories: bool = False
     draw_only_controllable_veh: bool = False
+    obj_idx_font_size: int = 9
     render_3d: bool = False
     vehicle_height: float = 0.06

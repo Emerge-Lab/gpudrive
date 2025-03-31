@@ -101,12 +101,27 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
 
 static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
+    
+   // Static agents are those that are not tracks to predict
+    if (ctx.data().params.readFromTracksToPredict and ctx.get<MetaData>(agent_iface).isTrackToPredict != -1) {
+        return false;
+    }
+    
+    // Original logic for other initialization modes
     bool isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold;
     return !ctx.data().params.isStaticAgentControlled and isStatic;
 }
 
 static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExpert = false) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
+    
+    // If readFromTracksToPredict is true, base controllability on isTrackToPredict flag
+    if (ctx.data().params.readFromTracksToPredict) {
+        return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
+               ctx.get<MetaData>(agent_iface).isTrackToPredict != -1;
+    }
+    
+    // Original logic for other initialization modes
     return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
            ctx.get<Trajectory>(agent_iface).valids[0] &&
            ctx.get<ResponseType>(agent) == ResponseType::Dynamic &&
@@ -337,16 +352,35 @@ void createCameraEntity(Engine &ctx)
 
 static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
 {
+    // When readFromTracksToPredict is enabled, we want to create all agents
+    // This overrides all other rules except for the check against deleted agents
+    if (ctx.data().params.readFromTracksToPredict) {
+        // Only check the deleted agents list
+        auto& deletedAgents = ctx.singleton<DeletedAgents>().deletedAgents;
+        for (CountT i = 0; i < consts::kMaxAgentCount; i++)
+        {
+            if(deletedAgents[i] == agentInit.id)
+            {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // Original logic for other initialization modes
     if (ctx.data().params.IgnoreNonVehicles &&
         (agentInit.type == EntityType::Pedestrian || agentInit.type == EntityType::Cyclist))
     {
         return false;
     }
+    
     if (ctx.data().params.initOnlyValidAgentsAtFirstStep && !agentInit.valid[0])
     {
         return false;
     }
 
+    // Check the deleted agents list
     auto& deletedAgents = ctx.singleton<DeletedAgents>().deletedAgents;
     for (CountT i = 0; i < consts::kMaxAgentCount; i++)
     {
