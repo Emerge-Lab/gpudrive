@@ -11,7 +11,7 @@ wheel-directory = "build"
 
 [project]
 name = "gpudrive"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
     {name = "Saman Kazemkheni", email = "skazemkhani@gmail.com"},
     {name = "Aarav Pandya", email = "pandya.aarav.97@gmail.com"},
@@ -29,12 +29,13 @@ dependencies = [
     "pandas",
     "python-box==7.2.0",
     "typer",
-    "pyyaml", 
+    "pyyaml",
     "mediapy",
     "wandb",
     "torch>=2.2.1",
     "seaborn",
     "safetensors",
+    "python-box",
 ]
 
 [project.optional-dependencies]
