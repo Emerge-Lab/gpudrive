@@ -41,8 +41,8 @@ class SB3MultiAgentEnv(VecEnv):
         log_distance_weight=.01,
         render = False,
         render_3d=True,
-        render_interval=2,
-        render_k_scenarios=2,
+        render_interval=20,
+        render_k_scenarios=3,
         render_agent_obs=False,
         render_format="mp4",
         render_fps=15,
@@ -73,7 +73,6 @@ class SB3MultiAgentEnv(VecEnv):
             sample_with_replacement=exp_config.sample_with_replacement,
             shuffle=exp_config.shuffle_dataset,
         )
-
         self._env = GPUDriveTorchEnv(
             config=config,
             render_config=render_config,
@@ -135,7 +134,7 @@ class SB3MultiAgentEnv(VecEnv):
             env_idx: True for env_idx in range(render_k_scenarios)
         }
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
-
+        
     def _reset_seeds(self) -> None:
         """Reset all environments' seeds."""
         self._seeds = None
@@ -148,22 +147,21 @@ class SB3MultiAgentEnv(VecEnv):
             torch.Tensor (max_agent_count * num_worlds, obs_dim):
                 Initial observation.
         """
-        self.episode_lengths = torch.zeros(self.num_envs, dtype=torch.int32)
         if world_idx is None:
+            self.episode_lengths = torch.zeros(self.num_worlds, dtype=torch.int32)
             self._env.reset()
             obs = self._env.get_obs()
 
             # Make dead agent mask (True for dead or invalid agents)
             self.dead_agent_mask = ~self.controlled_agent_mask.clone()
-
             # Flatten over num_worlds and max_agent_count
             obs = obs[self.controlled_agent_mask].reshape(
                 self.num_envs, self.obs_dim
             )
-
             return obs
         else:
             self._env.sim.reset(world_idx.item())
+            self.episode_lengths[world_idx] = 0
 
     def step(self, actions) -> VecEnvStepReturn:
         """
@@ -400,6 +398,7 @@ class SB3MultiAgentEnv(VecEnv):
                         np.moveaxis(frames_array, -1, 1),
                         fps=self.render_fps,
                         format=self.render_format,
+                        caption=f"iteration: {self.iters}",
                     )
                 }
             )
