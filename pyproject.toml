@@ -36,6 +36,7 @@ dependencies = [
     "seaborn",
     "safetensors",
     "python-box",
+    "lightning",
 ]
 
 [project.optional-dependencies]

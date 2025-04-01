@@ -33,9 +33,6 @@ from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.geometry import normalize_min_max
 
-# Versatile Behavior Diffusion model
-from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
-
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -141,6 +138,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         # Set VBD configuration parameters
         self.use_vbd = self.config.use_vbd
+        if self.use_vbd:
+            # Versatile Behavior Diffusion model
+            from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
         self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
 
         # Set initialization steps - ensure minimum steps for VBD
