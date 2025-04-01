@@ -229,9 +229,11 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
             
             agents_history[w, i] = history_data
             
-            # Apply mask using torch operations
-            mask = log_trajectory.valids[w, a, :init_steps+1].unsqueeze(-1)
-            agents_history[w, i] *= mask
+            # Apply mask correctly by matching dimensions
+            mask = log_trajectory.valids[w, a, :init_steps+1]
+            # Reshape mask to [init_steps+1, 1] for proper broadcasting across features
+            mask = mask.view(-1, 1)
+            agents_history[w, i] = agents_history[w, i] * mask
             
             # Use the same approach for future data - efficient vectorized operations
             pos_x_fut = log_trajectory.pos_xy[w, a, init_steps:, 0]
@@ -245,9 +247,11 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
             
             agents_future[w, i] = future_data
             
-            # Apply mask for future using torch operations
-            mask = log_trajectory.valids[w, a, init_steps:].unsqueeze(-1)
-            agents_future[w, i] *= mask
+            # Apply mask for future data correctly
+            mask_future = log_trajectory.valids[w, a, init_steps:]
+            # Reshape mask to [future_len, 1] for proper broadcasting across features
+            mask_future = mask_future.view(-1, 1)
+            agents_future[w, i] = agents_future[w, i] * mask_future
     
     # Map agent types for all worlds at once using torch operations
     mapped_agents_type = torch.zeros_like(agents_type)
