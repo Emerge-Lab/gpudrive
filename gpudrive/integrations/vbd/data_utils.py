@@ -205,7 +205,7 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
                 agents_interested[w, i] = 0
                 continue
                 
-            if metadata.isModeled[w, a] or metadata.isOfInterest[w, a]:
+            if metadata.tracks_to_predict[w, a] or metadata.objects_of_interest[w, a]:
                 agents_interested[w, i] = 10
             else:
                 agents_interested[w, i] = 1

@@ -10,9 +10,9 @@ class Metadata:
     
     Attributes (all masks are 0/1 int of shape (NumWorlds, NumAgents)):
         id: Unique ID of the agent (non-negative int).
-        isSdc: Whether agent is self-driving car (1/0, -1 padding). 
-        isOfInterest: IDs of agents interested (1/0, -1 padding).
-        isModeled: Whether agent's trajectory needs to be predicted for WOSAC (1/0, -1 padding).
+        is_sdc: Whether agent is self-driving car (1/0, -1 padding). 
+        objects_of_interest: IDs of agents interested (1/0, -1 padding).
+        tracks_to_predict: Whether agent's trajectory needs to be predicted for WOSAC (1/0, -1 padding).
         difficulty: Difficulty of the agent's trajectory to be predicted (0/1/2 if isModeled, 0 if !isModeled, -1 padding).
     """
 
