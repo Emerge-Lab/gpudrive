@@ -284,36 +284,37 @@ namespace madrona_gpudrive
 
         std::string scenario_id = j.at("scenario_id").get<std::string>();
         std::strncpy(map.scenarioId, scenario_id.c_str(), sizeof(map.scenarioId));
-    
+        
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
 
+        const auto& metadata = j.at("metadata");
+        int sdc_index = metadata.at("sdc_track_index").get<int>();
+        
         // Create id to object index mapping
         std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
-        for (const auto &obj : j.at("objects")) {
-            if (idx >= map.numObjects)
-                break;
-            obj.get_to(map.objects[idx]);
+        
+        // Initialize SDC first if valid
+        if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
+            j.at("objects")[sdc_index].get_to(map.objects[0]);
+            map.objects[0].metadata.isSdc = 1;
+            idToObjIdx[map.objects[0].id] = 0;
+            idx = 1;
+        }
+        
+        // Initialize all other objects
+        for (size_t i = 0; i < j.at("objects").size(); i++) {
+            if (i == sdc_index) continue; // Skip SDC as it's already initialized
+            if (idx >= map.numObjects) break;
+            
+            j.at("objects")[i].get_to(map.objects[idx]);
             idToObjIdx[map.objects[idx].id] = idx;
             idx++;
         }
-
-        const auto& metadata = j.at("metadata");
-
-        // Set SDC
-        int sdc_index = metadata.at("sdc_track_index").get<int>();
-        if (sdc_index < 0 || sdc_index >= j.at("objects").size()) {
-            std::cerr << "Warning: Invalid sdc_track_index " << sdc_index << " in scene " << j.at("name").get<std::string>() << std::endl;
-        } else {
-            int sdc_id = j.at("objects")[sdc_index].at("id").get<int>();
-            if (auto it = idToObjIdx.find(sdc_id); it != idToObjIdx.end()) {
-                map.objects[it->second].metadata.isSdc = 1;
-            }
-        }
-
-        // Set objects of interest
+        
+        // Process objects_of_interest using the ID mapping
         for (const auto& obj_id : metadata.at("objects_of_interest")) {
             int interest_id = obj_id.get<int>();
             if (auto it = idToObjIdx.find(interest_id); it != idToObjIdx.end()) {
@@ -321,7 +322,7 @@ namespace madrona_gpudrive
             }
         }
 
-        // Set tracks to predict
+        // Process tracks_to_predict using the ID mapping
         for (const auto& track : metadata.at("tracks_to_predict")) {
             int track_index = track.at("track_index").get<int>();
             if (track_index < 0 || track_index >= j.at("objects").size()) {
@@ -334,7 +335,7 @@ namespace madrona_gpudrive
                 }
             }
         }
-
+        
         // Process roads
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
