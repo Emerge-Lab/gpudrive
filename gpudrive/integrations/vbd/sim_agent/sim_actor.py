@@ -6,7 +6,7 @@ from tqdm import tqdm
 from gpudrive.integrations.vbd.model.VBD import VBD
 from gpudrive.integrations.vbd.sim_agent.utils import *
 from gpudrive.integrations.vbd.model.model_utils import roll_out
-from gpudrive.integrations.vbd.sim_agent.guidance_metrics import *
+# from gpudrive.integrations.vbd.sim_agent.guidance_metrics import *
 
 
 class VBDTest(VBD):
