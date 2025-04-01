@@ -99,7 +99,7 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
+    # Alternatively, "weighted_combination", "follow_waypoints", "distance_to_vdb_trajs", "reward_conditioned"
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
@@ -134,9 +134,7 @@ class EnvConfig:
     num_lidar_samples: int = madrona_gpudrive.numLidarSamples
 
     # Initialization mode
-    init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
-    )
+    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
 
     # VBD model settings
     use_vbd: bool = False

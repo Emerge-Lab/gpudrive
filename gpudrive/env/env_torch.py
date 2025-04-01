@@ -138,9 +138,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         # Set VBD configuration parameters
         self.use_vbd = self.config.use_vbd
-        if self.use_vbd:
-            # Versatile Behavior Diffusion model
-            from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
         self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
 
         # Set initialization steps - ensure minimum steps for VBD
@@ -180,6 +177,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _load_vbd_model(self, model_path):
         """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
+        from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+
+        # Versatile Behavior Diffusion model
         model = VBDTest.load_from_checkpoint(
             model_path, torch.device(self.device)
         )
@@ -487,7 +487,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         goal_achieved_weight=1.0,
         off_road_weight=-0.5,
         world_time_steps=None,
-        log_distance_weight=0.01,
+        waypoint_radius=1.0,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -578,9 +578,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-        elif self.config.reward_type == "distance_to_logs":
-            # Reward based on distance to logs and penalty for collision
-            weighted_rewards = (
+        elif self.config.reward_type == "follow_waypoints":
+            # Reward based on proximity to waypoints within a radius and penalty for collision/off-road
+            # With maximum reward of 0.1 per time step
+
+            # Calculate base weighted rewards (penalties)
+            base_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
@@ -610,11 +613,38 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
 
-            # compute euclidean distance between agent and logs
-            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+            # Compute euclidean distance between agent and waypoints
+            dist_to_waypoints = torch.norm(
+                log_traj_pos_tensor - agent_pos, dim=-1
+            )
 
-            # add reward based on inverse distance to logs
-            weighted_rewards += log_distance_weight * torch.exp(-dist_to_logs)
+            # Create proximity reward based on waypoint_radius
+            # Only reward agents within the waypoint radius
+            # Smoothly increases as agent gets closer to the center
+            proximity_mask = (dist_to_waypoints <= waypoint_radius).float()
+
+            # Normalized distance within the radius (1.0 at center, 0.0 at radius)
+            normalized_proximity = proximity_mask * (
+                1.0 - (dist_to_waypoints / waypoint_radius)
+            )
+
+            # Calculate weighted rewards but normalize to max of 0.1 per time step
+            waypoint_weight = 0.5
+
+            # Compute the raw weighted rewards
+            raw_weighted_rewards = (0.5 * base_rewards) + (
+                waypoint_weight * normalized_proximity
+            )
+
+            # Scale down to ensure maximum is 0.1 per time step
+            # First ensure rewards are non-negative (for scaling purposes)
+            non_negative_rewards = torch.clamp(raw_weighted_rewards, min=0.0)
+
+            # Scale down to max of 0.1
+            weighted_rewards = 0.1 * (
+                non_negative_rewards
+                / torch.clamp(torch.max(non_negative_rewards), min=1.0)
+            )
 
             return weighted_rewards
 

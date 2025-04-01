@@ -98,7 +98,7 @@ class MatplotlibVisualizer:
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
-        plot_log_replay_trajectory: bool = False,
+        plot_waypoints: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
         policy_masks: Optional[Dict[int, Dict[str, torch.Tensor]]] = None,
@@ -118,7 +118,7 @@ class MatplotlibVisualizer:
             center_agent_indices: Optional list of center agent indices for zooming.
             figsize: Tuple for figure size of each subplot.
             zoom_radius: Radius for zooming in around the center agent.
-            plot_log_replay_trajectory: If True, plots the log replay trajectory.
+            plot_waypoints: If True, plots the waypoints from the human replays.
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
             policy_mask: dict
@@ -300,8 +300,8 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
-            if plot_log_replay_trajectory:
-                self._plot_log_replay_trajectory(
+            if plot_waypoints:
+                self._plot_waypoints(
                     ax=ax,
                     control_mask=controlled_live,
                     env_idx=env_idx,
@@ -609,7 +609,7 @@ class MatplotlibVisualizer:
 
         return None
 
-    def _plot_log_replay_trajectory(
+    def _plot_waypoints(
         self,
         ax: matplotlib.axes.Axes,
         env_idx: int,
@@ -683,8 +683,12 @@ class MatplotlibVisualizer:
         else:
             # Original 2D plotting
             ax.scatter(
-                log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
-                log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+                log_trajectory.pos_xy[env_idx, control_mask, :, 0]
+                .cpu()
+                .numpy(),
+                log_trajectory.pos_xy[env_idx, control_mask, :, 1]
+                .cpu()
+                .numpy(),
                 color="lightgreen",
                 linewidth=0.35 * line_width_scale,
                 alpha=0.35,
