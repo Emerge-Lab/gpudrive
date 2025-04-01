@@ -205,27 +205,27 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
                 agents_interested[w, i] = 0
                 continue
                 
-            if metadata.tracks_to_predict[w, a] or metadata.objects_of_interest[w, a]:
+            if metadata.isModeled[w, a] or metadata.isOfInterest[w, a]:
                 agents_interested[w, i] = 10
             else:
                 agents_interested[w, i] = 1
             
             agents_type[w, i] = agent_type
             
-            # Stack history data using torch operations
-            history_data = torch.stack(
-                [
-                    log_trajectory.pos_xy[w, a, :init_steps+1, 0],
-                    log_trajectory.pos_xy[w, a, :init_steps+1, 1],
-                    log_trajectory.yaw[w, a, :init_steps+1, 0],
-                    log_trajectory.vel_xy[w, a, :init_steps+1, 0],
-                    log_trajectory.vel_xy[w, a, :init_steps+1, 1],
-                    global_agent_obs.vehicle_length[w, a].repeat(init_steps + 1),
-                    global_agent_obs.vehicle_width[w, a].repeat(init_steps + 1),
-                    global_agent_obs.vehicle_height[w, a].repeat(init_steps + 1),
-                ],
-                dim=1
-            ).transpose(0, 1)
+            # Stack history data using efficient torch operations
+            # Create a tensor with the right shape directly
+            pos_x = log_trajectory.pos_xy[w, a, :init_steps+1, 0]
+            pos_y = log_trajectory.pos_xy[w, a, :init_steps+1, 1]
+            yaw = log_trajectory.yaw[w, a, :init_steps+1, 0]
+            vel_x = log_trajectory.vel_xy[w, a, :init_steps+1, 0]
+            vel_y = log_trajectory.vel_xy[w, a, :init_steps+1, 1]
+            veh_length = global_agent_obs.vehicle_length[w, a].repeat(init_steps + 1)
+            veh_width = global_agent_obs.vehicle_width[w, a].repeat(init_steps + 1)
+            veh_height = global_agent_obs.vehicle_height[w, a].repeat(init_steps + 1)
+            
+            # Stack along the feature dimension (last dimension)
+            history_data = torch.stack([pos_x, pos_y, yaw, vel_x, vel_y, 
+                                       veh_length, veh_width, veh_height], dim=-1)
             
             agents_history[w, i] = history_data
             
@@ -233,17 +233,15 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
             mask = log_trajectory.valids[w, a, :init_steps+1].unsqueeze(-1)
             agents_history[w, i] *= mask
             
-            # Stack future data using torch operations
-            future_data = torch.stack(
-                [
-                    log_trajectory.pos_xy[w, a, init_steps:, 0],
-                    log_trajectory.pos_xy[w, a, init_steps:, 1],
-                    log_trajectory.yaw[w, a, init_steps:, 0],
-                    log_trajectory.vel_xy[w, a, init_steps:, 0],
-                    log_trajectory.vel_xy[w, a, init_steps:, 1],
-                ],
-                dim=1
-            ).transpose(0, 1)
+            # Use the same approach for future data - efficient vectorized operations
+            pos_x_fut = log_trajectory.pos_xy[w, a, init_steps:, 0]
+            pos_y_fut = log_trajectory.pos_xy[w, a, init_steps:, 1]
+            yaw_fut = log_trajectory.yaw[w, a, init_steps:, 0]
+            vel_x_fut = log_trajectory.vel_xy[w, a, init_steps:, 0]
+            vel_y_fut = log_trajectory.vel_xy[w, a, init_steps:, 1]
+            
+            # Stack along the feature dimension (last dimension)
+            future_data = torch.stack([pos_x_fut, pos_y_fut, yaw_fut, vel_x_fut, vel_y_fut], dim=-1)
             
             agents_future[w, i] = future_data
             
