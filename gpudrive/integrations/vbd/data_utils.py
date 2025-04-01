@@ -29,43 +29,107 @@ def filter_topk_roadgraph_points(global_road_graph, reference_points, topk):
     if topk > global_road_graph.num_points:
         raise NotImplementedError("Not enough points in roadgraph.")
     elif topk < global_road_graph.num_points:
-        roadgraph_xy = global_road_graph.xy[0]
+        device = global_road_graph.xy.device
+        roadgraph_xy = global_road_graph.xy[0]  # Shape [N, 2]
+        
         # Use torch functions for distance calculation
-        expanded_ref = reference_points.unsqueeze(-2)  # Add dim for broadcasting
-        expanded_roadgraph = roadgraph_xy.unsqueeze(0)  # Add dim for broadcasting
-        distances = torch.norm(expanded_ref - expanded_roadgraph, dim=-1)
+        # reference_points shape is [..., 2]
+        expanded_ref = reference_points.unsqueeze(-2)  # Shape [..., 1, 2]
+        # roadgraph_xy shape is [N, 2]
+        expanded_roadgraph = roadgraph_xy.unsqueeze(0)  # Shape [1, N, 2]
+        # Calculate distance using broadcasting
+        distances = torch.norm(expanded_ref - expanded_roadgraph, dim=-1)  # Shape [..., N]
         
-        # Create mask for valid points
+        # Create mask for valid points (id > 0)
         valid_mask = global_road_graph.id[0] > 0
-        valid_distances = torch.where(valid_mask, distances, torch.tensor(float('inf'), device=distances.device))
+        valid_distances = torch.where(valid_mask, distances, torch.tensor(float('inf'), device=device))
         
-        # Find topk indices
+        # Find topk indices - we want the smallest distances
+        # top_idx will have shape [..., topk]
         _, top_idx = torch.topk(valid_distances, k=topk, largest=False, dim=-1)
         
-        # Gather the topk points by slicing along the indices
-        filtered_xy = torch.gather(roadgraph_xy, 0, top_idx.unsqueeze(-1).expand(-1, 2))
-        filtered_length = torch.gather(global_road_graph.segment_length[0], 0, top_idx)
-        filtered_width = torch.gather(global_road_graph.segment_width[0], 0, top_idx)
-        filtered_height = torch.gather(global_road_graph.segment_height[0], 0, top_idx)
-        filtered_orientation = torch.gather(global_road_graph.orientation[0], 0, top_idx)
-        filtered_type = torch.gather(global_road_graph.vbd_type[0], 0, top_idx)
-        filtered_id = torch.gather(global_road_graph.id[0], 0, top_idx)
+        # Handle the case where reference_points might have leading batch dimensions
+        batch_dims = reference_points.size()[:-1]  # Get all dimensions except the last one
+        
+        # For each attribute, we'll gather the topk values using advanced indexing
+        
+        # For xy coordinates, we need to handle the last dimension (size 2) separately
+        batch_size = torch.prod(torch.tensor(batch_dims), dtype=torch.int64) if batch_dims else 1
+        
+        # Reshape for easier gathering
+        flat_top_idx = top_idx.view(batch_size, topk)  # Shape [batch_size, topk]
+        
+        # Create output tensors
+        filtered_xy = torch.zeros((batch_size, topk, 2), device=device)
+        filtered_length = torch.zeros((batch_size, topk), device=device)
+        filtered_width = torch.zeros((batch_size, topk), device=device)
+        filtered_height = torch.zeros((batch_size, topk), device=device)
+        filtered_orientation = torch.zeros((batch_size, topk), device=device)
+        filtered_type = torch.zeros((batch_size, topk), device=device)
+        filtered_id = torch.zeros((batch_size, topk), device=device)
+        
+        # Gather each value efficiently
+        for b in range(batch_size):
+            indices = flat_top_idx[b]  # Shape [topk]
+            filtered_xy[b] = roadgraph_xy[indices]  # Shape [topk, 2]
+            filtered_length[b] = global_road_graph.segment_length[0][indices]
+            filtered_width[b] = global_road_graph.segment_width[0][indices]
+            filtered_height[b] = global_road_graph.segment_height[0][indices]
+            filtered_orientation[b] = global_road_graph.orientation[0][indices]
+            filtered_type[b] = global_road_graph.vbd_type[0][indices]
+            filtered_id[b] = global_road_graph.id[0][indices]
+        
+        # Reshape back to original batch dimensions
+        if batch_dims:
+            new_shape = batch_dims + (topk, 2)
+            filtered_xy = filtered_xy.view(new_shape)
+            
+            new_shape = batch_dims + (topk,)
+            filtered_length = filtered_length.view(new_shape)
+            filtered_width = filtered_width.view(new_shape)
+            filtered_height = filtered_height.view(new_shape)
+            filtered_orientation = filtered_orientation.view(new_shape)
+            filtered_type = filtered_type.view(new_shape)
+            filtered_id = filtered_id.view(new_shape)
         
         # Stack the filtered attributes to form a new roadgraph tensor
-        filtered_tensor = torch.stack(
-            [
-                filtered_xy[..., 0],
-                filtered_xy[..., 1],
-                filtered_length,
-                filtered_width,
-                filtered_height,
-                filtered_orientation,
-                torch.zeros_like(filtered_length),
-                filtered_id,
-                filtered_type
-            ],
-            dim=-1
-        )
+        # For simplicity, we'll handle the case where batch_size is 1 (most common case)
+        if batch_size == 1 and not batch_dims:
+            filtered_tensor = torch.stack(
+                [
+                    filtered_xy[0, :, 0],
+                    filtered_xy[0, :, 1],
+                    filtered_length[0],
+                    filtered_width[0],
+                    filtered_height[0],
+                    filtered_orientation[0],
+                    torch.zeros_like(filtered_length[0]),
+                    filtered_id[0],
+                    filtered_type[0]
+                ],
+                dim=-1
+            ).unsqueeze(0)  # Add batch dimension back
+            
+        else:
+            # More complex case with multiple batch dimensions
+            # This would need careful reshaping to handle correctly
+            filtered_tensor = torch.zeros(batch_dims + (topk, 9), device=device)
+            
+            # Handle the general case with proper reshaping
+            filtered_tensor[..., 0] = filtered_xy[..., 0]
+            filtered_tensor[..., 1] = filtered_xy[..., 1]
+            filtered_tensor[..., 2] = filtered_length
+            filtered_tensor[..., 3] = filtered_width
+            filtered_tensor[..., 4] = filtered_height
+            filtered_tensor[..., 5] = filtered_orientation
+            filtered_tensor[..., 6] = torch.zeros_like(filtered_length)
+            filtered_tensor[..., 7] = filtered_id
+            filtered_tensor[..., 8] = filtered_type
+            
+            # Add the world batch dimension if not present
+            if len(filtered_tensor.shape) == 2:  # [topk, 9]
+                filtered_tensor = filtered_tensor.unsqueeze(0)  # [1, topk, 9]
+            
         return GlobalRoadGraphPoints(filtered_tensor.clone())
     else:
         return global_road_graph
