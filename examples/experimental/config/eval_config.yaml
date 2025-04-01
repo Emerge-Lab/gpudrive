@@ -1,17 +1,17 @@
 res_path: examples/experimental/dataframes # Store dataframes here
-test_dataset_size: 10_000 # Number of test scenarios to evaluate on
+test_dataset_size: 10000 # Number of test scenarios to evaluate on
 
 # Environment settings
 train_dir: data/processed/training 
 test_dir: data/processed/validation 
 
-num_worlds: 50 # Number of parallel environments for evaluation
+num_worlds: 100 # Number of parallel environments for evaluation
 max_controlled_agents: 64 # Maximum number of agents controlled by the model.
 ego_state: true
 road_map_obs: true
 partner_obs: true
 norm_obs: true
-remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
+remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
 lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
 reward_type: "weighted_combination"
 collision_weight: -0.75
@@ -24,7 +24,12 @@ polyline_reduction_threshold: 0.1 # Rate at which to sample points from the poly
 sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
 obs_radius: 50.0 # Visibility radius of the agents
 init_roadgraph: False
+init_mode: all_valid #all_non_trivial
 render_3d: True
+
+# Reward conditioning
+condition_mode: None
+agent_type: None
 
 # Number of discretizations in the action space
 # Note: Make sure that this equals the discretizations that the policy

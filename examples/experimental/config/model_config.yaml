@@ -2,6 +2,6 @@ models_path: examples/experimental/models
 
 models:
   - name: model_PPO____R_10000__02_27_09_19_10_626_003200
-    train_dataset_size: 10_000
+    train_dataset_size: 10000
     wandb: null
     trained_on: null

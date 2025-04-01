@@ -34,9 +34,9 @@ def make_env(config, train_loader):
             torch.linspace(-4.0, 4.0, config.action_space_accel_disc),
             decimals=3,
         ),
-        reward_type=config.reward_type,
         condition_mode=config.condition_mode,
         agent_type=config.agent_type,
+        init_mode=config.init_mode,
     )
 
     render_config = RenderConfig()

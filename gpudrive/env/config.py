@@ -135,7 +135,7 @@ class EnvConfig:
 
     # Initialization mode
     init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
+        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
     )
 
     # VBD model settings

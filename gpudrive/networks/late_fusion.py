@@ -94,6 +94,7 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
+        self.vbd_in_obs = False
 
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
