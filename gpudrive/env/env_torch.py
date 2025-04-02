@@ -1169,19 +1169,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-
-        # Rasterized observation, see https://github.com/Emerge-Lab/gpudrive/pull/390
-        if self.config.bev_obs:
-            bev_observations = self._get_bev_obs(mask)
-            obs = torch.cat(
-                (
-                    ego_states,
-                    bev_observations,
-                ),
-                dim=-1,
-            )
-
-        elif (
+        if (
             self.use_vbd
             and self.vbd_model is not None
             and self.config.vbd_in_obs
