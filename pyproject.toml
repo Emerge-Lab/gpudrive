@@ -51,6 +51,8 @@ test = [
 ]
 
 vbd = [
+    "lightning",
+    "jaxlib",
     "waymo-waymax @ git+https://github.com/waymo-research/waymax.git@main",
 ]
 
