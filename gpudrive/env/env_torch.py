@@ -1467,7 +1467,6 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         dynamics_model="delta_local",
-        use_vbd=True,
     )
     render_config = RenderConfig()
 
