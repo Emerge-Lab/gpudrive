@@ -278,14 +278,6 @@ def train(data):
                     )
                     
 
-                    # history_batch = data.vecenv.get_history_batch()
-                    # _, newlogprob, entropy, newvalue = data.policy(
-                    #     obs.reshape(
-                    #         -1, *data.vecenv.single_observation_space.shape
-                    #     ),
-                    #     history=history_batch,
-                    #     action=atn,
-                    # )
                     
                 else:
                     _, newlogprob, entropy, newvalue = data.policy(
@@ -703,10 +695,9 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            if torch.cuda.is_available():
-                self.gpu_util.append(torch.cuda.utilization())
-                free, total = torch.cuda.mem_get_info()
-                self.gpu_mem.append(free / total)
+            self.gpu_util.append(torch.cuda.utilization())
+            free, total = torch.cuda.mem_get_info()
+            self.gpu_mem.append(free / total)
             time.sleep(self.delay)
 
     def stop(self):
