@@ -44,7 +44,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )
 
-    vecenv.async_reset(config.seed)
+    vecenv.async_reset(seed=config.seed) 
     obs_shape = vecenv.single_observation_space.shape
     obs_dtype = vecenv.single_observation_space.dtype
     atn_shape = vecenv.single_action_space.shape
@@ -158,6 +158,10 @@ def evaluate(data):
                 actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
+            elif hasattr(data.vecenv,'history_dict'):
+                obs_and_history = data.vecenv.get_history_batch(combine=True)
+                actions, logprob, _, value = policy(obs_and_history)
+                obs_device = obs_and_history
             else:
                 actions, logprob, _, value = policy(obs_device)
 
@@ -265,6 +269,24 @@ def train(data):
                         lstm_state[0].detach(),
                         lstm_state[1].detach(),
                     )
+                elif hasattr(data.vecenv,'history_dict'):
+                    _, newlogprob, entropy, newvalue = data.policy(
+                        obs.reshape(
+                            -1, *data.vecenv.single_observation_space.shape
+                        ),
+                        action=atn,
+                    )
+                    
+
+                    # history_batch = data.vecenv.get_history_batch()
+                    # _, newlogprob, entropy, newvalue = data.policy(
+                    #     obs.reshape(
+                    #         -1, *data.vecenv.single_observation_space.shape
+                    #     ),
+                    #     history=history_batch,
+                    #     action=atn,
+                    # )
+                    
                 else:
                     _, newlogprob, entropy, newvalue = data.policy(
                         obs.reshape(
@@ -681,9 +703,10 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            self.gpu_util.append(torch.cuda.utilization())
-            free, total = torch.cuda.mem_get_info()
-            self.gpu_mem.append(free / total)
+            if torch.cuda.is_available():
+                self.gpu_util.append(torch.cuda.utilization())
+                free, total = torch.cuda.mem_get_info()
+                self.gpu_mem.append(free / total)
             time.sleep(self.delay)
 
     def stop(self):
