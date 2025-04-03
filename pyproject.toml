@@ -50,6 +50,10 @@ test = [
     "pytest>=8.2.1",
 ]
 
+vbd = [
+    "waymo-waymax @ git+https://github.com/waymo-research/waymax.git@main",
+]
+
 [tool.madrona.packages.madrona_gpudrive]
 ext-only = true
 ext-out-dir = "build"

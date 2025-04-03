@@ -7,8 +7,6 @@ from itertools import product
 import mediapy as media
 import gymnasium
 
-from gpudrive.integrations.vbd.data_utils import process_scenario_data
-
 from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
@@ -33,8 +31,7 @@ from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.geometry import normalize_min_max
 
-# Versatile Behavior Diffusion model
-from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+from gpudrive.integrations.vbd.data_utils import process_scenario_data
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -132,12 +129,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _initialize_vbd(self):
         """
-        Initialize the Versatile Behavior Diffusion (VBD) model and related components.
+        Initialize the Versatile Behavior Diffusion (VBD) model and related
+        components. Link: https://arxiv.org/abs/2404.02524.
 
         Args:
             config: Configuration object containing VBD settings.
         """
-        # Set VBD configuration parameters
         self.use_vbd = self.config.use_vbd
         self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
 
@@ -149,16 +146,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             self.init_steps = self.config.init_steps
 
-        # Initialize VBD model and trajectories if enabled
         if (
             self.use_vbd
             and hasattr(self.config, "vbd_model_path")
             and self.config.vbd_model_path
         ):
-            # Load VBD model from specified path
             self.vbd_model = self._load_vbd_model(self.config.vbd_model_path)
 
-            # Initialize trajectory tensor with zeros
             self.vbd_trajectories = torch.zeros(
                 (
                     self.num_worlds,
@@ -167,17 +161,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     5,
                 ),
                 device=self.device,
-                dtype=torch.float32,  # Explicitly specify dtype for clarity
+                dtype=torch.float32,
             )
 
             self._generate_vbd_trajectories()
         else:
-            # Set to None if VBD is disabled or model path is not provided
             self.vbd_model = None
             self.vbd_trajectories = None
 
     def _load_vbd_model(self, model_path):
         """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
+        from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+
         model = VBDTest.load_from_checkpoint(
             model_path, torch.device(self.device)
         )
@@ -1169,6 +1164,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
+
         if (
             self.use_vbd
             and self.vbd_model is not None
@@ -1471,6 +1467,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         dynamics_model="delta_local",
+        use_vbd=True,
     )
     render_config = RenderConfig()
 
