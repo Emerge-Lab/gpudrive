@@ -4,16 +4,17 @@ import pandas as pd
 
 from gpudrive.utils.config import load_config
 from gpudrive.utils.rollout import rollout
-from gpudrive.utils.env import make
-from gpudrive.utils.checkpoint import make_agent
+from gpudrive.utils.env import make_env
+from gpudrive.utils.checkpoint import load_policy
 
-RESULTS_DIR = "ada/eval/notebooks/results"
+from gpudrive.env.dataset import SceneDataLoader
+
+RESULTS_DIR = "examples/experimental/dataframes"
 
 
 def get_compatibility_scores(
     env,
     agent,
-    data_loader,
     num_rollouts,
     device,
     identifier,
@@ -21,6 +22,12 @@ def get_compatibility_scores(
     render_sim_state=False,
 ):
     """Evaluate policy in the environment."""
+
+    if env.config.reward_type == "reward_conditioned":
+        agent_weights = env.agent_type
+        set_agent_type = True
+
+    print(f"Controlling {env.max_cont_agents} agents per scenario")
 
     res_dict = {
         "scene": [],
@@ -71,6 +78,8 @@ def get_compatibility_scores(
             device=device,
             deterministic=deterministic,
             render_sim_state=render_sim_state,
+            set_agent_type=set_agent_type,
+            agent_weights=agent_weights,
         )
 
         # Get names from env
@@ -105,30 +114,43 @@ def get_compatibility_scores(
 
 
 if __name__ == "__main__":
-    # config = load_config("config/ada/eval/sp_cross_play")
-    config = load_config("config/exp/pop_play_rew_cond_flat")
+
+    config = load_config(
+        "/home/emerge/gpudrive/baselines/ppo/config/ppo_population"
+    )
     EXP_ID = "rew_cond"
 
     # Set maximum number of agents that policy controls
 
     # Analysis settings
-    config.data_dir = "/home/emerge/gpudrive/data/processed/training"
-    config.num_worlds = 100
-    config.dataset_size = 500
+    config.data_dir = "data/processed/training"
+    config.environment.num_worlds = 100
+    config.dataset_size = 5000
     config.sample_with_replacement = True
     config.num_rollouts = 10
-    config.max_controlled_agents = 64
-    config.condition_mode = "fixed"
+    config.environment.max_controlled_agents = 1
     config.device = "cuda"
-    # config.agent_type = torch.Tensor([-0.75, 1.0, -0.75])
+    config.environment.reward_type = "reward_conditioned"
+    config.environment.condition_mode = "fixed"
+    config.environment.agent_type = torch.Tensor([-1.5, 1.0, -1.5])
 
-    env = make(config)
+    agent = load_policy(
+        model_name="rew_conditioned_0321",
+        path_to_cpt="/home/emerge/gpudrive/examples/experimental/models",
+        env_config=config.environment,
+        device=config.device,
+    )
 
-    # Load sim agent trained through naive self-play
-    POLICY = "models/baselines/model_pop_play_rew_cond___S_500__03_16_10_41_19_391_007522.pt"
-    print(f"Loading policy: {POLICY} \n")
-    cpt = torch.load(POLICY, map_location=config.device, weights_only=False)
-    agent = make_agent(cpt, config, device=config.device)
+    # Create data loader
+    train_loader = SceneDataLoader(
+        root=config.data_dir,
+        batch_size=config.environment.num_worlds,
+        dataset_size=config.dataset_size,
+        sample_with_replacement=True,
+    )
+
+    env = make_env(config.environment, train_loader, device=config.device)
+
     # Load sim agent trained through naive self-play
     # agent = NeuralNet.from_pretrained(
     #     "daphne-cornelisse/policy_S10_000_02_27"
@@ -137,15 +159,14 @@ if __name__ == "__main__":
     df = get_compatibility_scores(
         env=env,
         agent=agent,
-        data_loader=env.data_loader,
         num_rollouts=config.num_rollouts,
         device=config.device,
-        identifier=f"{EXP_ID}_{config.max_controlled_agents}",
+        identifier=f"{EXP_ID}_{config.environment.max_controlled_agents}",
     )
     df = df.dropna()
 
     df.to_csv(
-        f"{RESULTS_DIR}/compatibility_scores_{config.max_controlled_agents}.csv",
+        f"{RESULTS_DIR}/compatibility_scores_{config.environment.max_controlled_agents}.csv",
         index=False,
     )
 

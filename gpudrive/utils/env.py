@@ -5,7 +5,7 @@ from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.config import EnvConfig, RenderConfig
 
 
-def make_env(config, train_loader):
+def make_env(config, train_loader, device="cuda"):
     """Make the environment with the given config."""
 
     # Override any default environment settings
@@ -45,7 +45,7 @@ def make_env(config, train_loader):
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=config.max_controlled_agents,
-        device=config.device,
+        device=device,
         render_config=render_config,
     )
 

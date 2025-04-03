@@ -21,6 +21,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
+  init_mode: all_non_trivial
 
   # If reward_type is "reward_conditioned", the following parameters are used
   condition_mode: random
