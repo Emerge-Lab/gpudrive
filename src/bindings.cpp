@@ -25,6 +25,7 @@ namespace madrona_gpudrive
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
         m.attr("episodeLen") = consts::episodeLen;
         m.attr("numLidarSamples") = consts::numLidarSamples;
+        m.attr("vehicleScale") = consts::vehicleLengthScale;
 
         // Define RewardType enum
         nb::enum_<RewardType>(m, "RewardType")

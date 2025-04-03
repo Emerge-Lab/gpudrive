@@ -129,6 +129,9 @@ class EnvConfig:
         madrona_gpudrive.episodeLen
     )  # Length of an episode in the simulator
     num_lidar_samples: int = madrona_gpudrive.numLidarSamples
+    # Agent size scale factor (0.0-1.0)
+    # Controls the visual and collision size of vehicles in the simulation.
+    agent_size_scale: float = madrona_gpudrive.vehicleScale
 
     # Initialization mode
     init_mode: str = (
