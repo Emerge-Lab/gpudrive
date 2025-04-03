@@ -94,10 +94,10 @@ Finally, install the Python components of the repository using pip:
 
 ```bash
 # macOS and Linux.
-pip install -e . 
+pip install -e .
 ```
 
-Optional depencies include [pufferlib], [sb3] and [tests].
+Optional depencies include [pufferlib], [sb3], [vbd], and [tests].
 
 ```bash
 # On Windows.
@@ -113,22 +113,22 @@ pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_D
 <details>
   <summary> 🐳  Option 2. Docker </summary>
 
-To get started quickly, we provide a Dockerfile in the root directory.  
+To get started quickly, we provide a Dockerfile in the root directory.
 
-### Prerequisites  
-Ensure you have the following installed:  
-- [Docker](https://docs.docker.com/get-docker/)  
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)  
+### Prerequisites
+Ensure you have the following installed:
+- [Docker](https://docs.docker.com/get-docker/)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-### Building the Docker mage  
-Once installed, you can build the container with:  
+### Building the Docker mage
+Once installed, you can build the container with:
 
 ```bash
 DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag my_image:latest --progress=plain .
 ```
 
-### Running the Container  
-To run the container with GPU support and shared memory:  
+### Running the Container
+To run the container with GPU support and shared memory:
 
 ```bash
 docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:latest /bin/bash
@@ -206,15 +206,15 @@ cd build
 
 ## Pre-trained policies
 
-Several pre-trained policies are available via the `PyTorchModelHubMixin` class on 🤗 huggingface_hub. 
+Several pre-trained policies are available via the `PyTorchModelHubMixin` class on 🤗 huggingface_hub.
 
-- **Best Policy (10,000 Scenarios).** The best policy from [Building reliable sim driving agents by scaling self-play](https://arxiv.org/abs/2502.14706) is available here [here](https://huggingface.co/daphne-cornelisse/policy_S10_000_02_27). This policy was trained on 10,000 randomly sampled scenarios from the WOMD training dataset. 
+- **Best Policy (10,000 Scenarios).** The best policy from [Building reliable sim driving agents by scaling self-play](https://arxiv.org/abs/2502.14706) is available here [here](https://huggingface.co/daphne-cornelisse/policy_S10_000_02_27). This policy was trained on 10,000 randomly sampled scenarios from the WOMD training dataset.
 
 - **Alternative Policy (1,000 Scenarios).** A policy trained on 1,000 scenarios can be found [here](https://huggingface.co/daphne-cornelisse/policy_S1000_02_27)
 
 ---
 
-> Note: These models were trained with the environment configurations defined in `examples/experimental/config/reliable_agents_params.yaml`, changing environment/observation configurations will affect performance. 
+> Note: These models were trained with the environment configurations defined in `examples/experimental/config/reliable_agents_params.yaml`, changing environment/observation configurations will affect performance.
 
 ---
 
@@ -240,7 +240,7 @@ See [tutorial 04](https://github.com/Emerge-Lab/gpudrive/tree/main/examples/tuto
 <details>
   <summary>Download the dataset</summary>
 
-To download the dataset you need the huggingface_hub library 
+To download the dataset you need the huggingface_hub library
 
 ```bash
 pip install huggingface_hub
@@ -356,7 +356,7 @@ and that's it!
 If you use GPUDrive in your research, please cite our ICLR 2025 paper
 ```bibtex
 @inproceedings{kazemkhani2025gpudrive,
-      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS}, 
+      title={GPUDrive: Data-driven, multi-agent driving simulation at 1 million FPS},
       author={Saman Kazemkhani and Aarav Pandya and Daphne Cornelisse and Brennan Shacklett and Eugene Vinitsky},
       booktitle={Proceedings of the International Conference on Learning Representations (ICLR)},
       year={2025},
