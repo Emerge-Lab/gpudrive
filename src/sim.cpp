@@ -619,7 +619,7 @@ inline void doneSystem(Engine &ctx,
 }
 
 void collisionDetectionSystem(Engine &ctx,
-                              const CandidateCollision &candidateCollision) {
+    const CandidateCollision &candidateCollision) {
 
     auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
     {
@@ -656,7 +656,6 @@ void collisionDetectionSystem(Engine &ctx,
 
     if (isInvalidExpertOrDone(candidateCollision.a) || 
         isInvalidExpertOrDone(candidateCollision.b)) {
-
         return;
     }
 
@@ -693,11 +692,15 @@ void collisionDetectionSystem(Engine &ctx,
     for(auto &pair : ctx.data().collisionPairs)
     {
         if((pair.first == aEntityType && pair.second == bEntityType) ||
-           (pair.first == bEntityType && pair.second == aEntityType))
+            (pair.first == bEntityType && pair.second == aEntityType))
         {
             return;
         }
     }
+
+    // Implement the specific collision logic
+    // Use existing logic for road element detection:
+    // Road elements have EntityType > None && EntityType <= StopSign
 
     // Check collisions based on entity types
     bool shouldRegisterCollisionA = false;
@@ -708,28 +711,24 @@ void collisionDetectionSystem(Engine &ctx,
         // Vehicles and Cyclists always register collisions
         shouldRegisterCollisionA = true;
     } else if (aEntityType == EntityType::Pedestrian) {
-        // Pedestrians don't register collisions with Vehicles, Cyclists, or Road elements
-        if (!(bEntityType == EntityType::Vehicle || 
-              bEntityType == EntityType::Cyclist || 
-              (bEntityType > EntityType::None && bEntityType <= EntityType::StopSign))) {
-            shouldRegisterCollisionA = true;
-        }
+    // Pedestrians don't register collisions with road elements but can collide with other agents
+    if (!(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)) {
+        shouldRegisterCollisionA = true;
+    }
     } else {
         // Non-agent entities (like Road elements) don't need special handling
         shouldRegisterCollisionA = true;
     }
-    
+
     // Process collisions for Entity B
     if (bEntityType == EntityType::Vehicle || bEntityType == EntityType::Cyclist) {
         // Vehicles and Cyclists always register collisions
         shouldRegisterCollisionB = true;
     } else if (bEntityType == EntityType::Pedestrian) {
-        // Pedestrians don't register collisions with Vehicles, Cyclists, or Road elements
-        if (!(aEntityType == EntityType::Vehicle || 
-              aEntityType == EntityType::Cyclist || 
-              (aEntityType > EntityType::None && aEntityType <= EntityType::StopSign))) {
-            shouldRegisterCollisionB = true;
-        }
+        // Pedestrians don't register collisions with road elements but can collide with other agents
+    if (!(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)) {
+        shouldRegisterCollisionB = true;
+    }
     } else {
         // Non-agent entities (like Road elements) don't need special handling
         shouldRegisterCollisionB = true;
