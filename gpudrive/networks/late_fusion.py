@@ -98,9 +98,6 @@ class NeuralNet(
 
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
-        self.partner_obs_idx = (
-            constants.PARTNER_FEAT_DIM * self.max_controlled_agents
-        )
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
@@ -111,6 +108,10 @@ class NeuralNet(
                     self.partner_obs_idx += 3
 
             self.vbd_in_obs = self.config.vbd_in_obs
+
+        self.partner_obs_idx = self.ego_state_idx + (
+            constants.PARTNER_FEAT_DIM * self.max_observable_agents
+        )
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5
