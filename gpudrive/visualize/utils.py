@@ -14,6 +14,36 @@ from matplotlib.patches import Circle, Polygon, RegularPolygon
 
 from gpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
 
+def color_onehot_segmentation_map(onehot_map, device):
+    """
+    Args:
+        onehot_map: torch.Tensor of shape [num_classes, H, W], dtype=bool or float (one-hot)
+        device: torch device
+    Returns:
+        colored_image: [H, W, 3] uint8 image
+    """
+    color_mapping = torch.tensor([
+        [0, 0, 0],         # None
+        [125, 125, 125],   # RoadEdge
+        [120, 120, 120],   # RoadLine
+        [230, 230, 230],   # RoadLane
+        [200, 200, 200],   # CrossWalk
+        [217, 166, 33],    # SpeedBump
+        [255, 0, 0],       # StopSign
+        [0, 255, 255],     # Vehicle
+        [0, 255, 0],       # Pedestrian
+        [128, 0, 128],     # Cyclist
+        [192, 192, 192],   # Padding
+    ], dtype=torch.uint8, device=device)
+
+    # Convert one-hot to class indices: [H, W]
+    class_map = onehot_map.argmax(dim=0)
+
+    # Map to color image: [H, W, 3]
+    colored_image = color_mapping[class_map]
+
+    return colored_image
+
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
     # Adjusted margins to better accommodate 3D plots
