@@ -36,7 +36,9 @@ dependencies = [
     "seaborn",
     "safetensors",
     "python-box",
-    "lightning",
+    "tqdm",
+    "jax",
+    "huggingface_hub",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +51,12 @@ sb3 = [
 
 test = [
     "pytest>=8.2.1",
+]
+
+vbd = [
+    "lightning",
+    "jaxlib",
+    "waymo-waymax @ git+https://github.com/waymo-research/waymax.git@main",
 ]
 
 [tool.madrona.packages.madrona_gpudrive]
