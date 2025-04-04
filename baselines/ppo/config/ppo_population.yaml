@@ -8,14 +8,14 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 30 # Number of parallel environments
-  k_unique_scenes: 30 # Number of unique scenes to sample from
+  num_worlds: 50 # Number of parallel environments
+  k_unique_scenes: 50 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
+  remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "reward_conditioned" #"follow_waypoints"
   collision_weight: -0.75
