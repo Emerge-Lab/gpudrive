@@ -36,6 +36,9 @@ dependencies = [
     "seaborn",
     "safetensors",
     "python-box",
+    "tqdm",
+    "jax",
+    "huggingface_hub",
 ]
 
 [project.optional-dependencies]
