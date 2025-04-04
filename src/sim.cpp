@@ -83,7 +83,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
     registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     registry.exportSingleton<ScenarioId>((uint32_t)ExportID::ScenarioId);
-    
+
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
     registry.exportColumn<AgentInterface, SelfObservation>(
@@ -166,23 +166,30 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
 }
 
 inline void collectSelfObsSystem(Engine &ctx,
-                           const VehicleSize &size,
-                           const Position &pos,
-                           const Rotation &rot,
-                           const Velocity &vel,
-                           const Goal &goal,
-                           const CollisionDetectionEvent& collisionEvent,
-                           const AgentInterfaceEntity &agent_iface)
+    const VehicleSize &size,
+    const Position &pos,
+    const Rotation &rot,
+    const Velocity &vel,
+    const Goal &goal,
+    const CollisionDetectionEvent& collisionEvent,
+    const AgentInterfaceEntity &agent_iface)
 {
     auto &self_obs = ctx.get<SelfObservation>(agent_iface.e);
     self_obs.speed = vel.linear.length();
     self_obs.vehicle_size = size;
+
+    // Get the relative goal position
     auto goalPos = goal.position - pos.xy();
+
+    // For the agent's observation, convert the goal position to the agent's local frame
     self_obs.goal.position = rot.inv().rotateVec({goalPos.x, goalPos.y, 0}).xy();
 
     auto hasCollided = collisionEvent.hasCollided.load_relaxed();
     self_obs.collisionState = hasCollided ? 1.f : 0.f;
     self_obs.id = ctx.get<AgentID>(agent_iface.e).id;
+
+    const Info& info = ctx.get<Info>(agent_iface.e);
+    self_obs.goalState = info.reachedGoal ? 1.f : 0.f;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,
@@ -241,7 +248,7 @@ inline void collectMapObservationsSystem(Engine &ctx,
         return;
 
     auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
-    
+
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
@@ -323,15 +330,41 @@ inline void movementSystem(Engine &e,
         return;
     }
 
+    // Check if the agent is done
     if (e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static) {
-        // Case: Agent has not collided but is done. 
-        // This can only happen if the agent has reached goal or the episode has ended.
-        // In that case we teleport the agent. The agent will not collide with anything.
-        position = consts::kPaddingPosition;
-        velocity.linear.x = 0;
-        velocity.linear.y = 0;
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
+        // In all cases where the agent is done, we need to handle per the goal behavior
+        if (e.get<Info>(agent_iface.e).reachedGoal && !collisionEvent.hasCollided.load_relaxed()) {
+            // Handle based on goal behavior setting
+            switch (e.data().params.goalBehaviour) {
+                case GoalBehaviour::Remove:
+                    // Original behavior: teleport away
+                    position = consts::kPaddingPosition;
+                    velocity.linear.x = 0;
+                    velocity.linear.y = 0;
+                    velocity.linear.z = 0;
+                    velocity.angular = Vector3::zero();
+                    break;
+
+                case GoalBehaviour::Stop:
+                    // Agent stops in place
+                    velocity.linear.x = 0;
+                    velocity.linear.y = 0;
+                    velocity.linear.z = 0;
+                    velocity.angular = Vector3::zero();
+                    break;
+
+                case GoalBehaviour::Ignore:
+                    // Do nothing - agent continues to exist and can be controlled
+                    break;
+            }
+        } else {
+            // Agent is done for other reasons (collision or episode end)
+            position = consts::kPaddingPosition;
+            velocity.linear.x = 0;
+            velocity.linear.y = 0;
+            velocity.linear.z = 0;
+            velocity.angular = Vector3::zero();
+        }
         return;
     }
 
@@ -398,7 +431,7 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 
     auto traceRay = [&](int32_t idx, float offset, LidarSample *samples) {
         // float theta = 2.f * math::pi * (
-        //     float(idx) / float(consts::numLidarSamples)); 
+        //     float(idx) / float(consts::numLidarSamples));
         float head_angle = ctx.get<ControlledState>(agent_iface.e).controlled ? action.classic.headAngle : 0.f;
         float theta = consts::lidarAngle * (2 * float(idx) / float(consts::numLidarSamples) - 1) + head_angle;
         float x = cosf(theta);
@@ -456,7 +489,7 @@ inline void collectBevObservationsSystem(Engine &ctx,
                         const Position &pos,
                         const Rotation &rot,
                         const OtherAgents &other_agents,
-                        const AgentInterfaceEntity &agent_iface) 
+                        const AgentInterfaceEntity &agent_iface)
 {
     if(ctx.data().params.disableClassicalObs)
         return;
@@ -472,7 +505,7 @@ inline void collectBevObservationsSystem(Engine &ctx,
     }
 
     utils::ReferenceFrame referenceFrame(pos.xy(), rot);
-    
+
     // Roads
     CountT roadIdx = 0;
     CountT arrIndex = 0;
@@ -482,14 +515,14 @@ inline void collectBevObservationsSystem(Engine &ctx,
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
         const MapObservation &map_obs = referenceFrame.observationOf(
-            roadPos, 
-            roadRot, 
-            ctx.get<Scale>(road), 
-            ctx.get<EntityType>(road), 
-            static_cast<float>(ctx.get<RoadMapId>(road).id), 
+            roadPos,
+            roadRot,
+            ctx.get<Scale>(road),
+            ctx.get<EntityType>(road),
+            static_cast<float>(ctx.get<RoadMapId>(road).id),
             ctx.get<MapType>(road)
-        );        
-        
+        );
+
         auto dist = referenceFrame.distanceTo(roadPos);
         if (dist > ctx.data().params.observationRadius)
             continue;
@@ -498,9 +531,9 @@ inline void collectBevObservationsSystem(Engine &ctx,
         float rel_yaw = map_obs.heading;
         auto new_scale = map_obs.scale;
         new_scale.d1 = std::max( //Ensure minimum segment width
-            map_obs.scale.d1, 
+            map_obs.scale.d1,
             (2 * ctx.data().params.observationRadius / consts::bev_rasterization_resolution)
-        ); 
+        );
 
         rasterizer::rasterizeRotatedRectangle(
             bev_obs,
@@ -514,13 +547,13 @@ inline void collectBevObservationsSystem(Engine &ctx,
         );
         arrIndex++;
     }
-    
+
     // Other agents
     CountT agentIdx = 0;
     while (agentIdx < ctx.data().numAgents - 1)
     {
         Entity other = other_agents.e[agentIdx++];
-    
+
         const Position &other_position = ctx.get<Position>(other);
         const Rotation &other_rot = ctx.get<Rotation>(other);
         const VehicleSize &other_size = ctx.get<VehicleSize>(other);
@@ -533,7 +566,7 @@ inline void collectBevObservationsSystem(Engine &ctx,
 
         if(relative_pos.length() > ctx.data().params.observationRadius)
             continue;
-    
+
         rasterizer::rasterizeRotatedRectangle(
             bev_obs,
             relative_pos,
@@ -618,6 +651,7 @@ inline void doneSystem(Engine &ctx,
     }
 }
 
+
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
@@ -654,7 +688,7 @@ void collisionDetectionSystem(Engine &ctx,
         return false;
     };
 
-    if (isInvalidExpertOrDone(candidateCollision.a) || 
+    if (isInvalidExpertOrDone(candidateCollision.a) ||
         isInvalidExpertOrDone(candidateCollision.b)) {
 
         return;
@@ -862,7 +896,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         Rotation,
         OtherAgents,
         AgentInterfaceEntity>>({clear_tmp});
-    
+
     auto collect_map_obs = builder.addToGraph<ParallelForNode<Engine,
         collectMapObservationsSystem,
         Position,
@@ -915,7 +949,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     }
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
-        
+
     auto sort_phys_objects = queueSortByWorld<PhysicsEntity>(
         builder, {sort_agents});
 
@@ -945,7 +979,7 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
             Velocity,
             CollisionDetectionEvent,
             ResponseType
-        >>({});  
+        >>({});
 
     setupRestOfTasks(builder, cfg, {moveSystem}, true);
 }
