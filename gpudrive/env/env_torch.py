@@ -766,10 +766,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.rel_goal_y,
             ego_state.is_collided,
         ]
-        
+
         if self.config.add_goal_state:
             base_fields.append(ego_state.is_goal_reached)
-        
+
         if mask is None:
             if self.config.reward_type == "reward_conditioned":
                 full_fields = base_fields + [
@@ -790,7 +790,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 return torch.stack(masked_fields).permute(1, 0)
             else:
                 return torch.stack(base_fields).permute(1, 0)
-            
+
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
 

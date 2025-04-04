@@ -2,19 +2,20 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: data/processed/examples
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 75 # Number of parallel environments
-  k_unique_scenes: 75 # Number of unique scenes to sample from
+  num_worlds: 50 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
+  add_goal_state: true # If true, the goal state is added to the ego observation
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "weighted_combination"
@@ -39,8 +40,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "gpudrive"
-  group: "test"
+  project: "clean_tests"
+  group: " "
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 

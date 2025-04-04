@@ -20,7 +20,7 @@ MAX_ROAD_LINE_SEGMENT_LEN = 100
 MAX_ROAD_SCALE = 100
 
 # Feature shape constants
-EGO_FEAT_DIM = 7
+EGO_FEAT_DIM = 6 # Ego state base fields
 PARTNER_FEAT_DIM = 6
 ROAD_GRAPH_FEAT_DIM = 13
 
