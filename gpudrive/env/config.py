@@ -92,7 +92,8 @@ class EnvConfig:
     init_steps: int = 0
 
     # Goal behavior settings
-    goal_behavior: str = "stop"  # Options: "stop", "ignore", "remove"
+    goal_behavior: str = "remove"  # Options: "stop", "ignore", "remove"
+    add_goal_state: bool = True  # Add goal state to the scene
 
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"

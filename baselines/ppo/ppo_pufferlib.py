@@ -19,7 +19,7 @@ from box import Box
 from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
-from gpudrive.networks.late_fusion import NeuralNet
+from gpudrive.networks.late_fusion_v2 import NeuralNet
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
