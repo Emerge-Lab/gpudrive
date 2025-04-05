@@ -33,6 +33,59 @@ from c_gae import compute_gae
 from gpudrive.integrations.puffer.logging import print_dashboard, abbreviate
 
 
+class AdvantageFilter:
+    """
+    Advantage filtering class to filter transitions based on advantage magnitude.
+
+    This implementation is based on Algorithm 1 in "Robust Autonomy Emerges from Self-Play"
+    (https://arxiv.org/abs/2502.03349). The key idea is to discard transitions with
+    low-magnitude advantages to focus training on the most informative samples.
+
+    The filtering threshold η is set to a percentage of the maximum advantage
+    magnitude observed so far, making it scale-invariant to reward magnitudes.
+    """
+
+    def __init__(self, beta=0.25, initial_th_factor=0.01):
+        """
+        Args:
+            beta: EWMA decay factor for tracking maximum advantage
+            initial_th_factor: Filter threshold as a percentage of max advantage
+        """
+        self.beta = beta
+        self.threshold_factor = initial_th_factor
+        self.max_advantage_ewma = None
+
+    def filter(self, advantages_np):
+        """
+        Filter transitions based on advantage magnitude.
+
+        Args:
+            advantages_np: Numpy array of advantages
+
+        Returns:
+            Boolean mask where True indicates transitions to keep
+        """
+        # Get new max advantage
+        max_advantage = float(np.max(np.abs(advantages_np)))
+
+        # Update the EWMA of max advantage
+        if self.max_advantage_ewma is None:
+            self.max_advantage_ewma = max_advantage
+        else:
+            self.max_advantage_ewma = (
+                self.beta * max_advantage
+                + (1 - self.beta) * self.max_advantage_ewma
+            )
+
+        # Update filtering threshold
+        threshold = self.threshold_factor * self.max_advantage_ewma
+
+        # Create mask of transitions to keep (where |advantage| >= threshold)
+        mask = np.abs(advantages_np) >= threshold
+
+        return mask, threshold
+
+
 def create(config, vecenv, policy, optimizer=None, wandb=None):
     seed_everything(config.seed, config.torch_deterministic)
     profile = Profile()
@@ -235,13 +288,50 @@ def train(data):
     losses = data.losses
 
     with profile.train_misc:
+        # Get the sorted indices for training data
         idxs = experience.sort_training_data()
         dones_np = experience.dones_np[idxs]
         values_np = experience.values_np[idxs]
         rewards_np = experience.rewards_np[idxs]
+
+        # Compute GAE advantages
         advantages_np = compute_gae(
             dones_np, values_np, rewards_np, config.gamma, config.gae_lambda
         )
+
+        if config.apply_advantage_filter:
+            # Initialize the advantage filter if not already created
+            if not hasattr(data, "advantage_filter"):
+                data.advantage_filter = AdvantageFilter(
+                    beta=config.beta,
+                    initial_th_factor=config.initial_th_factor,
+                )
+
+            # Get mask of transitions to keep based on advantage magnitude
+            mask, threshold = data.advantage_filter.filter(advantages_np)
+
+            # Apply weights to advantages - this zeroes out filtered transitions
+            # but keeps the array the same size and shape
+            advantages_np = advantages_np * mask.astype(np.float32)
+
+            # Log filtering stats
+            num_total = len(advantages_np)
+            num_kept = mask.sum()
+            percent_kept = 100 * num_kept / num_total if num_total > 0 else 0
+            data.msg = f"Advantage filtering: kept {num_kept}/{num_total} transitions ({percent_kept:.1f}%)"
+
+            if not hasattr(data, "filtering_stats"):
+                data.filtering_stats = []
+
+            data.filtering_stats.append(
+                {
+                    "threshold": threshold,
+                    "percent_kept": percent_kept,
+                    "max_advantage": float(np.max(np.abs(advantages_np))),
+                    "global_step": data.global_step,
+                }
+            )
+
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
@@ -381,22 +471,32 @@ def train(data):
                 and data.global_step > 0
                 and time.perf_counter() - data.last_log_time > 3.0
             ):
-
                 data.last_log_time = time.perf_counter()
-                data.wandb.log(
-                    {
-                        "performance/controlled_agent_sps": profile.controlled_agent_sps,
-                        "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
-                        "performance/pad_agent_sps": profile.pad_agent_sps,
-                        "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
-                        "global_step": data.global_step,
-                        "performance/epoch": data.epoch,
-                        "performance/uptime": profile.uptime,
-                        "train/learning_rate": data.optimizer.param_groups[0]["lr"],
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
-                        **{f"train/{k}": v for k, v in data.losses.items()},
-                    }
-                )
+
+                # Create log dictionary with existing metrics
+                log_dict = {
+                    "performance/controlled_agent_sps": profile.controlled_agent_sps,
+                    "performance/controlled_agent_sps_env": profile.controlled_agent_sps_env,
+                    "performance/pad_agent_sps": profile.pad_agent_sps,
+                    "performance/pad_agent_sps_env": profile.pad_agent_sps_env,
+                    "global_step": data.global_step,
+                    "performance/epoch": data.epoch,
+                    "performance/uptime": profile.uptime,
+                    "train/learning_rate": data.optimizer.param_groups[0]["lr"],
+                    **{f"metrics/{k}": v for k, v in data.stats.items()},
+                    **{f"train/{k}": v for k, v in data.losses.items()},
+                }
+
+                # Add advantage filtering metrics if available
+                if hasattr(data, 'filtering_stats') and data.filtering_stats:
+                    latest_stats = data.filtering_stats[-1]
+                    log_dict.update({
+                        "advantage_filtering/threshold (η)": latest_stats['threshold'],
+                        "advantage_filtering/percent_kept": latest_stats['percent_kept'],
+                        "advantage_filtering/max_advantage": latest_stats['max_advantage']
+                    })
+
+                data.wandb.log(log_dict)
 
             if bool(data.stats):
                 data.wandb.log({
