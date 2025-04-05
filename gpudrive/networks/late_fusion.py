@@ -105,8 +105,7 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-                    self.partner_obs_idx += 3
-
+        
             self.vbd_in_obs = self.config.vbd_in_obs
 
         self.partner_obs_idx = self.ego_state_idx + (

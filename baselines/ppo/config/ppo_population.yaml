@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: /scratch/kj2676/gpudrive/data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -26,11 +26,11 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   # If reward_type is "reward_conditioned", the following parameters are used
   condition_mode: random
   collision_weight_lb: -3.0
-  collision_weight_ub: 0.05
+  collision_weight_ub: 0.0
   goal_achieved_weight_lb: 1.0
   goal_achieved_weight_ub: 3.0
   off_road_weight_lb: -3.0
-  off_road_weight_ub: 0.05
+  off_road_weight_ub: 0.0
 
   dynamics_model: "classic"
   collision_behavior: "ignore" # Options: "remove", "stop", "ignore"

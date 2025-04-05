@@ -243,7 +243,7 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "04_01"
+    group = "04_04"
 
     fields = {
         "time_h": 47,  # Max time per job (job will finish if run is done before)
@@ -255,17 +255,18 @@ if __name__ == "__main__":
     
     hyperparams = {
         "group": [group], # Group name
-        "num_worlds": [800],
+        "num_worlds": [300],
         "resample_scenes": [1], # Yes
-        "k_unique_scenes": [800],
-        "max_controlled_agents": [64, 1],
+        "k_unique_scenes": [300],
+        "max_controlled_agents": [64],
         "resample_interval": [5_000_000],
         "total_timesteps": [4_000_000_000],
         "resample_dataset_size": [10_000],
-        "batch_size": [524288],
+        "batch_size": [262144],
         "minibatch_size": [16384],
-        "update_epochs": [4],
-        "ent_coef": [0.001, 0.0001],
+        "update_epochs": [3, 4],
+        "ent_coef": [0.001, 0.0001, 0.003],
+        "learning_rate": [1e-4, 3e-4],
         "render": [0],
     }
 
