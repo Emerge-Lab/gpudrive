@@ -854,10 +854,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
             mask=mask,
         )
+        roadgraph.one_hot_encode_road_point_types()
 
         if self.config.norm_obs:
             roadgraph.normalize()
-            roadgraph.one_hot_encode_road_point_types()
 
         if mask is not None:
             return torch.cat(
