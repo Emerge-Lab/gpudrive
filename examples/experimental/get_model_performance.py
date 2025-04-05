@@ -4,13 +4,13 @@ from box import Box
 import numpy as np
 import os
 import logging
+
+from eval_utils import evaluate_policy
+
+from gpudrive.utils.env import make_env
+from gpudrive.utils.config import load_config
+from gpudrive.utils.checkpoint import load_policy
 from gpudrive.env.dataset import SceneDataLoader
-from eval_utils import (
-    load_config,
-    make_env,
-    load_policy,
-    evaluate_policy,
-)
 
 import random
 import torch
@@ -52,7 +52,6 @@ if __name__ == "__main__":
             path_to_cpt=model_config.models_path,
             model_name=model.name,
             device=eval_config.device,
-            env=env,
         )
 
         # Create dataloaders for train and test sets

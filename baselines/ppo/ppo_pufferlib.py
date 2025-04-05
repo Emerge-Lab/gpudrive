@@ -156,11 +156,12 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "baselines/ppo/config/ppo_base_puffer.yaml",
+    ] = "baselines/ppo/config/ppo_population.yaml",
     *,
     # fmt: off
     # Environment options
     num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
+    max_controlled_agents: Annotated[Optional[int], typer.Option(help="Number of controlled agents")] = None,
     k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
     collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
@@ -204,6 +205,7 @@ def run(
     # Override configs with command-line arguments
     env_config = {
         "num_worlds": num_worlds,
+        "max_controlled_agents": max_controlled_agents,
         "k_unique_scenes": k_unique_scenes,
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,
