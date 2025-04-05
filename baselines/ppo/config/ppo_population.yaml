@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: /scratch/kj2676/gpudrive/data/processed/training
+data_dir: data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "reward_conditioned" #"follow_waypoints"
+  reward_type: "follow_waypoints" # Options: "weighted_combination", "reward_conditioned", "follow_waypoints"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -49,8 +49,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "kshotagents"
-  group: "04_01"
+  project: "blended"
+  group: "follow_waypoints"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -64,7 +64,7 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
   sample_with_replacement: true
@@ -103,10 +103,10 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
+  render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
   render_interval: 50 # Render every k iterations
-  render_k_scenarios: 2 # Number of scenarios to render
+  render_k_scenarios: 1 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100

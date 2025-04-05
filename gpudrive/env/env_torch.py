@@ -82,6 +82,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
+
         # Now initialize reward weights tensor if using reward_conditioned reward type
         if (
             hasattr(self.config, "reward_type")
@@ -482,16 +489,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         goal_achieved_weight=1.0,
         off_road_weight=-0.5,
         world_time_steps=None,
-        waypoint_radius=1.0,
     ):
-        """Obtain the rewards for the current step.
-        By default, the reward is a weighted combination of the following components:
-        - collision
-        - goal_achieved
-        - off_road
-
-        The importance of each component is determined by the weights.
-        """
+        """Obtain the rewards for the current step."""
 
         # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
@@ -511,18 +510,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
-
             return weighted_rewards
 
         elif self.config.reward_type == "reward_conditioned":
             # Extract individual weight components from the tensor
             # Shape: [num_worlds, max_agents, 3]
+            # 0: collision, 1: goal_achieved, 2: off_road
             if self.reward_weights_tensor is None:
                 self._set_reward_weights()
 
-            # Apply the weights in a vectorized manner
-            # Each index in dimension 2 corresponds to a specific weight:
-            # 0: collision, 1: goal_achieved, 2: off_road
             weighted_rewards = (
                 self.reward_weights_tensor[:, :, 0] * collided
                 + self.reward_weights_tensor[:, :, 1] * goal_achieved
@@ -575,73 +571,60 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         elif self.config.reward_type == "follow_waypoints":
             # Reward based on proximity to waypoints within a radius and penalty for collision/off-road
-            # With maximum reward of 0.1 per time step
 
-            # Calculate base weighted rewards (penalties)
+            # Calculate base weighted rewards
             base_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
 
-            log_trajectory = LogTrajectory.from_tensor(
-                self.sim.expert_trajectory_tensor(),
-                self.num_worlds,
-                self.max_agent_count,
-                backend=self.backend,
+            # Extract waypoints (ground truth) at time t
+            batch_indices = torch.arange(world_time_steps.shape[0])
+            gt_agent_pos = self.log_trajectory.pos_xy[
+                batch_indices, :, world_time_steps, :
+            ]
+
+            waypoint_mask = (
+                (world_time_steps % self.config.waypoint_sample_interval == 0)
+                .float()
+                .unsqueeze(1)
             )
 
-            # Index log positions at current time steps
-            log_traj_pos = []
-            for i in range(self.num_worlds):
-                log_traj_pos.append(
-                    log_trajectory.pos_xy[i, :, world_time_steps[i], :]
-                )
-            log_traj_pos_tensor = torch.stack(log_traj_pos)
-
+            # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
             )
 
-            agent_pos = torch.stack(
+            actual_agent_pos = torch.stack(
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
 
             # Compute euclidean distance between agent and waypoints
             dist_to_waypoints = torch.norm(
-                log_traj_pos_tensor - agent_pos, dim=-1
+                gt_agent_pos - actual_agent_pos, dim=-1
             )
+
+            # Apply waypoint mask to zero out distances for non-sampled time steps
+            dist_to_waypoints = dist_to_waypoints * waypoint_mask
 
             # Create proximity reward based on waypoint_radius
             # Only reward agents within the waypoint radius
             # Smoothly increases as agent gets closer to the center
-            proximity_mask = (dist_to_waypoints <= waypoint_radius).float()
+            proximity_mask = (
+                dist_to_waypoints <= self.config.waypoint_radius
+            ).float()
 
-            # Normalized distance within the radius (1.0 at center, 0.0 at radius)
-            normalized_proximity = proximity_mask * (
-                1.0 - (dist_to_waypoints / waypoint_radius)
+            waypoint_rewards = (
+                proximity_mask
+                * (1.0 - dist_to_waypoints / self.config.waypoint_radius)
+                * self.config.waypoint_max_reward
             )
 
-            # Calculate weighted rewards but normalize to max of 0.1 per time step
-            waypoint_weight = 0.5
+            rewards = base_rewards + waypoint_rewards
 
-            # Compute the raw weighted rewards
-            raw_weighted_rewards = (0.5 * base_rewards) + (
-                waypoint_weight * normalized_proximity
-            )
-
-            # Scale down to ensure maximum is 0.1 per time step
-            # First ensure rewards are non-negative (for scaling purposes)
-            non_negative_rewards = torch.clamp(raw_weighted_rewards, min=0.0)
-
-            # Scale down to max of 0.1
-            weighted_rewards = 0.1 * (
-                non_negative_rewards
-                / torch.clamp(torch.max(non_negative_rewards), min=1.0)
-            )
-
-            return weighted_rewards
+            return rewards
 
     def step_dynamics(self, actions):
         if actions is not None:
@@ -1360,6 +1343,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+
+        # Obtain new log trajectory
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
 
     def _generate_vbd_trajectories(self):
         """Generate and store trajectory predictions for all scenes using VBD model."""

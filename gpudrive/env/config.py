@@ -101,8 +101,15 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "follow_waypoints", "distance_to_vdb_trajs", "reward_conditioned"
 
-    condition_mode: str = "random"  # Options: "random", "fixed", "preset"
+    # If reward_type is "follow_waypoints", the following parameters are used
+    waypoint_radius: float = (
+        0.5  # Radius around the waypoint to consider as "reached"
+    )
+    waypoint_sample_interval: int = 10  # Interval for sampling waypoints
+    waypoint_max_reward: float = 1.0  # Maximum reward for reaching a waypoint
 
+    # If reward_type is "reward_conditioned", the following parameters are used
+    condition_mode: str = "random"  # Options: "random", "fixed", "preset"
     # If condition_mode is "fixed", set the agent weights here
     agent_type: Optional[Union[str, torch.Tensor]] = None
 
