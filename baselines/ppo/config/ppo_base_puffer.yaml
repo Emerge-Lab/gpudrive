@@ -78,6 +78,10 @@ train:
   max_grad_norm: 0.5
   target_kl: null
   log_window: 1000
+  # Advantage filtering
+  apply_advantage_filter: true
+  initial_th_factor: 0.01
+  beta: 0.25
 
   # # # Network # # #
   network:
