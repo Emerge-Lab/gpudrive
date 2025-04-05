@@ -318,7 +318,9 @@ def train(data):
             num_total = len(advantages_np)
             num_kept = mask.sum()
             percent_kept = 100 * num_kept / num_total if num_total > 0 else 0
-            data.msg = f"Advantage filtering: kept {num_kept}/{num_total} transitions ({percent_kept:.1f}%)"
+            data.msg = (
+                f"Advantage filtering: kept {percent_kept:.1f}% of transitions"
+            )
 
             if not hasattr(data, "filtering_stats"):
                 data.filtering_stats = []
@@ -504,7 +506,6 @@ def train(data):
                 })
 
             # fmt: on
-
         if data.epoch % config.checkpoint_interval == 0 or done_training:
             save_checkpoint(data)
             data.msg = f"Checkpoint saved at update {data.epoch}"
@@ -816,6 +817,7 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
         "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
         "num_params": config.network["num_parameters"],
+        "config": data.config.to_dict(),
     }
 
     torch.save(state, model_path)
