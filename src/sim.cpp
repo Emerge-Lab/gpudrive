@@ -279,17 +279,10 @@ inline void collectMapObservationsSystem(Engine &ctx,
     }
 }
 
-// Make the agents easier to control by zeroing out their velocity
-// after each step.
-inline void agentZeroVelSystem(Engine &,
-                               Velocity &vel)
-{
-    vel.linear.x = 0;
-    vel.linear.y = 0;
-    vel.linear.z = 0;
-    vel.angular = Vector3::zero();
+inline void zeroVelocity(Velocity &velocity) {
+    velocity.linear = Vector3::zero();
+    velocity.angular = Vector3::zero();
 }
-
 
 inline void movementSystem(Engine &e,
                            const AgentInterfaceEntity &agent_iface,
@@ -299,75 +292,69 @@ inline void movementSystem(Engine &e,
                            Velocity &velocity,
                            CollisionDetectionEvent& collisionEvent,
                            const ResponseType &responseType) {
-    if (collisionEvent.hasCollided.load_relaxed()) {
-        switch (e.data().params.collisionBehaviour) {
-            case CollisionBehaviour::AgentStop:
-                e.get<Done>(agent_iface.e).v = 1;
-                agentZeroVelSystem(e, velocity);
-                break;
-
-            case CollisionBehaviour::AgentRemoved:
-                e.get<Done>(agent_iface.e).v = 1;
-                position = consts::kPaddingPosition;
-                agentZeroVelSystem(e, velocity);
-                break;
-
-            case CollisionBehaviour::Ignore:
-                // Reset collision state at the start of each timestep.
-                // This ensures the collision state is only true if the agent collided in the current timestep.
-                collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
-                Info& info = e.get<Info>(agent_iface.e);
-                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
-                break;
-        }
-    }
-
-    const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
     if (responseType == ResponseType::Static) {
         // Do nothing. The agent is static.
         // Agent can only be static if isStaticAgentControlled is set to true.
+        // If agent is static, we dont want to teleport it away in case of collision or goal completion
         return;
+    }
+
+    if (collisionEvent.hasCollided.load_relaxed())
+    {
+        switch (e.data().params.collisionBehaviour){
+            case CollisionBehaviour::AgentStop:
+            {
+                e.get<Done>(agent_iface.e).v = 1;
+                zeroVelocity(velocity);
+                return;
+            }
+
+            case CollisionBehaviour::AgentRemoved:
+            {
+                e.get<Done>(agent_iface.e).v = 1;
+                position = consts::kPaddingPosition;
+                zeroVelocity(velocity);
+                return;
+            }
+
+            case CollisionBehaviour::Ignore:
+            { // Reset collision state at the start of each timestep.
+                // This ensures the collision state is only true if the agent collided in the current timestep.
+                collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
+                Info &info = e.get<Info>(agent_iface.e);
+                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
+                break;
+            }
+        }
     }
 
     // Check if the agent is done
-    if (e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static) {
-        // In all cases where the agent is done, we need to handle per the goal behavior
-        if (e.get<Info>(agent_iface.e).reachedGoal && !collisionEvent.hasCollided.load_relaxed()) {
-            // Handle based on goal behavior setting
-            switch (e.data().params.goalBehaviour) {
-                case GoalBehaviour::Remove:
-                    // Original behavior: teleport away
-                    position = consts::kPaddingPosition;
-                    velocity.linear.x = 0;
-                    velocity.linear.y = 0;
-                    velocity.linear.z = 0;
-                    velocity.angular = Vector3::zero();
-                    break;
+    if (e.get<Done>(agent_iface.e).v) {
+        // This case only happens if the agent is done for reaching goal or episode end or ignoring collisions
 
-                case GoalBehaviour::Stop:
-                    // Agent stops in place
-                    velocity.linear.x = 0;
-                    velocity.linear.y = 0;
-                    velocity.linear.z = 0;
-                    velocity.angular = Vector3::zero();
-                    break;
-
-                case GoalBehaviour::Ignore:
-                    // Do nothing - agent continues to exist and can be controlled
-                    break;
+        switch (e.data().params.goalBehaviour){
+            case GoalBehaviour::Remove:
+            {
+                position = consts::kPaddingPosition;
+                zeroVelocity(velocity);
+                return;
             }
-        } else {
-            // Agent is done for other reasons (collision or episode end)
-            position = consts::kPaddingPosition;
-            velocity.linear.x = 0;
-            velocity.linear.y = 0;
-            velocity.linear.z = 0;
-            velocity.angular = Vector3::zero();
+
+            case GoalBehaviour::Stop:
+            {
+                zeroVelocity(velocity);
+                return;
+            }
+
+            case GoalBehaviour::Ignore:
+            {
+                break; // We dont want to return here because the agent is still controlled
+            }
         }
-        return;
     }
 
+    const auto &controlledState = e.get<ControlledState>(agent_iface.e);
     if (controlledState.controlled) {
         Action &action = e.get<Action>(agent_iface.e);
         switch (e.data().params.dynamicsModel) {
