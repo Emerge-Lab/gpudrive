@@ -332,10 +332,10 @@ inline void movementSystem(Engine &e,
     // Check if the agent is done
     if (e.get<Done>(agent_iface.e).v) {
         // This case only happens if the agent is done for reaching goal or episode end or ignoring collisions
-
-        switch (e.data().params.goalBehaviour){
-            case GoalBehaviour::Remove:
-            {
+        if (e.get<Info>(agent_iface.e).reachedGoal) {
+            switch (e.data().params.goalBehaviour){
+                case GoalBehaviour::Remove:
+                {
                 position = consts::kPaddingPosition;
                 zeroVelocity(velocity);
                 return;
@@ -348,8 +348,9 @@ inline void movementSystem(Engine &e,
             }
 
             case GoalBehaviour::Ignore:
-            {
-                break; // We dont want to return here because the agent is still controlled
+                {
+                    break; // We dont want to return here because the agent is still controlled
+                }
             }
         }
     }
