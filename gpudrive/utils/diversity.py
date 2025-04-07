@@ -393,7 +393,7 @@ if __name__ == "__main__":
     config.environment.agent_type = torch.Tensor([-0.2, 1.0, -0.2])
 
     agent = load_policy(
-        model_name="rew_conditioned_0321",
+        model_name="model_pop_play____R_10000__04_04_18_27_28_702_002500",
         path_to_cpt="/home/emerge/gpudrive/examples/experimental/models",
         env_config=config.environment,
         device=device,
