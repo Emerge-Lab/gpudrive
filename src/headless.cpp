@@ -35,9 +35,7 @@ int main(int argc, char *argv[])
 
     uint64_t num_steps = std::stoul(argv[2]);
     std::vector<std::string> scenes = {
-        "../data/processed/examples/tfrecord-00000-of-00150_78.json",
-        "../data/processed/examples/tfrecord-00043-of-00150_223.json",
-        "../data/processed/examples/tfrecord-00149-of-00150_111.json"
+        "../data/processed/examples/tfrecord-00000-of-01000_325.json",
     };
     uint64_t num_worlds = scenes.size();
 

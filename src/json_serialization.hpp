@@ -4,46 +4,88 @@
 #include "types.hpp"
 #include "consts.hpp"
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include <simdjson.h>
+#include <madrona/json.hpp>
 
 namespace madrona_gpudrive
 {
-    void from_json(const nlohmann::json &j, MapVector2 &p)
-    {
-        p.x = j.at("x").get<float>();
-        p.y = j.at("y").get<float>();
+
+    #define CHECK_JSON_ERROR(err) \
+    if (err) { \
+        std::cerr << "JSON error: " << simdjson::error_message(err) << std::endl; \
+        abort(); \
     }
 
-    void from_json(const nlohmann::json &j, MapObject &obj)
+    // Helper function to safely get values with error checking
+    template<typename T>
+    T getValueOrDefault(simdjson::ondemand::object &obj, 
+                        std::string_view key, 
+                        T defaultValue) {
+        T result;
+        auto error = obj[key].get(result);
+        if (error == simdjson::NO_SUCH_FIELD) {
+            return defaultValue;
+        }
+        CHECK_JSON_ERROR(error);
+        return result;
+    }
+
+    void from_json(const simdjson::dom::element &j, MapVector2 &p)
+    {
+        double x_val, y_val;
+        CHECK_JSON_ERROR(j["x"].get(x_val));
+        CHECK_JSON_ERROR(j["y"].get(y_val));
+
+        p.x = static_cast<float>(x_val);
+        p.y = static_cast<float>(y_val);
+    }
+
+     void from_json(simdjson::dom::element &j, MapObject &obj)
     {
         obj.mean = {0,0};
         uint32_t i = 0;
-        for (const auto &pos : j.at("position"))
-        { 
-            if (i < MAX_POSITIONS)
-            {
+
+        // Parse positions array
+        simdjson::dom::array positions;
+        auto positions_error = j["position"].get_array().get(positions);
+        CHECK_JSON_ERROR(positions_error);
+
+        for (auto pos : positions) {
+            if (i < MAX_POSITIONS) {
                 from_json(pos, obj.position[i]);
                 obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
                 obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
                 ++i;
             }
-            else
-            {
+            else{
                 break; // Avoid overflow
             }
         }
         obj.numPositions = i;
-        j.at("width").get_to(obj.vehicle_size.width);
-        j.at("length").get_to(obj.vehicle_size.length);
-        j.at("height").get_to(obj.vehicle_size.height);
-        j.at("id").get_to(obj.id);
+        // Get scalar values
+        double width, length, height;
+        int64_t id;
+
+        CHECK_JSON_ERROR(j["width"].get(width));
+        CHECK_JSON_ERROR(j["length"].get(length));
+        CHECK_JSON_ERROR(j["height"].get(height));
+        CHECK_JSON_ERROR(j["id"].get(id));
+
+        obj.vehicle_size.width = static_cast<float>(width);
+        obj.vehicle_size.length = static_cast<float>(length);
+        obj.vehicle_size.height = static_cast<float>(height);
+        obj.id = static_cast<uint32_t>(id);
 
         i = 0;
-        for (const auto &h : j.at("heading"))
-        {
-            if (i < MAX_POSITIONS)
-            {
-                h.get_to(obj.heading[i]);
+        simdjson::dom::array headings;
+        auto headings_error = j["heading"].get_array().get(headings);
+        CHECK_JSON_ERROR(headings_error);
+
+        for (auto h : headings) {
+            if (i < MAX_POSITIONS) {
+                double heading_val;
+                CHECK_JSON_ERROR(h.get(heading_val));
+                obj.heading[i] = static_cast<float>(heading_val);
                 ++i;
             }
             else
@@ -54,10 +96,12 @@ namespace madrona_gpudrive
         obj.numHeadings = i;
 
         i = 0;
-        for (const auto &v : j.at("velocity"))
-        {
-            if (i < MAX_POSITIONS)
-            {
+        simdjson::dom::array velocities;
+        auto velocities_error = j["velocity"].get_array().get(velocities);
+        CHECK_JSON_ERROR(velocities_error);
+
+        for (auto v : velocities) {
+            if (i < MAX_POSITIONS) {
                 from_json(v, obj.velocity[i]);
                 ++i;
             }
@@ -69,11 +113,17 @@ namespace madrona_gpudrive
         obj.numVelocities = i;
 
         i = 0;
-        for (const auto &v : j.at("valid"))
+        simdjson::dom::array valid;
+        auto valid_error = j["valid"].get_array().get(valid);
+        CHECK_JSON_ERROR(valid_error);
+
+        for (const auto &v : valid)
         {
             if (i < MAX_POSITIONS)
             {
-                v.get_to(obj.valid[i]);
+                bool valid_val;
+                CHECK_JSON_ERROR(v.get(valid_val));
+                obj.valid[i] = valid_val;
                 ++i;
             }
             else
@@ -84,20 +134,32 @@ namespace madrona_gpudrive
         obj.numValid = i;
 
 
-        from_json(j.at("goalPosition"), obj.goalPosition);
-        std::string type = j.at("type");
-        if(type == "vehicle")
+        simdjson::dom::element goalPosition;
+        auto goalPosition_error = j["goalPosition"].get(goalPosition);
+        CHECK_JSON_ERROR(goalPosition_error);
+        from_json(goalPosition, obj.goalPosition);
+
+        std::string_view type_view;
+        CHECK_JSON_ERROR(j["type"].get(type_view));
+        if(type_view == "vehicle")
             obj.type = EntityType::Vehicle;
-        else if(type == "pedestrian")
+        else if(type_view == "pedestrian")
             obj.type = EntityType::Pedestrian;
-        else if(type == "cyclist")
+        else if(type_view == "cyclist")
             obj.type = EntityType::Cyclist;
         else
             obj.type = EntityType::None;
 
-        std::string markAsExpertKey = "mark_as_expert";
-        if (j.contains(markAsExpertKey)) {
-            from_json(j.at("mark_as_expert"), obj.markAsExpert);
+        bool mark_as_expert;
+        auto error = j["mark_as_expert"].get(mark_as_expert);
+        if (error == simdjson::error_code::NO_SUCH_FIELD)
+        {
+            // Field "mark_as_expert" does not exist; do nothing.
+        }
+        else
+        {
+            CHECK_JSON_ERROR(error); // Make sure no other error occurred.
+            obj.markAsExpert = mark_as_expert;
         }
 
          // Initialize metadata fields to 0
@@ -107,35 +169,40 @@ namespace madrona_gpudrive
         obj.metadata.difficulty = 0;
     }
 
-    void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
+    void from_json(const simdjson::dom::element &j, MapRoad &road, float polylineReductionThreshold = 0.0)
     {
         road.mean = {0,0};
-        std::string type = j.at("type");
-         if(type == "road_edge")
+
+        std::string_view type_view;
+        CHECK_JSON_ERROR(j["type"].get(type_view));
+        if(type_view == "road_edge")
             road.type = EntityType::RoadEdge;
-        else if(type == "road_line")
+        else if(type_view == "road_line")
             road.type = EntityType::RoadLine;
-        else if(type == "lane")
+        else if(type_view == "lane")
             road.type = EntityType::RoadLane;
-        else if(type == "crosswalk")
+        else if(type_view == "crosswalk")
             road.type = EntityType::CrossWalk;
-        else if(type == "speed_bump")
+        else if(type_view == "speed_bump")
             road.type = EntityType::SpeedBump;
-        else if(type == "stop_sign")
+        else if(type_view == "stop_sign")
             road.type = EntityType::StopSign;
         else
             road.type = EntityType::None;
 
-        
+        simdjson::dom::array geometry;
+        auto geometry_error = j["geometry"].get_array().get(geometry);
+        CHECK_JSON_ERROR(geometry_error);
+
         std::vector<MapVector2> geometry_points_;
-        for(const auto &point: j.at("geometry"))
+        for(const auto &point: geometry)
         {
             MapVector2 p;
             from_json(point, p);
             geometry_points_.push_back(p);
         }
 
-        const int64_t num_segments = j["geometry"].size() - 1;
+        const int64_t num_segments = geometry.size() - 1;
         const int64_t sample_every_n_ = 1;
         const int64_t num_sampled_points = (num_segments + sample_every_n_ - 1) / sample_every_n_ + 1;
         if (num_segments >= 10 && (road.type == EntityType::RoadLane || road.type == EntityType::RoadEdge || road.type == EntityType::RoadLine))
@@ -212,13 +279,23 @@ namespace madrona_gpudrive
             road.numPoints = num_sampled_points;
         }
 
-        if (j.contains("id")) {
-            road.id = j.at("id").get<uint32_t>();
+        
+        int64_t road_id;
+        auto error = j["id"].get(road_id);
+        if (error != simdjson::error_code::NO_SUCH_FIELD) {
+            CHECK_JSON_ERROR(error);
+            road.id = static_cast<uint32_t>(road_id);
         }
+        
+        int64_t mapElementId;
+        auto mapElementId_error = j["map_element_id"].get(mapElementId);
 
-        if (j.contains("map_element_id"))
+        if(mapElementId_error == simdjson::error_code::NO_SUCH_FIELD)
         {
-            auto mapElementId = j.at("map_element_id").get<int32_t>();
+            road.mapType = MapType::UNKNOWN;
+        }
+        else{
+            CHECK_JSON_ERROR(mapElementId_error); // Make sure no other error occurred.
 
             if(mapElementId == 4 or mapElementId >= static_cast<int32_t>(MapType::NUM_TYPES) or mapElementId < -1)
             {
@@ -229,10 +306,6 @@ namespace madrona_gpudrive
                 road.mapType = static_cast<MapType>(mapElementId);
             }
         }
-        else
-        {
-            road.mapType = MapType::UNKNOWN;
-        }
 
         for (int i = 0; i < road.numPoints; i++)
         {
@@ -242,105 +315,165 @@ namespace madrona_gpudrive
 
     }
 
-    std::pair<float, float> calc_mean(const nlohmann::json &j)
+    std::pair<float, float> calc_mean(const simdjson::dom::element &j)
     {
         std::pair<float, float> mean = {0, 0};
         int64_t numEntities = 0;
-        for (const auto &obj : j["objects"])
-        {
+
+        // Process objects
+        simdjson::dom::array objects;
+        auto objects_error = j["objects"].get_array().get(objects);
+        CHECK_JSON_ERROR(objects_error);
+
+        for (auto obj : objects) {
+            simdjson::dom::array positions;
+            auto positions_error = obj["position"].get_array().get(positions);
+            CHECK_JSON_ERROR(positions_error);
+
+            simdjson::dom::array valid_array;
+            auto valid_array_error = obj["valid"].get_array().get(valid_array);
+            CHECK_JSON_ERROR(valid_array_error);
+
             int i = 0;
-            for (const auto &pos : obj["position"])
-            {
-                if(obj["valid"][i++] == false)
+            for (auto pos : positions) {
+                // Get valid flag
+                bool is_valid;
+                auto valid_val = valid_array.at(i);
+                CHECK_JSON_ERROR(valid_val.get(is_valid));
+
+                if (!is_valid) {
+                    i++;
                     continue;
+                }
+
                 numEntities++;
-                float newX = pos["x"];
-                float newY = pos["y"];
+
+                // Use the existing from_json function to parse the position
+                double newX, newY;
+                CHECK_JSON_ERROR(pos["x"].get(newX));
+                CHECK_JSON_ERROR(pos["y"].get(newY));
+
                 // Update mean incrementally
                 mean.first += (newX - mean.first) / numEntities;
                 mean.second += (newY - mean.second) / numEntities;
+
+                i++;
             }
         }
-        for (const auto &obj : j["roads"])
-        {
-            for (const auto &point : obj["geometry"])
-            {
+
+        // Process roads
+        simdjson::dom::array roads;
+        auto roads_error = j["roads"].get_array().get(roads);
+        CHECK_JSON_ERROR(roads_error);
+
+        for (auto road : roads) {
+            simdjson::dom::array geometry;
+            auto geometry_error = road["geometry"].get_array().get(geometry);
+            CHECK_JSON_ERROR(geometry_error);
+
+            for (auto point : geometry) {
                 numEntities++;
-                float newX = point["x"];
-                float newY = point["y"];
+                double newX, newY;
+                CHECK_JSON_ERROR(point["x"].get(newX));
+                CHECK_JSON_ERROR(point["y"].get(newY));
 
                 // Update mean incrementally
                 mean.first += (newX - mean.first) / numEntities;
                 mean.second += (newY - mean.second) / numEntities;
             }
         }
+
         return mean;
     }
 
-    void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
+    void from_json(const simdjson::dom::element &j, Map &map, float polylineReductionThreshold)
     {
-        std::string name = j.at("name").get<std::string>();
-        std::strncpy(map.mapName, name.c_str(), sizeof(map.mapName));
+        std::string_view name_view;
+        CHECK_JSON_ERROR(j["name"].get(name_view));
+        std::strncpy(map.mapName, name_view.data(), sizeof(map.mapName));
 
-        std::string scenario_id = j.at("scenario_id").get<std::string>();
-        std::strncpy(map.scenarioId, scenario_id.c_str(), sizeof(map.scenarioId));
+        std::string_view scenario_id_view;
+        CHECK_JSON_ERROR(j["scenario_id"].get(scenario_id_view));
+        std::strncpy(map.scenarioId, scenario_id_view.data(), sizeof(map.scenarioId));
         
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
-        map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
 
-        const auto& metadata = j.at("metadata");
-        int sdc_index = metadata.at("sdc_track_index").get<int>();
+        simdjson::dom::array objects;
+        CHECK_JSON_ERROR(j["objects"].get_array().get(objects));
+        map.numObjects = std::min(objects.size(), static_cast<size_t>(MAX_OBJECTS));
+
+        simdjson::dom::object metadata;
+        CHECK_JSON_ERROR(j["metadata"].get(metadata));
+
+        int64_t sdc_index;
+        CHECK_JSON_ERROR(metadata["sdc_track_index"].get(sdc_index));
         
         // Create id to object index mapping
         std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
         
         // Initialize SDC first if valid
-        if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
-            j.at("objects")[sdc_index].get_to(map.objects[0]);
+        if (sdc_index >= 0 && sdc_index < objects.size()) {
+            simdjson::dom::element sdc_obj;
+            CHECK_JSON_ERROR(objects.at(sdc_index).get(sdc_obj));
+            from_json(sdc_obj, map.objects[0]);
             map.objects[0].metadata.isSdc = 1;
             idToObjIdx[map.objects[0].id] = 0;
             idx = 1;
         }
         
         // Initialize all other objects
-        for (size_t i = 0; i < j.at("objects").size(); i++) {
+        for (size_t i = 0; i < objects.size(); i++) {
             if (i == sdc_index) continue; // Skip SDC as it's already initialized
             if (idx >= map.numObjects) break;
-            
-            j.at("objects")[i].get_to(map.objects[idx]);
+            simdjson::dom::element obj;
+            CHECK_JSON_ERROR(objects.at(i).get(obj));
+            from_json(obj, map.objects[idx]);
             idToObjIdx[map.objects[idx].id] = idx;
             idx++;
         }
         
         // Process objects_of_interest using the ID mapping
-        for (const auto& obj_id : metadata.at("objects_of_interest")) {
-            int interest_id = obj_id.get<int>();
+        simdjson::dom::array objects_of_interest;
+        CHECK_JSON_ERROR(metadata["objects_of_interest"].get(objects_of_interest));
+        for (const auto& obj_id : objects_of_interest) {
+            int64_t interest_id;
+            CHECK_JSON_ERROR(obj_id.get(interest_id));
             if (auto it = idToObjIdx.find(interest_id); it != idToObjIdx.end()) {
                 map.objects[it->second].metadata.isObjectOfInterest = 1;
             }
         }
 
         // Process tracks_to_predict using the ID mapping
-        for (const auto& track : metadata.at("tracks_to_predict")) {
-            int track_index = track.at("track_index").get<int>();
-            if (track_index < 0 || track_index >= j.at("objects").size()) {
-                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
+        simdjson::dom::array tracks_to_predict;
+        CHECK_JSON_ERROR(metadata["tracks_to_predict"].get(tracks_to_predict));
+        for (const auto& track : tracks_to_predict) {
+            int64_t track_index;
+            CHECK_JSON_ERROR(track["track_index"].get(track_index));
+            if (track_index < 0 || track_index >= objects.size()) {
+                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << name_view.data() << std::endl;
             } else {
-                int track_id = j.at("objects")[track_index].at("id").get<int>();
+                int64_t track_id;
+                simdjson::dom::element track_obj;
+                CHECK_JSON_ERROR(objects.at(track_index).get(track_obj));
+                CHECK_JSON_ERROR(track_obj["id"].get(track_id));
                 if (auto it = idToObjIdx.find(track_id); it != idToObjIdx.end()) {
                     map.objects[it->second].metadata.isTrackToPredict = 1;
-                    map.objects[it->second].metadata.difficulty = track.at("difficulty").get<int>();
+                    int64_t difficulty;
+                    CHECK_JSON_ERROR(track["difficulty"].get(difficulty));
+                    map.objects[it->second].metadata.difficulty = difficulty;
                 }
             }
         }
         
         // Process roads
-        map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
+        simdjson::dom::array roads;
+        CHECK_JSON_ERROR(j["roads"].get_array().get(roads));
+        map.numRoads = std::min(roads.size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
         idx = 0;
-        for (const auto &road : j.at("roads")) {
+        for (const auto &road : roads) {
             if (idx >= map.numRoads)
                 break;
             from_json(road, map.roads[idx], polylineReductionThreshold);
