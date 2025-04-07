@@ -63,7 +63,8 @@ class AdvantageFilter:
             advantages_np: Numpy array of advantages
 
         Returns:
-            Boolean mask where True indicates transitions to keep
+            mask: Boolean mask where True indicates transitions to keep
+            threshold: Current filtering threshold (η)
         """
         # Get new max advantage
         max_advantage = float(np.max(np.abs(advantages_np)))
@@ -299,7 +300,13 @@ def train(data):
             dones_np, values_np, rewards_np, config.gamma, config.gae_lambda
         )
 
+        filter_mask = None
         if config.apply_advantage_filter:
+            if config.bptt_horizon > 1:
+                raise ValueError(
+                    "Advantage filtering cannot be used with LSTM (bptt_horizon > 1)"
+                )
+
             # Initialize the advantage filter if not already created
             if not hasattr(data, "advantage_filter"):
                 data.advantage_filter = AdvantageFilter(
@@ -308,32 +315,35 @@ def train(data):
                 )
 
             # Get mask of transitions to keep based on advantage magnitude
-            mask, threshold = data.advantage_filter.filter(advantages_np)
+            filter_mask, threshold = data.advantage_filter.filter(
+                advantages_np
+            )
 
             # Apply weights to advantages - this zeroes out filtered transitions
             # but keeps the array the same size and shape
-            advantages_np = advantages_np * mask.astype(np.float32)
+            advantages_np = advantages_np * filter_mask.astype(np.float32)
 
-            # Log filtering stats
+            # Log stats
             num_total = len(advantages_np)
-            num_kept = mask.sum()
+            num_kept = filter_mask.sum()
             percent_kept = 100 * num_kept / num_total if num_total > 0 else 0
+
+            data.filtering_stats = {
+                "advantage_filtering/threshold (η)": threshold,
+                "advantage_filtering/percent_kept": percent_kept,
+                "advantage_filtering/max_advantage": float(
+                    np.max(np.abs(advantages_np))
+                ),
+                "advantage_filtering/num_kept": int(num_kept),
+                "advantage_filtering/total": int(num_total),
+            }
+
             data.msg = (
-                f"Advantage filtering: kept {percent_kept:.1f}% of transitions"
+                f"Advantage filtering: kept {num_kept}/{num_total} transitions "
+                f"({percent_kept:.1f}%, threshold (η)={threshold:.4f})"
             )
 
-            if not hasattr(data, "filtering_stats"):
-                data.filtering_stats = []
-
-            data.filtering_stats.append(
-                {
-                    "threshold": threshold,
-                    "percent_kept": percent_kept,
-                    "max_advantage": float(np.max(np.abs(advantages_np))),
-                    "global_step": data.global_step,
-                }
-            )
-
+        # experience.flatten_batch(advantages_np, filter_mask)
         experience.flatten_batch(advantages_np)
 
     # Optimizing the policy and value network
