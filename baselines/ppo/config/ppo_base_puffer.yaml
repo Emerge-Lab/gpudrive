@@ -64,7 +64,6 @@ train:
   total_timesteps: 1_000_000_000
   batch_size: 131_072
   num_minibatches: 16
-  minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99

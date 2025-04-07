@@ -252,21 +252,21 @@ if __name__ == "__main__":
         "memory": 70,
         "job_name": group,
     }
-    
+
     hyperparams = {
-        "group": [group], # Group name
+        "group": [group],  # Group name
         "num_worlds": [800],
-        "resample_scenes": [1], # Yes
+        "resample_scenes": [1],  # Yes
         "k_unique_scenes": [800],
         "resample_interval": [5_000_000],
         "total_timesteps": [4_000_000_000],
         "resample_dataset_size": [10_000],
         "batch_size": [524288],
-        "minibatch_size": [16384],
+        "num_minibatches": [16],
         "update_epochs": [4],
         "ent_coef": [0.001, 0.003, 0.0001],
         "render": [0],
-        #"seed": [42, 3],
+        # "seed": [42, 3],
     }
 
     save_script(
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     #     "total_timesteps": [3_000_000_000],
     #     "resample_dataset_size": [1000],
     #     "batch_size": [262_144, 524_288],
-    #     "minibatch_size": [16_384],
+    #     "num_minibatches": [16_384],
     #     "update_epochs": [2, 4, 5],
     #     "ent_coef": [0.0001, 0.001, 0.003],
     #     "learning_rate": [1e-4, 3e-4],
@@ -299,6 +299,3 @@ if __name__ == "__main__":
     #     fields=fields,
     #     params=hyperparams,
     # )
-
-
-

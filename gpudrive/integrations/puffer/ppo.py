@@ -116,7 +116,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     experience = Experience(
         config.batch_size,
         config.bptt_horizon,
-        config.minibatch_size,
+        config.num_minibatches,
         obs_shape,
         obs_dtype,
         atn_shape,
@@ -501,12 +501,7 @@ def train(data):
 
                 # Add advantage filtering metrics if available
                 if hasattr(data, 'filtering_stats') and data.filtering_stats:
-                    latest_stats = data.filtering_stats[-1]
-                    log_dict.update({
-                        "advantage_filtering/threshold (η)": latest_stats['threshold'],
-                        "advantage_filtering/percent_kept": latest_stats['percent_kept'],
-                        "advantage_filtering/max_advantage": latest_stats['max_advantage']
-                    })
+                    log_dict.update(data.filtering_stats)
 
                 data.wandb.log(log_dict)
 
@@ -645,7 +640,7 @@ class Experience:
         self,
         batch_size,
         bptt_horizon,
-        minibatch_size,
+        num_minibatches,
         obs_shape,
         obs_dtype,
         atn_shape,
@@ -654,8 +649,8 @@ class Experience:
         lstm=None,
         lstm_total_agents=0,
     ):
-        if minibatch_size is None:
-            minibatch_size = batch_size
+        if num_minibatches is None:
+            num_minibatches = 1
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == "cuda" and cpu_offload
@@ -690,8 +685,8 @@ class Experience:
             self.lstm_h = torch.zeros(shape).to(device)
             self.lstm_c = torch.zeros(shape).to(device)
 
-        num_minibatches = batch_size / minibatch_size
         self.num_minibatches = int(num_minibatches)
+        minibatch_size = batch_size // num_minibatches
         if self.num_minibatches != num_minibatches:
             raise ValueError("batch_size must be divisible by minibatch_size")
 
@@ -712,9 +707,11 @@ class Experience:
 
     @property
     def full(self):
+        """Check if the buffer is full."""
         return self.ptr >= self.batch_size
 
     def store(self, obs, value, action, logprob, reward, done, env_id, mask):
+        """Store a batch of transitions in the buffer."""
         # Mask learner and Ensure indices do not exceed batch size
         ptr = self.ptr
         indices = torch.where(mask)[0].cpu().numpy()[: self.batch_size - ptr]
