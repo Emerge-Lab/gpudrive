@@ -111,7 +111,9 @@ class EnvConfig:
     # If reward_type is "reward_conditioned", the following parameters are used
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
     # If condition_mode is "fixed", set the agent weights here
-    agent_type: Optional[Union[str, torch.Tensor]] = None
+    agent_type: Optional[Union[str, torch.Tensor]] = torch.Tensor(
+        [-0.75, 1.0, -0.75]
+    )  # weights for collision, goal_achieved, off_road
 
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0

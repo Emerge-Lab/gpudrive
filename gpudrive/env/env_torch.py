@@ -451,9 +451,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if condition_mode is not None
                 else getattr(self.config, "condition_mode", "random")
             )
-            self.agent_type = agent_type
+            use_agent_type = (
+                agent_type if agent_type is not None else self.agent_type
+            )
             self._set_reward_weights(
-                env_idx_list, condition_mode=mode, agent_type=self.agent_type
+                env_idx_list, condition_mode=mode, agent_type=use_agent_type
             )
 
         self.world_time_steps.zero_()
@@ -1509,6 +1511,8 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         dynamics_model="delta_local",
+        reward_type="reward_conditioned",
+        condition_mode="fixed",
     )
     render_config = RenderConfig()
 
