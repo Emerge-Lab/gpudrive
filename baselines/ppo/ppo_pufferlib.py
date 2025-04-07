@@ -167,6 +167,7 @@ def run(
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
     goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
+    randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 1,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
@@ -201,7 +202,13 @@ def run(
 
     # Load default configs
     config = load_config(config_path)
-
+    
+    if config.environment.reward_type == "reward_conditioned":
+        if bool(randomize_rewards):
+            config.environment.condition_mode = "random"
+        else:
+            config.environment.condition_mode = "fixed" # Use the same type for every agent
+            
     # Override configs with command-line arguments
     env_config = {
         "num_worlds": num_worlds,

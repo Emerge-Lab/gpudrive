@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: data/processed/pop_play
 continue_training: false
 model_cpt: null
 
@@ -17,13 +17,14 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "follow_waypoints" # Options: "weighted_combination", "reward_conditioned", "follow_waypoints"
+  reward_type: "reward_conditioned" # Options: "weighted_combination", "reward_conditioned", "follow_waypoints"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
   init_mode: all_non_trivial
 
   # If reward_type is "reward_conditioned", the following parameters are used
+  randomize_rewards: true
   condition_mode: random
   collision_weight_lb: -3.0
   collision_weight_ub: 0.0
@@ -49,13 +50,13 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "blended"
-  group: "follow_waypoints"
+  project: "kshotagents"
+  group: " "
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: pop_play # Set dynamically in the script if needed
+  exp_id: random_rewards # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
