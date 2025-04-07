@@ -812,6 +812,12 @@ Tensor Manager::agentMapObservationsTensor() const
 
 }
 
+Tensor Manager::episodeLengthTensor() const
+{
+    return impl_->exportTensor(ExportID::EpisodeLength, TensorElementType::Int32,
+                               {impl_->numWorlds, 1});
+}
+
 Tensor Manager::lidarTensor() const
 {
     return impl_->exportTensor(ExportID::Lidar, TensorElementType::Float32,

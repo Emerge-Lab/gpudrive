@@ -18,9 +18,10 @@ namespace madrona_gpudrive
     {
         obj.mean = {0,0};
         uint32_t i = 0;
+        int numPositions = j.at("position").size();
         for (const auto &pos : j.at("position"))
         { 
-            if (i < MAX_POSITIONS)
+            if (i < MAX_POSITIONS && i < numPositions)
             {
                 from_json(pos, obj.position[i]);
                 obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
@@ -41,7 +42,7 @@ namespace madrona_gpudrive
         i = 0;
         for (const auto &h : j.at("heading"))
         {
-            if (i < MAX_POSITIONS)
+            if (i < MAX_POSITIONS && i < numPositions)
             {
                 h.get_to(obj.heading[i]);
                 ++i;
@@ -56,7 +57,7 @@ namespace madrona_gpudrive
         i = 0;
         for (const auto &v : j.at("velocity"))
         {
-            if (i < MAX_POSITIONS)
+            if (i < MAX_POSITIONS && i < numPositions)
             {
                 from_json(v, obj.velocity[i]);
                 ++i;
@@ -71,7 +72,7 @@ namespace madrona_gpudrive
         i = 0;
         for (const auto &v : j.at("valid"))
         {
-            if (i < MAX_POSITIONS)
+            if (i < MAX_POSITIONS && i < numPositions)
             {
                 v.get_to(obj.valid[i]);
                 ++i;

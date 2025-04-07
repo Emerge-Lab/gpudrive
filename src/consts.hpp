@@ -31,7 +31,7 @@ inline constexpr float rewardPerDist = 0.05f;
 inline constexpr float slackReward = -0.005f;
 
 // Steps per episode
-inline constexpr int32_t episodeLen = 91;
+inline constexpr int32_t maxEpisodeLength = 200;
 
 // Number of lidar samples, arranged in circle around agent
 inline constexpr madrona::CountT numLidarSamples = 50;
@@ -57,7 +57,7 @@ inline constexpr madrona::CountT numPhysicsSubsteps = 0.f;
 inline constexpr float zDimensionScale = 1;
 inline constexpr float xDimensionScaleRoadSegment = 1;
 
-inline constexpr madrona::CountT kTrajectoryLength = 91; // Nocturne has 90 timesteps per episode. making it 91 as a buffer.
+// inline constexpr madrona::CountT kTrajectoryLength = 91; // Nocturne has 90 timesteps per episode. making it 91 as a buffer.
 
 inline constexpr madrona::CountT kMaxRoadGeometryLength = 1810;
 

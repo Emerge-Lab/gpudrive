@@ -20,8 +20,8 @@ namespace RenderingSystem = madrona::render::RenderingSystem;
 
 namespace madrona_gpudrive {
 
-CountT getCurrentStep(const StepsRemaining &stepsRemaining) {
-  return consts::episodeLen - stepsRemaining.t;
+CountT getCurrentStep(Engine &ctx, const StepsRemaining &stepsRemaining) {
+  return ctx.singleton<EpisodeLength>().episode_length - stepsRemaining.t;
 }
 
 // Register all the ECS components and archetypes that will be
@@ -68,6 +68,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerSingleton<DeletedAgents>();
     registry.registerSingleton<MapName>();
     registry.registerSingleton<ScenarioId>();
+    registry.registerSingleton<EpisodeLength>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -83,6 +84,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
     registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     registry.exportSingleton<ScenarioId>((uint32_t)ExportID::ScenarioId);
+    registry.exportSingleton<EpisodeLength>((uint32_t)ExportID::EpisodeLength);
     
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
@@ -363,7 +365,7 @@ inline void movementSystem(Engine &e,
     } else {
         // Follow expert trajectory
         const Trajectory &trajectory = e.get<Trajectory>(agent_iface.e);
-        CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
+        CountT curStepIdx = getCurrentStep(e, e.get<StepsRemaining>(agent_iface.e));
         position.x = trajectory.positions[curStepIdx].x;
         position.y = trajectory.positions[curStepIdx].y;
         position.z = 1;
@@ -596,7 +598,7 @@ inline void doneSystem(Engine &ctx,
     Done &done = ctx.get<Done>(agent_iface.e);
     Info &info = ctx.get<Info>(agent_iface.e);
     int32_t num_remaining = steps_remaining.t;
-    if (num_remaining == consts::episodeLen && done.v != 1)
+    if (num_remaining == ctx.singleton<EpisodeLength>().episode_length && done.v != 1)
     { // Make sure to not reset an agent's done flag
         done.v = 0;
         return;
@@ -630,7 +632,7 @@ void collisionDetectionSystem(Engine &ctx,
             // Case: If an expert agent is in an invalid state, we need to ignore the collision detection for it.
             if (controlledState == false)
             {
-                auto currStep = getCurrentStep(ctx.get<StepsRemaining>(agent_iface.value().e));
+                auto currStep = getCurrentStep(ctx, ctx.get<StepsRemaining>(agent_iface.value().e));
                 auto &validState = ctx.get<Trajectory>(agent_iface.value().e).valids[currStep];
                 if (!validState)
                 {
@@ -997,6 +999,9 @@ Sim::Sim(Engine &ctx,
     for (auto i = 0; i < consts::kMaxAgentCount; i++) {
         deletedAgents.deletedAgents[i] = -1;
     }
+
+    auto& episodeLength = ctx.singleton<EpisodeLength>();
+    episodeLength.episode_length = init.params->episode_length;
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
 
