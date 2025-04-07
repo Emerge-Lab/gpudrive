@@ -40,12 +40,6 @@ class EnvConfig:
     disable_classic_obs: bool = False  # Disable classic observations
     lidar_obs: bool = False  # Use LiDAR in observations
 
-    # Set the weights for the reward components
-    # R = a * collided + b * goal_achieved + c * off_road
-    collision_weight: float = 0.0
-    goal_achieved_weight: float = 1.0
-    off_road_weight: float = 0.0
-
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 50.0  # Radius for road observations
@@ -89,7 +83,7 @@ class EnvConfig:
     vy: torch.Tensor = torch.round(torch.linspace(-10.0, 10.0, 10), decimals=3)
 
     # Collision behavior settings
-    collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
+    collision_behavior: str = "ignore"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
     remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
@@ -97,9 +91,18 @@ class EnvConfig:
     # Initialization steps: Number of steps to take before the episode starts
     init_steps: int = 0
 
+    # Goal behavior settings
+    goal_behavior: str = "remove"  # Options: "stop", "ignore", "remove"
+    add_goal_state: bool = True  # Add goal state to the scene
+
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
+
+    # Weights for the reward components
+    collision_weight: float = 0.0
+    goal_achieved_weight: float = 1.0
+    off_road_weight: float = 0.0
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 

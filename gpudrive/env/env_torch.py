@@ -754,63 +754,42 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
             mask=mask,
         )
+
         if self.config.norm_obs:
             ego_state.normalize()
 
+        base_fields = [
+            ego_state.speed,
+            ego_state.vehicle_length,
+            ego_state.vehicle_width,
+            ego_state.rel_goal_x,
+            ego_state.rel_goal_y,
+            ego_state.is_collided,
+        ]
+
+        if self.config.add_goal_state:
+            base_fields.append(ego_state.is_goal_reached)
+
         if mask is None:
             if self.config.reward_type == "reward_conditioned":
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                        self.reward_weights_tensor[:, :, 0],
-                        self.reward_weights_tensor[:, :, 1],
-                        self.reward_weights_tensor[:, :, 2],
-                    ]
-                ).permute(1, 2, 0)
-
+                full_fields = base_fields + [
+                    self.reward_weights_tensor[:, :, 0],
+                    self.reward_weights_tensor[:, :, 1],
+                    self.reward_weights_tensor[:, :, 2],
+                ]
+                return torch.stack(full_fields).permute(1, 2, 0)
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 2, 0)
-
+                return torch.stack(base_fields).permute(1, 2, 0)
         else:
             if self.config.reward_type == "reward_conditioned":
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                        self.reward_weights_tensor[mask][:, 0],
-                        self.reward_weights_tensor[mask][:, 1],
-                        self.reward_weights_tensor[mask][:, 2],
-                    ]
-                ).permute(1, 0)
+                masked_fields = base_fields + [
+                    self.reward_weights_tensor[mask][:, 0],
+                    self.reward_weights_tensor[mask][:, 1],
+                    self.reward_weights_tensor[mask][:, 2],
+                ]
+                return torch.stack(masked_fields).permute(1, 0)
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 0)
+                return torch.stack(base_fields).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -1499,7 +1478,7 @@ if __name__ == "__main__":
 
     env_idx = 0
 
-    for t in range(10):
+    for t in range(91):
         print(f"Step: {t}")
 
         # Step the environment
@@ -1513,9 +1492,9 @@ if __name__ == "__main__":
         # Make video
         sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
-            zoom_radius=50,
+            zoom_radius=80,
             time_steps=[t],
-            center_agent_indices=[highlight_agent],
+            # center_agent_indices=[highlight_agent],
         )
 
         agent_obs = env.vis.plot_agent_observation(
@@ -1532,7 +1511,7 @@ if __name__ == "__main__":
         done = env.get_dones()
         info = env.get_infos()
 
-        if done[0, highlight_agent].bool():
+        if done.all().bool():
             break
 
     env.close()
