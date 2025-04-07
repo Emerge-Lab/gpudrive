@@ -12,6 +12,7 @@ import os
 import random
 import psutil
 import time
+import warnings
 
 from threading import Thread
 from collections import defaultdict, deque
@@ -319,10 +320,6 @@ def train(data):
                 advantages_np
             )
 
-            # Apply weights to advantages - this zeroes out filtered transitions
-            # but keeps the array the same size and shape
-            advantages_np = advantages_np * filter_mask.astype(np.float32)
-
             # Log stats
             num_total = len(advantages_np)
             num_kept = filter_mask.sum()
@@ -343,8 +340,8 @@ def train(data):
                 f"({percent_kept:.1f}%, threshold (η)={threshold:.4f})"
             )
 
-        # experience.flatten_batch(advantages_np, filter_mask)
-        experience.flatten_batch(advantages_np)
+        # Prepare batch of transitions for model updating
+        experience.flatten_batch(advantages_np, filter_mask)
 
     # Optimizing the policy and value network
     num_update_iters = config.update_epochs * experience.num_minibatches
@@ -632,7 +629,6 @@ def make_losses():
         explained_variance=0,
     )
 
-
 class Experience:
     """Flat tensor storage (buffer) and array views for faster indexing."""
 
@@ -751,27 +747,103 @@ class Experience:
         self.step = 0
         return idxs
 
-    def flatten_batch(self, advantages_np):
-        advantages = torch.from_numpy(advantages_np).to(self.device)
-        b_idxs, b_flat = self.b_idxs, self.b_idxs_flat
-        self.b_actions = self.actions.to(self.device, non_blocking=True)
-        self.b_logprobs = self.logprobs.to(self.device, non_blocking=True)
-        self.b_dones = self.dones.to(self.device, non_blocking=True)
-        self.b_values = self.values.to(self.device, non_blocking=True)
-        self.b_advantages = (
-            advantages.reshape(
-                self.minibatch_rows, self.num_minibatches, self.bptt_horizon
+    def flatten_batch(self, advantages_np, filter_mask=None):
+        """Prepare the batch of transitions for model updating."""    
+        
+        if filter_mask is not None:
+
+            # Get the indices of transitions to keep 
+            kept_indices = np.nonzero(filter_mask)[0]
+            total_kept = len(kept_indices)
+                    
+            # Determine how many transitions per minibatch (floor division)
+            transitions_per_mb = total_kept // self.num_minibatches
+            
+            # We need at least one transition per minibatch
+            if transitions_per_mb < 32:
+                transitions_per_mb = 64
+                
+                warnings.warn(f"Low adv. filtering retention rate: Only kept {len(kept_indices)} / {len(advantages_np)} transitions ({transitions_per_mb} per minibatch) \n Consider adjusting the advantage threshold factor or increase the batch_size.", UserWarning) 
+                
+                # If we don't have enough, sample with replacement
+                if total_kept < self.num_minibatches:
+                    kept_indices = np.random.choice(kept_indices, self.num_minibatches, replace=True)
+                    total_kept = len(kept_indices)
+            
+            # Calculate total transitions to use (divisible by num_minibatches)
+            transitions_to_use = transitions_per_mb * self.num_minibatches
+            
+            np.random.shuffle(kept_indices)
+            kept_indices = kept_indices[:transitions_to_use]
+            filtered_idxs = kept_indices.copy()
+            
+            # Reshape to (minibatch_rows, num_minibatches, bptt_horizon)
+            minibatch_rows_filtered = transitions_to_use // (self.num_minibatches * self.bptt_horizon)
+            filtered_idxs = filtered_idxs.reshape(
+                minibatch_rows_filtered,
+                self.num_minibatches,
+                self.bptt_horizon
             )
-            .transpose(0, 1)
-            .reshape(self.num_minibatches, self.minibatch_size)
-        )
-        self.returns_np = advantages_np + self.values_np
-        self.b_obs = self.obs[self.b_idxs_obs]
-        self.b_actions = self.b_actions[b_idxs].contiguous()
-        self.b_logprobs = self.b_logprobs[b_idxs]
-        self.b_dones = self.b_dones[b_idxs]
-        self.b_values = self.b_values[b_flat]
-        self.b_returns = self.b_advantages + self.b_values
+            filtered_idxs = np.transpose(filtered_idxs, (1, 0, 2))
+            
+            # Update minibatch indices
+            self.b_idxs_obs = torch.as_tensor(filtered_idxs).to(self.obs.device).long()
+            self.b_idxs = self.b_idxs_obs.to(self.device)
+            self.b_idxs_flat = self.b_idxs.reshape(self.num_minibatches, -1)
+            
+            # Get advantages for the filtered transitions
+            advantages = torch.from_numpy(advantages_np).to(self.device)
+            
+            # The rest of the processing is similar to the original code
+            b_idxs, b_flat = self.b_idxs, self.b_idxs_flat
+            self.b_actions = self.actions.to(self.device, non_blocking=True)
+            self.b_logprobs = self.logprobs.to(self.device, non_blocking=True)
+            self.b_dones = self.dones.to(self.device, non_blocking=True)
+            self.b_values = self.values.to(self.device, non_blocking=True)
+            
+            # Reshape advantages to match the filtered structure
+            filtered_advantages = advantages[kept_indices[:transitions_to_use]]
+            self.b_advantages = filtered_advantages.reshape(
+                self.num_minibatches, -1
+            )
+            
+            # Compute returns
+            self.returns_np = advantages_np + self.values_np
+            
+            # Get observations, actions, etc. based on filtered indices
+            self.b_obs = self.obs[self.b_idxs_obs]
+            self.b_actions = self.b_actions[b_idxs].contiguous()
+            self.b_logprobs = self.b_logprobs[b_idxs]
+            self.b_dones = self.b_dones[b_idxs]
+            self.b_values = self.b_values[b_flat]
+            self.b_returns = self.b_advantages + self.b_values
+            
+        else:
+            # Original implementation for when no filtering is applied
+            advantages = torch.from_numpy(advantages_np).to(self.device)
+            
+            # Get the respective indices for all minibatches
+            b_idxs, b_flat = self.b_idxs, self.b_idxs_flat
+            self.b_actions = self.actions.to(self.device, non_blocking=True)
+            self.b_logprobs = self.logprobs.to(self.device, non_blocking=True)
+            self.b_dones = self.dones.to(self.device, non_blocking=True)
+            self.b_values = self.values.to(self.device, non_blocking=True)
+            self.b_advantages = (
+                advantages.reshape(
+                    self.minibatch_rows, self.num_minibatches, self.bptt_horizon
+                )
+                .transpose(0, 1)
+                .reshape(self.num_minibatches, self.minibatch_size)
+            )
+            
+            # Re-order the transitions based on the sorted indices
+            self.returns_np = advantages_np + self.values_np
+            self.b_obs = self.obs[self.b_idxs_obs]
+            self.b_actions = self.b_actions[b_idxs].contiguous()
+            self.b_logprobs = self.b_logprobs[b_idxs]
+            self.b_dones = self.b_dones[b_idxs]
+            self.b_values = self.b_values[b_flat]
+            self.b_returns = self.b_advantages + self.b_values
 
 
 class Utilization(Thread):
