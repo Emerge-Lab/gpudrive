@@ -129,12 +129,12 @@ if __name__ == "__main__":
 
     # Analysis settings
     config.data_dir = "data/processed/training"
-    config.environment.num_worlds = 10
+    config.environment.num_worlds = 100
     config.dataset_size = 5000
     config.sample_with_replacement = True
     config.num_rollouts = 1
-    config.environment.max_controlled_agents = 64 #1
-    config.device = "cuda" 
+    config.environment.max_controlled_agents = 64  # 1
+    config.device = "cuda"
     config.environment.reward_type = "reward_conditioned"
     config.environment.condition_mode = "fixed"
     config.environment.agent_type = torch.Tensor([-0.5, 1.0, -0.5])
@@ -180,14 +180,14 @@ if __name__ == "__main__":
     print(f"goal_achieved: {df['goal_achieved_frac'].mean()*100:.2f}")
     print(f"collided: {df['collided_frac'].mean()*100:.2f}")
     print(f"off_road: {df['off_road_frac'].mean()*100:.2f}")
-    
+
     # Save videos
     sim_state_arrays = {k: np.array(v) for k, v in frames.items()}
     videos_dir = Path(f"videos/reward_conditioned")
     videos_dir.mkdir(parents=True, exist_ok=True)
 
     for env_id, frames in sim_state_arrays.items():
-        
+
         filename = filenames[env_id]
         video_path = videos_dir / f"{filename}.gif"
 
@@ -195,8 +195,7 @@ if __name__ == "__main__":
             str(video_path),
             frames,
             fps=5,
-            codec='gif',
+            codec="gif",
         )
 
         print(f"Saved video to {video_path}")
-
