@@ -113,7 +113,7 @@ def evaluate(data):
         and data.resample_buffer >= data.config.resample_interval
         and data.config.resample_dataset_size > data.vecenv.num_worlds
     ):
-        print(f"Resampling scenarios at global step {data.global_step}")
+        data.msg = f"Resampling scenarios at global step {data.global_step}"
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
 

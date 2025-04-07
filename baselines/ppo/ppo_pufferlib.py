@@ -202,13 +202,17 @@ def run(
 
     # Load default configs
     config = load_config(config_path)
-    
+
     if config.environment.reward_type == "reward_conditioned":
         if bool(randomize_rewards):
             config.environment.condition_mode = "random"
+            config.train.exp_id = "random_weights"
         else:
-            config.environment.condition_mode = "fixed" # Use the same type for every agent
-            
+            config.environment.condition_mode = (
+                "fixed"  # Use the same type for every agent
+            )
+            config.train.exp_id = "fixed_weights"
+
     # Override configs with command-line arguments
     env_config = {
         "num_worlds": num_worlds,
