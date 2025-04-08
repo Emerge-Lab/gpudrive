@@ -81,7 +81,7 @@ def make_agent(env, config):
         # )
 
         return Agent(
-            embed_dim=64,
+            embed_dim=config.train.network.embed_dim,
             action_dim=env.single_action_space.n,
         )
 

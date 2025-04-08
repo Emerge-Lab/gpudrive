@@ -24,8 +24,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   init_mode: all_non_trivial
 
   # If reward_type is "reward_conditioned", the following parameters are used
-  randomize_rewards: false
-  condition_mode: fixed # Options: random, fixed
+  randomize_rewards: true
+  condition_mode: random # Options: random, fixed
   collision_weight_lb: -3.0
   collision_weight_ub: 0.0
   goal_achieved_weight_lb: 1.0
@@ -51,7 +51,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "kshotagents"
-  group: "small"
+  group: "separate_actor_critic"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -93,14 +93,13 @@ train:
 
   # # # Network # # #
   network:
-    input_dim: 64 # Embedding of the input features
-    hidden_dim: 128 # Latent dimension
+    embed_dim: 64 # Embedding of the input features
     dropout: 0.01
-    class_name: "NeuralNet"
+    class_name: "Agent"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 500 # Save policy every k iterations
+  checkpoint_interval: 2 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #

@@ -34,6 +34,7 @@ class Agent(nn.Module):
 
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.ReLU()
         self.dropout = dropout
+        self.action_dim = action_dim
 
         # Indices for unpacking the observation modalities
         self.ego_state_idx = 9
