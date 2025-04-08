@@ -5,6 +5,7 @@
 #include "consts.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <unordered_set>
 
 namespace madrona_gpudrive
 {
@@ -295,44 +296,105 @@ namespace madrona_gpudrive
         // Create id to object index mapping
         std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
-        
+
+        // First, identify which objects are tracks_to_predict and objects_of_interest
+        std::unordered_set<int> tracks_to_predict_indices;
+        std::unordered_set<int> objects_of_interest_ids;
+
+        // Collect tracks_to_predict indices
+        for (const auto& track : metadata.at("tracks_to_predict")) {
+            int track_index = track.at("track_index").get<int>();
+            if (track_index >= 0 && track_index < j.at("objects").size()) {
+                tracks_to_predict_indices.insert(track_index);
+            } else {
+                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
+            }
+        }
+
+        // Collect objects_of_interest IDs
+        for (const auto& obj_id : metadata.at("objects_of_interest")) {
+            objects_of_interest_ids.insert(obj_id.get<int>());
+        }
+
         // Initialize SDC first if valid
         if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
             j.at("objects")[sdc_index].get_to(map.objects[0]);
             map.objects[0].metadata.isSdc = 1;
-            idToObjIdx[map.objects[0].id] = 0;
-            idx = 1;
-        }
-        
-        // Initialize all other objects
-        for (size_t i = 0; i < j.at("objects").size(); i++) {
-            if (i == sdc_index) continue; // Skip SDC as it's already initialized
-            if (idx >= map.numObjects) break;
             
-            j.at("objects")[i].get_to(map.objects[idx]);
-            idToObjIdx[map.objects[idx].id] = idx;
-            idx++;
+            // Set additional metadata if needed
+            int sdc_id = map.objects[0].id;
+            if (tracks_to_predict_indices.find(sdc_index) != tracks_to_predict_indices.end()) {
+                map.objects[0].metadata.isTrackToPredict = 1;
+                // Find and set difficulty
+                for (const auto& track : metadata.at("tracks_to_predict")) {
+                    if (track.at("track_index").get<int>() == sdc_index) {
+                        map.objects[0].metadata.difficulty = track.at("difficulty").get<int>();
+                        break;
+                    }
+                }
+            }
+            if (objects_of_interest_ids.find(sdc_id) != objects_of_interest_ids.end()) {
+                map.objects[0].metadata.isObjectOfInterest = 1;
+            }
+            
+            idToObjIdx[sdc_id] = 0;
+            idx = 1;
+            
+            // Remove SDC from sets to avoid double processing
+            tracks_to_predict_indices.erase(sdc_index);
+            objects_of_interest_ids.erase(sdc_id);
         }
-        
-        // Process objects_of_interest using the ID mapping
-        for (const auto& obj_id : metadata.at("objects_of_interest")) {
-            int interest_id = obj_id.get<int>();
-            if (auto it = idToObjIdx.find(interest_id); it != idToObjIdx.end()) {
-                map.objects[it->second].metadata.isObjectOfInterest = 1;
+
+        // Initialize tracks_to_predict objects (excluding SDC)
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue; // Skip SDC as it's already initialized
+            
+            if (tracks_to_predict_indices.find(i) != tracks_to_predict_indices.end()) {
+                j.at("objects")[i].get_to(map.objects[idx]);
+                map.objects[idx].metadata.isTrackToPredict = 1;
+                
+                // Find and set difficulty
+                for (const auto& track : metadata.at("tracks_to_predict")) {
+                    if (track.at("track_index").get<int>() == static_cast<int>(i)) {
+                        map.objects[idx].metadata.difficulty = track.at("difficulty").get<int>();
+                        break;
+                    }
+                }
+                
+                // Check if also object of interest
+                if (objects_of_interest_ids.find(map.objects[idx].id) != objects_of_interest_ids.end()) {
+                    map.objects[idx].metadata.isObjectOfInterest = 1;
+                    objects_of_interest_ids.erase(map.objects[idx].id);
+                }
+                
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
             }
         }
 
-        // Process tracks_to_predict using the ID mapping
-        for (const auto& track : metadata.at("tracks_to_predict")) {
-            int track_index = track.at("track_index").get<int>();
-            if (track_index < 0 || track_index >= j.at("objects").size()) {
-                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
-            } else {
-                int track_id = j.at("objects")[track_index].at("id").get<int>();
-                if (auto it = idToObjIdx.find(track_id); it != idToObjIdx.end()) {
-                    map.objects[it->second].metadata.isTrackToPredict = 1;
-                    map.objects[it->second].metadata.difficulty = track.at("difficulty").get<int>();
-                }
+        // Initialize objects_of_interest (excluding those already processed)
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue;
+            
+            int obj_id = j.at("objects")[i].at("id").get<int>();
+            if (objects_of_interest_ids.find(obj_id) != objects_of_interest_ids.end()) {
+                j.at("objects")[i].get_to(map.objects[idx]);
+                map.objects[idx].metadata.isObjectOfInterest = 1;
+                
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
+            }
+        }
+
+        // Initialize all remaining objects
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue;
+            
+            int obj_id = j.at("objects")[i].at("id").get<int>();
+            if (idToObjIdx.find(obj_id) == idToObjIdx.end()) { // Check if not already processed
+                j.at("objects")[i].get_to(map.objects[idx]);
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
             }
         }
         
