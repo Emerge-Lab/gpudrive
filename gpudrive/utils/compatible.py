@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     # Analysis settings
     config.data_dir = "data/processed/training"
-    config.environment.num_worlds = 100
+    config.environment.num_worlds = 20
     config.dataset_size = 5000
     config.sample_with_replacement = True
     config.num_rollouts = 1
@@ -137,7 +137,8 @@ if __name__ == "__main__":
     config.device = "cuda"
     config.environment.reward_type = "reward_conditioned"
     config.environment.condition_mode = "fixed"
-    config.environment.agent_type = torch.Tensor([-0.5, 1.0, -0.5])
+    config.environment.agent_type = torch.Tensor([-0.75, 1.0, -0.75])
+    config.render = True
 
     agent = load_policy(
         model_name="model_pop_play____R_10000__04_04_18_27_28_702_002500",
@@ -167,8 +168,8 @@ if __name__ == "__main__":
         num_rollouts=config.num_rollouts,
         device=config.device,
         identifier=f"{EXP_ID}_{config.environment.max_controlled_agents}",
-        render_sim_state=True,
-        render_every_t=5,
+        render_sim_state=config.render,
+        render_every_t=2,
     )
     df = df.dropna()
 
@@ -182,20 +183,21 @@ if __name__ == "__main__":
     print(f"off_road: {df['off_road_frac'].mean()*100:.2f}")
 
     # Save videos
-    sim_state_arrays = {k: np.array(v) for k, v in frames.items()}
-    videos_dir = Path(f"videos/reward_conditioned")
-    videos_dir.mkdir(parents=True, exist_ok=True)
+    if config.render:
+        sim_state_arrays = {k: np.array(v) for k, v in frames.items()}
+        videos_dir = Path(f"videos/reward_conditioned")
+        videos_dir.mkdir(parents=True, exist_ok=True)
 
-    for env_id, frames in sim_state_arrays.items():
+        for env_id, frames in sim_state_arrays.items():
 
-        filename = filenames[env_id]
-        video_path = videos_dir / f"{filename}.gif"
+            filename = filenames[env_id]
+            video_path = videos_dir / f"{filename}.gif"
 
-        mediapy.write_video(
-            str(video_path),
-            frames,
-            fps=5,
-            codec="gif",
-        )
+            mediapy.write_video(
+                str(video_path),
+                frames,
+                fps=5,
+                codec="gif",
+            )
 
-        print(f"Saved video to {video_path}")
+            print(f"Saved video to {video_path}")
