@@ -20,6 +20,7 @@ from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
 from gpudrive.networks.late_fusion import NeuralNet
+from gpudrive.networks.agents import Agent
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
@@ -71,12 +72,17 @@ def make_agent(env, config):
 
     else:
         # Start from scratch
-        return NeuralNet(
-            input_dim=config.train.network.input_dim,
+        # return NeuralNet(
+        #     input_dim=config.train.network.input_dim,
+        #     action_dim=env.single_action_space.n,
+        #     hidden_dim=config.train.network.hidden_dim,
+        #     dropout=config.train.network.dropout,
+        #     config=config.environment,
+        # )
+
+        return Agent(
+            embed_dim=64,
             action_dim=env.single_action_space.n,
-            hidden_dim=config.train.network.hidden_dim,
-            dropout=config.train.network.dropout,
-            config=config.environment,
         )
 
 
@@ -167,7 +173,7 @@ def run(
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
     goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
-    randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 1,
+    randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,

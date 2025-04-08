@@ -383,6 +383,7 @@ def train(data):
             ):
 
                 data.last_log_time = time.perf_counter()
+
                 data.wandb.log(
                     {
                         "performance/controlled_agent_sps": profile.controlled_agent_sps,
@@ -393,6 +394,8 @@ def train(data):
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
                         "train/learning_rate": data.optimizer.param_groups[0]["lr"],
+                        "train/advantages": data.wandb.Histogram(advantages_np),
+                        "train/advantages_var": np.var(advantages_np),
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }

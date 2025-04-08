@@ -8,8 +8,8 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 50 # Number of parallel environments
-  k_unique_scenes: 50 # Number of unique scenes to sample from
+  num_worlds: 100 # Number of parallel environments
+  k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -24,8 +24,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   init_mode: all_non_trivial
 
   # If reward_type is "reward_conditioned", the following parameters are used
-  randomize_rewards: true
-  condition_mode: random # Options: random, fixed
+  randomize_rewards: false
+  condition_mode: fixed # Options: random, fixed
   collision_weight_lb: -3.0
   collision_weight_ub: 0.0
   goal_achieved_weight_lb: 1.0
@@ -51,7 +51,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "kshotagents"
-  group: "benchmark_500s"
+  group: "small"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -65,9 +65,9 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 500 # Number of unique scenes to sample from
-  resample_interval: 100_000
+  resample_interval: 2_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
@@ -77,7 +77,7 @@ train:
   batch_size: 131072
   minibatch_size: 8192
   learning_rate: 3e-4
-  anneal_lr: false
+  anneal_lr: true
   gamma: 0.99
   gae_lambda: 0.95
   update_epochs: 4
@@ -85,7 +85,7 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.0001
+  ent_coef: 0.003
   vf_coef: 0.3
   max_grad_norm: 0.5
   target_kl: null
