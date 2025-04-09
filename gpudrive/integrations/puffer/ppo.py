@@ -396,6 +396,7 @@ def train(data):
                         "train/learning_rate": data.optimizer.param_groups[0]["lr"],
                         "train/advantages": data.wandb.Histogram(advantages_np),
                         "train/advantages_var": np.var(advantages_np),
+                        "train/advantages_mean": np.mean(advantages_np),
                         **{f"metrics/{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
