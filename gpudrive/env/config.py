@@ -143,7 +143,6 @@ class EnvConfig:
 
     # VBD model settings
     use_vbd: bool = False
-    vbd_model_path: str = None
     vbd_trajectory_weight: float = 0.01
     vbd_in_obs: bool = False
 
