@@ -796,7 +796,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if mask is None:
             if self.config.reward_type == "reward_conditioned":
-                
+
                 # Create expanded weights for all environments
                 # Expand from [max_agents, 3] to [num_worlds, max_agents]
                 collision_weights = self.reward_weights_tensor[:, 0].expand(
@@ -808,7 +808,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 off_road_weights = self.reward_weights_tensor[:, 2].expand(
                     self.num_worlds, -1
                 )
-                
+
                 full_fields = base_fields + [
                     collision_weights,
                     goal_weights,
@@ -826,7 +826,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 weights_for_masked_agents = self.reward_weights_tensor.to(
                     self.device
                 )[agent_indices]
-                
+
                 return torch.stack(
                     [
                         ego_state.speed,

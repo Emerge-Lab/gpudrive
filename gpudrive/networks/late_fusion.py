@@ -98,7 +98,7 @@ class NeuralNet(
 
         # Ego state base fields
         self.ego_state_idx = constants.EGO_FEAT_DIM
-        
+
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
