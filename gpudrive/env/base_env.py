@@ -158,6 +158,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
+        params = self._set_goal_behavior(params)
 
         return params
 
@@ -234,6 +235,27 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         else:
             raise ValueError(
                 f"Invalid collision behavior: {self.config.collision_behavior}"
+            )
+        return params
+
+    def _set_goal_behavior(self, params):
+        """Configures the behavior when an agent reaches its goal.
+
+        Args:
+            params (object): Parameters object to update based on goal behavior.
+
+        Returns:
+            object: Updated parameters with goal behavior settings.
+        """
+        if self.config.goal_behavior == "remove":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Remove
+        elif self.config.goal_behavior == "stop":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Stop
+        elif self.config.goal_behavior == "ignore":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Ignore
+        else:
+            raise ValueError(
+                f"Invalid goal behavior: {self.config.goal_behavior}"
             )
         return params
 

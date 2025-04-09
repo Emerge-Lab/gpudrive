@@ -51,6 +51,7 @@ namespace madrona_gpudrive
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
+            .def_rw("goalBehaviour", &Parameters::goalBehaviour)
             .def_rw("maxNumControlledAgents", &Parameters::maxNumControlledAgents)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
@@ -63,9 +64,15 @@ namespace madrona_gpudrive
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
-            .value("AgentStop", CollisionBehaviour::AgentStop)
-            .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
-            .value("Ignore", CollisionBehaviour::Ignore);
+        .value("AgentStop", CollisionBehaviour::AgentStop)
+        .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
+        .value("Ignore", CollisionBehaviour::Ignore);
+
+        // Define GoalBehaviour enum
+        nb::enum_<GoalBehaviour>(m, "GoalBehaviour")
+        .value("Remove", GoalBehaviour::Remove)
+        .value("Stop", GoalBehaviour::Stop)
+        .value("Ignore", GoalBehaviour::Ignore);
 
         nb::enum_<DynamicsModel>(m, "DynamicsModel")
             .value("Classic", DynamicsModel::Classic)

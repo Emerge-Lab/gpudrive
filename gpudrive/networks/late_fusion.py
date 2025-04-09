@@ -96,8 +96,9 @@ class NeuralNet(
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
         self.vbd_in_obs = False
 
-        # Indices for unpacking the observation
+        # Ego state base fields
         self.ego_state_idx = constants.EGO_FEAT_DIM
+        
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
@@ -105,7 +106,9 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-        
+            if "add_goal_state" in self.config:
+                self.ego_state_idx += 1
+
             self.vbd_in_obs = self.config.vbd_in_obs
 
         self.partner_obs_idx = self.ego_state_idx + (
@@ -235,7 +238,6 @@ class NeuralNet(
         else:
             # Without VBD, all remaining elements are road graph observations
             roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
-
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
         )

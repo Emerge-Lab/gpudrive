@@ -778,11 +778,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
             mask=mask,
         )
+
         if self.config.norm_obs:
             ego_state.normalize()
 
+        base_fields = [
+            ego_state.speed,
+            ego_state.vehicle_length,
+            ego_state.vehicle_width,
+            ego_state.rel_goal_x,
+            ego_state.rel_goal_y,
+            ego_state.is_collided,
+        ]
+
+        if self.config.add_goal_state:
+            base_fields.append(ego_state.is_goal_reached)
+
         if mask is None:
             if self.config.reward_type == "reward_conditioned":
+                
                 # Create expanded weights for all environments
                 # Expand from [max_agents, 3] to [num_worlds, max_agents]
                 collision_weights = self.reward_weights_tensor[:, 0].expand(
@@ -794,32 +808,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 off_road_weights = self.reward_weights_tensor[:, 2].expand(
                     self.num_worlds, -1
                 )
-
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                        collision_weights.to(self.device),
-                        goal_weights.to(self.device),
-                        off_road_weights.to(self.device),
-                    ]
-                ).permute(1, 2, 0)
+                
+                full_fields = base_fields + [
+                    collision_weights,
+                    goal_weights,
+                    off_road_weights,
+                ]
+                return torch.stack(full_fields).permute(1, 2, 0)
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 2, 0)
-
+                return torch.stack(base_fields).permute(1, 2, 0)
         else:
             if self.config.reward_type == "reward_conditioned":
                 # For masked agents, we need to extract agent indices from the mask
@@ -829,7 +826,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 weights_for_masked_agents = self.reward_weights_tensor.to(
                     self.device
                 )[agent_indices]
-
+                
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -838,22 +835,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_x,
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
-                        weights_for_masked_agents[:, 0],  # Collision weights
-                        weights_for_masked_agents[:, 1],  # Goal weights
-                        weights_for_masked_agents[:, 2],  # Off-road weights
+                        weights_for_masked_agents[:, 0],
+                        weights_for_masked_agents[:, 1],
+                        weights_for_masked_agents[:, 2],
                     ]
                 ).permute(1, 0)
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 0)
+                return torch.stack(base_fields).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -1552,7 +1540,7 @@ if __name__ == "__main__":
 
     env_idx = 0
 
-    for t in range(10):
+    for t in range(91):
         print(f"Step: {t}")
 
         # Step the environment
@@ -1566,9 +1554,9 @@ if __name__ == "__main__":
         # Make video
         sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
-            zoom_radius=50,
+            zoom_radius=80,
             time_steps=[t],
-            center_agent_indices=[highlight_agent],
+            # center_agent_indices=[highlight_agent],
         )
 
         agent_obs = env.vis.plot_agent_observation(
@@ -1585,7 +1573,7 @@ if __name__ == "__main__":
         done = env.get_dones()
         info = env.get_infos()
 
-        if done[0, highlight_agent].bool():
+        if done.all().bool():
             break
 
     env.close()
