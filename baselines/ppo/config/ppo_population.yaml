@@ -68,7 +68,7 @@ train:
   resample_scenes: false
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: true
+  sample_with_replacement: false
   shuffle_dataset: false
 
   # # # PPO # # #
@@ -85,8 +85,8 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.003
-  vf_coef: 0.3
+  ent_coef: 0.001
+  vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
   log_window: 1000
