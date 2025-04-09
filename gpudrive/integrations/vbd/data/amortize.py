@@ -1,17 +1,16 @@
-#!/usr/bin/env python
 """
-VBD Amortization Script
+VBD Amortization Script (CPU-only version)
 
 This script adds pre-computed VBD trajectories to Waymo Open Dataset JSON files.
-It uses a sliding window approach to generate trajectories in chunks.
+It uses a sliding window approach to generate trajectories in chunks, running exclusively on CPU.
 
 Usage:
-    python vbd_amortize.py --model_path /path/to/vbd/model 
-                           --input_dir /path/to/input/json/files 
-                           --output_dir /path/to/output/json/files
-                           --batch_size 8
-                           --window_size 10
-                           --total_steps 91
+    python vbd_amortize_cpu.py --model_path /path/to/vbd/model 
+                               --input_dir /path/to/input/json/files 
+                               --output_dir /path/to/output/json/files
+                               --batch_size 8
+                               --window_size 10
+                               --total_steps 91
 """
 
 import os
@@ -26,14 +25,18 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
 
-def load_vbd_model(model_path, device="cuda"):
-    """Load the VBD model from a checkpoint."""
+def load_vbd_model(model_path, device="cpu"):
+    """Load the VBD model from a checkpoint, forcing CPU usage."""
+    # Force the model to be loaded on CPU
     model = VBDTest.load_from_checkpoint(model_path, torch.device(device))
+    # Make sure model is in eval mode
     _ = model.eval()
     return model
 
 def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10, total_steps=91):
-    """Process a single JSON file, adding VBD trajectories."""
+    """Process a single JSON file, adding VBD trajectories, using CPU only."""
+    print(f"Processing file: {json_path}")
+    
     # Load the JSON file
     with open(json_path, 'r') as f:
         data = json.load(f)
@@ -47,7 +50,7 @@ def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10,
         bev_obs=False,
         lidar_obs=False,
         disable_classic_obs=False,
-        max_controlled_agents=64,
+        max_controlled_agents=32,
         use_vbd=False,  # We don't need the VBD integration in the env
         dynamics_model="delta_local",
     )
@@ -55,27 +58,27 @@ def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10,
     # Create data loader with just this file
     data_loader = SceneDataLoader(
         root=os.path.dirname(json_path),
-        filenames=[os.path.basename(json_path)],
         batch_size=batch_size,
         dataset_size=1,
         sample_with_replacement=False,
         shuffle=False,
     )
     
-    # Create environment
+    # Create environment with CPU device
     env = GPUDriveTorchEnv(
         config=config,
         data_loader=data_loader,
         max_cont_agents=64,
-        device=vbd_model.device,
+        device="cpu",  # Force CPU
         action_type="discrete",
+        backend="torch",
     )
     
     # Reset the environment
     _ = env.reset()
     
     # Get initial world state
-    means_xy = env.sim.world_means_tensor().to_torch()[:, :2].to(vbd_model.device)
+    means_xy = env.sim.world_means_tensor().to_torch().to("cpu")[:, :2]
     
     # Initialize VBD trajectories dictionary
     vbd_trajectories = {}
@@ -87,12 +90,17 @@ def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10,
     for start_idx in range(0, total_steps, window_size):
         print(f"Processing window starting at {start_idx}")
         
-        # Generate sample batch for VBD from current state
+        # Generate sample batch for VBD from current state, ensuring it's on CPU
         sample_batch = env._generate_sample_batch(init_steps=window_size)
         
-        # Generate predictions
+        # Make sure all tensors in the batch are on CPU
+        for key, value in sample_batch.items():
+            if isinstance(value, torch.Tensor):
+                sample_batch[key] = value.to("cpu")
+        
+        # Generate predictions using CPU
         predictions = vbd_model.sample_denoiser(sample_batch)
-        vbd_output = predictions["denoised_trajs"].to(vbd_model.device).detach().cpu().numpy()
+        vbd_output = predictions["denoised_trajs"].to("cpu").detach().cpu().numpy()
         
         # Get agent IDs
         agent_indices = sample_batch["agents_id"][0]  # Assuming batch size 1
@@ -139,21 +147,28 @@ def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10,
     return output_path
 
 def main():
-    parser = argparse.ArgumentParser(description="VBD Amortization Script")
+    parser = argparse.ArgumentParser(description="VBD Amortization Script (CPU-only version)")
     parser.add_argument("--model_path", required=True, help="Path to the VBD model checkpoint")
     parser.add_argument("--input_dir", required=True, help="Directory containing input JSON files")
     parser.add_argument("--output_dir", required=True, help="Directory for output JSON files")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for processing")
     parser.add_argument("--window_size", type=int, default=10, help="Size of sliding window")
     parser.add_argument("--total_steps", type=int, default=91, help="Total number of steps to generate")
+    parser.add_argument("--single_file", help="Process only a single file (optional)")
     args = parser.parse_args()
     
-    # Load VBD model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Always use CPU device
+    device = "cpu"
+    print(f"Loading VBD model on {device}...")
     vbd_model = load_vbd_model(args.model_path, device)
     
-    # Find all JSON files in the input directory
-    json_files = list(Path(args.input_dir).glob("**/*.json"))
+    if args.single_file:
+        # Process just one file
+        json_files = [Path(args.single_file)]
+    else:
+        # Find all JSON files in the input directory
+        json_files = list(Path(args.input_dir).glob("**/*.json"))
+    
     print(f"Found {len(json_files)} JSON files to process")
     
     # Process each file
@@ -170,6 +185,8 @@ def main():
             print(f"Processed {json_path} -> {output_path}")
         except Exception as e:
             print(f"Error processing {json_path}: {e}")
+            import traceback
+            traceback.print_exc()
     
     print("VBD amortization complete!")
 
