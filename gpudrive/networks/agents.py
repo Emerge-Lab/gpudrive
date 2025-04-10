@@ -25,6 +25,7 @@ class Agent(nn.Module):
 
     def __init__(
         self,
+        config,
         embed_dim,
         action_dim,
         act_func="tanh",
@@ -32,12 +33,15 @@ class Agent(nn.Module):
     ):
         super().__init__()
 
+        self.config = config
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.ReLU()
         self.dropout = dropout
         self.action_dim = action_dim
 
         # Indices for unpacking the observation modalities
-        self.ego_state_idx = 9
+        self.ego_state_idx = (
+            9 if config["reward_type"] == "reward_conditioned" else 6
+        )
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1
         self.partner_obs_idx = self.ego_state_idx + (

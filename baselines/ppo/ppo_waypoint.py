@@ -18,14 +18,10 @@ from box import Box
 
 from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
-
-from gpudrive.networks.late_fusion import NeuralNet
 from gpudrive.networks.agents import Agent
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
-import pufferlib.vector
-import pufferlib.cleanrl
 from rich.console import Console
 
 import typer
@@ -49,41 +45,11 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
-
-    if config.continue_training:
-        print("Loading checkpoint...")
-        # Load checkpoint
-        saved_cpt = torch.load(
-            f=config.model_cpt,
-            map_location=config.train.device,
-            weights_only=False,
-        )
-        policy = NeuralNet(
-            input_dim=saved_cpt["model_arch"]["input_dim"],
-            action_dim=saved_cpt["action_dim"],
-            hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-            config=config.environment,
-        )
-
-        # Load the model parameters
-        policy.load_state_dict(saved_cpt["parameters"])
-
-        return policy
-
-    else:
-        # Start from scratch
-        # return NeuralNet(
-        #     input_dim=config.train.network.input_dim,
-        #     action_dim=env.single_action_space.n,
-        #     hidden_dim=config.train.network.hidden_dim,
-        #     dropout=config.train.network.dropout,
-        #     config=config.environment,
-        # )
-
-        return Agent(
-            embed_dim=config.train.network.embed_dim,
-            action_dim=env.single_action_space.n,
-        )
+    return Agent(
+        config=config.environment,
+        embed_dim=config.train.network.embed_dim,
+        action_dim=env.single_action_space.n,
+    )
 
 
 def train(args, vecenv):
@@ -134,28 +100,6 @@ def init_wandb(args, name, id=None, resume=True):
     )
 
     return wandb
-
-
-def sweep(args, project="PPO", sweep_name="my_sweep"):
-    """Initialize a WandB sweep with hyperparameters."""
-    sweep_id = wandb.sweep(
-        sweep=dict(
-            method="random",
-            name=sweep_name,
-            metric={"goal": "maximize", "name": "environment/episode_return"},
-            parameters={
-                "learning_rate": {
-                    "distribution": "log_uniform_values",
-                    "min": 1e-4,
-                    "max": 1e-1,
-                },
-                "batch_size": {"values": [512, 1024, 2048]},
-                "minibatch_size": {"values": [128, 256, 512]},
-            },
-        ),
-        project=project,
-    )
-    wandb.agent(sweep_id, lambda: train(args), count=100)
 
 
 @app.command()
@@ -277,22 +221,17 @@ def run(
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
 
-    if config["continue_training"]:
-        cont_train = "C"
-    else:
-        cont_train = ""
-
     if config["train"]["resample_scenes"]:
         if config["train"]["resample_scenes"]:
             dataset_size = config["train"]["resample_dataset_size"]
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__{cont_train}__R_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
     else:
         dataset_size = str(config["environment"]["k_unique_scenes"])
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__{cont_train}__S_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
 
     config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get(

@@ -560,10 +560,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return weighted_rewards
 
         elif self.config.reward_type == "follow_waypoints":
-            # Reward based on proximity to waypoints within a radius and penalty for collision/off-road
+            # Reward based on minimizing distance to time-aligned waypoints plus penalty for collision/off-road
 
             # Calculate base weighted rewards
-            base_rewards = (
+            self.base_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
@@ -574,12 +574,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_pos = self.log_trajectory.pos_xy[
                 batch_indices, :, world_time_steps, :
             ]
-
-            waypoint_mask = (
-                (world_time_steps % self.config.waypoint_sample_interval == 0)
-                .float()
-                .unsqueeze(1)
-            )
 
             # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
@@ -592,27 +586,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             # Compute euclidean distance between agent and waypoints
-            dist_to_waypoints = torch.norm(
+            self.dist_to_waypoints = torch.norm(
                 gt_agent_pos - actual_agent_pos, dim=-1
             )
 
-            # Apply waypoint mask to zero out distances for non-sampled time steps
-            dist_to_waypoints = dist_to_waypoints * waypoint_mask
-
-            # Create proximity reward based on waypoint_radius
-            # Only reward agents within the waypoint radius
-            # Smoothly increases as agent gets closer to the center
-            proximity_mask = (
-                dist_to_waypoints <= self.config.waypoint_radius
-            ).float()
-
-            waypoint_rewards = (
-                proximity_mask
-                * (1.0 - dist_to_waypoints / self.config.waypoint_radius)
-                * self.config.waypoint_max_reward
+            distance_penalty = (
+                -self.config.waypoint_distance_scale
+                * torch.log(self.dist_to_waypoints + 1.0)
             )
 
-            rewards = base_rewards + waypoint_rewards
+            # Apply waypoint mask only if sampling interval is greater than 1
+            if self.config.waypoint_sample_interval > 1:
+                waypoint_mask = (
+                    (
+                        world_time_steps % self.config.waypoint_sample_interval
+                        == 0
+                    )
+                    .float()
+                    .unsqueeze(1)
+                )
+                distance_penalty = distance_penalty * waypoint_mask
+
+            # Combine base rewards with distance penalty
+            rewards = self.base_rewards + distance_penalty
 
             return rewards
 

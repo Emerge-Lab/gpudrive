@@ -86,7 +86,7 @@ class EnvConfig:
     collision_behavior: str = "ignore"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
-    remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
+    remove_non_vehicles: bool = False  # Remove non-vehicle entities from scene
 
     # Initialization steps: Number of steps to take before the episode starts
     init_steps: int = 0
@@ -100,11 +100,8 @@ class EnvConfig:
     # Alternatively, "weighted_combination", "follow_waypoints", "distance_to_vdb_trajs", "reward_conditioned"
 
     # If reward_type is "follow_waypoints", the following parameters are used
-    waypoint_radius: float = (
-        0.5  # Radius around the waypoint to consider as "reached"
-    )
-    waypoint_sample_interval: int = 10  # Interval for sampling waypoints
-    waypoint_max_reward: float = 1.0  # Maximum reward for reaching a waypoint
+    waypoint_sample_interval: int = 1  # Interval for sampling waypoints
+    waypoint_distance_scale: float = 0.1  # Importance of distance to waypoints
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components

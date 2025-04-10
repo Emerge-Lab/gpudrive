@@ -720,6 +720,7 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
         "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
         "num_params": config.network["num_parameters"],
+        "config": config,
     }
 
     torch.save(state, model_path)
