@@ -51,6 +51,7 @@ class PufferGPUDrive(PufferEnv):
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
+        init_mode="all_non_trivial",
         collision_weight=-0.5,
         off_road_weight=-0.5,
         goal_achieved_weight=1,
@@ -93,6 +94,8 @@ class PufferGPUDrive(PufferEnv):
         self.collision_weight = collision_weight
         self.off_road_weight = off_road_weight
         self.goal_achieved_weight = goal_achieved_weight
+        self.init_mode = init_mode
+        self.reward_type = reward_type
 
         self.render = render
         self.render_interval = render_interval
@@ -129,6 +132,7 @@ class PufferGPUDrive(PufferEnv):
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
             goal_behavior=goal_behavior,
+            init_mode=init_mode,
             dist_to_goal_threshold=dist_to_goal_threshold,
             polyline_reduction_threshold=polyline_reduction_threshold,
             remove_non_vehicles=remove_non_vehicles,
@@ -218,6 +222,14 @@ class PufferGPUDrive(PufferEnv):
         self.episode_returns = torch.zeros(
             self.num_agents, dtype=torch.float32
         ).to(self.device)
+        self.human_like_rewards = torch.zeros(
+            (self.num_worlds, self.max_cont_agents_per_env),
+            dtype=torch.float32,
+        ).to(self.device)
+        self.internal_rewards = torch.zeros(
+            (self.num_worlds, self.max_cont_agents_per_env),
+            dtype=torch.float32,
+        ).to(self.device)
         self.agent_episode_returns = torch.zeros(
             (self.num_worlds, self.max_cont_agents_per_env),
             dtype=torch.float32,
@@ -262,8 +274,19 @@ class PufferGPUDrive(PufferEnv):
             goal_achieved_weight=self.goal_achieved_weight,
             world_time_steps=self.episode_lengths[:, 0].long(),
         )
+
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
+
+        # Store human-like and internal rewards separately
+        if self.reward_type == "follow_waypoints":
+            self.human_like_rewards[
+                self.live_agent_mask
+            ] += self.env.distance_penalty[self.live_agent_mask]
+            self.internal_rewards[
+                self.live_agent_mask
+            ] += self.env.base_rewards[self.live_agent_mask]
+
         terminal = self.env.get_dones().bool()
 
         self.render_env() if self.render else None
@@ -347,8 +370,13 @@ class PufferGPUDrive(PufferEnv):
                 / num_finished_agents
             )
 
-            total_collisions = self.collided_in_episode[done_worlds, :].sum()
-            total_off_road = self.offroad_in_episode[done_worlds, :].sum()
+            # Calculate human-likeness metrics for completed episodes
+            human_like_values = self.human_like_rewards[done_worlds, :][
+                controlled_mask
+            ]
+            internal_reward_values = self.internal_rewards[done_worlds, :][
+                controlled_mask
+            ]
 
             agent_episode_returns = self.agent_episode_returns[done_worlds, :][
                 controlled_mask
@@ -362,6 +390,7 @@ class PufferGPUDrive(PufferEnv):
                 # fmt: off
                 info_lst.append(
                     {
+                        "num_completed_episodes": len(done_worlds),
                         "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
                         "perc_goal_achieved": goal_achieved_rate.item(),
                         "perc_off_road": off_road_rate.item(),
@@ -370,9 +399,8 @@ class PufferGPUDrive(PufferEnv):
                         "control_density": self.num_agents / self.controlled_agent_mask.numel(),
                         "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                         "perc_truncated": num_truncated / num_finished_agents,
-                        "num_completed_episodes": len(done_worlds),
-                        "total_collisions": total_collisions.item(),
-                        "total_off_road": total_off_road.item(),
+                        "mean_waypoint_distance": human_like_values.mean().item(),
+                        "mean_internal_reward": internal_reward_values.mean().item(),
                     }
                 )
                 # fmt: on
@@ -392,6 +420,8 @@ class PufferGPUDrive(PufferEnv):
             ]
             self.offroad_in_episode[done_worlds, :] = 0
             self.collided_in_episode[done_worlds, :] = 0
+            self.human_like_rewards[done_worlds, :] = 0
+            self.internal_rewards[done_worlds, :] = 0
 
         # Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation

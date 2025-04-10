@@ -18,9 +18,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   collision_behavior: "ignore"
   goal_behavior: "ignore"
   reward_type: "follow_waypoints"
-  init_mode: womd_tracks_to_predict
+  init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
-
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
@@ -35,7 +34,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "be_human"
+  project: "humanlike"
   group: "setup"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]

@@ -586,13 +586,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             # Compute euclidean distance between agent and waypoints
-            self.dist_to_waypoints = torch.norm(
+            dist_to_waypoints = torch.norm(
                 gt_agent_pos - actual_agent_pos, dim=-1
             )
 
-            distance_penalty = (
+            self.distance_penalty = (
                 -self.config.waypoint_distance_scale
-                * torch.log(self.dist_to_waypoints + 1.0)
+                * torch.log(dist_to_waypoints + 1.0)
             )
 
             # Apply waypoint mask only if sampling interval is greater than 1
@@ -605,10 +605,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     .float()
                     .unsqueeze(1)
                 )
-                distance_penalty = distance_penalty * waypoint_mask
+                self.distance_penalty = self.distance_penalty * waypoint_mask
+
+            if self.distance_penalty.max() > 10:
+                print("huh")
 
             # Combine base rewards with distance penalty
-            rewards = self.base_rewards + distance_penalty
+            rewards = self.base_rewards + self.distance_penalty
 
             return rewards
 
