@@ -243,10 +243,10 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "04_04"
+    group = "separate_actor_critic"
 
     fields = {
-        "time_h": 47,  # Max time per job (job will finish if run is done before)
+        "time_h": 24,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 70,
@@ -255,18 +255,17 @@ if __name__ == "__main__":
     
     hyperparams = {
         "group": [group], # Group name
-        "num_worlds": [300],
-        "resample_scenes": [1], # Yes
-        "k_unique_scenes": [300],
-        "max_controlled_agents": [64],
+        "num_worlds": [500],
+        "resample_scenes": [0], 
+        "k_unique_scenes": [500],
         "resample_interval": [5_000_000],
-        "total_timesteps": [4_000_000_000],
         "resample_dataset_size": [10_000],
+        "total_timesteps": [3_000_000_000],
         "batch_size": [262144],
         "minibatch_size": [16384],
-        "update_epochs": [3, 4],
-        "ent_coef": [0.001, 0.0001, 0.003],
-        "learning_rate": [1e-4, 3e-4],
+        "update_epochs": [4],
+        "ent_coef": [0.001, 0.003, 0.0001],
+        "randomize_rewards": [0, 1],
         "render": [0],
     }
 
