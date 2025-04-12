@@ -5,6 +5,7 @@ set(SIMULATOR_SRCS
     level_gen.hpp level_gen.cpp
     obb.hpp
     utils.hpp
+    rasterizer.hpp
     binary_heap.hpp
     knn.hpp
     dynamics.hpp
@@ -62,11 +63,11 @@ target_compile_definitions(gpudrive_mgr PRIVATE
     -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets/"
 )
 
-madrona_python_module(gpudrive
+madrona_python_module(madrona_gpudrive
     bindings.cpp
 )
 
-target_link_libraries(gpudrive PRIVATE
+target_link_libraries(madrona_gpudrive PRIVATE
     gpudrive_mgr
 )
 

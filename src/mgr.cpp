@@ -29,7 +29,7 @@ using namespace madrona::math;
 using namespace madrona::phys;
 using namespace madrona::py;
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 struct RenderGPUState {
     render::APILibHandle apiLib;
@@ -639,6 +639,11 @@ void Manager::setMaps(const std::vector<std::string> &maps)
 
             auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
             REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+
+            // reset agents to delete
+            auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+            REQ_CUDA(cudaMemset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t)));
         }
 
 #else
@@ -663,14 +668,81 @@ void Manager::setMaps(const std::vector<std::string> &maps)
 
             auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
             memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+
+            // reset agents to delete
+            auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+            memset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t));
         }
     }
 
     // Vector of range on integers from 0 to the number of worlds
-    std::vector<int32_t> worldIndices(maps.size());
+    std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
     std::iota(worldIndices.begin(), worldIndices.end(), 0);
     reset(worldIndices);
 }
+
+Tensor Manager::deletedAgentsTensor() const
+{
+    return impl_->exportTensor(ExportID::DeletedAgents, TensorElementType::Int32,
+                               {
+                                   impl_->numWorlds,
+                                   consts::kMaxAgentCount,
+                               });
+}
+
+void Manager::deleteAgents(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete)
+{
+
+    ResetMap resetmap{
+        1,
+    };
+
+    if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
+    {
+#ifdef MADRONA_CUDA_SUPPORT
+        auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
+        auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+        for (const auto &[worldIdx, agents] : agentsToDelete)
+        {
+            assert(worldIdx < impl_->cfg.scenes.size());
+            assert(agents.size() <= consts::kMaxAgentCount);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + worldIdx * consts::kMaxAgentCount;
+            for (size_t i = 0; i < agents.size(); i++)
+            {
+                REQ_CUDA(cudaMemcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t), cudaMemcpyHostToDevice));
+            }
+            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + worldIdx;
+            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+        }
+#else
+        // Handle the case where CUDA support is not available
+        FATAL("Madrona was not compiled with CUDA support");
+#endif
+    }
+    else
+    {
+        auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
+        auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+        for (const auto &[worldIdx, agents] : agentsToDelete)
+        {
+            assert(worldIdx < impl_->cfg.scenes.size());
+            assert(agents.size() <= consts::kMaxAgentCount);
+            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + worldIdx * consts::kMaxAgentCount;
+            for (size_t i = 0; i < agents.size(); i++)
+            {
+                memcpy(agentsToDeletePtr + i, &agents[i], sizeof(int32_t));
+            }
+            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + worldIdx;
+            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+        }
+    }
+
+    std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
+    std::iota(worldIndices.begin(), worldIndices.end(), 0);
+    reset(worldIndices);
+}
+
 
 Tensor Manager::actionTensor() const
 {
@@ -781,6 +853,18 @@ Tensor Manager::lidarTensor() const
                                });
 }
 
+Tensor Manager::bevObservationTensor() const
+{
+    return impl_->exportTensor(ExportID::BevObservations, TensorElementType::Float32,
+                                {
+                                    impl_->numWorlds,
+                                    consts::kMaxAgentCount,
+                                    consts::bev_rasterization_resolution,
+                                    consts::bev_rasterization_resolution,
+                                    BevObservationExportSize,
+                                });
+}
+
 Tensor Manager::stepsRemainingTensor() const
 {
     return impl_->exportTensor(ExportID::StepsRemaining,
@@ -823,6 +907,27 @@ Tensor Manager::expertTrajectoryTensor() const {
     return impl_->exportTensor(
         ExportID::Trajectory, TensorElementType::Float32,
         {impl_->numWorlds, consts::kMaxAgentCount, TrajectoryExportSize});
+}
+
+Tensor Manager::mapNameTensor() const {
+    return impl_->exportTensor(
+        ExportID::MapName, TensorElementType::Int32,
+        {impl_->numWorlds, MapNameExportSize}
+    );
+}
+
+Tensor Manager::scenarioIdTensor() const {
+    return impl_->exportTensor(
+        ExportID::ScenarioId, TensorElementType::Int32,
+        {impl_->numWorlds, ScenarioIdExportSize}
+    );
+}
+
+Tensor Manager::metadataTensor() const {
+    return impl_->exportTensor(
+        ExportID::MetaData, TensorElementType::Int32,
+        {impl_->numWorlds, consts::kMaxAgentCount, MetaDataExportSize}
+    );
 }
 
 void Manager::triggerReset(int32_t world_idx)

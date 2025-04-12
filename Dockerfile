@@ -1,15 +1,11 @@
-# Base image with CUDA and cuDNN support
+# Base image with CUDA and cuDNN support                                                                                      
 FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-
-# Create a user with the specified UID and GID
-RUN groupadd -g ${GROUP_ID} gpudrive_group && \
-    useradd -m -u ${USER_ID} -g gpudrive_group -s /bin/bash gpudrive_user
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Install essential packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y -q --no-install-recommends \
+	software-properties-common \
         build-essential \
         cmake \
         git \
@@ -26,41 +22,44 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxi-dev \
         mesa-common-dev \
         libc++1 \
-        openssh-client && \
-    rm -rf /var/lib/apt/lists/*
+        openssh-client \
+        ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Miniforge for Conda into /opt/miniforge3
-RUN wget --no-check-certificate https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh && \
-    bash Miniforge3-Linux-x86_64.sh -b -p /opt/miniforge3 && \
-    rm Miniforge3-Linux-x86_64.sh
+# Install Python 3.11
+RUN apt-add-repository -y ppa:deadsnakes/ppa \
+    && apt-get install -y -q --no-install-recommends python3.11 python3.11-dev python3.11-distutils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set up environment variables for Conda
-RUN echo "#!/bin/bash\n\
-unset -f which\n\
-source /opt/miniforge3/etc/profile.d/conda.sh\n\
-export PATH=/opt/miniforge3/bin:\$PATH\n\
-export PYTHONPATH=/opt/miniforge3/bin:\$PYTHONPATH" > /opt/env.sh
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
-# Clone the gpudrive repository
-RUN git clone --recursive https://github.com/Emerge-Lab/gpudrive.git
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 11 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 11
 
-# Set the working directory
+RUN apt-get remove -y cmake && pip3 install  --no-cache-dir --upgrade cmake
+
+# Copy the gpudrive repository
+COPY . /gpudrive
+WORKDIR /gpudrive
+RUN git submodule update --init --recursive --depth 1
+
+ENV MADRONA_MWGPU_KERNEL_CACHE=./gpudrive_cache
+
+RUN mkdir build
+WORKDIR /gpudrive/build
+RUN cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 && find external -type f -name "*.tar" -delete
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
+RUN LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH make -j
+RUN rm /usr/local/cuda/lib64/stubs/libcuda.so.1
 WORKDIR /gpudrive
 
-RUN git fetch --all && git checkout main
+RUN pip3 install --no-cache-dir torch==2.6.0 && rm -rf ~/.cache/pip/*
+RUN pip3 install --no-cache-dir tensorflow==2.19.0 && rm -rf ~/.cache/pip/*
+RUN pip3 install --no-cache-dir nvidia-cuda-runtime-cu12==12.4.127 && rm -rf ~/.cache/pip/*
+RUN pip3 install --no-cache-dir -e .[vbd,pufferlib]
 
-# Ensure Conda is available and create the environment
-SHELL ["/bin/bash", "-c"]  # Use bash shell for running conda commands
-RUN source /opt/env.sh && conda env create -f environment.yml
-
-# Activate the environment and install project dependencies using Poetry
-RUN echo "source /opt/env.sh && conda activate gpudrive" >> ~/.bashrc
-
-RUN source /opt/env.sh && conda activate gpudrive
-
-# Automatically start in the /gpudrive directory and activate the conda environment
-CMD ["bash", "-c", "source /opt/env.sh && conda activate gpudrive && cd /gpudrive && exec bash"]
-
-USER gpudrive_user
-
-LABEL org.opencontainers.image.source https://github.com/Emerge-Lab/gpudrive
+CMD ["/bin/bash"]
+LABEL org.opencontainers.image.source=https://github.com/Emerge-Lab/gpudrive

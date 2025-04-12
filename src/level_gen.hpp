@@ -3,7 +3,7 @@
 #include "sim.hpp"
 #include "utils.hpp"
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
 
     void createPersistentEntities(Engine &ctx);
@@ -64,4 +64,4 @@ void destroyWorld(Engine &ctx);
                                                                                        .mapType = static_cast<float>(mapType)};
     }
 
-} // namespace gpudrive
+} // namespace madrona_gpudrive

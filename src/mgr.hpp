@@ -17,7 +17,7 @@
 #include "init.hpp"
 #include "types.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 // The Manager class encapsulates the linkage between the outside training
 // code and the internal simulation state (src/sim.hpp / src/sim.cpp)
@@ -59,6 +59,7 @@ public:
     MGR_EXPORT madrona::py::Tensor partnerObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor agentMapObservationsTensor() const;
     MGR_EXPORT madrona::py::Tensor lidarTensor() const;
+    MGR_EXPORT madrona::py::Tensor bevObservationTensor() const;
     MGR_EXPORT madrona::py::Tensor stepsRemainingTensor() const;
     MGR_EXPORT madrona::py::Tensor shapeTensor() const;
     MGR_EXPORT madrona::py::Tensor controlledStateTensor() const;
@@ -68,6 +69,10 @@ public:
     MGR_EXPORT madrona::py::Tensor responseTypeTensor() const;
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
+    MGR_EXPORT madrona::py::Tensor metadataTensor() const;
+    MGR_EXPORT madrona::py::Tensor deletedAgentsTensor() const;
+    MGR_EXPORT madrona::py::Tensor mapNameTensor() const;
+    MGR_EXPORT madrona::py::Tensor scenarioIdTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation
@@ -77,6 +82,9 @@ public:
                               float acceleration, float steering,
                               float headAngle);
     MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
+
+    MGR_EXPORT void deleteAgents(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete);
+  
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory();

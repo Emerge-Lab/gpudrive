@@ -28,7 +28,7 @@ static HeapArray<float> readReplayLog(const char *path) {
 
 int main(int argc, char *argv[])
 {
-    using namespace gpudrive;
+    using namespace madrona_gpudrive;
 
     constexpr int64_t num_views = 2;
 

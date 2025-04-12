@@ -1,3 +1,4 @@
+#include <iostream>
 #include <algorithm>
 #include <limits>
 #include <madrona/mw_gpu_entry.hpp>
@@ -7,6 +8,7 @@
 #include "obb.hpp"
 #include "sim.hpp"
 #include "utils.hpp"
+#include "rasterizer.hpp"
 #include "knn.hpp"
 #include "dynamics.hpp"
 
@@ -16,7 +18,7 @@ using namespace madrona::phys;
 
 namespace RenderingSystem = madrona::render::RenderingSystem;
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 CountT getCurrentStep(const StepsRemaining &stepsRemaining) {
   return consts::episodeLen - stepsRemaining.t;
@@ -41,6 +43,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<OtherAgents>();
     registry.registerComponent<PartnerObservations>();
     registry.registerComponent<Lidar>();
+    registry.registerComponent<BevObservations>();
     registry.registerComponent<StepsRemaining>();
     registry.registerComponent<EntityType>();
     registry.registerComponent<VehicleSize>();
@@ -55,12 +58,16 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentID>();
     registry.registerComponent<RoadMapId>();
     registry.registerComponent<MapType>();
+    registry.registerComponent<MetaData>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
     registry.registerSingleton<ResetMap>();
     registry.registerSingleton<WorldMeans>();
+    registry.registerSingleton<DeletedAgents>();
+    registry.registerSingleton<MapName>();
+    registry.registerSingleton<ScenarioId>();
 
     registry.registerArchetype<Agent>();
     registry.registerArchetype<PhysicsEntity>();
@@ -73,6 +80,9 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<Map>((uint32_t)ExportID::Map);
     registry.exportSingleton<ResetMap>((uint32_t)ExportID::ResetMap);
     registry.exportSingleton<WorldMeans>((uint32_t)ExportID::WorldMeans);
+    registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
+    registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
+    registry.exportSingleton<ScenarioId>((uint32_t)ExportID::ScenarioId);
     
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
@@ -87,6 +97,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::PartnerObservations);
     registry.exportColumn<AgentInterface, Lidar>(
         (uint32_t)ExportID::Lidar);
+    registry.exportColumn<AgentInterface, BevObservations>(
+        (uint32_t)ExportID::BevObservations);
     registry.exportColumn<AgentInterface, StepsRemaining>(
         (uint32_t)ExportID::StepsRemaining);
     registry.exportColumn<AgentInterface, Reward>(
@@ -103,6 +115,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::ResponseType);
     registry.exportColumn<AgentInterface, Trajectory>(
         (uint32_t)ExportID::Trajectory);
+    registry.exportColumn<AgentInterface, MetaData>(
+        (uint32_t)ExportID::MetaData);
 }
 
 static inline void cleanupWorld(Engine &ctx) {
@@ -276,15 +290,14 @@ inline void movementSystem(Engine &e,
                            Rotation &rotation,
                            Position &position,
                            Velocity &velocity,
-                           const CollisionDetectionEvent &collisionEvent,
+                           CollisionDetectionEvent& collisionEvent,
                            const ResponseType &responseType) {
-    
     if (collisionEvent.hasCollided.load_relaxed()) {
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
                 e.get<Done>(agent_iface.e).v = 1;
                 agentZeroVelSystem(e, velocity);
-                 break;
+                break;
 
             case CollisionBehaviour::AgentRemoved:
                 e.get<Done>(agent_iface.e).v = 1;
@@ -293,21 +306,24 @@ inline void movementSystem(Engine &e,
                 break;
 
             case CollisionBehaviour::Ignore:
-                // Do nothing.
+                // Reset collision state at the start of each timestep.
+                // This ensures the collision state is only true if the agent collided in the current timestep.
+                collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
+                Info& info = e.get<Info>(agent_iface.e);
+                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
                 break;
         }
     }
+
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
-    if(responseType == ResponseType::Static)
-    {
+    if (responseType == ResponseType::Static) {
         // Do nothing. The agent is static.
         // Agent can only be static if isStaticAgentControlled is set to true.
         return;
     }
 
-    if(e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static)
-    {
+    if (e.get<Done>(agent_iface.e).v && responseType != ResponseType::Static) {
         // Case: Agent has not collided but is done. 
         // This can only happen if the agent has reached goal or the episode has ended.
         // In that case we teleport the agent. The agent will not collide with anything.
@@ -319,11 +335,9 @@ inline void movementSystem(Engine &e,
         return;
     }
 
-    if(controlledState.controlled)
-    {
+    if (controlledState.controlled) {
         Action &action = e.get<Action>(agent_iface.e);
-        switch (e.data().params.dynamicsModel)
-        {
+        switch (e.data().params.dynamicsModel) {
 
             case DynamicsModel::InvertibleBicycle:
             {
@@ -346,9 +360,7 @@ inline void movementSystem(Engine &e,
                 break;
             }
         }
-    }
-    else
-    {
+    } else {
         // Follow expert trajectory
         const Trajectory &trajectory = e.get<Trajectory>(agent_iface.e);
         CountT curStepIdx = getCurrentStep(e.get<StepsRemaining>(agent_iface.e));
@@ -438,6 +450,101 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
         traceRay(i, consts::lidarRoadLineOffset, lidar.samplesRoadLines);
     }
 #endif
+}
+
+inline void collectBevObservationsSystem(Engine &ctx,
+                        const Position &pos,
+                        const Rotation &rot,
+                        const OtherAgents &other_agents,
+                        const AgentInterfaceEntity &agent_iface) 
+{
+    if(ctx.data().params.disableClassicalObs)
+        return;
+
+    auto &bev_obs = ctx.get<BevObservations>(agent_iface.e);
+
+    for (size_t i = 0; i < consts::bev_rasterization_resolution; i++)
+    {
+        for (size_t j = 0; j < consts::bev_rasterization_resolution; j++)
+        {
+            bev_obs.obs[i][j].type = 0;
+        }
+    }
+
+    utils::ReferenceFrame referenceFrame(pos.xy(), rot);
+    
+    // Roads
+    CountT roadIdx = 0;
+    CountT arrIndex = 0;
+    while (roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount)
+    {
+        Entity road = ctx.data().roads[roadIdx++];
+        auto roadPos = ctx.get<Position>(road);
+        auto roadRot = ctx.get<Rotation>(road);
+        const MapObservation &map_obs = referenceFrame.observationOf(
+            roadPos, 
+            roadRot, 
+            ctx.get<Scale>(road), 
+            ctx.get<EntityType>(road), 
+            static_cast<float>(ctx.get<RoadMapId>(road).id), 
+            ctx.get<MapType>(road)
+        );        
+        
+        auto dist = referenceFrame.distanceTo(roadPos);
+        if (dist > ctx.data().params.observationRadius)
+            continue;
+
+        madrona::math::Vector2 rel_pos = map_obs.position;
+        float rel_yaw = map_obs.heading;
+        auto new_scale = map_obs.scale;
+        new_scale.d1 = std::max( //Ensure minimum segment width
+            map_obs.scale.d1, 
+            (2 * ctx.data().params.observationRadius / consts::bev_rasterization_resolution)
+        ); 
+
+        rasterizer::rasterizeRotatedRectangle(
+            bev_obs,
+            rel_pos,
+            rel_yaw,
+            new_scale.d0,
+            new_scale.d1,
+            map_obs.type,
+            ctx.data().params.observationRadius,
+            consts::bev_rasterization_resolution
+        );
+        arrIndex++;
+    }
+    
+    // Other agents
+    CountT agentIdx = 0;
+    while (agentIdx < ctx.data().numAgents - 1)
+    {
+        Entity other = other_agents.e[agentIdx++];
+    
+        const Position &other_position = ctx.get<Position>(other);
+        const Rotation &other_rot = ctx.get<Rotation>(other);
+        const VehicleSize &other_size = ctx.get<VehicleSize>(other);
+        const auto type = static_cast<size_t>(ctx.get<EntityType>(other));
+        Vector2 relative_pos = (other_position - pos).xy();
+        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        Rotation relative_orientation = rot.inv() * other_rot;
+
+        float relative_heading = utils::quatToYaw(relative_orientation);
+
+        if(relative_pos.length() > ctx.data().params.observationRadius)
+            continue;
+    
+        rasterizer::rasterizeRotatedRectangle(
+            bev_obs,
+            relative_pos,
+            relative_heading,
+            other_size.length,
+            other_size.width,
+            type,
+            ctx.data().params.observationRadius,
+            consts::bev_rasterization_resolution
+        );
+    }
 }
 
 // Computes reward for each agent and keeps track of the max distance achieved
@@ -645,6 +752,7 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.rotation.rotationFromAxis = utils::quatToYaw(rotation);
     out.goal = goal;
     out.vehicle_size = vehicleSize;
+    out.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
@@ -741,6 +849,13 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
         Rotation,
         AgentInterfaceEntity>>({clear_tmp});
 
+    auto collect_bev_obs = builder.addToGraph<ParallelForNode<Engine,
+        collectBevObservationsSystem,
+        Position,
+        Rotation,
+        OtherAgents,
+        AgentInterfaceEntity>>({clear_tmp});
+
     auto collectAbsoluteSelfObservations = builder.addToGraph<
         ParallelForNode<Engine, collectAbsoluteObservationsSystem, Position,
                         Rotation, Goal, VehicleSize, AgentInterfaceEntity>>(
@@ -798,6 +913,8 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     (void)collect_partner_obs;
     (void)collect_map_obs;
     (void)collectAbsoluteSelfObservations;
+    (void)collect_bev_obs;
+#endif
 }
 
 static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
@@ -857,6 +974,11 @@ Sim::Sim(Engine &ctx,
 
     auto& map = ctx.singleton<Map>();
     map = *(init.map);
+
+    auto& deletedAgents = ctx.singleton<DeletedAgents>();
+    for (auto i = 0; i < consts::kMaxAgentCount; i++) {
+        deletedAgents.deletedAgents[i] = -1;
+    }
     // Creates agents, walls, etc.
     createPersistentEntities(ctx);
 

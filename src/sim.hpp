@@ -8,7 +8,7 @@
 #include "init.hpp"
 #include "rng.hpp"
 
-namespace gpudrive {
+namespace madrona_gpudrive {
 
 class Engine;
 
@@ -23,6 +23,7 @@ enum class ExportID : uint32_t {
     PartnerObservations,
     AgentMapObservations,
     Lidar,
+    BevObservations,
     StepsRemaining,
     BicycleModel,
     MapObservation,
@@ -36,6 +37,10 @@ enum class ExportID : uint32_t {
     Map,
     ResetMap,
     WorldMeans,
+    MetaData,
+    DeletedAgents,
+    MapName,
+    ScenarioId,
     NumExports
 };
 

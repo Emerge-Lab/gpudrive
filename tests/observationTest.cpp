@@ -13,24 +13,19 @@
 using namespace madrona;
 using nlohmann::json;
 
-
-float degreesToRadians(float degrees) {
-    return degrees * M_PI / 180.0;
-}
-
 class ObservationsTest : public ::testing::Test {
 protected:    
     uint32_t num_worlds = 1;
     
-    gpudrive::Manager mgr = gpudrive::Manager({
+    madrona_gpudrive::Manager mgr = madrona_gpudrive::Manager({
         .execMode = ExecMode::CPU,
         .gpuID = 0,
         .scenes = {"testJsons/test.json"},
         .params = {
             .polylineReductionThreshold = 0.0,
             .observationRadius = 100.0,
-            .collisionBehaviour = gpudrive::CollisionBehaviour::Ignore,
-            .roadObservationAlgorithm = gpudrive::FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering
+            .collisionBehaviour = madrona_gpudrive::CollisionBehaviour::Ignore,
+            .roadObservationAlgorithm = madrona_gpudrive::FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering
         }
     });
 
@@ -59,27 +54,27 @@ protected:
 
             if(obj["type"] == "road_edge")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::RoadEdge);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::RoadEdge);
             }
             else if(obj["type"] == "road_line")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::RoadLine);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::RoadLine);
             }
             else if(obj["type"] == "lane")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::RoadLane);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::RoadLane);
             }
             else if(obj["type"] == "crosswalk")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::CrossWalk);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::CrossWalk);
             }
             else if(obj["type"] == "speed_bump")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::SpeedBump);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::SpeedBump);
             }
             else if(obj["type"] == "stop_sign")
             {
-                roadTypes.push_back((float)gpudrive::EntityType::StopSign);
+                roadTypes.push_back((float)madrona_gpudrive::EntityType::StopSign);
             }
             else if(obj["type"] == "invalid")
             {
@@ -100,7 +95,7 @@ TEST_F(ObservationsTest, TestObservations) {
         float roadType = roadTypes[i];
         for(int64_t j = 0; j < roadGeom.size() - 1; j++)
         {
-            if(roadType > (float)gpudrive::EntityType::RoadLane && roadType < (float)gpudrive::EntityType::StopSign)
+            if(roadType > (float)madrona_gpudrive::EntityType::RoadLane && roadType < (float)madrona_gpudrive::EntityType::StopSign)
             {
                 float x = (roadGeom[j].first + roadGeom[j+1].first + roadGeom[j+2].first + roadGeom[j+3].first)/4 - mean.first;
                 float y = (roadGeom[j].second + roadGeom[j+1].second + roadGeom[j+2].second + roadGeom[j+3].second)/4 - mean.second;
@@ -108,10 +103,10 @@ TEST_F(ObservationsTest, TestObservations) {
                 ASSERT_NEAR(flat_obs[idx], x, test_utils::EPSILON);
                 ASSERT_NEAR(flat_obs[idx+1], y, test_utils::EPSILON);
                 ASSERT_EQ(flat_obs[idx+6], roadType);
-                idx += gpudrive::MapObservationExportSize;
+                idx += madrona_gpudrive::MapObservationExportSize;
                 break;
             }
-            else if(roadType == (float)gpudrive::EntityType::StopSign)
+            else if(roadType == (float)madrona_gpudrive::EntityType::StopSign)
             {
                 float x = roadGeom[j].first - mean.first;
                 float y = roadGeom[j].second - mean.second;
@@ -133,7 +128,7 @@ TEST_F(ObservationsTest, TestObservations) {
             ASSERT_NEAR(flat_obs[idx], dx, test_utils::EPSILON);
             ASSERT_NEAR(flat_obs[idx+1], dy, test_utils::EPSILON);
             ASSERT_FLOAT_EQ(flat_obs[idx+6], roadType) << "i = " << i << " j = " << j << " idx = " << idx;
-            idx += gpudrive::MapObservationExportSize;
+            idx += madrona_gpudrive::MapObservationExportSize;
         }
         if(idx >= flat_obs.size())
         {

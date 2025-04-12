@@ -15,7 +15,7 @@ using namespace madrona;
 
 int main(int argc, char *argv[])
 {
-    using namespace gpudrive;
+    using namespace madrona_gpudrive;
 
     if (argc < 3) {
         fprintf(stderr, "%s TYPE NUM_STEPS [--rand-actions]\n", argv[0]);
@@ -34,9 +34,11 @@ int main(int argc, char *argv[])
     }
 
     uint64_t num_steps = std::stoul(argv[2]);
-    std::vector<std::string> scenes = {"../data/processed/examples/tfrecord-00001-of-01000_307.json",
-         "../data/processed/examples/tfrecord-00003-of-01000_109.json",
-         "../data/processed/examples/tfrecord-00012-of-01000_389.json"};
+    std::vector<std::string> scenes = {
+        "../data/processed/examples/tfrecord-00000-of-00150_78.json",
+        "../data/processed/examples/tfrecord-00043-of-00150_223.json",
+        "../data/processed/examples/tfrecord-00149-of-00150_111.json"
+    };
     uint64_t num_worlds = scenes.size();
 
     bool rand_actions = false;
@@ -78,6 +80,7 @@ int main(int argc, char *argv[])
     auto agent_map_obs_printer = mgr.agentMapObservationsTensor().makePrinter();
     auto info_printer = mgr.infoTensor().makePrinter();
     auto means_printer = mgr.worldMeansTensor().makePrinter();
+    auto metadata_printer = mgr.metadataTensor().makePrinter();
 
     auto printObs = [&]() {
         // printf("Self\n");
@@ -110,8 +113,10 @@ int main(int argc, char *argv[])
         // printf("Info\n");
         // info_printer.print();
 
-        printf("Means\n");
-        means_printer.print();
+        // printf("Means\n");
+        // means_printer.print();
+
+        metadata_printer.print();
     };
 
     auto worldToShape =

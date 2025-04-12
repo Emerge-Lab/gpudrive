@@ -2,10 +2,12 @@
 
 #include "init.hpp"
 #include "types.hpp"
+#include "consts.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <unordered_set>
 
-namespace gpudrive
+namespace madrona_gpudrive
 {
     void from_json(const nlohmann::json &j, MapVector2 &p)
     {
@@ -32,8 +34,10 @@ namespace gpudrive
             }
         }
         obj.numPositions = i;
-        j.at("width").get_to(obj.width);
-        j.at("length").get_to(obj.length);
+        j.at("width").get_to(obj.vehicle_size.width);
+        j.at("length").get_to(obj.vehicle_size.length);
+        j.at("height").get_to(obj.vehicle_size.height);
+        j.at("id").get_to(obj.id);
 
         i = 0;
         for (const auto &h : j.at("heading"))
@@ -92,10 +96,16 @@ namespace gpudrive
         else
             obj.type = EntityType::None;
 
-	std::string markAsExpertKey = "mark_as_expert";
-	if (j.contains(markAsExpertKey)) {
-	    from_json(j.at("mark_as_expert"), obj.markAsExpert);
-	}
+        std::string markAsExpertKey = "mark_as_expert";
+        if (j.contains(markAsExpertKey)) {
+            from_json(j.at("mark_as_expert"), obj.markAsExpert);
+        }
+
+         // Initialize metadata fields to 0
+        obj.metadata.isSdc = 0;
+        obj.metadata.isObjectOfInterest = 0;
+        obj.metadata.isTrackToPredict = 0;
+        obj.metadata.difficulty = 0;
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)
@@ -268,25 +278,131 @@ namespace gpudrive
         return mean;
     }
 
-
     void from_json(const nlohmann::json &j, Map &map, float polylineReductionThreshold)
     {
+        std::string name = j.at("name").get<std::string>();
+        std::strncpy(map.mapName, name.c_str(), sizeof(map.mapName));
+
+        std::string scenario_id = j.at("scenario_id").get<std::string>();
+        std::strncpy(map.scenarioId, scenario_id.c_str(), sizeof(map.scenarioId));
+        
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
+
+        const auto& metadata = j.at("metadata");
+        int sdc_index = metadata.at("sdc_track_index").get<int>();
+        
+        // Create id to object index mapping
+        std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
-        for (const auto &obj : j.at("objects"))
-        {
-            if (idx >= map.numObjects)
-                break;
-            obj.get_to(map.objects[idx++]);
+
+        // First, identify which objects are tracks_to_predict and objects_of_interest
+        std::unordered_set<int> tracks_to_predict_indices;
+        std::unordered_set<int> objects_of_interest_ids;
+
+        // Collect tracks_to_predict indices
+        for (const auto& track : metadata.at("tracks_to_predict")) {
+            int track_index = track.at("track_index").get<int>();
+            if (track_index >= 0 && track_index < j.at("objects").size()) {
+                tracks_to_predict_indices.insert(track_index);
+            } else {
+                std::cerr << "Warning: Invalid track_index " << track_index << " in scene " << j.at("name").get<std::string>() << std::endl;
+            }
         }
 
+        // Collect objects_of_interest IDs
+        for (const auto& obj_id : metadata.at("objects_of_interest")) {
+            objects_of_interest_ids.insert(obj_id.get<int>());
+        }
+
+        // Initialize SDC first if valid
+        if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
+            j.at("objects")[sdc_index].get_to(map.objects[0]);
+            map.objects[0].metadata.isSdc = 1;
+            
+            // Set additional metadata if needed
+            int sdc_id = map.objects[0].id;
+            if (tracks_to_predict_indices.find(sdc_index) != tracks_to_predict_indices.end()) {
+                map.objects[0].metadata.isTrackToPredict = 1;
+                // Find and set difficulty
+                for (const auto& track : metadata.at("tracks_to_predict")) {
+                    if (track.at("track_index").get<int>() == sdc_index) {
+                        map.objects[0].metadata.difficulty = track.at("difficulty").get<int>();
+                        break;
+                    }
+                }
+            }
+            if (objects_of_interest_ids.find(sdc_id) != objects_of_interest_ids.end()) {
+                map.objects[0].metadata.isObjectOfInterest = 1;
+            }
+            
+            idToObjIdx[sdc_id] = 0;
+            idx = 1;
+            
+            // Remove SDC from sets to avoid double processing
+            tracks_to_predict_indices.erase(sdc_index);
+            objects_of_interest_ids.erase(sdc_id);
+        }
+
+        // Initialize tracks_to_predict objects (excluding SDC)
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue; // Skip SDC as it's already initialized
+            
+            if (tracks_to_predict_indices.find(i) != tracks_to_predict_indices.end()) {
+                j.at("objects")[i].get_to(map.objects[idx]);
+                map.objects[idx].metadata.isTrackToPredict = 1;
+                
+                // Find and set difficulty
+                for (const auto& track : metadata.at("tracks_to_predict")) {
+                    if (track.at("track_index").get<int>() == static_cast<int>(i)) {
+                        map.objects[idx].metadata.difficulty = track.at("difficulty").get<int>();
+                        break;
+                    }
+                }
+                
+                // Check if also object of interest
+                if (objects_of_interest_ids.find(map.objects[idx].id) != objects_of_interest_ids.end()) {
+                    map.objects[idx].metadata.isObjectOfInterest = 1;
+                    objects_of_interest_ids.erase(map.objects[idx].id);
+                }
+                
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
+            }
+        }
+
+        // Initialize objects_of_interest (excluding those already processed)
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue;
+            
+            int obj_id = j.at("objects")[i].at("id").get<int>();
+            if (objects_of_interest_ids.find(obj_id) != objects_of_interest_ids.end()) {
+                j.at("objects")[i].get_to(map.objects[idx]);
+                map.objects[idx].metadata.isObjectOfInterest = 1;
+                
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
+            }
+        }
+
+        // Initialize all remaining objects
+        for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
+            if (i == sdc_index) continue;
+            
+            int obj_id = j.at("objects")[i].at("id").get<int>();
+            if (idToObjIdx.find(obj_id) == idToObjIdx.end()) { // Check if not already processed
+                j.at("objects")[i].get_to(map.objects[idx]);
+                idToObjIdx[map.objects[idx].id] = idx;
+                idx++;
+            }
+        }
+        
+        // Process roads
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;
         idx = 0;
-        for (const auto &road : j.at("roads"))
-        {
+        for (const auto &road : j.at("roads")) {
             if (idx >= map.numRoads)
                 break;
             from_json(road, map.roads[idx], polylineReductionThreshold);
