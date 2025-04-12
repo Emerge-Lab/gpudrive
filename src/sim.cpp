@@ -909,9 +909,9 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     TaskGraphNodeID sort_agents;
     if(cfg.enableLidar)
     {
-        sort_agents = queueSortByWorld<Agent>(builder, {lidar, collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
+        sort_agents = queueSortByWorld<Agent>(builder, {lidar, collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations, collect_bev_obs});
     } else {
-        sort_agents = queueSortByWorld<Agent>(builder, {collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations});
+        sort_agents = queueSortByWorld<Agent>(builder, {collect_self_obs, collect_partner_obs, collect_map_obs, collectAbsoluteSelfObservations, collect_bev_obs});
     }
     // Sort entities, this could be conditional on reset like the second
     // BVH build above.
