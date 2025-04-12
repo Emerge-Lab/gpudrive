@@ -117,7 +117,7 @@ namespace madrona_gpudrive
         uint32_t maxNumControlledAgents = 10000;                               // Arbitrary high number to by default control all vehicles
         bool IgnoreNonVehicles = false;                                        // Default: false
         FindRoadObservationsWith roadObservationAlgorithm{
-            FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering};
+            FindRoadObservationsWith::AllEntitiesWithRadiusFiltering};
         bool initOnlyValidAgentsAtFirstStep = true; // Default: true
         bool isStaticAgentControlled = false;       // Default: false
         bool enableLidar = false;

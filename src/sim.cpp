@@ -914,7 +914,6 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     (void)collect_map_obs;
     (void)collectAbsoluteSelfObservations;
     (void)collect_bev_obs;
-#endif
 }
 
 static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
