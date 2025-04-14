@@ -40,10 +40,10 @@ class Agent(nn.Module):
 
         # Indices for unpacking the observation modalities
         self.ego_state_idx = (
-            9 if self.config["reward_type"] == "reward_conditioned" else 6
+            9 if self.config["reward_type"] == "reward_conditioned" else constants.EGO_FEAT_DIM
         )
-        if self.config["add_goal_state"]:
-            self.ego_state_idx += 1
+        if self.config["add_reference_path"]: # Every agent receives a reference path
+            self.ego_state_idx += 91 * 2
 
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1

@@ -18,7 +18,7 @@ from gpudrive.datatypes.observation import (
 from gpudrive.env import constants
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.base_env import GPUDriveGymEnv
-from gpudrive.datatypes.trajectory import LogTrajectory
+from gpudrive.datatypes.trajectory import LogTrajectory, to_local_frame
 from gpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
     GlobalRoadGraphPoints,
@@ -570,7 +570,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_pos = self.log_trajectory.pos_xy[
                 batch_indices, :, world_time_steps, :
             ]
-
+            
             # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
@@ -580,7 +580,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             actual_agent_pos = torch.stack(
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
-
+        
             # Compute euclidean distance between agent and waypoints
             dist_to_waypoints = torch.norm(
                 gt_agent_pos - actual_agent_pos, dim=-1
@@ -778,18 +778,53 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         base_fields = [
-            ego_state.speed,
-            ego_state.vehicle_length,
-            ego_state.vehicle_width,
-            ego_state.rel_goal_x,
-            ego_state.rel_goal_y,
-            ego_state.is_collided,
+            ego_state.speed.unsqueeze(-1),
+            ego_state.vehicle_length.unsqueeze(-1),
+            ego_state.vehicle_width.unsqueeze(-1),
+            ego_state.rel_goal_x.unsqueeze(-1),
+            ego_state.rel_goal_y.unsqueeze(-1),
+            ego_state.is_collided.unsqueeze(-1),
         ]
-
-        if self.config.add_goal_state:
-            base_fields.append(ego_state.is_goal_reached)
-
+     
         if mask is None:
+            
+            if self.config.add_reference_path:
+                            
+                # Shape: [batch, 91, 2]
+                glob_ego_states = self.sim.absolute_self_observation_tensor().to_torch().clone()
+                glob_ego_pos_xy = glob_ego_states[:, :, :2]
+                glob_ego_yaw = glob_ego_states[:, :, 7]
+                
+                reference_xy = self.log_trajectory.pos_xy
+                
+                # Normalize
+                reference_xy /= constants.MAX_REL_GOAL_COORD
+                
+                # Transform reference path to be relative to current
+                # agent positions and heading
+                for i in range(self.num_worlds):
+                    reference_xy[i] = to_local_frame(
+                        reference_xy[i],
+                        glob_ego_pos_xy[i],
+                        glob_ego_yaw[i],
+                    )
+                
+                batch_size = reference_xy.shape[0]
+                num_points = reference_xy.shape[1]
+                time_steps = reference_xy.shape[2] 
+                    
+                # Create dropout mask for the time dimension
+                # Shape: [batch_size, num_points, time_steps, 1]
+                point_dropout_mask = torch.bernoulli(
+                    torch.ones(batch_size, num_points, time_steps, 1, device=reference_xy.device) * (1 - self.config.prob_reference_dropout)
+                ).bool()
+
+                # Apply dropout mask
+                reference_xy = reference_xy * point_dropout_mask
+
+                # Flatten the dimensions for stacking
+                base_fields.append(reference_xy.flatten(start_dim=2))
+                
             if self.config.reward_type == "reward_conditioned":
 
                 # Create expanded weights for all environments
@@ -811,8 +846,40 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ]
                 return torch.stack(full_fields).permute(1, 2, 0)
             else:
-                return torch.stack(base_fields).permute(1, 2, 0)
+                return torch.cat(base_fields, dim=-1)
         else:
+            if self.config.add_reference_path:
+                
+                # Shape: [batch, 91, 2]
+                glob_ego_states = self.sim.absolute_self_observation_tensor().to_torch().clone()[mask]
+                glob_ego_pos_xy = glob_ego_states[:, :2]
+                glob_ego_yaw = glob_ego_states[:, 7]
+                
+                reference_xy = self.log_trajectory.pos_xy[mask]
+                
+                # Transform reference path to be relative to current agent positions and heading
+                local_reference_xy = to_local_frame(
+                    reference_xy,
+                    glob_ego_pos_xy,
+                    glob_ego_yaw,
+                )
+                
+                # Normalize to [-1, 1]
+                local_reference_xy /= constants.MAX_REL_GOAL_COORD
+     
+                batch_size = reference_xy.shape[0]
+                num_points = reference_xy.shape[1]
+                           
+                point_dropout_mask = torch.bernoulli(
+                    torch.ones((batch_size, num_points), device=local_reference_xy.device) * (1 - self.config.prob_reference_dropout)
+                ).bool()
+                
+                # Dropout fraction of points in the reference path        
+                local_reference_xy = local_reference_xy * point_dropout_mask.unsqueeze(2)
+                
+                # Stack
+                base_fields.append(local_reference_xy.view(batch_size, -1))
+            
             if self.config.reward_type == "reward_conditioned":
                 # For masked agents, we need to extract agent indices from the mask
                 world_indices, agent_indices = torch.where(mask)
@@ -836,7 +903,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                 ).permute(1, 0)
             else:
-                return torch.stack(base_fields).permute(1, 0)
+                return torch.cat(base_fields, dim=1)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -1500,9 +1567,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="delta_local",
-        reward_type="reward_conditioned",
-        condition_mode="fixed",
+        dynamics_model="classic",
+        reward_type="follow_waypoints",
     )
     render_config = RenderConfig()
 

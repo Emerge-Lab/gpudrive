@@ -46,7 +46,8 @@ class PufferGPUDrive(PufferEnv):
         norm_obs=True,
         lidar_obs=False,
         bev_obs=False,
-        add_goal_state=False,
+        add_reference_path=False,
+        prob_reference_dropout=0.0,
         reward_type="weighted_combination",
         condition_mode="random",
         collision_behavior="ignore",
@@ -96,6 +97,7 @@ class PufferGPUDrive(PufferEnv):
         self.goal_achieved_weight = goal_achieved_weight
         self.init_mode = init_mode
         self.reward_type = reward_type
+        self.prob_reference_dropout = prob_reference_dropout
 
         self.render = render
         self.render_interval = render_interval
@@ -128,7 +130,8 @@ class PufferGPUDrive(PufferEnv):
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
-            add_goal_state=add_goal_state,
+            add_reference_path=add_reference_path,
+            prob_reference_dropout=prob_reference_dropout,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
             goal_behavior=goal_behavior,

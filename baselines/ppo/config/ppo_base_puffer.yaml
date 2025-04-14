@@ -15,7 +15,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  add_goal_state: false # If true, the goal state is added to the ego observation
+  add_reference_path: false # If true, the goal state is added to the ego observation
   remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
   reward_type: "reward_conditioned" # Options: "weighted_combination", "reward_conditioned"

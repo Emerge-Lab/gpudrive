@@ -106,8 +106,8 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-            if "add_goal_state" in self.config:
-                self.ego_state_idx += 1
+            if "add_reference_path" in self.config:
+                self.ego_state_idx += 2 * madrona_gpudrive.kTrajectoryLength
 
             self.vbd_in_obs = self.config.vbd_in_obs
 
