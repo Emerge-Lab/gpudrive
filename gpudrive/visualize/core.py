@@ -1704,16 +1704,14 @@ class MatplotlibVisualizer:
 
         if trajectory is not None and len(trajectory) > 0:
             # Plot the trajectory as a line
-            ax.plot(
+            ax.scatter(
                 trajectory[:, 0],  # x coordinates
                 trajectory[:, 1],  # y coordinates
-                color="blue",  # trajectory color
-                linestyle="-",  # solid line
-                linewidth=1.0,  # line width
+                color="lightgreen",
+                linewidth=0.35,
                 marker="o",  # circular markers at each point
-                markersize=1,  # size of markers
-                alpha=0.7,  # slight transparency
-                label="Trajectory",  # label for legend
+                alpha=0.8,  # slight transparency
+                zorder=0,
             )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))

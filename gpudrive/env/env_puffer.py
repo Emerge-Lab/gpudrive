@@ -404,6 +404,9 @@ class PufferGPUDrive(PufferEnv):
                         "perc_truncated": num_truncated / num_finished_agents,
                         "mean_waypoint_distance": human_like_values.mean().item(),
                         "mean_internal_reward": internal_reward_values.mean().item(),
+                        "waypoint_distance_distrib": wandb.Histogram(
+                            human_like_values.cpu().numpy(),
+                        ),
                     }
                 )
                 # fmt: on

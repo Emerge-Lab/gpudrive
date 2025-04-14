@@ -570,17 +570,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_pos = self.log_trajectory.pos_xy[
                 batch_indices, :, world_time_steps, :
             ]
-            
+
             # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
+                self.device,
             )
 
             actual_agent_pos = torch.stack(
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
-        
+
             # Compute euclidean distance between agent and waypoints
             dist_to_waypoints = torch.norm(
                 gt_agent_pos - actual_agent_pos, dim=-1
@@ -602,9 +603,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     .unsqueeze(1)
                 )
                 self.distance_penalty = self.distance_penalty * waypoint_mask
-
-            if self.distance_penalty.max() > 10:
-                print("huh")
 
             # Combine base rewards with distance penalty
             rewards = self.base_rewards + self.distance_penalty
@@ -785,46 +783,67 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.rel_goal_y.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
         ]
-     
+
         if mask is None:
-            
+
             if self.config.add_reference_path:
-                            
+
                 # Shape: [batch, 91, 2]
-                glob_ego_states = self.sim.absolute_self_observation_tensor().to_torch().clone()
+                glob_ego_states = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()
+                )
                 glob_ego_pos_xy = glob_ego_states[:, :, :2]
                 glob_ego_yaw = glob_ego_states[:, :, 7]
-                
-                reference_xy = self.log_trajectory.pos_xy
-                
-                # Normalize
-                reference_xy /= constants.MAX_REL_GOAL_COORD
-                
+                glob_reference_xy = self.log_trajectory.pos_xy
+
+                local_reference_xy = torch.empty_like(glob_reference_xy)
                 # Transform reference path to be relative to current
                 # agent positions and heading
-                for i in range(self.num_worlds):
-                    reference_xy[i] = to_local_frame(
-                        reference_xy[i],
-                        glob_ego_pos_xy[i],
-                        glob_ego_yaw[i],
-                    )
-                
-                batch_size = reference_xy.shape[0]
-                num_points = reference_xy.shape[1]
-                time_steps = reference_xy.shape[2] 
-                    
+                for world_idx in range(self.num_worlds):
+                    for agent_idx in range(self.max_cont_agents):
+                        local_reference_xy[
+                            world_idx, agent_idx, :, :
+                        ] = to_local_frame(
+                            global_pos_xy=glob_reference_xy[
+                                world_idx, agent_idx, :, :
+                            ],
+                            ego_pos=glob_ego_pos_xy[world_idx, agent_idx],
+                            ego_yaw=glob_ego_yaw[world_idx, agent_idx],
+                            device=self.device,
+                        )
+
+                # Normalize
+                local_reference_xy /= constants.MAX_REF_POINT
+
+                batch_size = local_reference_xy.shape[0]
+                num_points = local_reference_xy.shape[1]
+                time_steps = local_reference_xy.shape[2]
+
                 # Create dropout mask for the time dimension
                 # Shape: [batch_size, num_points, time_steps, 1]
                 point_dropout_mask = torch.bernoulli(
-                    torch.ones(batch_size, num_points, time_steps, 1, device=reference_xy.device) * (1 - self.config.prob_reference_dropout)
+                    torch.ones(
+                        batch_size,
+                        num_points,
+                        time_steps,
+                        1,
+                        device=local_reference_xy.device,
+                    )
+                    * (1 - self.config.prob_reference_dropout)
                 ).bool()
 
                 # Apply dropout mask
-                reference_xy = reference_xy * point_dropout_mask
+                self.local_reference_xy = (
+                    local_reference_xy * point_dropout_mask
+                )
 
                 # Flatten the dimensions for stacking
-                base_fields.append(reference_xy.flatten(start_dim=2))
-                
+                base_fields.append(
+                    self.local_reference_xy.flatten(start_dim=2)
+                )
+
             if self.config.reward_type == "reward_conditioned":
 
                 # Create expanded weights for all environments
@@ -849,37 +868,50 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 return torch.cat(base_fields, dim=-1)
         else:
             if self.config.add_reference_path:
-                
+
                 # Shape: [batch, 91, 2]
-                glob_ego_states = self.sim.absolute_self_observation_tensor().to_torch().clone()[mask]
+                glob_ego_states = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()[mask]
+                )
                 glob_ego_pos_xy = glob_ego_states[:, :2]
                 glob_ego_yaw = glob_ego_states[:, 7]
-                
-                reference_xy = self.log_trajectory.pos_xy[mask]
-                
-                # Transform reference path to be relative to current agent positions and heading
-                local_reference_xy = to_local_frame(
-                    reference_xy,
-                    glob_ego_pos_xy,
-                    glob_ego_yaw,
-                )
-                
+                glob_reference_xy = self.log_trajectory.pos_xy[mask]
+
+                local_reference_xy = torch.empty_like(glob_reference_xy)
+                batch_size = local_reference_xy.shape[0]
+                num_points = local_reference_xy.shape[1]
+
+                for agent_idx in range(batch_size):
+                    local_reference_xy[agent_idx, :, :] = to_local_frame(
+                        global_pos_xy=glob_reference_xy[agent_idx, :, :],
+                        ego_pos=glob_ego_pos_xy[agent_idx],
+                        ego_yaw=glob_ego_yaw[agent_idx],
+                        device=self.device,
+                    )
+
                 # Normalize to [-1, 1]
-                local_reference_xy /= constants.MAX_REL_GOAL_COORD
-     
-                batch_size = reference_xy.shape[0]
-                num_points = reference_xy.shape[1]
-                           
+                local_reference_xy /= constants.MAX_REF_POINT
+
                 point_dropout_mask = torch.bernoulli(
-                    torch.ones((batch_size, num_points), device=local_reference_xy.device) * (1 - self.config.prob_reference_dropout)
+                    torch.ones(
+                        (batch_size, num_points),
+                        device=local_reference_xy.device,
+                    )
+                    * (1 - self.config.prob_reference_dropout)
                 ).bool()
-                
-                # Dropout fraction of points in the reference path        
-                local_reference_xy = local_reference_xy * point_dropout_mask.unsqueeze(2)
-                
+
+                # Dropout fraction of points in the reference path
+                self.local_reference_xy = (
+                    local_reference_xy * point_dropout_mask.unsqueeze(2)
+                )
+
                 # Stack
-                base_fields.append(local_reference_xy.view(batch_size, -1))
-            
+                base_fields.append(
+                    self.local_reference_xy.view(batch_size, -1)
+                )
+
             if self.config.reward_type == "reward_conditioned":
                 # For masked agents, we need to extract agent indices from the mask
                 world_indices, agent_indices = torch.where(mask)
@@ -1429,6 +1461,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         agent_indices = sample_batch["agents_id"]
 
         self.vbd_trajectories.zero_()
+
         # Process each world separately
         for world_idx in range(self.num_worlds):
             world_agent_indices = agent_indices[world_idx]
@@ -1567,8 +1600,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="classic",
+        dynamics_model="delta_local",
         reward_type="follow_waypoints",
+        add_reference_path=True,
+        prob_reference_dropout=0.8,
     )
     render_config = RenderConfig()
 
@@ -1586,7 +1621,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     control_mask = env.cont_agent_mask
@@ -1601,7 +1636,7 @@ if __name__ == "__main__":
 
     env_idx = 0
 
-    for t in range(91):
+    for t in range(10):
         print(f"Step: {t}")
 
         # Step the environment
@@ -1617,7 +1652,8 @@ if __name__ == "__main__":
             env_indices=[env_idx],
             zoom_radius=80,
             time_steps=[t],
-            # center_agent_indices=[highlight_agent],
+            center_agent_indices=[highlight_agent],
+            plot_waypoints=True,
         )
 
         agent_obs = env.vis.plot_agent_observation(
@@ -1629,8 +1665,15 @@ if __name__ == "__main__":
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
+        world_time_steps = (
+            torch.Tensor([t]).repeat((1, env.num_worlds)).long().to(env.device)
+        )
+
         obs = env.get_obs()
-        reward = env.get_rewards()
+        reward = env.get_rewards(world_time_steps=world_time_steps)
+
+        print(f"Reward: {reward[:, env_idx, highlight_agent]}")
+
         done = env.get_dones()
         info = env.get_infos()
 
