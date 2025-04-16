@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/examples
+data_dir: data/processed/training
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 75 # Number of parallel environments
-  k_unique_scenes: 4 # Number of unique scenes to sample from
+  num_worlds: 1 # Number of parallel environments
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -23,8 +23,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
-  action_space_steer_disc: 31
-  action_space_accel_disc: 11
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
   init_steps: 0 # Warmup steps
   collision_weight: -0.2
   off_road_weight: -0.2
@@ -56,10 +56,10 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
-  resample_dataset_size: 500 # Number of unique scenes to sample from
-  resample_interval: 2_000_000
-  sample_with_replacement: false
+  resample_scenes: true
+  resample_dataset_size: 10_000 # Number of unique scenes to sample from
+  resample_interval: 1000 #2_000_000
+  sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
@@ -83,7 +83,7 @@ train:
 
   # # # Logging # # #
   log_window: 500
-  track_realism_metrics: true # Log human-like metrics
+  track_realism_metrics: false # Log human-like metrics
   track_n_worlds: 2 # Number of worlds to track
 
   # # # Network # # #
@@ -100,7 +100,7 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 50 # Render every k iterations
+  render_interval: 250 # Render every k iterations
   render_k_scenarios: 2 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
