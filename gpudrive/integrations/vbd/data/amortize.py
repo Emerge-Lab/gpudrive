@@ -1,16 +1,17 @@
 """
-VBD Amortization Script (CPU-only version)
+VBD Amortization Script
 
 This script adds pre-computed VBD trajectories to Waymo Open Dataset JSON files.
-It uses a sliding window approach to generate trajectories in chunks, running exclusively on CPU.
+It uses a sliding window approach to generate trajectories in chunks.
 
 Usage:
-    python vbd_amortize_cpu.py --model_path /path/to/vbd/model 
-                               --input_dir /path/to/input/json/files 
-                               --output_dir /path/to/output/json/files
-                               --batch_size 8
-                               --window_size 10
-                               --total_steps 91
+    python amortize.py 
+        --model_path /path/to/vbd/model 
+        --input_dir /path/to/input/json/files 
+        --output_dir /path/to/output/json/files
+        --batch_size 8
+        --window_size 10
+        --total_steps 91
 """
 
 import os
@@ -20,9 +21,11 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from gpudrive.env.config import EnvConfig
+from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.env.env_torch import GPUDriveTorchEnv
+from gpudrive.datatypes.trajectory import LogTrajectory
+from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
 
 def load_vbd_model(model_path, device="cpu"):
@@ -33,128 +36,15 @@ def load_vbd_model(model_path, device="cpu"):
     _ = model.eval()
     return model
 
-def process_file(json_path, vbd_model, output_dir, batch_size=1, window_size=10, total_steps=91):
-    """Process a single JSON file, adding VBD trajectories, using CPU only."""
-    print(f"Processing file: {json_path}")
-    
-    # Load the JSON file
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
-    # Create config
-    config = EnvConfig(
-        ego_state=True,
-        road_map_obs=True,
-        partner_obs=True,
-        norm_obs=True,
-        bev_obs=False,
-        lidar_obs=False,
-        disable_classic_obs=False,
-        max_controlled_agents=32,
-        use_vbd=False,  # We don't need the VBD integration in the env
-        dynamics_model="delta_local",
-    )
-    
-    # Create data loader with just this file
-    data_loader = SceneDataLoader(
-        root=os.path.dirname(json_path),
-        batch_size=batch_size,
-        dataset_size=1,
-        sample_with_replacement=False,
-        shuffle=False,
-    )
-    
-    # Create environment with CPU device
-    env = GPUDriveTorchEnv(
-        config=config,
-        data_loader=data_loader,
-        max_cont_agents=64,
-        device="cpu",  # Force CPU
-        action_type="discrete",
-        backend="torch",
-    )
-    
-    # Reset the environment
-    _ = env.reset()
-    
-    # Get initial world state
-    means_xy = env.sim.world_means_tensor().to_torch().to("cpu")[:, :2]
-    
-    # Initialize VBD trajectories dictionary
-    vbd_trajectories = {}
-    for i, obj in enumerate(data["objects"]):
-        agent_id = obj["id"]
-        vbd_trajectories[agent_id] = [None] * total_steps
-    
-    # Process in sliding windows
-    for start_idx in range(0, total_steps, window_size):
-        print(f"Processing window starting at {start_idx}")
-        
-        # Generate sample batch for VBD from current state, ensuring it's on CPU
-        sample_batch = env._generate_sample_batch(init_steps=window_size)
-        
-        # Make sure all tensors in the batch are on CPU
-        for key, value in sample_batch.items():
-            if isinstance(value, torch.Tensor):
-                sample_batch[key] = value.to("cpu")
-        
-        # Generate predictions using CPU
-        predictions = vbd_model.sample_denoiser(sample_batch)
-        vbd_output = predictions["denoised_trajs"].to("cpu").detach().cpu().numpy()
-        
-        # Get agent IDs
-        agent_indices = sample_batch["agents_id"][0]  # Assuming batch size 1
-        
-        # Store predictions in dictionary
-        valid_mask = agent_indices >= 0
-        valid_agent_indices = agent_indices[valid_mask]
-        
-        for i, agent_idx in enumerate(valid_agent_indices):
-            agent_id = env.sim.absolute_self_observation_tensor().to_torch()[0, agent_idx, -1].item()
-            
-            # Store predictions for this window
-            for t in range(window_size):
-                if start_idx + t < total_steps:
-                    # Store position (x, y), heading (yaw), velocity (vx, vy)
-                    vbd_trajectories[agent_id][start_idx + t] = [
-                        float(vbd_output[0, i, t, 0]),  # x
-                        float(vbd_output[0, i, t, 1]),  # y
-                        float(vbd_output[0, i, t, 2]),  # yaw
-                        float(vbd_output[0, i, t, 3]),  # vx
-                        float(vbd_output[0, i, t, 4])   # vy
-                    ]
-        
-        # Advance the environment by window_size steps
-        if start_idx + window_size < total_steps:
-            for _ in range(window_size):
-                # Get expert actions for the current step
-                expert_actions, _, _, _ = env.get_expert_actions()
-                env.step_dynamics(expert_actions[:, :, 0, :])
-    
-    # Add VBD trajectories to the JSON file
-    for obj in data["objects"]:
-        agent_id = obj["id"]
-        if agent_id in vbd_trajectories:
-            # Add a new key for VBD trajectories
-            obj["vbd_trajectories"] = vbd_trajectories[agent_id]
-    
-    # Write the updated JSON file
-    output_path = os.path.join(output_dir, os.path.basename(json_path))
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, 'w') as f:
-        json.dump(data, f)
-    
-    return output_path
-
 def main():
-    parser = argparse.ArgumentParser(description="VBD Amortization Script (CPU-only version)")
-    parser.add_argument("--model_path", required=True, help="Path to the VBD model checkpoint")
-    parser.add_argument("--input_dir", required=True, help="Directory containing input JSON files")
-    parser.add_argument("--output_dir", required=True, help="Directory for output JSON files")
+    parser = argparse.ArgumentParser(description="VBD Amortization Script")
+    parser.add_argument("--model_path", help="Path to the VBD model checkpoint", default="gpudrive/integrations/vbd/weights/epoch=18.ckpt")
+    parser.add_argument("--input_dir", help="Directory containing input JSON files", default="data/processed/examples")
+    parser.add_argument("--output_dir", help="Directory for output JSON files", default="data/processed/vbd")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for processing")
     parser.add_argument("--window_size", type=int, default=10, help="Size of sliding window")
     parser.add_argument("--total_steps", type=int, default=91, help="Total number of steps to generate")
-    parser.add_argument("--single_file", help="Process only a single file (optional)")
+    parser.add_argument("--num_scenes", type=int, default=1, help="Number of scenes to process")
     args = parser.parse_args()
     
     # Always use CPU device
@@ -162,31 +52,116 @@ def main():
     print(f"Loading VBD model on {device}...")
     vbd_model = load_vbd_model(args.model_path, device)
     
-    if args.single_file:
-        # Process just one file
-        json_files = [Path(args.single_file)]
-    else:
-        # Find all JSON files in the input directory
-        json_files = list(Path(args.input_dir).glob("**/*.json"))
+    # Find all JSON files in the input directory
+    json_files = list(Path(args.input_dir).glob("**/*.json"))
     
     print(f"Found {len(json_files)} JSON files to process")
     
-    # Process each file
-    for json_path in tqdm(json_files):
+    #Init GPUDrive env
+    INIT_STEPS = 11
+    env_config = EnvConfig(
+        init_steps=INIT_STEPS, # Warmup period
+        dynamics_model="state", # Use state-based dynamics model
+        dist_to_goal_threshold=1e-5, # Trick to make sure the agents don't disappear when they reach the goal
+        init_mode = 'all_non_trivial',
+        max_controlled_agents=32,
+        goal_behavior='ignore'
+    )
+            
+    # Make env
+    gpudrive_env = GPUDriveTorchEnv(
+        config=env_config,
+        data_loader = SceneDataLoader(
+            root=args.input_dir,
+            batch_size=args.batch_size,
+            dataset_size=args.num_scenes,
+        ),
+        render_config=RenderConfig(render_3d=True),
+        max_cont_agents=32, # Maximum number of agents to control per scene
+        device=device,
+    )
+
+    # Final VBD trajectories to write
+    output_trajectories = torch.zeros(gpudrive_env.num_worlds, gpudrive_env.max_agent_count, env_config.episode_len, 5)
+
+    # Save init steps from logs
+    log_trajectory = LogTrajectory.from_tensor(
+        gpudrive_env.sim.expert_trajectory_tensor(),
+        num_worlds=gpudrive_env.num_worlds,
+        max_agents=gpudrive_env.max_agent_count,
+        device=device
+    )
+    
+    output_trajectories[:, :, :INIT_STEPS, :2] = log_trajectory.pos_xy[:, :, :INIT_STEPS]
+    output_trajectories[:, :, :INIT_STEPS, 2] = log_trajectory.yaw[:, :, :INIT_STEPS, 0]
+    output_trajectories[:, :, :INIT_STEPS, 3:] = log_trajectory.vel_xy[:, :, :INIT_STEPS]
+
+    # Action tensor to step through simulation
+    predicted_actions = torch.zeros((gpudrive_env.num_worlds, gpudrive_env.max_agent_count, gpudrive_env.episode_len - INIT_STEPS, 10))
+
+    # World means for VBD outputs
+    world_means = gpudrive_env.sim.world_means_tensor().to_torch()[:, :2].to(device)
+
+    for _ in range(int(args.num_scenes / args.batch_size)):
+        # Generate VBD input
+        gpudrive_sample_batch = gpudrive_env._generate_sample_batch()
+        # Controlled agent mask
+        world_agent_indices = gpudrive_sample_batch['agents_id']
+        valid_mask = world_agent_indices >= 0  # Boolean mask of valid indices
+        valid_agent_indices = world_agent_indices[valid_mask]  # Filtered tensor
+
+        # Generate VBD output
+        predictions = vbd_model.sample_denoiser(gpudrive_sample_batch)
+        vbd_output = predictions["denoised_trajs"].to(device).detach()
+
+        for i in range(gpudrive_env.num_worlds):
+            # Get controlled agent indices for this world
+            valid_world_indices = valid_agent_indices[i]
+
+            # Populate predicted actions
+            predicted_actions[i, valid_world_indices, :, :2] = vbd_output[i, valid_world_indices, :, :2] - world_means[i].view(1, 1, 2)
+            predicted_actions[i, valid_world_indices, :, 3] = vbd_output[i, valid_world_indices, :, 2]
+            predicted_actions[i, valid_world_indices, :, 4:6] = vbd_output[i, valid_world_indices, :, 3:]
+
+            # Populate output trajectories
+            output_trajectories[i, valid_world_indices, INIT_STEPS:, :2] = vbd_output[i, valid_world_indices, :, :2] - world_means[i].view(1, 1, 2)
+            output_trajectories[i, valid_world_indices, INIT_STEPS:, 2:] = vbd_output[i, valid_world_indices, :, 2:]
+
+        # Save to each file's json
+        index_to_id = GlobalEgoState.from_tensor(
+            gpudrive_env.sim.absolute_self_observation_tensor(),
+            device=device
+        ).id
+        
+        filenames = gpudrive_env.get_env_filenames()
+        
+        for i in range(gpudrive_env.num_worlds):
+            filename = filenames[i]
+            with open(os.path.join(args.input_dir, filename), "r") as f:
+                data = json.load(f)
+            
+            # Find object with correct id
+            for j in range(output_trajectories.shape[1]):
+                id = index_to_id[i, j]
+
+                for obj in data["objects"]:
+                    if obj["id"] == id:
+                        # Add VBD output to JSON
+                        obj["vbd_trajectory"] = output_trajectories[i, j].cpu().numpy().tolist()
+                        break
+
+            # Write to output directory
+            output_file = os.path.join(args.output_dir, filename)
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            with open(output_file, "w") as f:
+                json.dump(data, f, indent=4)
+        
+        # Load next batch of scenes
         try:
-            output_path = process_file(
-                str(json_path),
-                vbd_model,
-                args.output_dir,
-                args.batch_size,
-                args.window_size,
-                args.total_steps
-            )
-            print(f"Processed {json_path} -> {output_path}")
+            gpudrive_env.swap_data_batch()
         except Exception as e:
-            print(f"Error processing {json_path}: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Reached end of dataset: {e}")
+            break
     
     print("VBD amortization complete!")
 

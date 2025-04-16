@@ -141,8 +141,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Set initialization steps - ensure minimum steps for VBD
         if self.use_vbd:
             self.init_steps = max(
-                self.config.init_steps, 10
-            )  # Minimum 10 steps for VBD
+                self.config.init_steps, 11
+            )  # Minimum 11 steps for VBD
         else:
             self.init_steps = self.config.init_steps
 
@@ -160,6 +160,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -188,6 +189,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
+            device=self.device
         )
         sample_batch = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
