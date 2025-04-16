@@ -329,7 +329,9 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
 
-        terminal = self.env.get_dones().bool()
+        terminal = self.env.get_dones(
+            world_time_steps=self.episode_lengths[:, 0].long()
+        )
 
         self.render_env() if self.render else None
 

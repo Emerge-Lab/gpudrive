@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: data/processed/examples
 continue_training: false
 model_cpt: null
 
@@ -16,7 +16,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   partner_obs: true
   norm_obs: true
   collision_behavior: "ignore"
-  goal_behavior: "remove"
+  goal_behavior: "stop"
   reward_type: "follow_waypoints"
   init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
@@ -101,7 +101,7 @@ train:
   render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
   render_interval: 250 # Render every k iterations
-  render_k_scenarios: 2 # Number of scenarios to render
+  render_k_scenarios: 1 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100

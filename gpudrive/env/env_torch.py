@@ -443,14 +443,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return self.get_obs(mask)
 
-    def get_dones(self):
-        return (
-            self.sim.done_tensor()
-            .to_torch()
-            .clone()
-            .squeeze(dim=2)
-            .to(torch.float)
-        )
+    def get_dones(self, world_time_steps=None):
+        """
+        Returns tensor indicating which agents have terminated.
+        
+        Args:
+            world_time_steps: Optional tensor [num_worlds] with current timestep per world.
+        
+        Returns:
+            torch.Tensor: Boolean tensor [num_worlds, num_agents] where True indicates done.
+        """
+        terminal = self.sim.done_tensor().to_torch().clone().squeeze(dim=2).to(torch.float)
+        
+        if world_time_steps is not None and self.config.reward_type == "follow_waypoints":
+            # Find last valid timestep for each agent
+            agent_episode_length = 90 - torch.argmax(self.log_trajectory.valids.squeeze(-1).flip(2), dim=2)
+
+            # Compare with expanded world timesteps
+            expanded_time_steps = world_time_steps.unsqueeze(1).expand_as(agent_episode_length)
+            return terminal.bool() & (expanded_time_steps >= agent_episode_length)
+        
+        else:
+            return terminal.bool()
 
     def get_infos(self):
         return Info.from_tensor(
