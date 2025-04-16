@@ -85,6 +85,8 @@ class PufferGPUDrive(PufferEnv):
         use_vbd=False,
         vbd_model_path=None,
         vbd_trajectory_weight=0.1,
+        track_realism_metrics=False,
+        track_n_worlds=2,
         render=False,
         render_3d=True,
         render_interval=50,
@@ -129,6 +131,8 @@ class PufferGPUDrive(PufferEnv):
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
         self.plot_waypoints = plot_waypoints
+        self.track_realism_metrics = track_realism_metrics
+        self.track_n_worlds = track_n_worlds
 
         # VBD
         self.vbd_model_path = vbd_model_path
@@ -276,16 +280,17 @@ class PufferGPUDrive(PufferEnv):
         ).to(self.device)
 
         # Storage for computing realism metrics
-        self.worlds_to_track = 2
-        self.pos_xyz = torch.zeros(
-            (self.worlds_to_track, self.max_cont_agents_per_env, 91, 3),
-            dtype=torch.float32,
-        ).to(self.device)
+        if self.track_realism_metrics:
+            self.worlds_to_track = self.track_n_worlds
+            self.pos_xyz = torch.zeros(
+                (self.worlds_to_track, self.max_cont_agents_per_env, 91, 3),
+                dtype=torch.float32,
+            ).to(self.device)
 
-        self.headings = torch.zeros(
-            (self.worlds_to_track, self.max_cont_agents_per_env, 91),
-            dtype=torch.float32,
-        ).to(self.device)
+            self.headings = torch.zeros(
+                (self.worlds_to_track, self.max_cont_agents_per_env, 91),
+                dtype=torch.float32,
+            ).to(self.device)
 
         return self.observations, []
 
@@ -348,18 +353,20 @@ class PufferGPUDrive(PufferEnv):
         self.offroad_in_episode += info.off_road
         self.collided_in_episode += info.collided
 
-        # Log global states
-        batch_indices = torch.arange(self.worlds_to_track, device=self.device)
-        pos_x, pos_y, pos_z, heading, ids = get_state(
-            self.env, num_worlds=self.worlds_to_track
-        )
-        episode_time_steps = (
-            self.episode_lengths[: self.worlds_to_track, 0].long() - 1
-        )
-        self.pos_xyz[batch_indices, :, episode_time_steps, :] = torch.stack(
-            [pos_x, pos_y, pos_z], dim=-1
-        )
-        self.headings[batch_indices, :, episode_time_steps] = heading
+        if self.track_realism_metrics:  # Log global states
+            batch_indices = torch.arange(
+                self.worlds_to_track, device=self.device
+            )
+            pos_x, pos_y, pos_z, heading, ids = get_state(
+                self.env, num_worlds=self.worlds_to_track
+            )
+            episode_time_steps = (
+                self.episode_lengths[: self.worlds_to_track, 0].long() - 1
+            )
+            self.pos_xyz[
+                batch_indices, :, episode_time_steps, :
+            ] = torch.stack([pos_x, pos_y, pos_z], dim=-1)
+            self.headings[batch_indices, :, episode_time_steps] = heading
 
         # Mask used for buffer
         self.masks = self.live_agent_mask[self.controlled_agent_mask]
@@ -476,13 +483,14 @@ class PufferGPUDrive(PufferEnv):
             self.human_like_rewards[done_worlds, :] = 0
             self.internal_rewards[done_worlds, :] = 0
 
-            tracked_done_worlds = done_worlds.tolist() and list(
-                range(self.worlds_to_track)
-            )
-            if len(tracked_done_worlds):
-                self.compute_realism_metrics(tracked_done_worlds)
-            self.pos_xyz[tracked_done_worlds, :] = 0
-            self.headings[tracked_done_worlds, :] = 0
+            if self.track_realism_metrics:
+                tracked_done_worlds = done_worlds.tolist() and list(
+                    range(self.worlds_to_track)
+                )
+                if len(tracked_done_worlds):
+                    self.compute_realism_metrics(tracked_done_worlds)
+                    self.pos_xyz[tracked_done_worlds, :] = 0
+                    self.headings[tracked_done_worlds, :] = 0
 
         # Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
