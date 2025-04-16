@@ -8,8 +8,8 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 1 # Number of parallel environments
-  k_unique_scenes: 1 # Number of unique scenes to sample from
+  num_worlds: 100 # Number of parallel environments
+  k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -42,7 +42,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac"
+  group: "minimal"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -56,9 +56,9 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 1000 #2_000_000
+  resample_interval: 5_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
@@ -82,7 +82,7 @@ train:
   target_kl: null
 
   # # # Logging # # #
-  log_window: 500
+  log_window: 1000
   track_realism_metrics: false # Log human-like metrics
   track_n_worlds: 2 # Number of worlds to track
 

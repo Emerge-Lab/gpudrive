@@ -30,6 +30,7 @@ class Agent(nn.Module):
         action_dim,
         act_func="tanh",
         dropout=0.00,
+        top_k=3, # Max pooling features to keep
     ):
         super().__init__()
 
@@ -37,6 +38,7 @@ class Agent(nn.Module):
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.ReLU()
         self.dropout = dropout
         self.action_dim = action_dim
+        self.top_k = top_k
 
         # Indices for unpacking the observation modalities
         self.ego_state_idx = (
@@ -82,7 +84,7 @@ class Agent(nn.Module):
 
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(3 * embed_dim, 32)),
+            layer_init(nn.Linear((2*top_k + 1) * embed_dim, 32)),
             nn.LayerNorm(32),
             self.act_func,
             layer_init(nn.Linear(32, 1), std=1.0),
@@ -90,25 +92,11 @@ class Agent(nn.Module):
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear(3 * embed_dim, 64)),
+            layer_init(nn.Linear((2*top_k + 1) * embed_dim, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
         )
-
-    def get_value(self, x):
-        # Unpack into modalities
-        ego_state, partner_obs, road_graph = self.unpack_obs(x)
-
-        # Embed each modality using shared embedding networks
-        ego_embed = self.ego_embed(ego_state)
-        partner_embed, _ = self.partner_embed(partner_obs).max(dim=1)
-        road_embed, _ = self.road_map_embed(road_graph).max(dim=1)
-
-        # Concatenate the embeddings
-        x = torch.cat([ego_embed, partner_embed, road_embed], dim=-1)
-
-        return self.critic(x)
 
     def forward(self, x, action=None):
         """Forward pass through the network.
@@ -122,11 +110,15 @@ class Agent(nn.Module):
 
         # Use shared embedding networks for both actor and critic
         ego_embed = self.ego_embed(ego_state)
-        partner_embed, _ = self.partner_embed(partner_obs).max(dim=1)
-        road_embed, _ = self.road_map_embed(road_graph).max(dim=1)
+        partner_embed = self.partner_embed(partner_obs)
+        road_embed = self.road_map_embed(road_graph)
+
+        # Take top k features from partner and road embeddings
+        partner_max_pool = torch.topk(partner_embed, k=self.top_k, dim=1)[0].flatten(start_dim=1) #partner_embed.max(dim=1)
+        road_max_pool = torch.topk(road_embed, k=self.top_k, dim=1)[0].flatten(start_dim=1)
 
         # Concatenate the embeddings
-        z = torch.cat([ego_embed, partner_embed, road_embed], dim=-1)
+        z = torch.cat([ego_embed, partner_max_pool, road_max_pool], dim=-1)
 
         # Pass to the actor and critic networks
         logits = self.actor(z)

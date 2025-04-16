@@ -20,7 +20,6 @@ from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
 from gpudrive.networks.late_fusion import NeuralNet
-from gpudrive.networks.agents import Agent
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
@@ -72,20 +71,13 @@ def make_agent(env, config):
 
     else:
         # Start from scratch
-        # return NeuralNet(
-        #     input_dim=config.train.network.input_dim,
-        #     action_dim=env.single_action_space.n,
-        #     hidden_dim=config.train.network.hidden_dim,
-        #     dropout=config.train.network.dropout,
-        #     config=config.environment,
-        # )
-
-        return Agent(
-            config=config.environment,
-            embed_dim=config.train.network.embed_dim,
+        return NeuralNet(
+            input_dim=config.train.network.input_dim,
             action_dim=env.single_action_space.n,
+            hidden_dim=config.train.network.hidden_dim,
+            dropout=config.train.network.dropout,
+            config=config.environment,
         )
-
 
 def train(args, vecenv):
     """Main training loop for the PPO agent."""
@@ -163,7 +155,7 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "baselines/ppo/config/ppo_population.yaml",
+    ] = "baselines/ppo/config/ppo_base_puffer.yaml",
     *,
     # fmt: off
     # Environment options

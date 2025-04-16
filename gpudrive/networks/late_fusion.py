@@ -107,7 +107,7 @@ class NeuralNet(
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
             if "add_reference_path" in self.config:
-                self.ego_state_idx += 2 * madrona_gpudrive.kTrajectoryLength
+                self.ego_state_idx += 2 * 91
 
             self.vbd_in_obs = self.config.vbd_in_obs
 
