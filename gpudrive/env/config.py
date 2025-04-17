@@ -95,6 +95,7 @@ class EnvConfig:
     goal_behavior: str = "remove"  # Options: "stop", "ignore", "remove"
     
     # Reference points settings
+    add_reference_speed: bool = False  # Include reference speed in observations
     add_reference_path: bool = False  
     prob_reference_dropout: float = 0.0  # Probability of dropping reference points
     min_reference_points: int = 1  # Minimum number of reference points 

@@ -51,6 +51,8 @@ class Agent(nn.Module):
         ]:  # Every agent receives a reference path
             self.ego_state_idx += 91 * 2
 
+        if self.config["add_reference_speed"]: 
+            self.ego_state_idx += 1
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1
         self.partner_obs_idx = self.ego_state_idx + (

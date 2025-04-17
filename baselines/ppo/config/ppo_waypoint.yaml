@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/examples
+data_dir: data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -37,6 +37,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Planning guidance
   add_reference_path: false # If true, the goal state is added to the ego observation
+  add_reference_speed: true # If true, the reference speed is added to the ego observation
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
 wandb:
@@ -83,7 +84,7 @@ train:
 
   # # # Logging # # #
   log_window: 1000
-  track_realism_metrics: false # Log human-like metrics
+  track_realism_metrics: true # Log human-like metrics
   track_n_worlds: 2 # Number of worlds to track
 
   # # # Network # # #
@@ -100,8 +101,8 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 250 # Render every k iterations
-  render_k_scenarios: 1 # Number of scenarios to render
+  render_interval: 100 # Render every k iterations
+  render_k_scenarios: 2 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100

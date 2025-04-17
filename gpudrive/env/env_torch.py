@@ -456,10 +456,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         terminal = self.sim.done_tensor().to_torch().clone().squeeze(dim=2).to(torch.float)
         
         if world_time_steps is not None and self.config.reward_type == "follow_waypoints":
-            # Find last valid timestep for each agent
+            # Find last valid timestep for each agent, this is the ground-truth episode length
             agent_episode_length = 90 - torch.argmax(self.log_trajectory.valids.squeeze(-1).flip(2), dim=2)
-
-            # Compare with expanded world timesteps
+            
             expanded_time_steps = world_time_steps.unsqueeze(1).expand_as(agent_episode_length)
             return terminal.bool() & (expanded_time_steps >= agent_episode_length)
         
@@ -788,7 +787,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if self.config.norm_obs:
             ego_state.normalize()
-
+            
+        
         base_fields = [
             ego_state.speed.unsqueeze(-1),
             ego_state.vehicle_length.unsqueeze(-1),
@@ -799,6 +799,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ]
 
         if mask is None:
+            
+            if self.config.add_reference_speed:
+                avg_ref_speed = self.log_trajectory.ref_speed.mean(axis=-1) / constants.MAX_SPEED
+                base_fields.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
 
@@ -881,6 +885,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             else:
                 return torch.cat(base_fields, dim=-1)
         else:
+            
+            if self.config.add_reference_speed:
+                avg_ref_speed = self.log_trajectory.ref_speed[mask].mean(axis=-1) / constants.MAX_SPEED
+                base_fields.append(avg_ref_speed.unsqueeze(-1))
+            
             if self.config.add_reference_path:
 
                 # Shape: [batch, 91, 2]

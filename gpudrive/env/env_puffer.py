@@ -19,6 +19,80 @@ from gpudrive.env.dataset import SceneDataLoader
 from pufferlib.environment import PufferEnv
 from gpudrive import GPU_DRIVE_DATA_DIR
 
+"""Metrics from 
+    https://github.com/waymo-research/waymo-open-dataset/blob/master/src/waymo_open_dataset/wdl_limited/sim_agents_metrics/trajectory_features.py
+    implemented with numpy instead of tensorflow.
+"""
+def central_diff_np(t, pad_value):
+    """NumPy version of central_diff function.
+    
+    Computes central difference along the last axis.
+    """
+    # Check if input is at least length 3 (needed for central diff)
+    if t.shape[-1] < 3:
+        result = np.full_like(t, pad_value)
+        return result
+        
+    # Create proper padding tensors
+    pad_shape = t.shape[:-1] + (1,)
+    pad_array = np.full(pad_shape, pad_value)
+    
+    # Compute central difference for middle elements
+    diff_t = (t[..., 2:] - t[..., :-2]) / 2
+    
+    return np.concatenate([pad_array, diff_t, pad_array], axis=-1)
+
+def central_logical_and_np(t, pad_value):
+    """NumPy version of central_logical_and function."""
+    # Check if input is at least length 3
+    if t.shape[-1] < 3:
+        result = np.full_like(t, pad_value)
+        return result
+        
+    pad_shape = t.shape[:-1] + (1,)
+    pad_array = np.full(pad_shape, pad_value)
+    diff_t = np.logical_and(t[..., :-2], t[..., 2:])
+    return np.concatenate([pad_array, diff_t, pad_array], axis=-1)
+
+def wrap_angle_np(angle):
+    """Wraps angles in the range [-pi, pi]."""
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
+def compute_kinematic_features_np(x, y, heading, seconds_per_step):
+    """NumPy version of compute_kinematic_features function, for x,y only."""
+    # Compute positions and displacement
+    batch_shape = x.shape[:-1]
+    time_steps = x.shape[-1]
+    
+    # For very short trajectories, just return placeholders
+    if time_steps < 3:
+        placeholder = np.full(x.shape, np.nan)
+        return placeholder, placeholder, placeholder, placeholder
+
+    # Linear speed - compute displacement first then magnitude
+    dx = central_diff_np(x, pad_value=np.nan)
+    dy = central_diff_np(y, pad_value=np.nan)
+    
+    # Calculate displacement norm directly (avoid reshaping issues)
+    displacements = np.sqrt(dx**2 + dy**2)
+    linear_speed = displacements / seconds_per_step
+    
+    # Linear acceleration (scalar)
+    linear_accel = central_diff_np(linear_speed, pad_value=np.nan) / seconds_per_step
+    
+    # Angular speed and acceleration
+    dh_step = wrap_angle_np(central_diff_np(heading, pad_value=np.nan))
+    angular_speed = dh_step / seconds_per_step
+    angular_accel = central_diff_np(angular_speed, pad_value=np.nan) / seconds_per_step
+    
+    return linear_speed, linear_accel, angular_speed, angular_accel
+
+def compute_kinematic_validity_np(valid):
+    """NumPy version of compute_kinematic_validity function."""
+    speed_validity = central_logical_and_np(valid, pad_value=False)
+    acceleration_validity = central_logical_and_np(speed_validity, pad_value=False)
+    return speed_validity, acceleration_validity
+
 
 def get_state(env, num_worlds):
     ego_state = GlobalEgoState.from_tensor(
@@ -69,6 +143,7 @@ class PufferGPUDrive(PufferEnv):
         lidar_obs=False,
         bev_obs=False,
         add_reference_path=False,
+        add_reference_speed=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
         condition_mode="random",
@@ -121,7 +196,6 @@ class PufferGPUDrive(PufferEnv):
         self.goal_achieved_weight = goal_achieved_weight
         self.init_mode = init_mode
         self.reward_type = reward_type
-        self.prob_reference_dropout = prob_reference_dropout
 
         self.render = render
         self.render_interval = render_interval
@@ -157,6 +231,7 @@ class PufferGPUDrive(PufferEnv):
             norm_obs=norm_obs,
             bev_obs=bev_obs,
             add_reference_path=add_reference_path,
+            add_reference_speed=add_reference_speed,
             prob_reference_dropout=prob_reference_dropout,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
@@ -626,13 +701,6 @@ class PufferGPUDrive(PufferEnv):
         Args:
             done_worlds: List of indices of the worlds to track.
         """
-        import tensorflow as tf
-        import numpy as np
-        from waymo_open_dataset.wdl_limited.sim_agents_metrics.trajectory_features import (
-            compute_displacement_error,
-            compute_kinematic_features,
-            compute_kinematic_validity,
-        )
 
         # [worlds, max_cont_agents]
         control_mask = (
@@ -655,7 +723,6 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()[control_mask]
         )
-        ref_pos_z_np = np.zeros_like(ref_pos_xy_np[:, :, 0])
         # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
         ref_headings_np = (
             self.env.log_trajectory.yaw[done_worlds]
@@ -665,7 +732,6 @@ class PufferGPUDrive(PufferEnv):
             .squeeze(-1)
         )
 
-        # Get agent information and convert to numpy
         agent_headings_np = (
             self.headings[done_worlds].detach().cpu().numpy()[control_mask]
         )
@@ -673,171 +739,59 @@ class PufferGPUDrive(PufferEnv):
             self.pos_xyz[done_worlds].detach().cpu().numpy()[control_mask]
         )
 
-        # Extract x, y, z components
+        # Extract x, y components (z is not informative)
         agent_x_np = agent_pos_xyz_np[..., 0]
         agent_y_np = agent_pos_xyz_np[..., 1]
-        agent_z_np = agent_pos_xyz_np[..., 2]
 
         ref_x_np = ref_pos_xy_np[..., 0]
         ref_y_np = ref_pos_xy_np[..., 1]
 
-        # Convert to TensorFlow tensors
-        ref_x = tf.convert_to_tensor(ref_x_np, dtype=tf.float32)
-        ref_y = tf.convert_to_tensor(ref_y_np, dtype=tf.float32)
-        ref_z = tf.convert_to_tensor(ref_pos_z_np, dtype=tf.float32)
-        ref_heading = tf.convert_to_tensor(ref_headings_np, dtype=tf.float32)
-
-        agent_x = tf.convert_to_tensor(agent_x_np, dtype=tf.float32)
-        agent_y = tf.convert_to_tensor(agent_y_np, dtype=tf.float32)
-        agent_z = tf.convert_to_tensor(agent_z_np, dtype=tf.float32)
-        agent_heading = tf.convert_to_tensor(
-            agent_headings_np, dtype=tf.float32
-        )
-
-        valid_mask = tf.convert_to_tensor(valid_mask, dtype=tf.bool)
-
         # Step duration in seconds
         seconds_per_step = 0.1  # Assuming 10Hz sampling rate
-
-        speed_validity, accel_validity = compute_kinematic_validity(valid_mask)
-
-        # Compute kinematic features for agents
-        (
-            agent_speed,
-            agent_accel,
-            agent_angular_speed,
-            agent_angular_accel,
-        ) = compute_kinematic_features(
-            agent_x, agent_y, agent_z, agent_heading, seconds_per_step
+        
+        # Compute the metrics for agent trajectories
+        agent_linear_speed, agent_linear_accel, agent_angular_speed, agent_angular_accel = compute_kinematic_features_np(
+            agent_x_np, agent_y_np, agent_headings_np, seconds_per_step
         )
-
-        # Compute kinematic features for reference trajectories
-        (
-            ref_speed,
-            ref_accel,
-            ref_angular_speed,
-            ref_angular_accel,
-        ) = compute_kinematic_features(
-            ref_x, ref_y, ref_z, ref_heading, seconds_per_step
+        
+        # Compute the metrics for reference trajectories
+        ref_linear_speed, ref_linear_accel, ref_angular_speed, ref_angular_accel = compute_kinematic_features_np(
+            ref_x_np, ref_y_np, ref_headings_np, seconds_per_step
         )
-
-        # Compute displacement error
-        displacement_error = compute_displacement_error(
-            agent_x, agent_y, agent_z, ref_x, ref_y, ref_z
-        )
-
-        # Compute additional metrics
-        speed_error = tf.abs(agent_speed - ref_speed)
-        accel_error = tf.abs(agent_accel - ref_accel)
-        angular_speed_error = tf.abs(agent_angular_speed - ref_angular_speed)
-        angular_accel_error = tf.abs(agent_angular_accel - ref_angular_accel)
-
-        def masked_mean_no_nan_inf(tensor):
-            """Compute mean excluding NaN and Inf values."""
-            # Create masks for non-NaN and non-Inf values
-            non_nan_mask = tf.math.logical_not(tf.math.is_nan(tensor))
-            non_inf_mask = tf.math.logical_not(tf.math.is_inf(tensor))
-            valid_values_mask = tf.logical_and(non_nan_mask, non_inf_mask)
-
-            # Apply mask to tensor
-            masked_tensor = tf.boolean_mask(tensor, valid_values_mask)
-
-            # If all values are filtered out, return 0.0
-            if tf.size(masked_tensor) == 0:
-                return tf.constant(0.0, dtype=tf.float32)
-
-            # Compute mean of valid values
-            return tf.reduce_mean(masked_tensor)
-
-        def masked_mean_with_validity_no_inf(tensor, validity_mask):
-            """Compute mean excluding NaN and Inf values and applying validity mask."""
-            # Create masks for non-NaN and non-Inf values
-            non_nan_mask = tf.math.logical_not(tf.math.is_nan(tensor))
-            non_inf_mask = tf.math.logical_not(tf.math.is_inf(tensor))
-            data_valid_mask = tf.logical_and(non_nan_mask, non_inf_mask)
-
-            # Combine with validity mask
-            combined_mask = tf.logical_and(data_valid_mask, validity_mask)
-
-            # Apply combined mask to tensor
-            masked_tensor = tf.boolean_mask(tensor, combined_mask)
-
-            # If all values are filtered out, return 0.0
-            if tf.size(masked_tensor) == 0:
-                return tf.constant(0.0, dtype=tf.float32)
-
-            # Compute mean of valid values
-            return tf.reduce_mean(masked_tensor)
-
-        metrics = {
-            "displacement_error": float(
-                masked_mean_no_nan_inf(displacement_error).numpy()
-            ),
-            "speed_error": float(
-                masked_mean_with_validity_no_inf(
-                    speed_error, speed_validity
-                ).numpy()
-            ),
-            "accel_error": float(
-                masked_mean_with_validity_no_inf(
-                    accel_error, accel_validity
-                ).numpy()
-            ),
-            "angular_speed_error": float(
-                masked_mean_with_validity_no_inf(
-                    angular_speed_error, speed_validity
-                ).numpy()
-            ),
-            "angular_accel_error": float(
-                masked_mean_with_validity_no_inf(
-                    angular_accel_error, accel_validity
-                ).numpy()
-            ),
-            "agent_speed": float(
-                masked_mean_with_validity_no_inf(
-                    agent_speed, speed_validity
-                ).numpy()
-            ),
-            "agent_accel": float(
-                masked_mean_with_validity_no_inf(
-                    agent_accel, accel_validity
-                ).numpy()
-            ),
-            "agent_angular_speed": float(
-                masked_mean_with_validity_no_inf(
-                    agent_angular_speed, speed_validity
-                ).numpy()
-            ),
-            "agent_angular_accel": float(
-                masked_mean_with_validity_no_inf(
-                    agent_angular_accel, accel_validity
-                ).numpy()
-            ),
-            "ref_speed": float(
-                masked_mean_with_validity_no_inf(
-                    ref_speed, speed_validity
-                ).numpy()
-            ),
-            "ref_accel": float(
-                masked_mean_with_validity_no_inf(
-                    ref_accel, accel_validity
-                ).numpy()
-            ),
-            "ref_angular_speed": float(
-                masked_mean_with_validity_no_inf(
-                    ref_angular_speed, speed_validity
-                ).numpy()
-            ),
-            "ref_angular_accel": float(
-                masked_mean_with_validity_no_inf(
-                    ref_angular_accel, accel_validity
-                ).numpy()
-            ),
-        }
-
-        wandb_metrics = {}
-        for key, value in metrics.items():
-            wandb_metrics[f"realism/{key}"] = value
-        wandb.log(wandb_metrics)
-
-        del wandb_metrics
+        
+        # Check which time steps are valid
+        speed_valid, accel_valid = compute_kinematic_validity_np(valid_mask)
+        
+        # Calculate absolute diffs between agent and reference trajectories
+        linear_speed_error = np.abs(agent_linear_speed - ref_linear_speed)
+        linear_accel_error = np.abs(agent_linear_accel - ref_linear_accel)
+        angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
+        angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
+        
+        # Apply validity masks
+        masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
+        masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
+        masked_angular_speed_error = np.ma.array(angular_speed_error, mask=~speed_valid)
+        masked_angular_accel_error = np.ma.array(angular_accel_error, mask=~accel_valid)
+        
+        # Compute MAEs
+        mean_linear_speed_error = masked_speed_error.mean()
+        mean_linear_accel_error = masked_accel_error.mean()
+        mean_angular_speed_error = masked_angular_speed_error.mean()
+        mean_angular_accel_error = masked_angular_accel_error.mean()
+        
+        if self.wandb_obj is not None:
+            self.wandb_obj.log(
+                {
+                    "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
+                    "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
+                    "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
+                    "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
+                    "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(ref_linear_speed[speed_valid]),
+                    "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(ref_linear_accel[accel_valid]),
+                    "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(agent_linear_speed[speed_valid]),
+                    "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(agent_linear_speed[accel_valid]),
+                    
+                },
+                step=self.global_step,
+            )

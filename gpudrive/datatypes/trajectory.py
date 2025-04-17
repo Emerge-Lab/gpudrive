@@ -77,6 +77,7 @@ class LogTrajectory:
         self.pos_xy = self.pos_xy * self.valids
         self.vel_xy = self.vel_xy * self.valids
         self.yaw = self.yaw * self.valids
+        self.ref_speed = self.comp_reference_speed()
 
     @classmethod
     def from_tensor(
@@ -103,3 +104,7 @@ class LogTrajectory:
         # Apply to x and y coordinates
         self.pos_xy[:, :, :, 0] += mean_x_reshaped
         self.pos_xy[:, :, :, 1] += mean_y_reshaped
+
+    def comp_reference_speed(self):
+        """Returns the average speed of the trajectory."""
+        return torch.sqrt(self.vel_xy[:, :, :, 0]**2 + self.vel_xy[:, :, :, 1]**2)
