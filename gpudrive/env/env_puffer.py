@@ -136,12 +136,8 @@ def get_state(env, num_worlds):
         backend=env.backend,
         device=env.device,
     )
-    mean_xy = env.sim.world_means_tensor().to_torch()[:, :2]
-    # mean_x = mean_xy[:, 0].unsqueeze(1)
-    # mean_y = mean_xy[:, 1].unsqueeze(1)
-
-    glob_ego_pos_x = ego_state.pos_x  # +mean_x
-    glob_ego_pos_y = ego_state.pos_y  # +mean_y
+    glob_ego_pos_x = ego_state.pos_x
+    glob_ego_pos_y = ego_state.pos_y
     return (
         glob_ego_pos_x[:num_worlds, :],
         glob_ego_pos_y[:num_worlds, :],
@@ -183,6 +179,7 @@ class PufferGPUDrive(PufferEnv):
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
         waypoint_distance_scale=0.05,
+        speed_distance_scale=0.0,
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
@@ -265,6 +262,7 @@ class PufferGPUDrive(PufferEnv):
             partner_obs=partner_obs,
             reward_type=reward_type,
             waypoint_distance_scale=waypoint_distance_scale,
+            speed_distance_scale=speed_distance_scale,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
@@ -442,10 +440,9 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
 
-        terminal = self.env.get_dones()
-        # terminal = self.env.get_dones(
-        #     world_time_steps=self.episode_lengths[:, 0].long()
-        # )
+        terminal = self.env.get_dones(
+            world_time_steps=self.episode_lengths[:, 0].long()
+        )
 
         self.render_env() if self.render else None
 

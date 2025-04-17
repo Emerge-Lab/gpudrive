@@ -19,6 +19,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   goal_behavior: "stop"
   reward_type: "follow_waypoints"
   waypoint_distance_scale: 0.05
+  speed_distance_scale: 0.0
 
   init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
@@ -51,7 +52,7 @@ wandb:
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: machine_like # Set dynamically in the script if needed
+  exp_id: waypoint_rs # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu

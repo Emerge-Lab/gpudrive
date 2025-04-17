@@ -464,6 +464,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if (
             world_time_steps is not None
             and self.config.reward_type == "follow_waypoints"
+            and self.config.waypoint_distance_scale > 0.0
         ):
             # Find last valid timestep for each agent, this is the ground-truth episode length
             agent_episode_length = 90 - torch.argmax(
@@ -611,9 +612,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.device,
             )
 
+            actual_agent_speed = self.sim.self_observation_tensor().to_torch()[
+                :, :, 0
+            ]
+
             actual_agent_pos = torch.stack(
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
+
+            speed_error = (gt_agent_speed - actual_agent_speed) ** 2
 
             # Compute euclidean distance between agent and waypoints
             dist_to_waypoints = torch.norm(
@@ -623,6 +630,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.distance_penalty = (
                 -self.config.waypoint_distance_scale
                 * torch.log(dist_to_waypoints + 1.0)
+                - self.config.speed_distance_scale
+                * torch.log(speed_error + 1.0)
             )
 
             # Apply waypoint mask only if sampling interval is greater than 1
