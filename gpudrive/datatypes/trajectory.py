@@ -107,4 +107,6 @@ class LogTrajectory:
 
     def comp_reference_speed(self):
         """Returns the average speed of the trajectory."""
-        return torch.sqrt(self.vel_xy[:, :, :, 0]**2 + self.vel_xy[:, :, :, 1]**2)
+        return torch.sqrt(
+            self.vel_xy[:, :, :, 0] ** 2 + self.vel_xy[:, :, :, 1] ** 2
+        )

@@ -30,7 +30,7 @@ class Agent(nn.Module):
         action_dim,
         act_func="tanh",
         dropout=0.00,
-        top_k=3, # Max pooling features to keep
+        top_k=3,  # Max pooling features to keep
     ):
         super().__init__()
 
@@ -51,7 +51,7 @@ class Agent(nn.Module):
         ]:  # Every agent receives a reference path
             self.ego_state_idx += 91 * 2
 
-        if self.config["add_reference_speed"]: 
+        if self.config["add_reference_speed"]:
             self.ego_state_idx += 1
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1
@@ -86,7 +86,7 @@ class Agent(nn.Module):
 
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear((2*top_k + 1) * embed_dim, 32)),
+            layer_init(nn.Linear((2 * top_k + 1) * embed_dim, 32)),
             nn.LayerNorm(32),
             self.act_func,
             layer_init(nn.Linear(32, 1), std=1.0),
@@ -94,7 +94,7 @@ class Agent(nn.Module):
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear((2*top_k + 1) * embed_dim, 64)),
+            layer_init(nn.Linear((2 * top_k + 1) * embed_dim, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
@@ -116,8 +116,14 @@ class Agent(nn.Module):
         road_embed = self.road_map_embed(road_graph)
 
         # Take top k features from partner and road embeddings
-        partner_max_pool = torch.topk(partner_embed, k=self.top_k, dim=1)[0].flatten(start_dim=1) #partner_embed.max(dim=1)
-        road_max_pool = torch.topk(road_embed, k=self.top_k, dim=1)[0].flatten(start_dim=1)
+        partner_max_pool = torch.topk(partner_embed, k=self.top_k, dim=1)[
+            0
+        ].flatten(
+            start_dim=1
+        )  # partner_embed.max(dim=1)
+        road_max_pool = torch.topk(road_embed, k=self.top_k, dim=1)[0].flatten(
+            start_dim=1
+        )
 
         # Concatenate the embeddings
         z = torch.cat([ego_embed, partner_max_pool, road_max_pool], dim=-1)

@@ -6,7 +6,8 @@ from waymo_open_dataset.wdl_limited.sim_agents_metrics.trajectory_features impor
     compute_kinematic_features,
     compute_kinematic_validity,
 )
-        
+
+
 def compute_realism_metrics(self, done_worlds):
     """Compute realism metrics.
 
@@ -70,9 +71,7 @@ def compute_realism_metrics(self, done_worlds):
     agent_x = tf.convert_to_tensor(agent_x_np, dtype=tf.float32)
     agent_y = tf.convert_to_tensor(agent_y_np, dtype=tf.float32)
     agent_z = tf.convert_to_tensor(agent_z_np, dtype=tf.float32)
-    agent_heading = tf.convert_to_tensor(
-        agent_headings_np, dtype=tf.float32
-    )
+    agent_heading = tf.convert_to_tensor(agent_headings_np, dtype=tf.float32)
 
     valid_mask = tf.convert_to_tensor(valid_mask, dtype=tf.bool)
 
@@ -194,14 +193,10 @@ def compute_realism_metrics(self, done_worlds):
             ).numpy()
         ),
         "ref_speed": float(
-            masked_mean_with_validity_no_inf(
-                ref_speed, speed_validity
-            ).numpy()
+            masked_mean_with_validity_no_inf(ref_speed, speed_validity).numpy()
         ),
         "ref_accel": float(
-            masked_mean_with_validity_no_inf(
-                ref_accel, accel_validity
-            ).numpy()
+            masked_mean_with_validity_no_inf(ref_accel, accel_validity).numpy()
         ),
         "ref_angular_speed": float(
             masked_mean_with_validity_no_inf(
