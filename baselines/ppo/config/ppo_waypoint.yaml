@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: data/processed/examples
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  k_unique_scenes: 4 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -37,7 +37,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Planning guidance
   add_reference_path: false # If true, the goal state is added to the ego observation
-  add_reference_speed: true # If true, the reference speed is added to the ego observation
+  add_reference_speed: false # If true, the reference speed is added to the ego observation
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
 wandb:
