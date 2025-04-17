@@ -37,18 +37,18 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Planning guidance
   add_reference_path: false # If true, the goal state is added to the ego observation
-  add_reference_speed: false # If true, the reference speed is added to the ego observation
+  add_reference_speed: true # If true, the reference speed is added to the ego observation
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
 wandb:
   entity: ""
   project: "humanlike"
-  group: "minimal"
+  group: "tinyexps"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: waypoint # Set dynamically in the script if needed
+  exp_id: waypoint_rs # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu

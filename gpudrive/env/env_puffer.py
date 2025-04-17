@@ -21,8 +21,32 @@ from gpudrive import GPU_DRIVE_DATA_DIR
 
 """Metrics from
     https://github.com/waymo-research/waymo-open-dataset/blob/master/src/waymo_open_dataset/wdl_limited/sim_agents_metrics/trajectory_features.py
-    implemented with numpy instead of tensorflow.
+    implemented using numpy instead of tensorflow.
 """
+
+
+def compute_displacement_error_np(pred_x, pred_y, ref_x, ref_y):
+    """NumPy version of compute_displacement_error function.
+
+    Computes displacement error (in x,y) w.r.t. a reference trajectory.
+
+    Args:
+        pred_x: The x-component of the predicted trajectories.
+        pred_y: The y-component of the predicted trajectories.
+        ref_x: The x-component of the reference trajectories.
+        ref_y: The y-component of the reference trajectories.
+
+    Returns:
+        A float array with the same shape as all the arguments, containing
+        the 2D distance between the predicted trajectories and the reference
+        trajectories.
+    """
+    # Stack coordinates along a new axis
+    pred_xy = np.stack([pred_x, pred_y], axis=-1)
+    ref_xy = np.stack([ref_x, ref_y], axis=-1)
+
+    # Calculate Euclidean distance
+    return np.linalg.norm(pred_xy - ref_xy, ord=2, axis=-1)
 
 
 def central_diff_np(t, pad_value):
@@ -790,6 +814,11 @@ class PufferGPUDrive(PufferEnv):
         angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
         angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
 
+        # Calculate displacement error
+        displacement_error = compute_displacement_error_np(
+            agent_x_np, agent_y_np, ref_x_np, ref_y_np
+        )
+
         # Apply validity masks
         masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
         masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
@@ -813,6 +842,7 @@ class PufferGPUDrive(PufferEnv):
                     "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
                     "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
                     "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
+                    "realism/mean_displacement_error": displacement_error.mean(),
                     "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
                         ref_linear_speed[speed_valid]
                     ),

@@ -598,6 +598,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_pos = self.log_trajectory.pos_xy[
                 batch_indices, :, world_time_steps, :
             ]
+            gt_agent_speed = self.log_trajectory.ref_speed[
+                batch_indices, :, world_time_steps
+            ]
 
             # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
