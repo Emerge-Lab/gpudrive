@@ -18,6 +18,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   collision_behavior: "ignore"
   goal_behavior: "stop"
   reward_type: "follow_waypoints"
+  waypoint_distance_scale: 0.05
+
   init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
@@ -49,7 +51,7 @@ wandb:
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: waypoint_rs # Set dynamically in the script if needed
+  exp_id: machine_like # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu

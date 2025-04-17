@@ -182,6 +182,7 @@ class PufferGPUDrive(PufferEnv):
         add_reference_speed=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
+        waypoint_distance_scale=0.05,
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
@@ -263,6 +264,7 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
             reward_type=reward_type,
+            waypoint_distance_scale=waypoint_distance_scale,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
@@ -440,9 +442,10 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
 
-        terminal = self.env.get_dones(
-            world_time_steps=self.episode_lengths[:, 0].long()
-        )
+        terminal = self.env.get_dones()
+        # terminal = self.env.get_dones(
+        #     world_time_steps=self.episode_lengths[:, 0].long()
+        # )
 
         self.render_env() if self.render else None
 

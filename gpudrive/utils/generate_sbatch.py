@@ -243,29 +243,30 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "separate_actor_critic"
+    group = "minimal_tiny"
 
     fields = {
-        "time_h": 24,  # Max time per job (job will finish if run is done before)
+        "time_h": 6,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 70,
         "job_name": group,
+        "run_file": "baselines/ppo/ppo_waypoint.py",
     }
     
     hyperparams = {
         "group": [group], # Group name
         "num_worlds": [500],
         "resample_scenes": [0], 
-        "k_unique_scenes": [500],
-        "resample_interval": [5_000_000],
-        "resample_dataset_size": [10_000],
-        "total_timesteps": [3_000_000_000],
-        "batch_size": [262144],
-        "minibatch_size": [16384],
-        "update_epochs": [4],
-        "ent_coef": [0.001, 0.003, 0.0001],
-        "randomize_rewards": [0, 1],
+        "k_unique_scenes": [4],
+        #"resample_interval": [5_000_000],
+        #"resample_dataset_size": [10_000],
+        #"total_timesteps": [3_000_000_000],
+        "batch_size": [262_144],
+        "minibatch_size": [16_384],
+        "waypoint_distance_scale": [0.0, 0.05, 0.1],
+        "ent_coef": [0.001],
+        "vf_coef": [0.5],
         "render": [0],
     }
 
