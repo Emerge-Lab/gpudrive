@@ -26,6 +26,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   action_space_steer_disc: 13
   action_space_accel_disc: 7
   init_steps: 0 # Warmup steps
+  goal_achieved_weight: 0.0
   collision_weight: -0.2
   off_road_weight: -0.2
 

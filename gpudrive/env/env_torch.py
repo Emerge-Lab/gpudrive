@@ -490,7 +490,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def get_rewards(
         self,
         collision_weight=-0.5,
-        goal_achieved_weight=0.5,
+        goal_achieved_weight=0.0,
         off_road_weight=-0.5,
         world_time_steps=None,
     ):
@@ -590,7 +590,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         elif self.config.reward_type == "follow_waypoints":
             # Reward based on minimizing distance to time-aligned waypoints plus penalty for collision/off-road
             self.base_rewards = (
-                collision_weight * collided + off_road_weight * off_road
+                goal_achieved_weight * goal_achieved
+                + collision_weight * collided
+                + off_road_weight * off_road
             )
 
             # Extract waypoints (ground truth) at time t
