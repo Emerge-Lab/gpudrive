@@ -604,6 +604,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_speed = self.log_trajectory.ref_speed[
                 batch_indices, :, world_time_steps
             ]
+            valid_mask = self.log_trajectory.valids[
+                batch_indices, :, world_time_steps
+            ].squeeze(-1).bool()
 
             # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
@@ -633,6 +636,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 - self.config.speed_distance_scale
                 * torch.log(speed_error + 1.0)
             )
+            
+            # Zero-out distance penalty for invalid time steps, that is, 
+            # The reference positions have not been observed at every time step
+            # if not observed, we set the distance penalty to 0
+            self.distance_penalty[~valid_mask] = 0.0
 
             # Apply waypoint mask only if sampling interval is greater than 1
             if self.config.waypoint_sample_interval > 1:
