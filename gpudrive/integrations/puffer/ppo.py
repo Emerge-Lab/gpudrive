@@ -208,7 +208,10 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if sum(data.infos["train/num_completed_episodes"]) > data.config.log_window:
+        if (
+            sum(data.infos["train/num_completed_episodes"])
+            > data.config.log_window
+        ):
             for k, v in data.infos.items():
                 try:
                     if "train/num_completed_episodes" in k:
@@ -218,7 +221,7 @@ def evaluate(data):
 
                     # Log variance for goal and collision metrics
                     if "goal" in k:
-                        data.stats[f"std_{k}"] = np.std(v)
+                        data.stats[f"{k}_std"] = np.std(v)
                 except:
                     continue
 

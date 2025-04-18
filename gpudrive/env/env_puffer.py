@@ -189,7 +189,7 @@ class PufferGPUDrive(PufferEnv):
         goal_achieved_weight=1,
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1,
-        remove_non_vehicles=True,
+        remove_non_vehicles=False,
         obs_radius=50.0,
         use_vbd=False,
         vbd_model_path=None,
