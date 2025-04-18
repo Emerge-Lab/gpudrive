@@ -113,15 +113,9 @@ class EnvConfig:
     waypoint_distance_scale: float = (
         0.05  # Importance of distance to waypoints
     )
-    speed_distance_scale: float = (
-        0.05
-    )
-    accel_smoothness_scale: float = (
-        0.002
-    )
-    steering_smoothness_scale: float = (
-        0.002
-    )
+    speed_distance_scale: float = 0.05
+    accel_smoothness_scale: float = 0.002
+    steering_smoothness_scale: float = 0.002
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components
