@@ -208,10 +208,10 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
+        if sum(data.infos["train/num_completed_episodes"]) > data.config.log_window:
             for k, v in data.infos.items():
                 try:
-                    if "num_completed_episodes" in k:
+                    if "train/num_completed_episodes" in k:
                         data.stats[k] = np.sum(v)
                     else:
                         data.stats[k] = np.mean(v)
@@ -397,7 +397,7 @@ def train(data):
                         "train/advantages": data.wandb.Histogram(advantages_np),
                         "train/advantages_var": np.var(advantages_np),
                         "train/advantages_mean": np.mean(advantages_np),
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        **{f"{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )

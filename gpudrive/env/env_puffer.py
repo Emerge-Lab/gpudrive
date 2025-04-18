@@ -500,7 +500,7 @@ class PufferGPUDrive(PufferEnv):
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
 
-        info_lst = []
+        self.info_lst = []
         if len(done_worlds) > 0:
 
             if self.render:
@@ -558,19 +558,19 @@ class PufferGPUDrive(PufferEnv):
 
             if num_finished_agents > 0:
                 # fmt: off
-                info_lst.append(
+                self.info_lst.append(
                     {
-                        "num_completed_episodes": len(done_worlds),
-                        "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
-                        "perc_goal_achieved": goal_achieved_rate.item(),
-                        "perc_off_road": off_road_rate.item(),
-                        "perc_veh_collisions": collision_rate.item(),
-                        "total_controlled_agents": self.num_agents,
-                        "control_density": self.num_agents / self.controlled_agent_mask.numel(),
-                        "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
-                        "perc_truncated": num_truncated / num_finished_agents,
-                        "mean_waypoint_distance": human_like_values.mean().item(),
-                        "mean_internal_reward": internal_reward_values.mean().item(),
+                        "metrics/mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
+                        "metrics/mean_waypoint_distance": human_like_values.mean().item(),
+                        "metrics/mean_internal_reward": internal_reward_values.mean().item(),
+                        "metrics/perc_goal_achieved": goal_achieved_rate.item(),
+                        "metrics/perc_off_road": off_road_rate.item(),
+                        "metrics/perc_veh_collisions": collision_rate.item(),
+                        "metrics/perc_truncated": num_truncated / num_finished_agents,
+                        "train/num_completed_episodes": len(done_worlds),
+                        "train/total_controlled_agents": self.num_agents,
+                        "train/control_density": self.num_agents / self.controlled_agent_mask.numel(),
+                        "train/episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                     }
                 )
                 # fmt: on
@@ -616,7 +616,7 @@ class PufferGPUDrive(PufferEnv):
             self.rewards,
             self.terminals,
             self.truncations,
-            info_lst,
+            self.info_lst,
         )
 
     def render_env(self):
@@ -835,26 +835,24 @@ class PufferGPUDrive(PufferEnv):
         mean_angular_speed_error = masked_angular_speed_error.mean()
         mean_angular_accel_error = masked_angular_accel_error.mean()
 
-        if self.wandb_obj is not None:
-            self.wandb_obj.log(
-                {
-                    "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
-                    "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
-                    "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
-                    "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
-                    "realism/mean_displacement_error": displacement_error.mean(),
-                    "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
-                        ref_linear_speed[speed_valid]
-                    ),
-                    "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
-                        ref_linear_accel[accel_valid]
-                    ),
-                    "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
-                        agent_linear_speed[speed_valid]
-                    ),
-                    "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
-                        agent_linear_speed[accel_valid]
-                    ),
-                },
-                step=self.global_step,
-            )
+        self.info_lst.append(
+            {
+                "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
+                "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
+                "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
+                "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
+                "realism/mean_displacement_error": displacement_error.mean(),
+                # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
+                #     ref_linear_speed[speed_valid]
+                # ),
+                # "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
+                #     ref_linear_accel[accel_valid]
+                # ),
+                # "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
+                #     agent_linear_speed[speed_valid]
+                # ),
+                # "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
+                #     agent_linear_speed[accel_valid]
+                # ),
+            },
+        )

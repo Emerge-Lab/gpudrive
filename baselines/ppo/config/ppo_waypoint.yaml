@@ -63,7 +63,7 @@ train:
   # # # Data sampling # # #
   resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 5_000_000
+  resample_interval: 1_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
@@ -87,7 +87,7 @@ train:
   target_kl: null
 
   # # # Logging # # #
-  log_window: 1000
+  log_window: 500
   track_realism_metrics: true # Log human-like metrics
   track_n_worlds: 2 # Number of worlds to track
 
