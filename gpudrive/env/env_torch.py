@@ -88,7 +88,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.max_agent_count,
             backend=self.backend,
         )
-
+        
         # Now initialize reward weights tensor if using reward_conditioned reward type
         if (
             hasattr(self.config, "reward_type")
@@ -122,6 +122,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
+        self.previous_action_value_tensor = torch.zeros((self.num_worlds, self.max_cont_agents, 3), device=self.device)
 
         self.num_agents = self.cont_agent_mask.sum().item()
 
@@ -433,6 +434,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         self.world_time_steps.zero_()
+        
+        # Reset smoothness tracking for reset environments
+        if env_idx_list is not None:
+            reset_mask = torch.zeros(self.num_worlds, dtype=torch.bool, device=self.device)
+            reset_mask[torch.tensor(env_idx_list, device=self.device)] = True
+        
+            # Zero out only the reset environments
+            self.previous_action_value_tensor[reset_mask] = 0.0
+        else:
+            self.previous_action_value_tensor.zero_()
 
         # Advance the simulator with log playback if warmup steps are provided
         if self.init_steps > 0:
@@ -629,18 +640,32 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dist_to_waypoints = torch.norm(
                 gt_agent_pos - actual_agent_pos, dim=-1
             )
+            
+            # Penalty for jerky movements
+            if hasattr(self, 'action_diff'):
+                acceleration_jerk = self.action_diff[:, :, 0]**2  # First action component is acceleration
+                steering_jerk = self.action_diff[:, :, 1]**2      # Second action component is steering
+                
+                self.smoothness_penalty = -(
+                    self.config.accel_smoothness_scale * acceleration_jerk + 
+                    self.config.steering_smoothness_scale * steering_jerk
+                )
+            else:
+                self.smoothness_penalty = torch.zeros_like(self.base_rewards)
 
             self.distance_penalty = (
                 -self.config.waypoint_distance_scale
                 * torch.log(dist_to_waypoints + 1.0)
                 - self.config.speed_distance_scale
                 * torch.log(speed_error + 1.0)
-            )
+            ) 
             
             # Zero-out distance penalty for invalid time steps, that is, 
             # The reference positions have not been observed at every time step
             # if not observed, we set the distance penalty to 0
             self.distance_penalty[~valid_mask] = 0.0
+            
+            self.distance_penalty += self.smoothness_penalty
 
             # Apply waypoint mask only if sampling interval is greater than 1
             if self.config.waypoint_sample_interval > 1:
@@ -681,22 +706,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 actions = (
                     torch.nan_to_num(actions, nan=0).long().to(self.device)
                 )
-                action_value_tensor = self.action_keys_tensor[actions]
+                self.action_value_tensor = self.action_keys_tensor[actions]
 
             elif actions.dim() == 3:
                 if actions.shape[2] == 1:
                     actions = actions.squeeze(dim=2).to(self.device)
-                    action_value_tensor = self.action_keys_tensor[actions]
+                    self.action_value_tensor = self.action_keys_tensor[actions]
                 else:  # Assuming we are given the actual action values
-                    action_value_tensor = actions.to(self.device)
+                    self.action_value_tensor = actions.to(self.device)
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
 
         else:
-            action_value_tensor = actions.to(self.device)
+            self.action_value_tensor = actions.to(self.device)
 
-        # Feed the action values to gpudrive
-        self._copy_actions_to_simulator(action_value_tensor)
+        if not hasattr(self, 'previous_action_value_tensor'):
+            # Initialize with current actions on first call
+            self.previous_action_value_tensor = self.action_value_tensor.clone()
+        
+        # Calculate action differences (jerk)
+        self.action_diff = self.action_value_tensor - self.previous_action_value_tensor
+        self.previous_action_value_tensor = self.action_value_tensor.clone()
+
+        self._copy_actions_to_simulator(self.action_value_tensor)
 
     def _copy_actions_to_simulator(self, actions):
         """Copy the provided actions to the simulator."""
