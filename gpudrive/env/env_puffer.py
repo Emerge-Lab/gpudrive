@@ -180,6 +180,7 @@ class PufferGPUDrive(PufferEnv):
         reward_type="weighted_combination",
         waypoint_distance_scale=0.05,
         speed_distance_scale=0.0,
+        jerk_smoothness_scale=0.0,
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
@@ -263,6 +264,7 @@ class PufferGPUDrive(PufferEnv):
             reward_type=reward_type,
             waypoint_distance_scale=waypoint_distance_scale,
             speed_distance_scale=speed_distance_scale,
+            jerk_smoothness_scale=jerk_smoothness_scale,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
@@ -561,7 +563,7 @@ class PufferGPUDrive(PufferEnv):
                 self.info_lst.append(
                     {
                         "metrics/mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
-                        "metrics/mean_waypoint_distance": human_like_values.mean().item(),
+                        "metrics/mean_imitation_distance": human_like_values.mean().item(),
                         "metrics/mean_internal_reward": internal_reward_values.mean().item(),
                         "metrics/perc_goal_achieved": goal_achieved_rate.item(),
                         "metrics/perc_off_road": off_road_rate.item(),
@@ -749,7 +751,7 @@ class PufferGPUDrive(PufferEnv):
             .cpu()
             .numpy()[control_mask]
             .squeeze(-1)
-        )
+        ).astype(bool)
 
         # Take human logs (ground-truth)
         # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
@@ -841,7 +843,9 @@ class PufferGPUDrive(PufferEnv):
                 "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
                 "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
                 "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
-                "realism/mean_displacement_error": displacement_error.mean(),
+                "realism/mean_displacement_error": displacement_error[
+                    valid_mask
+                ].mean(),
                 # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
                 #     ref_linear_speed[speed_valid]
                 # ),

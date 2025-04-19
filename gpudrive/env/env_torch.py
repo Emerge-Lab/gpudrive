@@ -101,6 +101,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 condition_mode=condition_mode, agent_type=self.agent_type
             )
 
+        self.previous_action_value_tensor = torch.zeros(
+            (self.num_worlds, self.max_cont_agents, 3), device=self.device
+        )
+
         self.episode_len = self.config.episode_len
 
         # Initialize VBD model if used
@@ -122,10 +126,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
-        self.previous_action_value_tensor = torch.zeros(
-            (self.num_worlds, self.max_cont_agents, 3), device=self.device
-        )
-
         self.num_agents = self.cont_agent_mask.sum().item()
 
         # Rendering setup
@@ -657,8 +657,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )  # Second action component is steering
 
                 self.smoothness_penalty = -(
-                    self.config.accel_smoothness_scale * acceleration_jerk
-                    + self.config.steering_smoothness_scale * steering_jerk
+                    self.config.jerk_smoothness_scale * acceleration_jerk
+                    + self.config.jerk_smoothness_scale * steering_jerk
                 )
             else:
                 self.smoothness_penalty = torch.zeros_like(self.base_rewards)
@@ -880,6 +880,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if mask is None:
 
+            base_fields.append(
+                self.previous_action_value_tensor[:, :, :2]
+                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
+            )
+
             if self.config.add_reference_speed:
                 avg_ref_speed = (
                     self.log_trajectory.ref_speed.mean(axis=-1)
@@ -969,6 +974,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 return torch.cat(base_fields, dim=-1)
         else:
 
+            base_fields.append(
+                self.previous_action_value_tensor[mask][:, :2]
+                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
+            )
+
             if self.config.add_reference_speed:
                 avg_ref_speed = (
                     self.log_trajectory.ref_speed[mask].mean(axis=-1)
@@ -987,7 +997,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 glob_reference_xy = self.log_trajectory.pos_xy[
                     mask
                 ]  # Shape: [batch, 91, 2]
-                batch_size = glob_ego_states.shape[0]
 
                 # Translate all points at once by broadcasting subtraction
                 # Reshape ego positions for broadcasting: [batch, 1, 2]

@@ -22,7 +22,7 @@ MAX_ROAD_LINE_SEGMENT_LEN = 100
 MAX_ROAD_SCALE = 100
 
 # Feature shape constants
-EGO_FEAT_DIM = 4  # Ego state base fields
+EGO_FEAT_DIM = 6  # Ego state base fields
 PARTNER_FEAT_DIM = 6
 ROAD_GRAPH_FEAT_DIM = 13
 
@@ -32,3 +32,6 @@ LOG_TRAJECTORY_LEN = 91
 # BEV observation constants
 BEV_RASTERIZATION_RESOLUTION = 200
 NUM_MADRONA_ENTITY_TYPES = 11
+
+# Action values
+MAX_ACTION_VALUE = 4.0
