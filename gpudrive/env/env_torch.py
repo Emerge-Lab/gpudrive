@@ -875,8 +875,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.speed.unsqueeze(-1),
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
-            ego_state.rel_goal_x.unsqueeze(-1),
-            ego_state.rel_goal_y.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
         ]
 
@@ -917,8 +915,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                             device=self.device,
                         )
 
+                self.local_reference_xy = local_reference_xy
+
                 # Normalize
-                local_reference_xy /= constants.MAX_REF_POINT
+                # local_reference_xy /= constants.MAX_REF_POINT
 
                 batch_size = local_reference_xy.shape[0]
                 num_points = local_reference_xy.shape[1]
@@ -938,9 +938,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ).bool()
 
                 # Apply dropout mask
-                self.local_reference_xy = (
-                    local_reference_xy * point_dropout_mask
-                )
+                # self.local_reference_xy = (
+                #     local_reference_xy * point_dropout_mask
+                # )
 
                 # Flatten the dimensions for stacking
                 base_fields.append(
@@ -1002,8 +1002,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         device=self.device,
                     )
 
+                self.local_reference_xy = local_reference_xy
+
                 # Normalize to [-1, 1]
-                local_reference_xy /= constants.MAX_REF_POINT
+                # local_reference_xy /= constants.MAX_REF_POINT
 
                 point_dropout_mask = torch.bernoulli(
                     torch.ones(
@@ -1732,7 +1734,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,  # Number of agents to control
-        device="cuda",
+        device="cpu",
     )
 
     control_mask = env.cont_agent_mask
@@ -1747,7 +1749,7 @@ if __name__ == "__main__":
 
     env_idx = 0
 
-    for t in range(10):
+    for t in range(91):
         print(f"Step: {t}")
 
         # Step the environment
@@ -1755,8 +1757,12 @@ if __name__ == "__main__":
         env.step_dynamics(expert_actions[:, :, t, :])
 
         highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
-            -1
+            0
         ].item()
+
+        print(
+            f"is_valid: {env.log_trajectory.valids[env_idx, highlight_agent, t, :]}"
+        )
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
@@ -1771,6 +1777,7 @@ if __name__ == "__main__":
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
+            trajectory=env.local_reference_xy[0, 0].to(env.device),
         )
 
         sim_frames.append(img_from_fig(sim_states[0]))
@@ -1787,6 +1794,8 @@ if __name__ == "__main__":
 
         done = env.get_dones()
         info = env.get_infos()
+
+        print(done[env.cont_agent_mask])
 
         if done.all().bool():
             break
