@@ -915,27 +915,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                             device=self.device,
                         )
 
-                self.local_reference_xy = local_reference_xy
+                self.local_reference_xy = local_reference_xy.clone()
 
                 # Normalize
-                # local_reference_xy /= constants.MAX_REF_POINT
+                local_reference_xy /= constants.MAX_REF_POINT
 
-                batch_size = local_reference_xy.shape[0]
-                num_points = local_reference_xy.shape[1]
-                time_steps = local_reference_xy.shape[2]
+                # batch_size = local_reference_xy.shape[0]
+                # num_points = local_reference_xy.shape[1]
+                # time_steps = local_reference_xy.shape[2]
 
                 # Create dropout mask for the time dimension
                 # Shape: [batch_size, num_points, time_steps, 1]
-                point_dropout_mask = torch.bernoulli(
-                    torch.ones(
-                        batch_size,
-                        num_points,
-                        time_steps,
-                        1,
-                        device=local_reference_xy.device,
-                    )
-                    * (1 - self.config.prob_reference_dropout)
-                ).bool()
+                # point_dropout_mask = torch.bernoulli(
+                #     torch.ones(
+                #         batch_size,
+                #         num_points,
+                #         time_steps,
+                #         1,
+                #         device=local_reference_xy.device,
+                #     )
+                #     * (1 - self.config.prob_reference_dropout)
+                # ).bool()
 
                 # Apply dropout mask
                 # self.local_reference_xy = (
@@ -943,9 +943,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # )
 
                 # Flatten the dimensions for stacking
-                base_fields.append(
-                    self.local_reference_xy.flatten(start_dim=2)
-                )
+                base_fields.append(local_reference_xy.flatten(start_dim=2))
 
             if self.config.reward_type == "reward_conditioned":
 
@@ -979,51 +977,65 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 base_fields.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
-
-                # Shape: [batch, 91, 2]
                 glob_ego_states = (
                     self.sim.absolute_self_observation_tensor()
                     .to_torch()
                     .clone()[mask]
                 )
-                glob_ego_pos_xy = glob_ego_states[:, :2]
-                glob_ego_yaw = glob_ego_states[:, 7]
-                glob_reference_xy = self.log_trajectory.pos_xy[mask]
+                glob_ego_pos_xy = glob_ego_states[:, :2]  # Shape: [batch, 2]
+                glob_ego_yaw = glob_ego_states[:, 7]  # Shape: [batch]
+                glob_reference_xy = self.log_trajectory.pos_xy[
+                    mask
+                ]  # Shape: [batch, 91, 2]
+                batch_size = glob_ego_states.shape[0]
 
-                local_reference_xy = torch.empty_like(glob_reference_xy)
-                batch_size = local_reference_xy.shape[0]
-                num_points = local_reference_xy.shape[1]
+                # Translate all points at once by broadcasting subtraction
+                # Reshape ego positions for broadcasting: [batch, 1, 2]
+                ego_pos_expanded = glob_ego_pos_xy.unsqueeze(1)
+                translated = glob_reference_xy - ego_pos_expanded
 
-                for agent_idx in range(batch_size):
-                    local_reference_xy[agent_idx, :, :] = to_local_frame(
-                        global_pos_xy=glob_reference_xy[agent_idx, :, :],
-                        ego_pos=glob_ego_pos_xy[agent_idx],
-                        ego_yaw=glob_ego_yaw[agent_idx],
-                        device=self.device,
-                    )
+                # Create rotation matrices for all agents at once
+                cos_yaw = torch.cos(glob_ego_yaw).to(
+                    self.device
+                )  # Shape: [batch]
+                sin_yaw = torch.sin(glob_ego_yaw).to(
+                    self.device
+                )  # Shape: [batch]
 
-                self.local_reference_xy = local_reference_xy
+                # Create batch of rotation matrices: [batch, 2, 2]
+                rotation_matrices = torch.stack(
+                    [
+                        torch.stack([cos_yaw, sin_yaw], dim=1),
+                        torch.stack([-sin_yaw, cos_yaw], dim=1),
+                    ],
+                    dim=1,
+                )  # Shape: [batch, 2, 2]
+
+                # Apply rotation to all points
+                local_reference_xy = torch.bmm(
+                    rotation_matrices, translated.transpose(1, 2)
+                ).transpose(1, 2)
+
+                self.local_reference_xy = local_reference_xy.clone()
 
                 # Normalize to [-1, 1]
-                # local_reference_xy /= constants.MAX_REF_POINT
+                local_reference_xy /= constants.MAX_REF_POINT
 
-                point_dropout_mask = torch.bernoulli(
-                    torch.ones(
-                        (batch_size, num_points),
-                        device=local_reference_xy.device,
-                    )
-                    * (1 - self.config.prob_reference_dropout)
-                ).bool()
+                # point_dropout_mask = torch.bernoulli(
+                #     torch.ones(
+                #         (batch_size, num_points),
+                #         device=local_reference_xy.device,
+                #     )
+                #     * (1 - self.config.prob_reference_dropout)
+                # ).bool()
 
                 # Dropout fraction of points in the reference path
-                self.local_reference_xy = (
-                    local_reference_xy * point_dropout_mask.unsqueeze(2)
-                )
+                # self.local_reference_xy = (
+                #     local_reference_xy * point_dropout_mask.unsqueeze(2)
+                # )
 
                 # Stack
-                base_fields.append(
-                    self.local_reference_xy.view(batch_size, -1)
-                )
+                base_fields.append(local_reference_xy.flatten(start_dim=1))
 
             if self.config.reward_type == "reward_conditioned":
                 # For masked agents, we need to extract agent indices from the mask
@@ -1740,7 +1752,7 @@ if __name__ == "__main__":
     control_mask = env.cont_agent_mask
 
     # Rollout
-    obs = env.reset()
+    obs = env.reset(control_mask)
 
     sim_frames = []
     agent_obs_frames = []
@@ -1777,7 +1789,9 @@ if __name__ == "__main__":
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
-            trajectory=env.local_reference_xy[0, 0].to(env.device),
+            trajectory=env.local_reference_xy[highlight_agent, :, :].to(
+                env.device
+            ),
         )
 
         sim_frames.append(img_from_fig(sim_states[0]))
@@ -1787,7 +1801,7 @@ if __name__ == "__main__":
             torch.Tensor([t]).repeat((1, env.num_worlds)).long().to(env.device)
         )
 
-        obs = env.get_obs()
+        obs = env.get_obs(control_mask)
         reward = env.get_rewards(world_time_steps=world_time_steps)
 
         print(f"Reward: {reward[:, env_idx, highlight_agent]}")

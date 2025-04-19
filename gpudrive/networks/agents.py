@@ -49,6 +49,7 @@ class Agent(nn.Module):
         if self.config[
             "add_reference_path"
         ]:  # Every agent receives a reference path
+            # NOTE: Hardcoded to 91 for now
             self.ego_state_idx += 91 * 2
 
         if self.config["add_reference_speed"]:

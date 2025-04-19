@@ -2,19 +2,20 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/examples
+data_dir: data/processed/training
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 4 # Number of unique scenes to sample from
+  k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
+  remove_non_vehicles: false
   collision_behavior: "ignore"
   goal_behavior: "stop"
   reward_type: "follow_waypoints"
@@ -40,14 +41,14 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   vbd_in_obs: false
 
   # Planning guidance
-  add_reference_path: false # If true, the goal state is added to the ego observation
+  add_reference_path: true # If true, the goal state is added to the ego observation
   add_reference_speed: true # If true, the reference speed is added to the ego observation
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
 wandb:
   entity: ""
-  project: "humanlike"
-  group: "tinyexps"
+  project: "human_like"
+  group: "full_ref_path"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -65,7 +66,7 @@ train:
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 1_000_000
   sample_with_replacement: true
-  shuffle_dataset: false
+  shuffle_dataset: true
 
   # # # PPO # # #
   torch_deterministic: false
@@ -105,8 +106,8 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 100 # Render every k iterations
-  render_k_scenarios: 2 # Number of scenarios to render
+  render_interval: 50 # Render every k iterations
+  render_k_scenarios: 1 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100
