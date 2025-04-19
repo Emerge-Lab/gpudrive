@@ -114,8 +114,7 @@ class EnvConfig:
         0.05  # Importance of distance to waypoints
     )
     speed_distance_scale: float = 0.0
-    accel_smoothness_scale: float = 0.00
-    steering_smoothness_scale: float = 0.00
+    jerk_smoothness_scale: float = 0.0
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components
