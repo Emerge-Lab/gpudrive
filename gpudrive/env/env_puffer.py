@@ -581,7 +581,10 @@ class PufferGPUDrive(PufferEnv):
             self.last_obs = self.env.get_obs(self.controlled_agent_mask)
 
             # Asynchronously reset the done worlds and empty storage
-            self.env.reset(env_idx_list=done_worlds_cpu)
+            self.env.reset(
+                env_idx_list=done_worlds_cpu, 
+                mask=self.controlled_agent_mask
+            )
             self.episode_returns[done_worlds] = 0
             self.agent_episode_returns[done_worlds, :] = 0
             self.episode_lengths[done_worlds, :] = 0
