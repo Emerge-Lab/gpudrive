@@ -1666,40 +1666,41 @@ class MatplotlibVisualizer:
                 0,  # Arrow points to the right, proportional to speed
                 head_width=1.0,
                 head_length=1.1,
-                fc=REL_OBS_OBJ_COLORS["ego"],
-                ec=REL_OBS_OBJ_COLORS["ego"],
+                fc="k",
+                ec="k",
+                zorder=1,
             )
 
-            ax.scatter(
-                observation_ego.rel_goal_x[env_idx, agent_idx],
-                observation_ego.rel_goal_y[env_idx, agent_idx],
-                s=5,
-                linewidth=1.5,
-                c=ego_agent_color,
-                marker="x",
-            )
+            # ax.scatter(
+            #     observation_ego.rel_goal_x[env_idx, agent_idx],
+            #     observation_ego.rel_goal_y[env_idx, agent_idx],
+            #     s=5,
+            #     linewidth=1.5,
+            #     c=ego_agent_color,
+            #     marker="x",
+            # )
 
-            circle = Circle(
-                (
-                    observation_ego.rel_goal_x[env_idx, agent_idx],
-                    observation_ego.rel_goal_y[env_idx, agent_idx],
-                ),
-                radius=self.goal_radius,
-                color=ego_agent_color,
-                fill=False,
-                linestyle="--",
-            )
-            ax.add_patch(circle)
+            # circle = Circle(
+            #     (
+            #         observation_ego.rel_goal_x[env_idx, agent_idx],
+            #         observation_ego.rel_goal_y[env_idx, agent_idx],
+            #     ),
+            #     radius=self.goal_radius,
+            #     color=ego_agent_color,
+            #     fill=False,
+            #     linestyle="--",
+            # )
+            # ax.add_patch(circle)
 
-            observation_radius = Circle(
-                (0, 0),
-                radius=self.env_config.obs_radius,
-                color="#000000",
-                linewidth=0.8,
-                fill=False,
-                linestyle="-",
-            )
-            ax.add_patch(observation_radius)
+            # observation_radius = Circle(
+            #     (0, 0),
+            #     radius=self.env_config.obs_radius,
+            #     color="#000000",
+            #     linewidth=0.8,
+            #     fill=False,
+            #     linestyle="-",
+            # )
+            # ax.add_patch(observation_radius)
             plt.axis("off")
 
         if trajectory is not None and len(trajectory) > 0:
@@ -1707,10 +1708,10 @@ class MatplotlibVisualizer:
             ax.scatter(
                 trajectory[:, 0],  # x coordinates
                 trajectory[:, 1],  # y coordinates
-                color="lightgreen",
-                linewidth=0.35,
-                marker="o",  # circular markers at each point
-                alpha=0.8,  # slight transparency
+                color="g",
+                linewidth=0.3,
+                marker="o",
+                alpha=0.2,
                 zorder=0,
             )
 
