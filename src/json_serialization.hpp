@@ -347,22 +347,20 @@ namespace madrona_gpudrive
         simdjson::dom::array objects = getValueOrDefault<simdjson::dom::array>(j, "objects", {});
         for (const auto &obj : objects)
         {
-            int i = 0;
             simdjson::dom::array position = getValueOrDefault<simdjson::dom::array>(obj, "position", {});
             simdjson::dom::array valids = getValueOrDefault<simdjson::dom::array>(obj, "valid", {});
-            for (const auto &pos : position)
-            {
+            int i = 0;
+            for (const auto &pos : position) {
                 bool valid_val;
                 CHECK_JSON_ERROR(valids.at(i).get(valid_val));
-                if(!valid_val)
-                    continue;
-                numEntities++;
-                float newX = getValueOrDefault<float>(pos, "x", 0.0f);
-                float newY = getValueOrDefault<float>(pos, "y", 0.0f);
-                // Update mean incrementally
-                mean.first += (newX - mean.first) / numEntities;
-                mean.second += (newY - mean.second) / numEntities;
-                i++;
+                if (valid_val) {
+                    numEntities++;
+                    float newX = getValueOrDefault<float>(pos, "x", 0.0f);
+                    float newY = getValueOrDefault<float>(pos, "y", 0.0f);
+                    mean.first  += (newX - mean.first) / numEntities;
+                    mean.second += (newY - mean.second) / numEntities;
+                }
+                ++i;
             }
         }
         simdjson::dom::array roads = getValueOrDefault<simdjson::dom::array>(j, "roads", {});
