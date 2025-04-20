@@ -1,6 +1,6 @@
 import os
 # Force JAX to use CPU only
-# os.environ["JAX_PLATFORMS"] = "cpu"
+os.environ["JAX_PLATFORMS"] = "cpu"
 
 import tensorflow as tf
 import glob
@@ -92,7 +92,7 @@ def data_process(
         
         with tf.io.TFRecordWriter(scenario_filename.as_posix()) as file_writer:
             file_writer.write(tf_data)
-
+            
 
 if __name__ == '__main__': 
     # add arguments
