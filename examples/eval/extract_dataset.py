@@ -1,17 +1,12 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-# disable GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# Force JAX to use CPU only
+os.environ["JAX_PLATFORMS"] = "cpu"
 
 import tensorflow as tf
-# set tf to cpu only
-tf.config.set_visible_devices([], 'GPU')
-
 import glob
 import argparse
 import pickle
 from tqdm import tqdm
-from tqdm.contrib.concurrent import process_map  # or thread_map
 
 from waymax import dataloader
 from waymax.config import DataFormat
@@ -74,7 +69,6 @@ def data_process(
     Args:
         data_dir (str): Directory path of the Waymax dataset.
         save_dir (str): Directory path to save the processed data.
-        save_raw (bool, optional): Whether to save the raw scenario data. Defaults to False.
     """
     # Waymax Dataset
     tf_dataset = dataloader.tf_examples_dataset(
@@ -115,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='/data/Dataset/Waymo/V1_2_tf')
     parser.add_argument('--save_dir', type=str, default='/data/Dataset/Waymo/VBD')
     parser.add_argument('--dataset', type=str, default='all')
-    parser.add_argument('--num_workers', type=int, default=16)
+    parser.add_argument('--num_workers', type=int, default=1)  # Change default to 1
     args = parser.parse_args()
     
     os.makedirs(args.save_dir, exist_ok=True)
@@ -128,7 +122,6 @@ if __name__ == '__main__':
 
         Args:
             dataset (str): Name of the dataset to process.
-            save_raw (bool, optional): Whether to save the raw scenario data. Defaults to False.
         """
         data_path = os.path.join(args.data_dir, dataset+'/*')
         data_files = glob.glob(data_path)
@@ -137,21 +130,17 @@ if __name__ == '__main__':
         print(f'Processing {n_files} files in {data_path} dataset')
         os.makedirs(save_dir, exist_ok=True)
         print(f'Saving to {save_dir}')
-        data_process_partial = functools.partial(
-            data_process, 
-            save_dir=save_dir,
-        )
-        _ = process_map(data_process_partial, data_files, max_workers=args.num_workers)
+        
+        # Process files one by one instead of using multiprocessing
+        for data_file in tqdm(data_files):
+            data_process(data_file, save_dir)
         
             
     if args.dataset == 'all' or args.dataset == 'train':
-        process('training', save_raw=args.save_raw, only_raw=args.only_raw)
+        process('training')
             
     if args.dataset == 'all' or args.dataset == 'val':
-        process('validation', save_raw=args.save_raw, only_raw=args.only_raw)
+        process('validation')
         
     if args.dataset == 'all' or args.dataset == 'val_interactive':
-        process('validation_interactive', save_raw=args.save_raw, only_raw=args.only_raw)
-    
-    
-            
+        process('validation_interactive')
