@@ -1,15 +1,17 @@
 import os
 # Force JAX to use CPU only
-os.environ["JAX_PLATFORMS"] = "cpu"
+# os.environ["JAX_PLATFORMS"] = "cpu"
 
 import tensorflow as tf
 import glob
 import argparse
-import pickle
+# import pickle
 from tqdm import tqdm
+from waymo_open_dataset.protos import scenario_pb2
 
-from waymax import dataloader
-from waymax.config import DataFormat
+
+# from waymax import dataloader
+# from waymax.config import DataFormat
 import functools
 
 MAX_NUM_OBJECTS = 64
@@ -70,38 +72,27 @@ def data_process(
         data_dir (str): Directory path of the Waymax dataset.
         save_dir (str): Directory path to save the processed data.
     """
-    # Waymax Dataset
-    tf_dataset = dataloader.tf_examples_dataset(
-        path=data_dir,
-        data_format=DataFormat.TFRECORD,
-        preprocess_fn=tf_preprocess,
-        repeat=1,
-        # num_shards=16,
-        deterministic=True,
+    dataset = tf.data.TFRecordDataset(
+        file_path, compression_type=""
     )
-    
-    tf_dataset_iter = tf_dataset.as_numpy_iterator()
-    
+       
     os.makedirs(save_dir, exist_ok=True)
     
-    for example in tf_dataset_iter:
-        
-        scenario_id_binary, scenario = tf_postprocess(example)
-        scenario_id = scenario_id_binary.tobytes().decode('utf-8')
-        
-        scenario_filename = os.path.join(save_dir, 'scenario_'+scenario_id+'.pkl')
+    for tf_data in dataset:
+        tf_data = tf_data.numpy()
+        scenario = scenario_pb2.Scenario()
+        scenario.ParseFromString(bytes(tf_data))
+        scenario_id = scenario.scenario_id
+                
+        scenario_filename = os.path.join(save_dir, +scenario_id+'.tfrecords')
         
         # check if file exists
         if os.path.exists(scenario_filename):
             continue
         
-        data_dict = {'scenario_raw': scenario}
-        data_dict['scenario_id'] = scenario_id
-        
+        with tf.io.TFRecordWriter(scenario_filename.as_posix()) as file_writer:
+            file_writer.write(tf_data)
 
-        with open(scenario_filename, 'wb') as f:
-            pickle.dump(data_dict, f)
-        
 
 if __name__ == '__main__': 
     # add arguments
