@@ -115,9 +115,9 @@ namespace madrona_gpudrive
         }
 
         // If VBD trajectories exist in the JSON, read them
-        if (j.contains("vbd_trajectories")) {
+        if (j.contains("vbd_trajectory")) {
             int vbd_idx = 0;
-            for (const auto &vbd_traj : j.at("vbd_trajectories")) {
+            for (const auto &vbd_traj : j.at("vbd_trajectory")) {
                 if (vbd_idx < consts::episodeLen) {
                     if (!vbd_traj.is_null()) {
                         obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();

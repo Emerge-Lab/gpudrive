@@ -107,8 +107,6 @@ def main():
         gpudrive_sample_batch = gpudrive_env._generate_sample_batch()
         # Controlled agent mask
         world_agent_indices = gpudrive_sample_batch['agents_id']
-        valid_mask = world_agent_indices >= 0  # Boolean mask of valid indices
-        valid_agent_indices = world_agent_indices[valid_mask]  # Filtered tensor
 
         # Generate VBD output
         predictions = vbd_model.sample_denoiser(gpudrive_sample_batch)
@@ -116,8 +114,9 @@ def main():
 
         for i in range(gpudrive_env.num_worlds):
             # Get controlled agent indices for this world
-            valid_world_indices = valid_agent_indices[i]
-
+            valid_mask = world_agent_indices[i] >= 0  # Boolean mask of valid indices
+            valid_world_indices = world_agent_indices[i][valid_mask]  # Filtered tensor
+            
             # Populate predicted actions
             predicted_actions[i, valid_world_indices, :, :2] = vbd_output[i, valid_world_indices, :, :2] - world_means[i].view(1, 1, 2)
             predicted_actions[i, valid_world_indices, :, 3] = vbd_output[i, valid_world_indices, :, 2]
@@ -140,8 +139,11 @@ def main():
             with open(os.path.join(args.input_dir, filename), "r") as f:
                 data = json.load(f)
             
+            valid_mask = world_agent_indices[i] >= 0  # Boolean mask of valid indices
+            valid_world_indices = world_agent_indices[i][valid_mask]  # Filtered tensor
+        
             # Find object with correct id
-            for j in range(output_trajectories.shape[1]):
+            for j in valid_world_indices:
                 id = index_to_id[i, j]
 
                 for obj in data["objects"]:

@@ -82,6 +82,7 @@ class VBDTrajectory:
         """Initializes the VBD trajectory with a tensor."""
         self.pos_x = vbd_traj_tensor[:, :, :, 0]
         self.pos_y = vbd_traj_tensor[:, :, :, 1]
+        self.pos_xy = torch.stack([self.pos_x, self.pos_y], dim=3)
         self.yaw = vbd_traj_tensor[:, :, :, 2]
         self.vel_x = vbd_traj_tensor[:, :, :, 3]
         self.vel_y = vbd_traj_tensor[:, :, :, 4] 
