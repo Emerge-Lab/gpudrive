@@ -73,7 +73,7 @@ def data_process(
         save_dir (str): Directory path to save the processed data.
     """
     dataset = tf.data.TFRecordDataset(
-        file_path, compression_type=""
+        data_dir, compression_type=""
     )
        
     os.makedirs(save_dir, exist_ok=True)
@@ -84,15 +84,16 @@ def data_process(
         scenario.ParseFromString(bytes(tf_data))
         scenario_id = scenario.scenario_id
                 
-        scenario_filename = os.path.join(save_dir, +scenario_id+'.tfrecords')
+        scenario_filename = os.path.join(save_dir, scenario_id+'.tfrecords')
         
         # check if file exists
         if os.path.exists(scenario_filename):
             continue
         
-        with tf.io.TFRecordWriter(scenario_filename.as_posix()) as file_writer:
+        # Remove the .as_posix() method call since scenario_filename is a string
+        with tf.io.TFRecordWriter(scenario_filename) as file_writer:
             file_writer.write(tf_data)
-            
+                
 
 if __name__ == '__main__': 
     # add arguments
@@ -126,7 +127,6 @@ if __name__ == '__main__':
         for data_file in tqdm(data_files):
             data_process(data_file, save_dir)
         
-            
     if args.dataset == 'all' or args.dataset == 'train':
         process('training')
             

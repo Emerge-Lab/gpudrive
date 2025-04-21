@@ -2,7 +2,7 @@
 
 
 ## Requirements
-Prerequisite 
+Prerequisite
 ```
 pip install --no-deps waymo-open-dataset-tf-2-12-0==1.6.4
 pip install --no-deps git+https://github.com/waymo-research/waymax.git@main#egg=waymo-waymax
@@ -17,7 +17,7 @@ python examples/eval/extract_dataset.py --data_dir XXXX --save_dir xxxx --datase
 e.g.
 
 ```
-python examples/eval/extract_dataset.py --data_dir data/raw --save_dir data/processed/wosac_val --dataset all
+python examples/eval/extract_dataset.py --data_dir data/raw --save_dir data/processed/wosac --dataset all
 ```
 
 

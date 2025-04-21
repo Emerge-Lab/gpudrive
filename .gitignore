@@ -252,6 +252,10 @@ examples/experimental/logs/*
 # Sbatch scripts
 *.sh
 
+# Dataset
+wosac/
+other/
+
 # Videos
 videos/
 output_videos_larger_dataset/

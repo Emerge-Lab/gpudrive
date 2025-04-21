@@ -3,6 +3,8 @@ import dataclasses
 import os
 import mediapy
 import numpy as np
+from tqdm import tqdm
+import json
 
 from gpudrive.networks.late_fusion import NeuralNet
 
@@ -11,21 +13,26 @@ from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.config import load_config
-
 from gpudrive.datatypes.observation import GlobalEgoState
-import json
+
+# WOSAC
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from waymo_open_dataset.protos import sim_agents_submission_pb2
 from eval.wosac_eval import WOSACMetrics
 
-from tqdm import tqdm
 
 # Settings
 max_agents = 64
-num_envs = 10
+num_envs = 2
 device = "cuda"
 num_runs = 1
+num_rollouts = 1
 init_steps = 10
-tf_record_base = '/Data/Dataset/Waymo_smart/validation_v2_tfrecord'
+  
+DATA_JSON = "data/processed/wosac/validation_json"
+DATA_TFRECORD = "data/processed/wosac/validation_tfrecord" 
 
 def get_state(env):
     ego_state = GlobalEgoState.from_tensor(
@@ -136,11 +143,11 @@ def rollout(env, sim_agent):
 
 
 if __name__ == "__main__":
-    
+  
     # Configs model has been trained with
     config = load_config(
         # "eval/reliable_agents_params"
-        "gpudrive/examples/experimental/config/reliable_agents_params"
+        "examples/experimental/config/reliable_agents_params"
     )
     
     # Configs
@@ -176,16 +183,15 @@ if __name__ == "__main__":
         add_goal_state = False,
     )
 
-    
-
     os.makedirs("videos", exist_ok=True)
 
     # Create data loader
     val_loader = SceneDataLoader(
-        root="gpudrive/data/processed/validation",
+        root=DATA_JSON,
         batch_size=num_envs,
         dataset_size=100,
-        sample_with_replacement=False,
+        sample_with_replacement=True,
+        file_prefix="",
     )
 
     # Load sim agent trained through naive self-play
@@ -205,7 +211,7 @@ if __name__ == "__main__":
 
     
     for _ in tqdm(range(num_runs)):
-        for _ in range(10):
+        for _ in range(num_rollouts):
             try:
                 scenario_ids, scenario_rollouts, scenario_rollout_masks \
                     = rollout(
@@ -217,7 +223,7 @@ if __name__ == "__main__":
                 continue
             
             tf_record_paths = [
-                os.path.join(tf_record_base, f"{scenario_id}.tfrecords") for scenario_id in scenario_ids
+                os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords") for scenario_id in scenario_ids
             ]
             wosac_metrics.update(
                 tf_record_paths,
