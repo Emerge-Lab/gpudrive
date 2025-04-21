@@ -17,8 +17,14 @@ from waymo_open_dataset.protos import scenario_pb2
 from waymo_open_dataset.protos import sim_agents_metrics_pb2
 from waymo_open_dataset.protos import sim_agents_submission_pb2
 from waymo_open_dataset.wdl_limited.sim_agents_metrics import estimators
-# from waymo_open_dataset.wdl_limited.sim_agents_metrics import metric_features
+
+import sys
+import os
+
+sys.path.append('examples/eval/wosac_metrics')
 import metric_features
+
+# from waymo_open_dataset.wdl_limited.sim_agents_metrics import metric_features
 from waymo_open_dataset.wdl_limited.sim_agents_metrics import trajectory_features
 
 _METRIC_FIELD_NAMES_BY_BUCKET = {

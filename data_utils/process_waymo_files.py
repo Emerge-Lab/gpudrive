@@ -685,7 +685,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--id_as_filename",
-        default=False,
+        default=True,
         action="store_true",
         help="Use the unique scenario id as the filename",
     )
