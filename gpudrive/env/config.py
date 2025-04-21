@@ -111,7 +111,7 @@ class EnvConfig:
     # If reward_type is "follow_waypoints", the following parameters are used
     waypoint_sample_interval: int = 1  # Interval for sampling waypoints
     waypoint_distance_scale: float = (
-        0.05  # Importance of distance to waypoints
+        0.01  # Importance of distance to waypoints
     )
     speed_distance_scale: float = 0.0
     jerk_smoothness_scale: float = 0.0

@@ -567,7 +567,7 @@ class PufferGPUDrive(PufferEnv):
                         "metrics/mean_internal_reward": internal_reward_values.mean().item(),
                         "metrics/perc_goal_achieved": goal_achieved_rate.item(),
                         "metrics/perc_off_road": off_road_rate.item(),
-                        "metrics/perc_veh_collisions": collision_rate.item(),
+                        "metrics/perc_collisions": collision_rate.item(),
                         "metrics/perc_truncated": num_truncated / num_finished_agents,
                         "train/num_completed_episodes": len(done_worlds),
                         "train/total_controlled_agents": self.num_agents,

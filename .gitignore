@@ -30,6 +30,8 @@ data/processed/testing/*
 data/processed/pop_play/*
 data/processed/hand_designed/*
 analyze/figures/*
+data/other/*
+wosac/
 
 # Logging
 /wandb
