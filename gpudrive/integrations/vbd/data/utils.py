@@ -400,7 +400,7 @@ def process_scenario_data(
         key: torch.from_numpy(value) 
         for key, value in data_dict.items()
     }
-    torch_dict["anchors"] = torch.zeros(num_worlds, 32, 64, 2)  # Batch-sized placeholder
+    torch_dict["anchors"] = torch.zeros(num_worlds, max_controlled_agents, 64, 2)  # Batch-sized placeholder
     
     return torch_dict
 
