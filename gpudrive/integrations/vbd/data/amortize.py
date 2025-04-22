@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for processing")
     parser.add_argument("--window_size", type=int, default=10, help="Size of sliding window")
     parser.add_argument("--total_steps", type=int, default=91, help="Total number of steps to generate")
-    parser.add_argument("--num_scenes", type=int, default=1, help="Number of scenes to process")
+    parser.add_argument("--num_scenes", type=int, default=4, help="Number of scenes to process")
     args = parser.parse_args()
     
     # Always use CPU device
@@ -64,7 +64,7 @@ def main():
         init_steps=INIT_STEPS, # Warmup period
         dynamics_model="state", # Use state-based dynamics model
         dist_to_goal_threshold=1e-5, # Trick to make sure the agents don't disappear when they reach the goal
-        init_mode = 'all_non_trivial',
+        init_mode = 'womd_tracks_to_predict',
         max_controlled_agents=MAX_CONTROLLED_AGENTS,
         goal_behavior='ignore'
     )
