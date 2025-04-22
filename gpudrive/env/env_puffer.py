@@ -428,7 +428,7 @@ class PufferGPUDrive(PufferEnv):
             off_road_weight=self.off_road_weight,
             goal_achieved_weight=self.goal_achieved_weight,
         )
-        
+
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
 
@@ -579,8 +579,7 @@ class PufferGPUDrive(PufferEnv):
 
             # Asynchronously reset the done worlds and empty storage
             self.env.reset(
-                env_idx_list=done_worlds_cpu, 
-                mask=self.controlled_agent_mask
+                env_idx_list=done_worlds_cpu, mask=self.controlled_agent_mask
             )
             self.episode_returns[done_worlds] = 0
             self.agent_episode_returns[done_worlds, :] = 0

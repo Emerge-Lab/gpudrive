@@ -56,7 +56,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
-        
+
         self.world_time_steps = torch.zeros(
             self.num_worlds, dtype=torch.short, device=self.device
         )
@@ -90,8 +90,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
         )
         self.episode_len = self.config.episode_len
-        self.reference_path_length = self.log_trajectory.pos_xy.shape[2] - self.config.init_steps
-        self.step_in_world = self.episode_len - self.sim.steps_remaining_tensor().to_torch()     
+        self.reference_path_length = (
+            self.log_trajectory.pos_xy.shape[2] - self.config.init_steps
+        )
+        self.step_in_world = (
+            self.episode_len - self.sim.steps_remaining_tensor().to_torch()
+        )
 
         # Now initialize reward weights tensor if using reward_conditioned reward type
         if (
@@ -618,7 +622,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             gt_agent_pos = self.log_trajectory.pos_xy[
                 batch_indices, :, step_in_world, :
             ]
-            
+
             gt_agent_speed = self.log_trajectory.ref_speed[
                 batch_indices, :, step_in_world
             ]
@@ -683,10 +687,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Apply waypoint mask only if sampling interval is greater than 1
             if self.config.waypoint_sample_interval > 1:
                 waypoint_mask = (
-                    (
-                        step_in_world % self.config.waypoint_sample_interval
-                        == 0
-                    )
+                    (step_in_world % self.config.waypoint_sample_interval == 0)
                     .float()
                     .unsqueeze(1)
                 )
@@ -701,9 +702,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
-        
+
         # Update time in worlds
-        self.step_in_world = self.episode_len - self.sim.steps_remaining_tensor().to_torch()
+        self.step_in_world = (
+            self.episode_len - self.sim.steps_remaining_tensor().to_torch()
+        )
 
         not_done_worlds = ~self.get_dones().any(
             dim=1
@@ -893,14 +896,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             if self.config.add_reference_speed:
-                
-                avg_ref_speed = self.log_trajectory.clone().ref_speed.mean(axis=-1) / constants.MAX_SPEED
-                
+
+                avg_ref_speed = (
+                    self.log_trajectory.clone().ref_speed.mean(axis=-1)
+                    / constants.MAX_SPEED
+                )
+
                 base_fields.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
 
-                state = self.sim.absolute_self_observation_tensor().to_torch().clone()
+                state = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()
+                )
                 global_ego_pos_xy = state[:, :, :2]
                 global_ego_yaw = state[:, :, 7]
                 glob_reference_xy = self.log_trajectory.pos_xy
@@ -922,25 +932,43 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                             ego_yaw=global_ego_yaw[world_idx, agent_idx],
                             device=self.device,
                         )
-                        
+
                 local_ref_xy_orig = local_reference_xy.clone()
-                
+
                 # Normalize
                 local_reference_xy /= constants.MAX_REF_POINT
-                
+
                 # Set invalid steps to -1.0
-                local_reference_xy[~valid_timesteps_mask.expand_as(local_reference_xy)] = constants.INVALID_ID
-                             
+                local_reference_xy[
+                    ~valid_timesteps_mask.expand_as(local_reference_xy)
+                ] = constants.INVALID_ID
+
                 # Provide agent with index to pay attention to through one-hot encoding
-                next_step_in_world = torch.clamp(self.step_in_world[:, 0, :].squeeze(-1) + 1, min=0, max=self.episode_len)
-                time_one_hot = torch.zeros((self.num_worlds, self.max_agent_count, self.reference_path_length, 1), device=self.device)
+                next_step_in_world = torch.clamp(
+                    self.step_in_world[:, 0, :].squeeze(-1) + 1,
+                    min=0,
+                    max=self.episode_len,
+                )
+                time_one_hot = torch.zeros(
+                    (
+                        self.num_worlds,
+                        self.max_agent_count,
+                        self.reference_path_length,
+                        1,
+                    ),
+                    device=self.device,
+                )
                 time_one_hot[:, :, next_step_in_world, :] = 1.0
-            
+
                 # Make unnormalized reference path available for plotting
-                self.reference_path = torch.cat((local_ref_xy_orig, time_one_hot), dim=-1)
-                
-                reference_path = torch.cat((local_reference_xy, time_one_hot), dim=-1)
-                
+                self.reference_path = torch.cat(
+                    (local_ref_xy_orig, time_one_hot), dim=-1
+                )
+
+                reference_path = torch.cat(
+                    (local_reference_xy, time_one_hot), dim=-1
+                )
+
                 # Flatten the dimensions for stacking
                 base_fields.append(reference_path.flatten(start_dim=2))
 
@@ -965,7 +993,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # self.local_reference_xy = (
                 #     local_reference_xy * point_dropout_mask
                 # )
-                
+
             if self.config.reward_type == "reward_conditioned":
 
                 # Create expanded weights for all environments
@@ -1003,23 +1031,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 base_fields.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
-                
+
                 # State information
-                state = (self.sim.absolute_self_observation_tensor().to_torch().clone()[mask]).to(self.device)
+                state = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()[mask]
+                ).to(self.device)
                 global_ego_pos_xy = state[:, :2]  # Shape: [batch, 2]
                 global_ego_yaw = state[:, 7]  # Shape: [batch]
-                global_reference_xy = self.log_trajectory.pos_xy.clone()[mask]  
+                global_reference_xy = self.log_trajectory.pos_xy.clone()[mask]
                 valid_timesteps_mask = self.log_trajectory.valids.bool()[mask]
                 batch_size = global_reference_xy.shape[0]
                 batch_indices = torch.arange(batch_size)
 
                 # Translate all points to a local coordinate frame
-                translated = global_reference_xy - global_ego_pos_xy.unsqueeze(1)
+                translated = global_reference_xy - global_ego_pos_xy.unsqueeze(
+                    1
+                )
 
                 # Create rotation matrices for all agents at once
                 cos_yaw = torch.cos(global_ego_yaw)
                 sin_yaw = torch.sin(global_ego_yaw)
-                
+
                 # Create batch of rotation matrices: [batch, 2, 2]
                 rotation_matrices = torch.stack(
                     [
@@ -1033,25 +1067,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 local_reference_xy = torch.bmm(
                     rotation_matrices, translated.transpose(1, 2)
                 ).transpose(1, 2)
-                
+
                 local_reference_xy_orig = local_reference_xy.clone()
-                                
+
                 # Normalize to [-1, 1]
                 local_reference_xy /= constants.MAX_REF_POINT
-                
+
                 # Set invalid timesteps to -1
-                local_reference_xy[~valid_timesteps_mask.expand_as(local_reference_xy)] = constants.INVALID_ID
-                
+                local_reference_xy[
+                    ~valid_timesteps_mask.expand_as(local_reference_xy)
+                ] = constants.INVALID_ID
+
                 # Provide agent with index to pay attention to through one-hot encoding
-                next_step_in_world = torch.clamp(self.step_in_world[mask] + 1, min=0, max=self.episode_len)
-                time_one_hot = torch.zeros((batch_size, self.reference_path_length, 1), device=self.device)
+                next_step_in_world = torch.clamp(
+                    self.step_in_world[mask] + 1, min=0, max=self.episode_len
+                )
+                time_one_hot = torch.zeros(
+                    (batch_size, self.reference_path_length, 1),
+                    device=self.device,
+                )
                 time_one_hot[batch_indices, next_step_in_world] = 1.0
-            
+
                 # Stack
-                reference_path = torch.cat((local_reference_xy, time_one_hot), dim=2)
-                
-                self.reference_path = torch.cat((local_reference_xy_orig, time_one_hot), dim=2)
-        
+                reference_path = torch.cat(
+                    (local_reference_xy, time_one_hot), dim=2
+                )
+
+                self.reference_path = torch.cat(
+                    (local_reference_xy_orig, time_one_hot), dim=2
+                )
+
                 # Stack
                 base_fields.append(reference_path.flatten(start_dim=1))
 
@@ -1777,18 +1822,16 @@ if __name__ == "__main__":
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
-    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
-        0
-    ].item()
-    
+    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
+
     print(highlight_agent)
-  
+
     for t in range(10):
         print(f"Step: {t+1}")
-        
+
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
-        env.step_dynamics(expert_actions[:, :, t-1, :])
+        env.step_dynamics(expert_actions[:, :, t - 1, :])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
@@ -1798,7 +1841,7 @@ if __name__ == "__main__":
             center_agent_indices=[highlight_agent],
             plot_waypoints=True,
         )
-        
+
         agent_obs = env.vis.plot_agent_observation(
             env_idx=env_idx,
             agent_idx=highlight_agent,
@@ -1830,12 +1873,15 @@ if __name__ == "__main__":
         #     # Check resetting behavior
         #     _ = env.reset(control_mask)
         #     env.step_dynamics(expert_actions[:, :, 0, :])
-            
+
     env.close()
 
     media.write_video(
         "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
     )
     media.write_video(
-        f"obs_video_env_{env_idx}_agent_{highlight_agent}.gif", np.array(agent_obs_frames), fps=10, codec="gif"
+        f"obs_video_env_{env_idx}_agent_{highlight_agent}.gif",
+        np.array(agent_obs_frames),
+        fps=10,
+        codec="gif",
     )
