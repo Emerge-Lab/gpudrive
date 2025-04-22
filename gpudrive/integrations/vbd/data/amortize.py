@@ -28,10 +28,10 @@ from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
 
-def load_vbd_model(model_path, device="cpu"):
-    """Load the VBD model from a checkpoint, forcing CPU usage."""
-    # Force the model to be loaded on CPU
+def load_vbd_model(model_path, device="cpu", max_cont_agents=64):
+    """Load the VBD model from a checkpoint"""
     model = VBDTest.load_from_checkpoint(model_path, torch.device(device))
+    model.reset_agent_length(max_cont_agents)
     # Make sure model is in eval mode
     _ = model.eval()
     return model
@@ -49,8 +49,9 @@ def main():
     
     # Always use CPU device
     device = "cpu"
+    MAX_CONTROLLED_AGENTS = 64
     print(f"Loading VBD model on {device}...")
-    vbd_model = load_vbd_model(args.model_path, device)
+    vbd_model = load_vbd_model(args.model_path, device, MAX_CONTROLLED_AGENTS)
     
     # Find all JSON files in the input directory
     json_files = list(Path(args.input_dir).glob("**/*.json"))
@@ -59,7 +60,6 @@ def main():
     
     #Init GPUDrive env
     INIT_STEPS = 11
-    MAX_CONTROLLED_AGENTS = 32
     env_config = EnvConfig(
         init_steps=INIT_STEPS, # Warmup period
         dynamics_model="state", # Use state-based dynamics model
