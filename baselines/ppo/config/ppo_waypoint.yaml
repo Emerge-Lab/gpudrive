@@ -21,7 +21,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   reward_type: "follow_waypoints"
   waypoint_distance_scale: 0.01
   speed_distance_scale: 0.01
-  jerk_smoothness_scale: 0.01
+  jerk_smoothness_scale: 0.001
 
   init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
