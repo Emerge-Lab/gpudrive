@@ -106,6 +106,30 @@ namespace madrona_gpudrive
         obj.metadata.isObjectOfInterest = 0;
         obj.metadata.isTrackToPredict = 0;
         obj.metadata.difficulty = 0;
+
+        // Initialize VBD trajectories to zeros
+        for (int i = 0; i < consts::episodeLen; i++) {
+            for (int j = 0; j < 5; j++) {
+                obj.vbd_trajectories[i][j] = 0.0f;
+            }
+        }
+
+        // If VBD trajectories exist in the JSON, read them
+        if (j.contains("vbd_trajectory")) {
+            int vbd_idx = 0;
+            for (const auto &vbd_traj : j.at("vbd_trajectory")) {
+                if (vbd_idx < consts::episodeLen) {
+                    if (!vbd_traj.is_null()) {
+                        obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
+                        obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
+                        obj.vbd_trajectories[vbd_idx][2] = vbd_traj.at(2).get<float>();
+                        obj.vbd_trajectories[vbd_idx][3] = vbd_traj.at(3).get<float>();
+                        obj.vbd_trajectories[vbd_idx][4] = vbd_traj.at(4).get<float>();
+                    }
+                }
+                vbd_idx++;
+            }
+        }
     }
 
     void from_json(const nlohmann::json &j, MapRoad &road, float polylineReductionThreshold = 0.0)

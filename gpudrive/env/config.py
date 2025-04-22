@@ -138,12 +138,11 @@ class EnvConfig:
 
     # Initialization mode
     init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
+        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
     )
 
     # VBD model settings
     use_vbd: bool = False
-    vbd_model_path: str = None
     vbd_trajectory_weight: float = 0.01
     vbd_in_obs: bool = False
 
