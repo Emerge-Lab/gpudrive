@@ -59,12 +59,12 @@ def main():
     
     #Init GPUDrive env
     INIT_STEPS = 11
-    MAX_CONTROLLED_AGENTS = 64
+    MAX_CONTROLLED_AGENTS = 32
     env_config = EnvConfig(
         init_steps=INIT_STEPS, # Warmup period
         dynamics_model="state", # Use state-based dynamics model
         dist_to_goal_threshold=1e-5, # Trick to make sure the agents don't disappear when they reach the goal
-        init_mode = 'womd_tracks_to_predict',
+        init_mode = 'all_non_trivial',
         max_controlled_agents=MAX_CONTROLLED_AGENTS,
         goal_behavior='ignore'
     )
