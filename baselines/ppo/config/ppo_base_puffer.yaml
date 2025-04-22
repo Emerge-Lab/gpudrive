@@ -33,8 +33,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   action_space_accel_disc: 7
   # Versatile Behavior Diffusion (VBD): This will slow down training
   use_vbd: false
-  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
-  init_steps: 11
+  init_steps: 0
   vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
   vbd_in_obs: false
 

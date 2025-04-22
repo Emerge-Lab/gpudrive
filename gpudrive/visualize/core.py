@@ -23,7 +23,7 @@ from gpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
 )
-from gpudrive.datatypes.trajectory import LogTrajectory
+from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
 from gpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
@@ -90,6 +90,13 @@ class MatplotlibVisualizer:
             self.num_worlds,
             self.controlled_agent_mask.shape[1],
             backend=self.backend,
+            device=self.device,
+        )
+
+        self.vbd_trajectory = VBDTrajectory.from_tensor(
+            self.sim_object.vbd_trajectory_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
 
     def plot_simulator_state(
@@ -99,6 +106,7 @@ class MatplotlibVisualizer:
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
         plot_log_replay_trajectory: bool = False,
+        plot_vbd_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
         policy_masks: Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
@@ -295,6 +303,15 @@ class MatplotlibVisualizer:
                     control_mask=controlled_live,
                     env_idx=env_idx,
                     log_trajectory=self.log_trajectory,
+                    line_width_scale=line_width_scale,
+                )
+            
+            if plot_vbd_trajectory:
+                self._plot_vbd_trajectory(
+                    ax=ax,
+                    control_mask=controlled_live,
+                    env_idx=env_idx,
+                    vbd_trajectory=self.vbd_trajectory,
                     line_width_scale=line_width_scale,
                 )
 
@@ -543,6 +560,88 @@ class MatplotlibVisualizer:
             ax.scatter(
                 log_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
                 log_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
+                color="lightgreen",
+                linewidth=0.35 * line_width_scale,
+                alpha=0.35,
+                zorder=0,
+            )
+    
+    def _plot_vbd_trajectory(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        control_mask: torch.Tensor,
+        vbd_trajectory: VBDTrajectory,
+        line_width_scale: int = 1.0,
+    ):
+        """Plot the VBD trajectory for controlled agents in either 2D or 3D."""
+        if self.render_3d:
+            # Get trajectory points
+            trajectory_points = vbd_trajectory.pos_xy[
+                env_idx, control_mask, :, :
+            ].numpy()
+
+            # Set a fixed height for trajectory visualization
+            trajectory_height = 0.05
+
+            # Plot trajectories for each controlled agent
+            for agent_trajectory in trajectory_points:
+                # Filter out invalid points (zeros or out of bounds)
+                valid_mask = (
+                    (agent_trajectory[:, 0] != 0)
+                    & (agent_trajectory[:, 1] != 0)
+                    & (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS)
+                    & (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS)
+                )
+                valid_points = agent_trajectory[valid_mask]
+
+                if len(valid_points) > 1:
+                    # Create segments for the trajectory
+                    segments = []
+                    for i in range(len(valid_points) - 1):
+                        segment = np.array(
+                            [
+                                [
+                                    valid_points[i, 0],
+                                    valid_points[i, 1],
+                                    trajectory_height,
+                                ],
+                                [
+                                    valid_points[i + 1, 0],
+                                    valid_points[i + 1, 1],
+                                    trajectory_height,
+                                ],
+                            ]
+                        )
+                        segments.append(segment)
+
+                    # Create line collection with fade effect
+                    colors = np.zeros((len(segments), 4))
+                    colors[:, 1] = 0.9  # Green component
+                    colors[:, 3] = np.linspace(
+                        0.2, 0.6, len(segments)
+                    )  # Alpha gradient
+
+                    lc = Line3DCollection(
+                        segments, colors=colors, linewidth=2 * line_width_scale
+                    )
+                    ax.add_collection3d(lc)
+
+                    # Add points at trajectory positions
+                    ax.scatter3D(
+                        valid_points[:, 0],
+                        valid_points[:, 1],
+                        np.full_like(valid_points[:, 0], trajectory_height),
+                        color="lightgreen",
+                        s=10,
+                        alpha=0.5,
+                        zorder=0,
+                    )
+        else:
+            # Original 2D plotting
+            ax.scatter(
+                vbd_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
+                vbd_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
                 color="lightgreen",
                 linewidth=0.35 * line_width_scale,
                 alpha=0.35,
