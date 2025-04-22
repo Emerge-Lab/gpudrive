@@ -35,3 +35,6 @@ NUM_MADRONA_ENTITY_TYPES = 11
 
 # Action values
 MAX_ACTION_VALUE = 4.0
+
+# Invalid points
+INVALID_ID = -1.0

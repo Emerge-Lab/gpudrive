@@ -1702,6 +1702,22 @@ class MatplotlibVisualizer:
             # )
             # ax.add_patch(observation_radius)
             plt.axis("off")
+            
+        time_step = (self.env_config.episode_len - self.sim_object.steps_remaining_tensor().to_torch()[env_idx, agent_idx]).item()
+        
+        # Add time step text to the figure
+        ax.text(
+            0.05,  # x position in axes coordinates (5% from left)
+            0.95,  # y position in axes coordinates (95% from bottom)
+            f"t = {time_step}",
+            transform=ax.transAxes,  # Use axes coordinates
+            fontsize=15,
+            color='black',
+            ha='left',
+            va='top'
+        )    
+                    
+        attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
 
         if trajectory is not None and len(trajectory) > 0:
             # Plot the trajectory as a line
@@ -1714,6 +1730,20 @@ class MatplotlibVisualizer:
                 alpha=0.2,
                 zorder=0,
             )
+            # Add a purple star above the reference position
+            if len(attn_reference_idx) > 0:
+                ref_idx = attn_reference_idx[0] 
+                ref_x = trajectory[ref_idx, 0]
+                ref_y = trajectory[ref_idx, 1]
+                
+                ax.scatter(
+                    ref_x,  
+                    ref_y,  
+                    color="#9D00FF",
+                    marker="*",
+                    s=120, 
+                    zorder=10,  
+                )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))

@@ -92,7 +92,7 @@ class EnvConfig:
     init_steps: int = 0
 
     # Goal behavior settings
-    goal_behavior: str = "remove"  # Options: "stop", "ignore", "remove"
+    goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
 
     # Reference points settings
     add_reference_speed: bool = (

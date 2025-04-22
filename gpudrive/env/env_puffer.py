@@ -427,9 +427,8 @@ class PufferGPUDrive(PufferEnv):
             collision_weight=self.collision_weight,
             off_road_weight=self.off_road_weight,
             goal_achieved_weight=self.goal_achieved_weight,
-            world_time_steps=self.episode_lengths[:, 0].long(),
         )
-
+        
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
 
@@ -442,9 +441,7 @@ class PufferGPUDrive(PufferEnv):
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
 
-        terminal = self.env.get_dones(
-            world_time_steps=self.episode_lengths[:, 0].long()
-        )
+        terminal = self.env.get_dones()
 
         self.render_env() if self.render else None
 
