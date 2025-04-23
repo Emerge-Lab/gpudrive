@@ -91,6 +91,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device
         )
         self.episode_len = self.config.episode_len
         self.reference_path_length = (
@@ -884,7 +885,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 state = (
                     self.sim.absolute_self_observation_tensor()
                     .to_torch()
-                    .clone()
+                    .clone().to(self.device)
                 )
                 global_ego_pos_xy = state[:, :, :2]
                 global_ego_yaw = state[:, :, 7]
@@ -1598,6 +1599,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device
         )
 
     def _load_vbd_trajectories(self):
@@ -1634,6 +1636,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device
         )
 
         if self.config.dynamics_model == "delta_local":
@@ -1716,19 +1719,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="classic",
+        dynamics_model="delta_local",
         reward_type="follow_waypoints",
         add_reference_path=True,
+        init_mode="womd_tracks_to_predict"
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/examples",
-        batch_size=2,
-        dataset_size=100,
-        sample_with_replacement=True,
+        root="data/processed/temp",
+        batch_size=1,
+        dataset_size=1,
+        sample_with_replacement=False,
         shuffle=False,
+        file_prefix=""
     )
 
     # Make env
@@ -1740,6 +1745,7 @@ if __name__ == "__main__":
     )
 
     control_mask = env.cont_agent_mask
+    print(f"Number of controlled agents: {control_mask.sum()}")
 
     # Rollout
     obs = env.reset()
@@ -1752,14 +1758,15 @@ if __name__ == "__main__":
     env_idx = 0
     highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
 
-    print(highlight_agent)
+    print(f"Highlighted agent: {highlight_agent}")
 
-    for t in range(10):
+    for t in range(90):
         print(f"Step: {t+1}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t - 1, :])
+        print(f"Reference path shape: {env.reference_path.shape}")
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
@@ -1774,7 +1781,7 @@ if __name__ == "__main__":
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
-            trajectory=env.reference_path[highlight_agent, :, :].to(
+            trajectory=env.reference_path[env_idx, highlight_agent, :, :].to(
                 env.device
             ),
         )

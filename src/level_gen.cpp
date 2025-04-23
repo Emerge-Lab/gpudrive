@@ -116,11 +116,11 @@ static inline bool isAgentStatic(Engine &ctx, Entity agent) {
 
     // Static agents are those that are not tracks to predict
     if (ctx.data().params.readFromTracksToPredict) {
-        if (ctx.get<MetaData>(agent_iface).isTrackToPredict == -1) {
-            return true;
+        if (ctx.get<MetaData>(agent_iface).isTrackToPredict == 1) {
+            return false;
         }
         else {
-            return false;
+            return true;
         }
     }
     
@@ -135,7 +135,7 @@ static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExp
     // If readFromTracksToPredict is true, base controllability on isTrackToPredict flag
     if (ctx.data().params.readFromTracksToPredict) {
         return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
-               ctx.get<MetaData>(agent_iface).isTrackToPredict != -1;
+               (ctx.get<MetaData>(agent_iface).isTrackToPredict == 1);
     }
     
     // Original logic for other initialization modes
@@ -160,6 +160,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y}};
     ctx.get<AgentID>(agent_iface) = AgentID{.id = static_cast<int32_t>(agentInit.id)};
+    ctx.get<MetaData>(agent_iface) = agentInit.metadata;
 
     populateExpertTrajectory(ctx, agent, agentInit);
     populateVBDTrajectory(ctx, agent, agentInit);
@@ -168,8 +169,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent) ? ResponseType::Static : ResponseType::Dynamic;
     ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent, agentInit.markAsExpert)};
     ctx.data().numControlledAgents += ctx.get<ControlledState>(agent_iface).controlled;
-
-    ctx.get<MetaData>(agent_iface) = agentInit.metadata;
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,
