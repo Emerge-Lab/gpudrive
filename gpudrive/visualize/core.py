@@ -316,7 +316,7 @@ class MatplotlibVisualizer:
                     log_trajectory=self.log_trajectory,
                     line_width_scale=line_width_scale,
                 )
-            
+
             if plot_vbd_trajectory:
                 self._plot_vbd_trajectory(
                     ax=ax,
@@ -711,7 +711,7 @@ class MatplotlibVisualizer:
                 alpha=0.35,
                 zorder=0,
             )
-    
+
     def _plot_vbd_trajectory(
         self,
         ax: matplotlib.axes.Axes,
@@ -793,7 +793,7 @@ class MatplotlibVisualizer:
                 alpha=0.35,
                 zorder=0,
             )
-    
+
     def _plot_vbd_trajectory(
         self,
         ax: matplotlib.axes.Axes,

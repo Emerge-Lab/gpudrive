@@ -10,7 +10,11 @@ import gymnasium
 from gpudrive.env import constants
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.base_env import GPUDriveGymEnv
-from gpudrive.datatypes.trajectory import LogTrajectory, to_local_frame, VBDTrajectory
+from gpudrive.datatypes.trajectory import (
+    LogTrajectory,
+    to_local_frame,
+    VBDTrajectory,
+)
 from gpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
     GlobalRoadGraphPoints,
@@ -178,7 +182,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device
+            device=self.device,
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -207,7 +211,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
-            device=self.device
+            device=self.device,
         )
         sample_batch = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -1381,7 +1385,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
             return ego_vbd_trajectories
-    
+
     def _normalize_vbd_obs(self, trajectories_flat, traj_len):
         """
         Normalize flattened VBD trajectory values to be between -1 and 1, with clipping.
@@ -1447,10 +1451,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
 
-        if (
-            self.use_vbd
-            and self.config.vbd_in_obs
-        ):
+        if self.use_vbd and self.config.vbd_in_obs:
             # Add ego-centric VBD trajectories
             vbd_observations = self._get_vbd_obs(mask)
 
@@ -1603,17 +1604,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Load VBD trajectories directly from the simulator."""
         if not self.use_vbd:
             return
-            
+
         # Get VBD trajectories from the simulator
         vbd_traj = VBDTrajectory.from_tensor(
             self.sim.vbd_trajectory_tensor(),
             backend=self.backend,
             device=self.device,
         )
-        
-        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+
+        means_xy = (
+            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        )
         vbd_traj.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-        
+
         self.vbd_trajectories = vbd_traj.trajectories
 
     def get_expert_actions(self):

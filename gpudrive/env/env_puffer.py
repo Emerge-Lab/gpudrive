@@ -245,7 +245,7 @@ class PufferGPUDrive(PufferEnv):
         # VBD
         self.vbd_trajectory_weight = vbd_trajectory_weight
         self.use_vbd = use_vbd
-        
+
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -505,7 +505,7 @@ class PufferGPUDrive(PufferEnv):
             if self.render:
                 for render_env_idx in range(self.render_k_scenarios):
                     self.log_video_to_wandb(render_env_idx, done_worlds)
-                
+
                 self.log_agent_obs_to_wandb()
 
             # Log episode statistics
@@ -650,18 +650,14 @@ class PufferGPUDrive(PufferEnv):
                 zoom_radius=self.zoom_radius,
                 plot_waypoints=self.plot_waypoints,
             )
-            
+
             agent_obs = self.env.vis.plot_agent_observation(
                 env_idx=0,
                 agent_idx=0,
                 figsize=(10, 10),
-                trajectory=self.env.reference_path[0, :, :].to(
-                    "cpu"
-                ),
+                trajectory=self.env.reference_path[0, :, :].to("cpu"),
             )
-            self.agent_frames.append(
-                img_from_fig(agent_obs)
-            )
+            self.agent_frames.append(img_from_fig(agent_obs))
 
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
@@ -694,10 +690,10 @@ class PufferGPUDrive(PufferEnv):
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
             self.agent_was_rendered_in_rollout = False
-            
+
     def log_agent_obs_to_wandb(self):
         """Log agent observation to wandb."""
-        
+
         frames_array = np.array(self.agent_frames)
         if frames_array.shape[0] > 10:
             self.wandb_obj.log(

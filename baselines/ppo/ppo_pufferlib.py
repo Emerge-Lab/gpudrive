@@ -79,6 +79,7 @@ def make_agent(env, config):
             config=config.environment,
         )
 
+
 def train(args, vecenv):
     """Main training loop for the PPO agent."""
     policy = make_agent(env=vecenv.driver_env, config=args).to(
