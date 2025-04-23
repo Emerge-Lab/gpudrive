@@ -10,6 +10,7 @@ from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.datatypes.observation import (
     LocalEgoState,
+    GlobalEgoState,
 )
 
 from gpudrive.visualize.utils import img_from_fig
@@ -17,6 +18,133 @@ from gpudrive.env.dataset import SceneDataLoader
 
 from pufferlib.environment import PufferEnv
 from gpudrive import GPU_DRIVE_DATA_DIR
+
+"""Metrics from
+    https://github.com/waymo-research/waymo-open-dataset/blob/master/src/waymo_open_dataset/wdl_limited/sim_agents_metrics/trajectory_features.py
+    implemented using numpy instead of tensorflow.
+"""
+
+
+def compute_displacement_error_np(pred_x, pred_y, ref_x, ref_y):
+    """NumPy version of compute_displacement_error function.
+
+    Computes displacement error (in x,y) w.r.t. a reference trajectory.
+
+    Args:
+        pred_x: The x-component of the predicted trajectories.
+        pred_y: The y-component of the predicted trajectories.
+        ref_x: The x-component of the reference trajectories.
+        ref_y: The y-component of the reference trajectories.
+
+    Returns:
+        A float array with the same shape as all the arguments, containing
+        the 2D distance between the predicted trajectories and the reference
+        trajectories.
+    """
+    # Stack coordinates along a new axis
+    pred_xy = np.stack([pred_x, pred_y], axis=-1)
+    ref_xy = np.stack([ref_x, ref_y], axis=-1)
+
+    # Calculate Euclidean distance
+    return np.linalg.norm(pred_xy - ref_xy, ord=2, axis=-1)
+
+
+def central_diff_np(t, pad_value):
+    """NumPy version of central_diff function.
+
+    Computes central difference along the last axis.
+    """
+    # Check if input is at least length 3 (needed for central diff)
+    if t.shape[-1] < 3:
+        result = np.full_like(t, pad_value)
+        return result
+
+    # Create proper padding tensors
+    pad_shape = t.shape[:-1] + (1,)
+    pad_array = np.full(pad_shape, pad_value)
+
+    # Compute central difference for middle elements
+    diff_t = (t[..., 2:] - t[..., :-2]) / 2
+
+    return np.concatenate([pad_array, diff_t, pad_array], axis=-1)
+
+
+def central_logical_and_np(t, pad_value):
+    """NumPy version of central_logical_and function."""
+    # Check if input is at least length 3
+    if t.shape[-1] < 3:
+        result = np.full_like(t, pad_value)
+        return result
+
+    pad_shape = t.shape[:-1] + (1,)
+    pad_array = np.full(pad_shape, pad_value)
+    diff_t = np.logical_and(t[..., :-2], t[..., 2:])
+    return np.concatenate([pad_array, diff_t, pad_array], axis=-1)
+
+
+def wrap_angle_np(angle):
+    """Wraps angles in the range [-pi, pi]."""
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
+
+def compute_kinematic_features_np(x, y, heading, seconds_per_step):
+    """NumPy version of compute_kinematic_features function, for x,y only."""
+    # Compute positions and displacement
+    batch_shape = x.shape[:-1]
+    time_steps = x.shape[-1]
+
+    # For very short trajectories, just return placeholders
+    if time_steps < 3:
+        placeholder = np.full(x.shape, np.nan)
+        return placeholder, placeholder, placeholder, placeholder
+
+    # Linear speed - compute displacement first then magnitude
+    dx = central_diff_np(x, pad_value=np.nan)
+    dy = central_diff_np(y, pad_value=np.nan)
+
+    # Calculate displacement norm directly (avoid reshaping issues)
+    displacements = np.sqrt(dx**2 + dy**2)
+    linear_speed = displacements / seconds_per_step
+
+    # Linear acceleration (scalar)
+    linear_accel = (
+        central_diff_np(linear_speed, pad_value=np.nan) / seconds_per_step
+    )
+
+    # Angular speed and acceleration
+    dh_step = wrap_angle_np(central_diff_np(heading, pad_value=np.nan))
+    angular_speed = dh_step / seconds_per_step
+    angular_accel = (
+        central_diff_np(angular_speed, pad_value=np.nan) / seconds_per_step
+    )
+
+    return linear_speed, linear_accel, angular_speed, angular_accel
+
+
+def compute_kinematic_validity_np(valid):
+    """NumPy version of compute_kinematic_validity function."""
+    speed_validity = central_logical_and_np(valid, pad_value=False)
+    acceleration_validity = central_logical_and_np(
+        speed_validity, pad_value=False
+    )
+    return speed_validity, acceleration_validity
+
+
+def get_state(env, num_worlds):
+    ego_state = GlobalEgoState.from_tensor(
+        env.sim.absolute_self_observation_tensor(),
+        backend=env.backend,
+        device=env.device,
+    )
+    glob_ego_pos_x = ego_state.pos_x
+    glob_ego_pos_y = ego_state.pos_y
+    return (
+        glob_ego_pos_x[:num_worlds, :],
+        glob_ego_pos_y[:num_worlds, :],
+        ego_state.pos_z[:num_worlds, :],
+        ego_state.rotation_angle[:num_worlds, :],
+        ego_state.id[:num_worlds, :],
+    )
 
 
 def env_creator(name="gpudrive", **kwargs):
@@ -46,19 +174,28 @@ class PufferGPUDrive(PufferEnv):
         norm_obs=True,
         lidar_obs=False,
         bev_obs=False,
-        add_goal_state=False,
+        add_reference_path=False,
+        add_reference_speed=False,
+        prob_reference_dropout=0.0,
         reward_type="weighted_combination",
+        waypoint_distance_scale=0.05,
+        speed_distance_scale=0.0,
+        jerk_smoothness_scale=0.0,
+        condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
+        init_mode="all_non_trivial",
         collision_weight=-0.5,
         off_road_weight=-0.5,
         goal_achieved_weight=1,
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1,
-        remove_non_vehicles=True,
+        remove_non_vehicles=False,
         obs_radius=50.0,
         use_vbd=False,
         vbd_trajectory_weight=0.1,
+        track_realism_metrics=False,
+        track_n_worlds=2,
         render=False,
         render_3d=True,
         render_interval=50,
@@ -67,6 +204,7 @@ class PufferGPUDrive(PufferEnv):
         render_format="mp4",
         render_fps=15,
         zoom_radius=50,
+        plot_waypoints=False,
         buf=None,
         **kwargs,
     ):
@@ -90,6 +228,8 @@ class PufferGPUDrive(PufferEnv):
         self.collision_weight = collision_weight
         self.off_road_weight = off_road_weight
         self.goal_achieved_weight = goal_achieved_weight
+        self.init_mode = init_mode
+        self.reward_type = reward_type
 
         self.render = render
         self.render_interval = render_interval
@@ -98,11 +238,14 @@ class PufferGPUDrive(PufferEnv):
         self.render_format = render_format
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
+        self.plot_waypoints = plot_waypoints
+        self.track_realism_metrics = track_realism_metrics
+        self.track_n_worlds = track_n_worlds
 
         # VBD
         self.vbd_trajectory_weight = vbd_trajectory_weight
         self.use_vbd = use_vbd
-        
+
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -116,12 +259,19 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
             reward_type=reward_type,
+            waypoint_distance_scale=waypoint_distance_scale,
+            speed_distance_scale=speed_distance_scale,
+            jerk_smoothness_scale=jerk_smoothness_scale,
+            condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
-            add_goal_state=add_goal_state,
+            add_reference_path=add_reference_path,
+            add_reference_speed=add_reference_speed,
+            prob_reference_dropout=prob_reference_dropout,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
             goal_behavior=goal_behavior,
+            init_mode=init_mode,
             dist_to_goal_threshold=dist_to_goal_threshold,
             polyline_reduction_threshold=polyline_reduction_threshold,
             remove_non_vehicles=remove_non_vehicles,
@@ -129,7 +279,9 @@ class PufferGPUDrive(PufferEnv):
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
             steer_actions=torch.round(
-                torch.linspace(-torch.pi, torch.pi, action_space_steer_disc),
+                torch.linspace(
+                    -torch.pi / 3, torch.pi / 3, action_space_steer_disc
+                ),
                 decimals=3,
             ),
             accel_actions=torch.round(
@@ -180,7 +332,9 @@ class PufferGPUDrive(PufferEnv):
         self.was_rendered_in_rollout = {
             env_idx: True for env_idx in range(render_k_scenarios)
         }
+        self.agent_was_rendered_in_rollout = False
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
+        self.agent_frames = []
 
         self.global_step = 0
         self.iters = 0
@@ -210,6 +364,14 @@ class PufferGPUDrive(PufferEnv):
         self.episode_returns = torch.zeros(
             self.num_agents, dtype=torch.float32
         ).to(self.device)
+        self.human_like_rewards = torch.zeros(
+            (self.num_worlds, self.max_cont_agents_per_env),
+            dtype=torch.float32,
+        ).to(self.device)
+        self.internal_rewards = torch.zeros(
+            (self.num_worlds, self.max_cont_agents_per_env),
+            dtype=torch.float32,
+        ).to(self.device)
         self.agent_episode_returns = torch.zeros(
             (self.num_worlds, self.max_cont_agents_per_env),
             dtype=torch.float32,
@@ -229,6 +391,19 @@ class PufferGPUDrive(PufferEnv):
             (self.num_worlds, self.max_cont_agents_per_env),
             dtype=torch.float32,
         ).to(self.device)
+
+        # Storage for computing realism metrics
+        if self.track_realism_metrics:
+            self.worlds_to_track = self.track_n_worlds
+            self.pos_xyz = torch.zeros(
+                (self.worlds_to_track, self.max_cont_agents_per_env, 91, 3),
+                dtype=torch.float32,
+            ).to(self.device)
+
+            self.headings = torch.zeros(
+                (self.worlds_to_track, self.max_cont_agents_per_env, 91),
+                dtype=torch.float32,
+            ).to(self.device)
 
         return self.observations, []
 
@@ -252,11 +427,21 @@ class PufferGPUDrive(PufferEnv):
             collision_weight=self.collision_weight,
             off_road_weight=self.off_road_weight,
             goal_achieved_weight=self.goal_achieved_weight,
-            world_time_steps=self.episode_lengths[:, 0].long(),
         )
+
         # Flatten rewards; only keep rewards for controlled agents
         reward_controlled = reward[self.controlled_agent_mask]
-        terminal = self.env.get_dones().bool()
+
+        # Store human-like and internal rewards separately
+        if self.reward_type == "follow_waypoints":
+            self.human_like_rewards[
+                self.live_agent_mask
+            ] += self.env.distance_penalty[self.live_agent_mask]
+            self.internal_rewards[
+                self.live_agent_mask
+            ] += self.env.base_rewards[self.live_agent_mask]
+
+        terminal = self.env.get_dones()
 
         self.render_env() if self.render else None
 
@@ -280,6 +465,21 @@ class PufferGPUDrive(PufferEnv):
         self.offroad_in_episode += info.off_road
         self.collided_in_episode += info.collided
 
+        if self.track_realism_metrics:  # Log global states
+            batch_indices = torch.arange(
+                self.worlds_to_track, device=self.device
+            )
+            pos_x, pos_y, pos_z, heading, ids = get_state(
+                self.env, num_worlds=self.worlds_to_track
+            )
+            episode_time_steps = (
+                self.episode_lengths[: self.worlds_to_track, 0].long() - 1
+            )
+            self.pos_xyz[
+                batch_indices, :, episode_time_steps, :
+            ] = torch.stack([pos_x, pos_y, pos_z], dim=-1)
+            self.headings[batch_indices, :, episode_time_steps] = heading
+
         # Mask used for buffer
         self.masks = self.live_agent_mask[self.controlled_agent_mask]
 
@@ -299,12 +499,14 @@ class PufferGPUDrive(PufferEnv):
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
 
-        info_lst = []
+        self.info_lst = []
         if len(done_worlds) > 0:
 
             if self.render:
                 for render_env_idx in range(self.render_k_scenarios):
                     self.log_video_to_wandb(render_env_idx, done_worlds)
+
+                self.log_agent_obs_to_wandb()
 
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
@@ -339,8 +541,13 @@ class PufferGPUDrive(PufferEnv):
                 / num_finished_agents
             )
 
-            total_collisions = self.collided_in_episode[done_worlds, :].sum()
-            total_off_road = self.offroad_in_episode[done_worlds, :].sum()
+            # Calculate human-likeness metrics for completed episodes
+            human_like_values = self.human_like_rewards[done_worlds, :][
+                controlled_mask
+            ]
+            internal_reward_values = self.internal_rewards[done_worlds, :][
+                controlled_mask
+            ]
 
             agent_episode_returns = self.agent_episode_returns[done_worlds, :][
                 controlled_mask
@@ -352,19 +559,19 @@ class PufferGPUDrive(PufferEnv):
 
             if num_finished_agents > 0:
                 # fmt: off
-                info_lst.append(
+                self.info_lst.append(
                     {
-                        "mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
-                        "perc_goal_achieved": goal_achieved_rate.item(),
-                        "perc_off_road": off_road_rate.item(),
-                        "perc_veh_collisions": collision_rate.item(),
-                        "total_controlled_agents": self.num_agents,
-                        "control_density": self.num_agents / self.controlled_agent_mask.numel(),
-                        "episode_length": self.episode_lengths[done_worlds, :].mean().item(),
-                        "perc_truncated": num_truncated / num_finished_agents,
-                        "num_completed_episodes": len(done_worlds),
-                        "total_collisions": total_collisions.item(),
-                        "total_off_road": total_off_road.item(),
+                        "metrics/mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
+                        "metrics/mean_imitation_distance": human_like_values.mean().item(),
+                        "metrics/mean_internal_reward": internal_reward_values.mean().item(),
+                        "metrics/perc_goal_achieved": goal_achieved_rate.item(),
+                        "metrics/perc_off_road": off_road_rate.item(),
+                        "metrics/perc_collisions": collision_rate.item(),
+                        "metrics/perc_truncated": num_truncated / num_finished_agents,
+                        "train/num_completed_episodes": len(done_worlds),
+                        "train/total_controlled_agents": self.num_agents,
+                        "train/control_density": self.num_agents / self.controlled_agent_mask.numel(),
+                        "train/episode_length": self.episode_lengths[done_worlds, :].mean().item(),
                     }
                 )
                 # fmt: on
@@ -373,7 +580,9 @@ class PufferGPUDrive(PufferEnv):
             self.last_obs = self.env.get_obs(self.controlled_agent_mask)
 
             # Asynchronously reset the done worlds and empty storage
-            self.env.reset(env_idx_list=done_worlds_cpu)
+            self.env.reset(
+                env_idx_list=done_worlds_cpu, mask=self.controlled_agent_mask
+            )
             self.episode_returns[done_worlds] = 0
             self.agent_episode_returns[done_worlds, :] = 0
             self.episode_lengths[done_worlds, :] = 0
@@ -384,6 +593,17 @@ class PufferGPUDrive(PufferEnv):
             ]
             self.offroad_in_episode[done_worlds, :] = 0
             self.collided_in_episode[done_worlds, :] = 0
+            self.human_like_rewards[done_worlds, :] = 0
+            self.internal_rewards[done_worlds, :] = 0
+
+            if self.track_realism_metrics:
+                tracked_done_worlds = done_worlds.tolist() and list(
+                    range(self.worlds_to_track)
+                )
+                if len(tracked_done_worlds):
+                    self.compute_realism_metrics(tracked_done_worlds)
+                    self.pos_xyz[tracked_done_worlds, :] = 0
+                    self.headings[tracked_done_worlds, :] = 0
 
         # Get the next observations. Note that we do this after resetting
         # the worlds so that we always return a fresh observation
@@ -399,7 +619,7 @@ class PufferGPUDrive(PufferEnv):
             self.rewards,
             self.terminals,
             self.truncations,
-            info_lst,
+            self.info_lst,
         )
 
     def render_env(self):
@@ -428,7 +648,16 @@ class PufferGPUDrive(PufferEnv):
                 env_indices=envs_to_render,
                 time_steps=time_steps,
                 zoom_radius=self.zoom_radius,
+                plot_waypoints=self.plot_waypoints,
             )
+
+            agent_obs = self.env.vis.plot_agent_observation(
+                env_idx=0,
+                agent_idx=0,
+                figsize=(10, 10),
+                trajectory=self.env.reference_path[0, :, :].to("cpu"),
+            )
+            self.agent_frames.append(img_from_fig(agent_obs))
 
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
@@ -457,8 +686,28 @@ class PufferGPUDrive(PufferEnv):
         """Clear rendering storage."""
         for env_idx in range(self.render_k_scenarios):
             self.frames[env_idx] = []
+            self.agent_frames = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+            self.agent_was_rendered_in_rollout = False
+
+    def log_agent_obs_to_wandb(self):
+        """Log agent observation to wandb."""
+
+        frames_array = np.array(self.agent_frames)
+        if frames_array.shape[0] > 10:
+            self.wandb_obj.log(
+                {
+                    f"vis/agent_obs/env_0": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),
+                        fps=self.render_fps,
+                        format=self.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                }
+            )
+            self.agent_frames = []
+            self.agent_was_rendered_in_rollout = True
 
     def log_video_to_wandb(self, render_env_idx, done_worlds):
         """Log arrays as videos to wandb."""
@@ -512,3 +761,131 @@ class PufferGPUDrive(PufferEnv):
                 },
                 step=self.global_step,
             )
+
+    def compute_realism_metrics(self, done_worlds):
+        """Compute realism metrics.
+
+        Args:
+            done_worlds: List of indices of the worlds to track.
+        """
+
+        # [worlds, max_cont_agents]
+        control_mask = (
+            self.controlled_agent_mask[done_worlds].detach().cpu().numpy()
+        )
+        # [batch, time, 1]
+        valid_mask = (
+            self.env.log_trajectory.valids[done_worlds]
+            .detach()
+            .cpu()
+            .numpy()[control_mask]
+            .squeeze(-1)
+        ).astype(bool)
+
+        # Take human logs (ground-truth)
+        # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
+        ref_pos_xy_np = (
+            self.env.log_trajectory.pos_xy[done_worlds]
+            .detach()
+            .cpu()
+            .numpy()[control_mask]
+        )
+        # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
+        ref_headings_np = (
+            self.env.log_trajectory.yaw[done_worlds]
+            .detach()
+            .cpu()
+            .numpy()[control_mask]
+            .squeeze(-1)
+        )
+
+        agent_headings_np = (
+            self.headings[done_worlds].detach().cpu().numpy()[control_mask]
+        )
+        agent_pos_xyz_np = (
+            self.pos_xyz[done_worlds].detach().cpu().numpy()[control_mask]
+        )
+
+        # Extract x, y components (z is not informative)
+        agent_x_np = agent_pos_xyz_np[..., 0]
+        agent_y_np = agent_pos_xyz_np[..., 1]
+
+        ref_x_np = ref_pos_xy_np[..., 0]
+        ref_y_np = ref_pos_xy_np[..., 1]
+
+        # Step duration in seconds
+        seconds_per_step = 0.1  # Assuming 10Hz sampling rate
+
+        # Compute the metrics for agent trajectories
+        (
+            agent_linear_speed,
+            agent_linear_accel,
+            agent_angular_speed,
+            agent_angular_accel,
+        ) = compute_kinematic_features_np(
+            agent_x_np, agent_y_np, agent_headings_np, seconds_per_step
+        )
+
+        # Compute the metrics for reference trajectories
+        (
+            ref_linear_speed,
+            ref_linear_accel,
+            ref_angular_speed,
+            ref_angular_accel,
+        ) = compute_kinematic_features_np(
+            ref_x_np, ref_y_np, ref_headings_np, seconds_per_step
+        )
+
+        # Check which time steps are valid
+        speed_valid, accel_valid = compute_kinematic_validity_np(valid_mask)
+
+        # Calculate absolute diffs between agent and reference trajectories
+        linear_speed_error = np.abs(agent_linear_speed - ref_linear_speed)
+        linear_accel_error = np.abs(agent_linear_accel - ref_linear_accel)
+        angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
+        angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
+
+        # Calculate displacement error
+        displacement_error = compute_displacement_error_np(
+            agent_x_np, agent_y_np, ref_x_np, ref_y_np
+        )
+
+        # Apply validity masks
+        masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
+        masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
+        masked_angular_speed_error = np.ma.array(
+            angular_speed_error, mask=~speed_valid
+        )
+        masked_angular_accel_error = np.ma.array(
+            angular_accel_error, mask=~accel_valid
+        )
+
+        # Compute MAEs
+        mean_linear_speed_error = masked_speed_error.mean()
+        mean_linear_accel_error = masked_accel_error.mean()
+        mean_angular_speed_error = masked_angular_speed_error.mean()
+        mean_angular_accel_error = masked_angular_accel_error.mean()
+
+        self.info_lst.append(
+            {
+                "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
+                "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
+                "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
+                "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
+                "realism/mean_displacement_error": displacement_error[
+                    valid_mask
+                ].mean(),
+                # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
+                #     ref_linear_speed[speed_valid]
+                # ),
+                # "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
+                #     ref_linear_accel[accel_valid]
+                # ),
+                # "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
+                #     agent_linear_speed[speed_valid]
+                # ),
+                # "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
+                #     agent_linear_speed[accel_valid]
+                # ),
+            },
+        )

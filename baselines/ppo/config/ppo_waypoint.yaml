@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/training
+data_dir: data/processed/wosac/validation_json_100
 continue_training: false
 model_cpt: null
 
@@ -15,69 +15,68 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  add_reference_path: false
-  remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
-  lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination" # Options: "weighted_combination", "reward_conditioned"
-  collision_weight: -0.75
-  off_road_weight: -0.75
-  goal_achieved_weight: 1.0
-  init_mode: all_non_trivial
+  remove_non_vehicles: false
+  collision_behavior: "ignore"
+  goal_behavior: "ignore"
+  reward_type: "follow_waypoints"
+  waypoint_distance_scale: 0.01
+  speed_distance_scale: 0.01
+  jerk_smoothness_scale: 0.001
 
-  # If reward_type is "reward_conditioned", the following parameters are used
-  condition_mode: random
-  collision_weight_lb: -3.0
-  collision_weight_ub: 0.01
-  goal_achieved_weight_lb: 1.0
-  goal_achieved_weight_ub: 3.0
-  off_road_weight_lb: -3.0
-  off_road_weight_ub: 0.0
-
+  init_mode: all_non_trivial #womd_tracks_to_predict
   dynamics_model: "classic"
-  collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
-  goal_behavior: "remove" # Options: "remove", "stop", "ignore"
-  dist_to_goal_threshold: 2.0
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
-  action_space_steer_disc: 13
-  action_space_accel_disc: 7
-  # Versatile Behavior Diffusion (VBD): This will slow down training
+  action_space_steer_disc: 15
+  action_space_accel_disc: 11
+  init_steps: 0 # Warmup steps
+  goal_achieved_weight: 0.0
+  collision_weight: -0.2
+  off_road_weight: -0.2
+
+  # Versatile Behavior Diffusion (VBD)
   use_vbd: false
   init_steps: 0
   vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
   vbd_in_obs: false
 
+  # Planning guidance
+  add_reference_path: true # If true, a reference path is added to the ego observation
+  add_reference_speed: true # If true, the reference speed (scalar) is added to the ego observation
+  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
+
 wandb:
   entity: ""
-  project: "gpudrive"
-  group: ""
+  project: "humanlike"
+  group: "debug"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: PPO # Set dynamically in the script if needed
+  exp_id: waypoint_rs # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
-  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  device: "cuda" # Dynamically set to cuda if available, else cpu
   bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
-  resample_dataset_size: 10_000 # Number of unique scenes to sample from
+  resample_scenes: false
+  resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 2_000_000
   sample_with_replacement: true
-  shuffle_dataset: false
+  shuffle_dataset: true
+  file_prefix: ""
 
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 2_000_000_000
-  batch_size: 262_144
+  batch_size: 131072
   minibatch_size: 8192
   learning_rate: 3e-4
-  anneal_lr: false
+  anneal_lr: true
   gamma: 0.99
   gae_lambda: 0.95
   update_epochs: 4
@@ -85,18 +84,21 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.0001
-  vf_coef: 0.3
+  ent_coef: 0.001
+  vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  log_window: 1000
+
+  # # # Logging # # #
+  log_window: 500
+  track_realism_metrics: true # Log human-like metrics
+  track_n_worlds: 3 # Number of worlds to track
 
   # # # Network # # #
   network:
-    input_dim: 64 # Embedding of the input features
-    hidden_dim: 128 # Latent dimension
+    embed_dim: 64 # Embedding of the input features
     dropout: 0.01
-    class_name: "NeuralNet"
+    class_name: "Agent"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
@@ -106,11 +108,12 @@ train:
   # # # Rendering # # #
   render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 10 # Render every k iterations
-  render_k_scenarios: 1 # Number of scenarios to render
+  render_interval: 150 # Render every k iterations
+  render_k_scenarios: 2 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
-  render_fps: 15 # Frames per second
-  zoom_radius: 50
+  render_fps: 20 # Frames per second
+  zoom_radius: 100
+  plot_waypoints: true
 
 vec:
   backend: "native" # Only native is currently supported

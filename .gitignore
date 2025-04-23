@@ -27,9 +27,11 @@ data/raw/*
 data/processed/validation/*
 data/processed/training/*
 data/processed/testing/*
-data/processed/sampled/*
+data/processed/pop_play/*
 data/processed/hand_designed/*
 analyze/figures/*
+data/other/*
+wosac/
 
 # Logging
 /wandb

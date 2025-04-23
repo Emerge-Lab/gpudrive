@@ -18,13 +18,10 @@ from box import Box
 
 from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
-
-from gpudrive.networks.late_fusion import NeuralNet
+from gpudrive.networks.agents import Agent
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
-import pufferlib.vector
-import pufferlib.cleanrl
 from rich.console import Console
 
 import typer
@@ -48,36 +45,11 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
-
-    if config.continue_training:
-        print("Loading checkpoint...")
-        # Load checkpoint
-        saved_cpt = torch.load(
-            f=config.model_cpt,
-            map_location=config.train.device,
-            weights_only=False,
-        )
-        policy = NeuralNet(
-            input_dim=saved_cpt["model_arch"]["input_dim"],
-            action_dim=saved_cpt["action_dim"],
-            hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-            config=config.environment,
-        )
-
-        # Load the model parameters
-        policy.load_state_dict(saved_cpt["parameters"])
-
-        return policy
-
-    else:
-        # Start from scratch
-        return NeuralNet(
-            input_dim=config.train.network.input_dim,
-            action_dim=env.single_action_space.n,
-            hidden_dim=config.train.network.hidden_dim,
-            dropout=config.train.network.dropout,
-            config=config.environment,
-        )
+    return Agent(
+        config=config.environment,
+        embed_dim=config.train.network.embed_dim,
+        action_dim=env.single_action_space.n,
+    )
 
 
 def train(args, vecenv):
@@ -130,33 +102,11 @@ def init_wandb(args, name, id=None, resume=True):
     return wandb
 
 
-def sweep(args, project="PPO", sweep_name="my_sweep"):
-    """Initialize a WandB sweep with hyperparameters."""
-    sweep_id = wandb.sweep(
-        sweep=dict(
-            method="random",
-            name=sweep_name,
-            metric={"goal": "maximize", "name": "environment/episode_return"},
-            parameters={
-                "learning_rate": {
-                    "distribution": "log_uniform_values",
-                    "min": 1e-4,
-                    "max": 1e-1,
-                },
-                "batch_size": {"values": [512, 1024, 2048]},
-                "minibatch_size": {"values": [128, 256, 512]},
-            },
-        ),
-        project=project,
-    )
-    wandb.agent(sweep_id, lambda: train(args), count=100)
-
-
 @app.command()
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "baselines/ppo/config/ppo_base_puffer.yaml",
+    ] = "baselines/ppo/config/ppo_waypoint.yaml",
     *,
     # fmt: off
     # Environment options
@@ -166,6 +116,9 @@ def run(
     collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
     goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
+    waypoint_distance_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    speed_distance_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    jerk_smoothness_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
@@ -173,9 +126,11 @@ def run(
     collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
     remove_non_vehicles: Annotated[Optional[int], typer.Option(help="Remove non-vehicles from the scene; 0 or 1")] = None,
     use_vbd: Annotated[Optional[bool], typer.Option(help="Use VBD model for trajectory predictions")] = False,
+    vbd_model_path: Annotated[Optional[str], typer.Option(help="Path to VBD model checkpoint")] = None,
     vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
     vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
+    
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -220,6 +175,9 @@ def run(
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,
         "goal_achieved_weight": goal_achieved_weight,
+        "waypoint_distance_scale": waypoint_distance_scale,
+        "jerk_smoothness_scale": jerk_smoothness_scale,
+        "speed_distance_scale": speed_distance_scale,
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
@@ -228,6 +186,7 @@ def run(
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),
         "use_vbd": use_vbd,
+        "vbd_model_path": vbd_model_path,
         "vbd_trajectory_weight": vbd_trajectory_weight,
         "vbd_in_obs": vbd_in_obs,
         "init_steps": init_steps,
@@ -269,22 +228,17 @@ def run(
 
     datetime_ = datetime.now().strftime("%m_%d_%H_%M_%S_%f")[:-3]
 
-    if config["continue_training"]:
-        cont_train = "C"
-    else:
-        cont_train = ""
-
     if config["train"]["resample_scenes"]:
         if config["train"]["resample_scenes"]:
             dataset_size = config["train"]["resample_dataset_size"]
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__{cont_train}__R_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__R_{dataset_size}__{datetime_}'
     else:
         dataset_size = str(config["environment"]["k_unique_scenes"])
         config["train"][
             "exp_id"
-        ] = f'{config["train"]["exp_id"]}__{cont_train}__S_{dataset_size}__{datetime_}'
+        ] = f'{config["train"]["exp_id"]}__S_{dataset_size}__{datetime_}'
 
     config["environment"]["dataset_size"] = dataset_size
     config["train"]["device"] = config["train"].get(
@@ -302,6 +256,7 @@ def run(
         else config.environment.k_unique_scenes,
         sample_with_replacement=config.train.sample_with_replacement,
         shuffle=config.train.shuffle_dataset,
+        file_prefix=config.train.file_prefix,
     )
 
     # Make environment
