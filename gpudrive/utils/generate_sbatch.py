@@ -62,7 +62,7 @@ TEMPLATE_SBATCH = """
 #SBATCH --account={account}
 
 SINGULARITY_IMAGE={singularity_image}
-OVERLAY_FILE=/scratch/{username}/{overlay_file}
+OVERLAY_FILE={overlay_file}
 
 singularity exec --nv --overlay "${{OVERLAY_FILE}}:ro" \
     "${{SINGULARITY_IMAGE}}" \
@@ -243,30 +243,31 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "02_24_S10_000"
+    group = "minimal_tiny"
 
     fields = {
-        "time_h": 47,  # Max time per job (job will finish if run is done before)
+        "time_h": 6,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 70,
         "job_name": group,
+        "run_file": "baselines/ppo/ppo_waypoint.py",
     }
     
     hyperparams = {
         "group": [group], # Group name
-        "num_worlds": [800],
-        "resample_scenes": [1], # Yes
-        "k_unique_scenes": [800],
-        "resample_interval": [5_000_000],
-        "total_timesteps": [4_000_000_000],
-        "resample_dataset_size": [10_000],
-        "batch_size": [524288],
-        "minibatch_size": [16384],
-        "update_epochs": [4],
-        "ent_coef": [0.001, 0.003, 0.0001],
+        "num_worlds": [500],
+        "resample_scenes": [0], 
+        "k_unique_scenes": [4],
+        #"resample_interval": [5_000_000],
+        #"resample_dataset_size": [10_000],
+        #"total_timesteps": [3_000_000_000],
+        "batch_size": [262_144],
+        "minibatch_size": [16_384],
+        "waypoint_distance_scale": [0.0, 0.05, 0.1],
+        "ent_coef": [0.001],
+        "vf_coef": [0.5],
         "render": [0],
-        #"seed": [42, 3],
     }
 
     save_script(
@@ -275,30 +276,3 @@ if __name__ == "__main__":
         fields=fields,
         params=hyperparams,
     )
-
-    # hyperparams = {
-    #     "group": [group], # Group name
-    #     "num_worlds": [800],
-    #     "resample_scenes": [1], # Yes
-    #     "k_unique_scenes": [1000], # Sample in batches of 500
-    #     "resample_interval": [2_000_000],
-    #     "total_timesteps": [3_000_000_000],
-    #     "resample_dataset_size": [1000],
-    #     "batch_size": [262_144, 524_288],
-    #     "minibatch_size": [16_384],
-    #     "update_epochs": [2, 4, 5],
-    #     "ent_coef": [0.0001, 0.001, 0.003],
-    #     "learning_rate": [1e-4, 3e-4],
-    #     "gamma": [0.99],
-    #     "render": [0],
-    # }
-
-    # save_script(
-    #     file_path="examples/experimental/sbatch_scripts/",
-    #     filename=f"sbatch_{group}.sh",
-    #     fields=fields,
-    #     params=hyperparams,
-    # )
-
-
-

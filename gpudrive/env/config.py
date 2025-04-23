@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 import torch
 
 import madrona_gpudrive
@@ -55,7 +55,7 @@ class EnvConfig:
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 13), decimals=3
+        torch.linspace(-torch.pi / 3, torch.pi / 3, 13), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
         torch.linspace(-4.0, 4.0, 7), decimals=3
@@ -86,31 +86,53 @@ class EnvConfig:
     collision_behavior: str = "ignore"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
-    remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
+    remove_non_vehicles: bool = False  # Remove non-vehicle entities from scene
 
     # Initialization steps: Number of steps to take before the episode starts
     init_steps: int = 0
 
     # Goal behavior settings
-    goal_behavior: str = "remove"  # Options: "stop", "ignore", "remove"
-    add_goal_state: bool = False  # Add goal state to the scene
+    goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
+
+    # Reference points settings
+    add_reference_speed: bool = (
+        False  # Include reference speed in observations
+    )
+    add_reference_path: bool = False
+    prob_reference_dropout: float = (
+        0.0  # Probability of dropping reference points
+    )
+    min_reference_points: int = 1  # Minimum number of reference points
 
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
+    # Alternatively, "weighted_combination", "follow_waypoints", "distance_to_vdb_trajs", "reward_conditioned"
 
+    # If reward_type is "follow_waypoints", the following parameters are used
+    waypoint_sample_interval: int = 1  # Interval for sampling waypoints
+    waypoint_distance_scale: float = (
+        0.01  # Importance of distance to waypoints
+    )
+    speed_distance_scale: float = 0.0
+    jerk_smoothness_scale: float = 0.0
+
+    # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components
     collision_weight: float = 0.0
     goal_achieved_weight: float = 1.0
     off_road_weight: float = 0.0
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
+    # If condition_mode is "fixed", set the agent weights here
+    agent_type: Optional[Union[str, torch.Tensor]] = torch.Tensor(
+        [-0.75, 1.0, -0.75]
+    )  # weights for collision, goal_achieved, off_road
 
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
     goal_achieved_weight_lb: float = 1.0
-    goal_achieved_weight_ub: float = 2.0
+    goal_achieved_weight_ub: float = 3.0
     off_road_weight_lb: float = -1.0
     off_road_weight_ub: float = 0.0
 
@@ -137,9 +159,7 @@ class EnvConfig:
     agent_size_scale: float = madrona_gpudrive.vehicleScale
 
     # Initialization mode
-    init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
-    )
+    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
 
     # VBD model settings
     use_vbd: bool = False

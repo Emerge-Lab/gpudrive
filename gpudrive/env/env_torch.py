@@ -10,7 +10,11 @@ import gymnasium
 from gpudrive.env import constants
 from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.base_env import GPUDriveGymEnv
-from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
+from gpudrive.datatypes.trajectory import (
+    LogTrajectory,
+    to_local_frame,
+    VBDTrajectory,
+)
 from gpudrive.datatypes.roadgraph import (
     LocalRoadGraphPoints,
     GlobalRoadGraphPoints,
@@ -55,22 +59,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.render_config = render_config
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
+
         self.world_time_steps = torch.zeros(
             self.num_worlds, dtype=torch.short, device=self.device
         )
 
-        # Initialize reward weights tensor if using reward_conditioned
+        # Initialize reward weights tensor to None initially
         self.reward_weights_tensor = None
-        if (
-            hasattr(self.config, "reward_type")
-            and self.config.reward_type == "reward_conditioned"
-        ):
-            # Use default condition_mode from config or fall back to "random"
-            condition_mode = getattr(self.config, "condition_mode", "random")
-            agent_type = getattr(self.config, "agent_type", None)
-            self._set_reward_weights(
-                condition_mode=condition_mode, agent_type=agent_type
-            )
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -91,7 +86,35 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
         self.episode_len = self.config.episode_len
+        self.reference_path_length = (
+            self.log_trajectory.pos_xy.shape[2] - self.config.init_steps
+        )
+        self.step_in_world = (
+            self.episode_len - self.sim.steps_remaining_tensor().to_torch()
+        )
+
+        # Now initialize reward weights tensor if using reward_conditioned reward type
+        if (
+            hasattr(self.config, "reward_type")
+            and self.config.reward_type == "reward_conditioned"
+        ):
+            # Use default condition_mode from config or fall back to "random"
+            condition_mode = getattr(self.config, "condition_mode", "random")
+            self.agent_type = getattr(self.config, "agent_type", None)
+            self._set_reward_weights(
+                condition_mode=condition_mode, agent_type=self.agent_type
+            )
+
+        self.previous_action_value_tensor = torch.zeros(
+            (self.num_worlds, self.max_cont_agents, 3), device=self.device
+        )
 
         # Initialize VBD model if used
         self._initialize_vbd()
@@ -112,7 +135,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
-
         self.num_agents = self.cont_agent_mask.sum().item()
 
         # Rendering setup
@@ -160,7 +182,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device
+            device=self.device,
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -189,7 +211,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
-            device=self.device
+            device=self.device,
         )
         sample_batch = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -204,14 +226,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return sample_batch
 
-    def _set_reward_weights(
-        self, env_idx_list=None, condition_mode="random", agent_type=None
-    ):
+    def _set_reward_weights(self, condition_mode="random", agent_type=None):
         """Set agent reward weights for all or specific environments.
 
         Args:
-            env_idx_list: List of environment indices to generate new weights for.
-                        If None, all environments are updated.
             condition_mode: Determines how reward weights are sampled:
                         - "random": Random sampling within bounds (default for training)
                         - "fixed": Use predefined agent_type weights (for testing)
@@ -220,12 +238,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
                     If condition_mode is "fixed", should be a tensor of shape [3] with weight values
         """
+        # Use weight sharing across environments for memory efficiency
         if self.reward_weights_tensor is None:
             self.reward_weights_tensor = torch.zeros(
-                self.num_worlds,
-                self.max_cont_agents,
+                self.cont_agent_mask.shape[1],  # max_agent_count from mask
                 3,  # collision, goal_achieved, off_road
-                device=self.device,
+                device="cpu",
+                dtype=torch.float16,
             )
 
         # Read bounds for the three reward components
@@ -235,7 +254,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.config.goal_achieved_weight_lb,
                 self.config.off_road_weight_lb,
             ],
-            device=self.device,
+            device="cpu",
+            dtype=torch.float16,
         )
 
         upper_bounds = torch.tensor(
@@ -244,7 +264,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.config.goal_achieved_weight_ub,
                 self.config.off_road_weight_ub,
             ],
-            device=self.device,
+            device="cpu",
+            dtype=torch.float16,
         )
         bounds_range = upper_bounds - lower_bounds
 
@@ -260,6 +281,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.9,  # Strong off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,
             ),
             "aggressive": torch.tensor(
                 [
@@ -271,6 +293,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.6,  # Moderate off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,
             ),
             "balanced": torch.tensor(
                 [
@@ -291,6 +314,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     / 2,
                 ],
                 device=self.device,
+                dtype=torch.float16,
             ),
             "risk_taker": torch.tensor(
                 [
@@ -301,20 +325,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     * 0.4,  # Low off-road penalty
                 ],
                 device=self.device,
+                dtype=torch.float16,
             ),
         }
-
-        # Determine which environments to update
-        if env_idx_list is None:
-            env_idx_list = list(range(self.num_worlds))
-
-        env_indices = torch.tensor(env_idx_list, device=self.device)
-        num_envs = len(env_indices)
+        # Just get the max agents dimension from the controlled agent mask
+        max_agents = self.cont_agent_mask.shape[1]
 
         if condition_mode == "random":
             # Traditional random sampling within bounds
             random_values = torch.rand(
-                num_envs, self.max_cont_agents, 3, device=self.device
+                max_agents,
+                3,
+                device="cpu",
+                dtype=torch.float16,
             )
             scaled_values = lower_bounds + random_values * bounds_range
 
@@ -325,13 +348,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     f"Unknown agent_type: {agent_type}. Available types: {list(agent_presets.keys())}"
                 )
 
-            # Create a tensor with the preset weights for all agents in the specified environments
+            # CHANGED: Create a tensor with the preset weights for all agents, but no environment dimension
             preset_weights = agent_presets[agent_type]
-            scaled_values = (
-                preset_weights.unsqueeze(0)
-                .unsqueeze(0)
-                .expand(num_envs, self.max_cont_agents, 3)
-            )
+            scaled_values = preset_weights.unsqueeze(0).expand(max_agents, 3)
 
         elif condition_mode == "fixed":
             # Use custom provided weights
@@ -340,23 +359,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
                 )
 
-            custom_weights = agent_type.to(device=self.device)
+            custom_weights = agent_type.to(device="cpu", dtype=torch.float16)
             if custom_weights.shape != (3,):
                 raise ValueError(
                     f"agent_type tensor must have shape [3], got {custom_weights.shape}"
                 )
 
-            scaled_values = (
-                custom_weights.unsqueeze(0)
-                .unsqueeze(0)
-                .expand(num_envs, self.max_cont_agents, 3)
-            )
+            scaled_values = custom_weights.unsqueeze(0).expand(max_agents, 3)
 
         else:
             raise ValueError(f"Unknown condition_mode: {condition_mode}")
 
-        # Update the weights tensor for the specified environments
-        self.reward_weights_tensor[env_indices.cpu()] = scaled_values
+        self.reward_weights_tensor = scaled_values
 
         return self.reward_weights_tensor
 
@@ -395,11 +409,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if condition_mode is not None
                 else getattr(self.config, "condition_mode", "random")
             )
+            use_agent_type = (
+                agent_type if agent_type is not None else self.agent_type
+            )
             self._set_reward_weights(
-                env_idx_list, condition_mode=mode, agent_type=agent_type
+                condition_mode=mode, agent_type=use_agent_type
             )
 
         self.world_time_steps.zero_()
+
+        # Reset smoothness tracking for reset environments
+        if env_idx_list is not None:
+            reset_mask = torch.zeros(
+                self.num_worlds, dtype=torch.bool, device=self.device
+            )
+            reset_mask[torch.tensor(env_idx_list, device=self.device)] = True
+
+            # Zero out only the reset environments
+            self.previous_action_value_tensor[reset_mask] = 0.0
+        else:
+            self.previous_action_value_tensor.zero_()
 
         # Advance the simulator with log playback if warmup steps are provided
         if self.init_steps > 0:
@@ -410,14 +439,43 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return self.get_obs(mask)
 
-    def get_dones(self):
-        return (
+    def get_dones(self, world_time_steps=None):
+        """
+        Returns tensor indicating which agents have terminated.
+
+        Args:
+            world_time_steps: Optional tensor [num_worlds] with current timestep per world.
+
+        Returns:
+            torch.Tensor: Boolean tensor [num_worlds, num_agents] where True indicates done.
+        """
+        terminal = (
             self.sim.done_tensor()
             .to_torch()
             .clone()
             .squeeze(dim=2)
             .to(torch.float)
         )
+
+        if (
+            world_time_steps is not None
+            and self.config.reward_type == "follow_waypoints"
+            and self.config.waypoint_distance_scale > 0.0
+        ):
+            # Find last valid timestep for each agent, this is the ground-truth episode length
+            agent_episode_length = 90 - torch.argmax(
+                self.log_trajectory.valids.squeeze(-1).flip(2), dim=2
+            )
+
+            expanded_time_steps = world_time_steps.unsqueeze(1).expand_as(
+                agent_episode_length
+            )
+            return terminal.bool() & (
+                expanded_time_steps >= agent_episode_length
+            )
+
+        else:
+            return terminal.bool()
 
     def get_infos(self):
         return Info.from_tensor(
@@ -429,19 +487,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def get_rewards(
         self,
         collision_weight=-0.5,
-        goal_achieved_weight=1.0,
+        goal_achieved_weight=0.0,
         off_road_weight=-0.5,
-        world_time_steps=None,
-        log_distance_weight=0.01,
     ):
-        """Obtain the rewards for the current step.
-        By default, the reward is a weighted combination of the following components:
-        - collision
-        - goal_achieved
-        - off_road
-
-        The importance of each component is determined by the weights.
-        """
+        """Obtain the rewards for the current step."""
 
         # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
@@ -461,22 +510,33 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
             )
-
             return weighted_rewards
 
         elif self.config.reward_type == "reward_conditioned":
-            # Extract individual weight components from the tensor
-            # Shape: [num_worlds, max_agents, 3]
             if self.reward_weights_tensor is None:
                 self._set_reward_weights()
 
-            # Apply the weights in a vectorized manner
-            # Each index in dimension 2 corresponds to a specific weight:
-            # 0: collision, 1: goal_achieved, 2: off_road
+            # Compute the weighted rewards
+            collision_weights = (
+                self.reward_weights_tensor[:, 0]
+                .expand(self.num_worlds, -1)
+                .to(self.device)
+            )
+            goal_weights = (
+                self.reward_weights_tensor[:, 1]
+                .expand(self.num_worlds, -1)
+                .to(self.device)
+            )
+            off_road_weights = (
+                self.reward_weights_tensor[:, 2]
+                .expand(self.num_worlds, -1)
+                .to(self.device)
+            )
+
             weighted_rewards = (
-                self.reward_weights_tensor[:, :, 0] * collided
-                + self.reward_weights_tensor[:, :, 1] * goal_achieved
-                + self.reward_weights_tensor[:, :, 2] * off_road
+                collision_weights * collided
+                + goal_weights * goal_achieved
+                + off_road_weights * off_road
             )
 
             return weighted_rewards
@@ -523,50 +583,106 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-        elif self.config.reward_type == "distance_to_logs":
-            # Reward based on distance to logs and penalty for collision
-            weighted_rewards = (
-                collision_weight * collided
-                + goal_achieved_weight * goal_achieved
+        elif self.config.reward_type == "follow_waypoints":
+            # Reward based on minimizing distance to time-aligned waypoints plus penalty for collision/off-road
+            self.base_rewards = (
+                goal_achieved_weight * goal_achieved
+                + collision_weight * collided
                 + off_road_weight * off_road
             )
 
-            log_trajectory = LogTrajectory.from_tensor(
-                self.sim.expert_trajectory_tensor(),
-                self.num_worlds,
-                self.max_agent_count,
-                backend=self.backend,
+            # Extract waypoints (ground truth) at time t
+            step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
+            batch_indices = torch.arange(step_in_world.shape[0])
+            gt_agent_pos = self.log_trajectory.pos_xy[
+                batch_indices, :, step_in_world, :
+            ]
+
+            gt_agent_speed = self.log_trajectory.ref_speed[
+                batch_indices, :, step_in_world
+            ]
+            valid_mask = (
+                self.log_trajectory.valids[batch_indices, :, step_in_world]
+                .squeeze(-1)
+                .bool()
             )
 
-            # Index log positions at current time steps
-            log_traj_pos = []
-            for i in range(self.num_worlds):
-                log_traj_pos.append(
-                    log_trajectory.pos_xy[i, :, world_time_steps[i], :]
-                )
-            log_traj_pos_tensor = torch.stack(log_traj_pos)
-
+            # Get actual agent positions
             agent_state = GlobalEgoState.from_tensor(
                 self.sim.absolute_self_observation_tensor(),
                 self.backend,
+                self.device,
             )
 
-            agent_pos = torch.stack(
+            actual_agent_speed = self.sim.self_observation_tensor().to_torch()[
+                :, :, 0
+            ]
+
+            actual_agent_pos = torch.stack(
                 [agent_state.pos_x, agent_state.pos_y], dim=-1
             )
 
-            # compute euclidean distance between agent and logs
-            dist_to_logs = torch.norm(log_traj_pos_tensor - agent_pos, dim=-1)
+            speed_error = (gt_agent_speed - actual_agent_speed) ** 2
 
-            # add reward based on inverse distance to logs
-            weighted_rewards += log_distance_weight * torch.exp(-dist_to_logs)
+            # Compute euclidean distance between agent and waypoints
+            dist_to_waypoints = torch.norm(
+                gt_agent_pos - actual_agent_pos, dim=-1
+            )
 
-            return weighted_rewards
+            # Penalty for jerky movements
+            if hasattr(self, "action_diff"):
+                acceleration_jerk = (
+                    self.action_diff[:, :, 0] ** 2
+                )  # First action component is acceleration
+                steering_jerk = (
+                    self.action_diff[:, :, 1] ** 2
+                )  # Second action component is steering
+
+                self.smoothness_penalty = -(
+                    self.config.jerk_smoothness_scale * acceleration_jerk
+                    + self.config.jerk_smoothness_scale * steering_jerk
+                )
+            else:
+                self.smoothness_penalty = torch.zeros_like(self.base_rewards)
+
+            self.distance_penalty = (
+                -self.config.waypoint_distance_scale
+                * torch.log(dist_to_waypoints + 1.0)
+                - self.config.speed_distance_scale
+                * torch.log(speed_error + 1.0)
+            )
+
+            # Zero-out distance penalty for invalid time steps, that is,
+            # The reference positions have not been observed at every time step
+            # if not observed, we set the distance penalty to 0
+            self.distance_penalty[~valid_mask] = 0.0
+
+            self.distance_penalty += self.smoothness_penalty
+
+            # Apply waypoint mask only if sampling interval is greater than 1
+            if self.config.waypoint_sample_interval > 1:
+                waypoint_mask = (
+                    (step_in_world % self.config.waypoint_sample_interval == 0)
+                    .float()
+                    .unsqueeze(1)
+                )
+                self.distance_penalty = self.distance_penalty * waypoint_mask
+
+            # Combine base rewards with distance penalty
+            rewards = self.base_rewards + self.distance_penalty
+
+            return rewards
 
     def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
+
+        # Update time in worlds
+        self.step_in_world = (
+            self.episode_len - self.sim.steps_remaining_tensor().to_torch()
+        )
+
         not_done_worlds = ~self.get_dones().any(
             dim=1
         )  # Check if any agent in world is done
@@ -585,22 +701,33 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 actions = (
                     torch.nan_to_num(actions, nan=0).long().to(self.device)
                 )
-                action_value_tensor = self.action_keys_tensor[actions]
+                self.action_value_tensor = self.action_keys_tensor[actions]
 
             elif actions.dim() == 3:
                 if actions.shape[2] == 1:
                     actions = actions.squeeze(dim=2).to(self.device)
-                    action_value_tensor = self.action_keys_tensor[actions]
+                    self.action_value_tensor = self.action_keys_tensor[actions]
                 else:  # Assuming we are given the actual action values
-                    action_value_tensor = actions.to(self.device)
+                    self.action_value_tensor = actions.to(self.device)
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
 
         else:
-            action_value_tensor = actions.to(self.device)
+            self.action_value_tensor = actions.to(self.device)
 
-        # Feed the action values to gpudrive
-        self._copy_actions_to_simulator(action_value_tensor)
+        if not hasattr(self, "previous_action_value_tensor"):
+            # Initialize with current actions on first call
+            self.previous_action_value_tensor = (
+                self.action_value_tensor.clone()
+            )
+
+        # Calculate action differences (jerk)
+        self.action_diff = (
+            self.action_value_tensor - self.previous_action_value_tensor
+        )
+        self.previous_action_value_tensor = self.action_value_tensor.clone()
+
+        self._copy_actions_to_simulator(self.action_value_tensor)
 
     def _copy_actions_to_simulator(self, actions):
         """Copy the provided actions to the simulator."""
@@ -730,37 +857,248 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         base_fields = [
-            ego_state.speed,
-            ego_state.vehicle_length,
-            ego_state.vehicle_width,
-            ego_state.rel_goal_x,
-            ego_state.rel_goal_y,
-            ego_state.is_collided,
+            ego_state.speed.unsqueeze(-1),
+            ego_state.vehicle_length.unsqueeze(-1),
+            ego_state.vehicle_width.unsqueeze(-1),
+            ego_state.is_collided.unsqueeze(-1),
         ]
 
-        if self.config.add_goal_state:
-            base_fields.append(ego_state.is_goal_reached)
-
         if mask is None:
+
+            base_fields.append(
+                self.previous_action_value_tensor[:, :, :2]
+                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
+            )
+
+            if self.config.add_reference_speed:
+
+                avg_ref_speed = (
+                    self.log_trajectory.clone().ref_speed.mean(axis=-1)
+                    / constants.MAX_SPEED
+                )
+
+                base_fields.append(avg_ref_speed.unsqueeze(-1))
+
+            if self.config.add_reference_path:
+
+                state = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()
+                )
+                global_ego_pos_xy = state[:, :, :2]
+                global_ego_yaw = state[:, :, 7]
+                glob_reference_xy = self.log_trajectory.pos_xy
+                agent_indices = torch.arange(self.max_cont_agents)
+                local_reference_xy = torch.empty_like(glob_reference_xy)
+                valid_timesteps_mask = self.log_trajectory.valids.bool()
+
+                # Transform reference path to be relative to current
+                # agent positions and heading
+                for world_idx in range(self.num_worlds):
+                    for agent_idx in range(self.max_cont_agents):
+                        local_reference_xy[
+                            world_idx, agent_idx, :, :
+                        ] = to_local_frame(
+                            global_pos_xy=glob_reference_xy[
+                                world_idx, agent_idx, :, :
+                            ],
+                            ego_pos=global_ego_pos_xy[world_idx, agent_idx],
+                            ego_yaw=global_ego_yaw[world_idx, agent_idx],
+                            device=self.device,
+                        )
+
+                local_ref_xy_orig = local_reference_xy.clone()
+
+                # Normalize
+                local_reference_xy /= constants.MAX_REF_POINT
+
+                # Set invalid steps to -1.0
+                local_reference_xy[
+                    ~valid_timesteps_mask.expand_as(local_reference_xy)
+                ] = constants.INVALID_ID
+
+                # Provide agent with index to pay attention to through one-hot encoding
+                next_step_in_world = torch.clamp(
+                    self.step_in_world[:, 0, :].squeeze(-1) + 1,
+                    min=0,
+                    max=self.episode_len,
+                )
+                time_one_hot = torch.zeros(
+                    (
+                        self.num_worlds,
+                        self.max_agent_count,
+                        self.reference_path_length,
+                        1,
+                    ),
+                    device=self.device,
+                )
+                time_one_hot[:, :, next_step_in_world, :] = 1.0
+
+                # Make unnormalized reference path available for plotting
+                self.reference_path = torch.cat(
+                    (local_ref_xy_orig, time_one_hot), dim=-1
+                )
+
+                reference_path = torch.cat(
+                    (local_reference_xy, time_one_hot), dim=-1
+                )
+
+                # Flatten the dimensions for stacking
+                base_fields.append(reference_path.flatten(start_dim=2))
+
+                # batch_size = local_reference_xy.shape[0]
+                # num_points = local_reference_xy.shape[1]
+                # time_steps = local_reference_xy.shape[2]
+
+                # Create dropout mask for the time dimension
+                # Shape: [batch_size, num_points, time_steps, 1]
+                # point_dropout_mask = torch.bernoulli(
+                #     torch.ones(
+                #         batch_size,
+                #         num_points,
+                #         time_steps,
+                #         1,
+                #         device=local_reference_xy.device,
+                #     )
+                #     * (1 - self.config.prob_reference_dropout)
+                # ).bool()
+
+                # Apply dropout mask
+                # self.local_reference_xy = (
+                #     local_reference_xy * point_dropout_mask
+                # )
+
             if self.config.reward_type == "reward_conditioned":
+
+                # Create expanded weights for all environments
+                # Expand from [max_agents, 3] to [num_worlds, max_agents]
+                collision_weights = self.reward_weights_tensor[:, 0].expand(
+                    self.num_worlds, -1
+                )
+                goal_weights = self.reward_weights_tensor[:, 1].expand(
+                    self.num_worlds, -1
+                )
+                off_road_weights = self.reward_weights_tensor[:, 2].expand(
+                    self.num_worlds, -1
+                )
+
                 full_fields = base_fields + [
-                    self.reward_weights_tensor[:, :, 0],
-                    self.reward_weights_tensor[:, :, 1],
-                    self.reward_weights_tensor[:, :, 2],
+                    collision_weights,
+                    goal_weights,
+                    off_road_weights,
                 ]
                 return torch.stack(full_fields).permute(1, 2, 0)
             else:
-                return torch.stack(base_fields).permute(1, 2, 0)
+                return torch.cat(base_fields, dim=-1)
         else:
+
+            base_fields.append(
+                self.previous_action_value_tensor[mask][:, :2]
+                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
+            )
+
+            if self.config.add_reference_speed:
+                avg_ref_speed = (
+                    self.log_trajectory.ref_speed[mask].clone().mean(axis=-1)
+                    / constants.MAX_SPEED
+                )
+                base_fields.append(avg_ref_speed.unsqueeze(-1))
+
+            if self.config.add_reference_path:
+
+                # State information
+                state = (
+                    self.sim.absolute_self_observation_tensor()
+                    .to_torch()
+                    .clone()[mask]
+                ).to(self.device)
+                global_ego_pos_xy = state[:, :2]  # Shape: [batch, 2]
+                global_ego_yaw = state[:, 7]  # Shape: [batch]
+                global_reference_xy = self.log_trajectory.pos_xy.clone()[mask]
+                valid_timesteps_mask = self.log_trajectory.valids.bool()[mask]
+                batch_size = global_reference_xy.shape[0]
+                batch_indices = torch.arange(batch_size)
+
+                # Translate all points to a local coordinate frame
+                translated = global_reference_xy - global_ego_pos_xy.unsqueeze(
+                    1
+                )
+
+                # Create rotation matrices for all agents at once
+                cos_yaw = torch.cos(global_ego_yaw)
+                sin_yaw = torch.sin(global_ego_yaw)
+
+                # Create batch of rotation matrices: [batch, 2, 2]
+                rotation_matrices = torch.stack(
+                    [
+                        torch.stack([cos_yaw, sin_yaw], dim=1),
+                        torch.stack([-sin_yaw, cos_yaw], dim=1),
+                    ],
+                    dim=1,
+                )  # Shape: [batch, 2, 2]
+
+                # Apply rotation to all points
+                local_reference_xy = torch.bmm(
+                    rotation_matrices, translated.transpose(1, 2)
+                ).transpose(1, 2)
+
+                local_reference_xy_orig = local_reference_xy.clone()
+
+                # Normalize to [-1, 1]
+                local_reference_xy /= constants.MAX_REF_POINT
+
+                # Set invalid timesteps to -1
+                local_reference_xy[
+                    ~valid_timesteps_mask.expand_as(local_reference_xy)
+                ] = constants.INVALID_ID
+
+                # Provide agent with index to pay attention to through one-hot encoding
+                next_step_in_world = torch.clamp(
+                    self.step_in_world[mask] + 1, min=0, max=self.episode_len
+                )
+                time_one_hot = torch.zeros(
+                    (batch_size, self.reference_path_length, 1),
+                    device=self.device,
+                )
+                time_one_hot[batch_indices, next_step_in_world] = 1.0
+
+                # Stack
+                reference_path = torch.cat(
+                    (local_reference_xy, time_one_hot), dim=2
+                )
+
+                self.reference_path = torch.cat(
+                    (local_reference_xy_orig, time_one_hot), dim=2
+                )
+
+                # Stack
+                base_fields.append(reference_path.flatten(start_dim=1))
+
             if self.config.reward_type == "reward_conditioned":
-                masked_fields = base_fields + [
-                    self.reward_weights_tensor[mask][:, 0],
-                    self.reward_weights_tensor[mask][:, 1],
-                    self.reward_weights_tensor[mask][:, 2],
-                ]
-                return torch.stack(masked_fields).permute(1, 0)
+                # For masked agents, we need to extract agent indices from the mask
+                world_indices, agent_indices = torch.where(mask)
+
+                # Get the reward weights for these specific agents
+                weights_for_masked_agents = self.reward_weights_tensor.to(
+                    self.device
+                )[agent_indices]
+
+                return torch.stack(
+                    [
+                        ego_state.speed,
+                        ego_state.vehicle_length,
+                        ego_state.vehicle_width,
+                        ego_state.rel_goal_x,
+                        ego_state.rel_goal_y,
+                        ego_state.is_collided,
+                        weights_for_masked_agents[:, 0],
+                        weights_for_masked_agents[:, 1],
+                        weights_for_masked_agents[:, 2],
+                    ]
+                ).permute(1, 0)
             else:
-                return torch.stack(base_fields).permute(1, 0)
+                return torch.cat(base_fields, dim=1)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""
@@ -1047,7 +1385,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
             return ego_vbd_trajectories
-    
+
     def _normalize_vbd_obs(self, trajectories_flat, traj_len):
         """
         Normalize flattened VBD trajectory values to be between -1 and 1, with clipping.
@@ -1113,10 +1451,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
 
-        if (
-            self.use_vbd
-            and self.config.vbd_in_obs
-        ):
+        if self.use_vbd and self.config.vbd_in_obs:
             # Add ego-centric VBD trajectories
             vbd_observations = self._get_vbd_obs(mask)
 
@@ -1257,21 +1592,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
 
+        # Obtain new log trajectory
+        self.log_trajectory = LogTrajectory.from_tensor(
+            self.sim.expert_trajectory_tensor(),
+            self.num_worlds,
+            self.max_agent_count,
+            backend=self.backend,
+        )
+
     def _load_vbd_trajectories(self):
         """Load VBD trajectories directly from the simulator."""
         if not self.use_vbd:
             return
-            
+
         # Get VBD trajectories from the simulator
         vbd_traj = VBDTrajectory.from_tensor(
             self.sim.vbd_trajectory_tensor(),
             backend=self.backend,
             device=self.device,
         )
-        
-        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+
+        means_xy = (
+            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        )
         vbd_traj.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-        
+
         self.vbd_trajectories = vbd_traj.trajectories
 
     def get_expert_actions(self):
@@ -1371,7 +1716,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="delta_local",
+        dynamics_model="classic",
+        reward_type="follow_waypoints",
+        add_reference_path=True,
     )
     render_config = RenderConfig()
 
@@ -1403,42 +1750,57 @@ if __name__ == "__main__":
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
+    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
 
-    for t in range(91):
-        print(f"Step: {t}")
+    print(highlight_agent)
+
+    for t in range(10):
+        print(f"Step: {t+1}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
-        env.step_dynamics(expert_actions[:, :, t, :])
-
-        highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][
-            -1
-        ].item()
+        env.step_dynamics(expert_actions[:, :, t - 1, :])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
             zoom_radius=80,
             time_steps=[t],
-            # center_agent_indices=[highlight_agent],
+            center_agent_indices=[highlight_agent],
+            plot_waypoints=True,
         )
 
         agent_obs = env.vis.plot_agent_observation(
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
+            trajectory=env.reference_path[highlight_agent, :, :].to(
+                env.device
+            ),
         )
 
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
-        obs = env.get_obs()
+        world_time_steps = (
+            torch.Tensor([t]).repeat((1, env.num_worlds)).long().to(env.device)
+        )
+
+        obs = env.get_obs(control_mask)
         reward = env.get_rewards()
+
+        print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
+        print(f"R_t+1: {reward[env_idx, highlight_agent]}")
+
         done = env.get_dones()
         info = env.get_infos()
 
-        if done.all().bool():
-            break
+        print(done[env.cont_agent_mask])
+
+        # if done.all().bool():
+        #     # Check resetting behavior
+        #     _ = env.reset(control_mask)
+        #     env.step_dynamics(expert_actions[:, :, 0, :])
 
     env.close()
 
@@ -1446,5 +1808,8 @@ if __name__ == "__main__":
         "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
     )
     media.write_video(
-        "obs_video.gif", np.array(agent_obs_frames), fps=10, codec="gif"
+        f"obs_video_env_{env_idx}_agent_{highlight_agent}.gif",
+        np.array(agent_obs_frames),
+        fps=10,
+        codec="gif",
     )

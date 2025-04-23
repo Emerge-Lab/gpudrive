@@ -630,16 +630,16 @@ inline void doneSystem(Engine &ctx,
         done.v = 1;
     }
 
-    // An agent can be done early if it reaches the goal
-    if (done.v != 1 || info.reachedGoal != 1)
-    {
-        float dist = (position.xy() - goal.position).length();
-        if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
-        {
-            done.v = 1;
-            info.reachedGoal = 1;
-        }
-    }
+    // // An agent can be done early if it reaches the goal
+    // if (done.v != 1 || info.reachedGoal != 1)
+    // {
+    //     float dist = (position.xy() - goal.position).length();
+    //     if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+    //     {
+    //         done.v = 1;
+    //         info.reachedGoal = 1;
+    //     }
+    // }
 }
 
 

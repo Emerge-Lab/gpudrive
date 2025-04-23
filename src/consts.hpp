@@ -10,7 +10,7 @@ namespace consts {
 
 inline constexpr madrona::CountT kMaxAgentCount = 64;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 10000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 200;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 128;
 
 inline constexpr bool useEstimatedYaw = true;
 
@@ -22,7 +22,7 @@ inline constexpr float worldLength = 40.f;
 // This factor rescales the length of the vehicles by a tiny amount
 // To account for the fact that noise occasionally puts vehicles into initial
 // collisions. This is a dataset artifact that we are handling here like this.
-inline constexpr float vehicleLengthScale = 0.7f;
+inline constexpr float vehicleLengthScale = 0.9f;
 
 // Each unit of distance forward (+ y axis) rewards the agents by this amount
 inline constexpr float rewardPerDist = 0.05f;
@@ -31,7 +31,7 @@ inline constexpr float rewardPerDist = 0.05f;
 inline constexpr float slackReward = -0.005f;
 
 // Steps per episode
-inline constexpr int32_t episodeLen = 91;
+inline constexpr int32_t episodeLen = 90;
 
 // Number of lidar samples, arranged in circle around agent
 inline constexpr madrona::CountT numLidarSamples = 50;

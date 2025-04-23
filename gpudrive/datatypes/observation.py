@@ -118,6 +118,7 @@ class GlobalEgoState:
         self.pos_x = abs_self_obs_tensor[:, :, 0]
         self.pos_y = abs_self_obs_tensor[:, :, 1]
         self.pos_z = abs_self_obs_tensor[:, :, 2]
+        self.pos_xy = abs_self_obs_tensor[:, :, :2]
         self.rotation_as_quaternion = abs_self_obs_tensor[:, :, 3:7]
         self.rotation_angle = abs_self_obs_tensor[:, :, 7]
         self.goal_x = abs_self_obs_tensor[:, :, 8]

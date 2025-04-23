@@ -113,7 +113,7 @@ def evaluate(data):
         and data.resample_buffer >= data.config.resample_interval
         and data.config.resample_dataset_size > data.vecenv.num_worlds
     ):
-        print(f"Resampling scenarios at global step {data.global_step}")
+        data.msg = f"Resampling scenarios at global step {data.global_step}"
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
 
@@ -208,17 +208,20 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
+        if (
+            sum(data.infos["train/num_completed_episodes"])
+            > data.config.log_window
+        ):
             for k, v in data.infos.items():
                 try:
-                    if "num_completed_episodes" in k:
+                    if "train/num_completed_episodes" in k:
                         data.stats[k] = np.sum(v)
                     else:
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
                     if "goal" in k:
-                        data.stats[f"std_{k}"] = np.std(v)
+                        data.stats[f"{k}_std"] = np.std(v)
                 except:
                     continue
 
@@ -383,6 +386,7 @@ def train(data):
             ):
 
                 data.last_log_time = time.perf_counter()
+
                 data.wandb.log(
                     {
                         "performance/controlled_agent_sps": profile.controlled_agent_sps,
@@ -393,14 +397,17 @@ def train(data):
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
                         "train/learning_rate": data.optimizer.param_groups[0]["lr"],
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        "train/advantages": data.wandb.Histogram(advantages_np),
+                        "train/advantages_var": np.var(advantages_np),
+                        "train/advantages_mean": np.mean(advantages_np),
+                        **{f"{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
 
             if bool(data.stats):
                 data.wandb.log({
-                    **{f"metrics/{k}": v for k, v in data.stats.items()},
+                    **{f"{k}": v for k, v in data.stats.items()},
                 })
 
             # fmt: on
@@ -716,6 +723,7 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
         "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
         "num_params": config.network["num_parameters"],
+        "config": config,
     }
 
     torch.save(state, model_path)

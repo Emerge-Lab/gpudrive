@@ -62,7 +62,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         if (
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
-            or self.config.reward_type == "distance_to_logs"
+            or self.config.reward_type == "follow_waypoints"
             or self.config.reward_type == "reward_conditioned"
         ):
             reward_params.rewardType = (
