@@ -99,6 +99,18 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
     }
 }
 
+static inline void populateVBDTrajectory(Engine &ctx, const Entity &agent, const MapObject &agentInit) {
+    const auto &agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
+    auto &vbd_trajectory = ctx.get<VBDTrajectory>(agent_iface);
+    
+    // Copy VBD trajectories from the map object
+    for (int i = 0; i < consts::episodeLen; i++) {
+        for (int j = 0; j < 5; j++) {
+            vbd_trajectory.trajectories[i][j] = agentInit.vbd_trajectories[i][j];
+        }
+    }
+}
+
 static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
 
@@ -150,6 +162,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<AgentID>(agent_iface) = AgentID{.id = static_cast<int32_t>(agentInit.id)};
 
     populateExpertTrajectory(ctx, agent, agentInit);
+    populateVBDTrajectory(ctx, agent, agentInit);
 
     //Applying custom rules
     ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent) ? ResponseType::Static : ResponseType::Dynamic;

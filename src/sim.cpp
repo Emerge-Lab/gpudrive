@@ -59,6 +59,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<RoadMapId>();
     registry.registerComponent<MapType>();
     registry.registerComponent<MetaData>();
+    registry.registerComponent<VBDTrajectory>();
 
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
@@ -117,6 +118,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Trajectory);
     registry.exportColumn<AgentInterface, MetaData>(
         (uint32_t)ExportID::MetaData);
+    registry.exportColumn<AgentInterface, VBDTrajectory>(
+        (uint32_t)ExportID::VBDTrajectory);
 }
 
 static inline void cleanupWorld(Engine &ctx) {
@@ -627,16 +630,16 @@ inline void doneSystem(Engine &ctx,
         done.v = 1;
     }
 
-    // An agent can be done early if it reaches the goal
-    if (done.v != 1 || info.reachedGoal != 1)
-    {
-        float dist = (position.xy() - goal.position).length();
-        if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
-        {
-            done.v = 1;
-            info.reachedGoal = 1;
-        }
-    }
+    // // An agent can be done early if it reaches the goal
+    // if (done.v != 1 || info.reachedGoal != 1)
+    // {
+    //     float dist = (position.xy() - goal.position).length();
+    //     if (dist < ctx.data().params.rewardParams.distanceToGoalThreshold)
+    //     {
+    //         done.v = 1;
+    //         info.reachedGoal = 1;
+    //     }
+    // }
 }
 
 
