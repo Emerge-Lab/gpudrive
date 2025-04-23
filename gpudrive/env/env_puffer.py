@@ -193,7 +193,6 @@ class PufferGPUDrive(PufferEnv):
         remove_non_vehicles=False,
         obs_radius=50.0,
         use_vbd=False,
-        vbd_model_path=None,
         vbd_trajectory_weight=0.1,
         track_realism_metrics=False,
         track_n_worlds=2,
@@ -244,11 +243,9 @@ class PufferGPUDrive(PufferEnv):
         self.track_n_worlds = track_n_worlds
 
         # VBD
-        self.vbd_model_path = vbd_model_path
         self.vbd_trajectory_weight = vbd_trajectory_weight
         self.use_vbd = use_vbd
-        self.vbd_trajectory_weight = vbd_trajectory_weight
-
+        
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -291,7 +288,6 @@ class PufferGPUDrive(PufferEnv):
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
             ),
             use_vbd=use_vbd,
-            vbd_model_path=vbd_model_path,
             vbd_trajectory_weight=vbd_trajectory_weight,
         )
 

@@ -7,21 +7,20 @@ from itertools import product
 import mediapy as media
 import gymnasium
 
+from gpudrive.env import constants
+from gpudrive.env.config import EnvConfig, RenderConfig
+from gpudrive.env.base_env import GPUDriveGymEnv
+from gpudrive.datatypes.trajectory import LogTrajectory, to_local_frame, VBDTrajectory
+from gpudrive.datatypes.roadgraph import (
+    LocalRoadGraphPoints,
+    GlobalRoadGraphPoints,
+)
 from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
     LidarObs,
     BevObs,
-)
-
-from gpudrive.env import constants
-from gpudrive.env.config import EnvConfig, RenderConfig
-from gpudrive.env.base_env import GPUDriveGymEnv
-from gpudrive.datatypes.trajectory import LogTrajectory, to_local_frame
-from gpudrive.datatypes.roadgraph import (
-    LocalRoadGraphPoints,
-    GlobalRoadGraphPoints,
 )
 from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
@@ -31,7 +30,7 @@ from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.utils.geometry import normalize_min_max
 
-from gpudrive.integrations.vbd.data_utils import process_scenario_data
+from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -149,6 +148,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         Initialize the Versatile Behavior Diffusion (VBD) model and related
         components. Link: https://arxiv.org/abs/2404.02524.
+        When using amortized VBD, we don't need to run the model at runtime.
 
         Args:
             config: Configuration object containing VBD settings.
@@ -159,43 +159,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Set initialization steps - ensure minimum steps for VBD
         if self.use_vbd:
             self.init_steps = max(
-                self.config.init_steps, 10
-            )  # Minimum 10 steps for VBD
+                self.config.init_steps, 11
+            )  # Minimum 11 steps for VBD
         else:
             self.init_steps = self.config.init_steps
 
-        if (
-            self.use_vbd
-            and hasattr(self.config, "vbd_model_path")
-            and self.config.vbd_model_path
-        ):
-            self.vbd_model = self._load_vbd_model(self.config.vbd_model_path)
-
-            self.vbd_trajectories = torch.zeros(
-                (
-                    self.num_worlds,
-                    self.max_agent_count,
-                    self.episode_len - self.init_steps,
-                    5,
-                ),
-                device=self.device,
-                dtype=torch.float32,
-            )
-
-            self._generate_vbd_trajectories()
-        else:
-            self.vbd_model = None
             self.vbd_trajectories = None
-
-    def _load_vbd_model(self, model_path):
-        """Load the Versatile Behavior Diffusion (VBD) model from checkpoint."""
-        from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
-
-        model = VBDTest.load_from_checkpoint(
-            model_path, torch.device(self.device)
-        )
-        _ = model.eval()
-        return model
 
     def _generate_sample_batch(self, init_steps=10):
         """Generate a sample batch for the VBD model."""
@@ -209,6 +178,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -237,6 +207,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
+            device=self.device
         )
         sample_batch = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -1167,10 +1138,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
             mask=mask,
         )
+        roadgraph.one_hot_encode_road_point_types()
 
         if self.config.norm_obs:
             roadgraph.normalize()
-            roadgraph.one_hot_encode_road_point_types()
 
         if mask is not None:
             return torch.cat(
@@ -1245,7 +1216,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _get_vbd_obs(self, mask=None):
         """
-        Get ego-centric VBD trajectory observations for controlled agents using matrix operations.
+        Get ego-centric VBD trajectory observations for controlled agents.
 
         Args:
             mask: Optional mask to filter agents
@@ -1253,7 +1224,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             Tensor of ego-centric VBD trajectories
         """
-        if not self.use_vbd or self.vbd_model is None:
+        if not self.use_vbd or self.vbd_trajectories is None:
             return torch.Tensor().to(self.device)
 
         # Get current agent positions and orientations
@@ -1336,9 +1307,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     out_idx += 1
 
             if self.config.norm_obs:
-                traj_len = self.vbd_trajectories.shape[2]
                 ego_vbd_trajectories = self._normalize_vbd_obs(
-                    ego_vbd_trajectories, traj_len
+                    ego_vbd_trajectories, self.vbd_trajectories.shape[2]
                 )
 
             return ego_vbd_trajectories
@@ -1406,13 +1376,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ] = transformed_traj.reshape(-1)
 
             if self.config.norm_obs:
-                traj_len = self.vbd_trajectories.shape[2]
                 ego_vbd_trajectories = self._normalize_vbd_obs(
-                    ego_vbd_trajectories, traj_len
+                    ego_vbd_trajectories, self.vbd_trajectories.shape[2]
                 )
 
             return ego_vbd_trajectories
-
+    
     def _normalize_vbd_obs(self, trajectories_flat, traj_len):
         """
         Normalize flattened VBD trajectory values to be between -1 and 1, with clipping.
@@ -1480,7 +1449,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if (
             self.use_vbd
-            and self.vbd_model is not None
             and self.config.vbd_in_obs
         ):
             # Add ego-centric VBD trajectories
@@ -1616,9 +1584,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
-        # Generate VBD trajectories for the new batch if VBD is enabled
-        if self.use_vbd and self.vbd_model is not None:
-            self._generate_vbd_trajectories()
+        # Load VBD trajectories for the new batch if VBD is enabled
+        if self.use_vbd:
+            self._load_vbd_trajectories()
 
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(self.cont_agent_mask)
@@ -1631,65 +1599,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
         )
 
-    def _generate_vbd_trajectories(self):
-        """Generate and store trajectory predictions for all scenes using VBD model."""
-        if not self.use_vbd or self.vbd_model is None:
+    def _load_vbd_trajectories(self):
+        """Load VBD trajectories directly from the simulator."""
+        if not self.use_vbd:
             return
-
-        _ = self.reset()
-
-        # Generate sample batch using the limited mask
-        sample_batch = self._generate_sample_batch(init_steps=self.init_steps)
-
-        # VBD model prediction
-        predictions = self.vbd_model.sample_denoiser(sample_batch)
-        vbd_trajectories = (
-            predictions["denoised_trajs"].to(self.device).numpy()
+            
+        # Get VBD trajectories from the simulator
+        vbd_traj = VBDTrajectory.from_tensor(
+            self.sim.vbd_trajectory_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
-        agent_indices = sample_batch["agents_id"]
-
-        self.vbd_trajectories.zero_()
-
-        # Process each world separately
-        for world_idx in range(self.num_worlds):
-            world_agent_indices = agent_indices[world_idx]
-
-            # Filter out negative indices (they're our padding)
-            valid_mask = (
-                world_agent_indices >= 0
-            )  # Boolean mask of valid indices
-            valid_agent_indices = world_agent_indices[
-                valid_mask
-            ]  # Filtered tensor
-
-            if len(valid_agent_indices) > 0:
-                # Update vbd_trajectories(x, y, yaw, vel_x, vel_y) for this world's agents
-                self.vbd_trajectories[
-                    world_idx, valid_agent_indices, :, :2
-                ] = torch.Tensor(
-                    vbd_trajectories[
-                        world_idx, : len(valid_agent_indices), :, :2
-                    ]
-                )
-                self.vbd_trajectories[
-                    world_idx, valid_agent_indices, :, :2
-                ] -= self.sim.world_means_tensor().to_torch()[
-                    world_idx, :2
-                ]  # subtract mean
-                self.vbd_trajectories[
-                    world_idx, valid_agent_indices, :, 2
-                ] = torch.Tensor(
-                    vbd_trajectories[
-                        world_idx, : len(valid_agent_indices), :, 2
-                    ]
-                )
-                self.vbd_trajectories[
-                    world_idx, valid_agent_indices, :, 3:
-                ] = torch.Tensor(
-                    vbd_trajectories[
-                        world_idx, : len(valid_agent_indices), :, 3:5
-                    ]
-                )
+        
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+        vbd_traj.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+        
+        self.vbd_trajectories = vbd_traj.trajectories
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.

@@ -86,11 +86,12 @@ class LogTrajectory:
         num_worlds: int,
         max_agents: int,
         backend="torch",
+        device="cuda",
     ):
         """Creates an LogTrajectory from a tensor."""
         if backend == "torch":
             return cls(
-                expert_traj_tensor.to_torch().clone(), num_worlds, max_agents
+                expert_traj_tensor.to_torch().clone().to(device), num_worlds, max_agents
             )  # Pass the entire tensor
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
@@ -110,3 +111,49 @@ class LogTrajectory:
         return torch.sqrt(
             self.vel_xy[:, :, :, 0] ** 2 + self.vel_xy[:, :, :, 1] ** 2
         )
+
+
+@dataclass
+class VBDTrajectory:
+    """A class to represent the VBD predicted trajectories.
+    Initialized from `vbd_trajectory_tensor` (src/bindings.cpp).
+    Shape: (num_worlds, max_agents, traj_len, 5)
+
+    Attributes:
+        trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 5) containing
+            position (x, y), heading (yaw), and velocity (vx, vy) for each timestep.
+    """
+
+    def __init__(
+        self, vbd_traj_tensor: torch.Tensor
+    ):
+        """Initializes the VBD trajectory with a tensor."""
+        self.pos_x = vbd_traj_tensor[:, :, :, 0]
+        self.pos_y = vbd_traj_tensor[:, :, :, 1]
+        self.pos_xy = torch.stack([self.pos_x, self.pos_y], dim=3)
+        self.yaw = vbd_traj_tensor[:, :, :, 2]
+        self.vel_x = vbd_traj_tensor[:, :, :, 3]
+        self.vel_y = vbd_traj_tensor[:, :, :, 4] 
+
+    @classmethod
+    def from_tensor(
+        cls,
+        vbd_traj_tensor: madrona_gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
+    ):
+        """Creates a VBDTrajectory from a tensor."""
+        if backend == "torch":
+            return cls(vbd_traj_tensor.to_torch().clone().to(device))
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    # def restore_mean(self, mean_x, mean_y):
+    #     """Reapplies the mean to revert back to the original coordinates."""
+    #     # Reshape for broadcasting
+    #     mean_x_reshaped = mean_x.view(-1, 1, 1)
+    #     mean_y_reshaped = mean_y.view(-1, 1, 1)
+        
+    #     # Apply to x and y coordinates
+    #     self.trajectories[..., 0] += mean_x_reshaped
+    #     self.trajectories[..., 1] += mean_y_reshaped
