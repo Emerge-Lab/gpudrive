@@ -94,7 +94,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
         )
         self.episode_len = self.config.episode_len
-        self.reference_path_length = self.log_trajectory.pos_xy.shape[2]
+        self.reference_path_length = self.log_trajectory.pos_xy.shape[2] 
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
@@ -921,7 +921,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 next_step_in_world = torch.clamp(
                     self.step_in_world[:, 0, :].squeeze(-1) + 1,
                     min=0,
-                    max=self.episode_len - 1,
+                    max=self.episode_len,
                 )
                 time_one_hot = torch.zeros(
                     (
@@ -1754,7 +1754,7 @@ if __name__ == "__main__":
 
     print(highlight_agent)
 
-    for t in range(10):
+    for t in range(90):
         print(f"Step: {t+1}")
 
         # Step the environment

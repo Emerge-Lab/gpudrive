@@ -72,7 +72,7 @@ def rollout(env, sim_agent):
 
     pos_x, pos_y, pos_z, heading, _ = get_state(env)
 
-    for time_step in range(env.episode_len - 1 - init_steps):
+    for time_step in range(env.episode_len - init_steps):
         # print(f"\rStep: {time_step}", end="", flush=True)
 
         # Predict actions
