@@ -336,7 +336,9 @@ class PufferGPUDrive(PufferEnv):
         self.was_rendered_in_rollout = {
             env_idx: True for env_idx in range(render_k_scenarios)
         }
+        self.agent_was_rendered_in_rollout = False
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
+        self.agent_frames = []
 
         self.global_step = 0
         self.iters = 0
@@ -507,6 +509,8 @@ class PufferGPUDrive(PufferEnv):
             if self.render:
                 for render_env_idx in range(self.render_k_scenarios):
                     self.log_video_to_wandb(render_env_idx, done_worlds)
+                
+                self.log_agent_obs_to_wandb()
 
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
@@ -650,6 +654,18 @@ class PufferGPUDrive(PufferEnv):
                 zoom_radius=self.zoom_radius,
                 plot_waypoints=self.plot_waypoints,
             )
+            
+            agent_obs = self.env.vis.plot_agent_observation(
+                env_idx=0,
+                agent_idx=0,
+                figsize=(10, 10),
+                trajectory=self.env.reference_path[0, :, :].to(
+                    "cpu"
+                ),
+            )
+            self.agent_frames.append(
+                img_from_fig(agent_obs)
+            )
 
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
@@ -678,8 +694,28 @@ class PufferGPUDrive(PufferEnv):
         """Clear rendering storage."""
         for env_idx in range(self.render_k_scenarios):
             self.frames[env_idx] = []
+            self.agent_frames = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+            self.agent_was_rendered_in_rollout = False
+            
+    def log_agent_obs_to_wandb(self):
+        """Log agent observation to wandb."""
+        
+        frames_array = np.array(self.agent_frames)
+        if frames_array.shape[0] > 10:
+            self.wandb_obj.log(
+                {
+                    f"vis/agent_obs/env_0": wandb.Video(
+                        np.moveaxis(frames_array, -1, 1),
+                        fps=self.render_fps,
+                        format=self.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                }
+            )
+            self.agent_frames = []
+            self.agent_was_rendered_in_rollout = True
 
     def log_video_to_wandb(self, render_env_idx, done_worlds):
         """Log arrays as videos to wandb."""

@@ -1638,7 +1638,7 @@ class MatplotlibVisualizer:
 
         if observation_ego is not None:
             ego_agent_color = (
-                "darkred"
+                "r"
                 if observation_ego.is_collided[env_idx, agent_idx]
                 else REL_OBS_OBJ_COLORS["ego"]
             )
