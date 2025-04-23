@@ -37,6 +37,7 @@ namespace madrona_gpudrive
         uint32_t id;
         MapVector2 mean;
         bool markAsExpert{false};
+        float vbd_trajectories[consts::episodeLen][5];  // x, y, yaw, vx, vy
     };
 
     struct MapRoad
@@ -94,6 +95,12 @@ namespace madrona_gpudrive
         Ignore
     };
 
+    enum class GoalBehaviour {
+        Remove,  // Teleport to padding position
+        Stop,    // Agent remains in place but is marked as done
+        Ignore,  // Agent continues to exist in the scene but is marked as done
+    };
+
     enum class DynamicsModel : uint32_t
     {
         Classic,
@@ -114,6 +121,7 @@ namespace madrona_gpudrive
         float observationRadius;
         RewardParams rewardParams;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
+        GoalBehaviour goalBehaviour = GoalBehaviour::Remove;  // Default to current behavior
         uint32_t maxNumControlledAgents = 10000;                               // Arbitrary high number to by default control all vehicles
         bool IgnoreNonVehicles = false;                                        // Default: false
         FindRoadObservationsWith roadObservationAlgorithm{

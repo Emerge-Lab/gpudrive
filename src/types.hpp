@@ -64,7 +64,7 @@ namespace madrona_gpudrive
         NUM_TYPES = 21,
     };
 
-    struct AgentID 
+    struct AgentID
     {
         int32_t id;
     };
@@ -92,7 +92,7 @@ namespace madrona_gpudrive
 
     struct ResetMap {
         int32_t reset;
-    };   
+    };
 
     struct DeletedAgents {
         int32_t deletedAgents[consts::kMaxAgentCount];
@@ -132,7 +132,7 @@ namespace madrona_gpudrive
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
-        
+
         static inline Action zero()
         {
             return Action{
@@ -191,6 +191,7 @@ namespace madrona_gpudrive
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
+        float goalState;
         float id;
         static inline SelfObservation zero()
         {
@@ -199,11 +200,12 @@ namespace madrona_gpudrive
                 .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
+                .goalState = 0,
                 .id = -1};
         }
     };
 
-    const size_t SelfObservationExportSize = 8; // 1 + 3 + 2 + 1 + 1
+    const size_t SelfObservationExportSize = 9; // 1 + 3 + 2 + 1 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -310,7 +312,7 @@ namespace madrona_gpudrive
     {
         BevObservation obs[consts::bev_rasterization_resolution][consts::bev_rasterization_resolution];
     };
-    
+
     const size_t BevObservationExportSize = 1;
 
     static_assert(sizeof(BevObservations) == BevObservationExportSize * sizeof(float) * consts::bev_rasterization_resolution * consts::bev_rasterization_resolution);
@@ -359,6 +361,28 @@ namespace madrona_gpudrive
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
     static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
+
+    struct VBDTrajectory
+    {
+        // For each agent, store the full VBD trajectory (x, y, yaw, vx, vy)
+        // The tensor has shape [traj_length, 5]
+        float trajectories[consts::episodeLen][5];
+
+        static inline void zero(VBDTrajectory& vbd_traj)
+        {
+            for (int i = 0; i < consts::episodeLen; i++)
+            {
+                for (int j = 0; j < 5; j++)
+                {
+                    vbd_traj.trajectories[i][j] = 0.0f;
+                }
+            }
+        }
+    };
+
+    const size_t VBDTrajectoryExportSize = consts::episodeLen * 5;
+
+    static_assert(sizeof(VBDTrajectory) == sizeof(float) * VBDTrajectoryExportSize);
 
     struct Shape
     {
@@ -447,6 +471,7 @@ namespace madrona_gpudrive
                                 Trajectory,
                                 AgentID,
                                 MetaData,
+                                VBDTrajectory,
 
                                 ControlledState // Drive Logic
 

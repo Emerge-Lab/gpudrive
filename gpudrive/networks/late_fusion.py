@@ -95,11 +95,9 @@ class NeuralNet(
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
 
-        # Indices for unpacking the observation
+        # Ego state base fields
         self.ego_state_idx = constants.EGO_FEAT_DIM
-        self.partner_obs_idx = (
-            constants.PARTNER_FEAT_DIM * self.max_controlled_agents
-        )
+        
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
@@ -107,9 +105,15 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-                    self.partner_obs_idx += 3
+            if "add_goal_state" in self.config:
+                self.ego_state_idx += 1
 
             self.vbd_in_obs = self.config.vbd_in_obs
+            
+        # Indices for unpacking the observation
+        self.partner_obs_idx = self.ego_state_idx + (
+            constants.PARTNER_FEAT_DIM * self.max_observable_agents
+        )
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5
@@ -234,7 +238,6 @@ class NeuralNet(
         else:
             # Without VBD, all remaining elements are road graph observations
             roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
-
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
         )

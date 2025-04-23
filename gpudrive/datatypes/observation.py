@@ -23,6 +23,7 @@ class LocalEgoState:
         rel_goal_x: Relative x-coordinate to the goal.
         rel_goal_y: Relative y-coordinate to the goal.
         is_collided: Whether the agent is in collision with another object.
+        is_goal_reached: Whether the agent has reached its goal position.
         id: Unique identifier of the agent.
     """
 
@@ -37,7 +38,8 @@ class LocalEgoState:
             self.rel_goal_x = self_obs_tensor[:, 4]
             self.rel_goal_y = self_obs_tensor[:, 5]
             self.is_collided = self_obs_tensor[:, 6]
-            self.id = self_obs_tensor[:, 7]
+            self.is_goal_reached = self_obs_tensor[:, 7]
+            self.id = self_obs_tensor[:, 8]
         else:
             self.speed = self_obs_tensor[:, :, 0]
             self.vehicle_length = self_obs_tensor[:, :, 1] * AGENT_SCALE
@@ -46,7 +48,8 @@ class LocalEgoState:
             self.rel_goal_x = self_obs_tensor[:, :, 4]
             self.rel_goal_y = self_obs_tensor[:, :, 5]
             self.is_collided = self_obs_tensor[:, :, 6]
-            self.id = self_obs_tensor[:, :, 7]
+            self.is_goal_reached = self_obs_tensor[:, :, 7]
+            self.id = self_obs_tensor[:, :, 8]
 
     @classmethod
     def from_tensor(

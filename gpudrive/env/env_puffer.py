@@ -46,8 +46,10 @@ class PufferGPUDrive(PufferEnv):
         norm_obs=True,
         lidar_obs=False,
         bev_obs=False,
+        add_goal_state=False,
         reward_type="weighted_combination",
         collision_behavior="ignore",
+        goal_behavior="remove",
         collision_weight=-0.5,
         off_road_weight=-0.5,
         goal_achieved_weight=1,
@@ -56,7 +58,6 @@ class PufferGPUDrive(PufferEnv):
         remove_non_vehicles=True,
         obs_radius=50.0,
         use_vbd=False,
-        vbd_model_path=None,
         vbd_trajectory_weight=0.1,
         render=False,
         render_3d=True,
@@ -99,11 +100,9 @@ class PufferGPUDrive(PufferEnv):
         self.zoom_radius = zoom_radius
 
         # VBD
-        self.vbd_model_path = vbd_model_path
         self.vbd_trajectory_weight = vbd_trajectory_weight
         self.use_vbd = use_vbd
-        self.vbd_trajectory_weight = vbd_trajectory_weight
-
+        
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -119,8 +118,10 @@ class PufferGPUDrive(PufferEnv):
             reward_type=reward_type,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
+            add_goal_state=add_goal_state,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
+            goal_behavior=goal_behavior,
             dist_to_goal_threshold=dist_to_goal_threshold,
             polyline_reduction_threshold=polyline_reduction_threshold,
             remove_non_vehicles=remove_non_vehicles,
@@ -135,7 +136,6 @@ class PufferGPUDrive(PufferEnv):
                 torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
             ),
             use_vbd=use_vbd,
-            vbd_model_path=vbd_model_path,
             vbd_trajectory_weight=vbd_trajectory_weight,
         )
 

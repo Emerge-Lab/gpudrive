@@ -25,11 +25,13 @@ class Metadata:
 
     @classmethod
     def from_tensor(
-        cls, metadata_tensor: madrona_gpudrive.madrona.Tensor, backend="torch"
+        cls, metadata_tensor: madrona_gpudrive.madrona.Tensor, 
+        backend="torch",
+        device="cuda"
     ):
         """Creates a Metadata object from the metadata_tensor."""
         if backend == "torch":
-            return cls(metadata_tensor.to_torch().clone())
+            return cls(metadata_tensor.to_torch().clone().to(device))
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
     

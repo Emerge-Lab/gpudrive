@@ -901,6 +901,16 @@ Tensor Manager::metadataTensor() const {
     );
 }
 
+Tensor Manager::vbdTrajectoryTensor() const {
+    return impl_->exportTensor(ExportID::VBDTrajectory, TensorElementType::Float32,
+                               {
+                                   impl_->numWorlds,
+                                   consts::kMaxAgentCount,
+                                   consts::episodeLen,
+                                   5,
+                               });
+}
+
 void Manager::triggerReset(int32_t world_idx)
 {
     WorldReset reset {
