@@ -49,7 +49,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_test_mini"
+  group: " "
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -106,10 +106,10 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
+  render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 10 # Render every k iterations
-  render_k_scenarios: 3 # Number of scenarios to render
+  render_interval: 150 # Render every k iterations
+  render_k_scenarios: 2 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100
