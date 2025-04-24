@@ -174,8 +174,11 @@ class PufferGPUDrive(PufferEnv):
         norm_obs=True,
         lidar_obs=False,
         bev_obs=False,
-        add_reference_path=False,
-        add_reference_speed=False,
+        add_previous_action=False,
+        guidance=True,
+        add_reference_path=True,
+        add_reference_speed=True,
+        add_reference_heading=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
         waypoint_distance_scale=0.05,
@@ -230,6 +233,12 @@ class PufferGPUDrive(PufferEnv):
         self.goal_achieved_weight = goal_achieved_weight
         self.init_mode = init_mode
         self.reward_type = reward_type
+        
+        # Expert guidance
+        self.guidance = guidance
+        self.add_reference_path = add_reference_path
+        self.add_reference_speed = add_reference_speed
+        self.add_reference_heading = add_reference_heading
 
         self.render = render
         self.render_interval = render_interval
@@ -265,8 +274,11 @@ class PufferGPUDrive(PufferEnv):
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
+            add_previous_action=add_previous_action,
+            guidance=guidance,
             add_reference_path=add_reference_path,
             add_reference_speed=add_reference_speed,
+            add_reference_heading=add_reference_heading,
             prob_reference_dropout=prob_reference_dropout,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,

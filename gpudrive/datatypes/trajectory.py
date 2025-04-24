@@ -114,7 +114,6 @@ class LogTrajectory:
             self.vel_xy[:, :, :, 0] ** 2 + self.vel_xy[:, :, :, 1] ** 2
         )
 
-
 @dataclass
 class VBDTrajectory:
     """A class to represent the VBD predicted trajectories.
@@ -134,6 +133,7 @@ class VBDTrajectory:
         self.yaw = vbd_traj_tensor[:, :, :, 2]
         self.vel_x = vbd_traj_tensor[:, :, :, 3]
         self.vel_y = vbd_traj_tensor[:, :, :, 4]
+        self.ref_speed = self.comp_reference_speed()
 
     @classmethod
     def from_tensor(
@@ -148,6 +148,11 @@ class VBDTrajectory:
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
+    def comp_reference_speed(self):
+        """Returns the average speed of the trajectory."""
+        return torch.sqrt(
+            self.vel_x ** 2 + self.vel_y ** 2
+        )
     # def restore_mean(self, mean_x, mean_y):
     #     """Reapplies the mean to revert back to the original coordinates."""
     #     # Reshape for broadcasting

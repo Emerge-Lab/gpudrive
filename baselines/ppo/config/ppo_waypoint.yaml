@@ -2,19 +2,29 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_100
+data_dir: data/processed/wosac/validation_json_1
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
+  add_previous_action: true
+  
+  # Guidance through expert suggestions
+  guidance: true # If true, the model will be guided by expert suggestions
+  add_reference_path: true # If true, a reference path is added to the ego observation
+  add_reference_speed: true # If true, the reference speed (scalar) is added to the ego observation
+  add_reference_heading: false # If true, the reference heading (scalar) is added to the ego observation
+  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
+
+  # Environment settings
   remove_non_vehicles: false
   collision_behavior: "ignore"
   goal_behavior: "ignore"
@@ -41,15 +51,10 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
   vbd_in_obs: false
 
-  # Planning guidance
-  add_reference_path: true # If true, a reference path is added to the ego observation
-  add_reference_speed: true # If true, the reference speed (scalar) is added to the ego observation
-  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
-
 wandb:
   entity: ""
   project: "humanlike"
-  group: "debug"
+  group: "wosac_scale_100_base"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 

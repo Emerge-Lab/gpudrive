@@ -816,44 +816,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self, mask=None) -> torch.Tensor:
-        """Get the ego state."""
-
-        if not self.config.ego_state:
+    def _get_guidance(self, mask=None) -> torch.Tensor:
+        """Receive (expert) suggestions from pre-trained expert or logs."""
+        
+        if not self.config.guidance:
             return torch.Tensor().to(self.device)
-
-        ego_state = LocalEgoState.from_tensor(
-            self_obs_tensor=self.sim.self_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-            mask=mask,
-        )
-
-        if self.config.norm_obs:
-            ego_state.normalize()
-
-        base_fields = [
-            ego_state.speed.unsqueeze(-1),
-            ego_state.vehicle_length.unsqueeze(-1),
-            ego_state.vehicle_width.unsqueeze(-1),
-            ego_state.is_collided.unsqueeze(-1),
-        ]
-
+        
+        guidance = []
+        
         if mask is None:
-
-            base_fields.append(
-                self.previous_action_value_tensor[:, :, :2]
-                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
-            )
-
+        
             if self.config.add_reference_speed:
 
                 avg_ref_speed = (
                     self.log_trajectory.ref_speed.clone().mean(axis=-1)
                     / constants.MAX_SPEED
                 )
-
-                base_fields.append(avg_ref_speed.unsqueeze(-1))
+                guidance.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
 
@@ -865,7 +844,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 global_ego_pos_xy = state[:, :, :2]
                 global_ego_yaw = state[:, :, 7]
                 glob_reference_xy = self.log_trajectory.pos_xy
-                agent_indices = torch.arange(self.max_cont_agents)
                 local_reference_xy = torch.empty_like(glob_reference_xy)
                 valid_timesteps_mask = self.log_trajectory.valids.bool()
 
@@ -921,65 +899,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Flatten the dimensions for stacking
-                base_fields.append(reference_path.flatten(start_dim=2))
+                guidance.append(reference_path.flatten(start_dim=2))
+            
+            if self.config.add_reference_heading:
+                pass
+            
+            return torch.cat(guidance, dim=-1)
 
-                # batch_size = local_reference_xy.shape[0]
-                # num_points = local_reference_xy.shape[1]
-                # time_steps = local_reference_xy.shape[2]
-
-                # Create dropout mask for the time dimension
-                # Shape: [batch_size, num_points, time_steps, 1]
-                # point_dropout_mask = torch.bernoulli(
-                #     torch.ones(
-                #         batch_size,
-                #         num_points,
-                #         time_steps,
-                #         1,
-                #         device=local_reference_xy.device,
-                #     )
-                #     * (1 - self.config.prob_reference_dropout)
-                # ).bool()
-
-                # Apply dropout mask
-                # self.local_reference_xy = (
-                #     local_reference_xy * point_dropout_mask
-                # )
-
-            if self.config.reward_type == "reward_conditioned":
-
-                # Create expanded weights for all environments
-                # Expand from [max_agents, 3] to [num_worlds, max_agents]
-                collision_weights = self.reward_weights_tensor[:, 0].expand(
-                    self.num_worlds, -1
-                )
-                goal_weights = self.reward_weights_tensor[:, 1].expand(
-                    self.num_worlds, -1
-                )
-                off_road_weights = self.reward_weights_tensor[:, 2].expand(
-                    self.num_worlds, -1
-                )
-
-                full_fields = base_fields + [
-                    collision_weights,
-                    goal_weights,
-                    off_road_weights,
-                ]
-                return torch.stack(full_fields).permute(1, 2, 0)
-            else:
-                return torch.cat(base_fields, dim=-1)
         else:
-
-            base_fields.append(
-                self.previous_action_value_tensor[mask][:, :2]
-                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
-            )
-
+            
             if self.config.add_reference_speed:
                 avg_ref_speed = (
                     self.log_trajectory.ref_speed[mask].clone().mean(axis=-1)
                     / constants.MAX_SPEED
                 )
-                base_fields.append(avg_ref_speed.unsqueeze(-1))
+                guidance.append(avg_ref_speed.unsqueeze(-1))
 
             if self.config.add_reference_path:
 
@@ -1049,13 +983,60 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Stack
-                base_fields.append(reference_path.flatten(start_dim=1))
+                guidance.append(reference_path.flatten(start_dim=1))
+            
+            if self.config.add_reference_heading:
+                pass
+               
+        return torch.cat(guidance, dim=1)
+        
+    def _get_ego_state(self, mask=None) -> torch.Tensor:
+        """Get the ego state."""
 
+        if not self.config.ego_state:
+            return torch.Tensor().to(self.device)
+
+        ego_state = LocalEgoState.from_tensor(
+            self_obs_tensor=self.sim.self_observation_tensor(),
+            backend=self.backend,
+            device=self.device,
+            mask=mask,
+        )
+
+        if self.config.norm_obs:
+            ego_state.normalize()
+
+        base_fields = [
+            ego_state.speed.unsqueeze(-1),
+            ego_state.vehicle_length.unsqueeze(-1),
+            ego_state.vehicle_width.unsqueeze(-1),
+            ego_state.is_collided.unsqueeze(-1),
+        ]
+        
+        if mask is None:
+            
+            if self.config.add_previous_action:
+                normalized_prev_actions = (
+                    self.previous_action_value_tensor[:, :, :2] / constants.MAX_ACTION_VALUE
+                )
+                base_fields.append(normalized_prev_actions)
+            
             if self.config.reward_type == "reward_conditioned":
-                # For masked agents, we need to extract agent indices from the mask
-                world_indices, agent_indices = torch.where(mask)
+                
+                full_fields = base_fields + [
+                    self.reward_weights_tensor.expand(self.num_worlds, -1)
+                ]
+                return torch.stack(full_fields).permute(1, 2, 0)
+            else:
+                return torch.cat(base_fields, dim=-1)
+        else:
 
-                # Get the reward weights for these specific agents
+            base_fields.append(
+                self.previous_action_value_tensor[mask][:, :2]
+                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
+            )
+            if self.config.reward_type == "reward_conditioned":
+                _, agent_indices = torch.where(mask)
                 weights_for_masked_agents = self.reward_weights_tensor.to(
                     self.device
                 )[agent_indices]
@@ -1422,10 +1403,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
-        # Base observations
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
+        guidance = self._get_guidance(mask)
 
         if self.use_vbd and self.config.vbd_in_obs:
             # Add ego-centric VBD trajectories
@@ -1446,6 +1427,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ego_states,
                     partner_observations,
                     road_map_observations,
+                    guidance,
                 ),
                 dim=-1,
             )
@@ -1695,7 +1677,9 @@ if __name__ == "__main__":
     env_config = EnvConfig(
         dynamics_model="classic",
         reward_type="follow_waypoints",
+        guidance=True,
         add_reference_path=True,
+        add_reference_speed=True,
     )
     render_config = RenderConfig()
 
