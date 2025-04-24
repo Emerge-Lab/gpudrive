@@ -31,11 +31,16 @@ static inline void resetAgentInterface(Engine &ctx, Entity agent_iface, EntityTy
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-    auto xCoord = ctx.get<Trajectory>(agent_iface).positions[0].x;
-    auto yCoord = ctx.get<Trajectory>(agent_iface).positions[0].y;
-    auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].x;
-    auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].y;
-    auto heading = ctx.get<Trajectory>(agent_iface).headings[0];
+
+    // Using warmup steps to reset
+    uint32_t initSteps = ctx.data().params.initSteps;
+    initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+
+    auto xCoord = ctx.get<Trajectory>(agent_iface).positions[initSteps].x;
+    auto yCoord = ctx.get<Trajectory>(agent_iface).positions[initSteps].y;
+    auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[initSteps].x;
+    auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[initSteps].y;
+    auto heading = ctx.get<Trajectory>(agent_iface).headings[initSteps];
 
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
@@ -46,7 +51,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     }
     ctx.get<Action>(agent_iface) = getZeroAction(ctx.data().params.dynamicsModel);
 
-    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent));
+    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent), consts::episodeLen - initSteps);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);

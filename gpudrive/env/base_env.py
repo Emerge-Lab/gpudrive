@@ -159,6 +159,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
         params = self._set_goal_behavior(params)
+        self.init_steps = getattr(self.config, "init_steps", 0)
+        params.initSteps = self.init_steps
 
         return params
 
