@@ -30,6 +30,15 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
+    add_previous_action: bool = False  # Previous action time agent has taken
+    
+    # Guidance settings; these are used to direct the agent's behavior and 
+    # will be included in the observations if set to True
+    guidance: bool = False  # Include reference path in observations
+    # Ways to guide the agent
+    add_reference_speed: bool = False  # speed time series
+    add_reference_path: bool = False # (x, y) coordinates of reference path
+    add_reference_heading: bool = False # heading time series
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -93,12 +102,7 @@ class EnvConfig:
 
     # Goal behavior settings
     goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
-
-    # Reference points settings
-    add_reference_speed: bool = (
-        False  # Include reference speed in observations
-    )
-    add_reference_path: bool = False
+    
     prob_reference_dropout: float = (
         0.0  # Probability of dropping reference points
     )

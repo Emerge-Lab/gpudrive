@@ -1,4 +1,5 @@
 import numpy as np
+import madrona_gpudrive
 
 """Predefined constants for the environment."""
 
@@ -22,12 +23,14 @@ MAX_ROAD_LINE_SEGMENT_LEN = 100
 MAX_ROAD_SCALE = 100
 
 # Feature shape constants
-EGO_FEAT_DIM = 6  # Ego state base fields
+EGO_FEAT_DIM = 4  # Ego state base fields
 PARTNER_FEAT_DIM = 6
 ROAD_GRAPH_FEAT_DIM = 13
 
+ROAD_GRAPH_TOP_K = madrona_gpudrive.kMaxAgentMapObservationsCount
+
 # Dataset constants
-LOG_TRAJECTORY_LEN = 91
+LOG_TRAJECTORY_LENGTH = 91
 
 # BEV observation constants
 BEV_RASTERIZATION_RESOLUTION = 200
