@@ -2,9 +2,13 @@
 
 
 ## Requirements
-Prerequisite
+Prerequisite to run the eval
 ```
-pip install --no-deps waymo-open-dataset-tf-2-12-0==1.6.4
+pip install --no-deps waymo-open-dataset-tf-2-12-0==1.6.6
+```
+
+Requirement to process the data
+```
 pip install --no-deps git+https://github.com/waymo-research/waymax.git@main#egg=waymo-waymax
 ```
 
@@ -24,5 +28,5 @@ python examples/eval/extract_dataset.py --data_dir data/raw --save_dir data/proc
 ## Evaluation
 Run eval with
 ```
-python wosac_eval.py
+python run_wosac_eval.py
 ```
