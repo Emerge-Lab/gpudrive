@@ -95,7 +95,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         self.episode_len = self.config.episode_len
         self.reference_path_length = (
-            self.log_trajectory.pos_xy.shape[2] - self.config.init_steps
+            self.log_trajectory.pos_xy.shape[2]
         )
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
@@ -718,6 +718,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if not hasattr(self, "previous_action_value_tensor"):
             # Initialize with current actions on first call
+            self.previous_action_value_tensor = (
+                self.action_value_tensor.clone()
+            )
+
+        if self.config.dynamics_model == "state" and self.previous_action_value_tensor.shape != self.action_value_tensor.shape:
             self.previous_action_value_tensor = (
                 self.action_value_tensor.clone()
             )
@@ -1719,7 +1724,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="delta_local",
+        dynamics_model="state",
         reward_type="follow_waypoints",
         add_reference_path=True,
         init_mode="womd_tracks_to_predict"
@@ -1748,7 +1753,7 @@ if __name__ == "__main__":
     print(f"Number of controlled agents: {control_mask.sum()}")
 
     # Rollout
-    obs = env.reset()
+    obs = env.reset(mask=control_mask)
 
     sim_frames = []
     agent_obs_frames = []
@@ -1756,9 +1761,21 @@ if __name__ == "__main__":
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
-    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
+    idx_to_id = GlobalEgoState.from_tensor(
+        env.sim.absolute_self_observation_tensor(),
+        device=env.device,
+    ).id
+    
+    highlight_agent = torch.where(idx_to_id[env_idx] == 2293)[0].item()
+
+    agent_positions = []
+    agent_positions.append(GlobalEgoState.from_tensor(
+        env.sim.absolute_self_observation_tensor(),
+        device=env.device,
+    ).pos_xy[env_idx, highlight_agent])
 
     print(f"Highlighted agent: {highlight_agent}")
+    print(f"Position: {agent_positions[-1]}")
 
     for t in range(90):
         print(f"Step: {t+1}")
@@ -1766,12 +1783,16 @@ if __name__ == "__main__":
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t - 1, :])
-        print(f"Reference path shape: {env.reference_path.shape}")
+
+        agent_positions.append(GlobalEgoState.from_tensor(
+            env.sim.absolute_self_observation_tensor(),
+            device=env.device,
+        ).pos_xy[env_idx, highlight_agent])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
-            zoom_radius=80,
+            zoom_radius=50,
             time_steps=[t],
             center_agent_indices=[highlight_agent],
             plot_waypoints=True,
@@ -1781,7 +1802,7 @@ if __name__ == "__main__":
             env_idx=env_idx,
             agent_idx=highlight_agent,
             figsize=(10, 10),
-            trajectory=env.reference_path[env_idx, highlight_agent, :, :].to(
+            trajectory=env.reference_path[highlight_agent, :, :].to(
                 env.device
             ),
         )
@@ -1798,6 +1819,7 @@ if __name__ == "__main__":
 
         print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
         print(f"R_t+1: {reward[env_idx, highlight_agent]}")
+        print(f"Position: {agent_positions[-1]}")
 
         done = env.get_dones()
         info = env.get_infos()
