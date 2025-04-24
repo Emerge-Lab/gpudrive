@@ -672,6 +672,12 @@ class Experience:
         self.b_values = self.b_values[b_flat]
         self.b_returns = self.b_advantages + self.b_values
 
+        if self.b_obs.max() > 1.0 or self.b_obs.min() < -1.0:
+            print(
+                f"Warning: The batch of observations contains features outside the range [-1, 1]."
+                f"Please check your observation normalization; min {self.b_obs.min()}, max {self.b_obs.max()}"
+            )
+
 
 class Utilization(Thread):
     def __init__(self, delay=1, maxlen=20):
