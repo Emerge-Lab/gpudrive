@@ -91,11 +91,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device,
         )
         self.episode_len = self.config.episode_len
-        self.reference_path_length = (
-            self.log_trajectory.pos_xy.shape[2] - self.config.init_steps
-        )
+        self.reference_path_length = self.log_trajectory.pos_xy.shape[2] 
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
@@ -873,7 +872,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if self.config.add_reference_speed:
 
                 avg_ref_speed = (
-                    self.log_trajectory.clone().ref_speed.mean(axis=-1)
+                    self.log_trajectory.ref_speed.clone().mean(axis=-1)
                     / constants.MAX_SPEED
                 )
 
@@ -1598,6 +1597,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device,
         )
 
     def _load_vbd_trajectories(self):
@@ -1754,7 +1754,7 @@ if __name__ == "__main__":
 
     print(highlight_agent)
 
-    for t in range(10):
+    for t in range(90):
         print(f"Step: {t+1}")
 
         # Step the environment

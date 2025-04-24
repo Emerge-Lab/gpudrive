@@ -82,7 +82,8 @@ class NeuralNet(
         act_func="tanh",
         max_controlled_agents=64,
         obs_dim=2984,  # Size of the flattened observation vector (hardcoded)
-        config=None,  # Optional config
+        config=None,  # Optional config,
+        **kwargs,
     ):
         super().__init__()
         self.input_dim = input_dim
