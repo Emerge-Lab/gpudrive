@@ -14,7 +14,8 @@ from gpudrive.utils.checkpoint import load_agent
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from waymo_open_dataset.protos import sim_agents_submission_pb2
-from eval.wosac_eval import WOSACMetrics
+# from eval.wosac_eval import WOSACMetrics
+from eval.wosac_eval_origin import WOSACMetrics
 
 
 def get_state(env):
