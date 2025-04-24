@@ -817,7 +817,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return action_space
 
     def _get_guidance(self, mask=None) -> torch.Tensor:
-        """Receive (expert) suggestions from pre-trained expert or logs."""
+        """Receive (expert) suggestions from pre-trained model or logs."""
         
         if not self.config.guidance:
             return torch.Tensor().to(self.device)
@@ -825,14 +825,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         guidance = []
         
         if mask is None:
+            
+            # Provide agent with index to pay attention to through one-hot encoding
+            # all elements are 0, except for the next time step
+            next_step_in_world = torch.clamp(
+                self.step_in_world[:, 0, :].squeeze(-1) + 1,
+                min=0,
+                max=self.episode_len,
+            )
+            time_one_hot = torch.zeros(
+                (
+                    self.num_worlds,
+                    self.max_agent_count,
+                    self.reference_path_length,
+                    1,
+                ),
+                device=self.device,
+            )
+            time_one_hot[:, :, next_step_in_world, :] = 1.0
         
-            if self.config.add_reference_speed:
+            valid_timesteps_mask = self.log_trajectory.valids.bool()
 
-                avg_ref_speed = (
-                    self.log_trajectory.ref_speed.clone().mean(axis=-1)
-                    / constants.MAX_SPEED
-                )
-                guidance.append(avg_ref_speed.unsqueeze(-1))
+            if self.config.add_reference_speed:
+                reference_speed = (self.log_trajectory.ref_speed.clone() / constants.MAX_SPEED).unsqueeze(-1)
+                reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
+                guidance.append(reference_speed)
 
             if self.config.add_reference_path:
 
@@ -845,8 +862,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 global_ego_yaw = state[:, :, 7]
                 glob_reference_xy = self.log_trajectory.pos_xy
                 local_reference_xy = torch.empty_like(glob_reference_xy)
-                valid_timesteps_mask = self.log_trajectory.valids.bool()
-
+                
                 # Transform reference path to be relative to current
                 # agent positions and heading
                 for world_idx in range(self.num_worlds):
@@ -872,23 +888,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ~valid_timesteps_mask.expand_as(local_reference_xy)
                 ] = constants.INVALID_ID
 
-                # Provide agent with index to pay attention to through one-hot encoding
-                next_step_in_world = torch.clamp(
-                    self.step_in_world[:, 0, :].squeeze(-1) + 1,
-                    min=0,
-                    max=self.episode_len,
-                )
-                time_one_hot = torch.zeros(
-                    (
-                        self.num_worlds,
-                        self.max_agent_count,
-                        self.reference_path_length,
-                        1,
-                    ),
-                    device=self.device,
-                )
-                time_one_hot[:, :, next_step_in_world, :] = 1.0
-
                 # Make unnormalized reference path available for plotting
                 self.reference_path = torch.cat(
                     (local_ref_xy_orig, time_one_hot), dim=-1
@@ -899,24 +898,35 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Flatten the dimensions for stacking
-                guidance.append(reference_path.flatten(start_dim=2))
+                guidance.append(reference_path)
             
             if self.config.add_reference_heading:
                 pass
             
-            return torch.cat(guidance, dim=-1)
+            return torch.cat(guidance, dim=-1).flatten(start_dim=2)
 
         else:
+            batch_size = mask.sum()
+            batch_indices = torch.arange(batch_size)
             
+            # Provide agent with index to pay attention to through one-hot encoding
+            next_step_in_world = torch.clamp(
+                self.step_in_world[mask] + 1, min=0, max=self.episode_len
+            )
+            time_one_hot = torch.zeros(
+                (batch_size, self.reference_path_length, 1),
+                device=self.device,
+            )
+            time_one_hot[batch_indices, next_step_in_world] = 1.0
+            
+            valid_timesteps_mask = self.log_trajectory.valids.bool()[mask]
+
             if self.config.add_reference_speed:
-                avg_ref_speed = (
-                    self.log_trajectory.ref_speed[mask].clone().mean(axis=-1)
-                    / constants.MAX_SPEED
-                )
-                guidance.append(avg_ref_speed.unsqueeze(-1))
+                reference_speed = (self.log_trajectory.ref_speed[mask].clone() / constants.MAX_SPEED).unsqueeze(-1)
+                reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
+                guidance.append(reference_speed)
 
             if self.config.add_reference_path:
-
                 # State information
                 state = (
                     self.sim.absolute_self_observation_tensor()
@@ -926,10 +936,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 global_ego_pos_xy = state[:, :2]  # Shape: [batch, 2]
                 global_ego_yaw = state[:, 7]  # Shape: [batch]
                 global_reference_xy = self.log_trajectory.pos_xy.clone()[mask]
-                valid_timesteps_mask = self.log_trajectory.valids.bool()[mask]
-                batch_size = global_reference_xy.shape[0]
-                batch_indices = torch.arange(batch_size)
-
+                
                 # Translate all points to a local coordinate frame
                 translated = global_reference_xy - global_ego_pos_xy.unsqueeze(
                     1
@@ -963,16 +970,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ~valid_timesteps_mask.expand_as(local_reference_xy)
                 ] = constants.INVALID_ID
 
-                # Provide agent with index to pay attention to through one-hot encoding
-                next_step_in_world = torch.clamp(
-                    self.step_in_world[mask] + 1, min=0, max=self.episode_len
-                )
-                time_one_hot = torch.zeros(
-                    (batch_size, self.reference_path_length, 1),
-                    device=self.device,
-                )
-                time_one_hot[batch_indices, next_step_in_world] = 1.0
-
                 # Stack
                 reference_path = torch.cat(
                     (local_reference_xy, time_one_hot), dim=2
@@ -983,12 +980,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Stack
-                guidance.append(reference_path.flatten(start_dim=1))
+                guidance.append(reference_path)
             
             if self.config.add_reference_heading:
                 pass
                
-        return torch.cat(guidance, dim=1)
+        return torch.cat(guidance, dim=-1).flatten(start_dim=1)
         
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
@@ -1675,9 +1672,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 if __name__ == "__main__":
 
     env_config = EnvConfig(
-        dynamics_model="classic",
         reward_type="follow_waypoints",
         guidance=True,
+        guidance_mode="log_replay",
         add_reference_path=True,
         add_reference_speed=True,
     )
