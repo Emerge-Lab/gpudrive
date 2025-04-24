@@ -94,7 +94,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
         )
         self.episode_len = self.config.episode_len
-        self.reference_path_length = self.log_trajectory.pos_xy.shape[2] 
+        self.reference_path_length = self.log_trajectory.pos_xy.shape[2]
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
@@ -433,20 +433,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.init_steps > 0:
             self.advance_sim_with_log_playback(
                 init_steps=self.init_steps,
-                # render_init=self.render_config.render_init,
             )
 
         return self.get_obs(mask)
 
-    def get_dones(self, world_time_steps=None):
+    def get_dones(self):
         """
         Returns tensor indicating which agents have terminated.
-
-        Args:
-            world_time_steps: Optional tensor [num_worlds] with current timestep per world.
-
-        Returns:
-            torch.Tensor: Boolean tensor [num_worlds, num_agents] where True indicates done.
         """
         terminal = (
             self.sim.done_tensor()
@@ -455,28 +448,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .squeeze(dim=2)
             .to(torch.float)
         )
-
-        if (
-            world_time_steps is not None
-            and self.config.reward_type == "follow_waypoints"
-            and self.config.waypoint_distance_scale > 0.0
-        ):
-            # Find last valid timestep for each agent, this is the ground-truth episode length
-            agent_episode_length = 90 - torch.argmax(
-                self.log_trajectory.valids.squeeze(-1).flip(2), dim=2
-            )
-
-            expanded_time_steps = world_time_steps.unsqueeze(1).expand_as(
-                agent_episode_length
-            )
-            return terminal.bool() & (
-                expanded_time_steps >= agent_episode_length
-            )
-
-        else:
-            return terminal.bool()
+        return terminal.bool()
 
     def get_infos(self):
+        """
+        Returns the info tensor for the current step.
+        """
         return Info.from_tensor(
             self.sim.info_tensor(),
             backend=self.backend,
