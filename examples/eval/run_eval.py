@@ -1,43 +1,24 @@
 import torch
 import dataclasses
 import os
+import sys
 import mediapy
-import numpy as np
 from tqdm import tqdm
-import json
-
-from gpudrive.networks.late_fusion import NeuralNet
 
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
-from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
-from gpudrive.utils.config import load_config
 from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.utils.checkpoint import load_agent
 
 # WOSAC
-import sys
-import os
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from waymo_open_dataset.protos import sim_agents_submission_pb2
 from eval.wosac_eval import WOSACMetrics
 
 
-# Settings
-max_agents = 64
-num_envs = 2
-device = "cpu"
-num_runs = 1
-num_rollouts = 1
-init_steps = 10
-
-DATA_JSON = "data/processed/wosac/validation_json_100"
-DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
-
-
 def get_state(env):
+    """Obtain raw agent states."""
     ego_state = GlobalEgoState.from_tensor(
         env.sim.absolute_self_observation_tensor(),
         backend=env.backend,
@@ -55,8 +36,15 @@ def get_state(env):
     )
 
 
-def rollout(env, sim_agent):
-    frames = {f"env_{i}": [] for i in range(num_envs)}
+def rollout(
+    env,
+    sim_agent,
+    init_steps,
+    num_envs,
+    max_agents,
+    device,
+):
+    """Rollout agent in the environment and return the scenario rollouts."""
 
     next_obs = env.reset()
 
@@ -73,7 +61,6 @@ def rollout(env, sim_agent):
     pos_x, pos_y, pos_z, heading, _ = get_state(env)
 
     for time_step in range(env.episode_len - init_steps):
-        # print(f"\rStep: {time_step}", end="", flush=True)
 
         # Predict actions
         action, _, _, _ = sim_agent(next_obs[control_mask])
@@ -145,7 +132,35 @@ def rollout(env, sim_agent):
 
 
 if __name__ == "__main__":
-    config = load_config("baselines/ppo/config/ppo_waypoint").environment
+
+    # Settings
+    MAX_AGENTS = 64
+    NUM_ENVS = 1
+    DEVICE = "cpu"
+    NUM_BATCHES = 1
+    NUM_ROLLOUTS = 10
+    INIT_STEPS = 10
+    DATASET_SIZE = 100
+
+    DATA_JSON = "data/processed/wosac/validation_json_1"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_1"
+
+    # Create data loader
+    val_loader = SceneDataLoader(
+        root=DATA_JSON,
+        batch_size=NUM_ENVS,
+        dataset_size=DATASET_SIZE,
+        sample_with_replacement=True,
+        file_prefix="",
+    )
+
+    # Load agent
+    agent = load_agent(
+        path_to_cpt="checkpoints/model_waypoint_rs__S_1__04_23_19_37_26_618_003500.pt",
+    )
+
+    # Obtain config directly from the agent checkpoint
+    config = agent.config
 
     # Configs
     env_config = dataclasses.replace(
@@ -171,42 +186,30 @@ if __name__ == "__main__":
         ),
         remove_non_vehicles=config.remove_non_vehicles,
         init_mode="womd_tracks_to_predict",
-        init_steps=init_steps,
+        init_steps=INIT_STEPS,
         goal_behavior="stop",
         add_reference_path=config.add_reference_path,
         add_reference_speed=config.add_reference_speed,
     )
 
-    os.makedirs("videos", exist_ok=True)
-
-    # Create data loader
-    val_loader = SceneDataLoader(
-        root=DATA_JSON,
-        batch_size=num_envs,
-        dataset_size=100,
-        sample_with_replacement=True,
-        file_prefix="",
-    )
-
-    # Load agent
-    agent = load_agent(
-        path_to_cpt="checkpoints/model_waypoint_rs__S_100__04_22_19_50_09_856_002083.pt",
-    )
-
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=val_loader,
-        max_cont_agents=max_agents,
-        device="cpu",
+        max_cont_agents=MAX_AGENTS,
+        device=DEVICE,
     )
     wosac_metrics = WOSACMetrics()
 
-    for _ in tqdm(range(num_runs)):
-        for _ in range(num_rollouts):
+    for _ in tqdm(range(NUM_BATCHES)):
+        for _ in range(NUM_ROLLOUTS):
             # try:
             scenario_ids, scenario_rollouts, scenario_rollout_masks = rollout(
                 env=env,
                 sim_agent=agent,
+                init_steps=INIT_STEPS,
+                num_envs=NUM_ENVS,
+                max_agents=MAX_AGENTS,
+                device=DEVICE,
             )
             # except Exception as e:
             #     print(f"Error during rollout: {e}")
