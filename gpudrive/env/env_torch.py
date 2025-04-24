@@ -820,14 +820,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Receive (expert) suggestions from pre-trained model or logs."""
 
         if not self.config.guidance:
-            return torch.Tensor().to(self.device)
+            return torch.zeros(0, device=self.device)
 
         guidance = []
 
         if mask is None:
 
+            valid_timesteps_mask = self.log_trajectory.valids.bool()
+
             # Provide agent with index to pay attention to through one-hot encoding
-            # all elements are 0, except for the next time step
             next_step_in_world = torch.clamp(
                 self.step_in_world[:, 0, :].squeeze(-1) + 1,
                 min=0,
@@ -844,8 +845,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
             time_one_hot[:, :, next_step_in_world, :] = 1.0
 
-            valid_timesteps_mask = self.log_trajectory.valids.bool()
-
             if self.config.add_reference_speed:
                 reference_speed = (
                     self.log_trajectory.ref_speed.clone() / constants.MAX_SPEED
@@ -854,14 +853,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_speed)
 
             if self.config.add_reference_path:
-
-                state = (
-                    self.sim.absolute_self_observation_tensor()
-                    .to_torch()
-                    .clone()
+                states = GlobalEgoState.from_tensor(
+                    self.sim.absolute_self_observation_tensor(),
+                    self.backend,
+                    self.device,
                 )
-                global_ego_pos_xy = state[:, :, :2]
-                global_ego_yaw = state[:, :, 7]
                 glob_reference_xy = self.log_trajectory.pos_xy
                 local_reference_xy = torch.empty_like(glob_reference_xy)
 
@@ -875,8 +871,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                             global_pos_xy=glob_reference_xy[
                                 world_idx, agent_idx, :, :
                             ],
-                            ego_pos=global_ego_pos_xy[world_idx, agent_idx],
-                            ego_yaw=global_ego_yaw[world_idx, agent_idx],
+                            ego_pos=states.pos_xy[world_idx, agent_idx],
+                            ego_yaw=states.rotation_angle[
+                                world_idx, agent_idx
+                            ],
                             device=self.device,
                         )
 
@@ -898,8 +896,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_path = torch.cat(
                     (local_reference_xy, time_one_hot), dim=-1
                 )
-
-                # Flatten the dimensions for stacking
                 guidance.append(reference_path)
 
             if self.config.add_reference_heading:
@@ -939,33 +935,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_speed)
 
             if self.config.add_reference_path:
-                # State information
-                state = (
-                    self.sim.absolute_self_observation_tensor()
-                    .to_torch()
-                    .clone()[mask]
-                ).to(self.device)
-                global_ego_pos_xy = state[:, :2]  # Shape: [batch, 2]
-                global_ego_yaw = state[:, 7]  # Shape: [batch]
+                states = GlobalEgoState.from_tensor(
+                    self.sim.absolute_self_observation_tensor(),
+                    self.backend,
+                    self.device,
+                )
+
                 global_reference_xy = self.log_trajectory.pos_xy.clone()[mask]
 
                 # Translate all points to a local coordinate frame
-                translated = global_reference_xy - global_ego_pos_xy.unsqueeze(
-                    1
-                )
-
-                # Create rotation matrices for all agents at once
-                cos_yaw = torch.cos(global_ego_yaw)
-                sin_yaw = torch.sin(global_ego_yaw)
+                translated = global_reference_xy - states.pos_xy[
+                    mask
+                ].unsqueeze(1)
 
                 # Create batch of rotation matrices: [batch, 2, 2]
+                cos_yaw = torch.cos(states.rotation_angle[mask])
+                sin_yaw = torch.sin(states.rotation_angle[mask])
                 rotation_matrices = torch.stack(
                     [
                         torch.stack([cos_yaw, sin_yaw], dim=1),
                         torch.stack([-sin_yaw, cos_yaw], dim=1),
                     ],
                     dim=1,
-                )  # Shape: [batch, 2, 2]
+                )
 
                 # Apply rotation to all points
                 local_reference_xy = torch.bmm(
