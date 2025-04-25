@@ -902,7 +902,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_headings = (
                     self.log_trajectory.yaw.clone()
                     / constants.MAX_ORIENTATION_RAD
-                ).unsqueeze(-1)
+                )
                 reference_headings[
                     ~valid_timesteps_mask
                 ] = constants.INVALID_ID
@@ -988,7 +988,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_headings = (
                     self.log_trajectory.yaw[mask].clone()
                     / constants.MAX_ORIENTATION_RAD
-                ).unsqueeze(-1)
+                )
                 reference_headings[
                     ~valid_timesteps_mask
                 ] = constants.INVALID_ID
@@ -1687,6 +1687,7 @@ if __name__ == "__main__":
         guidance_mode="log_replay",
         add_reference_path=True,
         add_reference_speed=True,
+        add_reference_heading=True,
     )
     render_config = RenderConfig()
 
