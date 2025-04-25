@@ -18,7 +18,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_previous_action: true
 
   # Guidance through expert suggestions
-  guidance: true # If true, the model will be guided by expert suggestions
+  guidance: true # If true, the agent will be guided by expert suggestions
   guidance_mode: "log_replay" # Options: "log_replay", "vbd_amortized", "vbd_online"
   add_reference_pos_xy: true # If true, a reference path is added to the ego observation
   add_reference_speed: true # If true, the reference speeds are added to the ego observation
