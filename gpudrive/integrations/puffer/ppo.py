@@ -157,11 +157,18 @@ def evaluate(data):
                 c = lstm_c[:, env_id]
                 actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
-                lstm_c[:, env_id] = c
+                lstm_c[:, env_id] = c              
             elif hasattr(data.vecenv,'history_dict'):
                 obs_and_history = data.vecenv.get_history_batch(combine=True)
-                actions, logprob, _, value = policy(obs_and_history)
+               
+                if config.network['class_name'] == "LateFusion":
+                    actions, logprob, _, value = policy(obs_and_history) 
+                elif config.network['class_name'] == "SequentialContextTransformer":
+                    history = data.vecenv.get_history_batch(combine=False)
+                    actions, logprob, _, value = policy(obs_device,history)
+
                 obs_device = obs_and_history
+
             else:
                 actions, logprob, _, value = policy(obs_device)
 
@@ -336,7 +343,7 @@ def train(data):
                 )
 
             with profile.learn:
-                data.optimizer.zero_grad()
+                data.optimizer.zero_grad()   
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
                     data.policy.parameters(), config.max_grad_norm
@@ -411,6 +418,7 @@ def train(data):
                 )
 
             if bool(data.stats):
+                print(f"logging data stats {data.stats.items()}")
                 data.wandb.log({
                     **{f"metrics/{k}": v for k, v in data.stats.items()},
                 })
@@ -620,7 +628,6 @@ class Experience:
         ptr = self.ptr
         indices = torch.where(mask)[0].cpu().numpy()[: self.batch_size - ptr]
         end = ptr + len(indices)
-
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
         self.actions_np[ptr:end] = action.cpu().numpy()[indices]
