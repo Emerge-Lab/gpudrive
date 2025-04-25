@@ -57,18 +57,36 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     lstm = policy.lstm if hasattr(policy, "lstm") else None
 
     # Rollout buffer
-    experience = Experience(
-        config.batch_size,
-        config.bptt_horizon,
-        config.minibatch_size,
-        obs_shape,
-        obs_dtype,
-        atn_shape,
-        config.cpu_offload,
-        config.device,
-        lstm,
-        total_agents,
-    )
+    if 'include_history_in_obs' in config:
+        experience = Experience(
+            config.batch_size,
+            config.bptt_horizon,
+            config.minibatch_size,
+            obs_shape,
+            obs_dtype,
+            atn_shape,
+            config.cpu_offload,
+            config.device,
+            lstm,
+            total_agents,
+            config.include_history_in_obs,
+            vecenv.max_seq_len,
+            vecenv.partner_obs_shape[1],
+        )
+    else:
+        experience = Experience(
+            config.batch_size,
+            config.bptt_horizon,
+            config.minibatch_size,
+            obs_shape,
+            obs_dtype,
+            atn_shape,
+            config.cpu_offload,
+            config.device,
+            lstm,
+            total_agents,
+        )
+
 
     uncompiled_policy = policy
 
@@ -159,15 +177,15 @@ def evaluate(data):
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c              
             elif hasattr(data.vecenv,'history_dict'):
-                obs_and_history = data.vecenv.get_history_batch(combine=True)
-               
+                        
                 if config.network['class_name'] == "LateFusion":
+                    obs_and_history = data.vecenv.get_history_batch(combine=True)
                     actions, logprob, _, value = policy(obs_and_history) 
+                    obs_device = obs_and_history
                 elif config.network['class_name'] == "SequentialContextTransformer":
+                    obs_and_history = data.vecenv.get_history_batch(combine=True)
                     history = data.vecenv.get_history_batch(combine=False)
                     actions, logprob, _, value = policy(obs_device,history)
-
-                obs_device = obs_and_history
 
             else:
                 actions, logprob, _, value = policy(obs_device)
@@ -196,17 +214,47 @@ def evaluate(data):
             #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
             # Add to rollout buffer
-            experience.store(
-                obs_device,
-                value,
-                actions,
-                logprob,
-                reward,
-                terminal,
-                env_id,
-                mask,
-            )
-        
+            if 'include_history_in_obs' in config:
+                if config['include_history_in_obs']:
+                    experience.store(
+                        obs_device,
+                        value,
+                        actions,
+                        logprob,
+                        reward,
+                        terminal,
+                        env_id,
+                        mask,
+                    )
+                else:
+                    history=data.vecenv.get_history_batch()
+                    experience.store(
+                        obs_device,
+                        value,
+                        actions,
+                        logprob,
+                        reward,
+                        terminal,
+                        env_id,
+                        mask,
+                        history
+
+                    )
+
+
+
+            else:
+                experience.store(
+                    obs_device,
+                    value,
+                    actions,
+                    logprob,
+                    reward,
+                    terminal,
+                    env_id,
+                    mask,
+                )
+            
             # Add metrics for logging
             for i in info: 
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
@@ -266,6 +314,9 @@ def train(data):
                 val = experience.b_values[mb]
                 adv = experience.b_advantages[mb]
                 ret = experience.b_returns[mb]
+                if config.network['class_name'] == "SequentialContextTransformer":
+                    history =experience.b_history[mb]
+                
 
             with profile.train_forward:
                 if experience.lstm_h is not None:
@@ -277,13 +328,20 @@ def train(data):
                         lstm_state[1].detach(),
                     )
                 elif hasattr(data.vecenv,'history_dict'):
-                    _, newlogprob, entropy, newvalue = data.policy(
-                        obs.reshape(
-                            -1, *data.vecenv.single_observation_space.shape
-                        ),
-                        action=atn,
-                    )
-                    
+                    if config.network['class_name'] == "LateFusion":
+                        _, newlogprob, entropy, newvalue = data.policy(
+                            obs.reshape(
+                                -1, *data.vecenv.single_observation_space.shape
+                            ),
+                            action=atn,
+                        )
+                    elif config.network['class_name'] == "SequentialContextTransformer":
+                        #history = data.vecenv.get_history_batch(combine=False)
+
+                        obs=obs.reshape(
+                                -1, *data.vecenv.single_observation_space.shape
+                            )
+                        _, newlogprob, entropy, newvalue  = data.policy(obs,history,action=atn)
 
                     
                 else:
@@ -562,6 +620,9 @@ class Experience:
         device="cuda",
         lstm=None,
         lstm_total_agents=0,
+        include_history_in_obs = True,
+        max_seq_len =0,
+        partner_obs_size = 0
     ):
         if minibatch_size is None:
             minibatch_size = batch_size
@@ -578,6 +639,18 @@ class Experience:
         self.actions = torch.zeros(
             batch_size, *atn_shape, dtype=int, pin_memory=pin
         )
+        self.include_history_in_obs = include_history_in_obs
+
+        if not self.include_history_in_obs:
+            self.history = torch.zeros(  
+            batch_size, 
+            max_seq_len, 
+            partner_obs_size,   
+            dtype=obs_dtype,
+            pin_memory=pin,
+            device=device if not pin else "cpu",)
+
+
         self.logprobs = torch.zeros(batch_size, pin_memory=pin)
         self.rewards = torch.zeros(batch_size, pin_memory=pin)
         self.dones = torch.zeros(batch_size, pin_memory=pin)
@@ -623,7 +696,7 @@ class Experience:
     def full(self):
         return self.ptr >= self.batch_size
 
-    def store(self, obs, value, action, logprob, reward, done, env_id, mask):
+    def store(self, obs, value, action, logprob, reward, done, env_id, mask,history = None):
         # Mask learner and Ensure indices do not exceed batch size
         ptr = self.ptr
         indices = torch.where(mask)[0].cpu().numpy()[: self.batch_size - ptr]
@@ -631,6 +704,8 @@ class Experience:
         self.obs[ptr:end] = obs.to(self.obs.device)[indices]
         self.values_np[ptr:end] = value.cpu().numpy()[indices]
         self.actions_np[ptr:end] = action.cpu().numpy()[indices]
+        if history is not None:
+            self.history[ptr:end] = torch.from_numpy(history.cpu().numpy()[indices])
         self.logprobs_np[ptr:end] = logprob.cpu().numpy()[indices]
         self.rewards_np[ptr:end] = reward.cpu().numpy()[indices]
         self.dones_np[ptr:end] = done.cpu().numpy()[indices]
@@ -683,6 +758,8 @@ class Experience:
         self.b_dones = self.b_dones[b_idxs]
         self.b_values = self.b_values[b_flat]
         self.b_returns = self.b_advantages + self.b_values
+        if not self.include_history_in_obs:
+            self.b_history = self.history[b_idxs].squeeze(2)
 
 
 class Utilization(Thread):
@@ -702,9 +779,10 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            self.gpu_util.append(torch.cuda.utilization())
-            free, total = torch.cuda.mem_get_info()
-            self.gpu_mem.append(free / total)
+            if torch.cuda.is_available():
+                self.gpu_util.append(torch.cuda.utilization())
+                free, total = torch.cuda.mem_get_info()
+                self.gpu_mem.append(free / total)
             time.sleep(self.delay)
 
     def stop(self):
