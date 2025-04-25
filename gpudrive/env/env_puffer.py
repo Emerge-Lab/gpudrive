@@ -176,14 +176,15 @@ class PufferGPUDrive(PufferEnv):
         bev_obs=False,
         add_previous_action=False,
         guidance=True,
-        add_reference_path=True,
+        add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
-        waypoint_distance_scale=0.05,
-        speed_distance_scale=0.0,
-        jerk_smoothness_scale=0.0,
+        guidance_pos_xy_weight=0.01,
+        guidance_speed_weight=0.0,
+        guidance_heading_weight=0.0,
+        smoothness_weight=0.0,
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
@@ -233,10 +234,10 @@ class PufferGPUDrive(PufferEnv):
         self.goal_achieved_weight = goal_achieved_weight
         self.init_mode = init_mode
         self.reward_type = reward_type
-        
+
         # Expert guidance
         self.guidance = guidance
-        self.add_reference_path = add_reference_path
+        self.add_reference_pos_xy = add_reference_pos_xy
         self.add_reference_speed = add_reference_speed
         self.add_reference_heading = add_reference_heading
 
@@ -268,15 +269,16 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
             reward_type=reward_type,
-            waypoint_distance_scale=waypoint_distance_scale,
-            speed_distance_scale=speed_distance_scale,
-            jerk_smoothness_scale=jerk_smoothness_scale,
+            guidance_pos_xy_weight=guidance_pos_xy_weight,
+            guidance_speed_weight=guidance_speed_weight,
+            guidance_heading_weight=guidance_speed_weight,
+            smoothness_weight=smoothness_weight,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
             add_previous_action=add_previous_action,
             guidance=guidance,
-            add_reference_path=add_reference_path,
+            add_reference_pos_xy=add_reference_pos_xy,
             add_reference_speed=add_reference_speed,
             add_reference_heading=add_reference_heading,
             prob_reference_dropout=prob_reference_dropout,
@@ -445,10 +447,10 @@ class PufferGPUDrive(PufferEnv):
         reward_controlled = reward[self.controlled_agent_mask]
 
         # Store human-like and internal rewards separately
-        if self.reward_type == "follow_waypoints":
+        if self.reward_type == "guided_autonomy":
             self.human_like_rewards[
                 self.live_agent_mask
-            ] += self.env.distance_penalty[self.live_agent_mask]
+            ] += self.env.guidance_error[self.live_agent_mask]
             self.internal_rewards[
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
@@ -787,7 +789,7 @@ class PufferGPUDrive(PufferEnv):
         )
         # [batch, time, 1]
         valid_mask = (
-            self.env.log_trajectory.valids[done_worlds]
+            self.env.reference_trajectory.valids[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]
@@ -797,14 +799,14 @@ class PufferGPUDrive(PufferEnv):
         # Take human logs (ground-truth)
         # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
         ref_pos_xy_np = (
-            self.env.log_trajectory.pos_xy[done_worlds]
+            self.env.reference_trajectory.pos_xy[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]
         )
         # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
         ref_headings_np = (
-            self.env.log_trajectory.yaw[done_worlds]
+            self.env.reference_trajectory.yaw[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]

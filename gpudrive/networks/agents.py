@@ -45,24 +45,26 @@ class Agent(nn.Module):
         if self.config["reward_type"] == "reward_conditioned":
             self.ego_state_idx += 3
         if self.config["add_previous_action"]:
-            self.ego_state_idx += 2 
-            
+            self.ego_state_idx += 2
+
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )
-            
+
         self.road_map_idx = self.partner_obs_idx + (
             constants.ROAD_GRAPH_TOP_K * constants.ROAD_GRAPH_FEAT_DIM
         )
-        
+
         if self.config["guidance"]:
             self.guidance_feature_dim = 0
             # One-hot encoding signalling the next time step
-            self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH 
-            if self.config["add_reference_path"]:  
-                self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH * 2
+            self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
+            if self.config["add_reference_pos_xy"]:
+                self.guidance_feature_dim += (
+                    constants.LOG_TRAJECTORY_LENGTH * 2
+                )
             if self.config["add_reference_speed"]:
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
             if self.config["add_reference_heading"]:
@@ -93,7 +95,7 @@ class Agent(nn.Module):
             nn.Dropout(self.dropout),
             layer_init(nn.Linear(embed_dim, embed_dim)),
         )
-        
+
         self.guidance_embed = nn.Sequential(
             layer_init(nn.Linear(self.guidance_feature_dim, embed_dim)),
             nn.LayerNorm(embed_dim),
@@ -145,7 +147,10 @@ class Agent(nn.Module):
         )
 
         # Concatenate the embeddings
-        z = torch.cat([ego_embed, partner_max_pool, road_max_pool, guidance_embed], dim=-1)
+        z = torch.cat(
+            [ego_embed, partner_max_pool, road_max_pool, guidance_embed],
+            dim=-1,
+        )
 
         # Pass to the actor and critic networks
         logits = self.actor(z)
@@ -170,7 +175,7 @@ class Agent(nn.Module):
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
         roadgraph_obs = obs_flat[:, self.partner_obs_idx : self.road_map_idx]
-        guidance = obs_flat[:, self.road_map_idx : ]
+        guidance = obs_flat[:, self.road_map_idx :]
 
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
@@ -210,7 +215,7 @@ class SeparateActorCriticAgent(nn.Module):
             else constants.EGO_FEAT_DIM
         )
         if self.config[
-            "add_reference_path"
+            "add_reference_pos_xy"
         ]:  # Every agent receives a reference path
             self.ego_state_idx += 91 * 2
 

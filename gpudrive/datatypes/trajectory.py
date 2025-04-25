@@ -112,7 +112,12 @@ class LogTrajectory:
         """Returns the average speed of the trajectory."""
         return torch.sqrt(
             self.vel_xy[:, :, :, 0] ** 2 + self.vel_xy[:, :, :, 1] ** 2
-        )
+        ).unsqueeze(-1)
+
+    @property
+    def length(self):
+        """Returns the length of the trajectory."""
+        return self.pos_xy.shape[2]
 
 
 @dataclass
@@ -128,14 +133,16 @@ class VBDTrajectory:
 
     def __init__(self, vbd_traj_tensor: torch.Tensor):
         """Initializes the VBD trajectory with a tensor."""
-        self.pos_x = vbd_traj_tensor[:, :, :, 0]
-        self.pos_y = vbd_traj_tensor[:, :, :, 1]
-        self.pos_xy = torch.stack([self.pos_x, self.pos_y], dim=3)
-        self.yaw = vbd_traj_tensor[:, :, :, 2]
-        self.vel_x = vbd_traj_tensor[:, :, :, 3]
-        self.vel_y = vbd_traj_tensor[:, :, :, 4]
+        self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
+        self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
+        self.pos_xy = vbd_traj_tensor[:, :, :, :2]
+        self.yaw = vbd_traj_tensor[:, :, :, 2].unsqueeze(-1)
+        self.vel_x = vbd_traj_tensor[:, :, :, 3].unsqueeze(-1)
+        self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
+        # Assumption: All timesteps are valid
+        self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
     @classmethod
     def from_tensor(
@@ -153,6 +160,11 @@ class VBDTrajectory:
     def comp_reference_speed(self):
         """Returns the average speed of the trajectory."""
         return torch.sqrt(self.vel_x**2 + self.vel_y**2)
+
+    @property
+    def length(self):
+        """Returns the length of the trajectory."""
+        return self.pos_xy.shape[2]
 
     # def restore_mean(self, mean_x, mean_y):
     #     """Reapplies the mean to revert back to the original coordinates."""
