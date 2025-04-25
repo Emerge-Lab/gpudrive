@@ -14,6 +14,7 @@ from gpudrive.utils.checkpoint import load_agent
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from waymo_open_dataset.protos import sim_agents_submission_pb2
+
 # from eval.wosac_eval import WOSACMetrics
 from eval.wosac_eval_origin import WOSACMetrics
 
@@ -157,48 +158,50 @@ if __name__ == "__main__":
 
     # Load agent
     agent = load_agent(
-        path_to_cpt="checkpoints/model_waypoint_rs__S_1__04_23_19_37_26_618_003500.pt",
+        path_to_cpt="checkpoints/model_waypoint_rs__S_1__04_24_19_08_49_096_000850.pt",
     )
 
-    # Obtain config directly from the agent checkpoint
-    config = agent.config
+    # Override default environment settings to match those the agent was trained with
+    default_config = EnvConfig()
+    config_dict = {
+        field.name: getattr(agent.config, field.name)
+        for field in dataclasses.fields(EnvConfig)
+        if hasattr(agent.config, field.name)
+        and getattr(agent.config, field.name)
+        != getattr(default_config, field.name)
+    }
 
-    # Configs
-    env_config = dataclasses.replace(
-        EnvConfig(),
-        ego_state=config.ego_state,
-        road_map_obs=config.road_map_obs,
-        partner_obs=config.partner_obs,
-        reward_type=config.reward_type,
-        norm_obs=config.norm_obs,
-        dynamics_model=config.dynamics_model,
-        collision_behavior=config.collision_behavior,
-        polyline_reduction_threshold=config.polyline_reduction_threshold,
-        obs_radius=config.obs_radius,
-        steer_actions=torch.round(
+    # Add the fixed overrides specific to WOSAC evaluation
+    fixed_overrides = {
+        "steer_actions": torch.round(
             torch.linspace(
-                -torch.pi / 3, torch.pi / 3, config.action_space_steer_disc
+                -torch.pi / 3,
+                torch.pi / 3,
+                agent.config.action_space_steer_disc,
             ),
             decimals=3,
         ),
-        accel_actions=torch.round(
-            torch.linspace(-4.0, 4.0, config.action_space_accel_disc),
+        "accel_actions": torch.round(
+            torch.linspace(-4.0, 4.0, agent.config.action_space_accel_disc),
             decimals=3,
         ),
-        remove_non_vehicles=config.remove_non_vehicles,
-        init_mode="womd_tracks_to_predict",
-        init_steps=INIT_STEPS,
-        goal_behavior="stop",
-        add_reference_path=config.add_reference_path,
-        add_reference_speed=config.add_reference_speed,
+        "init_mode": "womd_tracks_to_predict",
+        "init_steps": INIT_STEPS,
+        "goal_behavior": "stop",
+    }
+
+    env_config = dataclasses.replace(
+        default_config, **config_dict, **fixed_overrides
     )
 
+    # Make environment
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=val_loader,
         max_cont_agents=MAX_AGENTS,
         device=DEVICE,
     )
+
     wosac_metrics = WOSACMetrics()
 
     for _ in tqdm(range(NUM_BATCHES)):
