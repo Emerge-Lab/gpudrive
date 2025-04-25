@@ -208,7 +208,7 @@ class PufferGPUDrive(PufferEnv):
         render_format="mp4",
         render_fps=15,
         zoom_radius=50,
-        plot_waypoints=False,
+        plot_guidance_pos_xy=False,
         buf=None,
         **kwargs,
     ):
@@ -248,7 +248,7 @@ class PufferGPUDrive(PufferEnv):
         self.render_format = render_format
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
-        self.plot_waypoints = plot_waypoints
+        self.plot_guidance_pos_xy = plot_guidance_pos_xy
         self.track_realism_metrics = track_realism_metrics
         self.track_n_worlds = track_n_worlds
 
@@ -662,7 +662,7 @@ class PufferGPUDrive(PufferEnv):
                 env_indices=envs_to_render,
                 time_steps=time_steps,
                 zoom_radius=self.zoom_radius,
-                plot_waypoints=self.plot_waypoints,
+                plot_guidance_pos_xy=self.plot_guidance_pos_xy,
             )
 
             agent_obs = self.env.vis.plot_agent_observation(

@@ -116,7 +116,7 @@ train:
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100
-  plot_waypoints: true
+  plot_guidance_pos_xy: true
 
 vec:
   backend: "native" # Only native is currently supported

@@ -127,8 +127,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.vis = MatplotlibVisualizer(
             sim_object=self.sim,
             controlled_agent_mask=self.cont_agent_mask,
+            reference_trajectory=self.reference_trajectory,
             goal_radius=self.config.dist_to_goal_threshold,
-            backend=self.backend,
             num_worlds=self.num_worlds,
             render_config=self.render_config,
             env_config=self.config,
@@ -138,7 +138,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """Configure the reference trajectory based on the guidance mode."""
         self.guidance_mode = self.config.guidance_mode
 
-        if self.guidance_mode == "log_replay":
+        if self.guidance_mode == "vbd_amortized":
+            trajectory_tensor = self.sim.vbd_trajectory_tensor()
+            self.reference_trajectory = VBDTrajectory.from_tensor(
+                trajectory_tensor, self.backend, self.device
+            )
+        elif self.guidance_mode == "vbd_online":
+            # TODO: Add support for 'vbd_online' mode
+            raise ValueError(
+                f"Unsupported guidance mode: {self.guidance_mode}."
+            )
+        else:  # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
             self.reference_trajectory = LogTrajectory.from_tensor(
                 trajectory_tensor,
@@ -146,18 +156,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.max_agent_count,
                 self.backend,
                 self.device,
-            )
-        elif self.guidance_mode == "vbd_amortized":
-            trajectory_tensor = self.sim.vbd_trajectory_tensor()
-            self.reference_trajectory = VBDTrajectory.from_tensor(
-                trajectory_tensor, self.backend, self.device
-            )
-        else:
-            # TODO: Add support for 'vbd_online' mode
-            supported_modes = "'log_replay', 'vbd_amortized'"
-            raise ValueError(
-                f"Unknown guidance mode: '{self.guidance_mode}'. "
-                f"Available options: {supported_modes}."
             )
 
         # Length of the guidance trajectory
@@ -1523,7 +1521,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         # Reset static scenario data for the visualizer
-        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+        self.vis.initialize_static_scenario_data(
+            controlled_agent_mask=self.cont_agent_mask,
+            reference_trajectory=self.reference_trajectory.clone(),
+        )
 
     def swap_data_batch(self, data_batch=None):
         """
@@ -1554,7 +1555,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         # Reset static scenario data for the visualizer
-        self.vis.initialize_static_scenario_data(self.cont_agent_mask)
+        self.vis.initialize_static_scenario_data(
+            controlled_agent_mask=self.cont_agent_mask,
+            reference_trajectory=self.reference_trajectory.clone(),
+        )
 
         # Receive guidance trajectories from the new batch of scenarios
         self.setup_guidance()
@@ -1657,7 +1661,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="log_replay",  # "log_replay",
+        guidance_mode="vbd_amortized",  # "log_replay",
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
@@ -1710,7 +1714,7 @@ if __name__ == "__main__":
             zoom_radius=80,
             time_steps=[t],
             center_agent_indices=[highlight_agent],
-            plot_waypoints=True,
+            plot_guidance_pos_xy=True,
         )
 
         agent_obs = env.vis.plot_agent_observation(
