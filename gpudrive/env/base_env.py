@@ -121,6 +121,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             # Bypasses all gpudrive initialization rules and directly reads from the tracks_to_predict
             # flag in the WOMD dataset metadata
             params.readFromTracksToPredict = True
+            params.isStaticAgentControlled = True
         elif self.config.init_mode == "all_objects":
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False

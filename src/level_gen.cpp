@@ -118,18 +118,6 @@ static inline void populateVBDTrajectory(Engine &ctx, const Entity &agent, const
 
 static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-
-    // Static agents are those that are not tracks to predict
-    if (ctx.data().params.readFromTracksToPredict) {
-        if (ctx.get<MetaData>(agent_iface).isTrackToPredict == 1) {
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-    
-    // Original logic for other initialization modes
     bool isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold;
     return !ctx.data().params.isStaticAgentControlled and isStatic;
 }
@@ -137,10 +125,17 @@ static inline bool isAgentStatic(Engine &ctx, Entity agent) {
 static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExpert = false) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     
-    // If readFromTracksToPredict is true, base controllability on isTrackToPredict flag
+    // If readFromTracksToPredict is true, control all valid objects
     if (ctx.data().params.readFromTracksToPredict) {
-        return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
-               (ctx.get<MetaData>(agent_iface).isTrackToPredict == 1);
+        uint32_t initSteps = ctx.data().params.initSteps;
+        initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+        
+        if (ctx.get<Trajectory>(agent_iface).valids[initSteps] == 0) {
+            return false;
+        }
+        else {
+            return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents;
+        }
     }
     
     // Original logic for other initialization modes
@@ -374,6 +369,9 @@ void createCameraEntity(Engine &ctx)
 
 static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
 {
+    uint32_t initSteps = ctx.data().params.initSteps;
+    initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+    
     // When readFromTracksToPredict is enabled, we want to create all agents
     // This overrides all other rules except for the check against deleted agents
     if (ctx.data().params.readFromTracksToPredict) {
@@ -387,6 +385,11 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
             }
         }
         
+        if (agentInit.valid[initSteps] == 0)
+        {
+            return false;
+        }        
+        
         return true;
     }
     
@@ -397,7 +400,7 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
         return false;
     }
     
-    if (ctx.data().params.initOnlyValidAgentsAtFirstStep && !agentInit.valid[0])
+    if (ctx.data().params.initOnlyValidAgentsAtFirstStep && !agentInit.valid[initSteps])
     {
         return false;
     }
