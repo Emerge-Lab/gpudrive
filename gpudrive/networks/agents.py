@@ -66,6 +66,7 @@ class Agent(nn.Module):
                     constants.LOG_TRAJECTORY_LENGTH * 2
                 )
             if self.config["add_reference_speed"]:
+                #TODO: Change to reference path-length (90) if using the vbd_amortized trajs
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
             if self.config["add_reference_heading"]:
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH

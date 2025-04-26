@@ -847,12 +847,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
                 guidance.append(reference_speed)
 
-            if self.config.add_reference_pos_xy:
+            states = None
+            if self.config.add_reference_pos_xy or self.config.add_reference_heading:
                 states = GlobalEgoState.from_tensor(
                     self.sim.absolute_self_observation_tensor(),
                     self.backend,
                     self.device,
                 )
+
+            if self.config.add_reference_pos_xy:
                 glob_reference_xy = self.reference_trajectory.pos_xy
                 local_reference_xy = torch.empty_like(glob_reference_xy)
 
@@ -894,13 +897,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_path)
 
             if self.config.add_reference_heading:
-                reference_headings = (
-                    self.reference_trajectory.yaw.clone()
-                    / constants.MAX_ORIENTATION_RAD
-                )
-                reference_headings[
-                    ~valid_timesteps_mask
-                ] = constants.INVALID_ID
+                reference_headings = self.reference_trajectory.yaw.clone()
+                
+                # Transform headings to local coordinate frame
+                for world_idx in range(self.num_worlds):
+                    for agent_idx in range(self.max_cont_agents):
+                        # Subtract current agent heading to get relative heading
+                        reference_headings[world_idx, agent_idx] -= states.rotation_angle[world_idx, agent_idx]
+                
+                # Normalize
+                reference_headings = reference_headings / constants.MAX_ORIENTATION_RAD
+                
+                # Set invalid timesteps to -1
+                reference_headings[~valid_timesteps_mask] = constants.INVALID_ID
                 guidance.append(reference_headings)
 
             return torch.cat(guidance, dim=-1).flatten(start_dim=2)
@@ -925,6 +934,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 mask
             ]
 
+            states = None
+            if self.config.add_reference_pos_xy or self.config.add_reference_heading:
+                states = GlobalEgoState.from_tensor(
+                    self.sim.absolute_self_observation_tensor(),
+                    self.backend,
+                    self.device,
+                )
+
             if self.config.add_reference_speed:
                 reference_speed = (
                     self.reference_trajectory.ref_speed[mask].clone()
@@ -934,12 +951,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_speed)
 
             if self.config.add_reference_pos_xy:
-                states = GlobalEgoState.from_tensor(
-                    self.sim.absolute_self_observation_tensor(),
-                    self.backend,
-                    self.device,
-                )
-
                 global_reference_xy = self.reference_trajectory.pos_xy.clone()[
                     mask
                 ]
@@ -986,13 +997,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_path)
 
             if self.config.add_reference_heading:
-                reference_headings = (
-                    self.reference_trajectory.yaw[mask].clone()
-                    / constants.MAX_ORIENTATION_RAD
-                )
-                reference_headings[
-                    ~valid_timesteps_mask
-                ] = constants.INVALID_ID
+                reference_headings = self.reference_trajectory.yaw[mask].clone()
+                        
+                # Translate headings to local coordinate frame by subtracting current global agent headings
+                reference_headings = reference_headings - states.rotation_angle[mask].view(-1, 1, 1)
+                
+                # Normalize by 2pi to ensure values are in [-1, 1]
+                reference_headings = reference_headings / constants.MAX_ORIENTATION_RAD
+                
+                # Set invalid timesteps to -1
+                reference_headings[~valid_timesteps_mask] = constants.INVALID_ID
                 guidance.append(reference_headings)
 
         return torch.cat(guidance, dim=-1).flatten(start_dim=1)
@@ -1661,7 +1675,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="vbd_amortized",  # "log_replay",
+        guidance_mode="log_replay",  # "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
