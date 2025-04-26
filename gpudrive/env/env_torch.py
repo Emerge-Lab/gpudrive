@@ -1714,7 +1714,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/temp",
+        root="data/processed/examples",
         batch_size=1,
         dataset_size=1,
         sample_with_replacement=False,
@@ -1743,7 +1743,7 @@ if __name__ == "__main__":
 
     env_idx = 0
     
-    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
+    highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
 
     agent_positions = []
     init_state = GlobalEgoState.from_tensor(
