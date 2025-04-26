@@ -91,12 +91,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device
+            device=self.device,
         )
         self.episode_len = self.config.episode_len
-        self.reference_path_length = (
-            self.log_trajectory.pos_xy.shape[2]
-        )
+        self.reference_path_length = self.log_trajectory.pos_xy.shape[2] 
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
@@ -866,7 +864,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if self.config.add_reference_speed:
 
                 avg_ref_speed = (
-                    self.log_trajectory.clone().ref_speed.mean(axis=-1)
+                    self.log_trajectory.ref_speed.clone().mean(axis=-1)
                     / constants.MAX_SPEED
                 )
 
@@ -1710,7 +1708,7 @@ if __name__ == "__main__":
         reward_type="follow_waypoints",
         add_reference_path=True,
         init_mode="womd_tracks_to_predict",
-        init_steps=70,       
+        init_steps=10,       
     )
     render_config = RenderConfig()
 
