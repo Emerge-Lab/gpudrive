@@ -34,7 +34,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   guidance_heading_weight: 0.01
   smoothness_weight: 0.001
 
-  init_mode: all_non_trivial #womd_tracks_to_predict
+  init_mode: womd_tracks_to_predict
   dynamics_model: "classic"
   remove_non_vehicles: false
   collision_behavior: "ignore"
@@ -44,6 +44,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 15
   action_space_accel_disc: 11
+  max_steer_angle: -1.57  # pi/2 = 1.57, pi/3 = 1.05
+  max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
   collision_weight: -0.2
@@ -105,7 +107,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 500 # Save policy every k iterations
+  checkpoint_interval: 50 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #

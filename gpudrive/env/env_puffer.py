@@ -168,6 +168,8 @@ class PufferGPUDrive(PufferEnv):
         dynamics_model="classic",
         action_space_steer_disc=13,
         action_space_accel_disc=7,
+        max_steer_angle=1.57,
+        max_accel_value=4.0,
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -271,7 +273,7 @@ class PufferGPUDrive(PufferEnv):
             reward_type=reward_type,
             guidance_pos_xy_weight=guidance_pos_xy_weight,
             guidance_speed_weight=guidance_speed_weight,
-            guidance_heading_weight=guidance_speed_weight,
+            guidance_heading_weight=guidance_heading_weight,
             smoothness_weight=smoothness_weight,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
@@ -292,15 +294,10 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=lidar_obs,
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
-            steer_actions=torch.round(
-                torch.linspace(
-                    -torch.pi / 3, torch.pi / 3, action_space_steer_disc
-                ),
-                decimals=3,
-            ),
-            accel_actions=torch.round(
-                torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
-            ),
+            max_steer_angle=max_steer_angle,
+            max_accel_value=max_accel_value,
+            action_space_steer_disc=action_space_steer_disc,
+            action_space_accel_disc=action_space_accel_disc,
             use_vbd=use_vbd,
             vbd_trajectory_weight=vbd_trajectory_weight,
         )
