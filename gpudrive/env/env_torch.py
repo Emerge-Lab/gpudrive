@@ -1714,10 +1714,10 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/examples",
-        batch_size=1,
-        dataset_size=1,
-        sample_with_replacement=False,
+        root="data/processed/wosac/validation_json_100",
+        batch_size=10,
+        dataset_size=100,
+        sample_with_replacement=True,
         shuffle=False,
         file_prefix=""
     )
@@ -1727,106 +1727,112 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
-
-    control_mask = env.cont_agent_mask
-    print(f"Number of controlled agents: {control_mask.sum()}")
-
-    # Rollout
-    obs = env.reset(mask=control_mask)
-
-    sim_frames = []
-    agent_obs_frames = []
-
-    expert_actions, _, _, _ = env.get_expert_actions()
-
-    env_idx = 0
     
-    highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
+    
+    for i in range(10):
+        print(i)
+        env.swap_data_batch()
+    
 
-    agent_positions = []
-    init_state = GlobalEgoState.from_tensor(
-        env.sim.absolute_self_observation_tensor(),
-        device=env.device,
-    )
-    means_xy = (
-            env.sim.world_means_tensor().to_torch()[:, :2].to(env.device)
-        )
-    init_state.restore_mean(
-        mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-    )
-    agent_positions.append(init_state.pos_xy[env_idx, highlight_agent])
+    # control_mask = env.cont_agent_mask
+    # print(f"Number of controlled agents: {control_mask.sum()}")
 
-    print(f"Highlighted agent: {highlight_agent}")
-    print(f"Position: {agent_positions[-1]}")
+    # # Rollout
+    # obs = env.reset(mask=control_mask)
 
-    for t in range(env.init_steps, env.episode_len):
-        print(f"Step: {t+1}")
+    # sim_frames = []
+    # agent_obs_frames = []
 
-        # Step the environment
-        expert_actions, _, _, _ = env.get_expert_actions()
-        env.step_dynamics(expert_actions[:, :, t, :])
+    # expert_actions, _, _, _ = env.get_expert_actions()
 
-        current_state = GlobalEgoState.from_tensor(
-            env.sim.absolute_self_observation_tensor(),
-            device=env.device,
-        )
-        current_state.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-        agent_positions.append(current_state.pos_xy[env_idx, highlight_agent])
+    # env_idx = 0
+    
+    # highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
 
-        # Make video
-        sim_states = env.vis.plot_simulator_state(
-            env_indices=[env_idx],
-            zoom_radius=70,
-            time_steps=[t],
-            center_agent_indices=[highlight_agent],
-            plot_waypoints=True,
-        )
+    # agent_positions = []
+    # init_state = GlobalEgoState.from_tensor(
+    #     env.sim.absolute_self_observation_tensor(),
+    #     device=env.device,
+    # )
+    # means_xy = (
+    #         env.sim.world_means_tensor().to_torch()[:, :2].to(env.device)
+    #     )
+    # init_state.restore_mean(
+    #     mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+    # )
+    # agent_positions.append(init_state.pos_xy[env_idx, highlight_agent])
 
-        agent_obs = env.vis.plot_agent_observation(
-            env_idx=env_idx,
-            agent_idx=highlight_agent,
-            figsize=(10, 10),
-            trajectory=env.reference_path[highlight_agent, :, :].to(
-                env.device
-            ),
-        )
+    # print(f"Highlighted agent: {highlight_agent}")
+    # print(f"Position: {agent_positions[-1]}")
 
-        sim_frames.append(img_from_fig(sim_states[0]))
-        agent_obs_frames.append(img_from_fig(agent_obs))
+    # for t in range(env.init_steps, env.episode_len):
+    #     print(f"Step: {t+1}")
 
-        world_time_steps = (
-            torch.Tensor([t]).repeat((1, env.num_worlds)).long().to(env.device)
-        )
+    #     # Step the environment
+    #     expert_actions, _, _, _ = env.get_expert_actions()
+    #     env.step_dynamics(expert_actions[:, :, t, :])
 
-        obs = env.get_obs(control_mask)
-        reward = env.get_rewards()
+    #     current_state = GlobalEgoState.from_tensor(
+    #         env.sim.absolute_self_observation_tensor(),
+    #         device=env.device,
+    #     )
+    #     current_state.restore_mean(
+    #         mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+    #     )
+    #     agent_positions.append(current_state.pos_xy[env_idx, highlight_agent])
 
-        print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
-        print(f"R_t+1: {reward[env_idx, highlight_agent]}")
-        print(f"Position: {agent_positions[-1]}")
+    #     # Make video
+    #     sim_states = env.vis.plot_simulator_state(
+    #         env_indices=[env_idx],
+    #         zoom_radius=70,
+    #         time_steps=[t],
+    #         center_agent_indices=[highlight_agent],
+    #         plot_waypoints=True,
+    #     )
 
-        done = env.get_dones()
-        info = env.get_infos()
+    #     agent_obs = env.vis.plot_agent_observation(
+    #         env_idx=env_idx,
+    #         agent_idx=highlight_agent,
+    #         figsize=(10, 10),
+    #         trajectory=env.reference_path[highlight_agent, :, :].to(
+    #             env.device
+    #         ),
+    #     )
 
-        print(done[env.cont_agent_mask])
+    #     sim_frames.append(img_from_fig(sim_states[0]))
+    #     agent_obs_frames.append(img_from_fig(agent_obs))
 
-        # if done.all().bool():
-        #     # Check resetting behavior
-        #     _ = env.reset(control_mask)
-        #     env.step_dynamics(expert_actions[:, :, 0, :])
+    #     world_time_steps = (
+    #         torch.Tensor([t]).repeat((1, env.num_worlds)).long().to(env.device)
+    #     )
 
-    env.close()
+    #     obs = env.get_obs(control_mask)
+    #     reward = env.get_rewards()
 
-    media.write_video(
-        "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
-    )
-    media.write_video(
-        f"obs_video_env_{env_idx}_agent_{highlight_agent}.gif",
-        np.array(agent_obs_frames),
-        fps=10,
-        codec="gif",
-    )
+    #     print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
+    #     print(f"R_t+1: {reward[env_idx, highlight_agent]}")
+    #     print(f"Position: {agent_positions[-1]}")
+
+    #     done = env.get_dones()
+    #     info = env.get_infos()
+
+    #     print(done[env.cont_agent_mask])
+
+    #     # if done.all().bool():
+    #     #     # Check resetting behavior
+    #     #     _ = env.reset(control_mask)
+    #     #     env.step_dynamics(expert_actions[:, :, 0, :])
+
+    # env.close()
+
+    # media.write_video(
+    #     "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
+    # )
+    # media.write_video(
+    #     f"obs_video_env_{env_idx}_agent_{highlight_agent}.gif",
+    #     np.array(agent_obs_frames),
+    #     fps=10,
+    #     codec="gif",
+    # )
