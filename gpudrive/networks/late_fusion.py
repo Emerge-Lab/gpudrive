@@ -111,7 +111,6 @@ class NeuralNet(
                 self.ego_state_idx += 2 * 91
 
             self.vbd_in_obs = self.config.vbd_in_obs
-
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )

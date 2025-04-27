@@ -174,14 +174,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         self.use_vbd = self.config.use_vbd
         self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
-
-        # Set initialization steps - ensure minimum steps for VBD
         if self.use_vbd:
-            self.init_steps = max(
-                self.config.init_steps, 11
-            )  # Minimum 11 steps for VBD
+            self._load_vbd_trajectories()
         else:
             self.init_steps = self.config.init_steps
+
             self.vbd_trajectories = None
 
     def _generate_sample_batch(self, init_steps=10):
@@ -430,7 +427,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 condition_mode=mode, agent_type=use_agent_type
             )
 
-        self.world_time_steps.zero_()
+        self.world_time_steps.fill_(self.init_steps)
 
         # Reset smoothness tracking for reset environments
         if env_idx_list is not None:
@@ -443,12 +440,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.previous_action_value_tensor[reset_mask] = 0.0
         else:
             self.previous_action_value_tensor.zero_()
-
-        # Advance the simulator with log playback if warmup steps are provided
-        if self.config.init_steps > 0:
-            self.advance_sim_with_log_playback(
-                init_steps=self.init_steps,
-            )
 
         return self.get_obs(mask)
 
@@ -689,6 +680,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if not hasattr(self, "previous_action_value_tensor"):
             # Initialize with current actions on first call
+            self.previous_action_value_tensor = (
+                self.action_value_tensor.clone()
+            )
+
+        if (
+            self.config.dynamics_model == "state"
+            and self.previous_action_value_tensor.shape
+            != self.action_value_tensor.shape
+        ):
             self.previous_action_value_tensor = (
                 self.action_value_tensor.clone()
             )
@@ -1615,6 +1615,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
+            device=self.device,
         )
 
         if self.config.dynamics_model == "delta_local":
@@ -1709,10 +1710,11 @@ if __name__ == "__main__":
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/examples",
-        batch_size=2,
-        dataset_size=100,
-        sample_with_replacement=True,
+        batch_size=1,
+        dataset_size=1,
+        sample_with_replacement=False,
         shuffle=False,
+        file_prefix="",
     )
 
     # Make env
@@ -1724,9 +1726,10 @@ if __name__ == "__main__":
     )
 
     control_mask = env.cont_agent_mask
+    print(f"Number of controlled agents: {control_mask.sum()}")
 
     # Rollout
-    obs = env.reset()
+    obs = env.reset(mask=control_mask)
 
     sim_frames = []
     agent_obs_frames = []
@@ -1734,21 +1737,41 @@ if __name__ == "__main__":
     expert_actions, _, _, _ = env.get_expert_actions()
 
     env_idx = 0
-    highlight_agent = torch.where(env.cont_agent_mask[env_idx, :])[0][0].item()
 
-    print(highlight_agent)
+    highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
 
-    for t in range(90):
+    agent_positions = []
+    init_state = GlobalEgoState.from_tensor(
+        env.sim.absolute_self_observation_tensor(),
+        device=env.device,
+    )
+    means_xy = env.sim.world_means_tensor().to_torch()[:, :2].to(env.device)
+    init_state.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
+    agent_positions.append(init_state.pos_xy[env_idx, highlight_agent])
+
+    print(f"Highlighted agent: {highlight_agent}")
+    print(f"Position: {agent_positions[-1]}")
+
+    for t in range(env.init_steps, env.episode_len):
         print(f"Step: {t+1}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
-        env.step_dynamics(expert_actions[:, :, t - 1, :])
+        env.step_dynamics(expert_actions[:, :, t, :])
+
+        current_state = GlobalEgoState.from_tensor(
+            env.sim.absolute_self_observation_tensor(),
+            device=env.device,
+        )
+        current_state.restore_mean(
+            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
+        )
+        agent_positions.append(current_state.pos_xy[env_idx, highlight_agent])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
             env_indices=[env_idx],
-            zoom_radius=80,
+            zoom_radius=70,
             time_steps=[t],
             center_agent_indices=[highlight_agent],
             plot_guidance_pos_xy=True,
@@ -1771,6 +1794,7 @@ if __name__ == "__main__":
 
         print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
         print(f"R_t+1: {reward[env_idx, highlight_agent]}")
+        print(f"Position: {agent_positions[-1]}")
 
         done = env.get_dones()
         info = env.get_infos()
