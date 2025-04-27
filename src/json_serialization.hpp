@@ -226,19 +226,45 @@ namespace madrona_gpudrive
         }
 
         // If VBD trajectories exist in the JSON, read them
-        if (j.contains("vbd_trajectory")) {
-            int vbd_idx = 0;
-            for (const auto &vbd_traj : j.at("vbd_trajectory")) {
-                if (vbd_idx < consts::episodeLen) {
-                    if (!vbd_traj.is_null()) {
-                        obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
-                        obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
-                        obj.vbd_trajectories[vbd_idx][2] = vbd_traj.at(2).get<float>();
-                        obj.vbd_trajectories[vbd_idx][3] = vbd_traj.at(3).get<float>();
-                        obj.vbd_trajectories[vbd_idx][4] = vbd_traj.at(4).get<float>();
+        auto vbd_traj_result = j.at_pointer("/vbd_trajectory");
+        if (!vbd_traj_result.error()) {
+            // Get the array
+            simdjson::dom::array vbd_array;
+            auto array_error = vbd_traj_result.get(vbd_array);
+            
+            if (!array_error) {
+                int vbd_idx = 0;
+                // Rename the loop variable to avoid shadowing the outer i
+                for (size_t traj_i = 0; traj_i < vbd_array.size(); traj_i++) {
+                    // Rename to avoid shadowing the outer vbd_traj_result
+                    auto elem_result = vbd_array.at(traj_i);
+                    if (!elem_result.error()) {
+                        simdjson::dom::element vbd_traj;
+                        auto get_error = elem_result.get(vbd_traj);
+                        
+                        if (!get_error && vbd_idx < consts::episodeLen) {
+                            if (!vbd_traj.is_null()) {
+                                // Extract float values properly for each coordinate
+                                for (int coord_idx = 0; coord_idx < 5; coord_idx++) {
+                                    auto coord_result = vbd_traj.at(coord_idx);
+                                    if (!coord_result.error()) {
+                                        simdjson::dom::element coord_elem;
+                                        auto elem_error = coord_result.get(coord_elem);
+                                        if (!elem_error) {
+                                            // Get as double first, then cast to float (following your pattern)
+                                            double d_val;
+                                            auto d_error = coord_elem.get_double().get(d_val);
+                                            if (!d_error) {
+                                                obj.vbd_trajectories[vbd_idx][coord_idx] = static_cast<float>(d_val);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        vbd_idx++;
                     }
                 }
-                vbd_idx++;
             }
         }
     }
