@@ -3,6 +3,8 @@ import dataclasses
 import os
 import sys
 import mediapy
+import logging
+from time import perf_counter
 from tqdm import tqdm
 
 from gpudrive.env.config import EnvConfig
@@ -14,9 +16,11 @@ from gpudrive.utils.checkpoint import load_agent
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from waymo_open_dataset.protos import sim_agents_submission_pb2
-
-# from eval.wosac_eval import WOSACMetrics
 from eval.wosac_eval_origin import WOSACMetrics
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("WOSAC evaluation")
 
 
 def get_state(env):
@@ -47,6 +51,8 @@ def rollout(
     device,
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
+
+    start_env_rollout = perf_counter()
 
     next_obs = env.reset()
 
@@ -96,6 +102,12 @@ def rollout(
     id = id.cpu().numpy()
     control_mask = control_mask.cpu().numpy()
 
+    logging.info(
+        f"Policy rollout took: {perf_counter() - start_env_rollout:.2f} s ({len(env.data_batch)} scenarios)."
+    )
+
+    start_ground_truth_ext = perf_counter()
+
     scenario_rollouts = []
     scenario_rollout_masks = []
     for i, scenario_id in enumerate(scenario_ids):
@@ -130,6 +142,10 @@ def rollout(
             )
         )
 
+    logging.info(
+        f"Ground truth extraction took: {perf_counter() - start_ground_truth_ext:.2f} s ({len(env.data_batch)} scenarios)."
+    )
+
     return scenario_ids, scenario_rollouts, scenario_rollout_masks
 
 
@@ -159,7 +175,8 @@ if __name__ == "__main__":
     # Load agent
     agent = load_agent(
         path_to_cpt="checkpoints/model_waypoint_rs__S_1__04_24_19_08_49_096_000850.pt",
-    )
+        # path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_25_14_04_49_149_002500.pt",
+    ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
     default_config = EnvConfig()
