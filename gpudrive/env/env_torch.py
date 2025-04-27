@@ -1560,7 +1560,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(
             controlled_agent_mask=self.cont_agent_mask,
-            reference_trajectory=self.reference_trajectory.clone(),
+            reference_trajectory=self.reference_trajectory,
         )
 
     def swap_data_batch(self, data_batch=None):
@@ -1594,7 +1594,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(
             controlled_agent_mask=self.cont_agent_mask,
-            reference_trajectory=self.reference_trajectory.clone(),
+            reference_trajectory=self.reference_trajectory,
         )
 
         # Receive guidance trajectories from the new batch of scenarios
@@ -1726,6 +1726,7 @@ if __name__ == "__main__":
     )
 
     control_mask = env.cont_agent_mask
+    
     print(f"Number of controlled agents: {control_mask.sum()}")
 
     # Rollout

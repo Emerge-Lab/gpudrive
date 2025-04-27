@@ -4,14 +4,17 @@ import os
 import sys
 import mediapy
 import logging
+import numpy as np
 from time import perf_counter
 from tqdm import tqdm
+from pathlib import Path
 
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.utils.checkpoint import load_agent
+from gpudrive.visualize.utils import img_from_fig
 
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,20 +46,34 @@ def get_state(env):
 
 
 def rollout(
-    env,
-    sim_agent,
-    init_steps,
-    num_envs,
-    max_agents,
-    device,
+    env: GPUDriveTorchEnv,
+    sim_agent: torch.nn.Module,
+    init_steps: int,
+    num_envs: int,
+    max_agents: int,
+    device: str,
+    render_simulator_states: bool = False,
+    render_agent_pov: bool = False,
+    render_every_n_steps: int = 5,
+    save_videos: bool = True,
+    video_dir: str = "videos",
+    video_format: str = "gif",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
-
+    # Storage
+    env_ids = list(range(num_envs))
+    simulator_state_frames = {env_id: [] for env_id in range(num_envs)}
+    agent_observation_frames = {env_id: [] for env_id in range(num_envs)}
+    
     start_env_rollout = perf_counter()
+    
+    control_mask = env.cont_agent_mask
 
-    next_obs = env.reset()
+    next_obs = env.reset(control_mask)
 
-    scenario_ids = list(env.get_scenario_ids().values())
+    # Get scenario ids
+    scenario_ids_dict = env.get_scenario_ids()
+    scenario_ids = list(scenario_ids_dict.values())
 
     pos_x_list = []
     pos_y_list = []
@@ -64,14 +81,12 @@ def rollout(
     heading_list = []
     done_list = [env.get_dones()]
 
-    control_mask = env.cont_agent_mask
-
     pos_x, pos_y, pos_z, heading, _ = get_state(env)
 
     for time_step in range(env.episode_len - init_steps):
 
         # Predict actions
-        action, _, _, _ = sim_agent(next_obs[control_mask])
+        action, _, _, _ = sim_agent(next_obs)
 
         action_template = torch.zeros(
             (num_envs, max_agents), dtype=torch.int64, device=device
@@ -80,8 +95,33 @@ def rollout(
 
         # Step
         env.step_dynamics(action_template)
-
-        next_obs = env.get_obs()
+        
+        # Render
+        if render_simulator_states and time_step % render_every_n_steps == 0:
+            sim_states = env.vis.plot_simulator_state(
+                env_indices=env_ids,
+                zoom_radius=100,
+                time_steps=[time_step]*len(env_ids),
+                plot_guidance_pos_xy=True,
+            )
+            for idx in range(num_envs):
+                simulator_state_frames[idx].append(
+                    img_from_fig(sim_states[idx])
+                )
+            
+        if render_agent_pov and time_step % render_every_n_steps == 0:            
+            agent_obs = env.vis.plot_agent_observation(
+                env_idx=0,
+                agent_idx=0,
+                figsize=(10, 10),
+                trajectory=env.reference_path[0, :, :].to(
+                    env.device
+                ),
+            )
+            agent_observation_frames[idx].append(img_from_fig(agent_obs))
+            
+        # Get next observation
+        next_obs = env.get_obs(control_mask)
         done = env.get_dones()
 
         pos_x, pos_y, pos_z, heading, id = get_state(env)
@@ -92,6 +132,28 @@ def rollout(
         heading_list.append(heading)
         done_list.append(done)
     _ = done_list.pop()
+
+    if save_videos:
+        for idx in range(num_envs):
+            scenario_id = scenario_ids_dict[idx]
+            if render_simulator_states and len(simulator_state_frames[idx]) > 0:
+                mediapy.write_video(
+                    f"{video_dir}/sim_state_{scenario_id}.{video_format}", 
+                    np.array(simulator_state_frames[idx]), 
+                    fps=10, 
+                    codec=video_format,
+                )
+                
+        if render_agent_pov and len(agent_observation_frames[0]) > 0:
+            scenario_id = scenario_ids_dict[0]
+            mediapy.write_video(
+                f"{video_dir}/agent_0_{scenario_id}.{video_format}", 
+                np.array(agent_observation_frames[0]), 
+                fps=10, 
+                codec=video_format,
+            )
+            
+        logging.info(f'Videos saved to {video_dir}')
 
     # Generate Scenario
     pos_x_stack = torch.stack(pos_x_list, dim=-1).cpu().numpy()
@@ -154,14 +216,14 @@ if __name__ == "__main__":
     # Settings
     MAX_AGENTS = 64
     NUM_ENVS = 1
-    DEVICE = "cpu"
-    NUM_BATCHES = 1
-    NUM_ROLLOUTS = 10
+    DEVICE = "cpu" # where to run the env rollouts
+    NUM_ROLLOUTS_PER_BATCH = 1
+    NUM_DATA_BATCHES = 5
     INIT_STEPS = 10
     DATASET_SIZE = 100
 
-    DATA_JSON = "data/processed/wosac/validation_json_1"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_1"
+    DATA_JSON = "data/processed/wosac/validation_json_100"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -174,8 +236,8 @@ if __name__ == "__main__":
 
     # Load agent
     agent = load_agent(
-        path_to_cpt="checkpoints/model_waypoint_rs__S_1__04_24_19_08_49_096_000850.pt",
-        # path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_25_14_04_49_149_002500.pt",
+        #path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_26_15_28_18_693_007000.pt",
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
@@ -221,9 +283,9 @@ if __name__ == "__main__":
 
     wosac_metrics = WOSACMetrics()
 
-    for _ in tqdm(range(NUM_BATCHES)):
-        for _ in range(NUM_ROLLOUTS):
-            # try:
+    for _ in tqdm(range(NUM_DATA_BATCHES)):
+        for _ in range(NUM_ROLLOUTS_PER_BATCH):
+           
             scenario_ids, scenario_rollouts, scenario_rollout_masks = rollout(
                 env=env,
                 sim_agent=agent,
@@ -231,11 +293,12 @@ if __name__ == "__main__":
                 num_envs=NUM_ENVS,
                 max_agents=MAX_AGENTS,
                 device=DEVICE,
+                render_simulator_states=True,
+                render_agent_pov=True,
+                save_videos=True,
+                video_dir="videos",
+                video_format="gif",
             )
-            # except Exception as e:
-            #     print(f"Error during rollout: {e}")
-            #     continue
-
             tf_record_paths = [
                 os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
                 for scenario_id in scenario_ids
@@ -245,11 +308,11 @@ if __name__ == "__main__":
                 scenario_rollouts,
                 # scenario_rollout_masks=scenario_rollout_masks
             )
-        try:
-            env.swap_data_batch()
-        except Exception as e:
-            break
 
+        # Swap batch of scenarios
+        env.swap_data_batch()
+        
+    # Aggregate results
     results = wosac_metrics.compute()
 
     for key, value in results.items():
