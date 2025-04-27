@@ -54,7 +54,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_scale_100_base2"
+  group: "wosac_scale_100_base"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
