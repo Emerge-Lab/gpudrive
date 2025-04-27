@@ -31,11 +31,16 @@ static inline void resetAgentInterface(Engine &ctx, Entity agent_iface, EntityTy
 
 static inline void resetAgent(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-    auto xCoord = ctx.get<Trajectory>(agent_iface).positions[0].x;
-    auto yCoord = ctx.get<Trajectory>(agent_iface).positions[0].y;
-    auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].x;
-    auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[0].y;
-    auto heading = ctx.get<Trajectory>(agent_iface).headings[0];
+
+    // Using warmup steps to reset
+    uint32_t initSteps = ctx.data().params.initSteps;
+    initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+
+    auto xCoord = ctx.get<Trajectory>(agent_iface).positions[initSteps].x;
+    auto yCoord = ctx.get<Trajectory>(agent_iface).positions[initSteps].y;
+    auto xVelocity = ctx.get<Trajectory>(agent_iface).velocities[initSteps].x;
+    auto yVelocity = ctx.get<Trajectory>(agent_iface).velocities[initSteps].y;
+    auto heading = ctx.get<Trajectory>(agent_iface).headings[initSteps];
 
     ctx.get<Position>(agent) = Vector3{.x = xCoord, .y = yCoord, .z = 1};
     ctx.get<Rotation>(agent) = Quat::angleAxis(heading, madrona::math::up);
@@ -46,7 +51,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     }
     ctx.get<Action>(agent_iface) = getZeroAction(ctx.data().params.dynamicsModel);
 
-    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent));
+    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent), consts::episodeLen - initSteps);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);
@@ -113,13 +118,6 @@ static inline void populateVBDTrajectory(Engine &ctx, const Entity &agent, const
 
 static inline bool isAgentStatic(Engine &ctx, Entity agent) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
-    
-   // Static agents are those that are not tracks to predict
-    if (ctx.data().params.readFromTracksToPredict and ctx.get<MetaData>(agent_iface).isTrackToPredict != -1) {
-        return false;
-    }
-    
-    // Original logic for other initialization modes
     bool isStatic = (ctx.get<Goal>(agent).position - ctx.get<Trajectory>(agent_iface).positions[0]).length() < consts::staticThreshold;
     return !ctx.data().params.isStaticAgentControlled and isStatic;
 }
@@ -127,10 +125,17 @@ static inline bool isAgentStatic(Engine &ctx, Entity agent) {
 static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExpert = false) {
     auto agent_iface = ctx.get<AgentInterfaceEntity>(agent).e;
     
-    // If readFromTracksToPredict is true, base controllability on isTrackToPredict flag
+    // If readFromTracksToPredict is true, control all valid objects
     if (ctx.data().params.readFromTracksToPredict) {
-        return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
-               ctx.get<MetaData>(agent_iface).isTrackToPredict != -1;
+        uint32_t initSteps = ctx.data().params.initSteps;
+        initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+        
+        if (ctx.get<Trajectory>(agent_iface).valids[initSteps] == 0) {
+            return false;
+        }
+        else {
+            return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents;
+        }
     }
     
     // Original logic for other initialization modes
@@ -155,6 +160,7 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<EntityType>(agent) = agentInit.type;
     ctx.get<Goal>(agent)= Goal{.position = Vector2{.x = agentInit.goalPosition.x - ctx.singleton<WorldMeans>().mean.x, .y = agentInit.goalPosition.y - ctx.singleton<WorldMeans>().mean.y}};
     ctx.get<AgentID>(agent_iface) = AgentID{.id = static_cast<int32_t>(agentInit.id)};
+    ctx.get<MetaData>(agent_iface) = agentInit.metadata;
 
     populateExpertTrajectory(ctx, agent, agentInit);
     populateVBDTrajectory(ctx, agent, agentInit);
@@ -163,8 +169,6 @@ static inline Entity createAgent(Engine &ctx, const MapObject &agentInit) {
     ctx.get<ResponseType>(agent) = isAgentStatic(ctx, agent) ? ResponseType::Static : ResponseType::Dynamic;
     ctx.get<ControlledState>(agent_iface) = ControlledState{.controlled = isAgentControllable(ctx, agent, agentInit.markAsExpert)};
     ctx.data().numControlledAgents += ctx.get<ControlledState>(agent_iface).controlled;
-
-    ctx.get<MetaData>(agent_iface) = agentInit.metadata;
 
     if (ctx.data().enableRender) {
         render::RenderingSystem::attachEntityToView(ctx,
@@ -365,6 +369,9 @@ void createCameraEntity(Engine &ctx)
 
 static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
 {
+    uint32_t initSteps = ctx.data().params.initSteps;
+    initSteps = std::min(initSteps, (uint32_t)consts::kTrajectoryLength - 1);
+    
     // When readFromTracksToPredict is enabled, we want to create all agents
     // This overrides all other rules except for the check against deleted agents
     if (ctx.data().params.readFromTracksToPredict) {
@@ -378,6 +385,11 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
             }
         }
         
+        if (agentInit.valid[initSteps] == 0)
+        {
+            return false;
+        }        
+        
         return true;
     }
     
@@ -388,7 +400,7 @@ static inline bool shouldAgentBeCreated(Engine &ctx, const MapObject &agentInit)
         return false;
     }
     
-    if (ctx.data().params.initOnlyValidAgentsAtFirstStep && !agentInit.valid[0])
+    if (ctx.data().params.initOnlyValidAgentsAtFirstStep && !agentInit.valid[initSteps])
     {
         return false;
     }
