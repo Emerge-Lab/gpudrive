@@ -1591,14 +1591,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
+        # Receive guidance trajectories from the new batch of scenarios
+        self.setup_guidance()
+
         # Reset static scenario data for the visualizer
         self.vis.initialize_static_scenario_data(
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
-
-        # Receive guidance trajectories from the new batch of scenarios
-        self.setup_guidance()
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
@@ -1726,7 +1726,7 @@ if __name__ == "__main__":
     )
 
     control_mask = env.cont_agent_mask
-    
+
     print(f"Number of controlled agents: {control_mask.sum()}")
 
     # Rollout

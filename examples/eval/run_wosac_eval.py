@@ -64,9 +64,9 @@ def rollout(
     env_ids = list(range(num_envs))
     simulator_state_frames = {env_id: [] for env_id in range(num_envs)}
     agent_observation_frames = {env_id: [] for env_id in range(num_envs)}
-    
+
     start_env_rollout = perf_counter()
-    
+
     control_mask = env.cont_agent_mask
 
     next_obs = env.reset(control_mask)
@@ -95,31 +95,29 @@ def rollout(
 
         # Step
         env.step_dynamics(action_template)
-        
+
         # Render
         if render_simulator_states and time_step % render_every_n_steps == 0:
             sim_states = env.vis.plot_simulator_state(
                 env_indices=env_ids,
                 zoom_radius=100,
-                time_steps=[time_step]*len(env_ids),
+                time_steps=[time_step] * len(env_ids),
                 plot_guidance_pos_xy=True,
             )
             for idx in range(num_envs):
                 simulator_state_frames[idx].append(
                     img_from_fig(sim_states[idx])
                 )
-            
-        if render_agent_pov and time_step % render_every_n_steps == 0:            
+
+        if render_agent_pov and time_step % render_every_n_steps == 0:
             agent_obs = env.vis.plot_agent_observation(
                 env_idx=0,
                 agent_idx=0,
                 figsize=(10, 10),
-                trajectory=env.reference_path[0, :, :].to(
-                    env.device
-                ),
+                trajectory=env.reference_path[0, :, :].to(env.device),
             )
             agent_observation_frames[idx].append(img_from_fig(agent_obs))
-            
+
         # Get next observation
         next_obs = env.get_obs(control_mask)
         done = env.get_dones()
@@ -136,24 +134,25 @@ def rollout(
     if save_videos:
         for idx in range(num_envs):
             scenario_id = scenario_ids_dict[idx]
-            if render_simulator_states and len(simulator_state_frames[idx]) > 0:
+            if (
+                render_simulator_states
+                and len(simulator_state_frames[idx]) > 0
+            ):
                 mediapy.write_video(
-                    f"{video_dir}/sim_state_{scenario_id}.{video_format}", 
-                    np.array(simulator_state_frames[idx]), 
-                    fps=10, 
+                    f"{video_dir}/sim_state_env_{idx}_{scenario_id}.{video_format}",
+                    np.array(simulator_state_frames[idx]),
+                    fps=8,
                     codec=video_format,
                 )
-                
+
         if render_agent_pov and len(agent_observation_frames[0]) > 0:
             scenario_id = scenario_ids_dict[0]
             mediapy.write_video(
-                f"{video_dir}/agent_0_{scenario_id}.{video_format}", 
-                np.array(agent_observation_frames[0]), 
-                fps=10, 
+                f"{video_dir}/agent_0_{scenario_id}.{video_format}",
+                np.array(agent_observation_frames[0]),
+                fps=8,
                 codec=video_format,
             )
-            
-        logging.info(f'Videos saved to {video_dir}')
 
     # Generate Scenario
     pos_x_stack = torch.stack(pos_x_list, dim=-1).cpu().numpy()
@@ -216,7 +215,7 @@ if __name__ == "__main__":
     # Settings
     MAX_AGENTS = 64
     NUM_ENVS = 1
-    DEVICE = "cpu" # where to run the env rollouts
+    DEVICE = "cpu"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 5
     INIT_STEPS = 10
@@ -231,13 +230,14 @@ if __name__ == "__main__":
         batch_size=NUM_ENVS,
         dataset_size=DATASET_SIZE,
         sample_with_replacement=True,
+        shuffle=True,
         file_prefix="",
     )
 
     # Load agent
     agent = load_agent(
-        #path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_26_15_28_18_693_007000.pt",
+        # path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_000450.pt",
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
@@ -250,24 +250,14 @@ if __name__ == "__main__":
         != getattr(default_config, field.name)
     }
 
-    # Add the fixed overrides specific to WOSAC evaluation
+    # Add fixed overrides specific to WOSAC evaluation
     fixed_overrides = {
-        "steer_actions": torch.round(
-            torch.linspace(
-                -torch.pi / 3,
-                torch.pi / 3,
-                agent.config.action_space_steer_disc,
-            ),
-            decimals=3,
-        ),
-        "accel_actions": torch.round(
-            torch.linspace(-4.0, 4.0, agent.config.action_space_accel_disc),
-            decimals=3,
-        ),
-        "init_mode": "womd_tracks_to_predict",
         "init_steps": INIT_STEPS,
-        "goal_behavior": "stop",
     }
+
+    logging.info(
+        f"initializing env with init_mode = {config_dict['init_mode']}"
+    )
 
     env_config = dataclasses.replace(
         default_config, **config_dict, **fixed_overrides
@@ -285,7 +275,7 @@ if __name__ == "__main__":
 
     for _ in tqdm(range(NUM_DATA_BATCHES)):
         for _ in range(NUM_ROLLOUTS_PER_BATCH):
-           
+
             scenario_ids, scenario_rollouts, scenario_rollout_masks = rollout(
                 env=env,
                 sim_agent=agent,
@@ -296,8 +286,6 @@ if __name__ == "__main__":
                 render_simulator_states=True,
                 render_agent_pov=True,
                 save_videos=True,
-                video_dir="videos",
-                video_format="gif",
             )
             tf_record_paths = [
                 os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
@@ -311,7 +299,7 @@ if __name__ == "__main__":
 
         # Swap batch of scenarios
         env.swap_data_batch()
-        
+
     # Aggregate results
     results = wosac_metrics.compute()
 
