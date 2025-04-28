@@ -243,30 +243,33 @@ def save_script(filename, file_path, fields, params, param_order=None):
 
 if __name__ == "__main__":
 
-    group = "minimal_tiny"
+    group = "wosac_scale_100_v3"
 
     fields = {
-        "time_h": 6,  # Max time per job (job will finish if run is done before)
+        "time_h": 47,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 70,
         "job_name": group,
-        "run_file": "baselines/ppo/ppo_waypoint.py",
+        "run_file": "baselines/ppo/ppo_guided_autonomy.py",
     }
 
     hyperparams = {
         "group": [group],  # Group name
-        "num_worlds": [500],
+        "num_worlds": [700],
         "resample_scenes": [0],
-        "k_unique_scenes": [4],
+        "k_unique_scenes": [100],
         # "resample_interval": [5_000_000],
         # "resample_dataset_size": [10_000],
         # "total_timesteps": [3_000_000_000],
         "batch_size": [262_144],
         "minibatch_size": [16_384],
-        "guidance_pos_xy_weight": [0.0, 0.05, 0.1],
-        "ent_coef": [0.001],
+        # "guidance_pos_xy_weight": [0.01],
+        # "guidance_speed_weight": [0.01],
+        # "guidance_heading_weight": [0.01],
+        "ent_coef": [0.005, 0.001, 0.003, 0.01],
         "vf_coef": [0.5],
+        "update_epochs": [4],
         "render": [0],
     }
 
