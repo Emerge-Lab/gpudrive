@@ -168,19 +168,25 @@ class PufferGPUDrive(PufferEnv):
         dynamics_model="classic",
         action_space_steer_disc=13,
         action_space_accel_disc=7,
+        max_steer_angle=1.57,
+        max_accel_value=4.0,
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
         norm_obs=True,
         lidar_obs=False,
         bev_obs=False,
-        add_reference_path=False,
-        add_reference_speed=False,
+        add_previous_action=False,
+        guidance=True,
+        add_reference_pos_xy=True,
+        add_reference_speed=True,
+        add_reference_heading=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
-        waypoint_distance_scale=0.05,
-        speed_distance_scale=0.0,
-        jerk_smoothness_scale=0.0,
+        guidance_pos_xy_weight=0.01,
+        guidance_speed_weight=0.0,
+        guidance_heading_weight=0.0,
+        smoothness_weight=0.0,
         condition_mode="random",
         collision_behavior="ignore",
         goal_behavior="remove",
@@ -204,7 +210,7 @@ class PufferGPUDrive(PufferEnv):
         render_format="mp4",
         render_fps=15,
         zoom_radius=50,
-        plot_waypoints=False,
+        plot_guidance_pos_xy=False,
         buf=None,
         **kwargs,
     ):
@@ -231,6 +237,12 @@ class PufferGPUDrive(PufferEnv):
         self.init_mode = init_mode
         self.reward_type = reward_type
 
+        # Expert guidance
+        self.guidance = guidance
+        self.add_reference_pos_xy = add_reference_pos_xy
+        self.add_reference_speed = add_reference_speed
+        self.add_reference_heading = add_reference_heading
+
         self.render = render
         self.render_interval = render_interval
         self.render_k_scenarios = render_k_scenarios
@@ -238,7 +250,7 @@ class PufferGPUDrive(PufferEnv):
         self.render_format = render_format
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
-        self.plot_waypoints = plot_waypoints
+        self.plot_guidance_pos_xy = plot_guidance_pos_xy
         self.track_realism_metrics = track_realism_metrics
         self.track_n_worlds = track_n_worlds
 
@@ -259,14 +271,18 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
             reward_type=reward_type,
-            waypoint_distance_scale=waypoint_distance_scale,
-            speed_distance_scale=speed_distance_scale,
-            jerk_smoothness_scale=jerk_smoothness_scale,
+            guidance_pos_xy_weight=guidance_pos_xy_weight,
+            guidance_speed_weight=guidance_speed_weight,
+            guidance_heading_weight=guidance_heading_weight,
+            smoothness_weight=smoothness_weight,
             condition_mode=condition_mode,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
-            add_reference_path=add_reference_path,
+            add_previous_action=add_previous_action,
+            guidance=guidance,
+            add_reference_pos_xy=add_reference_pos_xy,
             add_reference_speed=add_reference_speed,
+            add_reference_heading=add_reference_heading,
             prob_reference_dropout=prob_reference_dropout,
             dynamics_model=dynamics_model,
             collision_behavior=collision_behavior,
@@ -278,15 +294,10 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=lidar_obs,
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
-            steer_actions=torch.round(
-                torch.linspace(
-                    -torch.pi / 3, torch.pi / 3, action_space_steer_disc
-                ),
-                decimals=3,
-            ),
-            accel_actions=torch.round(
-                torch.linspace(-4.0, 4.0, action_space_accel_disc), decimals=3
-            ),
+            max_steer_angle=max_steer_angle,
+            max_accel_value=max_accel_value,
+            action_space_steer_disc=action_space_steer_disc,
+            action_space_accel_disc=action_space_accel_disc,
             use_vbd=use_vbd,
             vbd_trajectory_weight=vbd_trajectory_weight,
         )
@@ -433,10 +444,10 @@ class PufferGPUDrive(PufferEnv):
         reward_controlled = reward[self.controlled_agent_mask]
 
         # Store human-like and internal rewards separately
-        if self.reward_type == "follow_waypoints":
+        if self.reward_type == "guided_autonomy":
             self.human_like_rewards[
                 self.live_agent_mask
-            ] += self.env.distance_penalty[self.live_agent_mask]
+            ] += self.env.guidance_error[self.live_agent_mask]
             self.internal_rewards[
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
@@ -648,7 +659,7 @@ class PufferGPUDrive(PufferEnv):
                 env_indices=envs_to_render,
                 time_steps=time_steps,
                 zoom_radius=self.zoom_radius,
-                plot_waypoints=self.plot_waypoints,
+                plot_guidance_pos_xy=self.plot_guidance_pos_xy,
             )
 
             agent_obs = self.env.vis.plot_agent_observation(
@@ -775,7 +786,7 @@ class PufferGPUDrive(PufferEnv):
         )
         # [batch, time, 1]
         valid_mask = (
-            self.env.log_trajectory.valids[done_worlds]
+            self.env.reference_trajectory.valids[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]
@@ -785,14 +796,14 @@ class PufferGPUDrive(PufferEnv):
         # Take human logs (ground-truth)
         # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
         ref_pos_xy_np = (
-            self.env.log_trajectory.pos_xy[done_worlds]
+            self.env.reference_trajectory.pos_xy[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]
         )
         # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
         ref_headings_np = (
-            self.env.log_trajectory.yaw[done_worlds]
+            self.env.reference_trajectory.yaw[done_worlds]
             .detach()
             .cpu()
             .numpy()[control_mask]

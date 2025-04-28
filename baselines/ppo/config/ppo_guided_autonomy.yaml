@@ -2,59 +2,64 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_1
+data_dir: data/processed/wosac/validation_json_100
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 1 # Number of unique scenes to sample from
+  k_unique_scenes: 100 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
+  add_previous_action: true
+
+  # Guidance through expert suggestions
+  guidance: true # If true, the agent will be guided by expert suggestions
+  guidance_mode: "log_replay" # Options: "log_replay", "vbd_amortized", "vbd_online"
+  add_reference_pos_xy: true # If true, a reference path is added to the ego observation
+  add_reference_speed: true # If true, the reference speeds are added to the ego observation
+  add_reference_heading: true # If true, the reference heading are added to the ego observation
+  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
+
+  # Reward function
+  reward_type: "guided_autonomy"
+  collision_weight: -0.2
+  off_road_weight: -0.2
+  guidance_pos_xy_weight: 0.01
+  guidance_speed_weight: 0.01
+  guidance_heading_weight: 0.01
+  smoothness_weight: 0.001
+
+  init_mode: womd_tracks_to_predict
+  dynamics_model: "classic"
   remove_non_vehicles: false
   collision_behavior: "ignore"
   goal_behavior: "ignore"
-  reward_type: "follow_waypoints"
-  waypoint_distance_scale: 0.01
-  speed_distance_scale: 0.01
-  jerk_smoothness_scale: 0.001
-
-  init_mode: all_non_trivial #womd_tracks_to_predict
-  dynamics_model: "classic"
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 15
   action_space_accel_disc: 11
+  max_steer_angle: -1.57  # pi/2 = 1.57, pi/3 = 1.05
+  max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
   collision_weight: -0.2
   off_road_weight: -0.2
 
-  # Versatile Behavior Diffusion (VBD)
-  use_vbd: false
-  init_steps: 0
-  vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
-  vbd_in_obs: false
-
-  # Planning guidance
-  add_reference_path: true # If true, a reference path is added to the ego observation
-  add_reference_speed: true # If true, the reference speed (scalar) is added to the ego observation
-  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
-
 wandb:
   entity: ""
   project: "humanlike"
-  group: "debug"
+  group: "wosac_scale_100_base"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: waypoint_rs # Set dynamically in the script if needed
+  exp_id: guidance_log_replay # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu
@@ -66,7 +71,7 @@ train:
   resample_scenes: false
   resample_dataset_size: 500 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: true
+  sample_with_replacement: false
   shuffle_dataset: true
   file_prefix: ""
 
@@ -102,18 +107,18 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 250 # Save policy every k iterations
+  checkpoint_interval: 50 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: true # Determines whether to render the environment (note: will slow down training)
+  render: false # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 200 # Render every k iterations
+  render_interval: 300 # Render every k iterations
   render_k_scenarios: 1 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100
-  plot_waypoints: true
+  plot_guidance_pos_xy: true
 
 vec:
   backend: "native" # Only native is currently supported

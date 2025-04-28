@@ -30,6 +30,16 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
+    add_previous_action: bool = False  # Previous action time agent has taken
+
+    # Guidance settings; these are used to direct the agent's behavior and
+    # will be included in the observations if set to True
+    guidance: bool = True
+    guidance_mode: str = "log_replay"  # Options: "log_replay", "vbd_amortized", "vbd_online", "goals_only"
+    # Ways to guide the agent
+    add_reference_pos_xy: bool = True  # (x, y) position time series
+    add_reference_speed: bool = False  # speed time series
+    add_reference_heading: bool = False  # heading time series
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -51,14 +61,18 @@ class EnvConfig:
     dynamics_model: str = (
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
-
+    
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
+    action_space_steer_disc: int = 13
+    action_space_accel_disc: int = 7
+    max_steer_angle: float = 1.57  # in radians: pi/2 = 1.57, pi/3 = 1.05
+    max_accel_value: float = 4.0
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi / 3, torch.pi / 3, 13), decimals=3
+        torch.linspace(-max_steer_angle, max_steer_angle, action_space_steer_disc), decimals=3
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 7), decimals=3
+        torch.linspace(-max_accel_value, max_accel_value, action_space_accel_disc), decimals=3
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -94,11 +108,6 @@ class EnvConfig:
     # Goal behavior settings
     goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
 
-    # Reference points settings
-    add_reference_speed: bool = (
-        False  # Include reference speed in observations
-    )
-    add_reference_path: bool = False
     prob_reference_dropout: float = (
         0.0  # Probability of dropping reference points
     )
@@ -106,15 +115,20 @@ class EnvConfig:
 
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "follow_waypoints", "distance_to_vdb_trajs", "reward_conditioned"
+    # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
 
-    # If reward_type is "follow_waypoints", the following parameters are used
-    waypoint_sample_interval: int = 1  # Interval for sampling waypoints
-    waypoint_distance_scale: float = (
-        0.01  # Importance of distance to waypoints
+    # If reward_type is "guided_autonomy", the following parameters are used
+    guidance_sample_interval: int = 1
+    guidance_pos_xy_weight: float = (
+        0.01  # Importance of matching suggested positions
     )
-    speed_distance_scale: float = 0.0
-    jerk_smoothness_scale: float = 0.0
+    guidance_speed_weight: float = (
+        0.01  # Importance of matching suggested speeds
+    )
+    guidance_heading_weight: float = (
+        0.0  # Importance of matching suggested headings
+    )
+    smoothness_weight: float = 0.0
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components

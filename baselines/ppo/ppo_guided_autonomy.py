@@ -106,7 +106,7 @@ def init_wandb(args, name, id=None, resume=True):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "baselines/ppo/config/ppo_waypoint.yaml",
+    ] = "baselines/ppo/config/ppo_guided_autonomy.yaml",
     *,
     # fmt: off
     # Environment options
@@ -115,10 +115,10 @@ def run(
     k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
     collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
-    goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
-    waypoint_distance_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
-    speed_distance_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
-    jerk_smoothness_scale: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    guidance_pos_xy_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    guidance_speed_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    guidance_heading_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
@@ -130,7 +130,7 @@ def run(
     vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
     vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
-    
+
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -174,10 +174,10 @@ def run(
         "k_unique_scenes": k_unique_scenes,
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,
-        "goal_achieved_weight": goal_achieved_weight,
-        "waypoint_distance_scale": waypoint_distance_scale,
-        "jerk_smoothness_scale": jerk_smoothness_scale,
-        "speed_distance_scale": speed_distance_scale,
+        "guidance_pos_xy_weight": guidance_pos_xy_weight,
+        "smoothness_weight": smoothness_weight,
+        "guidance_speed_weight": guidance_speed_weight,
+        "guidance_heading_weight": guidance_heading_weight,
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
