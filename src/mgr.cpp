@@ -894,10 +894,10 @@ Tensor Manager::scenarioIdTensor() const {
     );
 }
 
-Tensor Manager::metadataTensor() const {
+Tensor Manager::trafficLightTensor() const {
     return impl_->exportTensor(
-        ExportID::MetaData, TensorElementType::Int32,
-        {impl_->numWorlds, consts::kMaxAgentCount, MetaDataExportSize}
+        ExportID::TrafficLights, TensorElementType::Int32,
+        {impl_->numWorlds, consts::kMaxTrafficLightCount, TrafficLightsExportSize}
     );
 }
 

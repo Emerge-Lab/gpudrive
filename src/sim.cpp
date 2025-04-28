@@ -60,7 +60,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<MapType>();
     registry.registerComponent<MetaData>();
     registry.registerComponent<VBDTrajectory>();
-
+    registry.registerComponent<TrafficLights>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
@@ -120,6 +120,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::MetaData);
     registry.exportColumn<AgentInterface, VBDTrajectory>(
         (uint32_t)ExportID::VBDTrajectory);
+    registry.exportColumn<AgentInterface, TrafficLights>(
+            (uint32_t)ExportID::TrafficLights);
 }
 
 static inline void cleanupWorld(Engine &ctx) {

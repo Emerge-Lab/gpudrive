@@ -29,6 +29,7 @@ namespace madrona_gpudrive
         MapVector2 goalPosition;
         EntityType type;
         MetaData metadata;
+        TrafficLights trafficLights;
 
         uint32_t numPositions;
         uint32_t numHeadings;
