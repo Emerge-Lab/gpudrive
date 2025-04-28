@@ -1032,7 +1032,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ] = constants.INVALID_ID
                 guidance.append(reference_headings)
 
-        return torch.cat(guidance, dim=-1).flatten(start_dim=1)
+        self.guidance_obs = torch.cat(guidance, dim=-1)
+
+        return self.guidance_obs.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
@@ -1451,7 +1453,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ego_states = self._get_ego_state(mask)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
-        guidance = self._get_guidance(mask)
+        guidance_obs = self._get_guidance(mask)
 
         if self.config.use_vbd and self.config.vbd_in_obs:
             # Add ego-centric VBD trajectories
@@ -1472,7 +1474,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ego_states,
                     partner_observations,
                     road_map_observations,
-                    guidance,
+                    guidance_obs,
                 ),
                 dim=-1,
             )

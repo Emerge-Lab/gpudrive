@@ -53,7 +53,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (15, 15)
+        self.figsize = (10, 10)
         self.env_config = env_config
         self.render_3d = render_config.render_3d
         self.vehicle_height = render_config.vehicle_height
@@ -1646,6 +1646,9 @@ class MatplotlibVisualizer:
             device="cpu",
         )
 
+        marker_scale = max(figsize) / 15
+        line_width_scale = max(figsize) / 15
+
         # Check if agent index is valid, otherwise return None
         if observation_ego.id[env_idx, agent_idx] == -1:
             return None, None
@@ -1680,7 +1683,7 @@ class MatplotlibVisualizer:
                     x_points,
                     y_points,
                     c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=8,
+                    s=8 * marker_scale,
                     label=type_name,
                 )
 
@@ -1707,28 +1710,28 @@ class MatplotlibVisualizer:
                         [y_start - width_dy, y_end - width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start + width_dx, x_end + width_dx],
                         [y_start + width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start - width_dx, x_start + width_dx],
                         [y_start - width_dy, y_start + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_end - width_dx, x_end + width_dx],
                         [y_end - width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
 
         # Plot partner agents if provided
@@ -1759,6 +1762,7 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
+                line_width_scale=line_width_scale,
             )
 
         if observation_ego is not None:
@@ -1847,17 +1851,16 @@ class MatplotlibVisualizer:
             va="top",
         )
 
-        attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
-
         if trajectory is not None and len(trajectory) > 0:
+            attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
             # Plot the trajectory as a line
             ax.scatter(
                 trajectory[:, 0],  # x coordinates
                 trajectory[:, 1],  # y coordinates
                 color="g",
-                linewidth=0.3,
+                linewidth=0.2 * line_width_scale,
                 marker="o",
-                alpha=0.2,
+                alpha=0.1,
                 zorder=0,
             )
             # Add a purple star above the reference position
@@ -1875,9 +1878,9 @@ class MatplotlibVisualizer:
                     zorder=10,
                 )
 
-        ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
-        ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
-        ax.set_xticks([])
-        ax.set_yticks([])
+        # ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        # ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        # ax.set_xticks([])
+        # ax.set_yticks([])
 
         return fig
