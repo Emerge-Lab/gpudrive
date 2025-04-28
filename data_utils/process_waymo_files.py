@@ -168,6 +168,7 @@ def _init_tl_object(mapstate: scenario_pb2.DynamicMapState) -> Dict[int, Any]:
             "x": lane_state.stop_point.x,
             "y": lane_state.stop_point.y,
             "z": lane_state.stop_point.z,
+            "lane_id": lane_state.lane,
         }
     return returned_dict
 
@@ -327,20 +328,16 @@ def waymo_to_scenario(
 
     # Construct the traffic light states
     tl_dict = defaultdict(
-        lambda: {"state": [], "x": [], "y": [], "z": [], "time_index": []}
+        lambda: {"state": [], "x": [], "y": [], "z": [], "time_index": [], "lane_id": []}
     )
     all_keys = ["state", "x", "y", "z"]
-    i = 0
-    for dynamic_map_state in protobuf.dynamic_map_states:
+    for i, dynamic_map_state in enumerate(protobuf.dynamic_map_states):
         traffic_light_dict = _init_tl_object(dynamic_map_state)
-        # there is a traffic light but we don't want traffic light scenes so just return
-        if len(traffic_light_dict) > 0:
-            return
-        for id, value in traffic_light_dict.items():
+        for lane_id, value in traffic_light_dict.items():
             for key in all_keys:
-                tl_dict[id][key].append(value[key])
-            tl_dict[id]["time_index"].append(i)
-        i += 1
+                tl_dict[lane_id][key].append(value[key])
+            tl_dict[lane_id]["time_index"].append(i)
+            tl_dict[lane_id]["lane_id"].append(lane_id)
 
     # Construct the map states
     roads = []
