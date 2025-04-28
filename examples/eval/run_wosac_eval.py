@@ -114,7 +114,7 @@ def rollout(
                 env_idx=0,
                 agent_idx=0,
                 figsize=(10, 10),
-                trajectory=env.reference_path[0, :, :].to(env.device),
+                trajectory=env.reference_path[0, :, :].to("cpu"),
             )
             agent_observation_frames[idx].append(img_from_fig(agent_obs))
 
@@ -214,15 +214,16 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = 64
-    NUM_ENVS = 1
-    DEVICE = "cpu"  # where to run the env rollouts
+    NUM_ENVS = 3
+    DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 5
+    NUM_DATA_BATCHES = 2
     INIT_STEPS = 10
     DATASET_SIZE = 100
+    RENDER = True
 
-    DATA_JSON = "data/processed/wosac/validation_json_100"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
+    DATA_JSON = "data/processed/wosac/validation_json_3"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_3"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -237,7 +238,7 @@ if __name__ == "__main__":
     # Load agent
     agent = load_agent(
         # path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_000450.pt",
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_013762.pt",
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
@@ -283,9 +284,9 @@ if __name__ == "__main__":
                 num_envs=NUM_ENVS,
                 max_agents=MAX_AGENTS,
                 device=DEVICE,
-                render_simulator_states=True,
-                render_agent_pov=True,
-                save_videos=True,
+                render_simulator_states=RENDER,
+                render_agent_pov=RENDER,
+                save_videos=RENDER,
             )
             tf_record_paths = [
                 os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
