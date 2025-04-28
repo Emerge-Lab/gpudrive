@@ -1706,6 +1706,10 @@ if __name__ == "__main__":
         add_reference_speed=True,
         add_reference_heading=True,
         reward_type="guided_autonomy",
+        # lidar_obs=True,
+        # ego_state=False,
+        # road_map_obs=False,
+        # partner_obs=False,
     )
     render_config = RenderConfig()
 

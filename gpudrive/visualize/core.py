@@ -22,6 +22,7 @@ from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
+    LidarObs,
 )
 from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
@@ -1582,30 +1583,43 @@ class MatplotlibVisualizer:
                 Should be of shape (N, 2) where N is the number of points and each point
                 is an (x, y) coordinate. Defaults to None.
         """
-        observation_ego = LocalEgoState.from_tensor(
-            self_obs_tensor=self.sim_object.self_observation_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
 
-        observation_roadgraph = LocalRoadGraphPoints.from_tensor(
-            local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
+        observation_ego = None
+        if self.env_config.ego_state:
+            observation_ego = LocalEgoState.from_tensor(
+                self_obs_tensor=self.sim_object.self_observation_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
-        observation_partner = PartnerObs.from_tensor(
-            partner_obs_tensor=self.sim_object.partner_observations_tensor(),
-            backend=self.backend,
-            device="cpu",
+        observation_roadgraph = None
+        if self.env_config.road_map_obs:
+            observation_roadgraph = LocalRoadGraphPoints.from_tensor(
+                local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        observation_partner = None
+        if self.env_config.partner_obs:
+            observation_partner = PartnerObs.from_tensor(
+                partner_obs_tensor=self.sim_object.partner_observations_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        lidar_obs = (
+            None  # Note: Lidar obs are in global coordinates by default
         )
+        if self.env_config.lidar_obs:
+            lidar_obs = LidarObs.from_tensor(
+                lidar_tensor=self.sim_object.lidar_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
         marker_scale = max(figsize) / 15
         line_width_scale = max(figsize) / 15
-
-        # Check if agent index is valid, otherwise return None
-        if observation_ego.id[env_idx, agent_idx] == -1:
-            return None, None
 
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
@@ -1720,6 +1734,10 @@ class MatplotlibVisualizer:
             )
 
         if observation_ego is not None:
+            # Check if agent index is valid, otherwise return None
+            if observation_ego.id[env_idx, agent_idx] == -1:
+                return None, None
+
             ego_agent_color = (
                 "r"
                 if observation_ego.is_collided[env_idx, agent_idx]
@@ -1754,37 +1772,32 @@ class MatplotlibVisualizer:
                 zorder=1,
             )
 
-            # ax.scatter(
-            #     observation_ego.rel_goal_x[env_idx, agent_idx],
-            #     observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     s=5,
-            #     linewidth=1.5,
-            #     c=ego_agent_color,
-            #     marker="x",
-            # )
+        if lidar_obs is not None:
+            num_lidar_samples = lidar_obs.num_lidar_samples * 3
 
-            # circle = Circle(
-            #     (
-            #         observation_ego.rel_goal_x[env_idx, agent_idx],
-            #         observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     ),
-            #     radius=self.goal_radius,
-            #     color=ego_agent_color,
-            #     fill=False,
-            #     linestyle="--",
-            # )
-            # ax.add_patch(circle)
+            ego_lidar_pos_xy = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 2:4]
+                .flatten(end_dim=1)
+                .cpu()
+                .numpy()
+            )
 
-            # observation_radius = Circle(
-            #     (0, 0),
-            #     radius=self.env_config.obs_radius,
-            #     color="#000000",
-            #     linewidth=0.8,
-            #     fill=False,
-            #     linestyle="-",
-            # )
-            # ax.add_patch(observation_radius)
-            plt.axis("off")
+            ego_lidar_entity_types = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 1]
+                .flatten()
+                .cpu()
+                .numpy()
+            )
+
+            for lidar_sample_idx in range(num_lidar_samples):
+                ax.scatter(
+                    ego_lidar_pos_xy[lidar_sample_idx, 0],
+                    ego_lidar_pos_xy[lidar_sample_idx, 1],
+                    s=2,
+                    marker="o",
+                    c="k",
+                    alpha=0.5,
+                )
 
         time_step = (
             self.env_config.episode_len
@@ -1836,5 +1849,6 @@ class MatplotlibVisualizer:
         # ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
         # ax.set_xticks([])
         # ax.set_yticks([])
+        # plt.axis("off")
 
         return fig
