@@ -23,9 +23,8 @@ class Metadata:
         self.objects_of_interest = metadata_tensor[:, :, 1]
         self.tracks_to_predict = metadata_tensor[:, :, 2]
         self.difficulty = metadata_tensor[:, :, 3]
-        self.avg_z = metadata_tensor[:, :, 4]  # Added average z-coordinate
+        self.avg_z = metadata_tensor[:, :, 4] 
         
-
     @classmethod
     def from_tensor(
         cls, metadata_tensor: madrona_gpudrive.madrona.Tensor, 
