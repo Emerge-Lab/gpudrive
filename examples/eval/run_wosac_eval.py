@@ -214,16 +214,16 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = 64
-    NUM_ENVS = 20
+    NUM_ENVS = 3
     DEVICE = "cuda"  # where to run the env rollouts
-    NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 1
+    NUM_ROLLOUTS_PER_BATCH = 2
+    NUM_DATA_BATCHES = 3
     INIT_STEPS = 10
     DATASET_SIZE = 100
     RENDER = True
 
-    DATA_JSON = "data/processed/wosac/validation_json_100"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
+    DATA_JSON = "data/processed/wosac/validation_json_3"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_3"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     agent = load_agent(
         # path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
         # path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_013762.pt",
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_27_13_56_08_309_003600.pt"
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_28_15_56_44_152_014083.pt"
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with

@@ -1845,10 +1845,10 @@ class MatplotlibVisualizer:
                     zorder=10,
                 )
 
-        # ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
-        # ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
-        # ax.set_xticks([])
-        # ax.set_yticks([])
-        # plt.axis("off")
+        ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        plt.axis("off")
 
         return fig
