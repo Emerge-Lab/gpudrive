@@ -69,16 +69,21 @@ def rollout(
 
     start_env_rollout = perf_counter()
 
-    next_obs = env.reset(control_mask)
+    _ = env.reset()
 
+    # Zero out actions for parked vehicles
     info = Info.from_tensor(
         env.sim.info_tensor(),
         backend=env.backend,
         device=env.device,
     )
-    # Zero out actions for parked vehicles
-    zero_action_mask = (info.off_road == 1) | (info.collided_with_vehicle == 1) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
-    control_mask = env.cont_agent_mask & ~zero_action_mask
+    control_mask_all = env.cont_agent_mask.clone()
+    zero_action_mask = (info.off_road == 1) | (
+        info.collided_with_vehicle == 1
+    ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
+    control_mask = control_mask_all & ~zero_action_mask
+
+    next_obs = env.reset(control_mask)
 
     # Get scenario ids
     scenario_ids_dict = env.get_scenario_ids()
@@ -226,7 +231,7 @@ if __name__ == "__main__":
     NUM_ENVS = 3
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 2
+    NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
     RENDER = True
@@ -247,7 +252,8 @@ if __name__ == "__main__":
     # Load agent
     agent = load_agent(
         # path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_013762.pt",
+        # path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_013762.pt", # Trained with collision penalty
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_28_15_56_44_152_014083.pt",  # Trained without collision penalty
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with

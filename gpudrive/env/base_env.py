@@ -126,6 +126,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         elif self.config.init_mode == "wosac_train":
             params.readFromTracksToPredict = True
             params.isStaticAgentControlled = True
+            params.controlExperts = False
         elif self.config.init_mode == "all_objects":
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False

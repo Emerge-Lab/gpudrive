@@ -1704,12 +1704,13 @@ if __name__ == "__main__":
         add_reference_speed=True,
         add_reference_heading=True,
         reward_type="guided_autonomy",
+        init_mode="wosac_train",
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/examples",
+        root="data/processed/wosac/debug",
         batch_size=1,
         dataset_size=1,
         sample_with_replacement=False,
@@ -1753,7 +1754,7 @@ if __name__ == "__main__":
     print(f"Highlighted agent: {highlight_agent}")
     print(f"Position: {agent_positions[-1]}")
 
-    for t in range(env.init_steps, env.episode_len):
+    for t in range(env.init_steps, env.init_steps + 10):
         print(f"Step: {t+1}")
 
         # Step the environment
