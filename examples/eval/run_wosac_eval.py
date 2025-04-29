@@ -13,8 +13,10 @@ from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.datatypes.info import Info
 from gpudrive.utils.checkpoint import load_agent
 from gpudrive.visualize.utils import img_from_fig
+import madrona_gpudrive
 
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -67,9 +69,16 @@ def rollout(
 
     start_env_rollout = perf_counter()
 
-    control_mask = env.cont_agent_mask
-
     next_obs = env.reset(control_mask)
+
+    info = Info.from_tensor(
+        env.sim.info_tensor(),
+        backend=env.backend,
+        device=env.device,
+    )
+    # Zero out actions for parked vehicles
+    zero_action_mask = (info.off_road == 1) & (info.collided_with_vehicle == 1) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
+    control_mask = env.cont_agent_mask & ~zero_action_mask
 
     # Get scenario ids
     scenario_ids_dict = env.get_scenario_ids()
