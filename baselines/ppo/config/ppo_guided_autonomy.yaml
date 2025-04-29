@@ -34,7 +34,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   guidance_heading_weight: 0.01
   smoothness_weight: 0.001
 
-  init_mode: womd_tracks_to_predict
+  init_mode: wosac_train
   dynamics_model: "classic"
   remove_non_vehicles: false
   collision_behavior: "ignore"

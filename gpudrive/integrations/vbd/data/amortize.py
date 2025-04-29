@@ -64,7 +64,7 @@ def main():
         init_steps=INIT_STEPS, # Warmup period
         dynamics_model="state", # Use state-based dynamics model
         dist_to_goal_threshold=1e-5, # Trick to make sure the agents don't disappear when they reach the goal
-        init_mode = 'womd_tracks_to_predict',
+        init_mode = 'wosac_eval',
         max_controlled_agents=MAX_CONTROLLED_AGENTS,
         goal_behavior='ignore'
     )
