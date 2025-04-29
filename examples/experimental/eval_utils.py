@@ -421,11 +421,12 @@ def multi_policy_rollout(
     for time_step in range(episode_len):
         print(f't: {time_step}')
 
-        policy_live_masks = {name: mask & live_agent_mask for name, (policy_fn,mask) in policies.items()}
+        policy_live_masks = {name: policy_data['mask'] & live_agent_mask for name, policy_data in policies.items()}
 
 
         actions = {}
-        for policy_name, (policy_fn,policy_mask) in policies.items():
+        for policy_name, policy_data in policies.items():
+            policy_fn = policy_data['func']
             live_mask = policy_live_masks[policy_name]
             if live_mask.any():
                 actions[policy_name], _, _, _ = policy_fn(
@@ -445,7 +446,8 @@ def multi_policy_rollout(
             live_mask = policy_live_masks[policy_name]
             if action.numel() > 0:
                 action_template[live_mask] = action.to(dtype=action_template.dtype, device=device)
-
+                
+        assert(torch.all(action_template *combined_mask == action_template)), "mismatch between action template and combined mask" 
         # Step environment
         env.step_dynamics(action_template)
 
@@ -483,6 +485,8 @@ def multi_policy_rollout(
             policy_metrics[policy_name]["off_road"][live_mask] += infos.off_road[live_mask]
             policy_metrics[policy_name]["collided"][live_mask] += infos.collided[live_mask]
             policy_metrics[policy_name]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
+            if infos.goal_achieved[live_mask].sum() != 0 and policy_name == 'pi_1':
+                pass
 
         live_agent_mask[dones] = False
 
@@ -504,20 +508,22 @@ def multi_policy_rollout(
         if not active_worlds:  
             break
     
-    controlled_per_scene = sum(mask.sum(dim=1).float() for policy_name,(policy_fn,mask) in policies.items())
+    
 
 
     
-    metrics =compute_metrics(policy_metrics,policy_live_masks,controlled_per_scene)
+    metrics =compute_metrics(policy_metrics,policies)
 
     if render_sim_state:
         return metrics, sim_state_frames
     
     return metrics
 
-def compute_metrics(policy_metrics,policy_live_masks,controlled_per_scene):
+def compute_metrics(policy_metrics,policies):
 
-    for policy_name, live_mask in policy_live_masks.items():
+    for policy_name, policy_data in policies.items():
+            
+            controlled_per_scene = policy_data['mask'].sum(dim=1)
             
             policy_metrics[policy_name]['off_road_count'] = ( policy_metrics[policy_name]["off_road"] > 0).float().sum(axis=1)
             policy_metrics[policy_name]['collided_count'] = (policy_metrics[policy_name]["collided"]   > 0).float().sum(axis=1)
