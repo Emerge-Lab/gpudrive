@@ -77,7 +77,7 @@ def rollout(
         device=env.device,
     )
     # Zero out actions for parked vehicles
-    zero_action_mask = (info.off_road == 1) & (info.collided_with_vehicle == 1) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
+    zero_action_mask = (info.off_road == 1) | (info.collided_with_vehicle == 1) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
     control_mask = env.cont_agent_mask & ~zero_action_mask
 
     # Get scenario ids
