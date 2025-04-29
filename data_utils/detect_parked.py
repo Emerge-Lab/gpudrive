@@ -330,7 +330,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--threshold",
         type=float,
-        default=0.4,
+        default=1.0,
         help="Threshold for trajectory length to classify a vehicle as moving (default: 0.2)"
     )
 
