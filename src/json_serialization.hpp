@@ -15,10 +15,23 @@ namespace madrona_gpudrive
         p.y = j.at("y").get<float>();
     }
 
+    // Extract Z coordinate from position JSON
+    float extract_z_from_position(const nlohmann::json &j)
+    {
+        if (j.contains("z")) {
+            return j.at("z").get<float>();
+        }
+        return 0.0f; // Default z value if not provided
+    }
+
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
         obj.mean = {0,0};
         uint32_t i = 0;
+        
+        // Clear z positions array - make sure to add this field to MapObject
+        obj.zPositions.clear();
+        
         for (const auto &pos : j.at("position"))
         { 
             if (i < MAX_POSITIONS)
@@ -26,6 +39,11 @@ namespace madrona_gpudrive
                 from_json(pos, obj.position[i]);
                 obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
                 obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
+                
+                // Store z position separately
+                float z = extract_z_from_position(pos);
+                obj.zPositions.push_back(z);
+                
                 ++i;
             }
             else
@@ -101,12 +119,23 @@ namespace madrona_gpudrive
             from_json(j.at("mark_as_expert"), obj.markAsExpert);
         }
 
-         // Initialize metadata fields to 0
+        // Initialize metadata fields to 0
         obj.metadata.isSdc = 0;
         obj.metadata.isObjectOfInterest = 0;
         obj.metadata.isTrackToPredict = 0;
         obj.metadata.difficulty = 0;
-
+        
+        // Calculate average z position from the first 10 positions (or fewer if less available)
+        // Store in the avgZ field of the MetaData struct for later access
+        float avgZ = 0.0f;
+        size_t zCount = std::min(static_cast<size_t>(10), obj.zPositions.size());
+        if (zCount > 0) {
+            for (size_t zi = 0; zi < zCount; zi++) {
+                avgZ += obj.zPositions[zi];
+            }
+            avgZ /= static_cast<float>(zCount);
+        }
+        obj.metadata.avgZ = avgZ;  // Make sure MetaData struct has this field
         // Initialize VBD trajectories to zeros
         for (int i = 0; i < consts::episodeLen; i++) {
             for (int j = 0; j < 5; j++) {

@@ -38,6 +38,7 @@ namespace madrona_gpudrive
         MapVector2 mean;
         bool markAsExpert{false};
         float vbd_trajectories[consts::episodeLen][5];  // x, y, yaw, vx, vy
+        std::vector<float> zPositions;
     };
 
     struct MapRoad

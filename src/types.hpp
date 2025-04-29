@@ -442,6 +442,7 @@ namespace madrona_gpudrive
         int32_t isObjectOfInterest;
         int32_t isTrackToPredict;
         int32_t difficulty;
+        float avgZ;  // Average z-coordinate (elevation) from first 10 positions
 
         static inline void zero(MetaData& metadata)
         {
@@ -449,9 +450,10 @@ namespace madrona_gpudrive
             metadata.isObjectOfInterest = -1;
             metadata.isTrackToPredict = -1;
             metadata.difficulty = -1;
+            metadata.avgZ = 0.0f;
         }
     };
-    const size_t MetaDataExportSize = 4;
+    const size_t MetaDataExportSize = 5;
     static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
 
     struct AgentInterface : public madrona::Archetype<

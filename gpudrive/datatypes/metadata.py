@@ -14,6 +14,7 @@ class Metadata:
         isOfInterest: IDs of agents interested (1/0, -1 padding).
         isModeled: Whether agent's trajectory needs to be predicted for WOSAC (1/0, -1 padding).
         difficulty: Difficulty of the agent's trajectory to be predicted (0/1/2 if isModeled, 0 if !isModeled, -1 padding).
+        avgZ: Average z-coordinate (elevation) from the first 10 positions of the agent.
     """
 
     def __init__(self, metadata_tensor: torch.Tensor):
@@ -22,6 +23,8 @@ class Metadata:
         self.objects_of_interest = metadata_tensor[:, :, 1]
         self.tracks_to_predict = metadata_tensor[:, :, 2]
         self.difficulty = metadata_tensor[:, :, 3]
+        self.avg_z = metadata_tensor[:, :, 4]  # Added average z-coordinate
+        
 
     @classmethod
     def from_tensor(
