@@ -173,7 +173,7 @@ class EnvConfig:
     agent_size_scale: float = madrona_gpudrive.vehicleScale
 
     # Initialization mode
-    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
+    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, wosac_eval, wosac_train
 
     # VBD model settings
     use_vbd: bool = False

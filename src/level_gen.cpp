@@ -133,12 +133,20 @@ static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExp
         if (ctx.get<Trajectory>(agent_iface).valids[initSteps] == 0) {
             return false;
         }
+        else if (!ctx.data().params.controlExperts && markAsExpert) {
+            return false;
+        }
         else {
             return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents;
         }
     }
     
     // Original logic for other initialization modes
+    if (ctx.data().params.controlExperts) {
+        return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
+           ctx.get<Trajectory>(agent_iface).valids[0] &&
+           ctx.get<ResponseType>(agent) == ResponseType::Dynamic;        
+    }
     return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
            ctx.get<Trajectory>(agent_iface).valids[0] &&
            ctx.get<ResponseType>(agent) == ResponseType::Dynamic &&
