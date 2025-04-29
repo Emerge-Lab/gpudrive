@@ -13,6 +13,7 @@ from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.info import Info
 from gpudrive.utils.checkpoint import load_agent
 from gpudrive.visualize.utils import img_from_fig
@@ -30,6 +31,15 @@ logger = logging.getLogger("WOSAC evaluation")
 
 def get_state(env):
     """Obtain raw agent states."""
+    # Take the z_pos as the first element of the logs
+    log_replay_z_init = LogTrajectory.from_tensor(
+        env.sim.expert_trajectory_tensor(),
+        env.num_worlds,
+        env.max_agent_count,
+        env.backend,
+        env.device,
+    )# TODO: Take .pos_z
+    
     ego_state = GlobalEgoState.from_tensor(
         env.sim.absolute_self_observation_tensor(),
         backend=env.backend,
