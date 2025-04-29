@@ -12,6 +12,7 @@ ROAD_GRAPH_COLORS = {
     4: np.array([200, 200, 200]) / 255.0,  # 'Crosswalk' (Light Gray)
     5: np.array([0.85, 0.65, 0.13]),  # 'SpeedBump' (Dark yellow)
     6: np.array([255, 0, 0]) / 255.0,  # 'StopSign' (Red)
+    7: np.array([0.0, 0.0, 0.0]),  # 'RoadEdge' (Black)
 }
 
 ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)

@@ -14,25 +14,26 @@ from matplotlib.patches import Circle, Polygon, RegularPolygon
 
 from gpudrive.visualize.color import ROAD_GRAPH_COLORS, ROAD_GRAPH_TYPE_NAMES
 
+
 def img_from_fig(fig: matplotlib.figure.Figure) -> np.ndarray:
     """Returns a [H, W, 3] uint8 np image from fig.canvas.tostring_rgb()."""
     # Adjusted margins to better accommodate 3D plots
     fig.subplots_adjust(
-        left=0.0,    # Reduce left margin
+        left=0.0,  # Reduce left margin
         bottom=0.0,  # Reduce bottom margin
-        right=1.0,   # Extend to right edge
-        top=1.0,     # Extend to top edge
-        wspace=0.0, 
-        hspace=0.0
+        right=1.0,  # Extend to right edge
+        top=1.0,  # Extend to top edge
+        wspace=0.0,
+        hspace=0.0,
     )
-    
+
     # Force render
     fig.canvas.draw()
-    
+
     # Convert to numpy array
     data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     img = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    
+
     plt.close(fig)
     return img
 
@@ -158,6 +159,7 @@ def plot_bounding_box(
     orientation: Union[float, torch.Tensor],
     color: str,
     alpha: Optional[float] = 1.0,
+    line_width_scale: float = 1.5,
     label: Optional[str] = None,
 ) -> None:
     """Plots bounding boxes, supporting both single and multiple agents.
@@ -223,7 +225,7 @@ def plot_bounding_box(
                 color=color,
                 alpha=alpha,
                 linestyle="-",
-                linewidth=2,
+                linewidth=2 * line_width_scale,
                 label=label if i == 0 else None,
             )
     else:
@@ -456,7 +458,7 @@ def plot_numpy_bounding_boxes_multiple_policy(
       label: String, represents the meaning of the color for different boxes.
     """
 
-    for bboxes,color in zip(bboxes_s,colors):
+    for bboxes, color in zip(bboxes_s, colors):
         if bboxes.ndim != 2 or bboxes.shape[1] != 5:
             raise ValueError(
                 (
