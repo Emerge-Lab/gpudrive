@@ -138,9 +138,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def setup_guidance(self):
         """Configure the reference trajectory based on the guidance mode.
-        
+
         Returns:
-            reference_trajectory: The reference trajectory to guide the agent's 
+            reference_trajectory: The reference trajectory to guide the agent's
             behavior. Shape: [num_worlds, max_agent_count, traj_len, feature_dim]
         """
         self.guidance_mode = self.config.guidance_mode
@@ -160,8 +160,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.reference_trajectory = self._generate_sample_batch(
                 init_steps=self.init_steps
             )
-            
-        else: # Default option is "log_replay"
+
+        else:  # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
             self.reference_trajectory = LogTrajectory.from_tensor(
                 trajectory_tensor,
