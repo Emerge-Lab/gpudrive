@@ -141,7 +141,7 @@ class VBDTrajectoryOnline:
         self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
-        # Assumption: All timesteps are valid
+        # Assumption: All timesteps are valid (correct)
         self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
     @classmethod
@@ -199,6 +199,7 @@ class VBDTrajectory:
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
         # Assumption: All timesteps are valid
+        # TODO: The first 10 timesteps come from the logs, so there may be invalid steps
         self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
     @classmethod
