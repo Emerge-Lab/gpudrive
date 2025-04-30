@@ -121,6 +121,63 @@ class LogTrajectory:
 
 
 @dataclass
+class VBDTrajectoryOnline:
+    """A class to represent the VBD predicted trajectories.
+    Initialized from VBD predictions.
+    Shape: (num_worlds, max_agents, traj_len, 5)
+
+    Attributes:
+        trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 5) containing
+            position (x, y), heading (yaw), and velocity (vx, vy) for each timestep.
+    """
+
+    def __init__(self, vbd_traj_tensor: torch.Tensor):
+        """Initializes the VBD trajectory with a tensor."""
+        self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
+        self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
+        self.pos_xy = vbd_traj_tensor[:, :, :, :2]
+        self.yaw = vbd_traj_tensor[:, :, :, 2].unsqueeze(-1)
+        self.vel_x = vbd_traj_tensor[:, :, :, 3].unsqueeze(-1)
+        self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
+        self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
+        self.ref_speed = self.comp_reference_speed()
+        # Assumption: All timesteps are valid
+        self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
+
+    @classmethod
+    def from_tensor(
+        cls,
+        vbd_predictions,
+        backend="torch",
+        device="cuda",
+    ):
+        """Creates a VBDTrajectory from a tensor."""
+        if backend == "torch":
+            return cls(vbd_predictions.clone().to(device))
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    def comp_reference_speed(self):
+        """Returns the average speed of the trajectory."""
+        return torch.sqrt(self.vel_x**2 + self.vel_y**2)
+
+    @property
+    def length(self):
+        """Returns the length of the trajectory."""
+        return self.pos_xy.shape[2]
+
+    # def restore_mean(self, mean_x, mean_y):
+    #     """Reapplies the mean to revert back to the original coordinates."""
+    #     # Reshape for broadcasting
+    #     mean_x_reshaped = mean_x.view(-1, 1, 1)
+    #     mean_y_reshaped = mean_y.view(-1, 1, 1)
+
+    #     # Apply to x and y coordinates
+    #     self.trajectories[..., 0] += mean_x_reshaped
+    #     self.trajectories[..., 1] += mean_y_reshaped
+
+
+@dataclass
 class VBDTrajectory:
     """A class to represent the VBD predicted trajectories.
     Initialized from `vbd_trajectory_tensor` (src/bindings.cpp).

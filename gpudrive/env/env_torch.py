@@ -13,6 +13,7 @@ from gpudrive.env.base_env import GPUDriveGymEnv
 from gpudrive.datatypes.trajectory import (
     LogTrajectory,
     VBDTrajectory,
+    VBDTrajectoryOnline,
     to_local_frame,
 )
 from gpudrive.datatypes.roadgraph import (
@@ -28,11 +29,9 @@ from gpudrive.datatypes.observation import (
 )
 from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
-
 from gpudrive.visualize.core import MatplotlibVisualizer
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
-from gpudrive.utils.geometry import normalize_min_max
 
 from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
@@ -163,7 +162,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )    
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
-            self.reference_trajectory = predicted["denoised_trajs"]
+            
+            # Wrap predictions into a VBDTrajectoryOnline object 
+            self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
+                predicted["denoised_trajs"], self.backend, self.device
+            )            
             
         else: # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
@@ -176,15 +179,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         # Length of the guidance trajectory
-        if self.guidance_mode in ["log_replay", "vbd_amortized"]:
-            self.reference_traj_len = self.reference_trajectory.length
-        else: 
-            self.reference_traj_len = self.reference_trajectory.shape[2]
+        self.reference_traj_len = self.reference_trajectory.length
 
     def _load_vbd_model(self, model_path):
-        """Load the Versatile Behavior Diffusion (VBD) weights from checkpoint."""
+        """
+        Load the Versatile Behavior Diffusion (VBD) weights from checkpoint.
+        """
         from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
-
         model = VBDTest.load_from_checkpoint(
             model_path, torch.device(self.device)
         )
@@ -194,9 +195,26 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _construct_context(self, init_steps=10):
         """
-        Construct a tensor that constains information from the first 10 steps 
-        (1 s) of the scene as context for the pre-trained VBD model. 
-        The model will infer the most likely trajectory for the next 80 based on this context vector.
+        Construct a dictionary containing information from the first 10 steps (1s) of the scene.
+        
+        This context data is used for the pre-trained VBD model, which infers
+        the most likely trajectory for the next 80 steps based on this context.
+        
+        Args:
+            init_steps (int): Number of steps to use for context. Default is 10.
+            
+        Returns:
+            dict: Dictionary containing context information with the following keys:
+                - 'agents_history': Past agent positions and states
+                - 'agents_interested': Agents marked for trajectory prediction
+                - 'agents_type': Type classification of each agent
+                - 'agents_future': Ground truth future states (if available)
+                - 'traffic_light_points': Location and state of traffic signals
+                - 'polylines': Road network geometry representation
+                - 'polylines_valid': Validity flags for polyline segments
+                - 'relations': Interaction relationships between agents
+                - 'agents_id': Unique identifiers for each agent
+                - 'anchors': Reference points
         """
         means_xy = (
             self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
@@ -239,7 +257,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
             device=self.device,
         )
-        context_batch = process_scenario_data(
+        context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
             controlled_agent_mask=self.cont_agent_mask,
             global_agent_obs=global_agent_obs,
@@ -250,7 +268,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             metadata=metadata,
         )
-        return context_batch
+        
+        return context_dict
 
     def _set_reward_weights(self, condition_mode="random", agent_type=None):
         """Set agent reward weights for all or specific environments.
