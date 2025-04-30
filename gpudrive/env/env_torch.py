@@ -59,10 +59,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
 
-        self.world_time_steps = torch.zeros(
-            self.num_worlds, dtype=torch.short, device=self.device
-        )
-
         # Initialize reward weights tensor to None initially
         self.reward_weights_tensor = None
 
@@ -86,14 +82,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
-        
+
         self.episode_len = self.config.episode_len
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
 
         self.setup_guidance()
-       
+
         if self.config.reward_type == "reward_conditioned":
             # Use default condition_mode from config or fall back to "random"
             condition_mode = getattr(self.config, "condition_mode", "random")
@@ -157,18 +153,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 model_path=self.config.vbd_model_path
             )
             # Construct scene context dict for the VBD model
-            scene_context = self._construct_context(
-                init_steps=self.init_steps
-            )    
+            scene_context = self._construct_context(init_steps=self.init_steps)
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
-            
-            # Wrap predictions into a VBDTrajectoryOnline object 
+
+            # Wrap predictions into a VBDTrajectoryOnline object
             self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
                 predicted["denoised_trajs"], self.backend, self.device
-            )            
-            
-        else: # Default option is "log_replay"
+            )
+
+        else:  # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
             self.reference_trajectory = LogTrajectory.from_tensor(
                 trajectory_tensor,
@@ -186,6 +180,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         Load the Versatile Behavior Diffusion (VBD) weights from checkpoint.
         """
         from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+
         model = VBDTest.load_from_checkpoint(
             model_path, torch.device(self.device)
         )
@@ -196,13 +191,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _construct_context(self, init_steps=10):
         """
         Construct a dictionary containing information from the first 10 steps (1s) of the scene.
-        
+
         This context data is used for the pre-trained VBD model, which infers
         the most likely trajectory for the next 80 steps based on this context.
-        
+
         Args:
             init_steps (int): Number of steps to use for context. Default is 10.
-            
+
         Returns:
             dict: Dictionary containing context information with the following keys:
                 - 'agents_history': Past agent positions and states
@@ -268,7 +263,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             metadata=metadata,
         )
-        
+
         return context_dict
 
     def _set_reward_weights(self, condition_mode="random", agent_type=None):
@@ -460,8 +455,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self._set_reward_weights(
                 condition_mode=mode, agent_type=use_agent_type
             )
-
-        self.world_time_steps.fill_(self.init_steps)
 
         # Reset smoothness tracking for reset environments
         if env_idx_list is not None:
@@ -679,11 +672,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
-
-        not_done_worlds = ~self.get_dones().any(
-            dim=1
-        )  # Check if any agent in world is done
-        self.world_time_steps[not_done_worlds] += 1
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
