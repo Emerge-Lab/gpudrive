@@ -198,8 +198,6 @@ class PufferGPUDrive(PufferEnv):
         polyline_reduction_threshold=0.1,
         remove_non_vehicles=False,
         obs_radius=50.0,
-        use_vbd=False,
-        vbd_trajectory_weight=0.1,
         track_realism_metrics=False,
         track_n_worlds=2,
         render=False,
@@ -254,10 +252,6 @@ class PufferGPUDrive(PufferEnv):
         self.track_realism_metrics = track_realism_metrics
         self.track_n_worlds = track_n_worlds
 
-        # VBD
-        self.vbd_trajectory_weight = vbd_trajectory_weight
-        self.use_vbd = use_vbd
-
         # Total number of agents across envs, including padding
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
@@ -298,8 +292,6 @@ class PufferGPUDrive(PufferEnv):
             max_accel_value=max_accel_value,
             action_space_steer_disc=action_space_steer_disc,
             action_space_accel_disc=action_space_accel_disc,
-            use_vbd=use_vbd,
-            vbd_trajectory_weight=vbd_trajectory_weight,
         )
 
         render_config = RenderConfig(

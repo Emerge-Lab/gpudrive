@@ -61,7 +61,7 @@ class EnvConfig:
     dynamics_model: str = (
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
-    
+
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
@@ -69,10 +69,16 @@ class EnvConfig:
     max_steer_angle: float = 1.57  # in radians: pi/2 = 1.57, pi/3 = 1.05
     max_accel_value: float = 4.0
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-max_steer_angle, max_steer_angle, action_space_steer_disc), decimals=3
+        torch.linspace(
+            -max_steer_angle, max_steer_angle, action_space_steer_disc
+        ),
+        decimals=3,
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-max_accel_value, max_accel_value, action_space_accel_disc), decimals=3
+        torch.linspace(
+            -max_accel_value, max_accel_value, action_space_accel_disc
+        ),
+        decimals=3,
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -175,10 +181,8 @@ class EnvConfig:
     # Initialization mode
     init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, wosac_eval, wosac_train
 
-    # VBD model settings
-    use_vbd: bool = False
-    vbd_trajectory_weight: float = 0.01
-    vbd_in_obs: bool = False
+    # Versatile Behavior Diffusion (VBD)
+    vbd_model_path: str = "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
 
 
 class SelectionDiscipline(Enum):

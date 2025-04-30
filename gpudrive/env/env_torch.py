@@ -87,14 +87,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.num_valid_controlled_agents_across_worlds = (
             self.cont_agent_mask.sum().item()
         )
-
-        self.setup_guidance()
-
+        
         self.episode_len = self.config.episode_len
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
 
+        self.setup_guidance()
+       
         if self.config.reward_type == "reward_conditioned":
             # Use default condition_mode from config or fall back to "random"
             condition_mode = getattr(self.config, "condition_mode", "random")
@@ -141,7 +141,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         Returns:
             reference_trajectory: The reference trajectory to guide the agent's
-            behavior. Shape: [num_worlds, max_agent_count, traj_len, feature_dim]
+            behavior. Shape: [num_worlds, max_agent_count, traj_len, feature_dim], where
+            features are assumed to be in the following order: [x, y, yaw, vx, vy]
         """
         self.guidance_mode = self.config.guidance_mode
 
@@ -156,12 +157,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.vbd_model = self._load_vbd_model(
                 model_path=self.config.vbd_model_path
             )
-            # Query the model online for the reference trajectory
-            self.reference_trajectory = self._generate_sample_batch(
+            # Construct scene context dict for the VBD model
+            scene_context = self._construct_context(
                 init_steps=self.init_steps
-            )
-
-        else:  # Default option is "log_replay"
+            )    
+            # Query the model online for the reference trajectory
+            predicted = self.vbd_model.sample_denoiser(scene_context)
+            self.reference_trajectory = predicted["denoised_trajs"]
+            
+        else: # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
             self.reference_trajectory = LogTrajectory.from_tensor(
                 trajectory_tensor,
@@ -172,7 +176,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         # Length of the guidance trajectory
-        self.reference_traj_len = self.reference_trajectory.length
+        if self.guidance_mode in ["log_replay", "vbd_amortized"]:
+            self.reference_traj_len = self.reference_trajectory.length
+        else: 
+            self.reference_traj_len = self.reference_trajectory.shape[2]
 
     def _load_vbd_model(self, model_path):
         """Load the Versatile Behavior Diffusion (VBD) weights from checkpoint."""
@@ -181,11 +188,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         model = VBDTest.load_from_checkpoint(
             model_path, torch.device(self.device)
         )
-        model.eval()
+        model.reset_agent_length(self.max_cont_agents)
+        _ = model.eval()
         return model
 
-    def _generate_sample_batch(self, init_steps=10):
-        """Generate a sample batch for the VBD model."""
+    def _construct_context(self, init_steps=10):
+        """
+        Construct a tensor that constains information from the first 10 steps 
+        (1 s) of the scene as context for the pre-trained VBD model. 
+        The model will infer the most likely trajectory for the next 80 based on this context vector.
+        """
         means_xy = (
             self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
         )
@@ -227,7 +239,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
             device=self.device,
         )
-        sample_batch = process_scenario_data(
+        context_batch = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
             controlled_agent_mask=self.cont_agent_mask,
             global_agent_obs=global_agent_obs,
@@ -238,7 +250,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             metadata=metadata,
         )
-        return sample_batch
+        return context_batch
 
     def _set_reward_weights(self, condition_mode="random", agent_type=None):
         """Set agent reward weights for all or specific environments.
@@ -1446,7 +1458,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="log_replay",  # "vbd_amortized"
+        guidance_mode="vbd_online",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
