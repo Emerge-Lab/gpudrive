@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_100
+data_dir: /scratch/kj2676/gpudrive/data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -67,9 +67,9 @@ train:
 
   # # # Data sampling # # #
   resample_scenes: false
-  resample_dataset_size: 500 # Number of unique scenes to sample from
+  resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: false
+  sample_with_replacement: true
   shuffle_dataset: true
   file_prefix: ""
 
@@ -105,7 +105,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 50 # Save policy every k iterations
+  checkpoint_interval: 400 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #

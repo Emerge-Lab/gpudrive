@@ -478,8 +478,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         info_tensor = self.sim.info_tensor().to_torch().clone()
         off_road = info_tensor[:, :, 0].to(torch.float)
 
-        # True if the vehicle is in collision with another road object
-        # (i.e. a cyclist or pedestrian)
+        # True if the agent is in collision with another road object
+        # (i.e. a cyclist, pedestrian or vehicle)
         collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
         goal_achieved = info_tensor[:, :, 3].to(torch.float)
 

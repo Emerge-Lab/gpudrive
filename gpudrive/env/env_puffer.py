@@ -784,119 +784,121 @@ class PufferGPUDrive(PufferEnv):
         control_mask = (
             self.controlled_agent_mask[done_worlds].detach().cpu().numpy()
         )
-        # [batch, time, 1]
-        valid_mask = (
-            self.env.reference_trajectory.valids[done_worlds]
-            .detach()
-            .cpu()
-            .numpy()[control_mask]
-            .squeeze(-1)
-        ).astype(bool)
+        
+        if control_mask.sum() > 0:
+            # [batch, time, 1]
+            valid_mask = (
+                self.env.reference_trajectory.valids[done_worlds]
+                .detach()
+                .cpu()
+                .numpy()[control_mask]
+                .squeeze(-1)
+            ).astype(bool)
 
-        # Take human logs (ground-truth)
-        # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
-        ref_pos_xy_np = (
-            self.env.reference_trajectory.pos_xy[done_worlds]
-            .detach()
-            .cpu()
-            .numpy()[control_mask]
-        )
-        # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
-        ref_headings_np = (
-            self.env.reference_trajectory.yaw[done_worlds]
-            .detach()
-            .cpu()
-            .numpy()[control_mask]
-            .squeeze(-1)
-        )
+            # Take human logs (ground-truth)
+            # Shape: [worlds, max_cont_agents, time, 2] -> [batch, time, 2]
+            ref_pos_xy_np = (
+                self.env.reference_trajectory.pos_xy[done_worlds]
+                .detach()
+                .cpu()
+                .numpy()[control_mask]
+            )
+            # Shape: [worlds, max_cont_agents, time, 1] -> [batch, time, 1]
+            ref_headings_np = (
+                self.env.reference_trajectory.yaw[done_worlds]
+                .detach()
+                .cpu()
+                .numpy()[control_mask]
+                .squeeze(-1)
+            )
 
-        agent_headings_np = (
-            self.headings[done_worlds].detach().cpu().numpy()[control_mask]
-        )
-        agent_pos_xyz_np = (
-            self.pos_xyz[done_worlds].detach().cpu().numpy()[control_mask]
-        )
+            agent_headings_np = (
+                self.headings[done_worlds].detach().cpu().numpy()[control_mask]
+            )
+            agent_pos_xyz_np = (
+                self.pos_xyz[done_worlds].detach().cpu().numpy()[control_mask]
+            )
 
-        # Extract x, y components (z is not informative)
-        agent_x_np = agent_pos_xyz_np[..., 0]
-        agent_y_np = agent_pos_xyz_np[..., 1]
+            # Extract x, y components (z is not informative)
+            agent_x_np = agent_pos_xyz_np[..., 0]
+            agent_y_np = agent_pos_xyz_np[..., 1]
 
-        ref_x_np = ref_pos_xy_np[..., 0]
-        ref_y_np = ref_pos_xy_np[..., 1]
+            ref_x_np = ref_pos_xy_np[..., 0]
+            ref_y_np = ref_pos_xy_np[..., 1]
 
-        # Step duration in seconds
-        seconds_per_step = 0.1  # Assuming 10Hz sampling rate
+            # Step duration in seconds
+            seconds_per_step = 0.1  # Assuming 10Hz sampling rate
 
-        # Compute the metrics for agent trajectories
-        (
-            agent_linear_speed,
-            agent_linear_accel,
-            agent_angular_speed,
-            agent_angular_accel,
-        ) = compute_kinematic_features_np(
-            agent_x_np, agent_y_np, agent_headings_np, seconds_per_step
-        )
+            # Compute the metrics for agent trajectories
+            (
+                agent_linear_speed,
+                agent_linear_accel,
+                agent_angular_speed,
+                agent_angular_accel,
+            ) = compute_kinematic_features_np(
+                agent_x_np, agent_y_np, agent_headings_np, seconds_per_step
+            )
 
-        # Compute the metrics for reference trajectories
-        (
-            ref_linear_speed,
-            ref_linear_accel,
-            ref_angular_speed,
-            ref_angular_accel,
-        ) = compute_kinematic_features_np(
-            ref_x_np, ref_y_np, ref_headings_np, seconds_per_step
-        )
+            # Compute the metrics for reference trajectories
+            (
+                ref_linear_speed,
+                ref_linear_accel,
+                ref_angular_speed,
+                ref_angular_accel,
+            ) = compute_kinematic_features_np(
+                ref_x_np, ref_y_np, ref_headings_np, seconds_per_step
+            )
 
-        # Check which time steps are valid
-        speed_valid, accel_valid = compute_kinematic_validity_np(valid_mask)
+            # Check which time steps are valid
+            speed_valid, accel_valid = compute_kinematic_validity_np(valid_mask)
 
-        # Calculate absolute diffs between agent and reference trajectories
-        linear_speed_error = np.abs(agent_linear_speed - ref_linear_speed)
-        linear_accel_error = np.abs(agent_linear_accel - ref_linear_accel)
-        angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
-        angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
+            # Calculate absolute diffs between agent and reference trajectories
+            linear_speed_error = np.abs(agent_linear_speed - ref_linear_speed)
+            linear_accel_error = np.abs(agent_linear_accel - ref_linear_accel)
+            angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
+            angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
 
-        # Calculate displacement error
-        displacement_error = compute_displacement_error_np(
-            agent_x_np, agent_y_np, ref_x_np, ref_y_np
-        )
+            # Calculate displacement error
+            displacement_error = compute_displacement_error_np(
+                agent_x_np, agent_y_np, ref_x_np, ref_y_np
+            )
 
-        # Apply validity masks
-        masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
-        masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
-        masked_angular_speed_error = np.ma.array(
-            angular_speed_error, mask=~speed_valid
-        )
-        masked_angular_accel_error = np.ma.array(
-            angular_accel_error, mask=~accel_valid
-        )
+            # Apply validity masks
+            masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
+            masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
+            masked_angular_speed_error = np.ma.array(
+                angular_speed_error, mask=~speed_valid
+            )
+            masked_angular_accel_error = np.ma.array(
+                angular_accel_error, mask=~accel_valid
+            )
 
-        # Compute MAEs
-        mean_linear_speed_error = masked_speed_error.mean()
-        mean_linear_accel_error = masked_accel_error.mean()
-        mean_angular_speed_error = masked_angular_speed_error.mean()
-        mean_angular_accel_error = masked_angular_accel_error.mean()
+            # Compute MAEs
+            mean_linear_speed_error = masked_speed_error.mean()
+            mean_linear_accel_error = masked_accel_error.mean()
+            mean_angular_speed_error = masked_angular_speed_error.mean()
+            mean_angular_accel_error = masked_angular_accel_error.mean()
 
-        self.info_lst.append(
-            {
-                "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
-                "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
-                "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
-                "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
-                "realism/mean_displacement_error": displacement_error[
-                    valid_mask
-                ].mean(),
-                # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
-                #     ref_linear_speed[speed_valid]
-                # ),
-                # "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
-                #     ref_linear_accel[accel_valid]
-                # ),
-                # "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
-                #     agent_linear_speed[speed_valid]
-                # ),
-                # "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
-                #     agent_linear_speed[accel_valid]
-                # ),
-            },
-        )
+            self.info_lst.append(
+                {
+                    "realism/kinematic_linear_speed_mae": mean_linear_speed_error,
+                    "realism/kinematic_linear_accel_mae": mean_linear_accel_error,
+                    "realism/kinematic_angular_speed_mae": mean_angular_speed_error,
+                    "realism/kinematic_angular_accel_mae": mean_angular_accel_error,
+                    "realism/mean_displacement_error": displacement_error[
+                        valid_mask
+                    ].mean(),
+                    # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
+                    #     ref_linear_speed[speed_valid]
+                    # ),
+                    # "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
+                    #     ref_linear_accel[accel_valid]
+                    # ),
+                    # "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
+                    #     agent_linear_speed[speed_valid]
+                    # ),
+                    # "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
+                    #     agent_linear_speed[accel_valid]
+                    # ),
+                },
+            )
