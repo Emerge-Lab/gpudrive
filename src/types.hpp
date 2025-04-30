@@ -435,14 +435,13 @@ namespace madrona_gpudrive
     const size_t ScenarioIdExportSize = 32;
     static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
 
-    //Metadata struct : using agent IDs.
     struct MetaData
     {
-        int32_t isSdc;
-        int32_t isObjectOfInterest;
-        int32_t isTrackToPredict;
-        int32_t difficulty;
-        float avgZ;  // Average z-coordinate (elevation) from first 10 positions
+        float isSdc;
+        float isObjectOfInterest;
+        float isTrackToPredict;
+        float difficulty;
+        float avgZ;
 
         static inline void zero(MetaData& metadata)
         {
@@ -454,7 +453,7 @@ namespace madrona_gpudrive
         }
     };
     const size_t MetaDataExportSize = 5;
-    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * (MetaDataExportSize - 1) + sizeof(float));
 
     struct AgentInterface : public madrona::Archetype<
                                 Action,

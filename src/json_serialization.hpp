@@ -29,8 +29,7 @@ namespace madrona_gpudrive
         obj.mean = {0,0};
         uint32_t i = 0;
         
-        // Clear z positions array - make sure to add this field to MapObject
-        obj.zPositions.clear();
+        float zPositions[10];
         
         for (const auto &pos : j.at("position"))
         { 
@@ -41,9 +40,12 @@ namespace madrona_gpudrive
                 obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
                 
                 // Store z position separately
-                float z = extract_z_from_position(pos);
-                obj.zPositions.push_back(z);
-                
+                if (i < 10)
+                {
+                    float z = extract_z_from_position(pos);
+                    zPositions[i] = z;
+                }
+
                 ++i;
             }
             else
@@ -124,18 +126,29 @@ namespace madrona_gpudrive
         obj.metadata.isObjectOfInterest = 0;
         obj.metadata.isTrackToPredict = 0;
         obj.metadata.difficulty = 0;
+        obj.metadata.avgZ = 0.0f;
         
-        // Calculate average z position from the first 10 positions (or fewer if less available)
-        // Store in the avgZ field of the MetaData struct for later access
+        // Calculate average z position from the first 10 positions
+        // Store in the avgZ field of map object
         float avgZ = 0.0f;
-        size_t zCount = std::min(static_cast<size_t>(10), obj.zPositions.size());
-        if (zCount > 0) {
-            for (size_t zi = 0; zi < zCount; zi++) {
-                avgZ += obj.zPositions[zi];
+        float avg_count = 0.0f;
+        for (int zi = 0; zi < 10; zi++) {
+            // Only consider valid z positions
+            if (obj.valid[zi]) {
+                avgZ += zPositions[zi];
+                avg_count += 1;
             }
-            avgZ /= static_cast<float>(zCount);
         }
-        obj.metadata.avgZ = avgZ;  // Make sure MetaData struct has this field
+        if (avg_count == 0) {
+            avgZ = 0.0f; // Avoid division by zero
+        }
+        else
+        {
+            avgZ /= avg_count; // Calculate average
+        }
+        std::cout << "avgZ: " << avgZ << std::endl;
+        obj.metadata.avgZ = avgZ;
+
         // Initialize VBD trajectories to zeros
         for (int i = 0; i < consts::episodeLen; i++) {
             for (int j = 0; j < 5; j++) {

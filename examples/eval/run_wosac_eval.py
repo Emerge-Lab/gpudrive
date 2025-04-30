@@ -33,7 +33,7 @@ def get_state(env):
     """Obtain raw agent states."""
     # TODO: Take the average elevation
     avg_z_pos = Metadata.from_tensor(
-         metadata_tensor=env.sim.metadata_tensor(),
+        metadata_tensor=env.sim.metadata_tensor(),
         backend=env.backend,
         device=env.device,
     ).avg_z 
@@ -48,7 +48,7 @@ def get_state(env):
     return (
         ego_state.pos_x + mean_x,
         ego_state.pos_y + mean_y,
-        ego_state.pos_z, #TODO: Return avg_z_pos
+        avg_z_pos,
         ego_state.rotation_angle,
         ego_state.id,
     )
