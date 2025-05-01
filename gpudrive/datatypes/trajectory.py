@@ -147,6 +147,8 @@ class VBDTrajectoryOnline:
         self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
         self.mean_pos_xy = mean_pos_xy
+        self.mean_x = mean_pos_xy[:, 0]
+        self.mean_y = mean_pos_xy[:, 1]
 
         self.demean_positions()
 
@@ -233,13 +235,3 @@ class VBDTrajectory:
     def length(self):
         """Returns the length of the trajectory."""
         return self.pos_xy.shape[2]
-
-    # def restore_mean(self, mean_x, mean_y):
-    #     """Reapplies the mean to revert back to the original coordinates."""
-    #     # Reshape for broadcasting
-    #     mean_x_reshaped = mean_x.view(-1, 1, 1)
-    #     mean_y_reshaped = mean_y.view(-1, 1, 1)
-
-    #     # Apply to x and y coordinates
-    #     self.trajectories[..., 0] += mean_x_reshaped
-    #     self.trajectories[..., 1] += mean_y_reshaped
