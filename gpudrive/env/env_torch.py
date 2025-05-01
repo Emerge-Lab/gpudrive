@@ -154,12 +154,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
             # Construct scene context dict for the VBD model
             scene_context = self._construct_context(init_steps=self.init_steps)
+
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
 
             # Wrap predictions into a VBDTrajectoryOnline object
             self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
-                predicted["denoised_trajs"], self.backend, self.device
+                vbd_predictions=predicted["denoised_trajs"],
+                mean_pos_xy=self.sim.world_means_tensor().to_torch()[:, :2],
+                backend=self.backend,
+                device=self.device,
             )
 
         else:  # Default option is "log_replay"

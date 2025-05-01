@@ -131,7 +131,9 @@ class VBDTrajectoryOnline:
             position (x, y), heading (yaw), and velocity (vx, vy) for each timestep.
     """
 
-    def __init__(self, vbd_traj_tensor: torch.Tensor):
+    def __init__(
+        self, vbd_traj_tensor: torch.Tensor, mean_pos_xy: torch.Tensor
+    ):
         """Initializes the VBD trajectory with a tensor."""
         self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
         self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
@@ -144,16 +146,24 @@ class VBDTrajectoryOnline:
         # Assumption: All timesteps are valid (correct)
         self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
+        self.mean_pos_xy = mean_pos_xy
+
+        self.demean_positions()
+
     @classmethod
     def from_tensor(
         cls,
         vbd_predictions,
+        mean_pos_xy,
         backend="torch",
         device="cuda",
     ):
         """Creates a VBDTrajectory from a tensor."""
         if backend == "torch":
-            return cls(vbd_predictions.clone().to(device))
+            return cls(
+                vbd_predictions.clone().to(device),
+                mean_pos_xy.clone().to(device),
+            )
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
@@ -166,15 +176,15 @@ class VBDTrajectoryOnline:
         """Returns the length of the trajectory."""
         return self.pos_xy.shape[2]
 
-    # def restore_mean(self, mean_x, mean_y):
-    #     """Reapplies the mean to revert back to the original coordinates."""
-    #     # Reshape for broadcasting
-    #     mean_x_reshaped = mean_x.view(-1, 1, 1)
-    #     mean_y_reshaped = mean_y.view(-1, 1, 1)
+    def demean_positions(self):
+        """In GPUDrive, everything is centered at zero, so we need to demean the predicted trajectory"""
+        # Reshape for broadcasting
+        mean_x_reshaped = self.mean_x.view(-1, 1, 1)
+        mean_y_reshaped = self.mean_y.view(-1, 1, 1)
 
-    #     # Apply to x and y coordinates
-    #     self.trajectories[..., 0] += mean_x_reshaped
-    #     self.trajectories[..., 1] += mean_y_reshaped
+        # Apply to x and y coordinates
+        self.pos_xy[..., 0] += mean_x_reshaped
+        self.pos_xy[..., 1] += mean_y_reshaped
 
 
 @dataclass
