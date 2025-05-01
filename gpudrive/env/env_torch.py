@@ -192,7 +192,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             model_path, torch.device(self.device)
         )
         model.reset_agent_length(self.max_cont_agents)
-        model.guidance_iter = 1 # Note: 5 by default
+        model.guidance_iter = 5
         _ = model.eval()
         return model
 
@@ -262,7 +262,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
-            controlled_agent_mask=self.cont_agent_mask,
+            controlled_agent_mask=self.cont_agent_mask.cpu(),
             global_agent_obs=global_agent_obs,
             global_road_graph=global_road_graph,
             log_trajectory=log_trajectory,
@@ -1473,7 +1473,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="vbd_amortized",  # Options: "log_replay", "vbd_amortized"
+        guidance_mode="vbd_amortized", # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,

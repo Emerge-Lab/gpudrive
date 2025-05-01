@@ -39,12 +39,12 @@ def load_vbd_model(model_path, device="cpu", max_cont_agents=64):
 def main():
     parser = argparse.ArgumentParser(description="VBD Amortization Script")
     parser.add_argument("--model_path", help="Path to the VBD model checkpoint", default="gpudrive/integrations/vbd/weights/epoch=18.ckpt")
-    parser.add_argument("--input_dir", help="Directory containing input JSON files", default="data/processed/examples")
-    parser.add_argument("--output_dir", help="Directory for output JSON files", default="data/processed/vbd")
-    parser.add_argument("--batch_size", type=int, default=1, help="Batch size for processing")
+    parser.add_argument("--input_dir", help="Directory containing input JSON files", default="data/processed/wosac/validation_json_100")
+    parser.add_argument("--output_dir", help="Directory for output JSON files", default="data/processed/wosac/validation_json_100")
+    parser.add_argument("--batch_size", type=int, default=10, help="Batch size for processing")
     parser.add_argument("--window_size", type=int, default=10, help="Size of sliding window")
     parser.add_argument("--total_steps", type=int, default=91, help="Total number of steps to generate")
-    parser.add_argument("--num_scenes", type=int, default=4, help="Number of scenes to process")
+    parser.add_argument("--num_scenes", type=int, default=100, help="Number of scenes to process")
     args = parser.parse_args()
     
     # Always use CPU device
@@ -59,7 +59,7 @@ def main():
     print(f"Found {len(json_files)} JSON files to process")
     
     #Init GPUDrive env
-    INIT_STEPS = 11
+    INIT_STEPS = 10
     env_config = EnvConfig(
         init_steps=INIT_STEPS, # Warmup period
         dynamics_model="state", # Use state-based dynamics model
@@ -76,6 +76,7 @@ def main():
             root=args.input_dir,
             batch_size=args.batch_size,
             dataset_size=args.num_scenes,
+            file_prefix="",
         ),
         render_config=RenderConfig(render_3d=True),
         max_cont_agents=MAX_CONTROLLED_AGENTS, # Maximum number of agents to control per scene
@@ -105,12 +106,12 @@ def main():
 
     for _ in range(int(args.num_scenes / args.batch_size)):
         # Generate VBD input
-        gpudrive_sample_batch = gpudrive_env._generate_sample_batch()
+        scene_context = gpudrive_env.construct_context(init_steps=gpudrive_env.init_steps)
         # Controlled agent mask
-        world_agent_indices = gpudrive_sample_batch['agents_id']
+        world_agent_indices = scene_context['agents_id']
 
         # Generate VBD output
-        predictions = vbd_model.sample_denoiser(gpudrive_sample_batch)
+        predictions = vbd_model.sample_denoiser(scene_context)
         vbd_output = predictions["denoised_trajs"].to(device).detach()
 
         for i in range(gpudrive_env.num_worlds):
@@ -133,11 +134,11 @@ def main():
             device=device
         ).id
         
-        filenames = gpudrive_env.get_env_filenames()
+        filenames = gpudrive_env.get_scenario_ids()
         
         for i in range(gpudrive_env.num_worlds):
-            filename = filenames[i]
-            with open(os.path.join(args.input_dir, filename), "r") as f:
+            filename = f"{filenames[i]}.json"
+            with open(f"{args.input_dir}/{filename}", "r") as f:
                 data = json.load(f)
             
             valid_mask = world_agent_indices[i] >= 0  # Boolean mask of valid indices
@@ -170,3 +171,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
+    """
+    python gpudrive/integrations/vbd/data/amortize.py --input_dir data/processed/wosac/validation_json_100 --output_dir data/processed/wosac/validation_json_100 --batch_size 8 --window_size 10 --total_steps 91
+    """
