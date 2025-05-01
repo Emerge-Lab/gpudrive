@@ -19,6 +19,7 @@ from waymo_open_dataset.protos import (
     sim_agents_metrics_pb2,
     sim_agents_submission_pb2,
 )
+import csv
 
 
 class WOSACMetrics(Metric):
@@ -33,6 +34,7 @@ class WOSACMetrics(Metric):
         ego_only: bool = False,
         baselines_df: Optional[pd.DataFrame] = None,
         save_table_with_baselines: bool = True,
+        log_dir: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.is_mp_init = False
@@ -53,7 +55,7 @@ class WOSACMetrics(Metric):
         else:
             self.baselines_df = baselines_df
 
-        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H")
+        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
         self.field_names = [
             "metametric",
@@ -78,6 +80,19 @@ class WOSACMetrics(Metric):
             "scenario_counter", default=tensor(0.0), dist_reduce_fx="sum"
         )
         tf.config.set_visible_devices([], "GPU")
+
+        if log_dir is not None:
+            # Get data and time for the current run as filename
+            log_dir = Path(log_dir)
+            self.log_file_path = log_dir / f"{self.timestamp}.csv"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            self.log_file = csv.writer(open(self.log_file_path, 'w'))
+            # Add header to the log file
+            self.log_file.writerow(self.field_names) 
+
+
+        else:
+            self.log_file = None
 
     def _create_baselines_df(self) -> pd.DataFrame:
         """Create a DataFrame with baseline metrics based on the provided table."""
@@ -212,15 +227,37 @@ class WOSACMetrics(Metric):
             scenario_files, scenario_rollouts, scenario_rollout_masks
         ):
             try:
-                pool_scenario_metrics.append(
-                    self._compute_scenario_metrics(
+                scenario_result = self._compute_scenario_metrics(
                         self.wosac_config,
                         _scenario,
                         _scenario_rollout,
                         self.ego_only,
                         # scenario_rollouts_mask=_scenario_mask
                     )
+                pool_scenario_metrics.append(
+                    scenario_result
                 )
+
+                if self.log_file is not None:
+                    # Log the scenario metrics to the file  
+                    result_to_log = [
+                        scenario_result.metametric,
+                        scenario_result.average_displacement_error
+                        scenario_result.linear_speed_likelihood,
+                        scenario_result.linear_acceleration_likelihood,
+                        scenario_result.angular_speed_likelihood,
+                        scenario_result.angular_acceleration_likelihood,
+                        scenario_result.distance_to_nearest_object_likelihood,
+                        scenario_result.collision_indication_likelihood,
+                        scenario_result.time_to_collision_likelihood,
+                        scenario_result.distance_to_road_edge_likelihood,
+                        scenario_result.offroad_indication_likelihood,
+                        scenario_result.min_average_displacement_error,
+                        scenario_result.traffic_light_violation_likelihood,
+                        scenario_result.simulated_collision_rate,
+                        scenario_result.simulated_offroad_rate, 
+                    ]
+                    self.log_file.writerow(result_to_log)
             except Exception as e:
                 print(
                     f"Error processing scenario {_scenario_rollout.scenario_id}"
