@@ -148,15 +148,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
-            
+
             # Load pre-trained Versatile Behavior Diffusion (VBD) model
             self.vbd_model = self._load_vbd_model(
                 model_path=self.config.vbd_model_path
             )
             # Construct scene context dict for the VBD model
             scene_context = self.construct_context(init_steps=self.init_steps)
-            
-            print('Generating VBD predictions...\n')
+
+            print("Generating VBD predictions...\n")
 
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
@@ -1473,7 +1473,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="vbd_amortized", # Options: "log_replay", "vbd_amortized"
+        guidance_mode="vbd_amortized",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
