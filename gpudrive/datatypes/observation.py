@@ -290,7 +290,7 @@ class PartnerObs:
 @dataclass
 class LidarObs:
     """Dataclass representing the scenario view through LiDAR sensors.
-        - Shape: (num_worlds, num_agents, 3, num_lidar_points, 4).
+        - Shape: (num_worlds, num_agents, 3, num_lidar_samples, 4).
         - Axis 2 represents the agent samples, road edge samples, and road line samples.
         - Axis 3 represents the lidar points per type, which can be configured in src/consts.hpp as `numLidarSamples`.
         - Axis 4 represents the depth, type and x, y, values of the lidar points.
@@ -317,8 +317,13 @@ class LidarObs:
             raise NotImplementedError("JAX backend not implemented yet.")
 
     @property
+    def num_lidar_samples(self) -> int:
+        """Number of lidar samples per type."""
+        return self.all_lidar_samples.shape[3]
+
+    @property
     def shape(self) -> tuple[int, ...]:
-        """Shape: (num_worlds, num_agents, 3, num_lidar_points, 4)."""
+        """Shape: (num_worlds, num_agents, 3, num_lidar_samples, 4)."""
         return self.all_lidar_samples.shape
 
 

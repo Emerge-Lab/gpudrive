@@ -27,8 +27,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.2
-  off_road_weight: -0.2
+  collision_weight: -0.01
+  off_road_weight: -0.01
   guidance_pos_xy_weight: 0.01
   guidance_speed_weight: 0.01
   guidance_heading_weight: 0.01
@@ -48,8 +48,6 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
-  collision_weight: -0.2
-  off_road_weight: -0.2
 
 wandb:
   entity: ""
@@ -77,7 +75,7 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 2_000_000_000
+  total_timesteps: 4_000_000_000
   batch_size: 131072
   minibatch_size: 8192
   learning_rate: 3e-4
@@ -107,7 +105,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 50 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #

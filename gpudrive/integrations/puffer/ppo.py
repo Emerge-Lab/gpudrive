@@ -40,8 +40,6 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
-    if vecenv.use_vbd:
-        msg += f" | Using VBD"
     print_dashboard(
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )

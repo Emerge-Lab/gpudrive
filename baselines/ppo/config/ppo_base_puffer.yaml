@@ -42,11 +42,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 13
   action_space_accel_disc: 7
-  # Versatile Behavior Diffusion (VBD): This will slow down training
-  use_vbd: false
   init_steps: 0
-  vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
-  vbd_in_obs: false
 
 wandb:
   entity: ""
