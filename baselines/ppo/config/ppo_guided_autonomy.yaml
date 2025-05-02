@@ -75,7 +75,7 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 2_000_000_000
+  total_timesteps: 4_000_000_000
   batch_size: 131072
   minibatch_size: 8192
   learning_rate: 3e-4
@@ -105,7 +105,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 400 # Save policy every k iterations
+  checkpoint_interval: 500 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
