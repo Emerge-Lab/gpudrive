@@ -41,6 +41,8 @@ class EnvConfig:
     add_reference_speed: bool = False  # speed time series
     add_reference_heading: bool = False  # heading time series
 
+    smoothen_trajectory: bool = False  # Filters out the trajectory
+
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
     num_worlds: int = 1  # Number of worlds in the environment
