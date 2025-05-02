@@ -72,17 +72,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
-
-        assert self.num_worlds == len(
-            self.data_batch
-        ), f"Number of scenarios in data_batch ({len(self.data_batch)}) \
-        should equal number of worlds ({self.num_worlds}). \
-        \n Please check your data loader configuration."
-
+        
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
-
-        self.init_steps = self.config.init_steps
 
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
@@ -157,12 +149,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
-
-            self.init_steps = max(self.init_steps, 10)
-            print(
-                f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
-            )
-
             # Load pre-trained Versatile Behavior Diffusion (VBD) model
             self.vbd_model = self._load_vbd_model(
                 model_path=self.config.vbd_model_path
