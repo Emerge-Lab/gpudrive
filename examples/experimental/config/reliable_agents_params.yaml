@@ -19,4 +19,3 @@ obs_radius: 50.0 # Visibility radius of the agents
 action_space_steer_disc: 13
 action_space_accel_disc: 7
 init_mode: all_non_trivial
-vbd_in_obs: false # If true, the VBD is included in the observation

@@ -13,6 +13,7 @@ from gpudrive.env.base_env import GPUDriveGymEnv
 from gpudrive.datatypes.trajectory import (
     LogTrajectory,
     VBDTrajectory,
+    VBDTrajectoryOnline,
     to_local_frame,
 )
 from gpudrive.datatypes.roadgraph import (
@@ -28,11 +29,9 @@ from gpudrive.datatypes.observation import (
 )
 from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
-
 from gpudrive.visualize.core import MatplotlibVisualizer
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
-from gpudrive.utils.geometry import normalize_min_max
 
 from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
@@ -60,10 +59,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.backend = backend
         self.max_num_agents_in_scene = self.config.max_num_agents_in_scene
 
-        self.world_time_steps = torch.zeros(
-            self.num_worlds, dtype=torch.short, device=self.device
-        )
-
         # Initialize reward weights tensor to None initially
         self.reward_weights_tensor = None
 
@@ -88,12 +83,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.cont_agent_mask.sum().item()
         )
 
-        self.setup_guidance()
-
         self.episode_len = self.config.episode_len
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
+
+        self.setup_guidance()
 
         if self.config.reward_type == "reward_conditioned":
             # Use default condition_mode from config or fall back to "random"
@@ -137,19 +132,48 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def setup_guidance(self):
-        """Configure the reference trajectory based on the guidance mode."""
+        """Configure the reference trajectory based on the guidance mode.
+
+        Returns:
+            reference_trajectory: The reference trajectory to guide the agent's
+            behavior. Shape: [num_worlds, max_agent_count, traj_len, feature_dim], where
+            features are assumed to be in the following order: [x, y, yaw, vx, vy]
+        """
         self.guidance_mode = self.config.guidance_mode
 
         if self.guidance_mode == "vbd_amortized":
+            # Use pre-generated VBD model predictions as guidance
             trajectory_tensor = self.sim.vbd_trajectory_tensor()
             self.reference_trajectory = VBDTrajectory.from_tensor(
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
-            # TODO: Add support for 'vbd_online' mode
-            raise ValueError(
-                f"Unsupported guidance mode: {self.guidance_mode}."
+
+            self.init_steps = max(self.init_steps, 10)
+            print(
+                f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
             )
+
+            # Load pre-trained Versatile Behavior Diffusion (VBD) model
+            self.vbd_model = self._load_vbd_model(
+                model_path=self.config.vbd_model_path
+            )
+            # Construct scene context dict for the VBD model
+            scene_context = self.construct_context(init_steps=self.init_steps)
+
+            print("Generating VBD predictions...\n")
+
+            # Query the model online for the reference trajectory
+            predicted = self.vbd_model.sample_denoiser(scene_context)
+
+            # Wrap predictions into a VBDTrajectoryOnline object
+            self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
+                vbd_predictions=predicted["denoised_trajs"],
+                mean_pos_xy=self.sim.world_means_tensor().to_torch()[:, :2],
+                backend=self.backend,
+                device=self.device,
+            )
+
         else:  # Default option is "log_replay"
             trajectory_tensor = self.sim.expert_trajectory_tensor()
             self.reference_trajectory = LogTrajectory.from_tensor(
@@ -163,26 +187,43 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Length of the guidance trajectory
         self.reference_traj_len = self.reference_trajectory.length
 
-    def _initialize_vbd(self):
+    def _load_vbd_model(self, model_path):
         """
-        Initialize the Versatile Behavior Diffusion (VBD) model and related
-        components. Link: https://arxiv.org/abs/2404.02524.
-        When using amortized VBD, we don't need to run the model at runtime.
+        Load the Versatile Behavior Diffusion (VBD) weights from checkpoint.
+        """
+        from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+
+        model = VBDTest.load_from_checkpoint(
+            model_path, torch.device(self.device)
+        )
+        model.reset_agent_length(self.max_cont_agents)
+        model.guidance_iter = 5
+        _ = model.eval()
+        return model
+
+    def construct_context(self, init_steps=10):
+        """
+        Construct a dictionary containing information from the first 10 steps (1s) of the scene.
+
+        This context data is used for the pre-trained VBD model, which infers
+        the most likely trajectory for the next 80 steps based on this context.
 
         Args:
-            config: Configuration object containing VBD settings.
+            init_steps (int): Number of steps to use for context. Default is 10.
+
+        Returns:
+            dict: Dictionary containing context information with the following keys:
+                - 'agents_history': Past agent positions and states
+                - 'agents_interested': Agents marked for trajectory prediction
+                - 'agents_type': Type classification of each agent
+                - 'agents_future': Ground truth future states (if available)
+                - 'traffic_light_points': Location and state of traffic signals
+                - 'polylines': Road network geometry representation
+                - 'polylines_valid': Validity flags for polyline segments
+                - 'relations': Interaction relationships between agents
+                - 'agents_id': Unique identifiers for each agent
+                - 'anchors': Reference points
         """
-        self.use_vbd = self.config.use_vbd
-        self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
-        if self.use_vbd:
-            self._load_vbd_trajectories()
-        else:
-            self.init_steps = self.config.init_steps
-
-            self.vbd_trajectories = None
-
-    def _generate_sample_batch(self, init_steps=10):
-        """Generate a sample batch for the VBD model."""
         means_xy = (
             self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
         )
@@ -224,9 +265,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             backend=self.backend,
             device=self.device,
         )
-        sample_batch = process_scenario_data(
+        context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
-            controlled_agent_mask=self.cont_agent_mask,
+            controlled_agent_mask=self.cont_agent_mask.cpu(),
             global_agent_obs=global_agent_obs,
             global_road_graph=global_road_graph,
             log_trajectory=log_trajectory,
@@ -235,7 +276,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
             metadata=metadata,
         )
-        return sample_batch
+
+        return context_dict
 
     def _set_reward_weights(self, condition_mode="random", agent_type=None):
         """Set agent reward weights for all or specific environments.
@@ -426,8 +468,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self._set_reward_weights(
                 condition_mode=mode, agent_type=use_agent_type
             )
-
-        self.world_time_steps.fill_(self.init_steps)
 
         # Reset smoothness tracking for reset environments
         if env_idx_list is not None:
@@ -645,11 +685,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.step_in_world = (
             self.episode_len - self.sim.steps_remaining_tensor().to_torch()
         )
-
-        not_done_worlds = ~self.get_dones().any(
-            dim=1
-        )  # Check if any agent in world is done
-        self.world_time_steps[not_done_worlds] += 1
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
@@ -1222,229 +1257,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             return bev.bev_segmentation_map.flatten(start_dim=2)
 
-    def _get_vbd_obs(self, mask=None):
-        """
-        Get ego-centric VBD trajectory observations for controlled agents.
-
-        Args:
-            mask: Optional mask to filter agents
-
-        Returns:
-            Tensor of ego-centric VBD trajectories
-        """
-        if not self.use_vbd or self.vbd_trajectories is None:
-            return torch.Tensor().to(self.device)
-
-        # Get current agent positions and orientations
-        agent_state = GlobalEgoState.from_tensor(
-            abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
-
-        # Initialize output tensor
-        traj_feature_dim = (
-            self.vbd_trajectories.shape[2] * self.vbd_trajectories.shape[3]
-        )
-
-        if mask is not None:
-            # Count valid agents for output tensor size
-            valid_count = mask.sum().item()
-            ego_vbd_trajectories = torch.zeros(
-                (valid_count, traj_feature_dim), device=self.device
-            )
-
-            # Track which output index we're filling
-            out_idx = 0
-
-            # Process each world
-            for w in range(self.num_worlds):
-                # Get valid agent indices for this world
-                world_mask = mask[w]
-                agent_indices = torch.where(world_mask)[0]
-
-                if len(agent_indices) == 0:
-                    continue
-
-                # Extract ego positions and yaws for these agents
-                ego_pos_x = agent_state.pos_x[w, agent_indices]
-                ego_pos_y = agent_state.pos_y[w, agent_indices]
-                ego_yaw = agent_state.rotation_angle[w, agent_indices]
-
-                # Process each agent in this world
-                for i, agent_idx in enumerate(agent_indices):
-                    # Get global trajectory for this agent
-                    global_traj = self.vbd_trajectories[w, agent_idx]
-
-                    # Create 2D rotation matrix for this agent
-                    cos_yaw = torch.cos(ego_yaw[i])
-                    sin_yaw = torch.sin(ego_yaw[i])
-                    rotation_matrix = torch.tensor(
-                        [[cos_yaw, sin_yaw], [-sin_yaw, cos_yaw]],
-                        device=self.device,
-                    )
-
-                    # Transform positions using matrix multiplication
-                    pos_xy = global_traj[:, :2]
-                    ego_pos = torch.tensor(
-                        [ego_pos_x[i], ego_pos_y[i]], device=self.device
-                    ).reshape(1, 2)
-                    translated_pos = (
-                        pos_xy - ego_pos
-                    )  # Broadcasting to subtract from all timesteps
-                    rotated_pos = torch.matmul(
-                        translated_pos, rotation_matrix.T
-                    )
-
-                    # Transform velocities (only rotation, no translation)
-                    vel_xy = global_traj[:, 3:5]
-                    rotated_vel = torch.matmul(vel_xy, rotation_matrix.T)
-
-                    # Create transformed trajectory
-                    transformed_traj = torch.zeros_like(global_traj)
-                    transformed_traj[:, :2] = rotated_pos
-                    transformed_traj[:, 2] = (
-                        global_traj[:, 2] - ego_yaw[i]
-                    )  # Adjust heading
-                    transformed_traj[:, 3:5] = rotated_vel
-
-                    # Flatten and add to output
-                    ego_vbd_trajectories[out_idx] = transformed_traj.reshape(
-                        -1
-                    )
-                    out_idx += 1
-
-            if self.config.norm_obs:
-                ego_vbd_trajectories = self._normalize_vbd_obs(
-                    ego_vbd_trajectories, self.vbd_trajectories.shape[2]
-                )
-
-            return ego_vbd_trajectories
-
-        else:
-            # Without mask, process all agents in all worlds
-            ego_vbd_trajectories = torch.zeros(
-                (self.num_worlds, self.max_agent_count, traj_feature_dim),
-                device=self.device,
-            )
-
-            # Process each world
-            for w in range(self.num_worlds):
-                # Get controlled agent indices for this world
-                valid_mask = self.cont_agent_mask[w]
-                world_agent_indices = torch.where(valid_mask)[0]
-
-                if len(world_agent_indices) == 0:
-                    continue
-
-                # Extract ego positions and yaws
-                ego_pos_x = agent_state.pos_x[w]
-                ego_pos_y = agent_state.pos_y[w]
-                ego_yaw = agent_state.rotation_angle[w]
-
-                # Process each agent in this world
-                for agent_idx in world_agent_indices:
-                    # Get global trajectory
-                    global_traj = self.vbd_trajectories[w, agent_idx]
-
-                    # Create 2D rotation matrix for this agent
-                    cos_yaw = torch.cos(ego_yaw[agent_idx])
-                    sin_yaw = torch.sin(ego_yaw[agent_idx])
-                    rotation_matrix = torch.tensor(
-                        [[cos_yaw, sin_yaw], [-sin_yaw, cos_yaw]],
-                        device=self.device,
-                    )
-
-                    # Transform positions
-                    pos_xy = global_traj[:, :2]
-                    ego_pos = torch.tensor(
-                        [ego_pos_x[agent_idx], ego_pos_y[agent_idx]],
-                        device=self.device,
-                    ).reshape(1, 2)
-                    translated_pos = pos_xy - ego_pos
-                    rotated_pos = torch.matmul(
-                        translated_pos, rotation_matrix.T
-                    )
-
-                    # Transform velocities
-                    vel_xy = global_traj[:, 3:5]
-                    rotated_vel = torch.matmul(vel_xy, rotation_matrix.T)
-
-                    # Create transformed trajectory
-                    transformed_traj = torch.zeros_like(global_traj)
-                    transformed_traj[:, :2] = rotated_pos
-                    transformed_traj[:, 2] = (
-                        global_traj[:, 2] - ego_yaw[agent_idx]
-                    )
-                    transformed_traj[:, 3:5] = rotated_vel
-
-                    # Flatten and add to output
-                    ego_vbd_trajectories[
-                        w, agent_idx
-                    ] = transformed_traj.reshape(-1)
-
-            if self.config.norm_obs:
-                ego_vbd_trajectories = self._normalize_vbd_obs(
-                    ego_vbd_trajectories, self.vbd_trajectories.shape[2]
-                )
-
-            return ego_vbd_trajectories
-
-    def _normalize_vbd_obs(self, trajectories_flat, traj_len):
-        """
-        Normalize flattened VBD trajectory values to be between -1 and 1, with clipping.
-
-        Args:
-            trajectories_flat: Flattened tensor containing trajectory data
-            traj_len: Number of trajectory steps
-
-        Returns:
-            Normalized flattened trajectories tensor
-        """
-        # Get original shape for proper reshaping
-        original_shape = trajectories_flat.shape
-
-        # Calculate feature dimension
-        feature_dim = 5  # x, y, yaw, vel_x, vel_y
-
-        # Reshape to separate the features
-        if len(original_shape) == 2:  # (num_agents, flattened_features)
-            traj_features = trajectories_flat.reshape(
-                -1, traj_len, feature_dim
-            )
-        else:  # (num_worlds, max_agents, flattened_features)
-            traj_features = trajectories_flat.reshape(
-                original_shape[0], original_shape[1], traj_len, feature_dim
-            )
-
-        # Normalize each feature
-        # x, y positions
-        traj_features[..., 0] = normalize_min_max(
-            tensor=traj_features[..., 0],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-        traj_features[..., 1] = normalize_min_max(
-            tensor=traj_features[..., 1],
-            min_val=constants.MIN_REL_GOAL_COORD,
-            max_val=constants.MAX_REL_GOAL_COORD,
-        )
-
-        # Normalize yaw angle
-        traj_features[..., 2] = (
-            traj_features[..., 2] / constants.MAX_ORIENTATION_RAD
-        )
-
-        # Normalize velocities
-        traj_features[..., 3] = traj_features[..., 3] / constants.MAX_SPEED
-        traj_features[..., 4] = traj_features[..., 4] / constants.MAX_SPEED
-
-        # Clip all values to the [-1, 1] range
-        traj_features = torch.clamp(traj_features, min=-1.0, max=1.0)
-
-        # Reshape back to original format
-        return traj_features.reshape(original_shape)
-
     def get_obs(self, mask=None):
         """Get observation: Combine different types of environment information into a single tensor.
         Returns:
@@ -1455,29 +1267,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         road_map_observations = self._get_road_map_obs(mask)
         guidance_obs = self._get_guidance(mask)
 
-        if self.config.use_vbd and self.config.vbd_in_obs:
-            # Add ego-centric VBD trajectories
-            vbd_observations = self._get_vbd_obs(mask)
-
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                    vbd_observations,
-                ),
-                dim=-1,
-            )
-        else:
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                    guidance_obs,
-                ),
-                dim=-1,
-            )
+        obs = torch.cat(
+            (
+                ego_states,
+                partner_observations,
+                road_map_observations,
+                guidance_obs,
+            ),
+            dim=-1,
+        )
 
         return obs
 
@@ -1486,27 +1284,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
-
-    def advance_sim_with_log_playback(self, init_steps=0):
-        """Advances the simulator by stepping the objects with the logged human trajectories.
-
-        Args:
-            init_steps (int): Number of warmup steps.
-        """
-        if init_steps >= self.config.episode_len:
-            raise ValueError(
-                "The length of the expert trajectory is 91,"
-                f"so init_steps = {init_steps} should be < than 91."
-            )
-
-        self.init_frames = []
-
-        self.log_playback_traj, _, _, _ = self.get_expert_actions()
-
-        for time_step in range(init_steps):
-            self.step_dynamics(
-                actions=self.log_playback_traj[:, :, time_step, :]
-            )
 
     def remove_agents_by_id(
         self, perc_to_rmv_per_scene, remove_controlled_agents=True
@@ -1701,7 +1478,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="log_replay",  # "vbd_amortized"
+        guidance_mode="vbd_online",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
@@ -1744,33 +1521,12 @@ if __name__ == "__main__":
 
     highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
 
-    agent_positions = []
-    init_state = GlobalEgoState.from_tensor(
-        env.sim.absolute_self_observation_tensor(),
-        device=env.device,
-    )
-    means_xy = env.sim.world_means_tensor().to_torch()[:, :2].to(env.device)
-    init_state.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-    agent_positions.append(init_state.pos_xy[env_idx, highlight_agent])
-
-    print(f"Highlighted agent: {highlight_agent}")
-    print(f"Position: {agent_positions[-1]}")
-
     for t in range(env.init_steps, env.init_steps + 10):
         print(f"Step: {t+1}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
-
-        current_state = GlobalEgoState.from_tensor(
-            env.sim.absolute_self_observation_tensor(),
-            device=env.device,
-        )
-        current_state.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-        agent_positions.append(current_state.pos_xy[env_idx, highlight_agent])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
@@ -1790,6 +1546,8 @@ if __name__ == "__main__":
             ),
         )
 
+        print(env.reference_trajectory.pos_xy[control_mask].max())
+
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
 
@@ -1798,7 +1556,6 @@ if __name__ == "__main__":
 
         print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
         print(f"R_t+1: {reward[env_idx, highlight_agent]}")
-        print(f"Position: {agent_positions[-1]}")
 
         done = env.get_dones()
         info = env.get_infos()
