@@ -28,17 +28,17 @@ namespace madrona_gpudrive
     {
         obj.mean = {0,0};
         uint32_t i = 0;
-        
+
         float zPositions[10];
-        
+
         for (const auto &pos : j.at("position"))
-        { 
+        {
             if (i < MAX_POSITIONS)
             {
                 from_json(pos, obj.position[i]);
                 obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
                 obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
-                
+
                 // Store z position separately
                 if (i < 10)
                 {
@@ -123,7 +123,7 @@ namespace madrona_gpudrive
 
         // Initialize metadata fields to 0
         MetaData::zero(obj.metadata);
-        
+
         // Calculate average z position from the first 10 positions
         // Store in the avgZ field of map object
         float avgZ = 0.0f;
@@ -188,7 +188,7 @@ namespace madrona_gpudrive
         else
             road.type = EntityType::None;
 
-        
+
         std::vector<MapVector2> geometry_points_;
         for(const auto &point: j.at("geometry"))
         {
@@ -269,7 +269,7 @@ namespace madrona_gpudrive
             {
                 if(i==MAX_GEOMETRY)
                     break;
-                road.geometry[i] = geometry_points_[i * sample_every_n_]; 
+                road.geometry[i] = geometry_points_[i * sample_every_n_];
             }
             road.numPoints = num_sampled_points;
         }
@@ -346,14 +346,14 @@ namespace madrona_gpudrive
 
         std::string scenario_id = j.at("scenario_id").get<std::string>();
         std::strncpy(map.scenarioId, scenario_id.c_str(), sizeof(map.scenarioId));
-        
+
         auto mean = calc_mean(j);
         map.mean = {mean.first, mean.second};
         map.numObjects = std::min(j.at("objects").size(), static_cast<size_t>(MAX_OBJECTS));
 
         const auto& metadata = j.at("metadata");
         int sdc_index = metadata.at("sdc_track_index").get<int>();
-        
+
         // Create id to object index mapping
         std::unordered_map<int, size_t> idToObjIdx;
         size_t idx = 0;
@@ -376,12 +376,12 @@ namespace madrona_gpudrive
         for (const auto& obj_id : metadata.at("objects_of_interest")) {
             objects_of_interest_ids.insert(obj_id.get<int>());
         }
-        
+
         // Initialize SDC first if valid
         if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
             j.at("objects")[sdc_index].get_to(map.objects[0]);
-            map.objects[0].metadata.isSdc = 1.0f; 
-            
+            map.objects[0].metadata.isSdc = 1.0f;
+
             // Set additional metadata if needed
             int sdc_id = map.objects[0].id;
             if (tracks_to_predict_indices.find(sdc_index) != tracks_to_predict_indices.end()) {
@@ -389,18 +389,18 @@ namespace madrona_gpudrive
                 // Find and set difficulty
                 for (const auto& track : metadata.at("tracks_to_predict")) {
                     if (track.at("track_index").get<int>() == sdc_index) {
-                        map.objects[0].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>());  
+                        map.objects[0].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>());
                         break;
                     }
                 }
             }
             if (objects_of_interest_ids.find(sdc_id) != objects_of_interest_ids.end()) {
-                map.objects[0].metadata.isObjectOfInterest = 1.0f; 
+                map.objects[0].metadata.isObjectOfInterest = 1.0f;
             }
-            
+
             idToObjIdx[sdc_id] = 0;
             idx = 1;
-            
+
             // Remove SDC from sets to avoid double processing
             tracks_to_predict_indices.erase(sdc_index);
             objects_of_interest_ids.erase(sdc_id);
@@ -409,25 +409,25 @@ namespace madrona_gpudrive
         // Initialize tracks_to_predict objects (excluding SDC)
         for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
             if (i == sdc_index) continue; // Skip SDC as it's already initialized
-            
+
             if (tracks_to_predict_indices.find(i) != tracks_to_predict_indices.end()) {
                 j.at("objects")[i].get_to(map.objects[idx]);
-                map.objects[idx].metadata.isTrackToPredict = 1.0f; 
-                
+                map.objects[idx].metadata.isTrackToPredict = 1.0f;
+
                 // Find and set difficulty
                 for (const auto& track : metadata.at("tracks_to_predict")) {
                     if (track.at("track_index").get<int>() == static_cast<int>(i)) {
-                        map.objects[idx].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>()); 
+                        map.objects[idx].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>());
                         break;
                     }
                 }
-                
+
                 // Check if also object of interest
                 if (objects_of_interest_ids.find(map.objects[idx].id) != objects_of_interest_ids.end()) {
-                    map.objects[idx].metadata.isObjectOfInterest = 1.0f; 
+                    map.objects[idx].metadata.isObjectOfInterest = 1.0f;
                     objects_of_interest_ids.erase(map.objects[idx].id);
                 }
-                
+
                 idToObjIdx[map.objects[idx].id] = idx;
                 idx++;
             }
@@ -436,12 +436,12 @@ namespace madrona_gpudrive
         // Initialize objects_of_interest (excluding those already processed)
         for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
             if (i == sdc_index) continue;
-            
+
             int obj_id = j.at("objects")[i].at("id").get<int>();
             if (objects_of_interest_ids.find(obj_id) != objects_of_interest_ids.end()) {
                 j.at("objects")[i].get_to(map.objects[idx]);
-                map.objects[idx].metadata.isObjectOfInterest = 1.0f;  
-                
+                map.objects[idx].metadata.isObjectOfInterest = 1.0f;
+
                 idToObjIdx[map.objects[idx].id] = idx;
                 idx++;
             }
@@ -450,7 +450,7 @@ namespace madrona_gpudrive
         // Initialize all remaining objects
         for (size_t i = 0; i < j.at("objects").size() && idx < map.numObjects; i++) {
             if (i == sdc_index) continue;
-            
+
             int obj_id = j.at("objects")[i].at("id").get<int>();
             if (idToObjIdx.find(obj_id) == idToObjIdx.end()) { // Check if not already processed
                 j.at("objects")[i].get_to(map.objects[idx]);
@@ -458,7 +458,7 @@ namespace madrona_gpudrive
                 idx++;
             }
         }
-        
+
         // Process roads
         map.numRoads = std::min(j.at("roads").size(), static_cast<size_t>(MAX_ROADS));
         size_t countRoadPoints = 0;

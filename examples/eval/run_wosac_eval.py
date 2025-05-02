@@ -31,7 +31,6 @@ logger = logging.getLogger("WOSAC evaluation")
 
 def get_state(env):
     """Obtain raw agent states."""
-    # TODO: Take the average elevation
     avg_z_pos = Metadata.from_tensor(
         metadata_tensor=env.sim.metadata_tensor(),
         backend=env.backend,
@@ -48,7 +47,7 @@ def get_state(env):
     return (
         ego_state.pos_x + mean_x,
         ego_state.pos_y + mean_y,
-        avg_z_pos,
+        avg_z_pos, #ego_state.pos_z
         ego_state.rotation_angle,
         ego_state.id,
     )
@@ -236,9 +235,9 @@ if __name__ == "__main__":
     # Settings
     MAX_AGENTS = 64
     NUM_ENVS = 1
-    DEVICE = "cuda"  # where to run the env rollouts
+    DEVICE = "cpu"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 1
+    NUM_DATA_BATCHES = 10
     INIT_STEPS = 10
     DATASET_SIZE = 100
     RENDER = False
@@ -272,17 +271,14 @@ if __name__ == "__main__":
     }
 
     # Add fixed overrides specific to WOSAC evaluation
-    fixed_overrides = {
-        "init_steps": INIT_STEPS,
-    }
-
+    config_dict["init_steps"] = INIT_STEPS
+    config_dict["init_mode"] = "wosac_eval"
+   
     logging.info(
         f"initializing env with init_mode = {config_dict['init_mode']}"
     )
 
-    env_config = dataclasses.replace(
-        default_config, **config_dict, **fixed_overrides
-    )
+    env_config = dataclasses.replace(default_config, **config_dict)
 
     # Make environment
     env = GPUDriveTorchEnv(
