@@ -148,6 +148,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
+            
+            self.init_steps = max(self.init_steps, 10)
+            print(f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n")
 
             # Load pre-trained Versatile Behavior Diffusion (VBD) model
             self.vbd_model = self._load_vbd_model(
@@ -1473,7 +1476,7 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="vbd_amortized",  # Options: "log_replay", "vbd_amortized"
+        guidance_mode="vbd_online",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
@@ -1516,33 +1519,12 @@ if __name__ == "__main__":
 
     highlight_agent = torch.where(control_mask[env_idx, :])[0][0].item()
 
-    agent_positions = []
-    init_state = GlobalEgoState.from_tensor(
-        env.sim.absolute_self_observation_tensor(),
-        device=env.device,
-    )
-    means_xy = env.sim.world_means_tensor().to_torch()[:, :2].to(env.device)
-    init_state.restore_mean(mean_x=means_xy[:, 0], mean_y=means_xy[:, 1])
-    agent_positions.append(init_state.pos_xy[env_idx, highlight_agent])
-
-    print(f"Highlighted agent: {highlight_agent}")
-    print(f"Position: {agent_positions[-1]}")
-
     for t in range(env.init_steps, env.init_steps + 10):
         print(f"Step: {t+1}")
 
         # Step the environment
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, t, :])
-
-        current_state = GlobalEgoState.from_tensor(
-            env.sim.absolute_self_observation_tensor(),
-            device=env.device,
-        )
-        current_state.restore_mean(
-            mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
-        )
-        agent_positions.append(current_state.pos_xy[env_idx, highlight_agent])
 
         # Make video
         sim_states = env.vis.plot_simulator_state(
@@ -1561,6 +1543,8 @@ if __name__ == "__main__":
                 env.device
             ),
         )
+        
+        print(env.reference_trajectory.pos_xy[control_mask].max())
 
         sim_frames.append(img_from_fig(sim_states[0]))
         agent_obs_frames.append(img_from_fig(agent_obs))
@@ -1570,7 +1554,6 @@ if __name__ == "__main__":
 
         print(f"A_t: {expert_actions[env_idx, highlight_agent, t, :]}")
         print(f"R_t+1: {reward[env_idx, highlight_agent]}")
-        print(f"Position: {agent_positions[-1]}")
 
         done = env.get_dones()
         info = env.get_infos()
