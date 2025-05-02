@@ -118,6 +118,12 @@ def run(
     guidance_pos_xy_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     guidance_speed_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     guidance_heading_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
+    add_reference_pos_xy: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    add_reference_speed: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    add_reference_heading: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
@@ -184,6 +190,21 @@ def run(
         else bool(remove_non_vehicles),
         "vbd_model_path": vbd_model_path,
         "init_steps": init_steps,
+        "add_previous_action": None
+        if add_previous_action is None
+        else bool(add_previous_action),
+        "add_reference_pos_xy": None
+        if add_reference_pos_xy is None
+        else bool(add_reference_pos_xy),
+        "add_reference_speed": None
+        if add_reference_speed is None
+        else bool(add_reference_speed),
+        "add_reference_heading": None
+        if add_reference_heading is None
+        else bool(add_reference_heading),
+        "smoothen_trajectory": None
+        if smoothen_trajectory is None
+        else bool(smoothen_trajectory),
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}

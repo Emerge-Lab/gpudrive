@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: /scratch/kj2676/gpudrive/data/processed/training
+data_dir: data/processed/wosac/validation_json_3
 continue_training: false
 model_cpt: null
 
@@ -23,6 +23,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_reference_pos_xy: true # If true, a reference path is added to the ego observation
   add_reference_speed: true # If true, the reference speeds are added to the ego observation
   add_reference_heading: true # If true, the reference heading are added to the ego observation
+  smoothen_trajectory: false # If true, the velocities and headings are smoothed
+
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
   # Reward function
@@ -33,7 +35,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   guidance_speed_weight: 0.01
   guidance_heading_weight: 0.01
   smoothness_weight: 0.001
-
+  
   init_mode: wosac_train
   dynamics_model: "classic"
   remove_non_vehicles: false
@@ -52,7 +54,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_scale"
+  group: "smooth_effect"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 

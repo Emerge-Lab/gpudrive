@@ -40,7 +40,6 @@ class EnvConfig:
     add_reference_pos_xy: bool = True  # (x, y) position time series
     add_reference_speed: bool = False  # speed time series
     add_reference_heading: bool = False  # heading time series
-
     smoothen_trajectory: bool = False  # Filters out the trajectory
 
     # Maximum number of controlled agents in the scene
