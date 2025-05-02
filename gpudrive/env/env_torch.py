@@ -1710,7 +1710,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/temp",
+        root="data/processed/wosac/validation_json_1",
         batch_size=1,
         dataset_size=1,
         sample_with_replacement=False,

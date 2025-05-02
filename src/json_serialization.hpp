@@ -122,11 +122,7 @@ namespace madrona_gpudrive
         }
 
         // Initialize metadata fields to 0
-        obj.metadata.isSdc = 0;
-        obj.metadata.isObjectOfInterest = 0;
-        obj.metadata.isTrackToPredict = 0;
-        obj.metadata.difficulty = 0;
-        obj.metadata.avgZ = 0.0f;
+        MetaData::zero(obj.metadata);
         
         // Calculate average z position from the first 10 positions
         // Store in the avgZ field of map object
@@ -381,26 +377,26 @@ namespace madrona_gpudrive
         for (const auto& obj_id : metadata.at("objects_of_interest")) {
             objects_of_interest_ids.insert(obj_id.get<int>());
         }
-
+        
         // Initialize SDC first if valid
         if (sdc_index >= 0 && sdc_index < j.at("objects").size()) {
             j.at("objects")[sdc_index].get_to(map.objects[0]);
-            map.objects[0].metadata.isSdc = 1;
+            map.objects[0].metadata.isSdc = 1.0f; 
             
             // Set additional metadata if needed
             int sdc_id = map.objects[0].id;
             if (tracks_to_predict_indices.find(sdc_index) != tracks_to_predict_indices.end()) {
-                map.objects[0].metadata.isTrackToPredict = 1;
+                map.objects[0].metadata.isTrackToPredict = 1.0f;
                 // Find and set difficulty
                 for (const auto& track : metadata.at("tracks_to_predict")) {
                     if (track.at("track_index").get<int>() == sdc_index) {
-                        map.objects[0].metadata.difficulty = track.at("difficulty").get<int>();
+                        map.objects[0].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>());  
                         break;
                     }
                 }
             }
             if (objects_of_interest_ids.find(sdc_id) != objects_of_interest_ids.end()) {
-                map.objects[0].metadata.isObjectOfInterest = 1;
+                map.objects[0].metadata.isObjectOfInterest = 1.0f; 
             }
             
             idToObjIdx[sdc_id] = 0;
@@ -417,19 +413,19 @@ namespace madrona_gpudrive
             
             if (tracks_to_predict_indices.find(i) != tracks_to_predict_indices.end()) {
                 j.at("objects")[i].get_to(map.objects[idx]);
-                map.objects[idx].metadata.isTrackToPredict = 1;
+                map.objects[idx].metadata.isTrackToPredict = 1.0f; 
                 
                 // Find and set difficulty
                 for (const auto& track : metadata.at("tracks_to_predict")) {
                     if (track.at("track_index").get<int>() == static_cast<int>(i)) {
-                        map.objects[idx].metadata.difficulty = track.at("difficulty").get<int>();
+                        map.objects[idx].metadata.difficulty = static_cast<float>(track.at("difficulty").get<int>()); 
                         break;
                     }
                 }
                 
                 // Check if also object of interest
                 if (objects_of_interest_ids.find(map.objects[idx].id) != objects_of_interest_ids.end()) {
-                    map.objects[idx].metadata.isObjectOfInterest = 1;
+                    map.objects[idx].metadata.isObjectOfInterest = 1.0f; 
                     objects_of_interest_ids.erase(map.objects[idx].id);
                 }
                 
@@ -445,7 +441,7 @@ namespace madrona_gpudrive
             int obj_id = j.at("objects")[i].at("id").get<int>();
             if (objects_of_interest_ids.find(obj_id) != objects_of_interest_ids.end()) {
                 j.at("objects")[i].get_to(map.objects[idx]);
-                map.objects[idx].metadata.isObjectOfInterest = 1;
+                map.objects[idx].metadata.isObjectOfInterest = 1.0f;  
                 
                 idToObjIdx[map.objects[idx].id] = idx;
                 idx++;
