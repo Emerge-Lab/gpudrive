@@ -11,6 +11,7 @@ def wrap_yaws(agent_headings: torch.Tensor) -> torch.Tensor:
     """
     return ((agent_headings + torch.pi) % (2 * torch.pi)) - torch.pi
 
+
 def to_local_frame(
     global_pos_xy: torch.Tensor,
     ego_pos: torch.Tensor,
@@ -186,17 +187,17 @@ class VBDTrajectoryOnline:
 
     def demean_positions(self):
         """
-        In GPUDrive, we center everything at zero. By default, the VBD 
+        In GPUDrive, we center everything at zero. By default, the VBD
         predictions are not centered at zero, so we demean the predicted trajectory.
         """
         # Reshape for broadcasting
         mean_x_reshaped = self.mean_x.view(-1, 1, 1)
         mean_y_reshaped = self.mean_y.view(-1, 1, 1)
-        
+
         # Apply to x and y coordinates
         self.pos_xy[..., 0] -= mean_x_reshaped
         self.pos_xy[..., 1] -= mean_y_reshaped
-            
+
         self.pos_x = self.pos_xy[..., 0].unsqueeze(-1)
         self.pos_y = self.pos_xy[..., 1].unsqueeze(-1)
 
@@ -205,7 +206,7 @@ class VBDTrajectoryOnline:
 class VBDTrajectory:
     """A class to represent the VBD predicted trajectories.
     Initialized from `vbd_trajectory_tensor` (src/bindings.cpp).
-    Shape: (num_worlds, max_agents, traj_len, 5) 
+    Shape: (num_worlds, max_agents, traj_len, 5)
             where traj_len is 90 - initialization steps.
 
     Attributes:

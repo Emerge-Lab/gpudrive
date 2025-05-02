@@ -148,9 +148,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
-            
+
             self.init_steps = max(self.init_steps, 10)
-            print(f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n")
+            print(
+                f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
+            )
 
             # Load pre-trained Versatile Behavior Diffusion (VBD) model
             self.vbd_model = self._load_vbd_model(
@@ -1543,7 +1545,7 @@ if __name__ == "__main__":
                 env.device
             ),
         )
-        
+
         print(env.reference_trajectory.pos_xy[control_mask].max())
 
         sim_frames.append(img_from_fig(sim_states[0]))
