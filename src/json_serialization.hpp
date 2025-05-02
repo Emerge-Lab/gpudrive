@@ -142,7 +142,6 @@ namespace madrona_gpudrive
         {
             avgZ /= avg_count; // Calculate average
         }
-        std::cout << "avgZ: " << avgZ << std::endl;
         obj.metadata.avgZ = avgZ;
 
         // Initialize VBD trajectories to zeros
