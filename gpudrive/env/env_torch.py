@@ -1120,11 +1120,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             else:
                 return torch.cat(base_fields, dim=-1)
         else:
+            if self.config.add_previous_action:
+                normalized_prev_actions = (
+                    self.previous_action_value_tensor[:, :, :2]
+                    / constants.MAX_ACTION_VALUE
+                )
+                base_fields.append(normalized_prev_actions)
 
-            base_fields.append(
-                self.previous_action_value_tensor[mask][:, :2]
-                / constants.MAX_ACTION_VALUE,  # Previous accel, steering
-            )
             if self.config.reward_type == "reward_conditioned":
                 _, agent_indices = torch.where(mask)
                 weights_for_masked_agents = self.reward_weights_tensor.to(
