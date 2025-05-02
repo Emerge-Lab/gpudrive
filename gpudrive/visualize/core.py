@@ -1841,8 +1841,8 @@ class MatplotlibVisualizer:
             attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
             # Plot the trajectory as a line
             ax.scatter(
-                trajectory[:, 0],  # x coordinates
-                trajectory[:, 1],  # y coordinates
+                trajectory[:, 0].cpu(),  # x coordinates
+                trajectory[:, 1].cpu(),  # y coordinates
                 color="g",
                 linewidth=0.2 * line_width_scale,
                 marker="o",
@@ -1856,8 +1856,8 @@ class MatplotlibVisualizer:
                 ref_y = trajectory[ref_idx, 1]
 
                 ax.scatter(
-                    ref_x,
-                    ref_y,
+                    ref_x.cpu(),
+                    ref_y.cpu(),
                     color="#9D00FF",
                     marker="*",
                     s=120,

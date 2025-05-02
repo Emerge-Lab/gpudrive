@@ -1511,7 +1511,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     control_mask = env.cont_agent_mask
