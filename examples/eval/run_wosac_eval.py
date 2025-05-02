@@ -27,7 +27,7 @@ from eval.wosac_eval_origin import WOSACMetrics
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WOSAC evaluation")
 # Suppress excessive logging
-logging.getLogger('tensorflow').setLevel(logging.ERROR)
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 
 def get_state(env):
@@ -64,10 +64,10 @@ def rollout(
     video_format: str = "gif",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
-    
+
     if save_videos:
         os.makedirs(video_dir, exist_ok=True)
-        
+
     # Storage
     env_ids = list(range(num_envs))
     simulator_state_frames = {env_id: [] for env_id in range(num_envs)}
@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
     # Load agent
     agent = load_agent(
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_29_19_49_30_053_015179.pt", 
+        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_29_19_49_30_053_015179.pt",
     ).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
@@ -278,9 +278,7 @@ if __name__ == "__main__":
         f"initializing env with init_mode = {config_dict['init_mode']}"
     )
 
-    env_config = dataclasses.replace(
-        default_config, **config_dict
-    )
+    env_config = dataclasses.replace(default_config, **config_dict)
 
     # Make environment
     env = GPUDriveTorchEnv(

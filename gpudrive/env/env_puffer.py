@@ -776,7 +776,7 @@ class PufferGPUDrive(PufferEnv):
         control_mask = (
             self.controlled_agent_mask[done_worlds].detach().cpu().numpy()
         )
-        
+
         if control_mask.sum() > 0:
             # [batch, time, 1]
             valid_mask = (
@@ -842,13 +842,19 @@ class PufferGPUDrive(PufferEnv):
             )
 
             # Check which time steps are valid
-            speed_valid, accel_valid = compute_kinematic_validity_np(valid_mask)
+            speed_valid, accel_valid = compute_kinematic_validity_np(
+                valid_mask
+            )
 
             # Calculate absolute diffs between agent and reference trajectories
             linear_speed_error = np.abs(agent_linear_speed - ref_linear_speed)
             linear_accel_error = np.abs(agent_linear_accel - ref_linear_accel)
-            angular_speed_error = np.abs(agent_angular_speed - ref_angular_speed)
-            angular_accel_error = np.abs(agent_angular_accel - ref_angular_accel)
+            angular_speed_error = np.abs(
+                agent_angular_speed - ref_angular_speed
+            )
+            angular_accel_error = np.abs(
+                agent_angular_accel - ref_angular_accel
+            )
 
             # Calculate displacement error
             displacement_error = compute_displacement_error_np(
@@ -856,8 +862,12 @@ class PufferGPUDrive(PufferEnv):
             )
 
             # Apply validity masks
-            masked_speed_error = np.ma.array(linear_speed_error, mask=~speed_valid)
-            masked_accel_error = np.ma.array(linear_accel_error, mask=~accel_valid)
+            masked_speed_error = np.ma.array(
+                linear_speed_error, mask=~speed_valid
+            )
+            masked_accel_error = np.ma.array(
+                linear_accel_error, mask=~accel_valid
+            )
             masked_angular_speed_error = np.ma.array(
                 angular_speed_error, mask=~speed_valid
             )
