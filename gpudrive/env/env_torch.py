@@ -1710,7 +1710,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/debug",
+        root="data/processed/temp",
         batch_size=1,
         dataset_size=1,
         sample_with_replacement=False,
@@ -1729,6 +1729,13 @@ if __name__ == "__main__":
     control_mask = env.cont_agent_mask
 
     print(f"Number of controlled agents: {control_mask.sum()}")
+
+    metadata = Metadata.from_tensor(
+        env.sim.metadata_tensor(),
+        backend=env.backend,
+        device=env.device,
+    )
+    print(f"avg Z: {metadata.avg_z}")
 
     # Rollout
     obs = env.reset(mask=control_mask)

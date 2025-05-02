@@ -437,10 +437,10 @@ namespace madrona_gpudrive
 
     struct MetaData
     {
-        float isSdc;
-        float isObjectOfInterest;
-        float isTrackToPredict;
-        float difficulty;
+        int32_t isSdc;
+        int32_t isObjectOfInterest;
+        int32_t isTrackToPredict;
+        int32_t difficulty;
         float avgZ;
 
         static inline void zero(MetaData& metadata)
