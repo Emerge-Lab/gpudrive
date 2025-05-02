@@ -123,7 +123,7 @@ def run(
     add_reference_heading: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
-    
+
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
