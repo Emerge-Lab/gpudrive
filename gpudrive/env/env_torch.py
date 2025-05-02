@@ -1518,6 +1518,13 @@ if __name__ == "__main__":
 
     print(f"Number of controlled agents: {control_mask.sum()}")
 
+    metadata = Metadata.from_tensor(
+        env.sim.metadata_tensor(),
+        backend=env.backend,
+        device=env.device,
+    )
+    print(f"avg Z: {metadata.avg_z}")
+
     # Rollout
     obs = env.reset(mask=control_mask)
 
