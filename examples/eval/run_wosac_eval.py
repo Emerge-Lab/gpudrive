@@ -13,6 +13,7 @@ from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
 from gpudrive.utils.checkpoint import load_agent
 from gpudrive.visualize.utils import img_from_fig
@@ -32,6 +33,11 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 def get_state(env):
     """Obtain raw agent states."""
+    avg_z_pos = Metadata.from_tensor(
+        metadata_tensor=env.sim.metadata_tensor(),
+        backend=env.backend,
+        device=env.device,
+    ).avg_z
     ego_state = GlobalEgoState.from_tensor(
         env.sim.absolute_self_observation_tensor(),
         backend=env.backend,
@@ -43,7 +49,7 @@ def get_state(env):
     return (
         ego_state.pos_x + mean_x,
         ego_state.pos_y + mean_y,
-        ego_state.pos_z,
+        avg_z_pos, #ego_state.pos_z
         ego_state.rotation_angle,
         ego_state.id,
     )
@@ -235,9 +241,9 @@ if __name__ == "__main__":
     # Settings
     MAX_AGENTS = 64
     NUM_ENVS = 1
-    DEVICE = "cuda"  # where to run the env rollouts
+    DEVICE = "cpu"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 1
+    NUM_DATA_BATCHES = 10
     INIT_STEPS = 10
     DATASET_SIZE = 100
     RENDER = False
@@ -273,7 +279,7 @@ if __name__ == "__main__":
     # Add fixed overrides specific to WOSAC evaluation
     config_dict["init_steps"] = INIT_STEPS
     config_dict["init_mode"] = "wosac_eval"
-
+   
     logging.info(
         f"initializing env with init_mode = {config_dict['init_mode']}"
     )
