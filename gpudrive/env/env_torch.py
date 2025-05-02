@@ -35,6 +35,8 @@ from gpudrive.env.dataset import SceneDataLoader
 
 from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
+from gpudrive.utils.preprocess import smooth_scenario
+
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
@@ -186,6 +188,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Length of the guidance trajectory
         self.reference_traj_len = self.reference_trajectory.length
+
+        # Smooth the trajectory if specified
+        if self.config.smoothen_trajectory:
+            self.reference_trajectory = smooth_scenario(
+                self.reference_trajectory
+            )
 
     def _load_vbd_model(self, model_path):
         """
@@ -1478,19 +1486,20 @@ if __name__ == "__main__":
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="vbd_online",  # Options: "log_replay", "vbd_amortized"
+        guidance_mode="log_replay",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
         reward_type="guided_autonomy",
         init_mode="wosac_train",
+        smoothen_trajectory=True,
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/wosac/debug",
-        batch_size=1,
+        batch_size=5,
         dataset_size=1,
         sample_with_replacement=False,
         shuffle=False,
