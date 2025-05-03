@@ -647,8 +647,10 @@ class PufferGPUDrive(PufferEnv):
             np.where(np.array(list(self.rendering_in_progress.values())))[0]
         )
         time_steps = list(self.episode_lengths[envs_to_render, 0])
+        
+        render_at_time = bool(self.env.world_time_step % 10 == 0)
 
-        if len(envs_to_render) > 0:
+        if len(envs_to_render) > 0 and render_at_time:
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
