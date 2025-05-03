@@ -2,39 +2,39 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_100
+data_dir: data/processed/wosac/validation_json_3
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  k_unique_scenes: 3 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  add_previous_action: true
+  add_previous_action: false
 
   # Guidance through expert suggestions
   guidance: true # If true, the agent will be guided by expert suggestions
   guidance_mode: "log_replay" # Options: "log_replay", "vbd_amortized", "vbd_online"
   add_reference_pos_xy: true # If true, a reference path is added to the ego observation
-  add_reference_speed: true # If true, the reference speeds are added to the ego observation
-  add_reference_heading: true # If true, the reference heading are added to the ego observation
-  smoothen_trajectory: true # If true, the velocities and headings are smoothed
+  add_reference_speed: false # If true, the reference speeds are added to the ego observation
+  add_reference_heading: false # If true, the reference heading are added to the ego observation
+  smoothen_trajectory: false # If true, the velocities and headings are smoothed
 
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01
-  off_road_weight: -0.01
+  collision_weight: -0.0
+  off_road_weight: -0.0
   guidance_pos_xy_weight: 0.01
-  guidance_speed_weight: 0.01
-  guidance_heading_weight: 0.01
-  smoothness_weight: 0.001
+  guidance_speed_weight: 0.0
+  guidance_heading_weight: 0.0
+  smoothness_weight: 0.00
 
   init_mode: wosac_train
   dynamics_model: "classic"
@@ -54,7 +54,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "smooth_effect"
+  group: "overfit"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 

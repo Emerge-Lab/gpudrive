@@ -1495,13 +1495,14 @@ if __name__ == "__main__":
         reward_type="guided_autonomy",
         init_mode="wosac_train",
         smoothen_trajectory=True,
+        add_previous_action=False,
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/wosac/debug",
-        batch_size=5,
+        batch_size=1,
         dataset_size=1,
         sample_with_replacement=False,
         shuffle=False,
@@ -1513,7 +1514,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,  # Number of agents to control
-        device="cuda",
+        device="cpu",
     )
 
     control_mask = env.cont_agent_mask
