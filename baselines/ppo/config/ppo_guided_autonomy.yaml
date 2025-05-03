@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_3
+data_dir: data/processed/wosac/selected_json
 continue_training: false
 model_cpt: null
 
@@ -28,9 +28,9 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
   # Reward function
-  reward_type: "guided_autonomy"
-  collision_weight: -0.0
-  off_road_weight: -0.0
+  reward_type: "reward_progress"
+  collision_weight: 0.0
+  off_road_weight: 0.0
   guidance_pos_xy_weight: 0.01
   guidance_speed_weight: 0.0
   guidance_heading_weight: 0.0
@@ -59,7 +59,7 @@ wandb:
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: guidance_log_replay # Set dynamically in the script if needed
+  exp_id: guidance_progress # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu
@@ -71,7 +71,7 @@ train:
   resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: false
+  sample_with_replacement: true
   shuffle_dataset: true
   file_prefix: ""
 
@@ -111,9 +111,9 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
+  render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 300 # Render every k iterations
+  render_interval: 1 # Render every k iterations
   render_k_scenarios: 1 # Number of scenarios to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
