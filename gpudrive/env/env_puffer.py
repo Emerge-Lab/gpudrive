@@ -204,6 +204,7 @@ class PufferGPUDrive(PufferEnv):
         render=False,
         render_3d=True,
         render_interval=50,
+        render_every_t=5,
         render_k_scenarios=3,
         render_agent_obs=False,
         render_format="mp4",
@@ -244,6 +245,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.render = render
         self.render_interval = render_interval
+        self.render_every_t = render_every_t
         self.render_k_scenarios = render_k_scenarios
         self.render_agent_obs = render_agent_obs
         self.render_format = render_format
@@ -647,10 +649,13 @@ class PufferGPUDrive(PufferEnv):
             np.where(np.array(list(self.rendering_in_progress.values())))[0]
         )
         time_steps = list(self.episode_lengths[envs_to_render, 0])
-        
-        render_at_time = bool(self.env.world_time_step % 10 == 0)
+
+        render_at_time = bool(
+            self.env.step_in_world[0, 0] % self.render_every_t == 0
+        )
 
         if len(envs_to_render) > 0 and render_at_time:
+            print("render")
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
@@ -733,6 +738,7 @@ class PufferGPUDrive(PufferEnv):
                     )
                 }
             )
+            print(f"rendering {render_env_idx} done")
             # Reset rendering storage
             self.frames[render_env_idx] = []
             self.rendering_in_progress[render_env_idx] = False

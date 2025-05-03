@@ -360,7 +360,7 @@ class MatplotlibVisualizer:
             else:
                 center_x = 0  # Default center x-coordinate
                 center_y = 0  # Default center y-coordinate
-                
+
             time_step = (
                 self.env_config.episode_len
                 - self.sim_object.steps_remaining_tensor().to_torch()[
@@ -1591,6 +1591,8 @@ class MatplotlibVisualizer:
         env_idx: int,
         figsize: Tuple[int, int] = (10, 10),
         trajectory: Optional[np.ndarray] = None,
+        step_reward: Optional[float] = None,
+        route_progress: Optional[float] = None,
     ):
         """
         Plot observation from agent POV to inspect the information available
@@ -1828,7 +1830,7 @@ class MatplotlibVisualizer:
         # Add time step text to the figure
         ax.text(
             0.05,  # x position in axes coordinates (5% from left)
-            0.95,  # y position in axes coordinates (95% from bottom)
+            0.90,  # y position in axes coordinates (95% from bottom)
             f"t = {time_step}",
             transform=ax.transAxes,  # Use axes coordinates
             fontsize=15,
@@ -1837,6 +1839,35 @@ class MatplotlibVisualizer:
             va="top",
         )
 
+        if step_reward is not None:
+            reward_color = (
+                "g" if step_reward > 0 else "r" if step_reward < 0 else "black"
+            )
+
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.85,  # y position in axes coordinates (90% from bottom)
+                r"$R_{t+1} = $" + f"{step_reward:.2f}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color=reward_color,  # Using the dynamically determined color
+                ha="left",
+                va="top",
+            )
+
+        if route_progress is not None:
+            # Add route process text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.80,  # y position in axes coordinates (85% from bottom)
+                f"Route progress = {route_progress:.2f}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
+
         if trajectory is not None and len(trajectory) > 0:
             attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
             # Plot the trajectory as a line
@@ -1844,25 +1875,38 @@ class MatplotlibVisualizer:
                 trajectory[:, 0].cpu(),  # x coordinates
                 trajectory[:, 1].cpu(),  # y coordinates
                 color="g",
-                linewidth=0.2 * line_width_scale,
+                linewidth=0.05 * line_width_scale,
                 marker="o",
-                alpha=0.1,
+                alpha=0.3,
                 zorder=0,
             )
-            # Add a purple star above the reference position
-            if len(attn_reference_idx) > 0:
-                ref_idx = attn_reference_idx[0]
-                ref_x = trajectory[ref_idx, 0]
-                ref_y = trajectory[ref_idx, 1]
 
-                ax.scatter(
-                    ref_x.cpu(),
-                    ref_y.cpu(),
-                    color="#9D00FF",
-                    marker="*",
-                    s=120,
-                    zorder=10,
+            # Draw a circle around every point in the trajectory
+            for i in range(trajectory.shape[0]):
+                circle = Circle(
+                    (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
+                    radius=self.env_config.guidance_pos_xy_radius,
+                    color="lightgrey",
+                    fill=False,
+                    linestyle="--",
+                    alpha=0.25,
                 )
+                ax.add_patch(circle)
+
+            # # Add a purple star above the reference position
+            # if len(attn_reference_idx) > 0:
+            #     ref_idx = attn_reference_idx[0]
+            #     ref_x = trajectory[ref_idx, 0]
+            #     ref_y = trajectory[ref_idx, 1]
+
+            #     ax.scatter(
+            #         ref_x.cpu(),
+            #         ref_y.cpu(),
+            #         color="#9D00FF",
+            #         marker="*",
+            #         s=120,
+            #         zorder=10,
+            #     )
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
