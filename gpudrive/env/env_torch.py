@@ -701,6 +701,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         elif self.config.reward_type == "reward_progress":
 
+            step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
+
             self.base_rewards = (
                 collision_weight * collided + off_road_weight * off_road
             )
@@ -712,8 +714,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.device,
             )
 
-            actual_agent_pos_xy = agent_states.pos_xy
-
             # Calculate Euclidean distance to all reference positions
             # Output shape: [worlds, agents, reference_traj_len]
             distances = torch.norm(
@@ -722,7 +722,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 dim=-1,
             )
 
-            valid_mask = self.reference_trajectory.valids.bool().squeeze(-1)
+            valid_mask = self.reference_trajectory.valids.squeeze(-1)
 
             # Find waypoints within X-meter radius that haven't been hit yet and are valid
             new_hits = (
@@ -740,11 +740,68 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Reward agent for successfully reaching guidance points along the route
             # Scale reward by 1/num_valid_points to ensure maximum attainable reward is 1.0
             # We do this for a consistent reward magnitude regardless of route length or density
-            self.guidance_error = guidance_points_hit_count / (
-                self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5
+            self.guidance_error = torch.clamp(
+                guidance_points_hit_count
+                / (self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5),
+                min=0,
+                max=1,
             )
 
             rewards = self.base_rewards + self.guidance_error
+
+            # We want agents that are parked to stay parked, and generally
+            # we want agents to don't go beyond their reference trajectory.
+            # To do this, add a penalty proportional to the agent position to
+            # the end position of the trajectory at the end of the episode
+            # Since all episodes terminate at the same time, we can just check the last step
+            if step_in_world[0].item() == self.episode_len - 1:
+                # Extract the last valid reference position for each world, agent
+                # valid_mask is [1, 64, 91] and reference_trajectory.pos_xy is [1, 64, 91, 2]
+                # We need to find the last valid position for each world-agent pair
+
+                # Get indices of last valid positions for each reference trajectory
+                last_valid_indices = torch.argmax(
+                    valid_mask
+                    * torch.arange(
+                        valid_mask.shape[2], device=valid_mask.device
+                    ),
+                    dim=2,
+                )
+
+                # Create indices for gathering
+                batch_indices = torch.zeros_like(
+                    last_valid_indices
+                )  # Shape: [1, 64]
+                agent_indices = torch.arange(
+                    valid_mask.shape[1], device=valid_mask.device
+                ).expand_as(
+                    last_valid_indices
+                )  # Shape: [1, 64]
+
+                # Gather the last valid reference positions
+                last_valid_positions = self.reference_trajectory.pos_xy[
+                    batch_indices, agent_indices, last_valid_indices
+                ]  # Shape: [1, 64, 2]
+
+                # Calculate distance between current positions and last valid reference positions
+                current_positions = (
+                    agent_states.pos_xy
+                )  # Assuming this has shape [1, 64, 2]
+                distance = torch.norm(
+                    current_positions - last_valid_positions, dim=2
+                )  # Shape: [1, 64]
+
+                # Add bonus for being close to the reference end position
+                # Using exponential decay: bonus = scale * exp(-distance/th)
+                # Normalize and scale the bonus (0.0 to 0.25 range)
+                distance_threshold = 2.0
+                max_position_bonus = 0.25
+
+                position_bonus = max_position_bonus * torch.exp(
+                    -distance / distance_threshold
+                )
+
+                rewards += position_bonus
 
             return rewards
 
@@ -1619,7 +1676,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1, 2]
+    FOCUS_AGENTS = [0, 1]
 
     env_config = EnvConfig(
         guidance=True,
@@ -1629,7 +1686,7 @@ if __name__ == "__main__":
         add_reference_heading=False,
         reward_type="reward_progress",
         init_mode="wosac_train",
-        dynamics_model="delta_local",
+        dynamics_model="classic",
         smoothen_trajectory=True,
         add_previous_action=False,
     )
@@ -1665,7 +1722,7 @@ if __name__ == "__main__":
 
     expert_actions, _, _, _ = env.get_expert_actions()
 
-    for time_step in range(env.init_steps, 5):
+    for time_step in range(env.init_steps, env.episode_len):
         print(f"Step: {env.step_in_world[0, 0, 0].item()}")
 
         # Step the environment

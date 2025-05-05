@@ -668,6 +668,8 @@ class PufferGPUDrive(PufferEnv):
                 agent_idx=0,
                 figsize=(10, 10),
                 trajectory=self.env.reference_path[0, :, :].to("cpu"),
+                step_reward=self.env.guidance_error[0, 0].item(),
+                route_progress=self.env.route_progress[0].item(),
             )
             self.agent_frames.append(img_from_fig(agent_obs))
 
