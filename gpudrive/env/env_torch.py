@@ -195,18 +195,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.reference_trajectory
             )
 
-        # Track reference trajectory positions that have been hit
-        self.guidance_points_hit = (
-            torch.zeros(
-                (
-                    self.num_worlds,
-                    self.max_cont_agents,
-                    self.reference_traj_len,
-                )
-            )
-            .bool()
-            .to(self.device)
-        )
+        # Initialize the reference trajectory positions that are already in reach
+        self.guidance_points_hit = self.guidance_points_within_reach()
 
     def _load_vbd_model(self, model_path):
         """
@@ -499,10 +489,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # Zero out only the reset environments
             self.previous_action_value_tensor[reset_mask] = 0.0
-            self.guidance_points_hit[reset_mask] = 0.0
+            # Reset the guidance points hit tensor for the reset environments
+            # TODO: Fix for asynchronous resets
+            self.guidance_points_hit = self.guidance_points_within_reach()
+            
         else:
             self.previous_action_value_tensor.zero_()
-            self.guidance_points_hit.zero_()
+            self.guidance_points_hit = self.guidance_points_within_reach()
 
         return self.get_obs(mask)
 
@@ -706,32 +699,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.base_rewards = (
                 collision_weight * collided + off_road_weight * off_road
             )
+            
+            is_valid = self.reference_trajectory.valids.squeeze(-1)
 
-            # Get actual agent positions
-            agent_states = GlobalEgoState.from_tensor(
-                self.sim.absolute_self_observation_tensor(),
-                self.backend,
-                self.device,
-            )
-
-            # Calculate Euclidean distance to all reference positions
-            # Output shape: [worlds, agents, reference_traj_len]
-            distances = torch.norm(
-                agent_states.pos_xy.unsqueeze(2)
-                - self.reference_trajectory.pos_xy,
-                dim=-1,
-            )
-
-            valid_mask = self.reference_trajectory.valids.squeeze(-1)
-
-            # Find waypoints within X-meter radius that haven't been hit yet and are valid
-            new_hits = (
-                (distances < self.config.guidance_pos_xy_radius)
-                & (~self.guidance_points_hit)
-                & valid_mask
-            )
-
-            # Update the hit tracking tensor
+            points_within_reach = self.guidance_points_within_reach()
+            
+            if step_in_world[0].item() == 1:
+                # This is the first step, and we reward the agent for
+                # reaching the initial guidance points
+                new_hits = self.guidance_points_hit & is_valid
+            else: # Find waypoints within X-meter radius that haven't been hit yet and are valid
+                new_hits = (
+                    points_within_reach
+                    & (~self.guidance_points_hit)
+                    & is_valid
+                )
+        
+            # Update the guidance points hit tensor
             self.guidance_points_hit = self.guidance_points_hit | new_hits
 
             # Count the number of new waypoints hit in this step
@@ -746,24 +730,40 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 min=0,
                 max=1,
             )
-
-            rewards = self.base_rewards + self.guidance_error
-
             # We want agents that are parked to stay parked, and generally
             # we want agents to don't go beyond their reference trajectory.
             # To do this, add a penalty proportional to the agent position to
             # the end position of the trajectory at the end of the episode
-            # Since all episodes terminate at the same time, we can just check the last step
-            if step_in_world[0].item() == self.episode_len - 1:
+            total_valid = self.reference_trajectory.valids.clone().sum(axis=[2, 3])
+            valid_hits_so_far = self.guidance_points_hit.clone().sum(dim=[-1])
+
+            # Handle the case where there are zero valid points
+            # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
+            route_progress = torch.where(
+                total_valid > 0,
+                valid_hits_so_far / (total_valid + 1e-5),  # Normal case
+                torch.ones_like(
+                    valid_hits_so_far
+                ),  # When agent has no valid points
+            )
+
+            completed_route_mask = (route_progress >= 0.99).float()
+            
+            if torch.any(completed_route_mask > 0):
                 # Extract the last valid reference position for each world, agent
                 # valid_mask is [1, 64, 91] and reference_trajectory.pos_xy is [1, 64, 91, 2]
                 # We need to find the last valid position for each world-agent pair
+                agent_states = GlobalEgoState.from_tensor(
+                    self.sim.absolute_self_observation_tensor(),
+                    self.backend,
+                    self.device,
+                )
 
                 # Get indices of last valid positions for each reference trajectory
                 last_valid_indices = torch.argmax(
-                    valid_mask
+                    is_valid
                     * torch.arange(
-                        valid_mask.shape[2], device=valid_mask.device
+                        is_valid.shape[2], device=is_valid.device
                     ),
                     dim=2,
                 )
@@ -773,7 +773,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     last_valid_indices
                 )  # Shape: [1, 64]
                 agent_indices = torch.arange(
-                    valid_mask.shape[1], device=valid_mask.device
+                    is_valid.shape[1], device=is_valid.device
                 ).expand_as(
                     last_valid_indices
                 )  # Shape: [1, 64]
@@ -794,17 +794,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance/th)
                 # Normalize and scale the bonus (0.0 to 0.25 range)
-                distance_threshold = 2.0
-                max_position_bonus = 0.25
+                distance_threshold = 1.0
+                max_position_bonus = 0.1
 
                 position_bonus = max_position_bonus * torch.exp(
                     -distance / distance_threshold
                 )
+                
+                position_bonus = position_bonus * completed_route_mask
 
-                rewards += position_bonus
+                self.guidance_error += position_bonus
+                
+            rewards = self.base_rewards + self.guidance_error
 
             return rewards
 
+    def guidance_points_within_reach(self):
+        # Get actual agent positions
+        agent_states = GlobalEgoState.from_tensor(
+            self.sim.absolute_self_observation_tensor(),
+            self.backend,
+            self.device,
+        )
+
+        # Calculate Euclidean distance to all reference positions
+        # Output shape: [worlds, agents, reference_traj_len]
+        distances = torch.norm(
+            agent_states.pos_xy.unsqueeze(2)
+            - self.reference_trajectory.pos_xy,
+            dim=-1,
+        )
+        
+        points_within_reach = distances < self.config.dist_to_goal_threshold        
+        
+        return points_within_reach       
+        
     def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
@@ -1240,7 +1264,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),  # When agent has no valid points
             )
 
-            # 2. How much time do I have left
+            # 2. How much time do I have left to complete the route
             normalized_time = self.step_in_world / self.episode_len
 
             base_fields.append(self.route_progress.unsqueeze(-1))
@@ -1281,6 +1305,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # 2. How much time do I have left
             normalized_time = self.step_in_world[mask] / self.episode_len
+            
             base_fields.append(self.route_progress.unsqueeze(-1))
             base_fields.append(normalized_time)
 
@@ -1663,11 +1688,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 env_idx=focus_env_idx,
                 agent_idx=agent_idx,
                 figsize=(10, 10),
-                trajectory=self.reference_path[focus_env_idx, agent_idx, :, :],
+                trajectory=self.reference_path[agent_idx, :, :],
                 step_reward=self.guidance_error[
                     focus_env_idx, agent_idx
                 ].item(),
-                route_progress=self.route_progress[focus_env_idx, agent_idx],
+                route_progress=self.route_progress[agent_idx],
             )
             agent_views.append(agent_obs)
 
@@ -1676,7 +1701,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1]
+    FOCUS_AGENTS = [0, 1, 2, 3]
 
     env_config = EnvConfig(
         guidance=True,
@@ -1686,7 +1711,7 @@ if __name__ == "__main__":
         add_reference_heading=False,
         reward_type="reward_progress",
         init_mode="wosac_train",
-        dynamics_model="classic",
+        dynamics_model="state", #"classic",
         smoothen_trajectory=True,
         add_previous_action=False,
     )
@@ -1729,13 +1754,13 @@ if __name__ == "__main__":
         expert_actions, _, _, _ = env.get_expert_actions()
         env.step_dynamics(expert_actions[:, :, time_step, :])
 
-        obs = env.get_obs()
+        obs = env.get_obs(control_mask)
         reward = env.get_rewards()
-
-        sim_states, agent_obs = env.render(focus_agent_idx=FOCUS_AGENTS)
-        sim_frames.append(img_from_fig(sim_states[0]))
-        for i in FOCUS_AGENTS:
-            agent_obs_frames[i].append(img_from_fig(agent_obs[i]))
+        if time_step % 10 == 0 or time_step > env.episode_len - 3:
+            sim_states, agent_obs = env.render(focus_agent_idx=FOCUS_AGENTS)
+            sim_frames.append(img_from_fig(sim_states[0]))
+            for i in FOCUS_AGENTS:
+                agent_obs_frames[i].append(img_from_fig(agent_obs[i]))
 
         print(f"R_t+1: {reward[0, 0]}")
 
@@ -1745,7 +1770,7 @@ if __name__ == "__main__":
     env.close()
 
     media.write_video(
-        "sim_video.gif", np.array(sim_frames), fps=10, codec="gif"
+        "sim_video.gif", np.array(sim_frames), fps=5, codec="gif"
     )
     for focus_agent_idx in FOCUS_AGENTS:
         agent_obs_frames[focus_agent_idx] = np.array(
@@ -1754,6 +1779,6 @@ if __name__ == "__main__":
         media.write_video(
             f"obs_video_env_{0}_agent_{focus_agent_idx}.gif",
             np.array(agent_obs_frames[focus_agent_idx]),
-            fps=10,
+            fps=5,
             codec="gif",
         )

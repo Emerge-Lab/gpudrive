@@ -1831,7 +1831,7 @@ class MatplotlibVisualizer:
         ax.text(
             0.05,  # x position in axes coordinates (5% from left)
             0.90,  # y position in axes coordinates (95% from bottom)
-            f"t = {time_step}",
+             r"$O_{t}$ for " + f"t = {time_step}",
             transform=ax.transAxes,  # Use axes coordinates
             fontsize=15,
             color="black",
