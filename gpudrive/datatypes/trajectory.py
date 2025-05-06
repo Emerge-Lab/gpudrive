@@ -157,8 +157,6 @@ class VBDTrajectoryOnline:
         self.mean_x = mean_pos_xy[:, 0]
         self.mean_y = mean_pos_xy[:, 1]
 
-        self.demean_positions()
-
     @classmethod
     def from_tensor(
         cls,
@@ -195,8 +193,8 @@ class VBDTrajectoryOnline:
         mean_y_reshaped = self.mean_y.view(-1, 1, 1)
 
         # Apply to x and y coordinates
-        self.pos_xy[..., 0] -= mean_x_reshaped
-        self.pos_xy[..., 1] -= mean_y_reshaped
+        self.pos_xy[..., 10:, 0] -= mean_x_reshaped
+        self.pos_xy[..., 10:, 1] -= mean_y_reshaped
 
         self.pos_x = self.pos_xy[..., 0].unsqueeze(-1)
         self.pos_y = self.pos_xy[..., 1].unsqueeze(-1)
