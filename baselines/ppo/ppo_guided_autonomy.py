@@ -162,7 +162,7 @@ def run(
     config = load_config(config_path)
 
     if data_dir is not None:
-        config["data_dir"] = data_dir
+        config.data_dir = data_dir
 
     if config.environment.reward_type == "reward_conditioned":
         if bool(randomize_rewards):

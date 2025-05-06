@@ -1292,7 +1292,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if self.config.add_previous_action:
                 normalized_prev_actions = (
-                    self.previous_action_value_tensor[:, :, :2]
+                    self.previous_action_value_tensor[:, :, :2][mask]
                     / constants.MAX_ACTION_VALUE
                 )
                 base_fields.append(normalized_prev_actions)
@@ -1670,7 +1670,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 agent_idx=agent_idx,
                 figsize=(10, 10),
                 trajectory=self.reference_path[agent_idx, :, :],
-                step_reward=self.guidance_error[
+                step_reward=self.guidance_reward[
                     focus_env_idx, agent_idx
                 ].item(),
                 route_progress=self.route_progress[agent_idx],
@@ -1694,7 +1694,7 @@ if __name__ == "__main__":
         init_mode="wosac_train",
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
-        add_previous_action=False,
+        add_previous_action=True,
     )
     render_config = RenderConfig()
 
