@@ -161,9 +161,60 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
 
+            # Pad first 10 steps with logs
+            trajectory_tensor = self.sim.expert_trajectory_tensor()
+            log_trajectory = LogTrajectory.from_tensor(
+                trajectory_tensor,
+                self.num_worlds,
+                self.max_agent_count,
+                self.backend,
+                self.device,
+            )
+            
+            reference_trajectory = torch.zeros(
+                self.num_worlds,
+                self.max_agent_count,
+                self.episode_len,
+                5
+            )
+            reference_trajectory[:, :, :self.init_steps, :2] = log_trajectory.pos_xy[
+                :, :, :self.init_steps
+            ]
+            reference_trajectory[:, :, :self.init_steps, 2] = log_trajectory.yaw[
+                :, :, :self.init_steps, 0
+            ]
+            reference_trajectory[:, :, :self.init_steps, 3:] = log_trajectory.vel_xy[
+                :, :, :self.init_steps
+            ]
+
+            vbd_predictions=predicted["denoised_trajs"].to(self.device).detach()
+
+            # Get the world means
+            world_means = (
+                self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+            )
+
+            # Add vbd predictions to the reference trajectory
+            for i in range(self.num_worlds):
+                # Get controlled agent indices for this world
+                valid_mask = (
+                    scene_context["agents_id"][i] >= 0
+                )
+                valid_world_indices = scene_context["agents_id"][i][valid_mask]
+
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps:, :2
+                ] = vbd_predictions[i, valid_world_indices, :, :2] - world_means[
+                    i
+                ].view(1, 1, 2)
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps:, 2:
+                ] = vbd_predictions[i, valid_world_indices, :, 2:]
+
+            
             # Wrap predictions into a VBDTrajectoryOnline object
             self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
-                vbd_predictions=predicted["denoised_trajs"],
+                vbd_predictions=reference_trajectory,
                 mean_pos_xy=self.sim.world_means_tensor().to_torch()[:, :2],
                 backend=self.backend,
                 device=self.device,
