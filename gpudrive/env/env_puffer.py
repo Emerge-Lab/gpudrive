@@ -206,6 +206,7 @@ class PufferGPUDrive(PufferEnv):
         render_interval=50,
         render_every_t=5,
         render_k_scenarios=3,
+        render_agent_idx=[0, 6],
         render_agent_obs=False,
         render_format="mp4",
         render_fps=15,
@@ -247,6 +248,7 @@ class PufferGPUDrive(PufferEnv):
         self.render_interval = render_interval
         self.render_every_t = render_every_t
         self.render_k_scenarios = render_k_scenarios
+        self.render_agent_idx = render_agent_idx
         self.render_agent_obs = render_agent_obs
         self.render_format = render_format
         self.render_fps = render_fps
@@ -341,7 +343,7 @@ class PufferGPUDrive(PufferEnv):
         }
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
         self.agent_frames = {
-            env_idx: [] for env_idx in range(render_k_scenarios)
+            agent_idx: [] for agent_idx in render_agent_idx
         }
 
         self.global_step = 0
@@ -661,22 +663,22 @@ class PufferGPUDrive(PufferEnv):
                 plot_guidance_pos_xy=self.plot_guidance_pos_xy,
             )
 
-            for idx, render_env_idx in enumerate(envs_to_render):
+            for agent_idx in self.render_agent_idx:
                 agent_obs = self.env.vis.plot_agent_observation(
                     env_idx=0,
                     agent_idx=0,
                     figsize=(10, 10),
                     trajectory=self.env.reference_path[
-                        render_env_idx, :, :
+                        agent_idx, :, :
                     ].to("cpu"),
                     step_reward=self.env.guidance_error[
-                        render_env_idx, 0
+                        0, agent_idx
                     ].item(),
                     route_progress=self.env.route_progress[
-                        render_env_idx
+                        agent_idx
                     ].item(),
                 )
-                self.agent_frames[render_env_idx].append(
+                self.agent_frames[agent_idx].append(
                     img_from_fig(agent_obs)
                 )
 
@@ -707,9 +709,12 @@ class PufferGPUDrive(PufferEnv):
         """Clear rendering storage."""
         for env_idx in env_list_to_clear:
             self.frames[env_idx] = []
-            self.agent_frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
+            
+        if env_list_to_clear is not None:
+            for agent_idx in self.render_agent_idx:
+                self.agent_frames[agent_idx] = []
 
     def log_video_to_wandb(self, render_env_idx, done_worlds):
         """Log arrays as videos to wandb."""
@@ -728,21 +733,23 @@ class PufferGPUDrive(PufferEnv):
                     )
                 }
             )
-            agent_frames_array = np.array(self.agent_frames[render_env_idx])
-            self.wandb_obj.log(
-                {
-                    f"vis/agent_obs/env_0": wandb.Video(
-                        np.moveaxis(agent_frames_array, -1, 1),
-                        fps=self.render_fps,
-                        format=self.render_format,
-                        caption=f"global step: {self.global_step:,}",
-                    )
-                }
-            )
+            for agent_idx in self.render_agent_idx:
+                agent_frames_array = np.array(self.agent_frames[agent_idx])
+                self.wandb_obj.log(
+                    {
+                        f"vis/agent_obs/env_0_agent_{agent_idx}": wandb.Video(
+                            np.moveaxis(agent_frames_array, -1, 1),
+                            fps=self.render_fps,
+                            format=self.render_format,
+                            caption=f"global step: {self.global_step:,}",
+                        )
+                    }
+                )
 
             # Reset rendering storage
             self.frames[render_env_idx] = []
-            self.agent_frames[render_env_idx] = []
+            for agent_idx in self.render_agent_idx:
+                self.agent_frames[agent_idx] = []
             self.rendering_in_progress[render_env_idx] = False
             self.was_rendered_in_rollout[render_env_idx] = True
 
@@ -902,17 +909,17 @@ class PufferGPUDrive(PufferEnv):
                     "realism/mean_displacement_error": displacement_error[
                         valid_mask
                     ].mean(),
-                    # "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
-                    #     ref_linear_speed[speed_valid]
-                    # ),
-                    # "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
-                    #     ref_linear_accel[accel_valid]
-                    # ),
-                    # "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
-                    #     agent_linear_speed[speed_valid]
-                    # ),
-                    # "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
-                    #     agent_linear_speed[accel_valid]
-                    # ),
+                    "realism/kinematic_ref_linear_speed_dist": wandb.Histogram(
+                        ref_linear_speed[speed_valid]
+                    ),
+                    "realism/kinematic_ref_linear_accel_dist": wandb.Histogram(
+                        ref_linear_accel[accel_valid]
+                    ),
+                    "realism/kinematic_agent_linear_speed_dist": wandb.Histogram(
+                        agent_linear_speed[speed_valid]
+                    ),
+                    "realism/kinematic_agent_linear_accel_dist": wandb.Histogram(
+                        agent_linear_speed[accel_valid]
+                    ),
                 },
             )
