@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/selected_json
+data_dir: data/processed/wosac/validation_json_1
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 3 # Number of unique scenes to sample from
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -21,20 +21,19 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   guidance: true # If true, the agent will be guided by expert suggestions
   guidance_mode: "log_replay" # Options: "log_replay", "vbd_amortized", "vbd_online"
   add_reference_pos_xy: true # If true, a reference path is added to the ego observation
-  add_reference_speed: false # If true, the reference speeds are added to the ego observation
-  add_reference_heading: false # If true, the reference heading are added to the ego observation
-  smoothen_trajectory: false # If true, the velocities and headings are smoothed
+  add_reference_speed: true # If true, the reference speeds are added to the ego observation
+  add_reference_heading: true # If true, the reference heading are added to the ego observation
+  smoothen_trajectory: true # If true, the velocities and headings are smoothed
 
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
   # Reward function
   reward_type: "reward_progress"
-  collision_weight: 0.0
-  off_road_weight: 0.0
-  guidance_pos_xy_weight: 0.01
-  guidance_speed_weight: 0.0
-  guidance_heading_weight: 0.0
-  smoothness_weight: 0.00
+  collision_weight: -0.01
+  off_road_weight: -0.01
+  guidance_speed_weight: 0.01
+  guidance_heading_weight: 0.01
+  smoothness_weight: 0.01
 
   init_mode: wosac_train
   dynamics_model: "classic"
@@ -54,7 +53,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "new"
+  group: "progress_one_tick"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -71,7 +70,7 @@ train:
   resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: true
+  sample_with_replacement: false
   shuffle_dataset: true
   file_prefix: ""
 
@@ -82,22 +81,22 @@ train:
   minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: true
-  gamma: 0.99
+  gamma: 1.0
   gae_lambda: 0.95
   update_epochs: 4
   norm_adv: true
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.005
+  ent_coef: 0.001
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
 
   # # # Logging # # #
-  log_window: 500
+  log_window: 100
   track_realism_metrics: true # Log human-like metrics
-  track_n_worlds: 3 # Number of worlds to track
+  track_n_worlds: 2 # Number of worlds to track
 
   # # # Network # # #
   network:
@@ -111,11 +110,12 @@ train:
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
+  render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 1 # Render every k iterations
-  render_every_t: 5 # Render every k timesteps
+  render_interval: 500 # Render every k iterations
+  render_every_t: 10 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
+  render_agent_idx: [0] # Agent observations to render
   render_format: "mp4" # Options: gif, mp4
   render_fps: 5 # Frames per second
   zoom_radius: 100

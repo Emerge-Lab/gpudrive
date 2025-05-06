@@ -264,7 +264,6 @@ if __name__ == "__main__":
         # "total_timesteps": [3_000_000_000],
         "batch_size": [262_144],
         "minibatch_size": [16_384],
-        # "guidance_pos_xy_weight": [0.01],
         # "guidance_speed_weight": [0.01],
         # "guidance_heading_weight": [0.01],
         "ent_coef": [0.001, 0.005, 0.003, 0.01],

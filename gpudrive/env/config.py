@@ -40,9 +40,8 @@ class EnvConfig:
     add_reference_pos_xy: bool = True  # (x, y) position time series
     add_reference_speed: bool = False  # speed time series
     add_reference_heading: bool = False  # heading time series
-    smoothen_trajectory: bool = False  # Filters out the trajectory
-
-    guidance_pos_xy_radius: float = 1.0
+    smoothen_trajectory: bool = True  # Filters out the trajectory
+    guidance_pos_xy_radius: float = 1.0  # Tightness of the positions guidance
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -128,14 +127,11 @@ class EnvConfig:
 
     # If reward_type is "guided_autonomy", the following parameters are used
     guidance_sample_interval: int = 1
-    guidance_pos_xy_weight: float = (
-        0.01  # Importance of matching suggested positions
-    )
     guidance_speed_weight: float = (
         0.01  # Importance of matching suggested speeds
     )
     guidance_heading_weight: float = (
-        0.0  # Importance of matching suggested headings
+        0.01  # Importance of matching suggested headings
     )
     smoothness_weight: float = 0.0
 

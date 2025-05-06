@@ -492,7 +492,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Reset the guidance points hit tensor for the reset environments
             # TODO: Fix for asynchronous resets
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
-            
+
         else:
             self.previous_action_value_tensor.zero_()
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
@@ -640,10 +640,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     suggested_heading - actual_agent_heading
                 ) ** 2
 
-                self.guidance_error = (
-                    -self.config.guidance_pos_xy_weight
-                    * torch.log(guidance_pos_error + 1.0)
-                    - self.config.guidance_speed_weight
+                self.guidance_reward = (
+                    -self.config.guidance_speed_weight
                     * torch.log(guidance_speed_error + 1.0)
                     - self.config.guidance_heading_weight
                     * torch.log(guidance_heading_error + 1.0)
@@ -651,7 +649,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 # Zero-out guidance errors for invalid time steps, that is,
                 # those that were not observed at the current time step
-                self.guidance_error[~is_valid] = 0.0
+                self.guidance_reward[~is_valid] = 0.0
 
                 # Reduce guidance density
                 if self.config.guidance_sample_interval > 1:
@@ -664,10 +662,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         .float()
                         .unsqueeze(1)
                     )
-                    self.guidance_error = self.guidance_error * waypoint_mask
+                    self.guidance_reward = self.guidance_reward * waypoint_mask
 
             else:
-                self.guidance_error = torch.zeros_like(self.base_rewards)
+                self.guidance_reward = torch.zeros_like(self.base_rewards)
 
             # Encourage smooth driving
             if hasattr(self, "action_diff"):
@@ -685,10 +683,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             else:
                 self.smoothness_penalty = torch.zeros_like(self.base_rewards)
 
-            self.guidance_error += self.smoothness_penalty
+            self.guidance_reward += self.smoothness_penalty
 
             # Combine base rewards with guidance error
-            rewards = self.base_rewards + self.guidance_error
+            rewards = self.base_rewards + self.guidance_reward
 
             return rewards
 
@@ -696,13 +694,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
 
+            # 1. Get base rewards defined by user
             self.base_rewards = (
                 collision_weight * collided + off_road_weight * off_road
             )
-            
+
             is_valid = self.reference_trajectory.valids.squeeze(-1)
 
-            points_within_reach, distance_to_points = self.guidance_points_within_reach()
+            # 2. Positions
+
+            # a) Get the reference trajectory positions
+            (
+                points_within_reach,
+                distance_to_points,
+            ) = self.guidance_points_within_reach()
 
             if step_in_world[0].item() == 1:
                 # This is the first step, and we reward the agent for
@@ -715,60 +720,82 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     & (~self.guidance_points_hit)
                     & is_valid
                 ).to(self.device)
-                
+
                 # Create a mask to handle cases where there are no potential hits
-                has_potential_hits = torch.any(potential_new_hits, dim=2, keepdim=True)
-                
+                has_potential_hits = torch.any(
+                    potential_new_hits, dim=2, keepdim=True
+                )
+
                 # Replace distances for non-potential hits with a large value
                 masked_distances = torch.where(
                     potential_new_hits.bool(),
                     distance_to_points,
-                    torch.ones_like(distance_to_points) * 1e10
+                    torch.ones_like(distance_to_points) * 1e10,
                 ).to(self.device)
-                
+
                 # Find indices of closest waypoints for each agent
                 closest_indices = torch.argmin(masked_distances, dim=2)
-                
+
                 # Create a one-hot tensor marking only the closest waypoint for each agent
-                batch_size, num_agents, num_waypoints = potential_new_hits.shape
-                batch_indices = torch.arange(batch_size).view(-1, 1).repeat(1, num_agents).flatten().to(self.device)
-                agent_indices = torch.arange(num_agents).repeat(batch_size).to(self.device)
-                
+                (
+                    batch_size,
+                    num_agents,
+                    num_waypoints,
+                ) = potential_new_hits.shape
+                batch_indices = (
+                    torch.arange(batch_size)
+                    .view(-1, 1)
+                    .repeat(1, num_agents)
+                    .flatten()
+                    .to(self.device)
+                )
+                agent_indices = (
+                    torch.arange(num_agents).repeat(batch_size).to(self.device)
+                )
+
                 # Initialize new_hits tensor with zeros
                 new_hits = torch.zeros_like(potential_new_hits)
-                
+
                 # Only set closest hits where there are potential hits
                 valid_agents = has_potential_hits.view(-1)
-                
+
                 # Efficiently set the closest point for each valid agent
                 if torch.any(valid_agents):
                     valid_batch_indices = batch_indices[valid_agents]
                     valid_agent_indices = agent_indices[valid_agents]
-                    valid_closest_indices = closest_indices.view(-1)[valid_agents]
-                    
-                    new_hits[valid_batch_indices, valid_agent_indices, valid_closest_indices] = True
+                    valid_closest_indices = closest_indices.view(-1)[
+                        valid_agents
+                    ]
 
-    
+                    new_hits[
+                        valid_batch_indices,
+                        valid_agent_indices,
+                        valid_closest_indices,
+                    ] = True
+
             # Update the guidance points hit tensor
             self.guidance_points_hit = self.guidance_points_hit | new_hits
 
             # Count the number of new waypoints hit in this step
             guidance_points_hit_count = new_hits.sum(dim=-1).float()
-            
+
             # Reward agent for successfully reaching guidance points along the route
             # Scale reward by 1/num_valid_points to ensure maximum attainable reward is 1.0
             # We do this for a consistent reward magnitude regardless of route length or density
-            self.guidance_error = torch.clamp(
+            self.guidance_reward = torch.clamp(
                 guidance_points_hit_count
                 / (self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5),
                 min=0,
                 max=1,
             )
+
             # We want agents that are parked to stay parked, and generally
             # we want agents to don't go beyond their reference trajectory.
             # To do this, add a penalty proportional to the agent position to
             # the end position of the trajectory at the end of the episode
-            total_valid = self.reference_trajectory.valids.clone().sum(axis=[2, 3])
+            total_valid = self.reference_trajectory.valids.clone().sum(
+                axis=[2, 3]
+            )
             valid_hits_so_far = self.guidance_points_hit.clone().sum(dim=[-1])
 
             # Handle the case where there are zero valid points
@@ -782,7 +809,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             completed_route_mask = (route_progress >= 0.99).float()
-            
+
+            # b). Add a bonus for being close to the reference end position
             if torch.any(completed_route_mask > 0):
                 # Extract the last valid reference position for each world, agent
                 # valid_mask is [1, 64, 91] and reference_trajectory.pos_xy is [1, 64, 91, 2]
@@ -796,9 +824,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # Get indices of last valid positions for each reference trajectory
                 last_valid_indices = torch.argmax(
                     is_valid
-                    * torch.arange(
-                        is_valid.shape[2], device=is_valid.device
-                    ),
+                    * torch.arange(is_valid.shape[2], device=is_valid.device),
                     dim=2,
                 )
 
@@ -827,25 +853,89 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance/th)
-                # Normalize and scale the bonus 
+                # Normalize and scale the bonus
                 distance_threshold = 0.5
                 max_position_bonus = 0.1
 
                 position_bonus = max_position_bonus * torch.exp(
                     -distance / distance_threshold
                 )
-                
+
                 position_bonus = position_bonus * completed_route_mask
 
-                self.guidance_error += position_bonus
-                
-            rewards = self.base_rewards + self.guidance_error
+                self.guidance_reward += position_bonus
+
+            # 3. Speed and heading targets
+            if step_in_world[0] < self.reference_traj_len:
+                batch_idx = torch.arange(step_in_world.shape[0])
+
+                suggested_speed = self.reference_trajectory.ref_speed[
+                    batch_idx, :, step_in_world
+                ].squeeze(-1)
+
+                suggested_heading = self.reference_trajectory.yaw[
+                    batch_idx, :, step_in_world
+                ].squeeze(-1)
+
+                is_valid = (
+                    self.reference_trajectory.valids[
+                        batch_idx, :, step_in_world
+                    ]
+                    .squeeze(-1)
+                    .bool()
+                )
+
+                actual_agent_speed = (
+                    self.sim.self_observation_tensor().to_torch()[:, :, 0]
+                )
+
+                actual_agent_heading = self.agent_states.rotation_angle
+
+                # Compute distances
+                guidance_speed_error = (
+                    suggested_speed - actual_agent_speed
+                ) ** 2
+                guidance_heading_error = (
+                    suggested_heading - actual_agent_heading
+                ) ** 2
+
+                speed_heading_error = (
+                    -self.config.guidance_speed_weight
+                    * torch.log(guidance_speed_error + 1.0)
+                    - self.config.guidance_heading_weight
+                    * torch.log(guidance_heading_error + 1.0)
+                )
+
+                speed_heading_error[~is_valid] = 0.0
+
+                self.guidance_reward += speed_heading_error
+
+            # 4. Encourage smooth driving
+            if hasattr(self, "action_diff"):
+                acceleration_jerk = (
+                    self.action_diff[:, :, 0] ** 2
+                )  # First action component is acceleration
+                steering_jerk = (
+                    self.action_diff[:, :, 1] ** 2
+                )  # Second action component is steering
+
+                self.smoothness_penalty = -(
+                    self.config.smoothness_weight * acceleration_jerk
+                    + self.config.smoothness_weight * steering_jerk
+                )
+            else:
+                self.smoothness_penalty = torch.zeros_like(self.base_rewards)
+
+            self.guidance_reward += self.smoothness_penalty
+
+            # Combine
+            rewards = self.base_rewards + self.guidance_reward
 
             return rewards
 
     def guidance_points_within_reach(self):
         # Get actual agent positions
-        agent_states = GlobalEgoState.from_tensor(
+        self.agent_states = GlobalEgoState.from_tensor(
             self.sim.absolute_self_observation_tensor(),
             self.backend,
             self.device,
@@ -854,15 +944,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Calculate Euclidean distance to all reference positions
         # Output shape: [worlds, agents, reference_traj_len]
         distances = torch.norm(
-            agent_states.pos_xy.unsqueeze(2)
+            self.agent_states.pos_xy.unsqueeze(2)
             - self.reference_trajectory.pos_xy,
             dim=-1,
         )
-        
-        points_within_reach = distances < self.config.dist_to_goal_threshold        
-        
-        return points_within_reach, distances       
-        
+
+        points_within_reach = distances < self.config.dist_to_goal_threshold
+
+        return points_within_reach, distances
+
     def step_dynamics(self, actions):
         if actions is not None:
             self._apply_actions(actions)
@@ -1046,7 +1136,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             valid_timesteps_mask = self.reference_trajectory.valids.bool()
 
-
             if self.config.add_reference_speed:
                 reference_speed = (
                     self.reference_trajectory.ref_speed.clone()
@@ -1128,7 +1217,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         else:
             batch_size = mask.sum()
-            batch_indices = torch.arange(batch_size)
 
             valid_timesteps_mask = self.reference_trajectory.valids.bool()[
                 mask
@@ -1192,7 +1280,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_path = local_reference_xy
 
                 self.reference_path = local_reference_xy_orig
-              
+
                 guidance.append(reference_path)
 
             if self.config.add_reference_heading:
@@ -1248,7 +1336,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
-            total_valid = self.reference_trajectory.valids.clone().sum(axis=[2, 3])
+            total_valid = self.reference_trajectory.valids.clone().sum(
+                axis=[2, 3]
+            )
             valid_hits_so_far = self.guidance_points_hit.clone().sum(dim=[-1])
 
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
@@ -1285,9 +1375,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
             total_valid = (
-                self.reference_trajectory.valids[mask].clone().sum(dim=1).squeeze(-1)
+                self.reference_trajectory.valids[mask]
+                .clone()
+                .sum(dim=1)
+                .squeeze(-1)
             )
-            valid_hits_so_far = self.guidance_points_hit.clone()[mask].sum(dim=-1)
+            valid_hits_so_far = self.guidance_points_hit.clone()[mask].sum(
+                dim=-1
+            )
 
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
@@ -1301,7 +1396,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # 2. How much time do I have left
             normalized_time = self.step_in_world[mask] / self.episode_len
-            
+
             base_fields.append(self.route_progress.unsqueeze(-1))
             base_fields.append(normalized_time)
 
@@ -1707,7 +1802,7 @@ if __name__ == "__main__":
         add_reference_heading=False,
         reward_type="reward_progress",
         init_mode="wosac_train",
-        dynamics_model="delta_local", #"state", #"classic",
+        dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=False,
     )

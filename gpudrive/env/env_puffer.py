@@ -184,7 +184,6 @@ class PufferGPUDrive(PufferEnv):
         smoothen_trajectory=False,
         prob_reference_dropout=0.0,
         reward_type="weighted_combination",
-        guidance_pos_xy_weight=0.01,
         guidance_speed_weight=0.0,
         guidance_heading_weight=0.0,
         smoothness_weight=0.0,
@@ -270,7 +269,6 @@ class PufferGPUDrive(PufferEnv):
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
             reward_type=reward_type,
-            guidance_pos_xy_weight=guidance_pos_xy_weight,
             guidance_speed_weight=guidance_speed_weight,
             guidance_heading_weight=guidance_heading_weight,
             smoothness_weight=smoothness_weight,
@@ -342,9 +340,7 @@ class PufferGPUDrive(PufferEnv):
             env_idx: True for env_idx in range(render_k_scenarios)
         }
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
-        self.agent_frames = {
-            agent_idx: [] for agent_idx in render_agent_idx
-        }
+        self.agent_frames = {agent_idx: [] for agent_idx in render_agent_idx}
 
         self.global_step = 0
         self.iters = 0
@@ -443,10 +439,10 @@ class PufferGPUDrive(PufferEnv):
         reward_controlled = reward[self.controlled_agent_mask]
 
         # Store human-like and internal rewards separately
-        if self.reward_type == "guided_autonomy":
+        if self.reward_type == "reward_progress":
             self.human_like_rewards[
                 self.live_agent_mask
-            ] += self.env.guidance_error[self.live_agent_mask]
+            ] += self.env.guidance_reward[self.live_agent_mask]
             self.internal_rewards[
                 self.live_agent_mask
             ] += self.env.base_rewards[self.live_agent_mask]
@@ -570,7 +566,7 @@ class PufferGPUDrive(PufferEnv):
                 self.info_lst.append(
                     {
                         "metrics/mean_episode_reward_per_agent": agent_episode_returns.mean().item(),
-                        "metrics/mean_imitation_distance": human_like_values.mean().item(),
+                        "metrics/mean_guidance_reward": human_like_values.mean().item(),
                         "metrics/mean_internal_reward": internal_reward_values.mean().item(),
                         "metrics/perc_goal_achieved": goal_achieved_rate.item(),
                         "metrics/perc_off_road": off_road_rate.item(),
@@ -668,19 +664,13 @@ class PufferGPUDrive(PufferEnv):
                     env_idx=0,
                     agent_idx=0,
                     figsize=(10, 10),
-                    trajectory=self.env.reference_path[
-                        agent_idx, :, :
-                    ].to("cpu"),
-                    step_reward=self.env.guidance_error[
-                        0, agent_idx
-                    ].item(),
-                    route_progress=self.env.route_progress[
-                        agent_idx
-                    ].item(),
+                    trajectory=self.env.reference_path[agent_idx, :, :].to(
+                        "cpu"
+                    ),
+                    step_reward=self.env.guidance_reward[0, agent_idx].item(),
+                    route_progress=self.env.route_progress[agent_idx].item(),
                 )
-                self.agent_frames[agent_idx].append(
-                    img_from_fig(agent_obs)
-                )
+                self.agent_frames[agent_idx].append(img_from_fig(agent_obs))
 
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
@@ -711,7 +701,7 @@ class PufferGPUDrive(PufferEnv):
             self.frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
-            
+
         if env_list_to_clear is not None:
             for agent_idx in self.render_agent_idx:
                 self.agent_frames[agent_idx] = []
