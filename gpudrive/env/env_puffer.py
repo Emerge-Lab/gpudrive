@@ -339,9 +339,10 @@ class PufferGPUDrive(PufferEnv):
         self.was_rendered_in_rollout = {
             env_idx: True for env_idx in range(render_k_scenarios)
         }
-        self.agent_was_rendered_in_rollout = False
         self.frames = {env_idx: [] for env_idx in range(render_k_scenarios)}
-        self.agent_frames = []
+        self.agent_frames = {
+            env_idx: [] for env_idx in range(render_k_scenarios)
+        }
 
         self.global_step = 0
         self.iters = 0
@@ -513,8 +514,6 @@ class PufferGPUDrive(PufferEnv):
                 for render_env_idx in range(self.render_k_scenarios):
                     self.log_video_to_wandb(render_env_idx, done_worlds)
 
-                self.log_agent_obs_to_wandb()
-
             # Log episode statistics
             controlled_mask = self.controlled_agent_mask[
                 done_worlds, :
@@ -655,7 +654,6 @@ class PufferGPUDrive(PufferEnv):
         )
 
         if len(envs_to_render) > 0 and render_at_time:
-            print("render")
             sim_state_figures = self.env.vis.plot_simulator_state(
                 env_indices=envs_to_render,
                 time_steps=time_steps,
@@ -663,15 +661,24 @@ class PufferGPUDrive(PufferEnv):
                 plot_guidance_pos_xy=self.plot_guidance_pos_xy,
             )
 
-            agent_obs = self.env.vis.plot_agent_observation(
-                env_idx=0,
-                agent_idx=0,
-                figsize=(10, 10),
-                trajectory=self.env.reference_path[0, :, :].to("cpu"),
-                step_reward=self.env.guidance_error[0, 0].item(),
-                route_progress=self.env.route_progress[0].item(),
-            )
-            self.agent_frames.append(img_from_fig(agent_obs))
+            for idx, render_env_idx in enumerate(envs_to_render):
+                agent_obs = self.env.vis.plot_agent_observation(
+                    env_idx=0,
+                    agent_idx=0,
+                    figsize=(10, 10),
+                    trajectory=self.env.reference_path[
+                        render_env_idx, :, :
+                    ].to("cpu"),
+                    step_reward=self.env.guidance_error[
+                        render_env_idx, 0
+                    ].item(),
+                    route_progress=self.env.route_progress[
+                        render_env_idx
+                    ].item(),
+                )
+                self.agent_frames[render_env_idx].append(
+                    img_from_fig(agent_obs)
+                )
 
             for idx, render_env_idx in enumerate(envs_to_render):
                 self.frames[render_env_idx].append(
@@ -696,32 +703,13 @@ class PufferGPUDrive(PufferEnv):
 
         self.log_data_coverage()
 
-    def clear_render_storage(self):
+    def clear_render_storage(self, env_list_to_clear=None):
         """Clear rendering storage."""
-        for env_idx in range(self.render_k_scenarios):
+        for env_idx in env_list_to_clear:
             self.frames[env_idx] = []
-            self.agent_frames = []
+            self.agent_frames[env_idx] = []
             self.rendering_in_progress[env_idx] = False
             self.was_rendered_in_rollout[env_idx] = False
-            self.agent_was_rendered_in_rollout = False
-
-    def log_agent_obs_to_wandb(self):
-        """Log agent observation to wandb."""
-
-        frames_array = np.array(self.agent_frames)
-        if frames_array.shape[0] > 10:
-            self.wandb_obj.log(
-                {
-                    f"vis/agent_obs/env_0": wandb.Video(
-                        np.moveaxis(frames_array, -1, 1),
-                        fps=self.render_fps,
-                        format=self.render_format,
-                        caption=f"global step: {self.global_step:,}",
-                    )
-                }
-            )
-            self.agent_frames = []
-            self.agent_was_rendered_in_rollout = True
 
     def log_video_to_wandb(self, render_env_idx, done_worlds):
         """Log arrays as videos to wandb."""
@@ -740,9 +728,21 @@ class PufferGPUDrive(PufferEnv):
                     )
                 }
             )
-            print(f"rendering {render_env_idx} done")
+            agent_frames_array = np.array(self.agent_frames[render_env_idx])
+            self.wandb_obj.log(
+                {
+                    f"vis/agent_obs/env_0": wandb.Video(
+                        np.moveaxis(agent_frames_array, -1, 1),
+                        fps=self.render_fps,
+                        format=self.render_format,
+                        caption=f"global step: {self.global_step:,}",
+                    )
+                }
+            )
+
             # Reset rendering storage
             self.frames[render_env_idx] = []
+            self.agent_frames[render_env_idx] = []
             self.rendering_in_progress[render_env_idx] = False
             self.was_rendered_in_rollout[render_env_idx] = True
 
