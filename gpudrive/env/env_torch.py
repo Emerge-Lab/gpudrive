@@ -196,7 +196,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         # Initialize the reference trajectory positions that are already in reach
-        self.guidance_points_hit = self.guidance_points_within_reach()
+        self.guidance_points_hit, _ = self.guidance_points_within_reach()
 
     def _load_vbd_model(self, model_path):
         """
@@ -491,11 +491,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.previous_action_value_tensor[reset_mask] = 0.0
             # Reset the guidance points hit tensor for the reset environments
             # TODO: Fix for asynchronous resets
-            self.guidance_points_hit = self.guidance_points_within_reach()
+            self.guidance_points_hit, _ = self.guidance_points_within_reach()
             
         else:
             self.previous_action_value_tensor.zero_()
-            self.guidance_points_hit = self.guidance_points_within_reach()
+            self.guidance_points_hit, _ = self.guidance_points_within_reach()
 
         return self.get_obs(mask)
 
@@ -702,25 +702,59 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             
             is_valid = self.reference_trajectory.valids.squeeze(-1)
 
-            points_within_reach = self.guidance_points_within_reach()
-            
+            points_within_reach, distance_to_points = self.guidance_points_within_reach()
+
             if step_in_world[0].item() == 1:
                 # This is the first step, and we reward the agent for
                 # reaching the initial guidance points
                 new_hits = self.guidance_points_hit & is_valid
-            else: # Find waypoints within X-meter radius that haven't been hit yet and are valid
-                new_hits = (
+            else:
+                # Find waypoints within reach that haven't been hit yet and are valid
+                potential_new_hits = (
                     points_within_reach
                     & (~self.guidance_points_hit)
                     & is_valid
-                )
-        
+                ).to(self.device)
+                
+                # Create a mask to handle cases where there are no potential hits
+                has_potential_hits = torch.any(potential_new_hits, dim=2, keepdim=True)
+                
+                # Replace distances for non-potential hits with a large value
+                masked_distances = torch.where(
+                    potential_new_hits.bool(),
+                    distance_to_points,
+                    torch.ones_like(distance_to_points) * 1e10
+                ).to(self.device)
+                
+                # Find indices of closest waypoints for each agent
+                closest_indices = torch.argmin(masked_distances, dim=2)
+                
+                # Create a one-hot tensor marking only the closest waypoint for each agent
+                batch_size, num_agents, num_waypoints = potential_new_hits.shape
+                batch_indices = torch.arange(batch_size).view(-1, 1).repeat(1, num_agents).flatten().to(self.device)
+                agent_indices = torch.arange(num_agents).repeat(batch_size).to(self.device)
+                
+                # Initialize new_hits tensor with zeros
+                new_hits = torch.zeros_like(potential_new_hits)
+                
+                # Only set closest hits where there are potential hits
+                valid_agents = has_potential_hits.view(-1)
+                
+                # Efficiently set the closest point for each valid agent
+                if torch.any(valid_agents):
+                    valid_batch_indices = batch_indices[valid_agents]
+                    valid_agent_indices = agent_indices[valid_agents]
+                    valid_closest_indices = closest_indices.view(-1)[valid_agents]
+                    
+                    new_hits[valid_batch_indices, valid_agent_indices, valid_closest_indices] = True
+
+    
             # Update the guidance points hit tensor
             self.guidance_points_hit = self.guidance_points_hit | new_hits
 
             # Count the number of new waypoints hit in this step
             guidance_points_hit_count = new_hits.sum(dim=-1).float()
-
+            
             # Reward agent for successfully reaching guidance points along the route
             # Scale reward by 1/num_valid_points to ensure maximum attainable reward is 1.0
             # We do this for a consistent reward magnitude regardless of route length or density
@@ -793,8 +827,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance/th)
-                # Normalize and scale the bonus (0.0 to 0.25 range)
-                distance_threshold = 1.0
+                # Normalize and scale the bonus 
+                distance_threshold = 0.5
                 max_position_bonus = 0.1
 
                 position_bonus = max_position_bonus * torch.exp(
@@ -827,7 +861,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         
         points_within_reach = distances < self.config.dist_to_goal_threshold        
         
-        return points_within_reach       
+        return points_within_reach, distances       
         
     def step_dynamics(self, actions):
         if actions is not None:
@@ -1012,22 +1046,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             valid_timesteps_mask = self.reference_trajectory.valids.bool()
 
-            # Provide agent with index to pay attention to through one-hot encoding
-            next_step_in_world = torch.clamp(
-                self.step_in_world[:, 0, :].squeeze(-1) + 1,
-                min=0,
-                max=self.reference_traj_len - 1,
-            )
-            time_one_hot = torch.zeros(
-                (
-                    self.num_worlds,
-                    self.max_agent_count,
-                    self.reference_traj_len,
-                    1,
-                ),
-                device=self.device,
-            )
-            time_one_hot[:, :, next_step_in_world, :] = 1.0
 
             if self.config.add_reference_speed:
                 reference_speed = (
@@ -1080,14 +1098,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ] = constants.INVALID_ID
 
                 # Make unnormalized reference path available for plotting
-                self.reference_path = torch.cat(
-                    (local_ref_xy_orig, time_one_hot), dim=-1
-                )
+                self.reference_path = local_ref_xy_orig
 
-                reference_path = torch.cat(
-                    (local_reference_xy, time_one_hot), dim=-1
-                )
-                guidance.append(reference_path)
+                guidance.append(local_reference_xy)
 
             if self.config.add_reference_heading:
                 reference_headings = self.reference_trajectory.yaw.clone()
@@ -1116,18 +1129,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             batch_size = mask.sum()
             batch_indices = torch.arange(batch_size)
-
-            # Provide agent with index to pay attention to through one-hot encoding
-            next_step_in_world = torch.clamp(
-                self.step_in_world[mask] + 1,
-                min=0,
-                max=self.reference_traj_len - 1,
-            )
-            time_one_hot = torch.zeros(
-                (batch_size, self.reference_traj_len, 1),
-                device=self.device,
-            )
-            time_one_hot[batch_indices, next_step_in_world] = 1.0
 
             valid_timesteps_mask = self.reference_trajectory.valids.bool()[
                 mask
@@ -1188,15 +1189,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ~valid_timesteps_mask.expand_as(local_reference_xy)
                 ] = constants.INVALID_ID
 
-                # Stack
-                reference_path = torch.cat(
-                    (local_reference_xy, time_one_hot), dim=2
-                )
+                reference_path = local_reference_xy
 
-                self.reference_path = torch.cat(
-                    (local_reference_xy_orig, time_one_hot), dim=2
-                )
-
+                self.reference_path = local_reference_xy_orig
+              
                 guidance.append(reference_path)
 
             if self.config.add_reference_heading:
@@ -1252,8 +1248,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
-            total_valid = self.reference_trajectory.valids.sum(axis=[2, 3])
-            valid_hits_so_far = self.guidance_points_hit.sum(dim=[-1])
+            total_valid = self.reference_trajectory.valids.clone().sum(axis=[2, 3])
+            valid_hits_so_far = self.guidance_points_hit.clone().sum(dim=[-1])
 
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
             self.route_progress = torch.where(
@@ -1265,7 +1261,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             # 2. How much time do I have left to complete the route
-            normalized_time = self.step_in_world / self.episode_len
+            normalized_time = self.step_in_world.clone() / self.episode_len
 
             base_fields.append(self.route_progress.unsqueeze(-1))
             base_fields.append(normalized_time)
@@ -1289,9 +1285,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
             total_valid = (
-                self.reference_trajectory.valids[mask].sum(dim=1).squeeze(-1)
+                self.reference_trajectory.valids[mask].clone().sum(dim=1).squeeze(-1)
             )
-            valid_hits_so_far = self.guidance_points_hit[mask].sum(dim=-1)
+            valid_hits_so_far = self.guidance_points_hit.clone()[mask].sum(dim=-1)
 
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
@@ -1711,8 +1707,8 @@ if __name__ == "__main__":
         add_reference_heading=False,
         reward_type="reward_progress",
         init_mode="wosac_train",
-        dynamics_model="state", #"classic",
-        smoothen_trajectory=True,
+        dynamics_model="delta_local", #"state", #"classic",
+        smoothen_trajectory=False,
         add_previous_action=False,
     )
     render_config = RenderConfig()
@@ -1722,7 +1718,7 @@ if __name__ == "__main__":
         root="data/processed/wosac/selected_json",
         batch_size=1,
         dataset_size=1,
-        sample_with_replacement=False,
+        sample_with_replacement=True,
         shuffle=False,
         file_prefix="",
     )
