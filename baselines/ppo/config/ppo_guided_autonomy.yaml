@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
 
   # Reward function
-  reward_type: "reward_progress"
+  reward_type: "guided_autonomy"
   collision_weight: -0.01
   off_road_weight: -0.01
   guidance_speed_weight: 0.01

@@ -579,118 +579,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
+
         elif self.config.reward_type == "guided_autonomy":
-
-            self.base_rewards = (
-                collision_weight * collided + off_road_weight * off_road
-            )
-
-            step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
-
-            # Assumption: All worlds are at the same time step
-            # Check if we still have referene trajectory points, if not
-            # we set the guidance errors to zero.
-            if step_in_world[0] < self.reference_traj_len:
-                batch_indices = torch.arange(step_in_world.shape[0])
-
-                # Guidance
-                suggested_pos_xy = self.reference_trajectory.pos_xy[
-                    batch_indices, :, step_in_world, :
-                ]
-
-                suggested_speed = self.reference_trajectory.ref_speed[
-                    batch_indices, :, step_in_world
-                ].squeeze(-1)
-
-                suggested_heading = self.reference_trajectory.yaw[
-                    batch_indices, :, step_in_world
-                ].squeeze(-1)
-
-                is_valid = (
-                    self.reference_trajectory.valids[
-                        batch_indices, :, step_in_world
-                    ]
-                    .squeeze(-1)
-                    .bool()
-                )
-
-                # Get actual agent positions
-                agent_states = GlobalEgoState.from_tensor(
-                    self.sim.absolute_self_observation_tensor(),
-                    self.backend,
-                    self.device,
-                )
-
-                actual_agent_pos_xy = agent_states.pos_xy
-
-                actual_agent_speed = (
-                    self.sim.self_observation_tensor().to_torch()[:, :, 0]
-                )
-
-                actual_agent_heading = agent_states.rotation_angle
-
-                # Compute distances
-                guidance_pos_error = torch.norm(
-                    suggested_pos_xy - actual_agent_pos_xy, dim=-1
-                )
-                guidance_speed_error = (
-                    suggested_speed - actual_agent_speed
-                ) ** 2
-                guidance_heading_error = (
-                    suggested_heading - actual_agent_heading
-                ) ** 2
-
-                self.guidance_reward = (
-                    -self.config.guidance_speed_weight
-                    * torch.log(guidance_speed_error + 1.0)
-                    - self.config.guidance_heading_weight
-                    * torch.log(guidance_heading_error + 1.0)
-                )
-
-                # Zero-out guidance errors for invalid time steps, that is,
-                # those that were not observed at the current time step
-                self.guidance_reward[~is_valid] = 0.0
-
-                # Reduce guidance density
-                if self.config.guidance_sample_interval > 1:
-                    waypoint_mask = (
-                        (
-                            step_in_world
-                            % self.config.guidance_sample_interval
-                            == 0
-                        )
-                        .float()
-                        .unsqueeze(1)
-                    )
-                    self.guidance_reward = self.guidance_reward * waypoint_mask
-
-            else:
-                self.guidance_reward = torch.zeros_like(self.base_rewards)
-
-            # Encourage smooth driving
-            if hasattr(self, "action_diff"):
-                acceleration_jerk = (
-                    self.action_diff[:, :, 0] ** 2
-                )  # First action component is acceleration
-                steering_jerk = (
-                    self.action_diff[:, :, 1] ** 2
-                )  # Second action component is steering
-
-                self.smoothness_penalty = -(
-                    self.config.smoothness_weight * acceleration_jerk
-                    + self.config.smoothness_weight * steering_jerk
-                )
-            else:
-                self.smoothness_penalty = torch.zeros_like(self.base_rewards)
-
-            self.guidance_reward += self.smoothness_penalty
-
-            # Combine base rewards with guidance error
-            rewards = self.base_rewards + self.guidance_reward
-
-            return rewards
-
-        elif self.config.reward_type == "reward_progress":
 
             step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
 
@@ -1800,7 +1690,7 @@ if __name__ == "__main__":
         add_reference_pos_xy=True,
         add_reference_speed=False,
         add_reference_heading=False,
-        reward_type="reward_progress",
+        reward_type="guided_autonomy",
         init_mode="wosac_train",
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,

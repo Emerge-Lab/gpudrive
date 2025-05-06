@@ -63,7 +63,6 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
             or self.config.reward_type == "guided_autonomy"
-            or self.config.reward_type == "reward_progress"
             or self.config.reward_type == "reward_conditioned"
         ):
             reward_params.rewardType = (

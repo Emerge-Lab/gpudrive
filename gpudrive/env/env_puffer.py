@@ -439,7 +439,7 @@ class PufferGPUDrive(PufferEnv):
         reward_controlled = reward[self.controlled_agent_mask]
 
         # Store human-like and internal rewards separately
-        if self.reward_type == "reward_progress":
+        if self.reward_type == "guided_autonomy":
             self.human_like_rewards[
                 self.live_agent_mask
             ] += self.env.guidance_reward[self.live_agent_mask]
