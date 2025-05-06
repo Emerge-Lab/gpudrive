@@ -157,10 +157,10 @@ def run(
 ):
     """Run PPO training with the given configuration."""
     # fmt: on
-    
+
     # Load default configs
     config = load_config(config_path)
-    
+
     if data_dir is not None:
         config["data_dir"] = data_dir
 
