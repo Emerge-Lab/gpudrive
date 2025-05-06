@@ -109,6 +109,8 @@ def run(
     ] = "baselines/ppo/config/ppo_guided_autonomy.yaml",
     *,
     # fmt: off
+    # Dataset options
+    data_dir: Annotated[Optional[str], typer.Option(help="The path to the dataset")] = None,
     # Environment options
     num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
     max_controlled_agents: Annotated[Optional[int], typer.Option(help="Number of controlled agents")] = None,
@@ -155,9 +157,12 @@ def run(
 ):
     """Run PPO training with the given configuration."""
     # fmt: on
-
+    
     # Load default configs
     config = load_config(config_path)
+    
+    if data_dir is not None:
+        config["data_dir"] = data_dir
 
     if config.environment.reward_type == "reward_conditioned":
         if bool(randomize_rewards):
