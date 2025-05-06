@@ -214,46 +214,28 @@ def evaluate(data):
             #     reward[done_but_truncated] += config.gamma * terminal_value.squeeze(-1)
 
             # Add to rollout buffer
-            if 'include_history_in_obs' in config:
-                if config['include_history_in_obs']:
-                    experience.store(
-                        obs_device,
-                        value,
-                        actions,
-                        logprob,
-                        reward,
-                        terminal,
-                        env_id,
-                        mask,
-                    )
-                else:
-                    history=data.vecenv.get_history_batch()
-                    experience.store(
-                        obs_device,
-                        value,
-                        actions,
-                        logprob,
-                        reward,
-                        terminal,
-                        env_id,
-                        mask,
-                        history
+            base_params = [
+                obs_device,
+                value,
+                actions,
+                logprob,
+                reward,
+                terminal,
+                env_id,
+                mask,
+            ]
 
-                    )
+            # Check if we need to include history in the observation
+            # include_history = config.get('include_history_in_obs', False)
+            # print(f"include history is {include_history}")
 
-
-
-            else:
-                experience.store(
-                    obs_device,
-                    value,
-                    actions,
-                    logprob,
-                    reward,
-                    terminal,
-                    env_id,
-                    mask,
-                )
+            # if include_history:
+            #     # Get history and include it in the parameters
+            #     history = data.vecenv.get_history_batch()
+            #     experience.store(*base_params, history)
+            # else:
+            #     # Store without history
+            experience.store(*base_params)
             
             # Add metrics for logging
             for i in info: 
@@ -620,7 +602,7 @@ class Experience:
         device="cuda",
         lstm=None,
         lstm_total_agents=0,
-        include_history_in_obs = True,
+        include_history_in_obs = False,
         max_seq_len =0,
         partner_obs_size = 0
     ):
@@ -639,6 +621,7 @@ class Experience:
         self.actions = torch.zeros(
             batch_size, *atn_shape, dtype=int, pin_memory=pin
         )
+        
         self.include_history_in_obs = include_history_in_obs
 
         if not self.include_history_in_obs:
@@ -760,6 +743,7 @@ class Experience:
         self.b_returns = self.b_advantages + self.b_values
         if not self.include_history_in_obs:
             self.b_history = self.history[b_idxs].squeeze(2)
+            
 
 
 class Utilization(Thread):
