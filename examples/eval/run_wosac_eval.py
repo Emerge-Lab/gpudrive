@@ -49,7 +49,7 @@ def get_state(env):
     return (
         ego_state.pos_x + mean_x,
         ego_state.pos_y + mean_y,
-        avg_z_pos, #ego_state.pos_z
+        avg_z_pos,  # ego_state.pos_z
         ego_state.rotation_angle,
         ego_state.id,
     )
@@ -64,7 +64,7 @@ def rollout(
     device: str,
     render_simulator_states: bool = False,
     render_agent_pov: bool = False,
-    render_every_n_steps: int = 5,
+    render_every_n_steps: int = 2,
     save_videos: bool = True,
     video_dir: str = "videos",
     video_format: str = "gif",
@@ -126,7 +126,7 @@ def rollout(
         if render_simulator_states and time_step % render_every_n_steps == 0:
             sim_states = env.vis.plot_simulator_state(
                 env_indices=env_ids,
-                zoom_radius=100,
+                zoom_radius=120,
                 time_steps=[time_step] * len(env_ids),
                 plot_guidance_pos_xy=True,
             )
@@ -240,16 +240,20 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = 64
-    NUM_ENVS = 1
-    DEVICE = "cpu"  # where to run the env rollouts
+    NUM_ENVS = 20
+    DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 10
+    NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = False
+    RENDER = True
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
+    # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
+    # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
+
+    CPT_PATH = "checkpoints/model_guidance_progress__S_100__05_06_20_02_22_663_001500.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -257,14 +261,12 @@ if __name__ == "__main__":
         batch_size=NUM_ENVS,
         dataset_size=DATASET_SIZE,
         sample_with_replacement=True,
-        shuffle=True,
+        shuffle=False,
         file_prefix="",
     )
 
     # Load agent
-    agent = load_agent(
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_100__04_29_19_49_30_053_015179.pt",
-    ).to(DEVICE)
+    agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
     default_config = EnvConfig()
@@ -279,7 +281,7 @@ if __name__ == "__main__":
     # Add fixed overrides specific to WOSAC evaluation
     config_dict["init_steps"] = INIT_STEPS
     config_dict["init_mode"] = "wosac_eval"
-   
+
     logging.info(
         f"initializing env with init_mode = {config_dict['init_mode']}"
     )

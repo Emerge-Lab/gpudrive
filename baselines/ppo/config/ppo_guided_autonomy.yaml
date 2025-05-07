@@ -15,7 +15,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  add_previous_action: false
+  add_previous_action: true
 
   # Guidance through expert suggestions
   guidance: true # If true, the agent will be guided by expert suggestions
@@ -25,15 +25,13 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_reference_heading: true # If true, the reference heading are added to the ego observation
   smoothen_trajectory: true # If true, the velocities and headings are smoothed
 
-  prob_reference_dropout: 0.0 # Value between 0 and 1, probability of a reference point to be zeroed out
-
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01
+  collision_weight: -0.01 
   off_road_weight: -0.01
   guidance_speed_weight: 0.01
   guidance_heading_weight: 0.01
-  smoothness_weight: 0.01
+  smoothness_weight: 0.0001
 
   init_mode: wosac_train
   dynamics_model: "classic"
@@ -53,12 +51,12 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "progress_one_tick"
+  group: "wosac_1"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: guidance_progress # Set dynamically in the script if needed
+  exp_id: guidance_logs # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu
@@ -88,7 +86,7 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.001
+  ent_coef: 0.003
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
