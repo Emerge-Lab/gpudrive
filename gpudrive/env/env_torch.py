@@ -72,6 +72,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
+        
+        assert (
+            self.num_worlds == len(self.data_batch)
+        ), f"Number of scenarios in data_batch ({len(self.data_batch)}) should equal number of worlds ({self.num_worlds}). \n Please check your data loader configuration."
 
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
@@ -1700,10 +1704,10 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/selected_json",
-        batch_size=1,
-        dataset_size=1,
-        sample_with_replacement=True,
+        root="data/processed/wosac/validation_json_1",
+        batch_size=2,
+        dataset_size=100,
+        sample_with_replacement=False,
         shuffle=False,
         file_prefix="",
     )

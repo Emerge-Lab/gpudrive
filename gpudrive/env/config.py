@@ -116,11 +116,6 @@ class EnvConfig:
     # Goal behavior settings
     goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
 
-    prob_reference_dropout: float = (
-        0.0  # Probability of dropping reference points
-    )
-    min_reference_points: int = 1  # Minimum number of reference points
-
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
