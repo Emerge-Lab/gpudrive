@@ -507,6 +507,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             self.previous_action_value_tensor.zero_()
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
+            
+        # Dropout mask for guidance points
+        # Assumption: all worlds are reset at the same time
+        if self.config.guidance_dropout_prob > 0:
+            self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         return self.get_obs(mask)
 
@@ -840,6 +845,40 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             rewards = self.base_rewards + self.guidance_reward
 
             return rewards
+        
+    def create_guidance_dropout_mask(self):
+        """
+        Create guidance dropout mask of shape [controlled_agents, reference_path_length].
+        """
+        
+        dropout_prob = self.config.guidance_dropout_prob
+        num_controlled = self.cont_agent_mask.sum().item()
+        # 1 if we want to keep the point, 0 if we want to drop it
+        guidance_dropout_mask = torch.ones(
+            (num_controlled, self.reference_traj_len),
+            device=self.device,
+            dtype=torch.bool,
+        )
+                
+        is_valid = self.reference_trajectory.valids[self.cont_agent_mask].squeeze(-1).bool()
+
+        for agent_idx in range(num_controlled):
+         
+            agent_valid_mask = is_valid[agent_idx]
+            agent_valid_indices = torch.where(agent_valid_mask)[0]
+            
+            if len(agent_valid_indices) > 2:  # Only apply dropout if we have more than 2 points
+                # Keep first and last points, apply dropout to middle points
+                # Get all valid indices except first and last
+                middle_indices = agent_valid_indices[1:-1]
+                
+                # Generate random dropout mask for middle points
+                dropout = torch.rand(len(middle_indices), device=self.device) < dropout_prob
+                
+                # Apply dropout to middle points (set to False for points to drop)
+                guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
+        
+        return guidance_dropout_mask
 
     def guidance_points_within_reach(self):
         # Get actual agent positions
@@ -1124,8 +1163,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return torch.cat(guidance, dim=-1).flatten(start_dim=2)
 
         else:
-            batch_size = mask.sum()
-
             valid_timesteps_mask = self.reference_trajectory.valids.bool()[
                 mask
             ]
@@ -1214,6 +1251,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_headings)
 
         self.guidance_obs = torch.cat(guidance, dim=-1)
+        
+        # Apply dropout mask if specified
+        # Note: currently only supported for masked observations
+        if self.config.guidance_dropout_prob > 0 and hasattr(self, "guidance_dropout_mask"):        
+            self.guidance_obs[~self.guidance_dropout_mask] = constants.INVALID_ID
+            
+            self.valid_guidance_points = torch.sum(self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1)
+            
+            self.reference_path[~self.guidance_dropout_mask] = constants.INVALID_ID
+            
+            
 
         return self.guidance_obs.flatten(start_dim=1)
 
@@ -1700,7 +1748,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1, 2, 3]
+    FOCUS_AGENTS = [0, 1, 2, 3, 4]
 
     env_config = EnvConfig(
         guidance=True,
@@ -1713,12 +1761,13 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
+        guidance_dropout_prob=0.001,#0.95,
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_json_1",
+        root="data/processed/wosac/validation_json_100",
         batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,

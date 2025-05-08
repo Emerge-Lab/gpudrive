@@ -26,6 +26,7 @@ from gpudrive.datatypes.observation import (
 )
 from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
+from gpudrive.env import constants
 from gpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
     ROAD_GRAPH_TYPE_NAMES,
@@ -1876,28 +1877,31 @@ class MatplotlibVisualizer:
             )
 
         if trajectory is not None and len(trajectory) > 0:
+            mask = trajectory[:, 0] != constants.INVALID_ID
             # Plot the trajectory as a line
             ax.scatter(
-                trajectory[:, 0].cpu(),  # x coordinates
-                trajectory[:, 1].cpu(),  # y coordinates
+                trajectory[:, 0][mask].cpu(),  # x coordinates
+                trajectory[:, 1][mask].cpu(),  # y coordinates
                 color="g",
                 linewidth=0.05 * line_width_scale,
                 marker="o",
-                alpha=0.3,
+                alpha=0.6,
                 zorder=0,
             )
 
             # Draw a circle around every point in the trajectory
             for i in range(trajectory.shape[0]):
-                circle = Circle(
-                    (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
-                    radius=self.env_config.guidance_pos_xy_radius,
-                    color="lightgrey",
-                    fill=False,
-                    linestyle="--",
-                    alpha=0.25,
-                )
-                ax.add_patch(circle)
+                if mask[i]:
+                    # Draw a circle around the trajectory point
+                    circle = Circle(
+                        (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
+                        radius=self.env_config.guidance_pos_xy_radius,
+                        color="lightgrey",
+                        fill=False,
+                        linestyle="--",
+                        alpha=0.35,
+                    )
+                    ax.add_patch(circle)
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
