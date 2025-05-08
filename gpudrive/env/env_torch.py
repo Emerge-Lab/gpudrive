@@ -72,10 +72,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Get the initial data batch (set of traffic scenarios)
         self.data_batch = next(self.data_iterator)
-        
-        assert (
-            self.num_worlds == len(self.data_batch)
-        ), f"Number of scenarios in data_batch ({len(self.data_batch)}) should equal number of worlds ({self.num_worlds}). \n Please check your data loader configuration."
+
+        assert self.num_worlds == len(
+            self.data_batch
+        ), f"Number of scenarios in data_batch ({len(self.data_batch)}) \
+        should equal number of worlds ({self.num_worlds}). \
+        \n Please check your data loader configuration."
 
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
@@ -122,6 +124,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dtype=np.float32,
         )
 
+        # Action space setup
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
         self.num_agents = self.cont_agent_mask.sum().item()
@@ -455,11 +458,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             mask: Optional mask indicating which agents to return observations for
             env_idx_list: Optional list of environment indices to reset
             condition_mode: Determines how reward weights are sampled:
-                        - "random": Random sampling within bounds (default for training)
-                        - "fixed": Use predefined agent_type weights (for testing)
-                        - "preset": Use a specific preset from agent_type parameter
+                - "random": Random sampling within bounds (default for training)
+                - "fixed": Use predefined agent_type weights (for testing)
+                - "preset": Use a specific preset from agent_type parameter
             agent_type: Specifies which preset weights to use or custom weights
+
+        Returns:
+            obs: The initial observations.
         """
+        # Reset the simulator state
         if env_idx_list is not None:
             self.sim.reset(env_idx_list)
         else:
@@ -528,9 +535,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def get_rewards(
         self,
-        collision_weight=-0.5,
+        collision_weight=-0.01,
         goal_achieved_weight=1.0,
-        off_road_weight=-0.5,
+        off_road_weight=-0.01,
     ):
         """Obtain the rewards for the current step."""
 
@@ -583,7 +590,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-
         elif self.config.reward_type == "guided_autonomy":
 
             step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
@@ -595,8 +601,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             is_valid = self.reference_trajectory.valids.squeeze(-1)
 
-            # 2. Positions
-
+            # 2. Route guidance (where to go)
             # a) Get the reference trajectory positions
             (
                 points_within_reach,
@@ -676,7 +681,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Reward agent for successfully reaching guidance points along the route
             # Scale reward by 1/num_valid_points to ensure maximum attainable reward is 1.0
             # We do this for a consistent reward magnitude regardless of route length or density
-            self.guidance_reward = torch.clamp(
+            self.route_reward = torch.clamp(
                 guidance_points_hit_count
                 / (self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5),
                 min=0,
@@ -735,21 +740,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # Gather the last valid reference positions
                 last_valid_positions = self.reference_trajectory.pos_xy[
                     batch_indices, agent_indices, last_valid_indices
-                ]  # Shape: [1, 64, 2]
+                ]
 
-                # Calculate distance between current positions and last valid reference positions
-                current_positions = (
-                    agent_states.pos_xy
-                )  # Assuming this has shape [1, 64, 2]
                 distance = torch.norm(
-                    current_positions - last_valid_positions, dim=2
-                )  # Shape: [1, 64]
+                    agent_states.pos_xy - last_valid_positions, dim=2
+                )
 
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance/th)
-                # Normalize and scale the bonus
                 distance_threshold = 0.5
-                max_position_bonus = 0.1
+                max_position_bonus = 0.01
 
                 position_bonus = max_position_bonus * torch.exp(
                     -distance / distance_threshold
@@ -757,7 +757,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 position_bonus = position_bonus * completed_route_mask
 
-                self.guidance_reward += position_bonus
+                self.route_reward += position_bonus
+
+            self.guidance_reward = self.route_reward.clone()
 
             # 3. Speed and heading targets
             if step_in_world[0] < self.reference_traj_len:
@@ -771,7 +773,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     batch_idx, :, step_in_world
                 ].squeeze(-1)
 
-                is_valid = (
+                valid_points = (
                     self.reference_trajectory.valids[
                         batch_idx, :, step_in_world
                     ]
@@ -793,29 +795,41 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     suggested_heading - actual_agent_heading
                 ) ** 2
 
-                speed_heading_error = (
-                    -self.config.guidance_speed_weight
-                    * torch.log(guidance_speed_error + 1.0)
-                    - self.config.guidance_heading_weight
-                    * torch.log(guidance_heading_error + 1.0)
+                guidance_speed_penalty = 1.0 - torch.exp(
+                    -guidance_speed_error + 1e-8
+                )
+                guidance_heading_penalty = 1.0 - torch.exp(
+                    -guidance_heading_error + 1e-8
                 )
 
-                speed_heading_error[~is_valid] = 0.0
+                speed_heading_reward = (
+                    -self.config.guidance_speed_weight * guidance_speed_penalty
+                    - self.config.guidance_heading_weight
+                    * guidance_heading_penalty
+                )
 
-                self.guidance_reward += speed_heading_error
+                speed_heading_reward[~valid_points] = 0.0
 
-            # 4. Encourage smooth driving
+                self.speed_heading_reward = speed_heading_reward.clone()
+
+                self.guidance_reward += self.speed_heading_reward
+
+            # 4. Penalty for action jerk
             if hasattr(self, "action_diff"):
                 acceleration_jerk = (
                     self.action_diff[:, :, 0] ** 2
                 )  # First action component is acceleration
                 steering_jerk = (
                     self.action_diff[:, :, 1] ** 2
-                )  # Second action component is steering
+                )  # Second action component is steering angle
 
-                self.smoothness_penalty = -(
-                    self.config.smoothness_weight * acceleration_jerk
-                    + self.config.smoothness_weight * steering_jerk
+                # Small jerks: penalty is close to x (approximately linear)
+                # Large jerks: penalty approaches 1.0 (saturates)
+                acceleration_penalty = 1.0 - torch.exp(-acceleration_jerk)
+                steering_penalty = 1.0 - torch.exp(-steering_jerk)
+
+                self.smoothness_penalty = -self.config.smoothness_weight * (
+                    acceleration_penalty + steering_penalty
                 )
             else:
                 self.smoothness_penalty = torch.zeros_like(self.base_rewards)
@@ -1660,7 +1674,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def render(self, focus_env_idx=0, focus_agent_idx=[0, 1]):
         """Quick rendering function for debugging."""
 
-        sim_states = env.vis.plot_simulator_state(
+        sim_states = self.vis.plot_simulator_state(
             env_indices=[focus_env_idx],
             zoom_radius=70,
             time_steps=[self.step_in_world[0, 0, 0].item()],
@@ -1669,7 +1683,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         agent_views = []
         for agent_idx in focus_agent_idx:
-            agent_obs = env.vis.plot_agent_observation(
+            agent_obs = self.vis.plot_agent_observation(
                 env_idx=focus_env_idx,
                 agent_idx=agent_idx,
                 figsize=(10, 10),
@@ -1705,7 +1719,7 @@ if __name__ == "__main__":
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/wosac/validation_json_1",
-        batch_size=2,
+        batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,

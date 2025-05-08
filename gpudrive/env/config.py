@@ -121,7 +121,6 @@ class EnvConfig:
     # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
 
     # If reward_type is "guided_autonomy", the following parameters are used
-    guidance_sample_interval: int = 1
     guidance_speed_weight: float = (
         0.01  # Importance of matching suggested speeds
     )

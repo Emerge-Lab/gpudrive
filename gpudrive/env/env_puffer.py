@@ -323,7 +323,7 @@ class PufferGPUDrive(PufferEnv):
         super().__init__()
 
         # Reset the environment and get the initial observations
-        self.observations = self.env.reset(self.controlled_agent_mask)
+        self.observations = self.env.reset(mask=self.controlled_agent_mask)
 
         self.masks = torch.ones(self.num_agents, dtype=bool)
         self.actions = torch.zeros(
@@ -689,7 +689,7 @@ class PufferGPUDrive(PufferEnv):
 
         self.reset()  # Reset storage
         # Get info from new worlds
-        self.observations = self.env.reset(self.controlled_agent_mask)
+        self.observations = self.env.reset(mask=self.controlled_agent_mask)
 
         self.log_data_coverage()
 
