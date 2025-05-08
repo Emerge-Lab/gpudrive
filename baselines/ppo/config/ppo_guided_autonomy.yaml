@@ -24,6 +24,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_reference_speed: true # If true, the reference speeds are added to the ego observation
   add_reference_heading: true # If true, the reference heading are added to the ego observation
   smoothen_trajectory: true # If true, the velocities and headings are smoothed
+  guidance_dropout_prob: 0.0 # Probability of out guidance points
 
   # Reward function
   reward_type: "guided_autonomy"
@@ -51,7 +52,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_1"
+  group: "wosac_100_v2"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -65,10 +66,10 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
+  resample_scenes: true
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: false
+  sample_with_replacement: true
   shuffle_dataset: true
   file_prefix: ""
 

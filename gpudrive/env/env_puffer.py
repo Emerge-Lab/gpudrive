@@ -195,6 +195,7 @@ class PufferGPUDrive(PufferEnv):
         goal_achieved_weight=1,
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1,
+        guidance_dropout_prob=0.0,
         remove_non_vehicles=False,
         obs_radius=50.0,
         track_realism_metrics=False,
@@ -241,6 +242,7 @@ class PufferGPUDrive(PufferEnv):
         self.add_reference_pos_xy = add_reference_pos_xy
         self.add_reference_speed = add_reference_speed
         self.add_reference_heading = add_reference_heading
+        self.guidance_dropout_prob = guidance_dropout_prob
 
         self.render = render
         self.render_interval = render_interval
@@ -276,6 +278,7 @@ class PufferGPUDrive(PufferEnv):
             bev_obs=bev_obs,
             add_previous_action=add_previous_action,
             guidance=guidance,
+            guidance_dropout_prob=guidance_dropout_prob,
             add_reference_pos_xy=add_reference_pos_xy,
             add_reference_speed=add_reference_speed,
             add_reference_heading=add_reference_heading,
@@ -558,7 +561,7 @@ class PufferGPUDrive(PufferEnv):
             num_truncated = (
                 truncated[done_worlds, :][controlled_mask].sum().item()
             )
-
+        
             if num_finished_agents > 0:
                 # fmt: off
                 self.info_lst.append(
@@ -755,6 +758,8 @@ class PufferGPUDrive(PufferEnv):
         # Update the cumulative set (coverage)
         self.cumulative_unique_files.update(new_idx)
 
+        guidance_density = self.env.valid_guidance_points / self.env.reference_traj_len
+
         if self.wandb_obj is not None:
             self.wandb_obj.log(
                 {
@@ -768,6 +773,8 @@ class PufferGPUDrive(PufferEnv):
                         / len(set(self.file_to_index))
                     )
                     * 100,
+                    "data/guidance_density_mean": guidance_density.mean().item(),
+                    "data/guidance_density_dist": wandb.Histogram(guidance_density.cpu().numpy()),
                 },
                 step=self.global_step,
             )

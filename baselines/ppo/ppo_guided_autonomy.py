@@ -137,6 +137,7 @@ def run(
 
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
+    guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
@@ -215,6 +216,7 @@ def run(
 
     train_config = {
         "seed": seed,
+        "guidance_dropout_prob": guidance_dropout_prob,
         "learning_rate": learning_rate,
         "anneal_lr": None if anneal_lr is None else bool(anneal_lr),
         "resample_scenes": None
