@@ -561,7 +561,7 @@ class PufferGPUDrive(PufferEnv):
             num_truncated = (
                 truncated[done_worlds, :][controlled_mask].sum().item()
             )
-        
+
             if num_finished_agents > 0:
                 # fmt: off
                 self.info_lst.append(
@@ -758,7 +758,9 @@ class PufferGPUDrive(PufferEnv):
         # Update the cumulative set (coverage)
         self.cumulative_unique_files.update(new_idx)
 
-        guidance_density = self.env.valid_guidance_points / self.env.reference_traj_len
+        guidance_density = (
+            self.env.valid_guidance_points / self.env.reference_traj_len
+        )
 
         if self.wandb_obj is not None:
             self.wandb_obj.log(
@@ -774,7 +776,9 @@ class PufferGPUDrive(PufferEnv):
                     )
                     * 100,
                     "data/guidance_density_mean": guidance_density.mean().item(),
-                    "data/guidance_density_dist": wandb.Histogram(guidance_density.cpu().numpy()),
+                    "data/guidance_density_dist": wandb.Histogram(
+                        guidance_density.cpu().numpy()
+                    ),
                 },
                 step=self.global_step,
             )
