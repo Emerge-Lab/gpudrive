@@ -27,6 +27,7 @@ from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+import madrona_gpudrive
 
 
 def load_vbd_model(model_path, device="cpu", max_cont_agents=64):
@@ -106,7 +107,7 @@ def main():
             dataset_size=args.num_scenes,
             file_prefix="",
         ),
-        render_config=RenderConfig(render_3d=True),
+        render_config=RenderConfig(),
         max_cont_agents=MAX_CONTROLLED_AGENTS,  # Maximum number of agents to control per scene
         device=device,
     )
@@ -115,8 +116,8 @@ def main():
     output_trajectories = torch.zeros(
         gpudrive_env.num_worlds,
         gpudrive_env.max_agent_count,
-        env_config.episode_len,
-        5,
+        madrona_gpudrive.kTrajectoryLength,
+        6,
     )
 
     # Save init steps from logs
@@ -127,14 +128,17 @@ def main():
         device=device,
     )
 
-    output_trajectories[:, :, :INIT_STEPS, :2] = log_trajectory.pos_xy[
-        :, :, :INIT_STEPS
+    output_trajectories[:, :, :INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
+        :, :, :INIT_STEPS + 1
     ]
-    output_trajectories[:, :, :INIT_STEPS, 2] = log_trajectory.yaw[
-        :, :, :INIT_STEPS, 0
+    output_trajectories[:, :, :INIT_STEPS + 1, 2] = log_trajectory.yaw[
+        :, :, :INIT_STEPS + 1, 0
     ]
-    output_trajectories[:, :, :INIT_STEPS, 3:] = log_trajectory.vel_xy[
-        :, :, :INIT_STEPS
+    output_trajectories[:, :, :INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
+        :, :, :INIT_STEPS + 1
+    ]
+    output_trajectories[:, :, :INIT_STEPS + 1, 5] = log_trajectory.valids[
+        :, :, :INIT_STEPS + 1, 0
     ]
 
     # Action tensor to step through simulation
@@ -142,7 +146,7 @@ def main():
         (
             gpudrive_env.num_worlds,
             gpudrive_env.max_agent_count,
-            gpudrive_env.episode_len - INIT_STEPS,
+            madrona_gpudrive.kTrajectoryLength - INIT_STEPS - 1,
             10,
         )
     )
@@ -181,20 +185,23 @@ def main():
                 i, valid_world_indices, :, 2
             ]
             predicted_actions[i, valid_world_indices, :, 4:6] = vbd_output[
-                i, valid_world_indices, :, 3:
+                i, valid_world_indices, :, 3:5
             ]
 
             # Populate output trajectories
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS:, :2
+                i, valid_world_indices, INIT_STEPS + 1:, :2
             ] = vbd_output[i, valid_world_indices, :, :2] - world_means[
                 i
             ].view(
                 1, 1, 2
             )
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS:, 2:
+                i, valid_world_indices, INIT_STEPS + 1:, 2:5
             ] = vbd_output[i, valid_world_indices, :, 2:]
+            output_trajectories[
+                i, valid_world_indices, INIT_STEPS + 1:, 5
+            ] = 1.0
 
         # Save to each file's json
         index_to_id = GlobalEgoState.from_tensor(

@@ -175,16 +175,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.num_worlds,
                 self.max_agent_count,
                 self.episode_len,
-                5
+                6
             )
-            reference_trajectory[:, :, :self.init_steps, :2] = log_trajectory.pos_xy[
-                :, :, :self.init_steps
+            reference_trajectory[:, :, :self.init_steps + 1, :2] = log_trajectory.pos_xy[
+                :, :, :self.init_steps + 1
             ]
-            reference_trajectory[:, :, :self.init_steps, 2] = log_trajectory.yaw[
-                :, :, :self.init_steps, 0
+            reference_trajectory[:, :, :self.init_steps + 1, 2] = log_trajectory.yaw[
+                :, :, :self.init_steps + 1, 0
             ]
-            reference_trajectory[:, :, :self.init_steps, 3:] = log_trajectory.vel_xy[
-                :, :, :self.init_steps
+            reference_trajectory[:, :, :self.init_steps + 1, 3:5] = log_trajectory.vel_xy[
+                :, :, :self.init_steps + 1
+            ]
+            reference_trajectory[:, :, :self.init_steps + 1, 5] = log_trajectory.valids[
+                :, :, :self.init_steps + 1, 0
             ]
 
             vbd_predictions=predicted["denoised_trajs"].to(self.device).detach()
@@ -203,13 +206,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 valid_world_indices = scene_context["agents_id"][i][valid_mask]
 
                 reference_trajectory[
-                    i, valid_world_indices, self.init_steps:, :2
+                    i, valid_world_indices, self.init_steps + 1:, :2
                 ] = vbd_predictions[i, valid_world_indices, :, :2] - world_means[
                     i
                 ].view(1, 1, 2)
                 reference_trajectory[
-                    i, valid_world_indices, self.init_steps:, 2:
-                ] = vbd_predictions[i, valid_world_indices, :, 2:]
+                    i, valid_world_indices, self.init_steps + 1:, 2:5
+                ] = vbd_predictions[i, valid_world_indices, :, 2:5]
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps + 1:, 5
+                ] = 1
 
             
             # Wrap predictions into a VBDTrajectoryOnline object
