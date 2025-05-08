@@ -1751,7 +1751,7 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
-                line_width_scale=line_width_scale,
+                line_width_scale=line_width_scale*1.5,
             )
 
         if observation_ego is not None:
@@ -1776,7 +1776,7 @@ class MatplotlibVisualizer:
                 orientation=0.0,
                 color=ego_agent_color,
                 alpha=1.0,
-                label="Ego agent",
+                line_width_scale=2.3,
             )
 
             # Add an arrow for speed
@@ -1790,7 +1790,7 @@ class MatplotlibVisualizer:
                 head_length=1.1,
                 fc="k",
                 ec="k",
-                zorder=1,
+                zorder=10,
             )
 
         if lidar_obs is not None:
@@ -1837,6 +1837,7 @@ class MatplotlibVisualizer:
             color="black",
             ha="left",
             va="top",
+            bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3) 
         )
 
         if step_reward is not None:
@@ -1853,6 +1854,7 @@ class MatplotlibVisualizer:
                 color=reward_color,  # Using the dynamically determined color
                 ha="left",
                 va="top",
+                bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3)
             )
 
         if route_progress is not None:
@@ -1866,6 +1868,7 @@ class MatplotlibVisualizer:
                 color="black",
                 ha="left",
                 va="top",
+                bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3)
             )
 
         if trajectory is not None and len(trajectory) > 0:
@@ -1895,6 +1898,19 @@ class MatplotlibVisualizer:
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
+        
+        # Add a circle representing the observation radius
+        observation_circle = Circle(
+            (0, 0),  # Center at origin
+            radius=self.env_config.obs_radius,
+            color="black",  
+            fill=False,     
+            linestyle="-",  
+            linewidth=1.0,  
+            alpha=0.7,         
+        )
+        
+        ax.add_patch(observation_circle)
         ax.set_xticks([])
         ax.set_yticks([])
         plt.axis("off")

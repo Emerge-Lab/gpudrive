@@ -32,8 +32,10 @@ AGENT_COLOR_BY_STATE = {
 }
 
 REL_OBS_OBJ_COLORS = {
-    "ego": "#0066ff",
-    "ego_goal": "#0099cc",
+    "ego": "#2a52be",
+    "ego_goal": "#2a52be",
     "other_agents": "#ff884d",
 }
 AGENT_COLOR_BY_POLICY = ["g", "b", "p"]
+
+
