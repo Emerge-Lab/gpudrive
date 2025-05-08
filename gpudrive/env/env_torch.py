@@ -896,7 +896,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dim=-1,
         )
 
-        points_within_reach = distances < self.config.dist_to_goal_threshold
+        points_within_reach = (distances < self.config.dist_to_goal_threshold) & self.reference_trajectory.valids.bool().squeeze(-1)
 
         return points_within_reach, distances
 
@@ -1256,13 +1256,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Note: currently only supported for masked observations
         if self.config.guidance_dropout_prob > 0 and hasattr(self, "guidance_dropout_mask"):        
             self.guidance_obs[~self.guidance_dropout_mask] = constants.INVALID_ID
-            
-            self.valid_guidance_points = torch.sum(self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1)
-            
             self.reference_path[~self.guidance_dropout_mask] = constants.INVALID_ID
             
+        self.valid_guidance_points = torch.sum(self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1)
             
-
         return self.guidance_obs.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
@@ -1343,7 +1340,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
             self.route_progress = torch.where(
-                total_valid > 0,
+                total_valid >= 1,
                 valid_hits_so_far / (total_valid + 1e-5),  # Normal case
                 torch.ones_like(
                     valid_hits_so_far
