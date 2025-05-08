@@ -49,6 +49,71 @@ namespace madrona_gpudrive
         velocity.angular.z = w;
     }
 
+    inline void forwardJerkModel(Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
+    {
+        // babs don't hardcode this
+        const float dt{0.1};
+        // We are going to call them accel and steer but it is really lateral and longitudinal jerk
+        // TODO(ev) add missing coefficients C
+        new_accel_long = accel.longitudinal + action.longitudinal_jerk * dt;
+        new_acc_later = accel.lateral + action.lateral_jerk * dt;
+        // clip the accels to reasonable values
+        // TODO(ev) add missing coefficients C
+        new_accel_long = fmaxf(-5.0, fminf(new_accel_long, 2.5 * 1.5));
+        new_accel_lateral = fmaxf(-4.0, fminf(new_accel_lateral, 4.0));
+        // TODO(ev) velocity clipping?
+        // update the speed
+        float new_speed = velocity.linear.length() + (accel.longitudinal + new_accel_long) * dt;
+        new_speed = fmaxf(-2.0, fminf(new_speed, 30.0));
+
+        // rho_inv = a_lat / max(v^2, 1e-5)
+        // TODO(ev) add squared value don't just multiply like this
+        rho_inv = new_accel_lateral / fmaxf(new_speed * new_speed, 1e-5);
+        // rho_inv = sign(rho_inv) * fmaxf(fabs(rho_inv), 1e-5)
+        // TODO(ev) is this safe? What does copysign do at zero?
+        rho_inv = copysignf(1.0, rho_inv) * fmaxf(fabsf(rho_inv), 1e-5);
+        // phi = arctan(rho_inv * length of wheelbase)
+        phi = atan2f(rho_inv * size.length, 1.0);
+
+        // Lets also compute phi_prev
+        rho_inv_prev = accel.lateral / fmaxf(velocity.linear.length() * velocity.linear.length(), 1e-5);
+        rho_inv_prev = copysignf(1.0, rho_inv_prev) * fmaxf(fabsf(rho_inv_prev), 1e-5);
+        phi_prev = atan2f(rho_inv_prev * size.length, 1.0);
+
+        // delta_phi = clip(\phi - phi_prev, -0.6 delta t, 0.6 delta t)
+        // TODO(ev) keep track of phi_prev
+        delta_phi = fmaxf(-0.6 * dt, fminf(phi - phi_prev, 0.6 * dt));
+        // phi_t = clip(\phi_prev + delta_phi, -0.55, 0.55)
+        phi_t = fmaxf(-0.55, fminf(phi_prev + delta_phi, 0.55));
+
+        // rho_inv = tan(phi_t) / length of wheelbase
+        rho_inv = tanf(phi_t) / size.length;
+        // a_lat = v(t)^2 * rho_inv
+        accel.lateral = new_speed * new_speed * rho_inv;
+        // store the previous velocity as well
+        d = 0.5 * (velocity.linear.length() + new_speed) * dt;
+        theta = d * rho_inv;
+        // Update yaw
+        float yaw = utils::quatToYaw(rotation);
+        float new_yaw = utils::AngleAdd(theta, yaw);
+        // end delta model
+        rotation = Quat::angleAxis(new_yaw, madrona::math::up);
+        // Increment delta x by rho sin(\theta)
+        position.x += rho_inv * sinf(theta);
+        // Increment delta y by rho cos(\theta)
+        position.y += rho_inv * cosf(theta);
+        // Update the speed
+        // new_vel_x = new_vel * jnp.cos(new_yaw)
+        velocity.linear.x = new_speed * cosf(new_yaw);
+        // new_vel_y = new_vel * jnp.sin(new_yaw)
+        velocity.linear.y = new_speed * sinf(new_yaw);
+        velocity.linear.z = 0;
+        // And now we actually update the accels too
+        accel.longitudinal = new_accel_long;
+        accel.lateral = new_accel_lateral;
+
+    }
+
     inline void forwardBicycleModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering

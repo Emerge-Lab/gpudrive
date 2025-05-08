@@ -100,6 +100,8 @@ static inline void populateExpertTrajectory(Engine &ctx, const Entity &agent, co
                 trajectory.inverseActions[i] = inverseDeltaModel(rot, pos, targetRot, targetPos);
                 break;
             }
+            case DynamicsModel::Jerk:
+                break;
         }
     }
 }

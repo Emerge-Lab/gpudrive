@@ -127,11 +127,18 @@ namespace madrona_gpudrive
         Velocity velocity; // 6 floats
     };
 
+    struct JerkAction
+    {
+        float longitudinal_jerk;
+        float lateral_jerk;
+    };
+
     union Action
     {
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
+        JerkAction jerk;
 
         static inline Action zero()
         {

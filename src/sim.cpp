@@ -383,6 +383,11 @@ inline void movementSystem(Engine &e,
                 forwardStateModel(action, rotation, position, velocity);
                 break;
             }
+            case DynamicsModel::Jerk:
+            {
+                forwardJerkModel(action, size, rotation, position, velocity);
+                break;
+            }
         }
     } else {
         // Follow expert trajectory

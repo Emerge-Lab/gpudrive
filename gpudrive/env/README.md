@@ -18,6 +18,7 @@ The following dynamics models are available:
 - **InvertibleBicycleModel**: A kinematically realistic model using 2D actions (acceleration, steering curvature) based on [this source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
 - **DeltaLocal**: A position-based model using a 3D action (dx, dy, dyaw) to represent displacement relative to current position and orientation. This model doesn't check for infeasible actions, and large displacements can cause unrealistic behavior. Based on [this source](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
 - **StateDynamics**: A position-based model using a 10D action (x, y, z, yaw, velocities, angular velocities) that directly sets global coordinates. This model doesn't check for infeasible actions, as referenced [here](https://github.com/waymo-research/waymax/tree/main/waymax/dynamics).
+- **Jerk Model**: A model that takes in a lateral and longitudinal jerk. Taken from [here](https://arxiv.org/abs/2502.03349).
 
 Example of creating an environment with one world and a maximum of three controllable agents per scenario:
 

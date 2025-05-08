@@ -32,6 +32,10 @@ void destroyWorld(Engine &ctx);
         {
             return Action{.state = {.position = madrona::math::Vector3{0, 0, 1}, .yaw = 0, .velocity = {.linear = madrona::math::Vector3::zero(), .angular = madrona::math::Vector3::zero()}}};
         }
+        case DynamicsModel::Jerk:
+        {
+            return Action{.jerk = {.longitudinal_jerk = 0, .lateral_jerk = 0}};
+        }
         default:
             return Action{.classic = {0, 0, 0}};
         }

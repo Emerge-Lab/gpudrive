@@ -106,7 +106,8 @@ namespace madrona_gpudrive
         Classic,
         InvertibleBicycle,
         DeltaLocal,
-        State
+        State,
+        Jerk
     };
 
     enum class FindRoadObservationsWith
