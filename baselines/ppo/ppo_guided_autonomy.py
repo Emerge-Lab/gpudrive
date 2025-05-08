@@ -124,6 +124,7 @@ def run(
     add_reference_heading: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
 
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
@@ -137,7 +138,6 @@ def run(
 
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
-    guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
@@ -189,6 +189,7 @@ def run(
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
         "collision_behavior": collision_behavior,
+        "guidance_dropout_prob": guidance_dropout_prob,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),
@@ -216,7 +217,6 @@ def run(
 
     train_config = {
         "seed": seed,
-        "guidance_dropout_prob": guidance_dropout_prob,
         "learning_rate": learning_rate,
         "anneal_lr": None if anneal_lr is None else bool(anneal_lr),
         "resample_scenes": None
