@@ -106,7 +106,10 @@ class Agent(nn.Module):
 
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 64)),
+            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 128)),
+            nn.LayerNorm(128),
+            self.act_func,
+            layer_init(nn.Linear(128, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, 1), std=1.0),
@@ -114,7 +117,10 @@ class Agent(nn.Module):
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 64)),
+            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 128)),
+            nn.LayerNorm(128),
+            self.act_func,
+            layer_init(nn.Linear(128, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
