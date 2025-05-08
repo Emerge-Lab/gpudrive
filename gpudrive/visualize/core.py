@@ -1751,7 +1751,7 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
-                line_width_scale=line_width_scale*1.5,
+                line_width_scale=line_width_scale * 1.5,
             )
 
         if observation_ego is not None:
@@ -1831,13 +1831,13 @@ class MatplotlibVisualizer:
         ax.text(
             0.05,  # x position in axes coordinates (5% from left)
             0.90,  # y position in axes coordinates (95% from bottom)
-             r"$O_{t}$ for " + f"t = {time_step}",
+            r"$O_{t}$ for " + f"t = {time_step}",
             transform=ax.transAxes,  # Use axes coordinates
             fontsize=15,
             color="black",
             ha="left",
             va="top",
-            bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3) 
+            bbox=dict(facecolor="white", alpha=1.0, edgecolor="none", pad=3),
         )
 
         if step_reward is not None:
@@ -1854,7 +1854,9 @@ class MatplotlibVisualizer:
                 color=reward_color,  # Using the dynamically determined color
                 ha="left",
                 va="top",
-                bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3)
+                bbox=dict(
+                    facecolor="white", alpha=1.0, edgecolor="none", pad=3
+                ),
             )
 
         if route_progress is not None:
@@ -1868,7 +1870,9 @@ class MatplotlibVisualizer:
                 color="black",
                 ha="left",
                 va="top",
-                bbox=dict(facecolor='white', alpha=1.0, edgecolor='none', pad=3)
+                bbox=dict(
+                    facecolor="white", alpha=1.0, edgecolor="none", pad=3
+                ),
             )
 
         if trajectory is not None and len(trajectory) > 0:
@@ -1895,21 +1899,20 @@ class MatplotlibVisualizer:
                 )
                 ax.add_patch(circle)
 
-
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
-        
+
         # Add a circle representing the observation radius
         observation_circle = Circle(
             (0, 0),  # Center at origin
             radius=self.env_config.obs_radius,
-            color="black",  
-            fill=False,     
-            linestyle="-",  
-            linewidth=1.0,  
-            alpha=0.7,         
+            color="black",
+            fill=False,
+            linestyle="-",
+            linewidth=1.0,
+            alpha=0.7,
         )
-        
+
         ax.add_patch(observation_circle)
         ax.set_xticks([])
         ax.set_yticks([])
