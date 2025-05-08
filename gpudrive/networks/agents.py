@@ -73,11 +73,11 @@ class Agent(nn.Module):
 
         # Shared embedding networks for both actor and critic
         self.ego_embed = nn.Sequential(
-            layer_init(nn.Linear(self.ego_state_idx, embed_dim)),
-            nn.LayerNorm(embed_dim),
+            layer_init(nn.Linear(self.ego_state_idx, 64)),
+            nn.LayerNorm(64),
             self.act_func,
             nn.Dropout(self.dropout),
-            layer_init(nn.Linear(embed_dim, embed_dim)),
+            layer_init(nn.Linear(64, 64)),
         )
 
         self.partner_embed = nn.Sequential(
@@ -95,7 +95,7 @@ class Agent(nn.Module):
             nn.Dropout(self.dropout),
             layer_init(nn.Linear(embed_dim, embed_dim)),
         )
-
+        
         self.guidance_embed = nn.Sequential(
             layer_init(nn.Linear(self.guidance_feature_dim, embed_dim)),
             nn.LayerNorm(embed_dim),
@@ -106,10 +106,10 @@ class Agent(nn.Module):
 
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 128)),
-            nn.LayerNorm(128),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
             self.act_func,
-            layer_init(nn.Linear(128, 64)),
+            layer_init(nn.Linear(256, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, 1), std=1.0),
@@ -117,10 +117,10 @@ class Agent(nn.Module):
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 128)),
-            nn.LayerNorm(128),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
             self.act_func,
-            layer_init(nn.Linear(128, 64)),
+            layer_init(nn.Linear(256, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
