@@ -12,7 +12,7 @@ import numpy as np
 if __name__ == "__main__":
 
     GUIDANCE_MODE = "log_replay"
-    DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
+    DATASET = "data/processed/wosac/validation_json_500"  # Ensure VBD trajectory structures are in here
     SAVE_PATH = "examples/eval/figures_data/"
 
     env_config = EnvConfig(
@@ -30,8 +30,8 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=DATASET,
-        batch_size=10,
-        dataset_size=100,
+        batch_size=500,
+        dataset_size=500,
         sample_with_replacement=False,
         shuffle=False,
         file_prefix="",
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,
-        device="cpu",
+        device="cuda",
     )
 
     obs = env.reset(env.cont_agent_mask)
