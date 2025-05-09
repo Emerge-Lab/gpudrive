@@ -145,7 +145,7 @@ namespace madrona_gpudrive
         obj.metadata.avgZ = avgZ;
 
         // Initialize VBD trajectories to zeros
-        for (int i = 0; i < consts::episodeLen; i++) {
+        for (int i = 0; i < consts::kTrajectoryLength; i++) {
             for (int j = 0; j < 6; j++) {
                 obj.vbd_trajectories[i][j] = 0.0f;
             }
@@ -155,7 +155,7 @@ namespace madrona_gpudrive
         if (j.contains("vbd_trajectory")) {
             int vbd_idx = 0;
             for (const auto &vbd_traj : j.at("vbd_trajectory")) {
-                if (vbd_idx < consts::episodeLen) {
+                if (vbd_idx < consts::kTrajectoryLength) {
                     if (!vbd_traj.is_null()) {
                         obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
                         obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
