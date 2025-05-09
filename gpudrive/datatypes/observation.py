@@ -575,7 +575,7 @@ class TrafficLightObs:
             Dictionary with time-to-change predictions for each traffic light
         """
         current_states = self.state[:, :, self.current_time]
-        time_to_change = torch.ones_like(current_states) * -1s
+        time_to_change = torch.ones_like(current_states) * -1
         
         # Look ahead to find when lights change
         max_time = min(self.current_time + future_window, self.state.shape[2])
