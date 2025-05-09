@@ -146,7 +146,7 @@ def main():
         (
             gpudrive_env.num_worlds,
             gpudrive_env.max_agent_count,
-            madrona_gpudrive.kTrajectoryLength - INIT_STEPS - 1,
+            gpudrive_env.episode_len - INIT_STEPS,
             10,
         )
     )
