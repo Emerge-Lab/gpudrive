@@ -436,142 +436,36 @@ namespace madrona_gpudrive
 
     const size_t ScenarioIdExportSize = 32;
     static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
-
-    enum class TrafficLightState : int32_t
+    
+    // Traffic light state definitions - Add to types.hpp
+    enum class TLState : int32_t
     {
-        UNKNOWN = 0,
-        ARROW_STOP = 1,
-        ARROW_CAUTION = 2,
-        ARROW_GO = 3,
-        STOP = 4,
-        CAUTION = 5,
-        GO = 6,
-        FLASHING_STOP = 7,
-        FLASHING_CAUTION = 8,
+        Unknown = 0,
+        Stop = 1,
+        Caution = 2,
+        Go = 3
     };
 
-    // This maps from the string values in JSON to enum values
-    const std::unordered_map<std::string, TrafficLightState> TL_STATE_MAP = {
-        {"unknown", TrafficLightState::UNKNOWN},
-        {"arrow_stop", TrafficLightState::ARROW_STOP},
-        {"arrow_caution", TrafficLightState::ARROW_CAUTION},
-        {"arrow_go", TrafficLightState::ARROW_GO},
-        {"stop", TrafficLightState::STOP},
-        {"caution", TrafficLightState::CAUTION},
-        {"go", TrafficLightState::GO},
-        {"flashing_stop", TrafficLightState::FLASHING_STOP},
-        {"flashing_caution", TrafficLightState::FLASHING_CAUTION}
-    };
-
-    struct TrafficLight
+    struct TrafficLightState
     {
-        madrona::math::Vector3 position; // x, y, z coordinates
-        TrafficLightState state;
-        int32_t lane_id;
-        int32_t time_index;
-        bool valid;
-
-        static inline TrafficLight zero()
-        {
-            return TrafficLight{
-                .position = {0, 0, 0},
-                .state = TrafficLightState::UNKNOWN,
-                .lane_id = -1,
-                .time_index = -1,
-                .valid = false};
-        }
+        TLState state[consts::kMaxTrafficLightCount];
+        float x[consts::kMaxTrafficLightCount];
+        float y[consts::kMaxTrafficLightCount];
+        float z[consts::kMaxTrafficLightCount];
+        int32_t timeIndex[consts::kMaxTrafficLightCount];
+        int32_t laneId[consts::kMaxTrafficLightCount];
+        uint32_t numStates;
     };
 
-    // Traffic lights in the scene
-    struct TrafficLights
-    {
-        TrafficLight lights[consts::kMaxTrafficLightCount];
-        int32_t count;
-        bool has_traffic_lights;
+    // 1 (TLState) + 3 (x,y,z coordinates) + 2 (timeIndex, laneId) = 6
+    const size_t TrafficLightsExportSize = 6;
 
-        static inline TrafficLights zero()
-        {
-            TrafficLights tl;
-            tl.count = 0;
-            tl.has_traffic_lights = false;
-            for (int i = 0; i < consts::kMaxTrafficLightCount; i++) {
-                tl.lights[i] = TrafficLight::zero();
-            }
-            return tl;
-        }
-    };
-
-    // Add this to your export sizes
-    const size_t TrafficLightExportSize = 5; // position (3) + state (1) + lane_id (1)
-    static_assert(sizeof(TrafficLight) == sizeof(float) * 3 + sizeof(int32_t) * 2 + sizeof(bool));
-
-    enum class TrafficLightState : int32_t
-    {
-        UNKNOWN = 0,
-        ARROW_STOP = 1,
-        ARROW_CAUTION = 2,
-        ARROW_GO = 3,
-        STOP = 4,
-        CAUTION = 5,
-        GO = 6,
-        FLASHING_STOP = 7,
-        FLASHING_CAUTION = 8,
-    };
-
-    // This maps from the string values in JSON to enum values
-    const std::unordered_map<std::string, TrafficLightState> TL_STATE_MAP = {
-        {"unknown", TrafficLightState::UNKNOWN},
-        {"arrow_stop", TrafficLightState::ARROW_STOP},
-        {"arrow_caution", TrafficLightState::ARROW_CAUTION},
-        {"arrow_go", TrafficLightState::ARROW_GO},
-        {"stop", TrafficLightState::STOP},
-        {"caution", TrafficLightState::CAUTION},
-        {"go", TrafficLightState::GO},
-        {"flashing_stop", TrafficLightState::FLASHING_STOP},
-        {"flashing_caution", TrafficLightState::FLASHING_CAUTION}
-    };
-
-    struct TrafficLight
-    {
-        madrona::math::Vector3 position; // x, y, z coordinates
-        TrafficLightState state;
-        int32_t lane_id;
-        int32_t time_index;
-        bool valid;
-
-        static inline TrafficLight zero()
-        {
-            return TrafficLight{
-                .position = {0, 0, 0},
-                .state = TrafficLightState::UNKNOWN,
-                .lane_id = -1,
-                .time_index = -1,
-                .valid = false};
-        }
-    };
-
-    // Traffic lights in the scene
-    struct TrafficLights
-    {
-        TrafficLight lights[consts::kMaxTrafficLightCount];
-        int32_t count;
-        bool has_traffic_lights;
-
-        static inline TrafficLights zero()
-        {
-            TrafficLights tl;
-            tl.count = 0;
-            tl.has_traffic_lights = false;
-            for (int i = 0; i < consts::kMaxTrafficLightCount; i++) {
-                tl.lights[i] = TrafficLight::zero();
-            }
-            return tl;
-        }
-    };
-
-    // Add this to your export sizes
-    const size_t TrafficLightExportSize = 5; // position (3) + state (1) + lane_id (1)
-    static_assert(sizeof(TrafficLight) == sizeof(float) * 3 + sizeof(int32_t) * 2 + sizeof(bool));
+    // Verify that struct size matches export size * number of elements
+    static_assert(sizeof(TrafficLightState) == 
+        sizeof(TLState) * consts::kMaxTrafficLightCount +  // state array
+        sizeof(float) * consts::kMaxTrafficLightCount * 3 + // x, y, z arrays
+        sizeof(int32_t) * consts::kMaxTrafficLightCount * 2 + // timeIndex, laneId arrays
+        sizeof(uint32_t)); // numStates
 
     struct MetaData
     {
@@ -611,7 +505,7 @@ namespace madrona_gpudrive
                                 AgentID,
                                 MetaData,
                                 VBDTrajectory,
-
+                                TrafficLightState,
                                 ControlledState // Drive Logic
 
                                 >

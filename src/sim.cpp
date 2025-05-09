@@ -60,7 +60,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<MapType>();
     registry.registerComponent<MetaData>();
     registry.registerComponent<VBDTrajectory>();
-    registry.registerComponent<TrafficLights>();
+    registry.registerComponent<TrafficLightState>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
@@ -93,7 +93,6 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::AgentMapObservations);
     registry.exportColumn<RoadInterface, MapObservation>(
         (uint32_t)ExportID::MapObservation);
-
     registry.exportColumn<AgentInterface, PartnerObservations>(
         (uint32_t)ExportID::PartnerObservations);
     registry.exportColumn<AgentInterface, Lidar>(
@@ -120,8 +119,8 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::MetaData);
     registry.exportColumn<AgentInterface, VBDTrajectory>(
         (uint32_t)ExportID::VBDTrajectory);
-    registry.exportColumn<AgentInterface, TrafficLights>(
-            (uint32_t)ExportID::TrafficLights);
+    registry.exportColumn<AgentInterface, TrafficLightState>(
+            (uint32_t)ExportID::TrafficLightState);
 }
 
 static inline void cleanupWorld(Engine &ctx) {

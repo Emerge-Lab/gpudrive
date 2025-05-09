@@ -24,6 +24,34 @@ namespace madrona_gpudrive
         return 0.0f; // Default z value if not provided
     }
 
+    // Traffic light state deserialization - Add to json_serialization.hpp
+    void from_json(const nlohmann::json &j, TrafficLightState &tl_state)
+    {
+        uint32_t numStates = std::min(j.at("state").size(), static_cast<size_t>(MAX_TL_STATES));
+        tl_state.numStates = numStates;
+        
+        for (uint32_t i = 0; i < numStates; i++) {
+            std::string state = j.at("state")[i];
+            if (state == "unknown") {
+                tl_state.state[i] = TLState::Unknown;
+            } else if (state == "stop") {
+                tl_state.state[i] = TLState::Stop;
+            } else if (state == "caution") {
+                tl_state.state[i] = TLState::Caution;
+            } else if (state == "go") {
+                tl_state.state[i] = TLState::Go;
+            } else {
+                tl_state.state[i] = TLState::Unknown;
+            }
+            
+            tl_state.x[i] = j.at("x")[i];
+            tl_state.y[i] = j.at("y")[i];
+            tl_state.z[i] = j.at("z")[i];
+            tl_state.timeIndex[i] = j.at("time_index")[i];
+            tl_state.laneId[i] = j.at("lane_id")[i];
+        }
+    }
+
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
         obj.mean = {0,0};
@@ -472,5 +500,22 @@ namespace madrona_gpudrive
             ++idx;
         }
         map.numRoadSegments = countRoadPoints;
+
+        
+        // Traffic light processing in Map deserialization - Add to the end of from_json(j, map, polylineReductionThreshold)
+        // Process traffic light states if present
+        if (j.contains("tl_states")) {
+            const auto& tl_states = j.at("tl_states");
+            map.numTrafficLights = std::min(tl_states.size(), static_cast<size_t>(MAX_TL_STATES));
+            
+            idx = 0;
+            for (auto it = tl_states.begin(); it != tl_states.end() && idx < map.numTrafficLights; ++it) {
+                int lane_id = std::stoi(it.key());
+                from_json(it.value(), map.trafficLightStates[idx]);
+                ++idx;
+            }
+        } else {
+            map.numTrafficLights = 0;
+        }
     }
 }

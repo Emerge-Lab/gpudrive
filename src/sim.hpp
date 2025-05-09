@@ -43,7 +43,7 @@ enum class ExportID : uint32_t {
     ScenarioId,
     VBDTrajectory,
     NumExports,
-    TrafficLights
+    TrafficLightState
 };
 
 // Stores values for the ObjectID component that links entities to

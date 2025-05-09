@@ -903,7 +903,7 @@ Tensor Manager::metadataTensor() const {
 
 Tensor Manager::trafficLightTensor() const {
     return impl_->exportTensor(
-        ExportID::TrafficLights, TensorElementType::Int32,
+        ExportID::TrafficLightState, TensorElementType::Int32,
         {impl_->numWorlds, consts::kMaxTrafficLightCount, TrafficLightsExportSize}
     );
 }
