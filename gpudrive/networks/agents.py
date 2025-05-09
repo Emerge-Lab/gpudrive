@@ -94,7 +94,7 @@ class Agent(nn.Module):
             nn.Dropout(self.dropout),
             layer_init(nn.Linear(embed_dim, embed_dim)),
         )
-        
+
         self.guidance_embed = nn.Sequential(
             layer_init(nn.Linear(self.guidance_feature_dim, embed_dim)),
             nn.LayerNorm(embed_dim),

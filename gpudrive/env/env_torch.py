@@ -507,7 +507,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             self.previous_action_value_tensor.zero_()
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
-            
+
         # Dropout mask for guidance points
         # Assumption: all worlds are reset at the same time
         if self.config.guidance_dropout_prob > 0:
@@ -716,7 +716,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # b). Add a bonus for being close to the reference end position
             if torch.any(completed_route_mask > 0):
-                # Extract the last valid reference position 
+                # Extract the last valid reference position
                 agent_states = GlobalEgoState.from_tensor(
                     self.sim.absolute_self_observation_tensor(),
                     self.backend,
@@ -731,14 +731,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Create indices for gathering
-                batch_indices = torch.zeros_like(
-                    last_valid_indices
-                )
+                batch_indices = torch.zeros_like(last_valid_indices)
                 agent_indices = torch.arange(
                     is_valid.shape[1], device=is_valid.device
-                ).expand_as(
-                    last_valid_indices
-                )  
+                ).expand_as(last_valid_indices)
 
                 # Gather the last valid reference positions
                 last_valid_positions = self.reference_trajectory.pos_xy[
@@ -843,12 +839,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             rewards = self.base_rewards + self.guidance_reward
 
             return rewards
-        
+
     def create_guidance_dropout_mask(self):
         """
         Create guidance dropout mask of shape [controlled_agents, reference_path_length].
         """
-        
+
         dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
         # 1 if we want to keep the point, 0 if we want to drop it
@@ -857,25 +853,34 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             device=self.device,
             dtype=torch.bool,
         )
-                
-        is_valid = self.reference_trajectory.valids[self.cont_agent_mask].squeeze(-1).bool()
+
+        is_valid = (
+            self.reference_trajectory.valids[self.cont_agent_mask]
+            .squeeze(-1)
+            .bool()
+        )
 
         for agent_idx in range(num_controlled):
-         
+
             agent_valid_mask = is_valid[agent_idx]
             agent_valid_indices = torch.where(agent_valid_mask)[0]
-            
-            if len(agent_valid_indices) > 2:  # Only apply dropout if we have more than 2 points
+
+            if (
+                len(agent_valid_indices) > 2
+            ):  # Only apply dropout if we have more than 2 points
                 # Keep first and last points, apply dropout to middle points
                 # Get all valid indices except first and last
                 middle_indices = agent_valid_indices[1:-1]
-                
+
                 # Generate random dropout mask for middle points
-                dropout = torch.rand(len(middle_indices), device=self.device) < dropout_prob
-                
+                dropout = (
+                    torch.rand(len(middle_indices), device=self.device)
+                    < dropout_prob
+                )
+
                 # Apply dropout to middle points (set to False for points to drop)
                 guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
-        
+
         return guidance_dropout_mask
 
     def guidance_points_within_reach(self):
@@ -894,7 +899,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dim=-1,
         )
 
-        points_within_reach = (distances < self.config.dist_to_goal_threshold) & self.reference_trajectory.valids.bool().squeeze(-1)
+        points_within_reach = (
+            distances < self.config.dist_to_goal_threshold
+        ) & self.reference_trajectory.valids.bool().squeeze(-1)
 
         return points_within_reach, distances
 
@@ -1249,15 +1256,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance.append(reference_headings)
 
         self.guidance_obs = torch.cat(guidance, dim=-1)
-        
+
         # Apply dropout mask if specified
         # Note: currently only supported for masked observations
-        if self.config.guidance_dropout_prob > 0 and hasattr(self, "guidance_dropout_mask"):        
-            self.guidance_obs[~self.guidance_dropout_mask] = constants.INVALID_ID
-            self.reference_path[~self.guidance_dropout_mask] = constants.INVALID_ID
-            
-        self.valid_guidance_points = torch.sum(self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1)
-            
+        if self.config.guidance_dropout_prob > 0 and hasattr(
+            self, "guidance_dropout_mask"
+        ):
+            self.guidance_obs[
+                ~self.guidance_dropout_mask
+            ] = constants.INVALID_ID
+            self.reference_path[
+                ~self.guidance_dropout_mask
+            ] = constants.INVALID_ID
+
+        self.valid_guidance_points = torch.sum(
+            self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1
+        )
+
         return self.guidance_obs.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
@@ -1756,7 +1771,7 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
-        guidance_dropout_prob=0.001,#0.95,
+        guidance_dropout_prob=0.001,  # 0.95,
     )
     render_config = RenderConfig()
 

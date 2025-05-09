@@ -79,10 +79,12 @@ def test_rollout(focus_agents=[0, 1], render=False):
         #     cum_reward[agent_idx] += reward[0, agent_idx].item()
 
         cum_reward += reward.cpu().numpy()
-        
+
         if render:
             if time_step % 5 == 0 or time_step > env.episode_len - 3:
-                sim_states, agent_obs = env.render(focus_agent_idx=focus_agents)
+                sim_states, agent_obs = env.render(
+                    focus_agent_idx=focus_agents
+                )
                 sim_frames.append(img_from_fig(sim_states[0]))
                 for i in focus_agents:
                     agent_obs_frames[i].append(img_from_fig(agent_obs[i]))
@@ -105,14 +107,18 @@ def test_rollout(focus_agents=[0, 1], render=False):
                     f"{agent_key}/R_route": env.route_reward[
                         0, agent_idx
                     ].item(),
-                    f"{agent_key}/R_cumulative": cum_reward[0, agent_idx].item(),
+                    f"{agent_key}/R_cumulative": cum_reward[
+                        0, agent_idx
+                    ].item(),
                 },
                 step=env.step_in_world[0, 0, 0].item(),
             )
             ""
-    avg_cum_reward = cum_reward[env.cont_agent_mask.cpu().numpy()].mean()        
-    
-    print(f"Avg cumulative rewards N = {env.cont_agent_mask.sum()}: {avg_cum_reward}")
+    avg_cum_reward = cum_reward[env.cont_agent_mask.cpu().numpy()].mean()
+
+    print(
+        f"Avg cumulative rewards N = {env.cont_agent_mask.sum()}: {avg_cum_reward}"
+    )
     if render:
         for agent_idx in focus_agents:
             agent_key = f"agent_{agent_idx}"
