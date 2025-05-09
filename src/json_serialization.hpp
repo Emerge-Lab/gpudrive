@@ -28,12 +28,12 @@ namespace madrona_gpudrive
     {
         uint32_t numStates = std::min(j.at("state").size(), static_cast<size_t>(MAX_TL_STATES));
         tl_state.numStates = numStates;
-        
+
         // Process each timestep in the state arrays
         for (uint32_t i = 0; i < numStates; i++) {
             // Get the number of timesteps (should match episodeLen)
             size_t numTimesteps = std::min(j.at("time_index").size(), static_cast<size_t>(consts::kTrajectoryLength-1));
-            
+
             for (size_t t = 0; t < numTimesteps; t++) {
                 // Convert string state to enum
                 if (t < j.at("state").size()) {
@@ -52,33 +52,33 @@ namespace madrona_gpudrive
                 } else {
                     tl_state.state[i][t] = TLState::Unknown;
                 }
-                
+
                 // Get coordinates
                 if (t < j.at("x").size()) {
                     tl_state.x[i][t] = j.at("x")[t];
                 } else {
                     tl_state.x[i][t] = 0.0f;
                 }
-                
+
                 if (t < j.at("y").size()) {
                     tl_state.y[i][t] = j.at("y")[t];
                 } else {
                     tl_state.y[i][t] = 0.0f;
                 }
-                
+
                 if (t < j.at("z").size()) {
                     tl_state.z[i][t] = j.at("z")[t];
                 } else {
                     tl_state.z[i][t] = 0.0f;
                 }
-                
+
                 // Get time index and lane id
                 if (t < j.at("time_index").size()) {
                     tl_state.timeIndex[i][t] = j.at("time_index")[t];
                 } else {
                     tl_state.timeIndex[i][t] = -1;
                 }
-                
+
                 if (t < j.at("lane_id").size()) {
                     tl_state.laneId[i][t] = j.at("lane_id")[t];
                 } else {
@@ -537,12 +537,12 @@ namespace madrona_gpudrive
         }
         map.numRoadSegments = countRoadPoints;
 
-        
+
         // Process traffic light states if present
         if (j.contains("tl_states")) {
             const auto& tl_states = j.at("tl_states");
             map.numTrafficLights = std::min(tl_states.size(), static_cast<size_t>(MAX_TL_STATES));
-            
+
             idx = 0;
             for (auto it = tl_states.begin(); it != tl_states.end() && idx < map.numTrafficLights; ++it) {
                 int lane_id = std::stoi(it.key());
