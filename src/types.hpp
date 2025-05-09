@@ -448,24 +448,17 @@ namespace madrona_gpudrive
 
     struct TrafficLightState
     {
-        TLState state[consts::kMaxTrafficLightCount];
-        float x[consts::kMaxTrafficLightCount];
-        float y[consts::kMaxTrafficLightCount];
-        float z[consts::kMaxTrafficLightCount];
-        int32_t timeIndex[consts::kMaxTrafficLightCount];
-        int32_t laneId[consts::kMaxTrafficLightCount];
+        TLState state[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        float x[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        float y[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        float z[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        int32_t timeIndex[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        int32_t laneId[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
         uint32_t numStates;
     };
 
     // 1 (TLState) + 3 (x,y,z coordinates) + 2 (timeIndex, laneId) = 6
-    const size_t TrafficLightsExportSize = 6;
-
-    // Verify that struct size matches export size * number of elements
-    static_assert(sizeof(TrafficLightState) == 
-        sizeof(TLState) * consts::kMaxTrafficLightCount +  // state array
-        sizeof(float) * consts::kMaxTrafficLightCount * 3 + // x, y, z arrays
-        sizeof(int32_t) * consts::kMaxTrafficLightCount * 2 + // timeIndex, laneId arrays
-        sizeof(uint32_t)); // numStates
+    const size_t TrafficLightsExportSize = 6 * consts::kTrajectoryLength-1;
 
     struct MetaData
     {

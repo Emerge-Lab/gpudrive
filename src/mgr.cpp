@@ -901,10 +901,17 @@ Tensor Manager::metadataTensor() const {
     );
 }
 
-Tensor Manager::trafficLightTensor() const {
+Tensor Manager::trafficLightTensor() const
+{
     return impl_->exportTensor(
-        ExportID::TrafficLightState, TensorElementType::Int32,
-        {impl_->numWorlds, consts::kMaxTrafficLightCount, TrafficLightsExportSize}
+        ExportID::TrafficLightState, 
+        TensorElementType::Float32,
+        {
+            impl_->numWorlds, 
+            consts::kMaxTrafficLightCount, 
+            consts::kTrajectoryLength - 1,  
+            6  
+        }
     );
 }
 
