@@ -70,10 +70,6 @@ def rollout(
     video_format: str = "gif",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
-
-    if save_videos:
-        os.makedirs(video_dir, exist_ok=True)
-
     # Storage
     env_ids = list(range(num_envs))
     simulator_state_frames = {env_id: [] for env_id in range(num_envs)}
@@ -126,7 +122,7 @@ def rollout(
         if render_simulator_states and time_step % render_every_n_steps == 0:
             sim_states = env.vis.plot_simulator_state(
                 env_indices=env_ids,
-                zoom_radius=120,
+                zoom_radius=100,
                 time_steps=[time_step] * len(env_ids),
                 plot_guidance_pos_xy=True,
             )

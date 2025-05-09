@@ -381,6 +381,25 @@ class MatplotlibVisualizer:
                 va="top",
             )
 
+            time_step = (
+                self.env_config.episode_len
+                - self.sim_object.steps_remaining_tensor().to_torch()[
+                    env_idx, 0
+                ]
+            ).item()
+
+            # Add time step text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.95,  # y position in axes coordinates (95% from bottom)
+                f"t = {time_step}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
+
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
@@ -1883,6 +1902,7 @@ class MatplotlibVisualizer:
                 trajectory[:, 0][mask].cpu(),  # x coordinates
                 trajectory[:, 1][mask].cpu(),  # y coordinates
                 color="g",
+                linewidth=0.05 * line_width_scale,
                 linewidth=0.05 * line_width_scale,
                 marker="o",
                 alpha=0.6,

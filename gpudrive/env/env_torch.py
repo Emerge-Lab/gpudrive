@@ -79,6 +79,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         should equal number of worlds ({self.num_worlds}). \
         \n Please check your data loader configuration."
 
+        assert self.num_worlds == len(
+            self.data_batch
+        ), f"Number of scenarios in data_batch ({len(self.data_batch)}) \
+        should equal number of worlds ({self.num_worlds}). \
+        \n Please check your data loader configuration."
+
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
 
@@ -124,6 +130,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dtype=np.float32,
         )
 
+        # Action space setup
         # Action space setup
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
@@ -1296,6 +1303,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
+            ego_state.steer_angle.unsqueeze(-1),
         ]
 
         if mask is None:
@@ -1728,6 +1736,32 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             scenario_ids[i] = scenario_id
 
         return scenario_ids
+
+    def render(self, focus_env_idx=0, focus_agent_idx=[0, 1]):
+        """Quick rendering function for debugging."""
+
+        sim_states = self.vis.plot_simulator_state(
+            env_indices=[focus_env_idx],
+            zoom_radius=70,
+            time_steps=[self.step_in_world[0, 0, 0].item()],
+            plot_guidance_pos_xy=True,
+        )
+
+        agent_views = []
+        for agent_idx in focus_agent_idx:
+            agent_obs = self.vis.plot_agent_observation(
+                env_idx=focus_env_idx,
+                agent_idx=agent_idx,
+                figsize=(10, 10),
+                trajectory=self.reference_path[agent_idx, :, :],
+                step_reward=self.guidance_reward[
+                    focus_env_idx, agent_idx
+                ].item(),
+                route_progress=self.route_progress[agent_idx],
+            )
+            agent_views.append(agent_obs)
+
+        return sim_states, agent_views
 
     def render(self, focus_env_idx=0, focus_agent_idx=[0, 1]):
         """Quick rendering function for debugging."""

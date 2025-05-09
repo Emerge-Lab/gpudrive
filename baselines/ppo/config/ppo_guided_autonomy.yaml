@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_100
+data_dir: data/processed/wosac/validation_json_1
 continue_training: false
 model_cpt: null
 
@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01
+  collision_weight: -0.01 
   off_road_weight: -0.01
   guidance_speed_weight: 0.01
   guidance_heading_weight: 0.01
@@ -52,7 +52,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_100_v2"
+  group: "wosac_1"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
