@@ -10,7 +10,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   name: "gpudrive"
   num_worlds: 100 # Number of parallel environments
   k_unique_scenes: 100 # Number of unique scenes to sample from
-  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -66,10 +66,10 @@ train:
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: true
+  resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 2_000_000
-  sample_with_replacement: true
+  sample_with_replacement: false
   shuffle_dataset: true
   file_prefix: ""
 
@@ -99,7 +99,7 @@ train:
 
   # # # Network # # #
   network:
-    embed_dim: 64 # Embedding of the input features
+    embed_dim: 256 # Embedding of the input features
     dropout: 0.01
     class_name: "Agent"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
