@@ -2,6 +2,8 @@ import numpy as np
 import mediapy as media
 import wandb
 
+import torch
+
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.dataset import SceneDataLoader
@@ -20,7 +22,7 @@ def test_rollout(focus_agents=[0, 1]):
         add_previous_action=True,
         reward_type="guided_autonomy",
         init_mode="wosac_train",
-        dynamics_model="delta_local",  # "state", #"classic",
+        dynamics_model="classic",  # "state", #"classic",
         smoothen_trajectory=True,
         smoothness_weight=0.001,
         collision_weight=-0.01,
