@@ -436,7 +436,7 @@ namespace madrona_gpudrive
 
     const size_t ScenarioIdExportSize = 32;
     static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
-    
+
     // Traffic light state definitions - Add to types.hpp
     enum class TLState : int32_t
     {
@@ -448,12 +448,18 @@ namespace madrona_gpudrive
 
     struct TrafficLightState
     {
-        TLState state[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
-        float x[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
-        float y[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
-        float z[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
-        int32_t timeIndex[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
-        int32_t laneId[consts::kMaxTrafficLightCount][consts::kTrajectoryLength-1];
+        // Lane ID for this traffic light
+        int32_t laneId;
+
+        // Arrays of state data for each timestep
+        TLState state[consts::kTrajectoryLength-1];
+        float x[consts::kTrajectoryLength-1];
+        float y[consts::kTrajectoryLength-1];
+        float z[consts::kTrajectoryLength-1];
+        int32_t timeIndex[consts::kTrajectoryLength-1];
+        int32_t laneIds[consts::kTrajectoryLength-1];
+
+        // Number of valid states
         uint32_t numStates;
     };
 
