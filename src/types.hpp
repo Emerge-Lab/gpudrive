@@ -202,7 +202,7 @@ namespace madrona_gpudrive
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
                 .goalState = 0,
-                .id = -1
+                .id = -1,
                 .steerAngle = 0};
         }
     };
@@ -439,18 +439,18 @@ namespace madrona_gpudrive
 
     struct MetaData
     {
-        float isSdc;                
-        float isObjectOfInterest;   
-        float isTrackToPredict;     
-        float difficulty;           
+        float isSdc;
+        float isObjectOfInterest;
+        float isTrackToPredict;
+        float difficulty;
         float avgZ;
-    
+
         static inline void zero(MetaData& metadata)
         {
-            metadata.isSdc = -1.0f;           
-            metadata.isObjectOfInterest = -1.0f; 
-            metadata.isTrackToPredict = -1.0f;   
-            metadata.difficulty = -1.0f;         
+            metadata.isSdc = -1.0f;
+            metadata.isObjectOfInterest = -1.0f;
+            metadata.isTrackToPredict = -1.0f;
+            metadata.difficulty = -1.0f;
             metadata.avgZ = 0.0f;
         }
     };
