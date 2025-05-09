@@ -51,7 +51,6 @@ if __name__ == "__main__":
     _ = env.reset(mask=control_mask)
 
     tl_states = env.sim.tl_state_tensor().to_torch()
-    
-    
+
     print("tl_states.shape", tl_states.shape)
     print("tl_states", tl_states.max())
