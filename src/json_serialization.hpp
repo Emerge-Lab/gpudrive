@@ -24,7 +24,6 @@ namespace madrona_gpudrive
         return 0.0f; // Default z value if not provided
     }
 
-    // Traffic light state deserialization - Add to json_serialization.hpp
     void from_json(const nlohmann::json &j, TrafficLightState &tl_state)
     {
         uint32_t numStates = std::min(j.at("state").size(), static_cast<size_t>(MAX_TL_STATES));
@@ -539,7 +538,6 @@ namespace madrona_gpudrive
         map.numRoadSegments = countRoadPoints;
 
         
-        // Traffic light processing in Map deserialization - Add to the end of from_json(j, map, polylineReductionThreshold)
         // Process traffic light states if present
         if (j.contains("tl_states")) {
             const auto& tl_states = j.at("tl_states");
