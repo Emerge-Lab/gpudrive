@@ -5,6 +5,13 @@ import madrona_gpudrive
 TRAJ_LEN = 91  # Length of the logged trajectory
 
 
+def wrap_yaws(agent_headings: torch.Tensor) -> torch.Tensor:
+    """
+    Wrap an array of angles to the range [-pi, pi]
+    """
+    return ((agent_headings + torch.pi) % (2 * torch.pi)) - torch.pi
+
+
 def to_local_frame(
     global_pos_xy: torch.Tensor,
     ego_pos: torch.Tensor,
@@ -121,10 +128,86 @@ class LogTrajectory:
 
 
 @dataclass
+class VBDTrajectoryOnline:
+    """A class to represent the VBD predicted trajectories.
+    Initialized from VBD predictions.
+    Shape: (num_worlds, max_agents, traj_len, 5)
+
+    Attributes:
+        trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 5) containing
+            position (x, y), heading (yaw), and velocity (vx, vy) for each timestep.
+    """
+
+    def __init__(
+        self, vbd_traj_tensor: torch.Tensor, mean_pos_xy: torch.Tensor
+    ):
+        """Initializes the VBD trajectory with a tensor."""
+        self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
+        self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
+        self.pos_xy = vbd_traj_tensor[:, :, :, :2]
+        self.yaw = wrap_yaws(vbd_traj_tensor[:, :, :, 2].unsqueeze(-1))
+        self.vel_x = vbd_traj_tensor[:, :, :, 3].unsqueeze(-1)
+        self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
+        self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
+        self.ref_speed = self.comp_reference_speed()
+        # Assumption: All timesteps are valid (correct)
+        self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
+
+        self.mean_pos_xy = mean_pos_xy
+        self.mean_x = mean_pos_xy[:, 0]
+        self.mean_y = mean_pos_xy[:, 1]
+
+        self.demean_positions()
+
+    @classmethod
+    def from_tensor(
+        cls,
+        vbd_predictions,
+        mean_pos_xy,
+        backend="torch",
+        device="cuda",
+    ):
+        """Creates a VBDTrajectory from a tensor."""
+        if backend == "torch":
+            return cls(
+                vbd_predictions.clone().to(device),
+                mean_pos_xy.clone().to(device),
+            )
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    def comp_reference_speed(self):
+        """Returns the average speed of the trajectory."""
+        return torch.sqrt(self.vel_x**2 + self.vel_y**2)
+
+    @property
+    def length(self):
+        """Returns the length of the trajectory."""
+        return self.pos_xy.shape[2]
+
+    def demean_positions(self):
+        """
+        In GPUDrive, we center everything at zero. By default, the VBD
+        predictions are not centered at zero, so we demean the predicted trajectory.
+        """
+        # Reshape for broadcasting
+        mean_x_reshaped = self.mean_x.view(-1, 1, 1)
+        mean_y_reshaped = self.mean_y.view(-1, 1, 1)
+
+        # Apply to x and y coordinates
+        self.pos_xy[..., 0] -= mean_x_reshaped
+        self.pos_xy[..., 1] -= mean_y_reshaped
+
+        self.pos_x = self.pos_xy[..., 0].unsqueeze(-1)
+        self.pos_y = self.pos_xy[..., 1].unsqueeze(-1)
+
+
+@dataclass
 class VBDTrajectory:
     """A class to represent the VBD predicted trajectories.
     Initialized from `vbd_trajectory_tensor` (src/bindings.cpp).
     Shape: (num_worlds, max_agents, traj_len, 5)
+            where traj_len is 90 - initialization steps.
 
     Attributes:
         trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 5) containing
@@ -136,12 +219,13 @@ class VBDTrajectory:
         self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
         self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
         self.pos_xy = vbd_traj_tensor[:, :, :, :2]
-        self.yaw = vbd_traj_tensor[:, :, :, 2].unsqueeze(-1)
+        self.yaw = wrap_yaws(vbd_traj_tensor[:, :, :, 2].unsqueeze(-1))
         self.vel_x = vbd_traj_tensor[:, :, :, 3].unsqueeze(-1)
         self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
         # Assumption: All timesteps are valid
+        # TODO: The first 10 timesteps come from the logs, so there may be invalid steps
         self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
 
     @classmethod
@@ -165,13 +249,3 @@ class VBDTrajectory:
     def length(self):
         """Returns the length of the trajectory."""
         return self.pos_xy.shape[2]
-
-    # def restore_mean(self, mean_x, mean_y):
-    #     """Reapplies the mean to revert back to the original coordinates."""
-    #     # Reshape for broadcasting
-    #     mean_x_reshaped = mean_x.view(-1, 1, 1)
-    #     mean_y_reshaped = mean_y.view(-1, 1, 1)
-
-    #     # Apply to x and y coordinates
-    #     self.trajectories[..., 0] += mean_x_reshaped
-    #     self.trajectories[..., 1] += mean_y_reshaped

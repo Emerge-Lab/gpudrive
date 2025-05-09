@@ -13,8 +13,11 @@ from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.datatypes.observation import GlobalEgoState
+from gpudrive.datatypes.metadata import Metadata
+from gpudrive.datatypes.info import Info
 from gpudrive.utils.checkpoint import load_agent
 from gpudrive.visualize.utils import img_from_fig
+import madrona_gpudrive
 
 # WOSAC
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,10 +27,17 @@ from eval.wosac_eval_origin import WOSACMetrics
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WOSAC evaluation")
+# Suppress excessive logging
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 
 def get_state(env):
     """Obtain raw agent states."""
+    avg_z_pos = Metadata.from_tensor(
+        metadata_tensor=env.sim.metadata_tensor(),
+        backend=env.backend,
+        device=env.device,
+    ).avg_z
     ego_state = GlobalEgoState.from_tensor(
         env.sim.absolute_self_observation_tensor(),
         backend=env.backend,
@@ -39,7 +49,7 @@ def get_state(env):
     return (
         ego_state.pos_x + mean_x,
         ego_state.pos_y + mean_y,
-        ego_state.pos_z,
+        avg_z_pos,  # ego_state.pos_z
         ego_state.rotation_angle,
         ego_state.id,
     )
@@ -54,12 +64,16 @@ def rollout(
     device: str,
     render_simulator_states: bool = False,
     render_agent_pov: bool = False,
-    render_every_n_steps: int = 5,
+    render_every_n_steps: int = 2,
     save_videos: bool = True,
     video_dir: str = "videos",
     video_format: str = "gif",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
+
+    if save_videos:
+        os.makedirs(video_dir, exist_ok=True)
+
     # Storage
     env_ids = list(range(num_envs))
     simulator_state_frames = {env_id: [] for env_id in range(num_envs)}
@@ -67,7 +81,19 @@ def rollout(
 
     start_env_rollout = perf_counter()
 
-    control_mask = env.cont_agent_mask
+    _ = env.reset()
+
+    # Zero out actions for parked vehicles
+    info = Info.from_tensor(
+        env.sim.info_tensor(),
+        backend=env.backend,
+        device=env.device,
+    )
+    control_mask_all = env.cont_agent_mask.clone()
+    zero_action_mask = (info.off_road == 1) | (
+        info.collided_with_vehicle == 1
+    ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
+    control_mask = control_mask_all & ~zero_action_mask
 
     next_obs = env.reset(control_mask)
 
@@ -100,7 +126,7 @@ def rollout(
         if render_simulator_states and time_step % render_every_n_steps == 0:
             sim_states = env.vis.plot_simulator_state(
                 env_indices=env_ids,
-                zoom_radius=100,
+                zoom_radius=120,
                 time_steps=[time_step] * len(env_ids),
                 plot_guidance_pos_xy=True,
             )
@@ -164,7 +190,7 @@ def rollout(
     control_mask = control_mask.cpu().numpy()
 
     logging.info(
-        f"Policy rollout took: {perf_counter() - start_env_rollout:.2f} s ({len(env.data_batch)} scenarios)."
+        f"Policy rollout took: {perf_counter() - start_env_rollout:.2f} s (Render = {render_simulator_states}; {len(env.data_batch)} scenarios)."
     )
 
     start_ground_truth_ext = perf_counter()
@@ -214,16 +240,20 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = 64
-    NUM_ENVS = 3
+    NUM_ENVS = 20
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 2
+    NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
     RENDER = True
 
-    DATA_JSON = "data/processed/wosac/validation_json_3"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_3"
+    DATA_JSON = "data/processed/wosac/validation_json_100"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
+    # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
+    # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
+
+    CPT_PATH = "checkpoints/model_guidance_progress__S_100__05_06_20_02_22_663_001500.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -231,15 +261,12 @@ if __name__ == "__main__":
         batch_size=NUM_ENVS,
         dataset_size=DATASET_SIZE,
         sample_with_replacement=True,
-        shuffle=True,
+        shuffle=False,
         file_prefix="",
     )
 
     # Load agent
-    agent = load_agent(
-        # path_to_cpt="checkpoints/model_guidance_log_replay__S_1__04_26_09_02_20_677_000833.pt",
-        path_to_cpt="checkpoints/model_guidance_log_replay__S_3__04_27_13_13_33_780_013762.pt",
-    ).to(DEVICE)
+    agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
 
     # Override default environment settings to match those the agent was trained with
     default_config = EnvConfig()
@@ -252,17 +279,14 @@ if __name__ == "__main__":
     }
 
     # Add fixed overrides specific to WOSAC evaluation
-    fixed_overrides = {
-        "init_steps": INIT_STEPS,
-    }
+    config_dict["init_steps"] = INIT_STEPS
+    config_dict["init_mode"] = "wosac_eval"
 
     logging.info(
         f"initializing env with init_mode = {config_dict['init_mode']}"
     )
 
-    env_config = dataclasses.replace(
-        default_config, **config_dict, **fixed_overrides
-    )
+    env_config = dataclasses.replace(default_config, **config_dict)
 
     # Make environment
     env = GPUDriveTorchEnv(

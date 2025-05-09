@@ -896,7 +896,7 @@ Tensor Manager::scenarioIdTensor() const {
 
 Tensor Manager::metadataTensor() const {
     return impl_->exportTensor(
-        ExportID::MetaData, TensorElementType::Int32,
+        ExportID::MetaData, TensorElementType::Float32,
         {impl_->numWorlds, consts::kMaxAgentCount, MetaDataExportSize}
     );
 }
@@ -909,13 +909,14 @@ Tensor Manager::trafficLightTensor() const {
 }
 
 Tensor Manager::vbdTrajectoryTensor() const {
-    return impl_->exportTensor(ExportID::VBDTrajectory, TensorElementType::Float32,
-                               {
-                                   impl_->numWorlds,
-                                   consts::kMaxAgentCount,
-                                   consts::episodeLen,
-                                   5,
-                               });
+    return impl_->exportTensor(
+        ExportID::VBDTrajectory, TensorElementType::Float32,
+    {
+        impl_->numWorlds,
+        consts::kMaxAgentCount,
+        consts::episodeLen,
+        5,
+    });
 }
 
 void Manager::triggerReset(int32_t world_idx)

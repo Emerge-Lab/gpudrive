@@ -193,6 +193,7 @@ namespace madrona_gpudrive
         float collisionState;
         float goalState;
         float id;
+        float steerAngle;
         static inline SelfObservation zero()
         {
             return SelfObservation{
@@ -201,11 +202,12 @@ namespace madrona_gpudrive
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
                 .goalState = 0,
-                .id = -1};
+                .id = -1,
+                .steerAngle = 0};
         }
     };
 
-    const size_t SelfObservationExportSize = 9; // 1 + 3 + 2 + 1 + 1 + 1
+    const size_t SelfObservationExportSize = 10; // 1 + 3 + 2 + 1 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -503,24 +505,93 @@ namespace madrona_gpudrive
     const size_t TrafficLightExportSize = 5; // position (3) + state (1) + lane_id (1)
     static_assert(sizeof(TrafficLight) == sizeof(float) * 3 + sizeof(int32_t) * 2 + sizeof(bool));
 
-    //Metadata struct : using agent IDs.
+    enum class TrafficLightState : int32_t
+    {
+        UNKNOWN = 0,
+        ARROW_STOP = 1,
+        ARROW_CAUTION = 2,
+        ARROW_GO = 3,
+        STOP = 4,
+        CAUTION = 5,
+        GO = 6,
+        FLASHING_STOP = 7,
+        FLASHING_CAUTION = 8,
+    };
+
+    // This maps from the string values in JSON to enum values
+    const std::unordered_map<std::string, TrafficLightState> TL_STATE_MAP = {
+        {"unknown", TrafficLightState::UNKNOWN},
+        {"arrow_stop", TrafficLightState::ARROW_STOP},
+        {"arrow_caution", TrafficLightState::ARROW_CAUTION},
+        {"arrow_go", TrafficLightState::ARROW_GO},
+        {"stop", TrafficLightState::STOP},
+        {"caution", TrafficLightState::CAUTION},
+        {"go", TrafficLightState::GO},
+        {"flashing_stop", TrafficLightState::FLASHING_STOP},
+        {"flashing_caution", TrafficLightState::FLASHING_CAUTION}
+    };
+
+    struct TrafficLight
+    {
+        madrona::math::Vector3 position; // x, y, z coordinates
+        TrafficLightState state;
+        int32_t lane_id;
+        int32_t time_index;
+        bool valid;
+
+        static inline TrafficLight zero()
+        {
+            return TrafficLight{
+                .position = {0, 0, 0},
+                .state = TrafficLightState::UNKNOWN,
+                .lane_id = -1,
+                .time_index = -1,
+                .valid = false};
+        }
+    };
+
+    // Traffic lights in the scene
+    struct TrafficLights
+    {
+        TrafficLight lights[consts::kMaxTrafficLightCount];
+        int32_t count;
+        bool has_traffic_lights;
+
+        static inline TrafficLights zero()
+        {
+            TrafficLights tl;
+            tl.count = 0;
+            tl.has_traffic_lights = false;
+            for (int i = 0; i < consts::kMaxTrafficLightCount; i++) {
+                tl.lights[i] = TrafficLight::zero();
+            }
+            return tl;
+        }
+    };
+
+    // Add this to your export sizes
+    const size_t TrafficLightExportSize = 5; // position (3) + state (1) + lane_id (1)
+    static_assert(sizeof(TrafficLight) == sizeof(float) * 3 + sizeof(int32_t) * 2 + sizeof(bool));
+
     struct MetaData
     {
-        int32_t isSdc;
-        int32_t isObjectOfInterest;
-        int32_t isTrackToPredict;
-        int32_t difficulty;
+        float isSdc;
+        float isObjectOfInterest;
+        float isTrackToPredict;
+        float difficulty;
+        float avgZ;
 
         static inline void zero(MetaData& metadata)
         {
-            metadata.isSdc = -1;
-            metadata.isObjectOfInterest = -1;
-            metadata.isTrackToPredict = -1;
-            metadata.difficulty = -1;
+            metadata.isSdc = -1.0f;
+            metadata.isObjectOfInterest = -1.0f;
+            metadata.isTrackToPredict = -1.0f;
+            metadata.difficulty = -1.0f;
+            metadata.avgZ = 0.0f;
         }
     };
-    const size_t MetaDataExportSize = 4;
-    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
+    const size_t MetaDataExportSize = 5;
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * (MetaDataExportSize - 1) + sizeof(float));
 
     struct AgentInterface : public madrona::Archetype<
                                 Action,

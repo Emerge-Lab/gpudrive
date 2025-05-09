@@ -22,6 +22,7 @@ from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
+    LidarObs,
 )
 from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
@@ -53,7 +54,7 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (15, 15)
+        self.figsize = (10, 10)
         self.env_config = env_config
         self.render_3d = render_config.render_3d
         self.vehicle_height = render_config.vehicle_height
@@ -359,6 +360,25 @@ class MatplotlibVisualizer:
             else:
                 center_x = 0  # Default center x-coordinate
                 center_y = 0  # Default center y-coordinate
+
+            time_step = (
+                self.env_config.episode_len
+                - self.sim_object.steps_remaining_tensor().to_torch()[
+                    env_idx, 0
+                ]
+            ).item()
+
+            # Add time step text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.95,  # y position in axes coordinates (95% from bottom)
+                f"t = {time_step}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
 
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
@@ -1565,58 +1585,14 @@ class MatplotlibVisualizer:
                 bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
             )
 
-    def _plot_expert_trajectories(
-        self,
-        ax: matplotlib.axes.Axes,
-        env_idx: int,
-        expert_trajectories: torch.Tensor,
-        response_type: Any,
-    ) -> None:
-        """Plot expert trajectories.
-        Args:
-            ax: Matplotlib axis for plotting.
-            env_idx: Environment index to select specific environment agents.
-            expert_trajectories: The global state of expert from `LogTrajectory`.
-        """
-        if self.vis_config.draw_expert_trajectories:
-            controlled_mask = self.controlled_agents[env_idx, :]
-            non_controlled_mask = (
-                ~response_type.static[env_idx, :]
-                & response_type.moving[env_idx, :]
-                & ~controlled_mask
-            )
-            mask = (
-                controlled_mask
-                if self.vis_config.draw_only_controllable_veh
-                else controlled_mask | non_controlled_mask
-            )
-            agent_indices = torch.where(mask)[0]
-            trajectories = expert_trajectories[env_idx][mask]
-            for idx, trajectory in zip(agent_indices, trajectories):
-                color = (
-                    AGENT_COLOR_BY_STATE["ok"]
-                    if controlled_mask[idx]
-                    else AGENT_COLOR_BY_STATE["log_replay"]
-                )
-                for step in trajectory:
-                    x, y = step[:2].numpy()
-                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
-                        ax.add_patch(
-                            Circle(
-                                (x, y),
-                                radius=0.3,
-                                color=color,
-                                fill=True,
-                                alpha=0.5,
-                            )
-                        )
-
     def plot_agent_observation(
         self,
         agent_idx: int,
         env_idx: int,
         figsize: Tuple[int, int] = (10, 10),
         trajectory: Optional[np.ndarray] = None,
+        step_reward: Optional[float] = None,
+        route_progress: Optional[float] = None,
     ):
         """
         Plot observation from agent POV to inspect the information available
@@ -1628,27 +1604,43 @@ class MatplotlibVisualizer:
                 Should be of shape (N, 2) where N is the number of points and each point
                 is an (x, y) coordinate. Defaults to None.
         """
-        observation_ego = LocalEgoState.from_tensor(
-            self_obs_tensor=self.sim_object.self_observation_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
 
-        observation_roadgraph = LocalRoadGraphPoints.from_tensor(
-            local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
+        observation_ego = None
+        if self.env_config.ego_state:
+            observation_ego = LocalEgoState.from_tensor(
+                self_obs_tensor=self.sim_object.self_observation_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
-        observation_partner = PartnerObs.from_tensor(
-            partner_obs_tensor=self.sim_object.partner_observations_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
+        observation_roadgraph = None
+        if self.env_config.road_map_obs:
+            observation_roadgraph = LocalRoadGraphPoints.from_tensor(
+                local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
-        # Check if agent index is valid, otherwise return None
-        if observation_ego.id[env_idx, agent_idx] == -1:
-            return None, None
+        observation_partner = None
+        if self.env_config.partner_obs:
+            observation_partner = PartnerObs.from_tensor(
+                partner_obs_tensor=self.sim_object.partner_observations_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        lidar_obs = (
+            None  # Note: Lidar obs are in global coordinates by default
+        )
+        if self.env_config.lidar_obs:
+            lidar_obs = LidarObs.from_tensor(
+                lidar_tensor=self.sim_object.lidar_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        marker_scale = max(figsize) / 15
+        line_width_scale = max(figsize) / 15
 
         fig, ax = plt.subplots(figsize=figsize)
         ax.clear()  # Clear any previous plots
@@ -1680,7 +1672,7 @@ class MatplotlibVisualizer:
                     x_points,
                     y_points,
                     c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=8,
+                    s=8 * marker_scale,
                     label=type_name,
                 )
 
@@ -1707,28 +1699,28 @@ class MatplotlibVisualizer:
                         [y_start - width_dy, y_end - width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start + width_dx, x_end + width_dx],
                         [y_start + width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start - width_dx, x_start + width_dx],
                         [y_start - width_dy, y_start + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_end - width_dx, x_end + width_dx],
                         [y_end - width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
 
         # Plot partner agents if provided
@@ -1759,9 +1751,14 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
+                line_width_scale=line_width_scale,
             )
 
         if observation_ego is not None:
+            # Check if agent index is valid, otherwise return None
+            if observation_ego.id[env_idx, agent_idx] == -1:
+                return None, None
+
             ego_agent_color = (
                 "r"
                 if observation_ego.is_collided[env_idx, agent_idx]
@@ -1796,37 +1793,32 @@ class MatplotlibVisualizer:
                 zorder=1,
             )
 
-            # ax.scatter(
-            #     observation_ego.rel_goal_x[env_idx, agent_idx],
-            #     observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     s=5,
-            #     linewidth=1.5,
-            #     c=ego_agent_color,
-            #     marker="x",
-            # )
+        if lidar_obs is not None:
+            num_lidar_samples = lidar_obs.num_lidar_samples * 3
 
-            # circle = Circle(
-            #     (
-            #         observation_ego.rel_goal_x[env_idx, agent_idx],
-            #         observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     ),
-            #     radius=self.goal_radius,
-            #     color=ego_agent_color,
-            #     fill=False,
-            #     linestyle="--",
-            # )
-            # ax.add_patch(circle)
+            ego_lidar_pos_xy = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 2:4]
+                .flatten(end_dim=1)
+                .cpu()
+                .numpy()
+            )
 
-            # observation_radius = Circle(
-            #     (0, 0),
-            #     radius=self.env_config.obs_radius,
-            #     color="#000000",
-            #     linewidth=0.8,
-            #     fill=False,
-            #     linestyle="-",
-            # )
-            # ax.add_patch(observation_radius)
-            plt.axis("off")
+            ego_lidar_entity_types = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 1]
+                .flatten()
+                .cpu()
+                .numpy()
+            )
+
+            for lidar_sample_idx in range(num_lidar_samples):
+                ax.scatter(
+                    ego_lidar_pos_xy[lidar_sample_idx, 0],
+                    ego_lidar_pos_xy[lidar_sample_idx, 1],
+                    s=2,
+                    marker="o",
+                    c="k",
+                    alpha=0.5,
+                )
 
         time_step = (
             self.env_config.episode_len
@@ -1838,8 +1830,8 @@ class MatplotlibVisualizer:
         # Add time step text to the figure
         ax.text(
             0.05,  # x position in axes coordinates (5% from left)
-            0.95,  # y position in axes coordinates (95% from bottom)
-            f"t = {time_step}",
+            0.90,  # y position in axes coordinates (95% from bottom)
+             r"$O_{t}$ for " + f"t = {time_step}",
             transform=ax.transAxes,  # Use axes coordinates
             fontsize=15,
             color="black",
@@ -1847,37 +1839,64 @@ class MatplotlibVisualizer:
             va="top",
         )
 
-        attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
+        if step_reward is not None:
+            reward_color = (
+                "g" if step_reward > 0 else "r" if step_reward < 0 else "black"
+            )
+
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.85,  # y position in axes coordinates (90% from bottom)
+                r"$R_{t+1} = $" + f"{step_reward:.2f}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color=reward_color,  # Using the dynamically determined color
+                ha="left",
+                va="top",
+            )
+
+        if route_progress is not None:
+            # Add route process text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.80,  # y position in axes coordinates (85% from bottom)
+                f"Route progress = {route_progress:.2f}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
 
         if trajectory is not None and len(trajectory) > 0:
             # Plot the trajectory as a line
             ax.scatter(
-                trajectory[:, 0],  # x coordinates
-                trajectory[:, 1],  # y coordinates
+                trajectory[:, 0].cpu(),  # x coordinates
+                trajectory[:, 1].cpu(),  # y coordinates
                 color="g",
-                linewidth=0.3,
+                linewidth=0.05 * line_width_scale,
                 marker="o",
-                alpha=0.2,
+                alpha=0.3,
                 zorder=0,
             )
-            # Add a purple star above the reference position
-            if len(attn_reference_idx) > 0:
-                ref_idx = attn_reference_idx[0]
-                ref_x = trajectory[ref_idx, 0]
-                ref_y = trajectory[ref_idx, 1]
 
-                ax.scatter(
-                    ref_x,
-                    ref_y,
-                    color="#9D00FF",
-                    marker="*",
-                    s=120,
-                    zorder=10,
+            # Draw a circle around every point in the trajectory
+            for i in range(trajectory.shape[0]):
+                circle = Circle(
+                    (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
+                    radius=self.env_config.guidance_pos_xy_radius,
+                    color="lightgrey",
+                    fill=False,
+                    linestyle="--",
+                    alpha=0.25,
                 )
+                ax.add_patch(circle)
+
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_xticks([])
         ax.set_yticks([])
+        plt.axis("off")
 
         return fig

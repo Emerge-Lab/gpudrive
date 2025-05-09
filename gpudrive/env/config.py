@@ -40,6 +40,8 @@ class EnvConfig:
     add_reference_pos_xy: bool = True  # (x, y) position time series
     add_reference_speed: bool = False  # speed time series
     add_reference_heading: bool = False  # heading time series
+    smoothen_trajectory: bool = True  # Filters out the trajectory
+    guidance_pos_xy_radius: float = 1.0  # Tightness of the positions guidance
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -61,7 +63,7 @@ class EnvConfig:
     dynamics_model: str = (
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"
     )
-    
+
     # Action space settings (if discretized)
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
@@ -69,10 +71,16 @@ class EnvConfig:
     max_steer_angle: float = 1.57  # in radians: pi/2 = 1.57, pi/3 = 1.05
     max_accel_value: float = 4.0
     steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-max_steer_angle, max_steer_angle, action_space_steer_disc), decimals=3
+        torch.linspace(
+            -max_steer_angle, max_steer_angle, action_space_steer_disc
+        ),
+        decimals=3,
     )
     accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-max_accel_value, max_accel_value, action_space_accel_disc), decimals=3
+        torch.linspace(
+            -max_accel_value, max_accel_value, action_space_accel_disc
+        ),
+        decimals=3,
     )
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
@@ -108,25 +116,16 @@ class EnvConfig:
     # Goal behavior settings
     goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
 
-    prob_reference_dropout: float = (
-        0.0  # Probability of dropping reference points
-    )
-    min_reference_points: int = 1  # Minimum number of reference points
-
     # Reward settings
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
 
     # If reward_type is "guided_autonomy", the following parameters are used
-    guidance_sample_interval: int = 1
-    guidance_pos_xy_weight: float = (
-        0.01  # Importance of matching suggested positions
-    )
     guidance_speed_weight: float = (
         0.01  # Importance of matching suggested speeds
     )
     guidance_heading_weight: float = (
-        0.0  # Importance of matching suggested headings
+        0.01  # Importance of matching suggested headings
     )
     smoothness_weight: float = 0.0
 
@@ -173,12 +172,10 @@ class EnvConfig:
     agent_size_scale: float = madrona_gpudrive.vehicleScale
 
     # Initialization mode
-    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, womd_tracks_to_predict
+    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, wosac_eval, wosac_train
 
-    # VBD model settings
-    use_vbd: bool = False
-    vbd_trajectory_weight: float = 0.01
-    vbd_in_obs: bool = False
+    # Versatile Behavior Diffusion (VBD)
+    vbd_model_path: str = "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
 
 
 class SelectionDiscipline(Enum):

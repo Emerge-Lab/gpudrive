@@ -40,8 +40,6 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
-    if vecenv.use_vbd:
-        msg += f" | Using VBD"
     print_dashboard(
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )
@@ -117,7 +115,11 @@ def evaluate(data):
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
 
-    data.vecenv.clear_render_storage()
+    # Check if there are unfinished rendered episodes
+    render_envs_to_reset = [
+        key for key, lst in data.vecenv.frames.items() if len(lst) == 0
+    ]
+    data.vecenv.clear_render_storage(env_list_to_clear=render_envs_to_reset)
 
     config, profile, experience = data.config, data.profile, data.experience
 
