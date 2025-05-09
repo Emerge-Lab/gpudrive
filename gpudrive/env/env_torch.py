@@ -716,9 +716,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             # b). Add a bonus for being close to the reference end position
             if torch.any(completed_route_mask > 0):
-                # Extract the last valid reference position for each world, agent
-                # valid_mask is [1, 64, 91] and reference_trajectory.pos_xy is [1, 64, 91, 2]
-                # We need to find the last valid position for each world-agent pair
+                # Extract the last valid reference position 
                 agent_states = GlobalEgoState.from_tensor(
                     self.sim.absolute_self_observation_tensor(),
                     self.backend,
@@ -735,12 +733,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # Create indices for gathering
                 batch_indices = torch.zeros_like(
                     last_valid_indices
-                )  # Shape: [1, 64]
+                )
                 agent_indices = torch.arange(
                     is_valid.shape[1], device=is_valid.device
                 ).expand_as(
                     last_valid_indices
-                )  # Shape: [1, 64]
+                )  
 
                 # Gather the last valid reference positions
                 last_valid_positions = self.reference_trajectory.pos_xy[
@@ -754,7 +752,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance/th)
                 distance_threshold = 0.5
-                max_position_bonus = 0.01
+                max_position_bonus = 0.02
 
                 position_bonus = max_position_bonus * torch.exp(
                     -distance / distance_threshold
@@ -1776,7 +1774,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,  # Number of agents to control
+        max_cont_agents=32,  # Number of agents to control
         device="cpu",
     )
 

@@ -52,7 +52,6 @@ class Agent(nn.Module):
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )
-
         self.road_map_idx = self.partner_obs_idx + (
             constants.ROAD_GRAPH_TOP_K * constants.ROAD_GRAPH_FEAT_DIM
         )
@@ -65,7 +64,7 @@ class Agent(nn.Module):
                     constants.LOG_TRAJECTORY_LENGTH * 2
                 )
             if self.config["add_reference_speed"]:
-                # TODO: Change to reference path-length (90) if using the vbd_amortized trajs
+                # Assumption: Guidance traj is of length 91
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
             if self.config["add_reference_heading"]:
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
