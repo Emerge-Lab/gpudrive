@@ -58,7 +58,7 @@ wandb:
 train:
   exp_id: guidance_logs # Set dynamically in the script if needed
   seed: 42
-  cpu_offload: false
+  cpu_offload: true
   device: "cuda" # Dynamically set to cuda if available, else cpu
   bptt_horizon: 1
   compile: false
