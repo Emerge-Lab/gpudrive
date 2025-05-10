@@ -200,7 +200,8 @@ namespace madrona_gpudrive
         float collisionState;
         float goalState;
         float id;
-        float steerAngle;
+        float lateralAccel;
+        float longitudinalAccel;
         static inline SelfObservation zero()
         {
             return SelfObservation{
@@ -210,11 +211,12 @@ namespace madrona_gpudrive
                 .collisionState = 0,
                 .goalState = 0,
                 .id = -1,
-                .steerAngle = 0};
+                .lateralAccel = 0
+                .longitudinalAccel = 0};
         }
     };
 
-    const size_t SelfObservationExportSize = 10; // 1 + 3 + 2 + 1 + 1 + 1
+    const size_t SelfObservationExportSize = 11; // 1 + 3 + 2 + 1 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 

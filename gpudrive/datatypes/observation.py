@@ -40,7 +40,8 @@ class LocalEgoState:
             self.is_collided = self_obs_tensor[:, 6]
             self.is_goal_reached = self_obs_tensor[:, 7]
             self.id = self_obs_tensor[:, 8]
-            self.steer_angle = self_obs_tensor[:, 9]
+            self.lateral_accel = self_obs_tensor[:, 9]
+            self.longitudinal_accel = self_obs_tensor[:, 10]
         else:
             self.speed = self_obs_tensor[:, :, 0]
             self.vehicle_length = self_obs_tensor[:, :, 1] * AGENT_SCALE
@@ -52,6 +53,8 @@ class LocalEgoState:
             self.is_goal_reached = self_obs_tensor[:, :, 7]
             self.id = self_obs_tensor[:, :, 8]
             self.steer_angle = self_obs_tensor[:, :, 9]
+            self.lateral_accel = self_obs_tensor[:, 9]
+            self.longitudinal_accel = self_obs_tensor[:, 10]
 
     @classmethod
     def from_tensor(
@@ -89,7 +92,8 @@ class LocalEgoState:
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
-        self.steer_angle /= (torch.pi / 3)
+        self.lateral_accel /= (15)
+        self.longitudinal_accel /= (15)
 
     @property
     def shape(self) -> tuple[int, ...]:

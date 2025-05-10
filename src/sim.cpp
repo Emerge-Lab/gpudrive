@@ -193,7 +193,8 @@ inline void collectSelfObsSystem(Engine &ctx,
 
     const Info& info = ctx.get<Info>(agent_iface.e);
     self_obs.goalState = info.reachedGoal ? 1.f : 0.f;
-    self_obs.steerAngle = vel.angular.z;
+    self_obs.lateralAccel = vel.angular.y;
+    self_obs.longitudinalAccel = vel.linear.x;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,

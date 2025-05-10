@@ -1249,7 +1249,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
-            ego_state.steer_angle.unsqueeze(-1),
+            ego_state.lateral_accel.unsqueeze(-1),
+            ego_state.longitudinal_accel.unsqueeze(-1),
         ]
 
         if mask is None:
