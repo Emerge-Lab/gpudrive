@@ -211,7 +211,7 @@ namespace madrona_gpudrive
                 .collisionState = 0,
                 .goalState = 0,
                 .id = -1,
-                .lateralAccel = 0
+                .lateralAccel = 0,
                 .longitudinalAccel = 0};
         }
     };
