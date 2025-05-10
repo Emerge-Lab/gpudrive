@@ -101,6 +101,7 @@ class MatplotlibVisualizer:
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
         plot_guidance_pos_xy: bool = False,
+        plot_guidance_up_to_time: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
         policy_masks: Optional[Dict[int, Dict[str, torch.Tensor]]] = None,
@@ -315,6 +316,7 @@ class MatplotlibVisualizer:
                     env_idx=env_idx,
                     trajectory=self.trajectory,
                     line_width_scale=line_width_scale,
+                    plot_guidance_up_to_time=plot_guidance_up_to_time,
                 )
 
             # Draw the agents
@@ -665,6 +667,7 @@ class MatplotlibVisualizer:
         control_mask: torch.Tensor,
         trajectory,
         line_width_scale: int = 1.0,
+        plot_guidance_up_to_time: bool = False,
     ):
         """Plot the log replay trajectory for controlled agents in either 2D or 3D."""
         if self.render_3d:
@@ -741,6 +744,19 @@ class MatplotlibVisualizer:
                 print(f"Error plotting 3D reference trajectory: {e}")
         else:
             try:
+                
+                if plot_guidance_up_to_time:
+                    # Get the time step for the current environment
+                    time_step = (
+                        self.env_config.episode_len
+                        - self.sim_object.steps_remaining_tensor().to_torch()[
+                            env_idx, 0
+                        ]
+                    ).item()
+
+                    # Limit the trajectory to the specified time step
+                    control_mask = control_mask[:time_step]
+                
                 # Create a new scatter plot for this specific environment and control mask
                 pos_x = (
                     trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
