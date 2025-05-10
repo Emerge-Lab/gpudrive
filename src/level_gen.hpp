@@ -34,6 +34,7 @@ void destroyWorld(Engine &ctx);
         }
         case DynamicsModel::Jerk:
         {
+            // TODO(ev) do I need to zero out the angular velocity?
             return Action{.jerk = {.longitudinal_jerk = 0, .lateral_jerk = 0}};
         }
         default:

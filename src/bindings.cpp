@@ -80,7 +80,7 @@ namespace madrona_gpudrive
             .value("Classic", DynamicsModel::Classic)
             .value("InvertibleBicycle", DynamicsModel::InvertibleBicycle)
             .value("DeltaLocal", DynamicsModel::DeltaLocal)
-            .value("State", DynamicsModel::State);
+            .value("State", DynamicsModel::State)
             .value("Jerk", DynamicsModel::Jerk);
 
         nb::enum_<EntityType>(m, "EntityType")

@@ -90,6 +90,10 @@ class EnvConfig:
     dyaw: torch.Tensor = torch.round(
         torch.linspace(-3.14, 3.14, 20), decimals=3
     )
+    
+    # Jerk dynamics model
+    longitudinal_jerk: torch.Tensor = torch.Tensor([-15.0, -4.0, 0.0, 4.0])
+    lateral_jerk: torch.Tensor = torch.Tensor([-4.0, 0.0, 4.0])
 
     # Global action space settings if StateDynamicsModel is used
     x: torch.Tensor = torch.round(

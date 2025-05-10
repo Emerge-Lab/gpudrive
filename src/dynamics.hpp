@@ -13,15 +13,15 @@ namespace madrona_gpudrive
         const float maxSpeed{std::numeric_limits<float>::max()};
         const float dt{0.1};
 
-        auto clipSpeed = [maxSpeed](float speed)
-        {
-            return std::max(std::min(speed, maxSpeed), -maxSpeed);
-        };
-        // TODO(samk): hoist into Vector2::PolarToVector2D
-        auto polarToVector2D = [](float r, float theta)
-        {
-            return math::Vector2{r * cosf(theta), r * sinf(theta)};
-        };
+        // auto clipSpeed = [maxSpeed](float speed)
+        // {
+        //     return std::max(std::min(speed, maxSpeed), -maxSpeed);
+        // };
+        // // TODO(samk): hoist into Vector2::PolarToVector2D
+        // auto polarToVector2D = [](float r, float theta)
+        // {
+        //     return math::Vector2{r * cosf(theta), r * sinf(theta)};
+        // };
 
         float speed = velocity.linear.length();
         float yaw = utils::quatToYaw(rotation);
@@ -36,8 +36,9 @@ namespace madrona_gpudrive
         velocity.linear.x = new_speed * cosf(new_yaw);
         velocity.linear.y = new_speed * sinf(new_yaw);
         // Update the position
-        position.x = position.x + x_dot * dt;
-        position.y = position.y + y_dot * dt;
+        // position.x = position.x + x_dot * dt;
+        // position.y = position.y + y_dot * dt;
+        
         // Update the rotation
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
         // Update the angular velocity
@@ -51,55 +52,73 @@ namespace madrona_gpudrive
     {
         // babs don't hardcode this
         const float dt{0.1};
-        // We are going to call them accel and steer but it is really lateral and longitudinal jerk
         // TODO(ev) add missing coefficients C
-        new_accel_long = accel.longitudinal + action.longitudinal_jerk * dt;
-        new_acc_later = accel.lateral + action.lateral_jerk * dt;
+        // TODOev) BAD BAD BAD we are going to store the acceleration in the angular velocity
+        // we will use angular.x for long and angular.y for lateral
+        float new_accel_long = velocity.angular.x + action.jerk.longitudinal_jerk * dt;
+        float new_accel_lateral = velocity.angular.y + action.jerk.lateral_jerk * dt;
+        // if these cross through zero, set them both to exactly zero
+        // if ((new_accel_long > 0.0 && velocity.angular.x < 0.0) || 
+        //     (new_accel_long < 0.0 && velocity.angular.x > 0.0))
+        // {
+        //     new_accel_long = 0.0;
+        // }
+        // if ((new_accel_lateral > 0.0 && velocity.angular.y < 0.0) || 
+        //     (new_accel_lateral < 0.0 ** velocity.angular.y > 0.0))
+        // {
+        //     new_accel_lateral = 0.0;
+        // }
         // clip the accels to reasonable values
         // TODO(ev) add missing coefficients C
         new_accel_long = fmaxf(-5.0, fminf(new_accel_long, 2.5 * 1.5));
         new_accel_lateral = fmaxf(-4.0, fminf(new_accel_lateral, 4.0));
         // TODO(ev) velocity clipping?
         // update the speed
-        float new_speed = velocity.linear.length() + (accel.longitudinal + new_accel_long) * dt;
+        float new_speed = velocity.linear.length() + 0.5 * (velocity.angular.x + new_accel_long) * dt;
         new_speed = fmaxf(-2.0, fminf(new_speed, 30.0));
 
         // rho_inv = a_lat / max(v^2, 1e-5)
         // TODO(ev) add squared value don't just multiply like this
-        rho_inv = new_accel_lateral / fmaxf(new_speed * new_speed, 1e-5);
+        float rho_inv = new_accel_lateral / fmaxf(new_speed * new_speed, 1e-5);
         // rho_inv = sign(rho_inv) * fmaxf(fabs(rho_inv), 1e-5)
         // TODO(ev) is this safe? What does copysign do at zero?
         rho_inv = copysignf(1.0, rho_inv) * fmaxf(fabsf(rho_inv), 1e-5);
         // phi = arctan(rho_inv * length of wheelbase)
-        phi = atan2f(rho_inv * size.length, 1.0);
+        // TODO(ev) the wheelbase is not the length, it's a little shorter!
+        float phi = atan2f(rho_inv * size.length, 1.0);
 
         // Lets also compute phi_prev
-        rho_inv_prev = accel.lateral / fmaxf(velocity.linear.length() * velocity.linear.length(), 1e-5);
+        float rho_inv_prev = velocity.angular.y / fmaxf(velocity.linear.length() * velocity.linear.length(), 1e-5);
         rho_inv_prev = copysignf(1.0, rho_inv_prev) * fmaxf(fabsf(rho_inv_prev), 1e-5);
-        phi_prev = atan2f(rho_inv_prev * size.length, 1.0);
+        float phi_prev = atan2f(rho_inv_prev * size.length, 1.0);
 
         // delta_phi = clip(\phi - phi_prev, -0.6 delta t, 0.6 delta t)
         // TODO(ev) keep track of phi_prev
-        delta_phi = fmaxf(-0.6 * dt, fminf(phi - phi_prev, 0.6 * dt));
+        float delta_phi = fmaxf(-0.6 * dt, fminf(phi - phi_prev, 0.6 * dt));
         // phi_t = clip(\phi_prev + delta_phi, -0.55, 0.55)
-        phi_t = fmaxf(-0.55, fminf(phi_prev + delta_phi, 0.55));
+        float phi_t = fmaxf(-0.55, fminf(phi_prev + delta_phi, 0.55));
 
         // rho_inv = tan(phi_t) / length of wheelbase
         rho_inv = tanf(phi_t) / size.length;
         // a_lat = v(t)^2 * rho_inv
-        accel.lateral = new_speed * new_speed * rho_inv;
+        new_accel_lateral = new_speed * new_speed * rho_inv;
         // store the previous velocity as well
-        d = 0.5 * (velocity.linear.length() + new_speed) * dt;
-        theta = d * rho_inv;
+        float d = 0.5 * (velocity.linear.length() + new_speed) * dt;
+        float theta = d * rho_inv;
         // Update yaw
         float yaw = utils::quatToYaw(rotation);
         float new_yaw = utils::AngleAdd(theta, yaw);
         // end delta model
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
-        // Increment delta x by rho sin(\theta)
-        position.x += rho_inv * sinf(theta);
-        // Increment delta y by rho cos(\theta)
-        position.y += rho_inv * cosf(theta);
+        // // Increment delta x by rho sin(\theta)
+        // position.x += cosf(theta) / rho_inv;
+        // // Increment delta y by rho cos(\theta)
+        // position.y += sinf(theta) / rho_inv;
+        // float R = 1.0f / rho_inv;           // signed curvature radius
+        // position.x += R * (sinf(new_yaw) - sinf(yaw));
+        // position.y += -R * (cosf(new_yaw) - cosf(yaw));
+        position.x += new_speed * cosf(new_yaw) * dt;
+        position.y += new_speed * sinf(new_yaw) * dt;
         // Update the speed
         // new_vel_x = new_vel * jnp.cos(new_yaw)
         velocity.linear.x = new_speed * cosf(new_yaw);
@@ -107,8 +126,8 @@ namespace madrona_gpudrive
         velocity.linear.y = new_speed * sinf(new_yaw);
         velocity.linear.z = 0;
         // And now we actually update the accels too
-        accel.longitudinal = new_accel_long;
-        accel.lateral = new_accel_lateral;
+        velocity.angular.x = new_accel_long;
+        velocity.angular.y = new_accel_lateral;
 
     }
 

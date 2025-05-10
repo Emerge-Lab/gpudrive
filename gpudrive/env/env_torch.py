@@ -926,6 +926,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if (
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
+            or self.config.dynamics_model == "jerk"
         ):
             # Action space: (acceleration, steering, heading)
             self.sim.action_tensor().to_torch()[:, :, :3].copy_(actions)
@@ -936,7 +937,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Following the StateAction struct in types.hpp
             # Need to provide:
             # (x, y, z, yaw, vel x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
-            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
+            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)            
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -967,6 +968,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.yaw = self.config.yaw.to(self.device)
             self.vx = self.config.vx.to(self.device)
             self.vy = self.config.vy.to(self.device)
+        elif self.config.dynamics_model == "jerk":
+            self.lateral_jerk = self.config.lateral_jerk.to(self.device)
+            self.longitudinal_jerk = self.config.longitudinal_jerk.to(
+                self.device
+            )
+            # TODO(ev) remove fake head actions
+            self.head_actions = self.config.head_tilt_actions.to(self.device)
+            products = product(
+                self.lateral_jerk, self.longitudinal_jerk, self.head_actions
+            )
 
         else:
             raise ValueError(
