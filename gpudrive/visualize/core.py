@@ -1903,7 +1903,6 @@ class MatplotlibVisualizer:
                 trajectory[:, 1][mask].cpu(),  # y coordinates
                 color="g",
                 linewidth=0.05 * line_width_scale,
-                linewidth=0.05 * line_width_scale,
                 marker="o",
                 alpha=0.6,
                 zorder=0,

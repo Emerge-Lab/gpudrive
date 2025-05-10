@@ -5,7 +5,7 @@ Based on https://github.com/TysonRayJones/PythonTools/tree/master
 import numpy as np
 import os
 import re
-from typing import Dict
+from typing import Dict, List, Optional
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -20,6 +20,8 @@ OVERLAY_FILE = os.getenv("OVERLAY_FILE")
 
 # Set to python file to run
 RUN_FILE = "baselines/ppo/ppo_pufferlib.py"
+
+SUPPORTED_GPU_TYPES = ["rtx8000", "v100", "a100"]
 
 # Default SLURM fields
 DEFAULT_SLURM_FIELDS = {
@@ -41,6 +43,7 @@ DEFAULT_SLURM_FIELDS = {
     "singularity_image": SINGULARITY_IMAGE,
     "overlay_file": OVERLAY_FILE,
     "run_file": RUN_FILE,
+    "exclude_nodes": [],  # GPU types to exclude
 }
 
 # a template for the submit script
@@ -58,8 +61,9 @@ TEMPLATE_SBATCH = """
 #SBATCH --time={time_d}-{time_h}:{time_m}:{time_s}
 #SBATCH --nodes={num_nodes}
 #SBATCH --cpus-per-task={num_cpus}
-#SBATCH --gres=gpu:{num_gpus}
+#SBATCH --gres=gpu:{num_gpus}{gpu_type_str}
 #SBATCH --account={account}
+{exclude_str}
 
 SINGULARITY_IMAGE={singularity_image}
 OVERLAY_FILE={overlay_file}
@@ -167,22 +171,23 @@ def _get_params_bash(params, values):
 
 
 def get_script(
-    fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_order=None
+    fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_order=None, exclude_notes: List[str] = None
 ):
     """
     returns a string of a SLURM submission script using the passed fields
     and which creates an array of jobs which sweep the given params
 
-    fields:      dict of SLURM field names to their values. type is ignored
-    params:      a dict of (param names, param value list) pairs.
-                 The param name is the name of the bash variable created in
-                 the submission script which will contain the param's current
-                 value (for that SLURM job instance). param value list is
-                 a list (or range instance) of the values the param should take,
-                 to be run once against every other possible configuration of all params.
-    param_order: a list containing all param names which indicates the ordering
-                 of the params in the sweep. The last param changes every
-                 job number. If not supplied, uses an arbitrary order
+    fields:        dict of SLURM field names to their values. type is ignored
+    params:        a dict of (param names, param value list) pairs.
+                   The param name is the name of the bash variable created in
+                   the submission script which will contain the param's current
+                   value (for that SLURM job instance). param value list is
+                   a list (or range instance) of the values the param should take,
+                   to be run once against every other possible configuration of all params.
+    param_order:   a list containing all param names which indicates the ordering
+                   of the params in the sweep. The last param changes every
+                   job number. If not supplied, uses an arbitrary order
+    exclude_nodes: a list of GPU types to exclude (options: "rtx8000", "v100", "a100")
     """
 
     assert isinstance(fields, dict)
@@ -197,7 +202,7 @@ def get_script(
 
     # Check each field appears in the template
     for field in fields:
-        if ("{%s}" % field) not in TEMPLATE_SBATCH:
+        if ("{%s}" % field) not in TEMPLATE_SBATCH and field != "exclude_nodes":
             raise ValueError("passed field %s unused in template" % field)
 
     # Calculate total number of jobs (minus 1; SLURM is inclusive)
@@ -225,14 +230,39 @@ def get_script(
         subs[key] = val
     if "job_name" not in subs:
         subs["job_name"] = "my_job"
+    
+    # Handle gpu_type if specified
+    gpu_type_str = ""
+    if subs.get("gpu_type") is not None:
+        gpu_type = subs["gpu_type"]
+        if gpu_type.lower() in SUPPORTED_GPU_TYPES:
+            gpu_type_str = f":{gpu_type}"
+        else:
+            raise ValueError(f"Unsupported GPU type: {gpu_type}. Supported types are: {', '.join(SUPPORTED_GPU_TYPES)}")
+    subs["gpu_type_str"] = gpu_type_str
+    
+    # Handle exclude_nodes parameter
+    exclude_str = ""
+    if exclude_nodes and len(exclude_nodes) > 0:
+        # For each GPU type in exclude_nodes, generate a command to get the nodes
+        exclusion_commands = []
+        for gpu_type in exclude_nodes:
+            if gpu_type.lower() in SUPPORTED_GPU_TYPES:
+                exclusion_commands.append(f"$(sinfo -N -O NodeHost,Gres | grep -i \"{gpu_type}\" | awk '{{print $1}}' | paste -sd \",\" -)")
+        
+        if exclusion_commands:
+            # Join the commands with commas
+            exclude_nodes_cmd = ",".join(exclusion_commands)
+            exclude_str = f"#SBATCH --exclude={exclude_nodes_cmd}"
+    subs["exclude_str"] = exclude_str
 
     return TEMPLATE_SBATCH.format(**subs)
 
 
-def save_script(filename, file_path, fields, params, param_order=None):
+def save_script(filename, file_path, fields, params, param_order=None, exclude_nodes=None):
     """Generate and save sbatch (.sh) submission script."""
 
-    sbatch_script = get_script(fields, params, param_order)
+    sbatch_script = get_script(fields, params, param_order, exclude_nodes)
 
     if not file_path:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -272,9 +302,13 @@ if __name__ == "__main__":
         "render": [0],
     }
 
+    # Exclude v100 and rtx8000 GPUs
+    exclude_nodes = ["v100", "rtx8000"]
+
     save_script(
         file_path="examples/experimental/sbatch_scripts/",
         filename=f"sbatch_{group}.sh",
         fields=fields,
         params=hyperparams,
+        exclude_nodes=exclude_nodes
     )
