@@ -36,6 +36,7 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
 from gpudrive.utils.preprocess import smooth_scenario
+import madrona_gpudrive
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -186,7 +187,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             reference_trajectory = torch.zeros(
                 self.num_worlds,
                 self.max_agent_count,
-                self.episode_len,
+                madrona_gpudrive.kTrajectoryLength,
                 6
             )
             reference_trajectory[:, :, :self.init_steps + 1, :2] = log_trajectory.pos_xy[
