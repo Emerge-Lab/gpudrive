@@ -134,7 +134,7 @@ def plot_numpy_bounding_boxes(
             [tl[1, :], tr[1, :], br[1, :], bl[1, :], tl[1, :]],
             color=color,
             zorder=4,
-            linewidth=1.7 * line_width_scale,
+            linewidth=2.0 * line_width_scale,
             alpha=alpha,
             label=label,
         )

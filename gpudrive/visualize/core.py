@@ -755,39 +755,103 @@ class MatplotlibVisualizer:
                     ).item()
 
                     # Limit the trajectory to the specified time step
-                    control_mask = control_mask[:time_step]
+                    # Create a new scatter plot for this specific environment and control mask
+                    pos_x_context = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :time_step, 0]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y_context = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :time_step, 1]
+                        .cpu()
+                        .numpy()
+                    )
+
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x_context != 0)
+                        & (pos_y_context != 0)
+                        & (np.abs(pos_x_context) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y_context) < OUT_OF_BOUNDS)
+                    )
+                    
+
+                    ax.scatter(
+                        pos_x_context,
+                        pos_y_context,
+                        color="#f4a261",
+                        linewidth=0.1 * line_width_scale,
+                        alpha=0.7,
+                        s=25,
+                        zorder=0,
+                    )
+                    
+                    pos_x = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, time_step:, 0]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, time_step:, 1]
+                        .cpu()
+                        .numpy()
+                    )
+
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x != 0)
+                        & (pos_y != 0)
+                        & (np.abs(pos_x) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y) < OUT_OF_BOUNDS)
+                    )
+
+                    # Apply mask if any valid points exist
+                    if np.any(valid_mask):
+                        pos_x = pos_x[valid_mask]
+                        pos_y = pos_y[valid_mask]
+
+                    
+                    ax.scatter(
+                        pos_x,
+                        pos_y,
+                        color="g",
+                        s=25,
+                        alpha=0.25,
+                        zorder=0,
+                    )
                 
-                # Create a new scatter plot for this specific environment and control mask
-                pos_x = (
-                    trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
-                    .cpu()
-                    .numpy()
-                )
-                pos_y = (
-                    trajectory.pos_xy.clone()[env_idx, control_mask, :, 1]
-                    .cpu()
-                    .numpy()
-                )
+                else:
+                    # Create a new scatter plot for this specific environment and control mask
+                    pos_x = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :, 1]
+                        .cpu()
+                        .numpy()
+                    )
 
-                # Filter out invalid points (zeros or out of bounds)
-                valid_mask = (
-                    (pos_x != 0)
-                    & (pos_y != 0)
-                    & (np.abs(pos_x) < OUT_OF_BOUNDS)
-                    & (np.abs(pos_y) < OUT_OF_BOUNDS)
-                )
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x != 0)
+                        & (pos_y != 0)
+                        & (np.abs(pos_x) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y) < OUT_OF_BOUNDS)
+                    )
 
-                # Apply mask if any valid points exist
-                if np.any(valid_mask):
-                    pos_x = pos_x[valid_mask]
-                    pos_y = pos_y[valid_mask]
+                    # Apply mask if any valid points exist
+                    if np.any(valid_mask):
+                        pos_x = pos_x[valid_mask]
+                        pos_y = pos_y[valid_mask]
 
                     # Create a fresh scatter plot
                     ax.scatter(
                         pos_x,
                         pos_y,
-                        color="lightgreen",
-                        linewidth=0.3 * line_width_scale,
+                        color="g",
+                        s=25,
                         alpha=0.25,
                         zorder=0,
                     )
@@ -1166,7 +1230,7 @@ class MatplotlibVisualizer:
                             radius,
                             height,
                             facecolor="#c04000",
-                            alpha=0.9,
+                            alpha=0.7,
                         )
                 else:
                     for x, y in zip(x_coords, y_coords):
@@ -1177,7 +1241,7 @@ class MatplotlibVisualizer:
                             facecolor="#c04000",
                             edgecolor="none",
                             linewidth=3.0,
-                            alpha=0.9,
+                            alpha=0.6,
                         )
 
             elif road_point_type == int(madrona_gpudrive.EntityType.CrossWalk):
@@ -1295,7 +1359,7 @@ class MatplotlibVisualizer:
         alpha: Optional[float] = 1.0,
         as_center_pts: bool = False,
         label: Optional[str] = None,
-        plot_goal_points: bool = True,
+        plot_goal_points: bool = False,
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
@@ -1451,7 +1515,7 @@ class MatplotlibVisualizer:
         # Plot goals
         if plot_goal_points:
             for mask, color in [
-                (is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
+                (is_ok_mask, "#f4a261"),#AGENT_COLOR_BY_STATE["ok"]),
                 (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
                 (is_collided_mask, AGENT_COLOR_BY_STATE["collided"]),
             ]:
@@ -1491,9 +1555,10 @@ class MatplotlibVisualizer:
                         goal_x,
                         goal_y,
                         s=5 * marker_size_scale,
-                        linewidth=1.5 * line_width_scale,
+                        linewidth=2.0 * line_width_scale,
                         c=color,
                         marker="o",
+                        zorder=3
                     )
                     for x, y in zip(goal_x, goal_y):
                         circle = Circle(
@@ -1502,6 +1567,8 @@ class MatplotlibVisualizer:
                             color=color,
                             fill=False,
                             linestyle="--",
+                            linewidth=3 * line_width_scale,
+                            zorder=3
                         )
                         ax.add_patch(circle)
 
@@ -1787,7 +1854,7 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
-                line_width_scale=line_width_scale * 1.5,
+                line_width_scale=line_width_scale * 2.0,
             )
 
         if observation_ego is not None:
