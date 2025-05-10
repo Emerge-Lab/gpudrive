@@ -878,6 +878,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
             or self.config.dynamics_model == "delta_local"
+            or self.config.dynamics_model == "jerk"
         ):
             if actions.dim() == 2:  # (num_worlds, max_agent_count)
                 # Map action indices to action values if indices are provided
@@ -937,7 +938,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Following the StateAction struct in types.hpp
             # Need to provide:
             # (x, y, z, yaw, vel x, vel y, vel z, ang_vel_x, ang_vel_y, ang_vel_z)
-            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)            
+            self.sim.action_tensor().to_torch()[:, :, :10].copy_(actions)
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
@@ -1249,8 +1250,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
             ego_state.is_collided.unsqueeze(-1),
-            ego_state.lateral_accel.unsqueeze(-1),
-            ego_state.longitudinal_accel.unsqueeze(-1),
+            ego_state.lateral_accel.unsqueeze(-1) / constants.MAX_LATERAL_JERK,
+            ego_state.longitudinal_accel.unsqueeze(-1)
+            / constants.MAX_LONGITUDINAL_JERK,
         ]
 
         if mask is None:
