@@ -64,7 +64,7 @@ def rollout(
     device: str,
     render_simulator_states: bool = False,
     render_agent_pov: bool = False,
-    render_every_n_steps: int = 2,
+    render_every_n_steps: int = 5,
     save_videos: bool = True,
     video_dir: str = "videos",
     video_format: str = "gif",
@@ -235,8 +235,8 @@ def rollout(
 if __name__ == "__main__":
 
     # Settings
-    MAX_AGENTS = 64
-    NUM_ENVS = 20
+    MAX_AGENTS = 32 #TODO: Set to 128 for real eval
+    NUM_ENVS = 4
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
@@ -244,12 +244,12 @@ if __name__ == "__main__":
     DATASET_SIZE = 100
     RENDER = True
 
-    DATA_JSON = "data/processed/wosac/validation_json_100"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
+    DATA_JSON = "data/processed/wosac/selected_json"
+    DATA_TFRECORD = "data/processed/wosac/selected_tfrecord"
     # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
     # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
 
-    CPT_PATH = "checkpoints/model_guidance_logs__S_100__05_08_08_32_27_313_000750.pt"
+    CPT_PATH = "checkpoints/model_guidance_logs__S_3__05_10_11_26_31_673_000750.pt" #"checkpoints/model_guidance_logs__S_100__collision_penalty.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(

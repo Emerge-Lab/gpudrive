@@ -1902,7 +1902,7 @@ class MatplotlibVisualizer:
                 trajectory[:, 0][mask].cpu(),  # x coordinates
                 trajectory[:, 1][mask].cpu(),  # y coordinates
                 color="g",
-                linewidth=0.05 * line_width_scale,
+                linewidth=0.01 * line_width_scale,
                 marker="o",
                 alpha=0.6,
                 zorder=0,
@@ -1915,10 +1915,10 @@ class MatplotlibVisualizer:
                     circle = Circle(
                         (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
                         radius=self.env_config.guidance_pos_xy_radius,
-                        color="lightgrey",
+                        color="#d4a373",
                         fill=False,
                         linestyle="--",
-                        alpha=0.35,
+                        alpha=0.3,
                     )
                     ax.add_patch(circle)
 

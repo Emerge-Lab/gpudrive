@@ -753,17 +753,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Add bonus for being close to the reference end position
-                # Using exponential decay: bonus = scale * exp(-distance/th)
-                distance_threshold = 0.5
+                # Using exponential decay: bonus = scale * exp(-distance)
                 max_position_bonus = 0.02
 
-                position_bonus = max_position_bonus * torch.exp(
-                    -distance / distance_threshold
-                )
+                position_bonus = max_position_bonus * torch.exp(-distance)
 
-                position_bonus = position_bonus * completed_route_mask
+                position_bonus_completed = position_bonus * completed_route_mask
 
-                self.route_reward += position_bonus
+                self.route_reward += position_bonus_completed
 
             self.guidance_reward = self.route_reward.clone()
 
@@ -1090,6 +1087,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return torch.zeros(0, device=self.device)
 
         guidance = []
+        guidance_orig = []
 
         if mask is None:
 
@@ -1191,12 +1189,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
             if self.config.add_reference_speed:
-                reference_speed = (
-                    self.reference_trajectory.ref_speed[mask].clone()
-                    / constants.MAX_SPEED
-                )
+                reference_speed = self.reference_trajectory.ref_speed[mask].clone()
                 reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
-                guidance.append(reference_speed)
+                
+                reference_speed_normalized = reference_speed / constants.MAX_SPEED
+                guidance_orig.append(reference_speed)
+                guidance.append(reference_speed_normalized)
 
             if self.config.add_reference_pos_xy:
                 global_reference_xy = self.reference_trajectory.pos_xy.clone()[
@@ -1239,6 +1237,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.reference_path = local_reference_xy_orig
 
                 guidance.append(reference_path)
+                guidance_orig.append(local_reference_xy_orig)
 
             if self.config.add_reference_heading:
                 reference_headings = self.reference_trajectory.yaw[
@@ -1252,7 +1251,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Normalize by 2pi to ensure values are in [-1, 1]
-                reference_headings = (
+                reference_headings_normalized = (
                     reference_headings / constants.MAX_ORIENTATION_RAD
                 )
 
@@ -1260,9 +1259,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_headings[
                     ~valid_timesteps_mask
                 ] = constants.INVALID_ID
-                guidance.append(reference_headings)
+                guidance.append(reference_headings_normalized)
+                guidance_orig.append(reference_headings)
 
-        self.guidance_obs = torch.cat(guidance, dim=-1)
+        self.guidance_obs = torch.cat(guidance_orig, dim=-1)
 
         # Apply dropout mask if specified
         # Note: currently only supported for masked observations
@@ -1805,6 +1805,7 @@ if __name__ == "__main__":
         smoothen_trajectory=False,
         add_previous_action=True,
         guidance_dropout_prob=0.001,  # 0.95,
+        
     )
     render_config = RenderConfig()
 
