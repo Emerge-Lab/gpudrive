@@ -52,8 +52,8 @@ def smooth_scenario(
         axis=-1,
     )
 
-    smoothed_vel_xy = np.zeros_like(reference_trajectory.vel_xy)
-    smoothed_yaw = np.zeros_like(reference_trajectory.yaw)
+    smoothed_vel_xy = np.zeros_like(reference_trajectory.vel_xy.cpu().numpy())
+    smoothed_yaw = np.zeros_like(reference_trajectory.yaw.cpu().numpy())
     smoothed_valid = np.zeros_like(original_valid, dtype=bool)
 
     t = np.arange(num_timesteps)

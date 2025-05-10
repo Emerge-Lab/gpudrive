@@ -60,7 +60,6 @@ class Agent(nn.Module):
         if self.config["guidance"]:
             self.guidance_feature_dim = 0
             # One-hot encoding signalling the next time step
-            self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
             if self.config["add_reference_pos_xy"]:
                 self.guidance_feature_dim += (
                     constants.LOG_TRAJECTORY_LENGTH * 2

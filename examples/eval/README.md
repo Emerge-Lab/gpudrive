@@ -12,6 +12,15 @@ Requirement to process the data
 pip install --no-deps git+https://github.com/waymo-research/waymax.git@main#egg=waymo-waymax
 ```
 
+You also need
+```
+pip install tensorflow==2.13.0
+pip install scikit-learn
+pip install tensorflow-probability==0.21.0
+pip install --upgrade typing-extensions
+```
+
+
 ## Dataset
 Extract TF example from raw waymo TF example dataset using
 ```
