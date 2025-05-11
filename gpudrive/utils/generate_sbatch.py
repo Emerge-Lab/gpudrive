@@ -273,7 +273,7 @@ def save_script(filename, file_path, fields, params, param_order=None, exclude_n
 
 if __name__ == "__main__":
 
-    group = "wosac_scale"
+    group = "wosac_scale_100"
 
     fields = {
         "time_h": 47,  # Max time per job (job will finish if run is done before)
@@ -287,19 +287,18 @@ if __name__ == "__main__":
     hyperparams = {
         "group": [group],  # Group name
         "num_worlds": [700],
+        "data_dir": ["data/processed/wosac/validation_json_100"],
         "resample_scenes": [0],
-        "k_unique_scenes": [500],
+        "k_unique_scenes": [100],
         # "resample_interval": [5_000_000],
         # "resample_dataset_size": [10_000],
         # "total_timesteps": [3_000_000_000],
-        "batch_size": [262_144],
-        "minibatch_size": [16_384],
-        # "guidance_speed_weight": [0.01],
-        # "guidance_heading_weight": [0.01],
-        "ent_coef": [0.001, 0.005, 0.003, 0.01],
+        "batch_size": [1048576],
+        "minibatch_size": [16384],
+        "ent_coef": [0.01, 0.003],
         "vf_coef": [0.5],
-        "update_epochs": [2, 4],
-        "render": [0],
+        "update_epochs": [1],
+        "render": [1],
     }
 
     # Exclude v100 and rtx8000 GPUs

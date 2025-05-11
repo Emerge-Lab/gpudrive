@@ -752,10 +752,8 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
 
     return model_path
 
-
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
-
 
 def seed_everything(seed, torch_deterministic):
     random.seed(seed)
