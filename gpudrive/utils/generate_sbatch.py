@@ -171,7 +171,7 @@ def _get_params_bash(params, values):
 
 
 def get_script(
-    fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_order=None, exclude_notes: List[str] = None
+    fields: Dict = DEFAULT_SLURM_FIELDS, params: Dict = {}, param_order=None, exclude_nodes: List[str] = None
 ):
     """
     returns a string of a SLURM submission script using the passed fields
@@ -244,16 +244,8 @@ def get_script(
     # Handle exclude_nodes parameter
     exclude_str = ""
     if exclude_nodes and len(exclude_nodes) > 0:
-        # For each GPU type in exclude_nodes, generate a command to get the nodes
-        exclusion_commands = []
-        for gpu_type in exclude_nodes:
-            if gpu_type.lower() in SUPPORTED_GPU_TYPES:
-                exclusion_commands.append(f"$(sinfo -N -O NodeHost,Gres | grep -i \"{gpu_type}\" | awk '{{print $1}}' | paste -sd \",\" -)")
-        
-        if exclusion_commands:
-            # Join the commands with commas
-            exclude_nodes_cmd = ",".join(exclusion_commands)
-            exclude_str = f"#SBATCH --exclude={exclude_nodes_cmd}"
+        exclude_nodes_cmd = ",".join(exclusion_commands)
+        exclude_str = f"#SBATCH --exclude={exclude_nodes_cmd}"
     subs["exclude_str"] = exclude_str
 
     return TEMPLATE_SBATCH.format(**subs)
@@ -273,41 +265,41 @@ def save_script(filename, file_path, fields, params, param_order=None, exclude_n
 
 if __name__ == "__main__":
 
-    group = "wosac_scale_100"
-
+    group = "mem_optimization_2" 
     fields = {
-        "time_h": 47,  # Max time per job (job will finish if run is done before)
+        "time_h": 1,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
-        "memory": 70,
+        "memory": 80,
         "job_name": group,
         "run_file": "baselines/ppo/ppo_guided_autonomy.py",
     }
 
     hyperparams = {
         "group": [group],  # Group name
-        "num_worlds": [700],
-        "data_dir": ["data/processed/wosac/validation_json_100"],
-        "resample_scenes": [0],
-        "k_unique_scenes": [100],
-        # "resample_interval": [5_000_000],
+        "num_worlds": [500, 700],
+        "data_dir": ["/scratch/kj2676/gpudrive/data/processed/training"],
+        "resample_scenes": [0, 1],
+        "k_unique_scenes": [500],
+        "resample_interval": [5_000_000],
+        "cpu_offload": [0, 1],
+        "batch_size": [1],
         # "resample_dataset_size": [10_000],
         # "total_timesteps": [3_000_000_000],
-        "batch_size": [1048576],
-        "minibatch_size": [16384],
-        "ent_coef": [0.01, 0.003],
-        "vf_coef": [0.5],
+        "batch_size": [1048576, 2097152],
+        # "minibatch_size": [16384],
+        # "ent_coef": [0.01, 0.003],
+        # "vf_coef": [0.5],
         "update_epochs": [1],
-        "render": [1],
+        "render": [0],
     }
 
-    # Exclude v100 and rtx8000 GPUs
-    exclude_nodes = ["v100", "rtx8000"]
+    # NOTE: The exclusion part doesn't work atm, have to spefify the nodes manually
+    #exclude_nodes = ["v100", "rtx8000"] 
 
     save_script(
         file_path="examples/experimental/sbatch_scripts/",
         filename=f"sbatch_{group}.sh",
         fields=fields,
         params=hyperparams,
-        exclude_nodes=exclude_nodes
     )
