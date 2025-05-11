@@ -26,8 +26,8 @@ def test_rollout(focus_agents=[0, 1], render=False):
         smoothness_weight=0.0,
         collision_weight=-0.01,
         off_road_weight=-0.01,
-        guidance_heading_weight=0.01,
-        guidance_speed_weight=0.01,
+        guidance_heading_weight=0.005,
+        guidance_speed_weight=0.0005,
     )
 
     # Create data loader
@@ -65,8 +65,8 @@ def test_rollout(focus_agents=[0, 1], render=False):
         # Step
         rand_actions = torch.randint(low=0, high=77, size=expert_actions[:, :, time_step, 0].shape)
 
-        #env.step_dynamics(expert_actions[:, :, time_step, :])
-        env.step_dynamics(rand_actions)
+        env.step_dynamics(expert_actions[:, :, time_step, :])
+        #env.step_dynamics(rand_actions)
 
         obs = env.get_obs(control_mask)
         reward = env.get_rewards()

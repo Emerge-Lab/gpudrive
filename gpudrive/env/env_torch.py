@@ -508,7 +508,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Zero out only the reset environments
             self.previous_action_value_tensor[reset_mask] = 0.0
             # Reset the guidance points hit tensor for the reset environments
-            # TODO: Fix for asynchronous resets
+            # TODO(dc): Fix for asynchronous resets
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
 
         else:
@@ -697,7 +697,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance_points_hit_count
                 / (self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5),
                 min=0,
-                max=1,
+                max=0.1,
             )
 
             # We want agents that are parked to stay parked, and generally

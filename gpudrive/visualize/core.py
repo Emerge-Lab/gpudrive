@@ -1929,12 +1929,11 @@ class MatplotlibVisualizer:
             ]
         ).item()
 
-        # Add time step text to the figure
         ax.text(
-            0.05,  # x position in axes coordinates (5% from left)
-            0.90,  # y position in axes coordinates (95% from bottom)
+            0.05,  
+            0.90, 
             r"$O_{t}$ for " + f"t = {time_step}",
-            transform=ax.transAxes,  # Use axes coordinates
+            transform=ax.transAxes,
             fontsize=15,
             color="black",
             ha="left",
@@ -1948,12 +1947,12 @@ class MatplotlibVisualizer:
             )
 
             ax.text(
-                0.05,  # x position in axes coordinates (5% from left)
-                0.85,  # y position in axes coordinates (90% from bottom)
-                r"$R_{t+1} = $" + f"{step_reward:.2f}",
-                transform=ax.transAxes,  # Use axes coordinates
+                0.05, 
+                0.85, 
+                r"$R_{t+1} = $" + f"{step_reward:.3f}",
+                transform=ax.transAxes,  
                 fontsize=15,
-                color=reward_color,  # Using the dynamically determined color
+                color=reward_color,
                 ha="left",
                 va="top",
                 bbox=dict(
@@ -1962,12 +1961,11 @@ class MatplotlibVisualizer:
             )
 
         if route_progress is not None:
-            # Add route process text to the figure
             ax.text(
-                0.05,  # x position in axes coordinates (5% from left)
-                0.80,  # y position in axes coordinates (85% from bottom)
+                0.05, 
+                0.80, 
                 f"Route progress = {route_progress:.2f}",
-                transform=ax.transAxes,  # Use axes coordinates
+                transform=ax.transAxes,
                 fontsize=15,
                 color="black",
                 ha="left",
