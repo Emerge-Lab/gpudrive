@@ -24,7 +24,7 @@ def test_rollout(focus_agents=[0, 1], render=False):
         dynamics_model="classic",  # "state", #"classic",
         smoothen_trajectory=True,
         smoothness_weight=0.0,
-        collision_weight=-0.01,
+        collision_weight=-0.02,
         off_road_weight=-0.01,
         guidance_heading_weight=0.005,
         guidance_speed_weight=0.0005,

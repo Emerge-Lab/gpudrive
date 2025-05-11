@@ -28,7 +28,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01 
+  collision_weight: -0.02
   off_road_weight: 0.0 # No off-road penalty
   guidance_speed_weight: 0.005
   guidance_heading_weight: 0.005
