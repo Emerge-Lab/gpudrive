@@ -744,7 +744,7 @@ class MatplotlibVisualizer:
                 print(f"Error plotting 3D reference trajectory: {e}")
         else:
             try:
-                
+
                 if plot_guidance_up_to_time:
                     # Get the time step for the current environment
                     time_step = (
@@ -757,12 +757,16 @@ class MatplotlibVisualizer:
                     # Limit the trajectory to the specified time step
                     # Create a new scatter plot for this specific environment and control mask
                     pos_x_context = (
-                        trajectory.pos_xy.clone()[env_idx, control_mask, :time_step, 0]
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, :time_step, 0
+                        ]
                         .cpu()
                         .numpy()
                     )
                     pos_y_context = (
-                        trajectory.pos_xy.clone()[env_idx, control_mask, :time_step, 1]
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, :time_step, 1
+                        ]
                         .cpu()
                         .numpy()
                     )
@@ -774,7 +778,6 @@ class MatplotlibVisualizer:
                         & (np.abs(pos_x_context) < OUT_OF_BOUNDS)
                         & (np.abs(pos_y_context) < OUT_OF_BOUNDS)
                     )
-                    
 
                     ax.scatter(
                         pos_x_context,
@@ -785,14 +788,18 @@ class MatplotlibVisualizer:
                         s=25,
                         zorder=0,
                     )
-                    
+
                     pos_x = (
-                        trajectory.pos_xy.clone()[env_idx, control_mask, time_step:, 0]
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, time_step:, 0
+                        ]
                         .cpu()
                         .numpy()
                     )
                     pos_y = (
-                        trajectory.pos_xy.clone()[env_idx, control_mask, time_step:, 1]
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, time_step:, 1
+                        ]
                         .cpu()
                         .numpy()
                     )
@@ -810,7 +817,6 @@ class MatplotlibVisualizer:
                         pos_x = pos_x[valid_mask]
                         pos_y = pos_y[valid_mask]
 
-                    
                     ax.scatter(
                         pos_x,
                         pos_y,
@@ -819,7 +825,7 @@ class MatplotlibVisualizer:
                         alpha=0.25,
                         zorder=0,
                     )
-                
+
                 else:
                     pos_x = (
                         trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
@@ -1514,7 +1520,7 @@ class MatplotlibVisualizer:
         # Plot goals
         if plot_goal_points:
             for mask, color in [
-                (is_ok_mask, "#f4a261"),#AGENT_COLOR_BY_STATE["ok"]),
+                (is_ok_mask, "#f4a261"),  # AGENT_COLOR_BY_STATE["ok"]),
                 (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
                 (is_collided_mask, AGENT_COLOR_BY_STATE["collided"]),
             ]:
@@ -1557,7 +1563,7 @@ class MatplotlibVisualizer:
                         linewidth=2.0 * line_width_scale,
                         c=color,
                         marker="o",
-                        zorder=3
+                        zorder=3,
                     )
                     for x, y in zip(goal_x, goal_y):
                         circle = Circle(
@@ -1567,7 +1573,7 @@ class MatplotlibVisualizer:
                             fill=False,
                             linestyle="--",
                             linewidth=3 * line_width_scale,
-                            zorder=3
+                            zorder=3,
                         )
                         ax.add_patch(circle)
 
@@ -1746,7 +1752,7 @@ class MatplotlibVisualizer:
 
         fig, ax = plt.subplots(figsize=figsize)
         self._cleanup_axis(ax)
-       
+
         ax.set_aspect("equal", adjustable="box")
 
         # Plot roadgraph if provided
@@ -1931,8 +1937,8 @@ class MatplotlibVisualizer:
         ).item()
 
         ax.text(
-            0.05,  
-            0.90, 
+            0.05,
+            0.90,
             r"$O_{t}$ for " + f"t = {time_step}",
             transform=ax.transAxes,
             fontsize=15,
@@ -1948,10 +1954,10 @@ class MatplotlibVisualizer:
             )
 
             ax.text(
-                0.05, 
-                0.85, 
+                0.05,
+                0.85,
                 r"$R_{t+1} = $" + f"{step_reward:.3f}",
-                transform=ax.transAxes,  
+                transform=ax.transAxes,
                 fontsize=15,
                 color=reward_color,
                 ha="left",
@@ -1963,8 +1969,8 @@ class MatplotlibVisualizer:
 
         if route_progress is not None:
             ax.text(
-                0.05, 
-                0.80, 
+                0.05,
+                0.80,
                 f"Route progress = {route_progress:.2f}",
                 transform=ax.transAxes,
                 fontsize=15,
@@ -2021,16 +2027,16 @@ class MatplotlibVisualizer:
         ax.set_xticks([])
         ax.set_yticks([])
         plt.axis("off")
-    
+
         return fig
-    
+
     def _cleanup_axis(self, ax):
         """Clean up all collections and artists from the axis."""
         if self.render_3d:
             # Clean 3D collections
             for collection in ax.collections[:]:
                 collection.remove()
-            
+
             # Clean lines
             for line in ax.lines[:]:
                 line.remove()
@@ -2038,15 +2044,15 @@ class MatplotlibVisualizer:
             # Clean 2D collections
             for collection in ax.collections[:]:
                 collection.remove()
-                
+
             # Clean patches
             for patch in ax.patches[:]:
                 patch.remove()
-                
+
             # Clean lines
             for line in ax.lines[:]:
                 line.remove()
-                
+
             # Clean texts
             for text in ax.texts[:]:
                 text.remove()
