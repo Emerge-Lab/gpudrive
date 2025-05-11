@@ -1745,7 +1745,8 @@ class MatplotlibVisualizer:
         line_width_scale = max(figsize) / 15
 
         fig, ax = plt.subplots(figsize=figsize)
-        ax.clear()  # Clear any previous plots
+        self._cleanup_axis(ax)
+       
         ax.set_aspect("equal", adjustable="box")
 
         # Plot roadgraph if provided
@@ -2020,5 +2021,32 @@ class MatplotlibVisualizer:
         ax.set_xticks([])
         ax.set_yticks([])
         plt.axis("off")
-
+    
         return fig
+    
+    def _cleanup_axis(self, ax):
+        """Clean up all collections and artists from the axis."""
+        if self.render_3d:
+            # Clean 3D collections
+            for collection in ax.collections[:]:
+                collection.remove()
+            
+            # Clean lines
+            for line in ax.lines[:]:
+                line.remove()
+        else:
+            # Clean 2D collections
+            for collection in ax.collections[:]:
+                collection.remove()
+                
+            # Clean patches
+            for patch in ax.patches[:]:
+                patch.remove()
+                
+            # Clean lines
+            for line in ax.lines[:]:
+                line.remove()
+                
+            # Clean texts
+            for text in ax.texts[:]:
+                text.remove()
