@@ -821,7 +821,6 @@ class MatplotlibVisualizer:
                     )
                 
                 else:
-                    # Create a new scatter plot for this specific environment and control mask
                     pos_x = (
                         trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
                         .cpu()
@@ -852,7 +851,7 @@ class MatplotlibVisualizer:
                         pos_y,
                         color="g",
                         s=25,
-                        alpha=0.25,
+                        alpha=0.2,
                         zorder=0,
                     )
             except Exception as e:

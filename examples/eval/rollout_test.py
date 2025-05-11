@@ -1,6 +1,7 @@
 import numpy as np
 import mediapy as media
 import wandb
+import torch
 
 from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.config import EnvConfig
@@ -20,9 +21,9 @@ def test_rollout(focus_agents=[0, 1], render=False):
         add_previous_action=True,
         reward_type="guided_autonomy",
         init_mode="wosac_train",
-        dynamics_model="delta_local",  # "state", #"classic",
+        dynamics_model="classic",  # "state", #"classic",
         smoothen_trajectory=True,
-        smoothness_weight=0.001,
+        smoothness_weight=0.0,
         collision_weight=-0.01,
         off_road_weight=-0.01,
         guidance_heading_weight=0.01,
@@ -32,7 +33,7 @@ def test_rollout(focus_agents=[0, 1], render=False):
     # Create data loader
     train_loader = SceneDataLoader(
         root="data/processed/wosac/validation_json_100",
-        batch_size=100,
+        batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,
@@ -62,13 +63,10 @@ def test_rollout(focus_agents=[0, 1], render=False):
         print(f"Step: {env.step_in_world[0, 0, 0].item()}")
 
         # Step
-        expert_actions, _, _, _ = env.get_expert_actions()
+        rand_actions = torch.randint(low=0, high=77, size=expert_actions[:, :, time_step, 0].shape)
 
-        # Sample random actions
-        # expert_actions = np.random.uniform(
-        #     low=-env_config.max_accel_value,
-
-        env.step_dynamics(expert_actions[:, :, time_step, :])
+        #env.step_dynamics(expert_actions[:, :, time_step, :])
+        env.step_dynamics(rand_actions)
 
         obs = env.get_obs(control_mask)
         reward = env.get_rewards()

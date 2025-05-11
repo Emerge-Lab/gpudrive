@@ -1279,8 +1279,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.valid_guidance_points = torch.sum(
             self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1
         )
+        
+        guidance = torch.cat(guidance, dim=-1)
 
-        return self.guidance_obs.flatten(start_dim=1)
+        return guidance.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
@@ -1400,6 +1402,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                 ).permute(1, 0)
             else:
+                
+                if torch.cat(base_fields, dim=1).max() > 1.0 or torch.cat(base_fields, dim=1).min() < -1.0:
+                    print('hi')
+                
                 return torch.cat(base_fields, dim=1)
 
     def _get_partner_obs(self, mask=None):
@@ -1539,6 +1545,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
+        
+        if obs.max() > 1.0 or obs.min() < -1.0:
+            print('hi')
 
         return obs
 
@@ -1804,7 +1813,7 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
-        guidance_dropout_prob=0.001,  # 0.95,
+        guidance_dropout_prob=0.00,  # 0.95,
         
     )
     render_config = RenderConfig()

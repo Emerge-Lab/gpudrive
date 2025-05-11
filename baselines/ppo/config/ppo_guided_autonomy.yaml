@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/selected_json
+data_dir: data/processed/wosac/validation_json_1
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 50 # Number of parallel environments
-  k_unique_scenes: 3 # Number of unique scenes to sample from
+  k_unique_scenes: 1 # Number of unique scenes to sample from
   max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -52,14 +52,14 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_100"
+  group: "fix_offroad"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
   exp_id: guidance_logs # Set dynamically in the script if needed
   seed: 42
-  cpu_offload: true
+  cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu
   bptt_horizon: 1
   compile: false
@@ -111,7 +111,7 @@ train:
   # # # Rendering # # #
   render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 250 # Render every k iterations
+  render_interval: 200 # Render every k iterations
   render_every_t: 5 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
   render_agent_idx: [0] # Agent observations to render
