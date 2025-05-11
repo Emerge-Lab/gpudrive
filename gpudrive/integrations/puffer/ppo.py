@@ -557,12 +557,14 @@ class Experience:
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == "cuda" and cpu_offload
+        # TODO(ev) remove
+        pin = False
         self.obs = torch.zeros(
             batch_size,
             *obs_shape,
             dtype=obs_dtype,
             pin_memory=pin,
-            device=device if not pin else "cpu",
+            device=device if not cpu_offload else "cpu",
         )
         self.actions = torch.zeros(
             batch_size, *atn_shape, dtype=int, pin_memory=pin
