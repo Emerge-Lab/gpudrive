@@ -287,7 +287,7 @@ class SeparateActorCriticAgent(nn.Module):
             self.act_func,
             layer_init(
                 nn.Linear(32, 1), std=1.0
-            ),  # Fixed the dimension (was 32)
+            ),  
         )
 
         # Actor network
