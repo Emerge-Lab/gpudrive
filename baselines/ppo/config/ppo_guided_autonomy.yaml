@@ -42,9 +42,9 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
-  action_space_steer_disc: 11
+  action_space_steer_disc: 13
   action_space_accel_disc: 7
-  max_steer_angle: -1.57  # pi/2 = 1.57, pi/3 = 1.05
+  max_steer_angle: 1.57  # pi/2 = 1.57, pi/3 = 1.05
   max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
