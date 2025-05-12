@@ -857,7 +857,7 @@ class MatplotlibVisualizer:
                         pos_y,
                         color="g",
                         s=25,
-                        alpha=0.2,
+                        alpha=0.1,
                         zorder=0,
                     )
             except Exception as e:
