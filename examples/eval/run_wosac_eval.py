@@ -250,9 +250,7 @@ if __name__ == "__main__":
     # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
     # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
 
-    CPT_PATH = (
-        "checkpoints/model_guidance_logs__S_100__05_12_03_10_45_701_001400.pt"
-    )
+    CPT_PATH = "checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000040.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(
