@@ -12,7 +12,7 @@ import numpy as np
 if __name__ == "__main__":
 
     GUIDANCE_MODE = "log_replay"
-    DATASET = "data/processed/wosac/validation_json_500"  # Ensure VBD trajectory structures are in here
+    DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
     SAVE_PATH = "examples/eval/figures_data/"
 
     env_config = EnvConfig(
@@ -24,14 +24,14 @@ if __name__ == "__main__":
         add_reference_speed=True,
         add_reference_pos_xy=True,
         init_mode="wosac_train",
-        smoothen_trajectory=True,
+        smoothen_trajectory=False,
     )
     render_config = RenderConfig()
 
     train_loader = SceneDataLoader(
         root=DATASET,
-        batch_size=500,
-        dataset_size=500,
+        batch_size=2,
+        dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,
         file_prefix="",
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     )
 
     np.save(
-        f"{SAVE_PATH}reference_{GUIDANCE_MODE}_smooth.npy", reference_traj_np
+        f"{SAVE_PATH}reference_{GUIDANCE_MODE}.npy", reference_traj_np
     )
     print(f"Saved reference trajectory for {GUIDANCE_MODE} mode.")
