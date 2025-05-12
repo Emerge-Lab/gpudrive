@@ -105,7 +105,7 @@ train:
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 200 # Save policy every k iterations
+  checkpoint_interval: 20 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
