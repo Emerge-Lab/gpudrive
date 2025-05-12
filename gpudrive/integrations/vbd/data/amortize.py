@@ -78,7 +78,7 @@ def main():
 
     # Always use CPU device
     device = "cpu"
-    MAX_CONTROLLED_AGENTS = 64
+    MAX_CONTROLLED_AGENTS = 32
     print(f"Loading VBD model on {device}...")
     vbd_model = load_vbd_model(args.model_path, device, MAX_CONTROLLED_AGENTS)
 
@@ -128,17 +128,17 @@ def main():
         device=device,
     )
 
-    output_trajectories[:, :, :INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
-        :, :, :INIT_STEPS + 1
+    output_trajectories[:, :, : INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
+        :, :, : INIT_STEPS + 1
     ]
-    output_trajectories[:, :, :INIT_STEPS + 1, 2] = log_trajectory.yaw[
-        :, :, :INIT_STEPS + 1, 0
+    output_trajectories[:, :, : INIT_STEPS + 1, 2] = log_trajectory.yaw[
+        :, :, : INIT_STEPS + 1, 0
     ]
-    output_trajectories[:, :, :INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
-        :, :, :INIT_STEPS + 1
+    output_trajectories[:, :, : INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
+        :, :, : INIT_STEPS + 1
     ]
-    output_trajectories[:, :, :INIT_STEPS + 1, 5] = log_trajectory.valids[
-        :, :, :INIT_STEPS + 1, 0
+    output_trajectories[:, :, : INIT_STEPS + 1, 5] = log_trajectory.valids[
+        :, :, : INIT_STEPS + 1, 0
     ]
 
     # Action tensor to step through simulation
@@ -190,17 +190,17 @@ def main():
 
             # Populate output trajectories
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS + 1:, :2
+                i, valid_world_indices, INIT_STEPS + 1 :, :2
             ] = vbd_output[i, valid_world_indices, :, :2] - world_means[
                 i
             ].view(
                 1, 1, 2
             )
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS + 1:, 2:5
+                i, valid_world_indices, INIT_STEPS + 1 :, 2:5
             ] = vbd_output[i, valid_world_indices, :, 2:]
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS + 1:, 5
+                i, valid_world_indices, INIT_STEPS + 1 :, 5
             ] = 1.0
 
         # Save to each file's json
