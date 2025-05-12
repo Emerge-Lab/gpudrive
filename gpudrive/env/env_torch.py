@@ -826,11 +826,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         acceleration_penalty + steering_penalty
                     )
                     
-                    # Also apply speed penalty to incentivice agent to slow down
-                    speed_penalty = -torch.clip(torch.log(actual_agent_speed + 1), min=0, max=0.01)            
+                    # # Also apply speed penalty to incentivice agent to slow down
+                    # speed_penalty = -torch.clip(torch.log(actual_agent_speed + 1), min=0, max=0.01)            
 
                 position_bonus_completed = (
-                    position_bonus + jerk_penalty + speed_penalty
+                    position_bonus + jerk_penalty 
                 ) * completed_route_mask
 
                 self.route_reward += position_bonus_completed
