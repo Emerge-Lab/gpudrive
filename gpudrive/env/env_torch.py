@@ -605,6 +605,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         elif self.config.reward_type == "guided_autonomy":
 
             step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
+            
+            actual_agent_speed = (
+                self.sim.self_observation_tensor().to_torch()[:, :, 0].clone()
+            )
 
             # 1. Get base rewards defined by user
             self.base_rewards = (
@@ -771,9 +775,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     jerk_penalty = -0.01 * (
                         acceleration_penalty + steering_penalty
                     )
+                    
+                    # Also apply speed penalty to incentivice agent to slow down
+                    speed_penalty = -torch.clip(torch.log(actual_agent_speed + 1), min=0, max=0.01)            
 
                 position_bonus_completed = (
-                    position_bonus + jerk_penalty
+                    position_bonus + jerk_penalty + speed_penalty
                 ) * completed_route_mask
 
                 self.route_reward += position_bonus_completed
@@ -798,10 +805,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                     .squeeze(-1)
                     .bool()
-                )
-
-                actual_agent_speed = (
-                    self.sim.self_observation_tensor().to_torch()[:, :, 0]
                 )
 
                 actual_agent_heading = self.agent_states.rotation_angle
