@@ -23,6 +23,7 @@ namespace madrona_gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("kTrajectoryLength") = consts::kTrajectoryLength;
         m.attr("episodeLen") = consts::episodeLen;
         m.attr("numLidarSamples") = consts::numLidarSamples;
         m.attr("vehicleScale") = consts::vehicleLengthScale;

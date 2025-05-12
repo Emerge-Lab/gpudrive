@@ -151,13 +151,13 @@ class VBDTrajectoryOnline:
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
         # Assumption: All timesteps are valid (correct)
-        self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
+        self.valids = vbd_traj_tensor[:, :, :, 5].unsqueeze(-1).to(
+            torch.int32
+        )
 
         self.mean_pos_xy = mean_pos_xy
         self.mean_x = mean_pos_xy[:, 0]
         self.mean_y = mean_pos_xy[:, 1]
-
-        self.demean_positions()
 
     @classmethod
     def from_tensor(
@@ -195,8 +195,8 @@ class VBDTrajectoryOnline:
         mean_y_reshaped = self.mean_y.view(-1, 1, 1)
 
         # Apply to x and y coordinates
-        self.pos_xy[..., 0] -= mean_x_reshaped
-        self.pos_xy[..., 1] -= mean_y_reshaped
+        self.pos_xy[..., 10:, 0] -= mean_x_reshaped
+        self.pos_xy[..., 10:, 1] -= mean_y_reshaped
 
         self.pos_x = self.pos_xy[..., 0].unsqueeze(-1)
         self.pos_y = self.pos_xy[..., 1].unsqueeze(-1)
@@ -224,9 +224,9 @@ class VBDTrajectory:
         self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
         self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
-        # Assumption: All timesteps are valid
-        # TODO: The first 10 timesteps come from the logs, so there may be invalid steps
-        self.valids = torch.ones_like(self.pos_x, dtype=torch.int32)
+        self.valids = vbd_traj_tensor[:, :, :, 5].unsqueeze(-1).to(
+            torch.int32
+        )
 
     @classmethod
     def from_tensor(
