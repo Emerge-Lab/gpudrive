@@ -754,32 +754,29 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 # Add bonus for being close to the reference end position
                 # Using exponential decay: bonus = scale * exp(-distance)
-                max_position_bonus = 0.02
+                max_position_bonus = 0.01
 
                 position_bonus = max_position_bonus * torch.exp(-distance)
-                
-                # # Apply a penalty for jerk because we don't want agents to turn around 
-                # # when they have already passed the end of the route
-                # if hasattr(self, "action_diff"):
-                #     acceleration_jerk = (
-                #         self.action_diff[:, :, 0] ** 2
-                #     )  
-                #     steering_jerk = (
-                #         self.action_diff[:, :, 1] ** 2
-                #     ) 
 
-                #     acceleration_penalty = 1.0 - torch.exp(-acceleration_jerk)
-                #     steering_penalty = 1.0 - torch.exp(-steering_jerk)
-                    
-                #     jerk_penalty = -0.001 * (
-                #         acceleration_penalty + steering_penalty
-                #     )
+                # Apply a penalty for jerk because we don't want agents to turn around
+                # when they have already passed the end of the route
+                # if they turn, the jerk penalty should cancel out the position bonus
+                if hasattr(self, "action_diff"):
+                    acceleration_jerk = self.action_diff[:, :, 0] ** 2
+                    steering_jerk = self.action_diff[:, :, 1] ** 2
 
-                position_bonus_completed = position_bonus * completed_route_mask
-                
-                #position_bonus_completed = (position_bonus + jerk_penalty) * completed_route_mask
+                    acceleration_penalty = 1.0 - torch.exp(-acceleration_jerk)
+                    steering_penalty = 1.0 - torch.exp(-steering_jerk)
 
-                self.route_reward += position_bonus_completed 
+                    jerk_penalty = -0.01 * (
+                        acceleration_penalty + steering_penalty
+                    )
+
+                position_bonus_completed = (
+                    position_bonus + jerk_penalty
+                ) * completed_route_mask
+
+                self.route_reward += position_bonus_completed
 
             self.guidance_reward = self.route_reward.clone()
 
@@ -865,12 +862,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def create_guidance_dropout_mask(self):
         """
-        Create guidance dropout mask where dropout_prob represents 
+        Create guidance dropout mask where dropout_prob represents
         the maximum dropout probability, with varying rates per trajectory.
         """
         max_dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
-        
+
         # 1 if we want to keep the point, 0 if we want to drop it
         guidance_dropout_mask = torch.ones(
             (num_controlled, self.reference_traj_len),
@@ -883,18 +880,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .squeeze(-1)
             .bool()
         )
-        
+
         # Generate random dropout rates for each agent between 0 and max_dropout_prob
-        agent_dropout_probs = torch.rand(num_controlled, device=self.device) * max_dropout_prob
-        
+        agent_dropout_probs = (
+            torch.rand(num_controlled, device=self.device) * max_dropout_prob
+        )
+
         for agent_idx in range(num_controlled):
             agent_valid_mask = is_valid[agent_idx]
             agent_valid_indices = torch.where(agent_valid_mask)[0]
-            
+
             # Get agent-specific dropout probability
             agent_dropout_prob = agent_dropout_probs[agent_idx]
 
-            if len(agent_valid_indices) > 2:  # Only apply dropout if we have more than 2 points
+            if (
+                len(agent_valid_indices) > 2
+            ):  # Only apply dropout if we have more than 2 points
                 # Keep first and last points, apply dropout to middle points
                 middle_indices = agent_valid_indices[1:-1]
 
@@ -906,7 +907,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                 # Apply dropout to middle points (set to False for points to drop)
                 guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
-        
+
         return guidance_dropout_mask
 
     def guidance_points_within_reach(self):
@@ -1211,10 +1212,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
             if self.config.add_reference_speed:
-                reference_speed = self.reference_trajectory.ref_speed[mask].clone()
+                reference_speed = self.reference_trajectory.ref_speed[
+                    mask
+                ].clone()
                 reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
-                
-                reference_speed_normalized = reference_speed / constants.MAX_SPEED
+
+                reference_speed_normalized = (
+                    reference_speed / constants.MAX_SPEED
+                )
                 guidance_orig.append(reference_speed)
                 guidance.append(reference_speed_normalized)
 
@@ -1301,7 +1306,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self.valid_guidance_points = torch.sum(
             self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1
         )
-        
+
         guidance = torch.cat(guidance, dim=-1)
 
         return guidance.flatten(start_dim=1)
@@ -1423,7 +1428,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         weights_for_masked_agents[:, 2],
                     ]
                 ).permute(1, 0)
-            else:                   
+            else:
                 return torch.cat(base_fields, dim=1)
 
     def _get_partner_obs(self, mask=None):
@@ -1563,7 +1568,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ),
             dim=-1,
         )
-    
+
         return obs
 
     def get_controlled_agents_mask(self):
@@ -1829,7 +1834,6 @@ if __name__ == "__main__":
         smoothen_trajectory=False,
         add_previous_action=True,
         guidance_dropout_prob=0.9,  # 0.95,
-        
     )
     render_config = RenderConfig()
 

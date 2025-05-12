@@ -25,14 +25,14 @@ def test_rollout(focus_agents=[0, 1], render=False):
         smoothen_trajectory=True,
         smoothness_weight=0.0,
         collision_weight=-0.02,
-        off_road_weight=-0.01,
+        off_road_weight=-0.0,
         guidance_heading_weight=0.005,
         guidance_speed_weight=0.0005,
     )
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_json_100",
+        root="data/processed/wosac/validation_json_1",
         batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,
@@ -45,7 +45,7 @@ def test_rollout(focus_agents=[0, 1], render=False):
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=32,  # Number of agents to control
-        device="cuda",
+        device="cpu",
     )
 
     control_mask = env.cont_agent_mask
@@ -63,10 +63,12 @@ def test_rollout(focus_agents=[0, 1], render=False):
         print(f"Step: {env.step_in_world[0, 0, 0].item()}")
 
         # Step
-        rand_actions = torch.randint(low=0, high=77, size=expert_actions[:, :, time_step, 0].shape)
+        rand_actions = torch.randint(
+            low=0, high=77, size=expert_actions[:, :, time_step, 0].shape
+        )
 
         env.step_dynamics(expert_actions[:, :, time_step, :])
-        #env.step_dynamics(rand_actions)
+        # env.step_dynamics(rand_actions)
 
         obs = env.get_obs(control_mask)
         reward = env.get_rewards()
@@ -136,4 +138,4 @@ def test_rollout(focus_agents=[0, 1], render=False):
 
 
 if __name__ == "__main__":
-    test_rollout(focus_agents=[0, 1, 2, 3, 4], render=True)
+    test_rollout(focus_agents=[0, 1, 2, 3, 4, 5, 6], render=True)
