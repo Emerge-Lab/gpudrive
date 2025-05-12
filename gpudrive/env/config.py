@@ -30,7 +30,7 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
-    add_previous_action: bool = False  # Previous action time agent has taken
+    add_previous_action: bool = True  # Previous action time agent has taken
 
     # Guidance settings; these are used to direct the agent's behavior and
     # will be included in the observations if set to True
@@ -38,9 +38,9 @@ class EnvConfig:
     guidance_mode: str = "log_replay"  # Options: "log_replay", "vbd_amortized", "vbd_online", "goals_only"
     # Ways to guide the agent
     add_reference_pos_xy: bool = True  # (x, y) position time series
-    add_reference_speed: bool = False  # speed time series
-    add_reference_heading: bool = False  # heading time series
-    smoothen_trajectory: bool = False  # Filters out the trajectory
+    add_reference_speed: bool = True  # speed time series
+    add_reference_heading: bool = True  # heading time series
+    smoothen_trajectory: bool = True  # Filters out the trajectory
     guidance_pos_xy_radius: float = 1.0  # Tightness of the positions guidance
     guidance_dropout_prob: float = 0.0  # Probability of dropping the points
 
@@ -118,21 +118,21 @@ class EnvConfig:
     goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
 
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"
+    reward_type: str = "guided_autonomy"
     # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
 
     # If reward_type is "guided_autonomy", the following parameters are used
     guidance_speed_weight: float = (
-        0.01  # Importance of matching suggested speeds
+        0.005  # Importance of matching suggested speeds
     )
     guidance_heading_weight: float = (
-        0.01  # Importance of matching suggested headings
+        0.005 # Importance of matching suggested headings
     )
     smoothness_weight: float = 0.0
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components
-    collision_weight: float = 0.0
+    collision_weight: float = -0.02
     goal_achieved_weight: float = 1.0
     off_road_weight: float = 0.0
 

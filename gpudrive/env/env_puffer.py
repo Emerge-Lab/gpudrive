@@ -297,6 +297,18 @@ class PufferGPUDrive(PufferEnv):
             max_accel_value=max_accel_value,
             action_space_steer_disc=action_space_steer_disc,
             action_space_accel_disc=action_space_accel_disc,
+            # Override action space
+            steer_actions = torch.round(torch.linspace(
+                    -max_steer_angle, max_steer_angle, action_space_steer_disc
+                ),
+                decimals=3,
+                ),
+                accel_actions = torch.round(
+                    torch.linspace(
+                        -max_accel_value, max_accel_value, action_space_accel_disc
+                    ),
+                    decimals=3,
+                )
         )
 
         render_config = RenderConfig(
