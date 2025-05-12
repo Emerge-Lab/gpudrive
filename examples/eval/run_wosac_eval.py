@@ -235,17 +235,18 @@ def rollout(
 if __name__ == "__main__":
 
     # Settings
-    MAX_AGENTS = 32  # TODO: Set to 128 for real eval
-    NUM_ENVS = 2
+    MAX_AGENTS = 32 #TODO: Set to 128 for real eval
+    NUM_ENVS = 50
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = True
+    RENDER = False
+    LOG_DIR = "examples/eval/figures_data/wosac/"
 
-    DATA_JSON = "data/processed/wosac/validation_json_1"
-    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_1"
+    DATA_JSON = "data/processed/wosac/validation_json_100"
+    DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
     # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
     # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
 
@@ -279,7 +280,7 @@ if __name__ == "__main__":
     # Add fixed overrides specific to WOSAC evaluation
     config_dict["init_steps"] = INIT_STEPS
     config_dict["init_mode"] = "wosac_eval"
-    config_dict["goal_behavior"] = "stop"
+    config_dict["goal_behavior"] = "ignore"
 
     logging.info(
         f"initializing env with init_mode = {config_dict['init_mode']}"
@@ -295,7 +296,10 @@ if __name__ == "__main__":
         device=DEVICE,
     )
 
-    wosac_metrics = WOSACMetrics()
+    wosac_metrics = WOSACMetrics(
+        save_table_with_baselines=True,
+        log_dir=LOG_DIR,
+    )
 
     for _ in tqdm(range(NUM_DATA_BATCHES)):
         for _ in range(NUM_ROLLOUTS_PER_BATCH):

@@ -84,12 +84,14 @@ class WOSACMetrics(Metric):
         if log_dir is not None:
             # Get data and time for the current run as filename
             log_dir = Path(log_dir)
-            self.log_file_path = log_dir / f"{self.timestamp}.csv"
+            self.log_file_path = log_dir / f"score_distribution_{self.timestamp}.csv"
+            self.log_aggregate_table_path = log_dir / f"wosac_table_{self.timestamp}.csv"
             log_dir.mkdir(parents=True, exist_ok=True)
             self.log_file = csv.writer(open(self.log_file_path, 'w'))
             # Add header to the log file
-            self.log_file.writerow(self.field_names) 
-
+            all_rows = self.field_names.copy()
+            all_rows.insert(0, "scenario_id")
+            self.log_file.writerow(all_rows) 
 
         else:
             self.log_file = None
@@ -241,8 +243,9 @@ class WOSACMetrics(Metric):
                 if self.log_file is not None:
                     # Log the scenario metrics to the file  
                     result_to_log = [
+                        _scenario_rollout.scenario_id,
                         scenario_result.metametric,
-                        scenario_result.average_displacement_error
+                        scenario_result.average_displacement_error,
                         scenario_result.linear_speed_likelihood,
                         scenario_result.linear_acceleration_likelihood,
                         scenario_result.angular_speed_likelihood,
@@ -336,9 +339,8 @@ class WOSACMetrics(Metric):
         if self.save_table_with_baselines:
             self._add_current_method_to_baselines(metrics_dict, final_metrics)
 
-            table_name = f"wosac_table_{self.timestamp}.csv"
-            self.baselines_df.to_csv(table_name, index=False)
-            print(f"Saved df to {table_name}")
+            self.baselines_df.to_csv(self.log_aggregate_table_path, index=False)
+            print(f"Saved df to {self.log_aggregate_table_path}")
 
         return out_dict
 
