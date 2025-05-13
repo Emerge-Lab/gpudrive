@@ -190,7 +190,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.max_agent_count,
                 madrona_gpudrive.kTrajectoryLength,
                 6,
-            )
+            ).to(self.device)
             reference_trajectory[
                 :, :, : self.init_steps + 1, :2
             ] = log_trajectory.pos_xy[:, :, : self.init_steps + 1]
