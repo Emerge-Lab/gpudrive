@@ -55,7 +55,7 @@ class WOSACMetrics(Metric):
         else:
             self.baselines_df = baselines_df
 
-        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
 
         self.field_names = [
             "metametric",
