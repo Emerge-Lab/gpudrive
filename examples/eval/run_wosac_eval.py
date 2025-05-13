@@ -246,15 +246,15 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = 32  # TODO: Set to 128 for real eval
-    NUM_ENVS = 20
+    NUM_ENVS = 1
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = False
+    RENDER = True
     LOG_DIR = "examples/eval/figures_data/wosac/"
-    GUIDANCE_MODE = "log_replay" #"vbd_amortized"
+    GUIDANCE_MODE = "vbd_amortized" # Options: "vbd_amortized", "vbd_online", "log_replay"
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
