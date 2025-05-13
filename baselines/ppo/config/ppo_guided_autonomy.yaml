@@ -8,9 +8,9 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
+  num_worlds: 10 # Number of parallel environments
   k_unique_scenes: 1 # Number of unique scenes to sample from
-  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  max_controlled_agents: 32 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -24,14 +24,15 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_reference_speed: true # If true, the reference speeds are added to the ego observation
   add_reference_heading: true # If true, the reference heading are added to the ego observation
   smoothen_trajectory: true # If true, the velocities and headings are smoothed
+  guidance_dropout_prob: 0.0 # Probability of out guidance points
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01 
-  off_road_weight: -0.01
-  guidance_speed_weight: 0.01
-  guidance_heading_weight: 0.01
-  smoothness_weight: 0.0001
+  collision_weight: -0.01
+  off_road_weight: -0.01 
+  guidance_speed_weight: 0.005
+  guidance_heading_weight: 0.005
+  smoothness_weight: 0.0
 
   init_mode: wosac_train
   dynamics_model: "classic"
@@ -41,9 +42,9 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
-  action_space_steer_disc: 15
-  action_space_accel_disc: 11
-  max_steer_angle: -1.57  # pi/2 = 1.57, pi/3 = 1.05
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  max_steer_angle: 1.57  # pi/2 = 1.57, pi/3 = 1.05
   max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
@@ -51,14 +52,14 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "wosac_1"
+  group: "debug_mini"  
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
   exp_id: guidance_logs # Set dynamically in the script if needed
   seed: 42
-  cpu_offload: true
+  cpu_offload: false
   device: "cuda" # Dynamically set to cuda if available, else cpu
   bptt_horizon: 1
   compile: false
@@ -67,7 +68,7 @@ train:
   # # # Data sampling # # #
   resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 2_000_000
+  resample_interval: 5_000_000
   sample_with_replacement: false
   shuffle_dataset: true
   file_prefix: ""
@@ -75,7 +76,7 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 4_000_000_000
-  batch_size: 131072
+  batch_size: 65536
   minibatch_size: 8192
   learning_rate: 3e-4
   anneal_lr: true
@@ -86,7 +87,7 @@ train:
   clip_coef: 0.2
   clip_vloss: false
   vf_clip_coef: 0.2
-  ent_coef: 0.003
+  ent_coef: 0.01
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
@@ -94,24 +95,24 @@ train:
   # # # Logging # # #
   log_window: 100
   track_realism_metrics: true # Log human-like metrics
-  track_n_worlds: 2 # Number of worlds to track
+  track_n_worlds: 3 # Number of worlds to track
 
   # # # Network # # #
   network:
-    embed_dim: 64 # Embedding of the input features
+    embed_dim: 256 # Embedding of the input features
     dropout: 0.01
     class_name: "Agent"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
 
   # # # Checkpointing # # #
-  checkpoint_interval: 500 # Save policy every k iterations
+  checkpoint_interval: 200 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
   render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 500 # Render every k iterations
-  render_every_t: 10 # Render every k timesteps
+  render_interval: 400 # Render every k iterations
+  render_every_t: 5 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
   render_agent_idx: [0] # Agent observations to render
   render_format: "mp4" # Options: gif, mp4

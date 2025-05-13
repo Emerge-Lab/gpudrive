@@ -45,6 +45,26 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
+    
+    if config.continue_training:
+        print("Loading checkpoint...")
+        # Load checkpoint
+        saved_cpt = torch.load(
+        f=config.model_cpt,
+            weights_only=False,
+        )
+
+        # Create policy architecture from saved checkpoint
+        agent = Agent(
+            config=saved_cpt["config"],
+            embed_dim=saved_cpt["model_arch"]["embed_dim"],
+            action_dim=saved_cpt["action_dim"],
+        )
+
+        # Load the model parameters
+        agent.load_state_dict(saved_cpt["parameters"])
+        return agent
+    
     return Agent(
         config=config.environment,
         embed_dim=config.train.network.embed_dim,
@@ -124,6 +144,7 @@ def run(
     add_reference_heading: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
 
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
@@ -189,6 +210,7 @@ def run(
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
         "collision_behavior": collision_behavior,
+        "guidance_dropout_prob": guidance_dropout_prob,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),

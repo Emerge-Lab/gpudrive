@@ -11,7 +11,7 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    GUIDANCE_MODE = "vbd_online"
+    GUIDANCE_MODE = "log_replay"
     DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
     SAVE_PATH = "examples/eval/figures_data/"
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=64,
-        device="cpu",
+        device="cuda",
     )
 
     obs = env.reset(env.cont_agent_mask)

@@ -195,6 +195,7 @@ class PufferGPUDrive(PufferEnv):
         goal_achieved_weight=1,
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1,
+        guidance_dropout_prob=0.0,
         remove_non_vehicles=False,
         obs_radius=50.0,
         track_realism_metrics=False,
@@ -241,6 +242,7 @@ class PufferGPUDrive(PufferEnv):
         self.add_reference_pos_xy = add_reference_pos_xy
         self.add_reference_speed = add_reference_speed
         self.add_reference_heading = add_reference_heading
+        self.guidance_dropout_prob = guidance_dropout_prob
 
         self.render = render
         self.render_interval = render_interval
@@ -276,6 +278,7 @@ class PufferGPUDrive(PufferEnv):
             bev_obs=bev_obs,
             add_previous_action=add_previous_action,
             guidance=guidance,
+            guidance_dropout_prob=guidance_dropout_prob,
             add_reference_pos_xy=add_reference_pos_xy,
             add_reference_speed=add_reference_speed,
             add_reference_heading=add_reference_heading,
@@ -294,8 +297,19 @@ class PufferGPUDrive(PufferEnv):
             max_accel_value=max_accel_value,
             action_space_steer_disc=action_space_steer_disc,
             action_space_accel_disc=action_space_accel_disc,
+            # Override action space
+            steer_actions = torch.round(torch.linspace(
+                    -max_steer_angle, max_steer_angle, action_space_steer_disc
+                ),
+                decimals=3,
+                ),
+            accel_actions = torch.round(
+                torch.linspace(
+                    -max_accel_value, max_accel_value, action_space_accel_disc
+                ),
+                decimals=3,
+            )
         )
-
         render_config = RenderConfig(
             render_3d=render_3d,
         )
@@ -755,6 +769,10 @@ class PufferGPUDrive(PufferEnv):
         # Update the cumulative set (coverage)
         self.cumulative_unique_files.update(new_idx)
 
+        guidance_density = (
+            self.env.valid_guidance_points / self.env.reference_traj_len
+        )
+
         if self.wandb_obj is not None:
             self.wandb_obj.log(
                 {
@@ -768,6 +786,10 @@ class PufferGPUDrive(PufferEnv):
                         / len(set(self.file_to_index))
                     )
                     * 100,
+                    "data/guidance_density_mean": guidance_density.mean().item(),
+                    "data/guidance_density_dist": wandb.Histogram(
+                        guidance_density.cpu().numpy()
+                    ),
                 },
                 step=self.global_step,
             )
