@@ -25,9 +25,9 @@ namespace madrona_gpudrive
 
         float speed = velocity.linear.length();
         float yaw = utils::quatToYaw(rotation);
-        float x_dot = speed * cosf(utils::AngleAdd(yaw, velocity.angular.z));
-        float y_dot = speed * sinf(utils::AngleAdd(yaw, velocity.angular.z));
-        float theta_dot = speed * tanf(velocity.angular.z) / size.length;
+        float x_dot = speed * cosf(yaw);
+        float y_dot = speed * sinf(yaw);
+        float theta_dot = speed * tanf(velocity.angular.z) / (0.8 * size.length);
         float delta_dot = action.classic.steering;
         // Update the yaw
         float new_yaw = utils::AngleAdd(yaw, theta_dot * dt);
