@@ -265,9 +265,9 @@ def save_script(filename, file_path, fields, params, param_order=None, exclude_n
 
 if __name__ == "__main__":
 
-    group = "mem_optimization_2" 
+    group = "10k_dropout_v3" 
     fields = {
-        "time_h": 1,  # Max time per job (job will finish if run is done before)
+        "time_h": 47,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
         "max_sim_jobs": 30,  # Max jobs at the same time
         "memory": 80,
@@ -277,19 +277,20 @@ if __name__ == "__main__":
 
     hyperparams = {
         "group": [group],  # Group name
-        "num_worlds": [500, 700],
+        "num_worlds": [700],
         "data_dir": ["/scratch/kj2676/gpudrive/data/processed/training"],
-        "resample_scenes": [0, 1],
-        "k_unique_scenes": [500],
+        "resample_scenes": [1],
+        "k_unique_scenes": [700],
         "resample_interval": [5_000_000],
-        "cpu_offload": [0, 1],
         "batch_size": [1],
-        # "resample_dataset_size": [10_000],
-        # "total_timesteps": [3_000_000_000],
-        "batch_size": [1048576, 2097152],
-        # "minibatch_size": [16384],
-        # "ent_coef": [0.01, 0.003],
-        # "vf_coef": [0.5],
+        "guidance_dropout_prob": [0.0, 0.95],
+        "off_road_weight": [-0.1, -0.01, 0.0],
+        "resample_dataset_size": [10_000],
+        "total_timesteps": [5_000_000_000],
+        "batch_size": [1048576],
+        "minibatch_size": [16384],
+        "ent_coef": [0.01],
+        "vf_coef": [0.5],
         "update_epochs": [1],
         "render": [0],
     }
