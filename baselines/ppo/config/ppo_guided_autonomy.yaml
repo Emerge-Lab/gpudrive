@@ -28,8 +28,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
   # Reward function
   reward_type: "guided_autonomy"
-  collision_weight: -0.01
-  off_road_weight: -0.01 
+  collision_weight: -0.1
+  off_road_weight: -0.1
   guidance_speed_weight: 0.005
   guidance_heading_weight: 0.005
   smoothness_weight: 0.0
@@ -52,7 +52,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 wandb:
   entity: ""
   project: "humanlike"
-  group: "debug_mini"  
+  group: "debug_mini"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -69,7 +69,7 @@ train:
   resample_scenes: false
   resample_dataset_size: 10_000 # Number of unique scenes to sample from
   resample_interval: 5_000_000
-  sample_with_replacement: false
+  sample_with_replacement: true
   shuffle_dataset: true
   file_prefix: ""
 
