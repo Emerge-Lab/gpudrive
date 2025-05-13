@@ -775,44 +775,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             completed_route_mask = (route_progress >= 0.99).float()
 
-            # b). Add a bonus for being close to the reference end position
+            # b). Jerk penalty for completed routes
             if torch.any(completed_route_mask > 0):
-                # Extract the last valid reference position
-                agent_states = GlobalEgoState.from_tensor(
-                    self.sim.absolute_self_observation_tensor(),
-                    self.backend,
-                    self.device,
-                )
-
-                # Get indices of last valid positions for each reference trajectory
-                last_valid_indices = torch.argmax(
-                    is_valid
-                    * torch.arange(is_valid.shape[2], device=is_valid.device),
-                    dim=2,
-                )
-
-                # Create indices for gathering
-                batch_indices = torch.zeros_like(last_valid_indices)
-                agent_indices = torch.arange(
-                    is_valid.shape[1], device=is_valid.device
-                ).expand_as(last_valid_indices)
-
-                # Gather the last valid reference positions
-                last_valid_positions = self.reference_trajectory.pos_xy[
-                    batch_indices, agent_indices, last_valid_indices
-                ]
-
-                distance = torch.norm(
-                    agent_states.pos_xy - last_valid_positions, dim=2
-                )
-
-                # Add bonus for being close to the reference end position
-                # Using exponential decay: bonus = scale * exp(-distance)
-                max_position_bonus = 0.01
-
-                position_bonus = max_position_bonus * torch.exp(-distance)
-
-                # Apply a penalty for jerk because we don't want agents to turn around
+                # Apply a penalty for jerk because we want agents to keep going straight
                 # when they have already passed the end of the route
                 # if they turn, the jerk penalty should cancel out the position bonus
                 if hasattr(self, "action_diff"):
@@ -822,18 +787,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     acceleration_penalty = 1.0 - torch.exp(-acceleration_jerk)
                     steering_penalty = 1.0 - torch.exp(-steering_jerk)
 
-                    jerk_penalty = -0.01 * (
+                    jerk_penalty = -0.001 * (
                         acceleration_penalty + steering_penalty
                     )
                     
-                    # # Also apply speed penalty to incentivice agent to slow down
-                    # speed_penalty = -torch.clip(torch.log(actual_agent_speed + 1), min=0, max=0.01)            
+                end_of_route_jerk = jerk_penalty * completed_route_mask
 
-                position_bonus_completed = (
-                    position_bonus + jerk_penalty 
-                ) * completed_route_mask
-
-                self.route_reward += position_bonus_completed
+                self.route_reward += end_of_route_jerk
 
             self.guidance_reward = self.route_reward.clone()
 
