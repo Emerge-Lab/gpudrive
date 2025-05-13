@@ -252,16 +252,15 @@ if __name__ == "__main__":
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = True
+    RENDER = False
     LOG_DIR = "examples/eval/figures_data/wosac/"
-    GUIDANCE_MODE = "vbd_amortized" #"vbd_amortized"
+    GUIDANCE_MODE = "log_replay" #"vbd_amortized"
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
 
     CPT_PATH = (
-        #"checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000100.pt"
-        "checkpoints/model_guidance_logs__S_100__05_12_17_55_40_614_000400.pt"
+        "checkpoints/model_guidance_logs__S_100__05_12_23_14_58_678_001000.pt"
     )
 
     # Create data loader
@@ -277,11 +276,13 @@ if __name__ == "__main__":
     # Load agent
     agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
     
-    config = load_config("baselines/ppo/config/ppo_guided_autonomy.yaml")
-    config = config.environment
+    # config = load_config("baselines/ppo/config/ppo_guided_autonomy.yaml")
+    # config = config.environment
+    
+    config = agent.config
 
     # Override default environment settings to match those the agent was trained with
-    # Make env
+    # TODO(dc): Clean this up
     env_config = EnvConfig(
         ego_state=config.ego_state,
         road_map_obs=config.road_map_obs,
@@ -301,7 +302,6 @@ if __name__ == "__main__":
         dynamics_model=config.dynamics_model,
         collision_behavior=config.collision_behavior,
         goal_behavior=config.goal_behavior,
-        init_mode=config.init_mode,
         polyline_reduction_threshold=config.polyline_reduction_threshold,
         remove_non_vehicles=config.remove_non_vehicles,
         lidar_obs=False, 
@@ -323,26 +323,10 @@ if __name__ == "__main__":
                 ),
                 decimals=3,
             ),
+        init_mode="wosac_eval",
         init_steps=INIT_STEPS,
         guidance_mode=GUIDANCE_MODE,
     )
-    # default_config = EnvConfig()
-    # config_dict = {
-    #     field.name: getattr(agent.config, field.name)
-    #     for field in dataclasses.fields(EnvConfig)
-    #     if hasattr(agent.config, field.name)
-    #     and getattr(agent.config, field.name)
-    #     != getattr(default_config, field.name)
-    # }
-
-    # # Add fixed overrides specific to WOSAC evaluation
-    # config_dict["init_steps"] = INIT_STEPS
-    # config_dict["init_mode"] = "wosac_train"
-    # config_dict["guidance_mode"] = GUIDANCE_MODE
-
-    # logging.info(
-    #     f"initializing env with init_mode = {config_dict['init_mode']}"
-    # )
 
     # Make environment
     env = GPUDriveTorchEnv(

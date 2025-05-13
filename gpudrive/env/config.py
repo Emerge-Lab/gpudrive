@@ -132,9 +132,9 @@ class EnvConfig:
 
     # If reward_type is "reward_conditioned", the following parameters are used
     # Weights for the reward components
-    collision_weight: float = -0.02
+    collision_weight: float = -0.1
     goal_achieved_weight: float = 1.0
-    off_road_weight: float = 0.0
+    off_road_weight: float = -0.1
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
     # If condition_mode is "fixed", set the agent weights here
