@@ -216,20 +216,15 @@ class VBDTrajectory:
 
     def __init__(self, vbd_traj_tensor: torch.Tensor):
         """Initializes the VBD trajectory with a tensor."""
-        # Pad to make sure the trajectory is of length 91
-        padding = (0, 0, 1, 0)
-
-        vbd_traj_tensor_pad = torch.nn.functional.pad(vbd_traj_tensor, padding, mode='constant', value=-1.0)
-
-        self.pos_x = vbd_traj_tensor_pad[:, :, :, 0].unsqueeze(-1)
-        self.pos_y = vbd_traj_tensor_pad[:, :, :, 1].unsqueeze(-1)
-        self.pos_xy = vbd_traj_tensor_pad[:, :, :, :2]
-        self.yaw = wrap_yaws(vbd_traj_tensor_pad[:, :, :, 2].unsqueeze(-1))
-        self.vel_x = vbd_traj_tensor_pad[:, :, :, 3].unsqueeze(-1)
-        self.vel_y = vbd_traj_tensor_pad[:, :, :, 4].unsqueeze(-1)
-        self.vel_xy = vbd_traj_tensor_pad[:, :, :, 3:5]
+        self.pos_x = vbd_traj_tensor[:, :, :, 0].unsqueeze(-1)
+        self.pos_y = vbd_traj_tensor[:, :, :, 1].unsqueeze(-1)
+        self.pos_xy = vbd_traj_tensor[:, :, :, :2]
+        self.yaw = wrap_yaws(vbd_traj_tensor[:, :, :, 2].unsqueeze(-1))
+        self.vel_x = vbd_traj_tensor[:, :, :, 3].unsqueeze(-1)
+        self.vel_y = vbd_traj_tensor[:, :, :, 4].unsqueeze(-1)
+        self.vel_xy = vbd_traj_tensor[:, :, :, 3:5]
         self.ref_speed = self.comp_reference_speed()
-        self.valids = vbd_traj_tensor_pad[:, :, :, 5].unsqueeze(-1).to(
+        self.valids = vbd_traj_tensor[:, :, :, 5].unsqueeze(-1).to(
             torch.int32
         )
         
