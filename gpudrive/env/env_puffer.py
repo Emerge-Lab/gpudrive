@@ -303,14 +303,13 @@ class PufferGPUDrive(PufferEnv):
                 ),
                 decimals=3,
                 ),
-                accel_actions = torch.round(
-                    torch.linspace(
-                        -max_accel_value, max_accel_value, action_space_accel_disc
-                    ),
-                    decimals=3,
-                )
+            accel_actions = torch.round(
+                torch.linspace(
+                    -max_accel_value, max_accel_value, action_space_accel_disc
+                ),
+                decimals=3,
+            )
         )
-
         render_config = RenderConfig(
             render_3d=render_3d,
         )

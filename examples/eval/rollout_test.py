@@ -14,7 +14,7 @@ def test_rollout(focus_agents=[0, 1], render=False, agent=None):
 
     env_config = EnvConfig(
         guidance=True,
-        guidance_mode="log_replay",  # Options: "log_replay", "vbd_amortized"
+        guidance_mode="vbd_amortized",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
         add_reference_speed=True,
         add_reference_heading=True,
@@ -120,7 +120,7 @@ def test_rollout(focus_agents=[0, 1], render=False, agent=None):
                 },
                 step=env.step_in_world[0, 0, 0].item(),
             )
-            ""
+            
     avg_cum_reward = cum_reward[env.cont_agent_mask.cpu().numpy()].mean()
 
     print(

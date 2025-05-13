@@ -45,6 +45,26 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
+    
+    if config.continue_training:
+        print("Loading checkpoint...")
+        # Load checkpoint
+        saved_cpt = torch.load(
+        f=config.model_cpt,
+            weights_only=False,
+        )
+
+        # Create policy architecture from saved checkpoint
+        agent = Agent(
+            config=saved_cpt["config"],
+            embed_dim=saved_cpt["model_arch"]["embed_dim"],
+            action_dim=saved_cpt["action_dim"],
+        )
+
+        # Load the model parameters
+        agent.load_state_dict(saved_cpt["parameters"])
+        return agent
+    
     return Agent(
         config=config.environment,
         embed_dim=config.train.network.embed_dim,

@@ -8,6 +8,8 @@ import numpy as np
 from time import perf_counter
 from tqdm import tqdm
 from pathlib import Path
+from box import Box
+import yaml
 
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.env_torch import GPUDriveTorchEnv
@@ -90,8 +92,8 @@ def rollout(
         info.collided_with_vehicle == 1
     ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
     control_mask = control_mask_all & ~zero_action_mask
-
-    next_obs = env.reset(control_mask)
+    
+    next_obs = env.reset(mask=control_mask)
 
     # Get scenario ids
     scenario_ids_dict = env.get_scenario_ids()
@@ -141,7 +143,9 @@ def rollout(
             agent_observation_frames[idx].append(img_from_fig(agent_obs))
 
         # Get next observation
-        next_obs = env.get_obs(control_mask)
+        next_obs = env.get_obs(control_mask)          
+        # NOTE(dc): Make sure to decouple the obs from the reward function
+        reward = env.get_rewards()
         done = env.get_dones()
 
         pos_x, pos_y, pos_z, heading, id = get_state(env)
@@ -231,26 +235,34 @@ def rollout(
 
     return scenario_ids, scenario_rollouts, scenario_rollout_masks
 
+def load_config(config_path):
+    """Load the configuration file."""
+    with open(config_path, "r") as f:
+        config = Box(yaml.safe_load(f))
+    return config
+
 
 if __name__ == "__main__":
 
     # Settings
-    MAX_AGENTS = 32 #TODO: Set to 128 for real eval
-    NUM_ENVS = 50
+    MAX_AGENTS = 32  # TODO: Set to 128 for real eval
+    NUM_ENVS = 20
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = False
+    RENDER = True
     LOG_DIR = "examples/eval/figures_data/wosac/"
+    GUIDANCE_MODE = "vbd_amortized" #"vbd_amortized"
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
-    # CPT_PATH = "checkpoints/model_guidance_progress__S_1__05_04_17_37_18_741_001677.pt" # .73 meta-score on single_scene (10 rollouts)
-    # https://wandb.ai/emerge_/humanlike/runs/guidance_progress__S_1__05_04_17_37_18_741?nw=nwuserdaphnecor
 
-    CPT_PATH = "checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000040.pt"
+    CPT_PATH = (
+        #"checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000100.pt"
+        "checkpoints/model_guidance_logs__S_100__05_12_17_55_40_614_000400.pt"
+    )
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -264,27 +276,73 @@ if __name__ == "__main__":
 
     # Load agent
     agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
+    
+    config = load_config("baselines/ppo/config/ppo_guided_autonomy.yaml")
+    config = config.environment
 
     # Override default environment settings to match those the agent was trained with
-    default_config = EnvConfig()
-    config_dict = {
-        field.name: getattr(agent.config, field.name)
-        for field in dataclasses.fields(EnvConfig)
-        if hasattr(agent.config, field.name)
-        and getattr(agent.config, field.name)
-        != getattr(default_config, field.name)
-    }
-
-    # Add fixed overrides specific to WOSAC evaluation
-    config_dict["init_steps"] = INIT_STEPS
-    config_dict["init_mode"] = "wosac_eval"
-    config_dict["goal_behavior"] = "ignore"
-
-    logging.info(
-        f"initializing env with init_mode = {config_dict['init_mode']}"
+    # Make env
+    env_config = EnvConfig(
+        ego_state=config.ego_state,
+        road_map_obs=config.road_map_obs,
+        partner_obs=config.partner_obs,
+        reward_type=config.reward_type,
+        guidance_speed_weight=config.guidance_speed_weight,
+        guidance_heading_weight=config.guidance_heading_weight,
+        smoothness_weight=config.smoothness_weight,
+        norm_obs=config.norm_obs,
+        add_previous_action=config.add_previous_action,
+        guidance=config.guidance,
+        guidance_dropout_prob=config.guidance_dropout_prob,
+        add_reference_pos_xy=config.add_reference_pos_xy,
+        add_reference_speed=config.add_reference_speed,
+        add_reference_heading=config.add_reference_heading,
+        smoothen_trajectory=config.smoothen_trajectory,
+        dynamics_model=config.dynamics_model,
+        collision_behavior=config.collision_behavior,
+        goal_behavior=config.goal_behavior,
+        init_mode=config.init_mode,
+        polyline_reduction_threshold=config.polyline_reduction_threshold,
+        remove_non_vehicles=config.remove_non_vehicles,
+        lidar_obs=False, 
+        obs_radius=config.obs_radius,
+        max_steer_angle=config.max_steer_angle,
+        max_accel_value=config.max_accel_value,
+        action_space_steer_disc=config.action_space_steer_disc,
+        action_space_accel_disc=config.action_space_accel_disc,
+        # Override action space
+        steer_actions = torch.round(
+            torch.linspace(
+                -config.max_steer_angle, config.max_steer_angle, config.action_space_steer_disc
+            ),
+            decimals=3,
+            ),
+        accel_actions = torch.round(
+                torch.linspace(
+                    -config.max_accel_value, config.max_accel_value, config.action_space_accel_disc
+                ),
+                decimals=3,
+            ),
+        init_steps=INIT_STEPS,
+        guidance_mode=GUIDANCE_MODE,
     )
+    # default_config = EnvConfig()
+    # config_dict = {
+    #     field.name: getattr(agent.config, field.name)
+    #     for field in dataclasses.fields(EnvConfig)
+    #     if hasattr(agent.config, field.name)
+    #     and getattr(agent.config, field.name)
+    #     != getattr(default_config, field.name)
+    # }
 
-    env_config = dataclasses.replace(default_config, **config_dict)
+    # # Add fixed overrides specific to WOSAC evaluation
+    # config_dict["init_steps"] = INIT_STEPS
+    # config_dict["init_mode"] = "wosac_train"
+    # config_dict["guidance_mode"] = GUIDANCE_MODE
+
+    # logging.info(
+    #     f"initializing env with init_mode = {config_dict['init_mode']}"
+    # )
 
     # Make environment
     env = GPUDriveTorchEnv(
