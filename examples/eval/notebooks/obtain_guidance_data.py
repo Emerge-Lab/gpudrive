@@ -11,9 +11,9 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    GUIDANCE_MODE = "log_replay"
+    GUIDANCE_MODE = "vbd_online"
     DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
-    SAVE_PATH = "examples/eval/figures_data/"
+    SAVE_PATH = "examples/eval/figures_data/guidance/"
 
     env_config = EnvConfig(
         dynamics_model="classic",
@@ -23,14 +23,14 @@ if __name__ == "__main__":
         add_reference_heading=True,
         add_reference_speed=True,
         add_reference_pos_xy=True,
-        init_mode="wosac_train",
+        init_mode="wosac_eval",
         smoothen_trajectory=False,
     )
     render_config = RenderConfig()
 
     train_loader = SceneDataLoader(
         root=DATASET,
-        batch_size=2,
+        batch_size=10,
         dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,
+        max_cont_agents=32,
         device="cuda",
     )
 

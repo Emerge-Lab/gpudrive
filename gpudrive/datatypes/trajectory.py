@@ -228,7 +228,6 @@ class VBDTrajectory:
             torch.int32
         )
         
-
     @classmethod
     def from_tensor(
         cls,

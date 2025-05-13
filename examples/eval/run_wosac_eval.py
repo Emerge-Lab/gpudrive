@@ -92,7 +92,7 @@ def rollout(
         info.collided_with_vehicle == 1
     ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
     control_mask = control_mask_all & ~zero_action_mask
-    
+
     next_obs = env.reset(mask=control_mask)
 
     # Get scenario ids
@@ -143,7 +143,7 @@ def rollout(
             agent_observation_frames[idx].append(img_from_fig(agent_obs))
 
         # Get next observation
-        next_obs = env.get_obs(control_mask)          
+        next_obs = env.get_obs(control_mask)
         # NOTE(dc): Make sure to decouple the obs from the reward function
         reward = env.get_rewards()
         done = env.get_dones()
@@ -235,6 +235,7 @@ def rollout(
 
     return scenario_ids, scenario_rollouts, scenario_rollout_masks
 
+
 def load_config(config_path):
     """Load the configuration file."""
     with open(config_path, "r") as f:
@@ -252,9 +253,11 @@ if __name__ == "__main__":
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = False
+    RENDER = True
     LOG_DIR = "examples/eval/figures_data/wosac/"
-    GUIDANCE_MODE = "log_replay" #"vbd_amortized"
+    GUIDANCE_MODE = (
+        "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
+    )
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
@@ -269,16 +272,16 @@ if __name__ == "__main__":
         batch_size=NUM_ENVS,
         dataset_size=DATASET_SIZE,
         sample_with_replacement=True,
-        shuffle=False,
+        shuffle=True,
         file_prefix="",
     )
 
     # Load agent
     agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
-    
+
     # config = load_config("baselines/ppo/config/ppo_guided_autonomy.yaml")
     # config = config.environment
-    
+
     config = agent.config
 
     # Override default environment settings to match those the agent was trained with
@@ -304,25 +307,29 @@ if __name__ == "__main__":
         goal_behavior=config.goal_behavior,
         polyline_reduction_threshold=config.polyline_reduction_threshold,
         remove_non_vehicles=config.remove_non_vehicles,
-        lidar_obs=False, 
+        lidar_obs=False,
         obs_radius=config.obs_radius,
         max_steer_angle=config.max_steer_angle,
         max_accel_value=config.max_accel_value,
         action_space_steer_disc=config.action_space_steer_disc,
         action_space_accel_disc=config.action_space_accel_disc,
         # Override action space
-        steer_actions = torch.round(
+        steer_actions=torch.round(
             torch.linspace(
-                -config.max_steer_angle, config.max_steer_angle, config.action_space_steer_disc
+                -config.max_steer_angle,
+                config.max_steer_angle,
+                config.action_space_steer_disc,
             ),
             decimals=3,
+        ),
+        accel_actions=torch.round(
+            torch.linspace(
+                -config.max_accel_value,
+                config.max_accel_value,
+                config.action_space_accel_disc,
             ),
-        accel_actions = torch.round(
-                torch.linspace(
-                    -config.max_accel_value, config.max_accel_value, config.action_space_accel_disc
-                ),
-                decimals=3,
-            ),
+            decimals=3,
+        ),
         init_mode="wosac_eval",
         init_steps=INIT_STEPS,
         guidance_mode=GUIDANCE_MODE,
