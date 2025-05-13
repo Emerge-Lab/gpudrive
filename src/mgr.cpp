@@ -907,7 +907,7 @@ Tensor Manager::vbdTrajectoryTensor() const {
     {
         impl_->numWorlds,
         consts::kMaxAgentCount,
-        consts::episodeLen,
+        consts::kTrajectoryLength,
         6,
     });
 }
