@@ -109,8 +109,8 @@ static inline void populateVBDTrajectory(Engine &ctx, const Entity &agent, const
     auto &vbd_trajectory = ctx.get<VBDTrajectory>(agent_iface);
     
     // Copy VBD trajectories from the map object
-    for (int i = 0; i < consts::episodeLen; i++) {
-        for (int j = 0; j < 5; j++) {
+    for (int i = 0; i < consts::kTrajectoryLength; i++) {
+        for (int j = 0; j < 6; j++) {
             vbd_trajectory.trajectories[i][j] = agentInit.vbd_trajectories[i][j];
         }
     }
