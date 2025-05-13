@@ -7,9 +7,9 @@ from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.env.config import EnvConfig
 from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.visualize.utils import img_from_fig
+from gpudrive.utils.checkpoint import load_agent
 
-
-def test_rollout(focus_agents=[0, 1], render=False):
+def test_rollout(focus_agents=[0, 1], render=False, agent=None):
     run = wandb.init(project="humanlike_tests", group="rollout_tests")
 
     env_config = EnvConfig(
@@ -28,6 +28,7 @@ def test_rollout(focus_agents=[0, 1], render=False):
         off_road_weight=-0.0,
         guidance_heading_weight=0.005,
         guidance_speed_weight=0.0005,
+        
     )
 
     # Create data loader
@@ -45,32 +46,38 @@ def test_rollout(focus_agents=[0, 1], render=False):
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=32,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     control_mask = env.cont_agent_mask
 
     # Rollout
-    obs = env.reset(mask=control_mask)
+    next_obs = env.reset(mask=control_mask)
 
     sim_frames = []
     agent_obs_frames = {i: [] for i in focus_agents}
     cum_reward = np.zeros((env.num_worlds, env.max_cont_agents))
-
+    
     expert_actions, _, _, _ = env.get_expert_actions()
 
     for time_step in range(env.init_steps, env.episode_len):
         print(f"Step: {env.step_in_world[0, 0, 0].item()}")
 
         # Step
-        rand_actions = torch.randint(
-            low=0, high=77, size=expert_actions[:, :, time_step, 0].shape
-        )
+        if agent is not None: # Rollout with pre-trained agent
+            control_mask = env.cont_agent_mask
+            action, _, _, _ = agent(next_obs)
+            action_template = torch.zeros(
+                (1, 32), dtype=torch.int64, device='cuda'
+            )
+            action_template[control_mask] = action.to('cuda')
+            
+            env.step_dynamics(action_template)
+            
+        else:
+            env.step_dynamics(expert_actions[:, :, time_step, :])
 
-        env.step_dynamics(expert_actions[:, :, time_step, :])
-        # env.step_dynamics(rand_actions)
-
-        obs = env.get_obs(control_mask)
+        next_obs = env.get_obs(control_mask)
         reward = env.get_rewards()
         done = env.get_dones()
         info = env.get_infos()
@@ -132,10 +139,31 @@ def test_rollout(focus_agents=[0, 1], render=False):
                     )
                 }
             )
+            
+        sim_frames_arr = np.array(sim_frames)
+        wandb.log(
+            {
+                "sim/render": wandb.Video(
+                    np.moveaxis(sim_frames_arr, -1, 1),
+                    fps=5,
+                    format="mp4",
+                )
+            }
+        )
 
     env.close()
     run.finish()
 
 
 if __name__ == "__main__":
-    test_rollout(focus_agents=[0, 1, 2, 3, 4, 5, 6], render=True)
+    
+    
+    # load policy    
+    CPT_PATH = (
+        "checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000100.pt"
+    )
+    agent = load_agent(path_to_cpt=CPT_PATH).to("cuda")
+
+    
+    
+    test_rollout(focus_agents=[0, 1, 2, 3, 4], render=True, agent=agent)
