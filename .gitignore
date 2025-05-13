@@ -30,6 +30,8 @@ data/processed/testing/*
 data/processed/pop_play/*
 data/processed/hand_designed/*
 figures/
+checkpoints/
+figures_data/
 data/other/*
 wosac/
 
