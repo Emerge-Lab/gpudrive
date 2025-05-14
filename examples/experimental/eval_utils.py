@@ -369,6 +369,7 @@ def multi_policy_rollout(
     env,
     policies, 
     device,
+    trials: int = 5,
     deterministic: bool = False,
     render_sim_state: bool = False,
     render_every_n_steps: int = 1,
@@ -399,16 +400,17 @@ def multi_policy_rollout(
     """
     def compute_metrics(policy_metrics,policies):
         for policy_name, policy_data in policies.items():
+            for trial in range(trials):
                 
                 controlled_per_scene = policy_data['mask'].sum(dim=1)
                 
-                policy_metrics[policy_name]['off_road_count'] = ( policy_metrics[policy_name]["off_road"] > 0).float().sum(axis=1)
-                policy_metrics[policy_name]['collided_count'] = (policy_metrics[policy_name]["collided"]   > 0).float().sum(axis=1)
-                policy_metrics[policy_name]['goal_achieved_count'] = (policy_metrics[policy_name]['goal_achieved']   > 0).float().sum(axis=1)
+                policy_metrics[policy_name][trial]['off_road_count'] = ( policy_metrics[policy_name][trial]["off_road"] > 0).float().sum(axis=1)
+                policy_metrics[policy_name][trial]['collided_count'] = (policy_metrics[policy_name][trial]["collided"]   > 0).float().sum(axis=1)
+                policy_metrics[policy_name][trial]['goal_achieved_count'] = (policy_metrics[policy_name][trial]['goal_achieved']   > 0).float().sum(axis=1)
                 
-                policy_metrics[policy_name]['frac_off_road'] = policy_metrics[policy_name]['off_road_count'] / controlled_per_scene
-                policy_metrics[policy_name]['frac_collided'] = policy_metrics[policy_name]['collided_count'] / controlled_per_scene
-                policy_metrics[policy_name]['frac_goal_achieved'] = policy_metrics[policy_name]['goal_achieved_count'] / controlled_per_scene
+                policy_metrics[policy_name][trial]['frac_off_road'] = policy_metrics[policy_name][trial]['off_road_count'] / controlled_per_scene
+                policy_metrics[policy_name][trial]['frac_collided'] = policy_metrics[policy_name][trial]['collided_count'] / controlled_per_scene
+                policy_metrics[policy_name][trial]['frac_goal_achieved'] = policy_metrics[policy_name][trial]['goal_achieved_count'] / controlled_per_scene
             
 
         return policy_metrics
@@ -450,10 +452,13 @@ def multi_policy_rollout(
     next_obs = env.reset()
     policy_metrics = {
         policy_name: {
-            "goal_achieved": torch.zeros((num_worlds, max_agent_count), device=device),
-            "collided": torch.zeros((num_worlds, max_agent_count), device=device),
-            "off_road": torch.zeros((num_worlds, max_agent_count), device=device),
-            "reward": torch.zeros((num_worlds, max_agent_count), device=device),
+            trial: {
+                "goal_achieved": torch.zeros((num_worlds, max_agent_count), device=device),
+                "collided": torch.zeros((num_worlds, max_agent_count), device=device),
+                "off_road": torch.zeros((num_worlds, max_agent_count), device=device),
+                "reward": torch.zeros((num_worlds, max_agent_count), device=device),
+            }
+            for trial in range(trials)  
         }
         for policy_name in policies
     }
@@ -478,143 +483,146 @@ def multi_policy_rollout(
             policy_data['env_to_step_in_trial_dict'] = {
             f"world_{i}": 0 for i in range(num_worlds)
             }
+    for trial in range(trials):
+        episode_lengths = torch.zeros(num_worlds)
+        next_obs = env.reset()
+            
+        active_worlds = list(range(num_worlds))
+        control_mask = env.cont_agent_mask
+        live_agent_mask = control_mask.clone()
+        
+        for time_step in range(episode_len):
+            print(f't: {time_step}')
 
-    for time_step in range(episode_len):
-        print(f't: {time_step}')
+            policy_live_masks = {name: policy_data['mask'] & live_agent_mask for name, policy_data in policies.items()}
 
-        policy_live_masks = {name: policy_data['mask'] & live_agent_mask for name, policy_data in policies.items()}
+            all_partner_observations = env._get_partner_obs()
+            actions = {}
+            for policy_name, policy_data in policies.items():
+                policy_fn = policy_data['func']
+                live_mask = policy_live_masks[policy_name]
+                if live_mask.any():
+                    agent_observations = next_obs[live_mask]
+                    if 'history' in policy_data:
+                        if time_step == 18:
+                            pass
+                        live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
+                        live_keys = [tuple(indice.tolist()) for indice in live_indices]
+                        observations_list = []
 
-        all_partner_observations = env._get_partner_obs()
-        actions = {}
-        for policy_name, policy_data in policies.items():
-            policy_fn = policy_data['func']
-            live_mask = policy_live_masks[policy_name]
-            if live_mask.any():
-                agent_observations = next_obs[live_mask]
-                if 'history' in policy_data:
-                    if time_step == 18:
-                        pass
-                    live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
-                    live_keys = [tuple(indice.tolist()) for indice in live_indices]
-                    observations_list = []
+                        for idx, key in enumerate(live_keys):
+                            observation = agent_observations[idx]
+                            agent_observation = get_history_batch(policy_data['history_dicts'][key],
+                                                                observation,
+                                                                device)
 
-                    for idx, key in enumerate(live_keys):
-                        observation = agent_observations[idx]
-                        agent_observation = get_history_batch(policy_data['history_dicts'][key],
-                                                            observation,
-                                                            device)
+                            observations_list.append(agent_observation)
 
-                        observations_list.append(agent_observation)
-
-                    agent_observations = torch.vstack(observations_list)
+                        agent_observations = torch.vstack(observations_list)
 
 
-                agent_actions, _, _, _  = policy_fn(
-                    agent_observations, deterministic=deterministic
-                )
-                actions[policy_name]= agent_actions
-                if 'history' in policy_data:
-                    partner_obs = all_partner_observations[live_agent_mask]
-                    for idx,key in enumerate(live_keys):
-                        world_key = key[0]
-                        policy_data['history_dicts'][key] = update_history(
-                            policy_data['history_dicts'][key],
-                            partner_obs[idx],
-                            policy_data['history']['max_seq_len'],
-                            policy_data['history']['log_history'],
-                            policy_data['env_to_step_in_trial_dict'][f'world_{world_key}']
+                    agent_actions, _, _, _  = policy_fn(
+                        agent_observations, deterministic=deterministic
+                    )
+                    actions[policy_name]= agent_actions
+                    if 'history' in policy_data:
+                        partner_obs = all_partner_observations[live_agent_mask]
+                        for idx,key in enumerate(live_keys):
+                            world_key = key[0]
+                            policy_data['history_dicts'][key] = update_history(
+                                policy_data['history_dicts'][key],
+                                partner_obs[idx],
+                                policy_data['history']['max_seq_len'],
+                                policy_data['history']['log_history'],
+                                policy_data['env_to_step_in_trial_dict'][f'world_{world_key}']
+                                )
+
+                        live_worlds = list(set([idx[0] for idx in live_keys]))
+                        for world in live_worlds:
+                            policy_data['env_to_step_in_trial_dict'][f'world_{world}'] += 1 
+
+                        
+                    
+            
+            combined_mask = torch.zeros_like(live_agent_mask, dtype=torch.bool)
+            for live_mask in policy_live_masks.values():
+                combined_mask |= live_mask
+            assert torch.all(live_agent_mask == combined_mask), "Live agent mask mismatch!"
+
+            action_template = torch.zeros((num_worlds, max_agent_count), dtype=torch.int64, device=device)
+
+            # Assign actions based on policy masks
+            for policy_name, action in actions.items():
+                live_mask = policy_live_masks[policy_name]
+                if action.numel() > 0:
+                    action_template[live_mask] = action.to(dtype=action_template.dtype, device=device)
+                    
+            assert(torch.all(action_template *combined_mask == action_template)), "mismatch between action template and combined mask" 
+            # Step environment
+            env.step_dynamics(action_template)
+
+            if render_sim_state and len(active_worlds) > 0:
+                    
+                    has_live_agent = torch.where(
+                        live_agent_mask[active_worlds, :].sum(axis=1) > 0
+                    )[0].tolist()
+
+                    if time_step % render_every_n_steps == 0:
+                        if center_on_ego:
+                            agent_indices = torch.argmax(control_mask.to(torch.uint8), dim=1).tolist()
+                        else:
+                            agent_indices = None
+
+                        sim_state_figures = env.vis.plot_simulator_state(
+                            env_indices=has_live_agent,
+                            time_steps=[time_step] * len(has_live_agent),
+                            zoom_radius=zoom_radius,
+                            center_agent_indices=agent_indices,
+                            policy_masks=policies 
+                        )
+                        for idx, env_id in enumerate(has_live_agent):
+                            sim_state_frames[env_id].append(
+                                img_from_fig(sim_state_figures[idx])
                             )
 
-                    live_worlds = list(set([idx[0] for idx in live_keys]))
-                    for world in live_worlds:
-                        policy_data['env_to_step_in_trial_dict'][f'world_{world}'] += 1 
 
-                    
-                
-        
-        combined_mask = torch.zeros_like(live_agent_mask, dtype=torch.bool)
-        for live_mask in policy_live_masks.values():
-            combined_mask |= live_mask
-        assert torch.all(live_agent_mask == combined_mask), "Live agent mask mismatch!"
-
-        action_template = torch.zeros((num_worlds, max_agent_count), dtype=torch.int64, device=device)
-
-        # Assign actions based on policy masks
-        for policy_name, action in actions.items():
-            live_mask = policy_live_masks[policy_name]
-            if action.numel() > 0:
-                action_template[live_mask] = action.to(dtype=action_template.dtype, device=device)
-                
-        assert(torch.all(action_template *combined_mask == action_template)), "mismatch between action template and combined mask" 
-        # Step environment
-        env.step_dynamics(action_template)
-
-        if render_sim_state and len(active_worlds) > 0:
-                
-                has_live_agent = torch.where(
-                    live_agent_mask[active_worlds, :].sum(axis=1) > 0
-                )[0].tolist()
-
-                if time_step % render_every_n_steps == 0:
-                    if center_on_ego:
-                        agent_indices = torch.argmax(control_mask.to(torch.uint8), dim=1).tolist()
-                    else:
-                        agent_indices = None
-
-                    sim_state_figures = env.vis.plot_simulator_state(
-                        env_indices=has_live_agent,
-                        time_steps=[time_step] * len(has_live_agent),
-                        zoom_radius=zoom_radius,
-                        center_agent_indices=agent_indices,
-                        policy_masks=policies 
-                    )
-                    for idx, env_id in enumerate(has_live_agent):
-                        sim_state_frames[env_id].append(
-                            img_from_fig(sim_state_figures[idx])
-                        )
+            # Update observations and agent statuses
+            next_obs = env.get_obs()
+            dones = env.get_dones().bool()
+            infos = env.get_infos()
+            reward =env.get_rewards(
+                collision_weight=collision_weight,
+                off_road_weight=off_road_weight,
+                goal_achieved_weight=goal_achieved_weight,
+            )
 
 
-        # Update observations and agent statuses
-        next_obs = env.get_obs()
-        dones = env.get_dones().bool()
-        infos = env.get_infos()
-        reward =env.get_rewards(
-            collision_weight=collision_weight,
-            off_road_weight=off_road_weight,
-            goal_achieved_weight=goal_achieved_weight,
-        )
+            for policy_name, live_mask in policy_live_masks.items():
+                policy_metrics[policy_name][trial]["off_road"][live_mask] += infos.off_road[live_mask]
+                policy_metrics[policy_name][trial]["collided"][live_mask] += infos.collided[live_mask]
+                policy_metrics[policy_name][trial]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
+                policy_metrics[policy_name][trial]["reward"][live_mask] += reward[live_mask]
 
 
-        for policy_name, live_mask in policy_live_masks.items():
-            policy_metrics[policy_name]["off_road"][live_mask] += infos.off_road[live_mask]
-            policy_metrics[policy_name]["collided"][live_mask] += infos.collided[live_mask]
-            policy_metrics[policy_name]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
-            policy_metrics[policy_name]["reward"][live_mask] += reward[live_mask]
+            live_agent_mask[dones] = False
 
+            # Process completed worlds
+            num_dones_per_world = (dones & control_mask).sum(dim=1)
+            total_controlled_agents = control_mask.sum(dim=1)
+            done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
 
-        live_agent_mask[dones] = False
+            for world in done_worlds:
+                if world in active_worlds:
+                    active_worlds.remove(world)
+                    episode_lengths[world] = time_step
 
-        # Process completed worlds
-        num_dones_per_world = (dones & control_mask).sum(dim=1)
-        total_controlled_agents = control_mask.sum(dim=1)
-        done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
+            if return_agent_positions:
+                global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
+                agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
+                agent_positions[:, :, time_step, 1] = global_agent_states.pos_y
 
-        for world in done_worlds:
-            if world in active_worlds:
-                active_worlds.remove(world)
-                episode_lengths[world] = time_step
-
-        if return_agent_positions:
-            global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
-            agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
-            agent_positions[:, :, time_step, 1] = global_agent_states.pos_y
-
-        if not active_worlds:  
-            break
-    
-    
-
-
+            if not active_worlds:  
+                break               
     
     metrics =compute_metrics(policy_metrics,policies)
 
