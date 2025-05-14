@@ -10,9 +10,6 @@ import json
 from tqdm import tqdm
 from waymo_open_dataset.protos import scenario_pb2
 
-from waymax import dataloader
-from waymax.config import DataFormat
-
 def extract_scene_from_tfrecord(tfrecord_path, scene_id, output_path):
     """
     Extract a specific scene from a TFRecord file based on its ID.
@@ -85,7 +82,7 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir):
         prefix, suffix = name_parts
         
         # Find corresponding TFRecord file
-        tfrecord_path = os.path.join(tfrecord_dir, dataset, f"{dataset}_tfexample.{prefix}")
+        tfrecord_path = os.path.join(tfrecord_dir, dataset, f"{dataset}.{prefix}")
         
         if not os.path.exists(tfrecord_path):
             print(f"TFRecord file not found: {tfrecord_path}")
@@ -102,7 +99,7 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir):
             json.dump(json_data, f_out)
         
         # Extract the scene from the TFRecord file
-        tfrecord_output_path = os.path.join(tfrecord_save_dir, f"{suffix}.tfrecord")
+        tfrecord_output_path = os.path.join(tfrecord_save_dir, f"{suffix}.tfrecords")
         found = extract_scene_from_tfrecord(tfrecord_path, suffix, tfrecord_output_path)
         
         if not found:
@@ -112,15 +109,15 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='/data/processed/')
-    parser.add_argument('--save_dir', type=str, default='/data/processed/wosac/')
-    parser.add_argument('--tfrecord_dir', type=str, default='/data/raw/')
+    parser.add_argument('--data_dir', type=str, default='data/processed/')
+    parser.add_argument('--save_dir', type=str, default='data/processed/wosac/')
+    parser.add_argument('--tfrecord_dir', type=str, default='data/raw/')
     parser.add_argument('--dataset', type=str, default='validation')
-    parser.add_argument('--num_scenes', type=int, default=1000)  # New parameter for selecting n scenes
-    parser.add_argument('--num_workers', type=int, default=1)  # Kept from original code
+    parser.add_argument('--num_scenes', type=int, default=1000)
+    parser.add_argument('--num_workers', type=int, default=1)
     args = parser.parse_args()
     
-    os.makedirs(args.save_dir, exist_ok=True)
+    # os.makedirs(args.save_dir, exist_ok=True)
     
     print(f'Processing data from {args.data_dir} and Saving to {args.save_dir}')
     print(f'Selecting {args.num_scenes} random scenes per dataset')
