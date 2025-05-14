@@ -50,7 +50,7 @@ class WOSACMetrics(Metric):
             self.challenge_type = challenge_type
 
         self.wosac_config = load_metrics_config(self.challenge_type)
-        self.guidance_mode = guidance_mode  
+        self.guidance_mode = guidance_mode
         self.guidance_density = guidance_density
 
         # Initialize baseline df if not provided
@@ -88,14 +88,20 @@ class WOSACMetrics(Metric):
         if log_dir is not None:
             # Get data and time for the current run as filename
             log_dir = Path(log_dir)
-            self.log_file_path = log_dir / f"score_dist_{self.guidance_mode}_density_{self.guidance_density:.2f}_{self.timestamp}.csv"
-            self.log_aggregate_table_path = log_dir / f"wosac_agg_{self.guidance_mode}_density_{self.guidance_density}_{self.timestamp}.csv"
+            self.log_file_path = (
+                log_dir
+                / f"score_dist_{self.guidance_mode}_density_{self.guidance_density:.2f}_{self.timestamp}.csv"
+            )
+            self.log_aggregate_table_path = (
+                log_dir
+                / f"wosac_agg_{self.guidance_mode}_density_{self.guidance_density}_{self.timestamp}.csv"
+            )
             log_dir.mkdir(parents=True, exist_ok=True)
-            self.log_file = csv.writer(open(self.log_file_path, 'w'))
+            self.log_file = csv.writer(open(self.log_file_path, "w"))
             # Add header to the log file
             all_rows = self.field_names.copy()
             all_rows.insert(0, "scenario_id")
-            self.log_file.writerow(all_rows) 
+            self.log_file.writerow(all_rows)
 
         else:
             self.log_file = None
@@ -234,18 +240,16 @@ class WOSACMetrics(Metric):
         ):
             try:
                 scenario_result = self._compute_scenario_metrics(
-                        self.wosac_config,
-                        _scenario,
-                        _scenario_rollout,
-                        self.ego_only,
-                        # scenario_rollouts_mask=_scenario_mask
-                    )
-                pool_scenario_metrics.append(
-                    scenario_result
+                    self.wosac_config,
+                    _scenario,
+                    _scenario_rollout,
+                    self.ego_only,
+                    # scenario_rollouts_mask=_scenario_mask
                 )
+                pool_scenario_metrics.append(scenario_result)
 
                 if self.log_file is not None:
-                    # Log the scenario metrics to the file  
+                    # Log the scenario metrics to the file
                     result_to_log = [
                         _scenario_rollout.scenario_id,
                         scenario_result.metametric,
@@ -262,7 +266,7 @@ class WOSACMetrics(Metric):
                         scenario_result.min_average_displacement_error,
                         scenario_result.traffic_light_violation_likelihood,
                         scenario_result.simulated_collision_rate,
-                        scenario_result.simulated_offroad_rate, 
+                        scenario_result.simulated_offroad_rate,
                     ]
                     self.log_file.writerow(result_to_log)
             except Exception as e:
@@ -343,7 +347,9 @@ class WOSACMetrics(Metric):
         if self.save_table_with_baselines:
             self._add_current_method_to_baselines(metrics_dict, final_metrics)
 
-            self.baselines_df.to_csv(self.log_aggregate_table_path, index=False)
+            self.baselines_df.to_csv(
+                self.log_aggregate_table_path, index=False
+            )
             print(f"Saved df to {self.log_aggregate_table_path}")
 
         return out_dict

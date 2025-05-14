@@ -70,6 +70,7 @@ def rollout(
     save_videos: bool = True,
     video_dir: str = "videos",
     video_format: str = "gif",
+    guidance_mode: str = "vbd_online",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
     # Storage
@@ -78,22 +79,25 @@ def rollout(
     agent_observation_frames = {env_id: [] for env_id in range(num_envs)}
 
     start_env_rollout = perf_counter()
-
-    _ = env.reset()
-
+    
     # Zero out actions for parked vehicles
     info = Info.from_tensor(
         env.sim.info_tensor(),
         backend=env.backend,
         device=env.device,
     )
-    control_mask_all = env.cont_agent_mask.clone()
+   
     zero_action_mask = (info.off_road == 1) | (
         info.collided_with_vehicle == 1
     ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
-    control_mask = control_mask_all & ~zero_action_mask
-
+    control_mask = env.cont_agent_mask.clone()
+    
     next_obs = env.reset(mask=control_mask)
+    
+    # Guidance logging
+    num_guidance_points = env.valid_guidance_points 
+    guidance_densities = num_guidance_points / env.reference_traj_len
+    print(f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n")
 
     # Get scenario ids
     scenario_ids_dict = env.get_scenario_ids()
@@ -105,6 +109,7 @@ def rollout(
     heading_list = []
     done_list = [env.get_dones()]
 
+    # Get initial states
     pos_x, pos_y, pos_z, heading, _ = get_state(env)
 
     for time_step in range(env.episode_len - init_steps):
@@ -116,6 +121,11 @@ def rollout(
             (num_envs, max_agents), dtype=torch.int64, device=device
         )
         action_template[control_mask] = action.to(device)
+    
+        # Find the integer key for the "do nothing" action (zero steering, zero acceleration)
+        # Check using env.action_key_to_values[DO_NOTHING_ACTION_INT]
+        DO_NOTHING_ACTION_INT = [key for key, value in env.action_key_to_values.items() if abs(value[0]) == 0.0 and abs(value[1]) == 0.0 and abs(value[2]) == 0.0][0]
+        action_template[zero_action_mask] = DO_NOTHING_ACTION_INT
 
         # Step
         env.step_dynamics(action_template)
@@ -165,7 +175,7 @@ def rollout(
                 and len(simulator_state_frames[idx]) > 0
             ):
                 mediapy.write_video(
-                    f"{video_dir}/sim_state_env_{idx}_{scenario_id}.{video_format}",
+                    f"{video_dir}/{guidance_mode}_sim_state_env_{idx}_{scenario_id}.{video_format}",
                     np.array(simulator_state_frames[idx]),
                     fps=8,
                     codec=video_format,
@@ -174,7 +184,7 @@ def rollout(
         if render_agent_pov and len(agent_observation_frames[0]) > 0:
             scenario_id = scenario_ids_dict[0]
             mediapy.write_video(
-                f"{video_dir}/agent_0_{scenario_id}.{video_format}",
+                f"{video_dir}/{guidance_mode}_agent_0_{scenario_id}.{video_format}",
                 np.array(agent_observation_frames[0]),
                 fps=8,
                 codec=video_format,
@@ -246,24 +256,26 @@ def load_config(config_path):
 if __name__ == "__main__":
 
     # Settings
-    MAX_AGENTS = 32  # TODO: Set to 128 for real eval
-    NUM_ENVS = 20
+    MAX_AGENTS = madrona_gpudrive.kMaxAgentCount # TODO: Set to 128 for real eval
+    NUM_ENVS = 75
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 100
-    RENDER = True
+    RENDER = False
     LOG_DIR = "examples/eval/figures_data/wosac/"
     GUIDANCE_MODE = (
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
+    GUIDANCE_DROPOUT_PROB = 0.0
+    SMOOTHEN_TRAJECTORY = True
 
     DATA_JSON = "data/processed/wosac/validation_json_100"
     DATA_TFRECORD = "data/processed/wosac/validation_tfrecord_100"
 
     CPT_PATH = (
-        "checkpoints/model_guidance_logs__S_100__05_12_23_14_58_678_001000.pt"
+        "checkpoints/model_guidance_logs__R_10000__05_13_14_38_56_650_002400.pt"
     )
 
     # Create data loader
@@ -274,6 +286,7 @@ if __name__ == "__main__":
         sample_with_replacement=True,
         shuffle=True,
         file_prefix="",
+        seed=10,
     )
 
     # Load agent
@@ -297,11 +310,9 @@ if __name__ == "__main__":
         norm_obs=config.norm_obs,
         add_previous_action=config.add_previous_action,
         guidance=config.guidance,
-        guidance_dropout_prob=config.guidance_dropout_prob,
         add_reference_pos_xy=config.add_reference_pos_xy,
         add_reference_speed=config.add_reference_speed,
         add_reference_heading=config.add_reference_heading,
-        smoothen_trajectory=config.smoothen_trajectory,
         dynamics_model=config.dynamics_model,
         collision_behavior=config.collision_behavior,
         goal_behavior=config.goal_behavior,
@@ -333,6 +344,9 @@ if __name__ == "__main__":
         init_mode="wosac_eval",
         init_steps=INIT_STEPS,
         guidance_mode=GUIDANCE_MODE,
+        guidance_dropout_prob=GUIDANCE_DROPOUT_PROB, 
+        guidance_dropout_mode="avg",  # Options: "max", "avg"
+        smoothen_trajectory=SMOOTHEN_TRAJECTORY,
     )
 
     # Make environment
@@ -346,8 +360,10 @@ if __name__ == "__main__":
     wosac_metrics = WOSACMetrics(
         save_table_with_baselines=True,
         log_dir=LOG_DIR,
+        guidance_mode=GUIDANCE_MODE,
+        guidance_density=1.0-GUIDANCE_DROPOUT_PROB,
     )
-
+    
     for _ in tqdm(range(NUM_DATA_BATCHES)):
         for _ in range(NUM_ROLLOUTS_PER_BATCH):
 
@@ -361,6 +377,7 @@ if __name__ == "__main__":
                 render_simulator_states=RENDER,
                 render_agent_pov=RENDER,
                 save_videos=RENDER,
+                guidance_mode=GUIDANCE_MODE,
             )
             tf_record_paths = [
                 os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
