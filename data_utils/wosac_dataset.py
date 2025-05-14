@@ -7,7 +7,9 @@ import glob
 import argparse
 import random
 import json
+import multiprocessing
 from tqdm import tqdm
+from functools import partial
 from waymo_open_dataset.protos import scenario_pb2
 
 def extract_scene_from_tfrecord(tfrecord_path, scene_id, output_path):
@@ -39,54 +41,35 @@ def extract_scene_from_tfrecord(tfrecord_path, scene_id, output_path):
     
     return found
 
-def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir):
+def process_single_scene(json_file, dataset, data_dir, tfrecord_dir, json_save_dir, tfrecord_save_dir):
     """
-    Process a specific dataset, selecting random scenes and extracting their TFRecords.
+    Process a single scene file.
     
     Args:
-        dataset (str): Name of the dataset to process
-        num_scenes (int): Number of scenes to randomly select
-        data_dir (str): Directory containing JSON files
+        json_file (str): Path to the JSON file
+        dataset (str): Name of the dataset
+        data_dir (str): Base directory containing JSON files
         tfrecord_dir (str): Directory containing TFRecord files
-        save_dir (str): Directory to save processed files
+        json_save_dir (str): Directory to save processed JSON files
+        tfrecord_save_dir (str): Directory to save processed TFRecord files
+        
+    Returns:
+        tuple: (json_file, success, message)
     """
-    # Set up paths
-    data_path = os.path.join(data_dir, dataset, '*.json')
-    json_files = glob.glob(data_path)
-    
-    # Create output directories
-    json_save_dir = os.path.join(save_dir, f"{dataset}_json")
-    tfrecord_save_dir = os.path.join(save_dir, f"{dataset}_tfrecord")
-    os.makedirs(json_save_dir, exist_ok=True)
-    os.makedirs(tfrecord_save_dir, exist_ok=True)
-    
-    # Randomly select scenes
-    n_files = len(json_files)
-    if n_files == 0:
-        print(f"No JSON files found in {data_path}")
-        return
-    
-    print(f"Found {n_files} files in {dataset} dataset")
-    num_to_select = min(num_scenes, n_files)
-    selected_files = random.sample(json_files, num_to_select)
-    
-    print(f"Processing {num_to_select} randomly selected files from {dataset}")
-    
-    for json_file in tqdm(selected_files):
+    try:
         # Extract prefix and suffix from filename
         filename = os.path.basename(json_file)
         name_parts = os.path.splitext(filename)[0].split('_', 1)  # Split on the first underscore only
         if len(name_parts) != 2:
-            print(f"Invalid filename format: {filename}, expected <prefix>_<suffix>.json")
-            continue
+            return json_file, False, f"Invalid filename format: {filename}, expected <prefix>_<suffix>.json"
+        
         prefix, suffix = name_parts
         
         # Find corresponding TFRecord file
         tfrecord_path = os.path.join(tfrecord_dir, dataset, f"{dataset}.{prefix}")
         
         if not os.path.exists(tfrecord_path):
-            print(f"TFRecord file not found: {tfrecord_path}")
-            continue
+            return json_file, False, f"TFRecord file not found: {tfrecord_path}"
         
         # Copy the JSON file to the output directory with new name
         json_output_path = os.path.join(json_save_dir, f"{suffix}.json")
@@ -103,9 +86,94 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir):
         found = extract_scene_from_tfrecord(tfrecord_path, suffix, tfrecord_output_path)
         
         if not found:
-            print(f"Scene {suffix} not found in TFRecord file: {tfrecord_path}")
             # Remove the JSON file if the TFRecord extraction failed
             os.remove(json_output_path)
+            return json_file, False, f"Scene {suffix} not found in TFRecord file: {tfrecord_path}"
+        
+        return json_file, True, "Successfully processed"
+    
+    except Exception as e:
+        return json_file, False, f"Error processing {json_file}: {str(e)}"
+
+def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers):
+    """
+    Process a specific dataset, selecting random scenes and extracting their TFRecords.
+    
+    Args:
+        dataset (str): Name of the dataset to process
+        num_scenes (int): Number of scenes to randomly select
+        data_dir (str): Directory containing JSON files
+        tfrecord_dir (str): Directory containing TFRecord files
+        save_dir (str): Directory to save processed files
+        num_workers (int): Number of worker processes to use
+    """
+    # Set up paths
+    data_path = os.path.join(data_dir, dataset, '*.json')
+    json_files = glob.glob(data_path)
+    
+    # Create output directories
+    json_save_dir = os.path.join(save_dir, f"{dataset}", "json")
+    tfrecord_save_dir = os.path.join(save_dir, f"{dataset}", "tfrecord")
+    os.makedirs(json_save_dir, exist_ok=True)
+    os.makedirs(tfrecord_save_dir, exist_ok=True)
+    
+    # Randomly select scenes
+    n_files = len(json_files)
+    if n_files == 0:
+        print(f"No JSON files found in {data_path}")
+        return
+    
+    print(f"Found {n_files} files in {dataset} dataset")
+    num_to_select = min(num_scenes, n_files)
+    selected_files = random.sample(json_files, num_to_select)
+    
+    print(f"Processing {num_to_select} randomly selected files from {dataset} using {num_workers} workers")
+    
+    # Create a partial function with fixed arguments
+    process_func = partial(
+        process_single_scene,
+        dataset=dataset,
+        data_dir=data_dir,
+        tfrecord_dir=tfrecord_dir,
+        json_save_dir=json_save_dir,
+        tfrecord_save_dir=tfrecord_save_dir
+    )
+    
+    # Create a pool of workers and process the files
+    # Adjust number of workers to not exceed CPU count
+    num_workers = min(num_workers, multiprocessing.cpu_count(), len(selected_files))
+    
+    # If only one worker, process sequentially (avoiding multiprocessing overhead)
+    if num_workers == 1:
+        results = []
+        for json_file in tqdm(selected_files, desc=f"Processing {dataset}"):
+            results.append(process_func(json_file))
+    else:
+        # Use multiprocessing for parallel processing
+        with multiprocessing.Pool(num_workers) as pool:
+            results = list(tqdm(
+                pool.imap(process_func, selected_files),
+                total=len(selected_files),
+                desc=f"Processing {dataset}"
+            ))
+    
+    # Count successes and failures
+    successes = sum(1 for _, success, _ in results if success)
+    failures = len(results) - successes
+    
+    print(f"Finished processing {dataset}: {successes} succeeded, {failures} failed")
+    
+    # Print some failures if there are any (limit to 5 to avoid flooding console)
+    if failures > 0:
+        print("Some failures occurred:")
+        for _, success, message in results:
+            if not success:
+                print(f"  - {message}")
+                # Only print 5 failure messages max
+                failures -= 1
+                if failures == 5:
+                    print(f"  ... and {failures} more failures")
+                    break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -114,22 +182,22 @@ if __name__ == '__main__':
     parser.add_argument('--tfrecord_dir', type=str, default='data/raw/')
     parser.add_argument('--dataset', type=str, default='validation')
     parser.add_argument('--num_scenes', type=int, default=1000)
-    parser.add_argument('--num_workers', type=int, default=1)
+    parser.add_argument('--num_workers', type=int, default=multiprocessing.cpu_count())
     args = parser.parse_args()
     
-    # os.makedirs(args.save_dir, exist_ok=True)
+    os.makedirs(args.save_dir, exist_ok=True)
     
     print(f'Processing data from {args.data_dir} and Saving to {args.save_dir}')
-    print(f'Selecting {args.num_scenes} random scenes per dataset')
+    print(f'Selecting {args.num_scenes} random scenes per dataset with {args.num_workers} workers')
     
     if args.dataset == 'all' or args.dataset == 'training':
-        process('training', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir)
+        process('training', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
 
     if args.dataset == 'all' or args.dataset == 'testing':
-        process('testing', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir)
+        process('testing', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
             
     if args.dataset == 'all' or args.dataset == 'validation':
-        process('validation', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir)
+        process('validation', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
         
     if args.dataset == 'all' or args.dataset == 'validation_interactive':
-        process('validation_interactive', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir)
+        process('validation_interactive', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
