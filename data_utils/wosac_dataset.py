@@ -7,6 +7,7 @@ import glob
 import argparse
 import random
 import json
+import pickle  # Added for loading pickle files
 import multiprocessing
 from tqdm import tqdm
 from functools import partial
@@ -95,7 +96,28 @@ def process_single_scene(json_file, dataset, data_dir, tfrecord_dir, json_save_d
     except Exception as e:
         return json_file, False, f"Error processing {json_file}: {str(e)}"
 
-def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers):
+def find_json_by_suffix(data_path, suffix):
+    """
+    Find a JSON file with a specific suffix in a directory.
+    
+    Args:
+        data_path (str): Directory path to search in
+        suffix (str): Suffix to look for
+        
+    Returns:
+        str or None: Path to the JSON file if found, None otherwise
+    """
+    json_files = glob.glob(os.path.join(data_path, '*.json'))
+    
+    for json_file in json_files:
+        filename = os.path.basename(json_file)
+        name_parts = os.path.splitext(filename)[0].split('_', 1)
+        if len(name_parts) == 2 and name_parts[1] == suffix:
+            return json_file
+    
+    return None
+
+def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers, scene_ids_pkl=None):
     """
     Process a specific dataset, selecting random scenes and extracting their TFRecords.
     
@@ -106,10 +128,10 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers):
         tfrecord_dir (str): Directory containing TFRecord files
         save_dir (str): Directory to save processed files
         num_workers (int): Number of worker processes to use
+        scene_ids_pkl (str): Path to pickle file containing scene IDs
     """
     # Set up paths
-    data_path = os.path.join(data_dir, dataset, '*.json')
-    json_files = glob.glob(data_path)
+    data_path = os.path.join(data_dir, dataset)
     
     # Create output directories
     json_save_dir = os.path.join(save_dir, f"{dataset}", "json")
@@ -117,17 +139,56 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers):
     os.makedirs(json_save_dir, exist_ok=True)
     os.makedirs(tfrecord_save_dir, exist_ok=True)
     
-    # Randomly select scenes
-    n_files = len(json_files)
-    if n_files == 0:
-        print(f"No JSON files found in {data_path}")
+    selected_files = []
+    
+    # If pickle file with scene IDs is provided, use those IDs instead of random selection
+    if scene_ids_pkl:
+        try:
+            with open(scene_ids_pkl, 'rb') as f:
+                scene_ids = pickle.load(f)
+            
+            print(f"Loaded {len(scene_ids)} scene IDs from {scene_ids_pkl}")
+            
+            # Find corresponding JSON files for each scene ID
+            found_files = []
+            not_found_ids = []
+            
+            for suffix in scene_ids:
+                json_file = find_json_by_suffix(data_path, suffix)
+                if json_file:
+                    found_files.append(json_file)
+                else:
+                    not_found_ids.append(suffix)
+            
+            selected_files = found_files
+            
+            print(f"Found {len(selected_files)} matching JSON files, {len(not_found_ids)} scene IDs not found")
+            if not_found_ids and len(not_found_ids) < 10:
+                print(f"IDs not found: {', '.join(not_found_ids)}")
+            elif not_found_ids:
+                print(f"First 5 IDs not found: {', '.join(not_found_ids[:5])}, and {len(not_found_ids) - 5} more")
+                
+        except Exception as e:
+            print(f"Error loading scene IDs from {scene_ids_pkl}: {str(e)}")
+            return
+    else:
+        # Use random selection as before
+        json_files = glob.glob(os.path.join(data_path, '*.json'))
+        n_files = len(json_files)
+        
+        if n_files == 0:
+            print(f"No JSON files found in {data_path}")
+            return
+        
+        print(f"Found {n_files} files in {dataset} dataset")
+        num_to_select = min(num_scenes, n_files)
+        selected_files = random.sample(json_files, num_to_select)
+    
+    if not selected_files:
+        print(f"No files to process for {dataset}")
         return
     
-    print(f"Found {n_files} files in {dataset} dataset")
-    num_to_select = min(num_scenes, n_files)
-    selected_files = random.sample(json_files, num_to_select)
-    
-    print(f"Processing {num_to_select} randomly selected files from {dataset} using {num_workers} workers")
+    print(f"Processing {len(selected_files)} files from {dataset} using {num_workers} workers")
     
     # Create a partial function with fixed arguments
     process_func = partial(
@@ -166,13 +227,13 @@ def process(dataset, num_scenes, data_dir, tfrecord_dir, save_dir, num_workers):
     # Print some failures if there are any (limit to 5 to avoid flooding console)
     if failures > 0:
         print("Some failures occurred:")
+        failure_count = 0
         for _, success, message in results:
             if not success:
                 print(f"  - {message}")
-                # Only print 5 failure messages max
-                failures -= 1
-                if failures == 5:
-                    print(f"  ... and {failures} more failures")
+                failure_count += 1
+                if failure_count >= 5 and failures > 5:
+                    print(f"  ... and {failures - 5} more failures")
                     break
 
 if __name__ == '__main__':
@@ -183,21 +244,26 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='validation')
     parser.add_argument('--num_scenes', type=int, default=1000)
     parser.add_argument('--num_workers', type=int, default=multiprocessing.cpu_count())
+    parser.add_argument('--scene_ids_pkl', type=str, default=None, help='Path to pickle file containing scene IDs to process')
     args = parser.parse_args()
     
     os.makedirs(args.save_dir, exist_ok=True)
     
     print(f'Processing data from {args.data_dir} and Saving to {args.save_dir}')
-    print(f'Selecting {args.num_scenes} random scenes per dataset with {args.num_workers} workers')
+    
+    if args.scene_ids_pkl:
+        print(f'Using scene IDs from {args.scene_ids_pkl}')
+    else:
+        print(f'Selecting {args.num_scenes} random scenes per dataset with {args.num_workers} workers')
     
     if args.dataset == 'all' or args.dataset == 'training':
-        process('training', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
+        process('training', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers, args.scene_ids_pkl)
 
     if args.dataset == 'all' or args.dataset == 'testing':
-        process('testing', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
+        process('testing', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers, args.scene_ids_pkl)
             
     if args.dataset == 'all' or args.dataset == 'validation':
-        process('validation', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
+        process('validation', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers, args.scene_ids_pkl)
         
     if args.dataset == 'all' or args.dataset == 'validation_interactive':
-        process('validation_interactive', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers)
+        process('validation_interactive', args.num_scenes, args.data_dir, args.tfrecord_dir, args.save_dir, args.num_workers, args.scene_ids_pkl)
