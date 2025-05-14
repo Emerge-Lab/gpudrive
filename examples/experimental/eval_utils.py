@@ -375,6 +375,9 @@ def multi_policy_rollout(
     zoom_radius: int = 100,
     return_agent_positions: bool = False,
     center_on_ego: bool = False,
+    collision_weight: float = -0.75,
+    off_road_weight: float = 0-0.75,
+    goal_achieved_weight: float = 1.0
 ):
     """
     Perform a rollout of multiple policies in the environment.
@@ -394,7 +397,48 @@ def multi_policy_rollout(
                 }
 
     """
-    
+    def compute_metrics(policy_metrics,policies):
+        for policy_name, policy_data in policies.items():
+                
+                controlled_per_scene = policy_data['mask'].sum(dim=1)
+                
+                policy_metrics[policy_name]['off_road_count'] = ( policy_metrics[policy_name]["off_road"] > 0).float().sum(axis=1)
+                policy_metrics[policy_name]['collided_count'] = (policy_metrics[policy_name]["collided"]   > 0).float().sum(axis=1)
+                policy_metrics[policy_name]['goal_achieved_count'] = (policy_metrics[policy_name]['goal_achieved']   > 0).float().sum(axis=1)
+                
+                policy_metrics[policy_name]['frac_off_road'] = policy_metrics[policy_name]['off_road_count'] / controlled_per_scene
+                policy_metrics[policy_name]['frac_collided'] = policy_metrics[policy_name]['collided_count'] / controlled_per_scene
+                policy_metrics[policy_name]['frac_goal_achieved'] = policy_metrics[policy_name]['goal_achieved_count'] / controlled_per_scene
+            
+
+        return policy_metrics
+
+    def initialise_history(max_seq_len,log_history_step,partner_obs_shape,device):
+        history_dict = torch.full(
+            (int(max_seq_len/log_history_step), partner_obs_shape), 0.0, device=device)
+
+        return history_dict
+
+
+    def update_history(history_dict,partner_obs,max_seq_len,log_history_step,current_step):
+        if max_seq_len>0 and current_step % log_history_step ==0:
+            history_dict = torch.roll(
+                    history_dict, shifts=1, dims=0
+                )
+            history_dict[0] = partner_obs
+
+        if current_step % max_seq_len == 0:
+            history_dict=history_dict.zero_()
+        
+        return history_dict
+                
+       
+
+    def get_history_batch(history_dict,observations,device):
+
+        flattened_history_batch = history_dict.flatten(start_dim=0) 
+        combination = torch.cat((observations,flattened_history_batch))
+        return combination.to(device)
     # Initialize storage
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
@@ -409,6 +453,7 @@ def multi_policy_rollout(
             "goal_achieved": torch.zeros((num_worlds, max_agent_count), device=device),
             "collided": torch.zeros((num_worlds, max_agent_count), device=device),
             "off_road": torch.zeros((num_worlds, max_agent_count), device=device),
+            "reward": torch.zeros((num_worlds, max_agent_count), device=device),
         }
         for policy_name in policies
     }
@@ -417,22 +462,75 @@ def multi_policy_rollout(
     active_worlds = list(range(num_worlds))
     control_mask = env.cont_agent_mask
     live_agent_mask = control_mask.clone()
+    all_partner_observations = env._get_partner_obs()
+    partner_obs_dim = all_partner_observations.shape[2]
+
+    for policy,policy_data in policies.items():
+        if 'history' in policy_data:
+            controlled_indices = torch.nonzero(policy_data['mask']).squeeze()
+            controlled_keys = [tuple(indice.tolist()) for indice in controlled_indices]
+            policy_data['history_dicts'] ={}
+            for keys in controlled_keys:
+                policy_data['history_dicts'][keys] =initialise_history(policy_data['history']['max_seq_len'],
+                                                                policy_data['history']['log_history'],
+                                                                partner_obs_dim,
+                                                                device)
+            policy_data['env_to_step_in_trial_dict'] = {
+            f"world_{i}": 0 for i in range(num_worlds)
+            }
 
     for time_step in range(episode_len):
         print(f't: {time_step}')
 
         policy_live_masks = {name: policy_data['mask'] & live_agent_mask for name, policy_data in policies.items()}
 
-
+        all_partner_observations = env._get_partner_obs()
         actions = {}
         for policy_name, policy_data in policies.items():
             policy_fn = policy_data['func']
             live_mask = policy_live_masks[policy_name]
             if live_mask.any():
-                actions[policy_name], _, _, _ = policy_fn(
-                    next_obs[live_mask], deterministic=deterministic
-                )
+                agent_observations = next_obs[live_mask]
+                if 'history' in policy_data:
+                    if time_step == 18:
+                        pass
+                    live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
+                    live_keys = [tuple(indice.tolist()) for indice in live_indices]
+                    observations_list = []
 
+                    for idx, key in enumerate(live_keys):
+                        observation = agent_observations[idx]
+                        agent_observation = get_history_batch(policy_data['history_dicts'][key],
+                                                            observation,
+                                                            device)
+
+                        observations_list.append(agent_observation)
+
+                    agent_observations = torch.vstack(observations_list)
+
+
+                agent_actions, _, _, _  = policy_fn(
+                    agent_observations, deterministic=deterministic
+                )
+                actions[policy_name]= agent_actions
+                if 'history' in policy_data:
+                    partner_obs = all_partner_observations[live_agent_mask]
+                    for idx,key in enumerate(live_keys):
+                        world_key = key[0]
+                        policy_data['history_dicts'][key] = update_history(
+                            policy_data['history_dicts'][key],
+                            partner_obs[idx],
+                            policy_data['history']['max_seq_len'],
+                            policy_data['history']['log_history'],
+                            policy_data['env_to_step_in_trial_dict'][f'world_{world_key}']
+                            )
+
+                    live_worlds = list(set([idx[0] for idx in live_keys]))
+                    for world in live_worlds:
+                        policy_data['env_to_step_in_trial_dict'][f'world_{world}'] += 1 
+
+                    
+                
         
         combined_mask = torch.zeros_like(live_agent_mask, dtype=torch.bool)
         for live_mask in policy_live_masks.values():
@@ -480,13 +578,19 @@ def multi_policy_rollout(
         next_obs = env.get_obs()
         dones = env.get_dones().bool()
         infos = env.get_infos()
+        reward =env.get_rewards(
+            collision_weight=collision_weight,
+            off_road_weight=off_road_weight,
+            goal_achieved_weight=goal_achieved_weight,
+        )
+
 
         for policy_name, live_mask in policy_live_masks.items():
             policy_metrics[policy_name]["off_road"][live_mask] += infos.off_road[live_mask]
             policy_metrics[policy_name]["collided"][live_mask] += infos.collided[live_mask]
             policy_metrics[policy_name]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
-            if infos.goal_achieved[live_mask].sum() != 0 and policy_name == 'pi_1':
-                pass
+            policy_metrics[policy_name]["reward"][live_mask] += reward[live_mask]
+
 
         live_agent_mask[dones] = False
 
@@ -519,19 +623,4 @@ def multi_policy_rollout(
     
     return metrics
 
-def compute_metrics(policy_metrics,policies):
 
-    for policy_name, policy_data in policies.items():
-            
-            controlled_per_scene = policy_data['mask'].sum(dim=1)
-            
-            policy_metrics[policy_name]['off_road_count'] = ( policy_metrics[policy_name]["off_road"] > 0).float().sum(axis=1)
-            policy_metrics[policy_name]['collided_count'] = (policy_metrics[policy_name]["collided"]   > 0).float().sum(axis=1)
-            policy_metrics[policy_name]['goal_achieved_count'] = (policy_metrics[policy_name]['goal_achieved']   > 0).float().sum(axis=1)
-            
-            policy_metrics[policy_name]['frac_off_road'] = policy_metrics[policy_name]['off_road_count'] / controlled_per_scene
-            policy_metrics[policy_name]['frac_collided'] = policy_metrics[policy_name]['collided_count'] / controlled_per_scene
-            policy_metrics[policy_name]['frac_goal_achieved'] = policy_metrics[policy_name]['goal_achieved_count'] / controlled_per_scene
-          
-
-    return policy_metrics
