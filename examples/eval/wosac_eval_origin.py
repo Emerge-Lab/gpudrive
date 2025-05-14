@@ -35,6 +35,8 @@ class WOSACMetrics(Metric):
         baselines_df: Optional[pd.DataFrame] = None,
         save_table_with_baselines: bool = True,
         log_dir: Optional[str] = None,
+        guidance_mode: Optional[str] = "",
+        guidance_density: Optional[float] = 1.0,
     ) -> None:
         super().__init__()
         self.is_mp_init = False
@@ -48,6 +50,8 @@ class WOSACMetrics(Metric):
             self.challenge_type = challenge_type
 
         self.wosac_config = load_metrics_config(self.challenge_type)
+        self.guidance_mode = guidance_mode  
+        self.guidance_density = guidance_density
 
         # Initialize baseline df if not provided
         if baselines_df is None:
@@ -55,7 +59,7 @@ class WOSACMetrics(Metric):
         else:
             self.baselines_df = baselines_df
 
-        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H")
 
         self.field_names = [
             "metametric",
@@ -84,8 +88,8 @@ class WOSACMetrics(Metric):
         if log_dir is not None:
             # Get data and time for the current run as filename
             log_dir = Path(log_dir)
-            self.log_file_path = log_dir / f"score_distribution_{self.timestamp}.csv"
-            self.log_aggregate_table_path = log_dir / f"wosac_table_{self.timestamp}.csv"
+            self.log_file_path = log_dir / f"score_dist_{self.guidance_mode}_density_{self.guidance_density:.2f}_{self.timestamp}.csv"
+            self.log_aggregate_table_path = log_dir / f"wosac_agg_{self.guidance_mode}_density_{self.guidance_density}_{self.timestamp}.csv"
             log_dir.mkdir(parents=True, exist_ok=True)
             self.log_file = csv.writer(open(self.log_file_path, 'w'))
             # Add header to the log file

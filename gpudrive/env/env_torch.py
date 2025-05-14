@@ -878,11 +878,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def create_guidance_dropout_mask(self):
         """
-        Create guidance dropout mask where dropout_prob represents
-        the maximum dropout probability, with varying rates per trajectory.
+        Create guidance dropout mask based on the specified dropout mode.
+
+        Args:
+            mask: Optional pre-existing mask to modify
+            dropout_mode: Either "max" (default) or "avg"
+                - "max": dropout_prob represents the maximum dropout probability
+                - "avg": dropout_prob represents the average dropout probability
+
+        Returns:
+            A boolean mask where True indicates keeping the point, False indicates dropping it
         """
-        max_dropout_prob = self.config.guidance_dropout_prob
+        dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
+        self.dropout_mode = self.config.guidance_dropout_mode
 
         # 1 if we want to keep the point, 0 if we want to drop it
         guidance_dropout_mask = torch.ones(
@@ -897,10 +906,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             .bool()
         )
 
-        # Generate random dropout rates for each agent between 0 and max_dropout_prob
-        agent_dropout_probs = (
-            torch.rand(num_controlled, device=self.device) * max_dropout_prob
-        )
+        if self.dropout_mode == "max":
+            # Generate random dropout rates for each agent between 0 and dropout_prob
+            agent_dropout_probs = (
+                torch.rand(num_controlled, device=self.device) * dropout_prob
+            )
+        elif self.dropout_mode == "avg":
+            # Use the same dropout probability for all agents (equal to dropout_prob)
+            agent_dropout_probs = torch.full(
+                (num_controlled,), dropout_prob, device=self.device
+            )
+        else:
+            raise ValueError(
+                f"Unsupported dropout mode: {self.config.dropout_mode}"
+            )
 
         for agent_idx in range(num_controlled):
             agent_valid_mask = is_valid[agent_idx]
@@ -912,17 +931,37 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if (
                 len(agent_valid_indices) > 2
             ):  # Only apply dropout if we have more than 2 points
-                # Keep first and last points, apply dropout to middle points
-                middle_indices = agent_valid_indices[1:-1]
+                if self.dropout_mode == "max":
+                    # Keep first and last points, apply dropout to middle points
+                    middle_indices = agent_valid_indices[1:-1]
 
-                # Generate random dropout mask for middle points
-                dropout = (
-                    torch.rand(len(middle_indices), device=self.device)
-                    < agent_dropout_prob
-                )
+                    # Generate random dropout mask for middle points
+                    dropout = (
+                        torch.rand(len(middle_indices), device=self.device)
+                        < agent_dropout_prob
+                    )
 
-                # Apply dropout to middle points (set to False for points to drop)
-                guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
+                    # Apply dropout to middle points (set to False for points to drop)
+                    guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
+
+                elif self.dropout_mode == "avg":
+                    # Calculate how many points to drop to achieve the desired average dropout rate
+                    middle_indices = agent_valid_indices[
+                        :-1
+                    ]  # All valid points except the last one
+                    num_middle = len(middle_indices)
+
+                    # Number of points to drop to achieve the desired average
+                    num_to_drop = int(
+                        np.ceil((agent_dropout_prob.item() * num_middle))
+                    )
+
+                    if num_to_drop > 0 and num_middle > 0:
+                        # Randomly select points to drop
+                        drop_indices = middle_indices[
+                            torch.randperm(num_middle)[:num_to_drop]
+                        ]
+                        guidance_dropout_mask[agent_idx, drop_indices] = False
 
         return guidance_dropout_mask
 
