@@ -96,7 +96,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         self.setup_guidance()
-        
+
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         if self.config.reward_type == "reward_conditioned":
@@ -304,9 +304,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 - 'agents_id': Unique identifiers for each agent
                 - 'anchors': Reference points
         """
-        means_xy = (
-            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
-        )
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
 
         # Get the logged trajectory and restore the mean
         log_trajectory = LogTrajectory.from_tensor(
@@ -314,7 +312,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -324,7 +322,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_road_graph = GlobalRoadGraphPoints.from_tensor(
             roadgraph_tensor=self.sim.map_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_road_graph.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -335,7 +333,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_agent_obs = GlobalEgoState.from_tensor(
             abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_agent_obs.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -343,7 +341,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -353,9 +351,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory=log_trajectory,
             episode_len=self.episode_len,
             init_steps=init_steps,
-            raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
+            raw_agent_types=self.sim.info_tensor().to_torch().cpu()[:, :, 4],
             metadata=metadata,
         )
+
+        if self.device != "cpu":
+            # Move tensors to the specified device
+            for key in context_dict:
+                if isinstance(context_dict[key], torch.Tensor):
+                    context_dict[key] = context_dict[key].to(self.device)
 
         return context_dict
 
@@ -894,7 +898,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
         self.dropout_mode = self.config.guidance_dropout_mode
-        
+
         if self.dropout_mode == "remove_all":
             # If the mode is "remove_all", we want to drop all points
             # so the agents receive no guidance
@@ -916,13 +920,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 .squeeze(-1)
                 .bool()
             )
-            
+
             if dropout_prob > 0.0:
 
                 if self.dropout_mode == "max":
                     # Generate random dropout rates for each agent between 0 and dropout_prob
                     agent_dropout_probs = (
-                        torch.rand(num_controlled, device=self.device) * dropout_prob
+                        torch.rand(num_controlled, device=self.device)
+                        * dropout_prob
                     )
                 elif self.dropout_mode == "avg":
                     # Use the same dropout probability for all agents (equal to dropout_prob)
@@ -950,12 +955,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                             # Generate random dropout mask for middle points
                             dropout = (
-                                torch.rand(len(middle_indices), device=self.device)
+                                torch.rand(
+                                    len(middle_indices), device=self.device
+                                )
                                 < agent_dropout_prob
                             )
 
                             # Apply dropout to middle points (set to False for points to drop)
-                            guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
+                            guidance_dropout_mask[
+                                agent_idx, middle_indices
+                            ] = ~dropout
 
                         elif self.dropout_mode == "avg":
                             # Calculate how many points to drop to achieve the desired average dropout rate
@@ -966,7 +975,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
                             # Number of points to drop to achieve the desired average
                             num_to_drop = int(
-                                np.ceil((agent_dropout_prob.item() * num_middle))
+                                np.ceil(
+                                    (agent_dropout_prob.item() * num_middle)
+                                )
                             )
 
                             if num_to_drop > 0 and num_middle > 0:
@@ -974,11 +985,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                                 drop_indices = middle_indices[
                                     torch.randperm(num_middle)[:num_to_drop]
                                 ]
-                                guidance_dropout_mask[agent_idx, drop_indices] = False
+                                guidance_dropout_mask[
+                                    agent_idx, drop_indices
+                                ] = False
 
                 return guidance_dropout_mask
-            
-            else: 
+
+            else:
                 return guidance_dropout_mask
 
     def guidance_points_within_reach(self):
@@ -1447,13 +1460,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
 
             # New: Give agent sense of progress
-            # 1. Overall trajectory progress 
+            # 1. Overall trajectory progress
             # Only increment route progress for visible points hit (those that
             # are not dropped out)
             total_valid = self.guidance_dropout_mask.sum(axis=1)
             valid_hits_so_far = self.guidance_points_hit.clone()[mask]
-            visible_hits_so_far = (valid_hits_so_far * self.guidance_dropout_mask).sum(dim=-1)
-            
+            visible_hits_so_far = (
+                valid_hits_so_far * self.guidance_dropout_mask
+            ).sum(dim=-1)
+
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
             self.route_progress = torch.where(
@@ -1463,10 +1478,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     visible_hits_so_far
                 ),  # When agent has no valid points
             )
-            
+
             # 2. How much time do I have left
             normalized_time = self.step_in_world[mask] / self.episode_len
-    
+
             base_fields.append(self.route_progress.unsqueeze(-1))
             base_fields.append(normalized_time)
 

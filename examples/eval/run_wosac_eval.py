@@ -79,25 +79,27 @@ def rollout(
     agent_observation_frames = {env_id: [] for env_id in range(num_envs)}
 
     start_env_rollout = perf_counter()
-    
+
     # Zero out actions for parked vehicles
     info = Info.from_tensor(
         env.sim.info_tensor(),
         backend=env.backend,
         device=env.device,
     )
-   
+
     zero_action_mask = (info.off_road == 1) | (
         info.collided_with_vehicle == 1
     ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
     control_mask = env.cont_agent_mask.clone()
-    
+
     next_obs = env.reset(mask=control_mask)
-    
+
     # Guidance logging
-    num_guidance_points = env.valid_guidance_points 
+    num_guidance_points = env.valid_guidance_points
     guidance_densities = num_guidance_points / env.reference_traj_len
-    print(f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n")
+    print(
+        f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
+    )
 
     # Get scenario ids
     scenario_ids_dict = env.get_scenario_ids()
@@ -121,10 +123,16 @@ def rollout(
             (num_envs, max_agents), dtype=torch.int64, device=device
         )
         action_template[control_mask] = action.to(device)
-    
+
         # Find the integer key for the "do nothing" action (zero steering, zero acceleration)
         # Check using env.action_key_to_values[DO_NOTHING_ACTION_INT]
-        DO_NOTHING_ACTION_INT = [key for key, value in env.action_key_to_values.items() if abs(value[0]) == 0.0 and abs(value[1]) == 0.0 and abs(value[2]) == 0.0][0]
+        DO_NOTHING_ACTION_INT = [
+            key
+            for key, value in env.action_key_to_values.items()
+            if abs(value[0]) == 0.0
+            and abs(value[1]) == 0.0
+            and abs(value[2]) == 0.0
+        ][0]
         action_template[zero_action_mask] = DO_NOTHING_ACTION_INT
 
         # Step
@@ -256,7 +264,9 @@ def load_config(config_path):
 if __name__ == "__main__":
 
     # Settings
-    MAX_AGENTS = madrona_gpudrive.kMaxAgentCount # TODO: Set to 128 for real eval
+    MAX_AGENTS = (
+        madrona_gpudrive.kMaxAgentCount
+    )  # TODO: Set to 128 for real eval
     NUM_ENVS = 100
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
@@ -268,16 +278,14 @@ if __name__ == "__main__":
     GUIDANCE_MODE = (
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
-    GUIDANCE_DROPOUT_MODE = "avg" # Options: "max", "avg", "remove_all"
+    GUIDANCE_DROPOUT_MODE = "avg"  # Options: "max", "avg", "remove_all"
     GUIDANCE_DROPOUT_PROB = 0.0
     SMOOTHEN_TRAJECTORY = True
 
     DATA_JSON = "data/processed/wosac/validation/json"
     DATA_TFRECORD = "data/processed/wosac/validation/tfrecord"
 
-    CPT_PATH = (
-        "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
-    )
+    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -345,8 +353,8 @@ if __name__ == "__main__":
         init_mode="wosac_eval",
         init_steps=INIT_STEPS,
         guidance_mode=GUIDANCE_MODE,
-        guidance_dropout_prob=GUIDANCE_DROPOUT_PROB, 
-        guidance_dropout_mode=GUIDANCE_DROPOUT_MODE,  
+        guidance_dropout_prob=GUIDANCE_DROPOUT_PROB,
+        guidance_dropout_mode=GUIDANCE_DROPOUT_MODE,
         smoothen_trajectory=SMOOTHEN_TRAJECTORY,
     )
 
@@ -362,9 +370,9 @@ if __name__ == "__main__":
         save_table_with_baselines=True,
         log_dir=LOG_DIR,
         guidance_mode=GUIDANCE_MODE,
-        guidance_density=1.0-GUIDANCE_DROPOUT_PROB,
+        guidance_density=1.0 - GUIDANCE_DROPOUT_PROB,
     )
-    
+
     for _ in tqdm(range(NUM_DATA_BATCHES)):
         for _ in range(NUM_ROLLOUTS_PER_BATCH):
 
