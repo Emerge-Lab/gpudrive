@@ -303,7 +303,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 - 'anchors': Reference points
         """
         means_xy = (
-            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+            self.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
         )
 
         # Get the logged trajectory and restore the mean
@@ -312,7 +312,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -322,7 +322,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_road_graph = GlobalRoadGraphPoints.from_tensor(
             roadgraph_tensor=self.sim.map_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_road_graph.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -333,7 +333,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_agent_obs = GlobalEgoState.from_tensor(
             abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_agent_obs.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -341,7 +341,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -351,9 +351,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory=log_trajectory,
             episode_len=self.episode_len,
             init_steps=init_steps,
-            raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
+            raw_agent_types=self.sim.info_tensor().to_torch().cpu()[:, :, 4],
             metadata=metadata,
         )
+
+        if (self.device != "cpu"):
+            # Move tensors to the specified device
+            for key in context_dict:
+                if isinstance(context_dict[key], torch.Tensor):
+                    context_dict[key] = context_dict[key].to(self.device)
 
         return context_dict
 
