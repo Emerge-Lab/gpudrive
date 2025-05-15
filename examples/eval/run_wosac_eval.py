@@ -71,7 +71,6 @@ def rollout(
     video_dir: str = "videos",
     video_format: str = "gif",
     guidance_mode: str = "vbd_online",
-    guidance_mode: str = "vbd_online",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
     # Storage
@@ -268,10 +267,10 @@ if __name__ == "__main__":
     MAX_AGENTS = (
         madrona_gpudrive.kMaxAgentCount
     )  # TODO: Set to 128 for real eval
-    NUM_ENVS = 10
+    NUM_ENVS = 200
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 5
+    NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 1000
     RENDER = False
