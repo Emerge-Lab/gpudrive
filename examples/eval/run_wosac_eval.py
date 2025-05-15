@@ -267,36 +267,34 @@ if __name__ == "__main__":
     MAX_AGENTS = (
         madrona_gpudrive.kMaxAgentCount
     )  # TODO: Set to 128 for real eval
-    NUM_ENVS = 20
+    NUM_ENVS = 10
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 1
+    NUM_DATA_BATCHES = 5
     INIT_STEPS = 10
-    DATASET_SIZE = 100
+    DATASET_SIZE = 1000
     RENDER = False
     LOG_DIR = "examples/eval/figures_data/wosac/"
     GUIDANCE_MODE = (
-        "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
+        "vbd_online"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
     GUIDANCE_DROPOUT_MODE = "avg"  # Options: "max", "avg", "remove_all"
-    GUIDANCE_DROPOUT_PROB = 0.0 #99
+    GUIDANCE_DROPOUT_PROB = 0.99
     SMOOTHEN_TRAJECTORY = True
 
-    DATA_JSON = "data/processed/wosac/validation/json"
-    DATA_TFRECORD = "data/processed/wosac/validation/tfrecord"
+    DATA_JSON = "data/processed/wosac/validation_interactive/json"
+    DATA_TFRECORD = "data/processed/wosac/validation_interactive/tfrecord"
 
-    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_001700.pt"
-    #"checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
-
+    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_002200.pt"
+  
     # Create data loader
     val_loader = SceneDataLoader(
         root=DATA_JSON,
         batch_size=NUM_ENVS,
         dataset_size=DATASET_SIZE,
-        sample_with_replacement=True,
+        sample_with_replacement=False,
         shuffle=True,
         file_prefix="",
-        seed=10,
     )
 
     # Load agent
@@ -371,7 +369,7 @@ if __name__ == "__main__":
         save_table_with_baselines=True,
         log_dir=LOG_DIR,
         guidance_mode=GUIDANCE_MODE,
-        guidance_density=99,#1.0 - GUIDANCE_DROPOUT_PROB,
+        guidance_density=1.0 - GUIDANCE_DROPOUT_PROB,
     )
 
     for _ in tqdm(range(NUM_DATA_BATCHES)):

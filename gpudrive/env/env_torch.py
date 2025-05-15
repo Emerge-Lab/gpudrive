@@ -1753,6 +1753,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
+        
+        self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
