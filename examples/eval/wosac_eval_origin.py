@@ -94,7 +94,7 @@ class WOSACMetrics(Metric):
             )
             self.log_aggregate_table_path = (
                 log_dir
-                / f"wosac_agg_{self.guidance_mode}_density_{self.guidance_density}_{self.timestamp}.csv"
+                / f"wosac_agg_{self.guidance_mode}_density_{self.guidance_density:.2f}_{self.timestamp}.csv"
             )
             log_dir.mkdir(parents=True, exist_ok=True)
             self.log_file = csv.writer(open(self.log_file_path, "w"))

@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = madrona_gpudrive.kMaxAgentCount # TODO: Set to 128 for real eval
-    NUM_ENVS = 10
+    NUM_ENVS = 100
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
@@ -268,15 +268,15 @@ if __name__ == "__main__":
     GUIDANCE_MODE = (
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
-    GUIDANCE_DROPOUT_MODE = "max" # Options: "max", "avg", "remove_all"
-    GUIDANCE_DROPOUT_PROB = 0.99 #0.99
+    GUIDANCE_DROPOUT_MODE = "avg" # Options: "max", "avg", "remove_all"
+    GUIDANCE_DROPOUT_PROB = 0.0
     SMOOTHEN_TRAJECTORY = True
 
-    DATA_JSON = "data/processed/validation_random/json"
-    DATA_TFRECORD = "data/processed/validation_random/tfrecord"
+    DATA_JSON = "data/processed/wosac/validation/json"
+    DATA_TFRECORD = "data/processed/wosac/validation/tfrecord"
 
     CPT_PATH = (
-        "checkpoints/model_guidance_logs__R_10000__05_13_14_38_56_650_002400.pt"
+        "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
     )
 
     # Create data loader
