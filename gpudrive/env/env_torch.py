@@ -96,6 +96,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         self.setup_guidance()
+        
+        self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         if self.config.reward_type == "reward_conditioned":
             # Use default condition_mode from config or fall back to "random"
@@ -892,78 +894,92 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
         self.dropout_mode = self.config.guidance_dropout_mode
-
-        # 1 if we want to keep the point, 0 if we want to drop it
-        guidance_dropout_mask = torch.ones(
-            (num_controlled, self.reference_traj_len),
-            device=self.device,
-            dtype=torch.bool,
-        )
-
-        is_valid = (
-            self.reference_trajectory.valids[self.cont_agent_mask]
-            .squeeze(-1)
-            .bool()
-        )
-
-        if self.dropout_mode == "max":
-            # Generate random dropout rates for each agent between 0 and dropout_prob
-            agent_dropout_probs = (
-                torch.rand(num_controlled, device=self.device) * dropout_prob
-            )
-        elif self.dropout_mode == "avg":
-            # Use the same dropout probability for all agents (equal to dropout_prob)
-            agent_dropout_probs = torch.full(
-                (num_controlled,), dropout_prob, device=self.device
+        
+        if self.dropout_mode == "remove_all":
+            # If the mode is "remove_all", we want to drop all points
+            # so the agents receive no guidance
+            return torch.zeros(
+                (num_controlled, self.reference_traj_len),
+                device=self.device,
+                dtype=torch.bool,
             )
         else:
-            raise ValueError(
-                f"Unsupported dropout mode: {self.config.dropout_mode}"
+            # 1 if we want to keep the point, 0 if we want to drop it
+            guidance_dropout_mask = torch.ones(
+                (num_controlled, self.reference_traj_len),
+                device=self.device,
+                dtype=torch.bool,
             )
 
-        for agent_idx in range(num_controlled):
-            agent_valid_mask = is_valid[agent_idx]
-            agent_valid_indices = torch.where(agent_valid_mask)[0]
+            is_valid = (
+                self.reference_trajectory.valids[self.cont_agent_mask]
+                .squeeze(-1)
+                .bool()
+            )
+            
+            if dropout_prob > 0.0:
 
-            # Get agent-specific dropout probability
-            agent_dropout_prob = agent_dropout_probs[agent_idx]
-
-            if (
-                len(agent_valid_indices) > 2
-            ):  # Only apply dropout if we have more than 2 points
                 if self.dropout_mode == "max":
-                    # Keep first and last points, apply dropout to middle points
-                    middle_indices = agent_valid_indices[1:-1]
-
-                    # Generate random dropout mask for middle points
-                    dropout = (
-                        torch.rand(len(middle_indices), device=self.device)
-                        < agent_dropout_prob
+                    # Generate random dropout rates for each agent between 0 and dropout_prob
+                    agent_dropout_probs = (
+                        torch.rand(num_controlled, device=self.device) * dropout_prob
                     )
-
-                    # Apply dropout to middle points (set to False for points to drop)
-                    guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
-
                 elif self.dropout_mode == "avg":
-                    # Calculate how many points to drop to achieve the desired average dropout rate
-                    middle_indices = agent_valid_indices[
-                        :-1
-                    ]  # All valid points except the last one
-                    num_middle = len(middle_indices)
-
-                    # Number of points to drop to achieve the desired average
-                    num_to_drop = int(
-                        np.ceil((agent_dropout_prob.item() * num_middle))
+                    # Use the same dropout probability for all agents (equal to dropout_prob)
+                    agent_dropout_probs = torch.full(
+                        (num_controlled,), dropout_prob, device=self.device
+                    )
+                else:
+                    raise ValueError(
+                        f"Unsupported dropout mode: {self.config.dropout_mode}"
                     )
 
-                    if num_to_drop > 0 and num_middle > 0:
-                        # Randomly select points to drop
-                        drop_indices = middle_indices[
-                            torch.randperm(num_middle)[:num_to_drop]
-                        ]
-                        guidance_dropout_mask[agent_idx, drop_indices] = False
+                for agent_idx in range(num_controlled):
+                    agent_valid_mask = is_valid[agent_idx]
+                    agent_valid_indices = torch.where(agent_valid_mask)[0]
 
-        return guidance_dropout_mask
+                    # Get agent-specific dropout probability
+                    agent_dropout_prob = agent_dropout_probs[agent_idx]
+
+                    if (
+                        len(agent_valid_indices) > 2
+                    ):  # Only apply dropout if we have more than 2 points
+                        if self.dropout_mode == "max":
+                            # Keep first and last points, apply dropout to middle points
+                            middle_indices = agent_valid_indices[1:-1]
+
+                            # Generate random dropout mask for middle points
+                            dropout = (
+                                torch.rand(len(middle_indices), device=self.device)
+                                < agent_dropout_prob
+                            )
+
+                            # Apply dropout to middle points (set to False for points to drop)
+                            guidance_dropout_mask[agent_idx, middle_indices] = ~dropout
+
+                        elif self.dropout_mode == "avg":
+                            # Calculate how many points to drop to achieve the desired average dropout rate
+                            middle_indices = agent_valid_indices[
+                                :-1
+                            ]  # All valid points except the last one
+                            num_middle = len(middle_indices)
+
+                            # Number of points to drop to achieve the desired average
+                            num_to_drop = int(
+                                np.ceil((agent_dropout_prob.item() * num_middle))
+                            )
+
+                            if num_to_drop > 0 and num_middle > 0:
+                                # Randomly select points to drop
+                                drop_indices = middle_indices[
+                                    torch.randperm(num_middle)[:num_to_drop]
+                                ]
+                                guidance_dropout_mask[agent_idx, drop_indices] = False
+
+                return guidance_dropout_mask
+            
+            else: 
+                return guidance_dropout_mask
 
     def guidance_points_within_reach(self):
         # Get actual agent positions
@@ -1391,6 +1407,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         if mask is None:
 
+            # TODO(dc): Make this one exactly the same as for the masked case
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
             total_valid = self.reference_trajectory.valids.clone().sum(
@@ -1429,31 +1446,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 return torch.cat(base_fields, dim=-1)
         else:
 
-            # New: Give agent sense of progress / history
-            # 1. Overall trajectory progress (percentage of valid points hit)
-            total_valid = (
-                self.reference_trajectory.valids[mask]
-                .clone()
-                .sum(dim=1)
-                .squeeze(-1)
-            )
-            valid_hits_so_far = self.guidance_points_hit.clone()[mask].sum(
-                dim=-1
-            )
-
+            # New: Give agent sense of progress
+            # 1. Overall trajectory progress 
+            # Only increment route progress for visible points hit (those that
+            # are not dropped out)
+            total_valid = self.guidance_dropout_mask.sum(axis=1)
+            valid_hits_so_far = self.guidance_points_hit.clone()[mask]
+            visible_hits_so_far = (valid_hits_so_far * self.guidance_dropout_mask).sum(dim=-1)
+            
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
             self.route_progress = torch.where(
                 total_valid >= 1,
-                valid_hits_so_far / (total_valid + 1e-5),  # Normal case
+                visible_hits_so_far / (total_valid + 1e-5),  # Normal case
                 torch.ones_like(
-                    valid_hits_so_far
+                    visible_hits_so_far
                 ),  # When agent has no valid points
             )
-
+            
             # 2. How much time do I have left
             normalized_time = self.step_in_world[mask] / self.episode_len
-
+    
             base_fields.append(self.route_progress.unsqueeze(-1))
             base_fields.append(normalized_time)
 
