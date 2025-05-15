@@ -71,6 +71,7 @@ def rollout(
     video_dir: str = "videos",
     video_format: str = "gif",
     guidance_mode: str = "vbd_online",
+    guidance_mode: str = "vbd_online",
 ):
     """Rollout agent in the environment and return the scenario rollouts."""
     # Storage
@@ -286,7 +287,7 @@ if __name__ == "__main__":
     DATA_TFRECORD = "data/processed/wosac/validation_interactive/tfrecord"
 
     CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_002200.pt"
-  
+
     # Create data loader
     val_loader = SceneDataLoader(
         root=DATA_JSON,
@@ -295,6 +296,7 @@ if __name__ == "__main__":
         sample_with_replacement=False,
         shuffle=True,
         file_prefix="",
+        seed=10,
     )
 
     # Load agent
