@@ -214,12 +214,13 @@ def rollout(
 
     start_ground_truth_ext = perf_counter()
 
-    scenario_rollouts = []
-    scenario_rollout_masks = []
+    # scenario_rollouts = []
+    joint_scenes = {}
+    # scenario_rollout_masks = []
     for i, scenario_id in enumerate(scenario_ids):
         # control_mask_i = id[i] != 0
         control_mask_i = control_mask[i]
-        scenario_rollout_masks.append(done_stack[i, control_mask_i] == 0)
+        # scenario_rollout_masks.append(done_stack[i, control_mask_i] == 0)
         pos_x_i = pos_x_stack[i, control_mask_i]
         pos_y_i = pos_y_stack[i, control_mask_i]
         pos_z_i = pos_z_stack[i, control_mask_i]
@@ -237,22 +238,28 @@ def rollout(
                     object_id=int(obj_i_a),
                 )
             )
-        joint_scene = sim_agents_submission_pb2.JointScene(
+        # joint_scene = sim_agents_submission_pb2.JointScene(
+        #     simulated_trajectories=simulated_trajectories
+        # )
+
+        joint_scenes[scenario_id] = sim_agents_submission_pb2.JointScene(
             simulated_trajectories=simulated_trajectories
         )
 
-        scenario_rollouts.append(
-            sim_agents_submission_pb2.ScenarioRollouts(
-                joint_scenes=[joint_scene],
-                scenario_id=scenario_id,
-            )
-        )
+        # scenario_rollouts.append(
+        #     sim_agents_submission_pb2.ScenarioRollouts(
+        #         joint_scenes=[joint_scene],
+        #         scenario_id=scenario_id,
+        #     )
+        # )
 
     logging.info(
         f"Ground truth extraction took: {perf_counter() - start_ground_truth_ext:.2f} s ({len(env.data_batch)} scenarios)."
     )
 
-    return scenario_ids, scenario_rollouts, scenario_rollout_masks
+    return joint_scenes
+
+    # return scenario_ids, scenario_rollouts, scenario_rollout_masks
 
 
 def load_config(config_path):
@@ -375,9 +382,9 @@ if __name__ == "__main__":
     )
 
     for _ in tqdm(range(NUM_DATA_BATCHES)):
+        joint_scene_list = []
         for _ in range(NUM_ROLLOUTS_PER_BATCH):
-
-            scenario_ids, scenario_rollouts, scenario_rollout_masks = rollout(
+            joint_scene = rollout(
                 env=env,
                 sim_agent=agent,
                 init_steps=INIT_STEPS,
@@ -389,15 +396,30 @@ if __name__ == "__main__":
                 save_videos=RENDER,
                 guidance_mode=GUIDANCE_MODE,
             )
-            tf_record_paths = [
-                os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
-                for scenario_id in scenario_ids
-            ]
-            wosac_metrics.update(
-                tf_record_paths,
-                scenario_rollouts,
-                # scenario_rollout_masks=scenario_rollout_masks
+            joint_scene_list.append(joint_scene)
+
+        # Construct scenario rollouts
+        scenario_ids = joint_scene_list[0].keys()
+        scenario_rollouts = []
+        for scenario_id in scenario_ids:
+            scenario_rollouts.append(
+                sim_agents_submission_pb2.ScenarioRollouts(
+                    joint_scenes=[
+                        joint_scene[scenario_id] for joint_scene in joint_scene_list
+                    ],
+                    scenario_id=scenario_id,
+                )
             )
+
+        tf_record_paths = [
+            os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
+            for scenario_id in scenario_ids
+        ]
+        
+        wosac_metrics.update(
+            tf_record_paths,
+            scenario_rollouts,
+        )
 
         # Swap batch of scenarios
         env.swap_data_batch()
