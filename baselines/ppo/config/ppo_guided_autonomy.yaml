@@ -32,7 +32,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   off_road_weight: -0.1
   guidance_speed_weight: 0.005
   guidance_heading_weight: 0.005
-  smoothness_weight: 0.0
+  smoothness_weight: 0.0001
 
   init_mode: wosac_train
   dynamics_model: "classic"
@@ -111,7 +111,7 @@ train:
   # # # Rendering # # #
   render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 400 # Render every k iterations
+  render_interval: 200 # Render every k iterations
   render_every_t: 5 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
   render_agent_idx: [0] # Agent observations to render

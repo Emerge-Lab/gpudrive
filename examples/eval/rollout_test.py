@@ -28,7 +28,8 @@ def test_rollout(focus_agents=[0, 1], render=False, agent=None):
         off_road_weight=-0.0,
         guidance_heading_weight=0.005,
         guidance_speed_weight=0.0005,
-        
+        guidance_dropout_prob=0.99,
+        guidance_dropout_mode="avg",  # Options: "max", "avg"
     )
 
     # Create data loader
@@ -162,8 +163,8 @@ if __name__ == "__main__":
     CPT_PATH = (
         "checkpoints/model_guidance_logs__S_1__05_12_18_44_58_857_000100.pt"
     )
-    agent = load_agent(path_to_cpt=CPT_PATH).to("cuda")
-
+    #agent = load_agent(path_to_cpt=CPT_PATH).to("cuda")
+    agent = None
     
     
     test_rollout(focus_agents=[0, 1, 2, 3, 4], render=True, agent=agent)

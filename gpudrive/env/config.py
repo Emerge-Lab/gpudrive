@@ -43,6 +43,7 @@ class EnvConfig:
     smoothen_trajectory: bool = True  # Filters out the trajectory
     guidance_pos_xy_radius: float = 1.0  # Tightness of the positions guidance
     guidance_dropout_prob: float = 0.0  # Probability of dropping the points
+    guidance_dropout_mode: str = "max"  # Options: "max", "avg", "remove_all"
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -126,7 +127,7 @@ class EnvConfig:
         0.005  # Importance of matching suggested speeds
     )
     guidance_heading_weight: float = (
-        0.005 # Importance of matching suggested headings
+        0.005  # Importance of matching suggested headings
     )
     smoothness_weight: float = 0.0
 

@@ -35,6 +35,7 @@ checkpoints/
 figures_data/
 data/other/*
 wosac/
+data/processed/validation_random/*
 
 # Logging
 /wandb
