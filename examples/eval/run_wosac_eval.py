@@ -267,7 +267,7 @@ if __name__ == "__main__":
     MAX_AGENTS = (
         madrona_gpudrive.kMaxAgentCount
     )  # TODO: Set to 128 for real eval
-    NUM_ENVS = 100
+    NUM_ENVS = 20
     DEVICE = "cuda"  # where to run the env rollouts
     NUM_ROLLOUTS_PER_BATCH = 1
     NUM_DATA_BATCHES = 1
@@ -279,13 +279,14 @@ if __name__ == "__main__":
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
     GUIDANCE_DROPOUT_MODE = "avg"  # Options: "max", "avg", "remove_all"
-    GUIDANCE_DROPOUT_PROB = 0.0
+    GUIDANCE_DROPOUT_PROB = 0.0 #99
     SMOOTHEN_TRAJECTORY = True
 
     DATA_JSON = "data/processed/wosac/validation/json"
     DATA_TFRECORD = "data/processed/wosac/validation/tfrecord"
 
-    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
+    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_001700.pt"
+    #"checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_000300.pt"
 
     # Create data loader
     val_loader = SceneDataLoader(
@@ -370,7 +371,7 @@ if __name__ == "__main__":
         save_table_with_baselines=True,
         log_dir=LOG_DIR,
         guidance_mode=GUIDANCE_MODE,
-        guidance_density=1.0 - GUIDANCE_DROPOUT_PROB,
+        guidance_density=99,#1.0 - GUIDANCE_DROPOUT_PROB,
     )
 
     for _ in tqdm(range(NUM_DATA_BATCHES)):
