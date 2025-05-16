@@ -576,7 +576,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Dropout mask for guidance points
         # Assumption: all worlds are reset at the same time
-        if self.config.guidance_dropout_prob > 0:
+        if self.config.guidance_dropout_prob > 0.0:
             self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         return self.get_obs(mask)
@@ -907,6 +907,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 device=self.device,
                 dtype=torch.bool,
             )
+        
+        elif self.dropout_mode == "end_points_only":
+            # Remove all points except the first and last
+            is_valid = self.reference_trajectory.valids[self.cont_agent_mask].squeeze(-1).bool()
+            guidance_dropout_mask = torch.zeros(
+                (num_controlled, self.reference_traj_len),
+                device=self.device,
+                dtype=torch.bool,
+            )
+            for agent_idx in range(num_controlled):
+                agent_valid_mask = is_valid[agent_idx]
+                agent_valid_indices = torch.where(agent_valid_mask)[0]
+
+                if len(agent_valid_indices) > 0:
+                    first_valid_indices = agent_valid_indices[0]
+                    last_valid_indices = agent_valid_indices[-1]
+                    guidance_dropout_mask[agent_idx, first_valid_indices] = True
+                    guidance_dropout_mask[agent_idx, last_valid_indices] = True
+            
+            return guidance_dropout_mask
+            
         else:
             # 1 if we want to keep the point, 0 if we want to drop it
             guidance_dropout_mask = torch.ones(
@@ -929,6 +950,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         torch.rand(num_controlled, device=self.device)
                         * dropout_prob
                     )
+                    
                 elif self.dropout_mode == "avg":
                     # Use the same dropout probability for all agents (equal to dropout_prob)
                     agent_dropout_probs = torch.full(
@@ -951,7 +973,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ):  # Only apply dropout if we have more than 2 points
                         if self.dropout_mode == "max":
                             # Keep first and last points, apply dropout to middle points
-                            middle_indices = agent_valid_indices[1:-1]
+                            middle_indices = agent_valid_indices[0:-1]
 
                             # Generate random dropout mask for middle points
                             dropout = (
@@ -1374,26 +1396,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance_orig.append(reference_headings)
 
         self.guidance_obs = torch.cat(guidance_orig, dim=-1)
+        self.guidance_obs_norm = torch.cat(guidance, dim=-1)
 
         # Apply dropout mask if specified
         # Note: currently only supported for masked observations
-        if self.config.guidance_dropout_prob > 0 and hasattr(
+        if self.config.guidance_dropout_prob > 0 or self.config.guidance_dropout_mode == "remove_all" and hasattr(
             self, "guidance_dropout_mask"
         ):
             self.guidance_obs[
                 ~self.guidance_dropout_mask
             ] = constants.INVALID_ID
+            
             self.reference_path[
                 ~self.guidance_dropout_mask
             ] = constants.INVALID_ID
+            
+            self.guidance_obs_norm[
+                ~self.guidance_dropout_mask
+            ] = constants.INVALID_ID    
 
         self.valid_guidance_points = torch.sum(
-            self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1
+            self.guidance_obs_norm[:, :, 0] != constants.INVALID_ID, axis=1
         )
 
-        guidance = torch.cat(guidance, dim=-1)
-
-        return guidance.flatten(start_dim=1)
+        return self.guidance_obs_norm.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
@@ -1911,23 +1937,24 @@ if __name__ == "__main__":
         guidance=True,
         guidance_mode="log_replay",  # Options: "log_replay", "vbd_amortized"
         add_reference_pos_xy=True,
-        add_reference_speed=False,
-        add_reference_heading=False,
+        add_reference_speed=True,
+        add_reference_heading=True,
         reward_type="guided_autonomy",
         init_mode="wosac_train",
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
-        guidance_dropout_prob=0.9,  # 0.95,
+        guidance_dropout_mode="end_points_only",
+        guidance_dropout_prob=0.9999,  # 0.95,
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_json_100",
-        batch_size=1,
+        root="data/processed/wosac/validation_interactive/json",
+        batch_size=20,
         dataset_size=100,
-        sample_with_replacement=False,
+        sample_with_replacement=True,
         shuffle=False,
         file_prefix="",
     )
@@ -1937,7 +1964,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=32,  # Number of agents to control
-        device="cpu",
+        device="cuda",
     )
 
     control_mask = env.cont_agent_mask
