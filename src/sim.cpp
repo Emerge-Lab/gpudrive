@@ -197,6 +197,10 @@ inline void collectPartnerObsSystem(Engine &ctx,
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
 
     CountT arrIndex = 0; CountT agentIdx = 0;
+
+    // Get the forward vector of the agent in world space
+    Vector3 forward_vec  = rot.rotateVec(math::fwd);
+
     while(agentIdx < ctx.data().numAgents - 1)
     {
         Entity other = other_agents.e[agentIdx++];
@@ -206,18 +210,32 @@ inline void collectPartnerObsSystem(Engine &ctx,
         const Rotation &other_rot = ctx.get<Rotation>(other);
         const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
-        Vector2 relative_pos = (other_position - pos).xy();
-        relative_pos = rot.inv().rotateVec({relative_pos.x, relative_pos.y, 0}).xy();
+        Vector2 relative_pos_world = (other_position - pos).xy();
+        relative_pos = rot.inv().rotateVec({relative_pos_world.x, relative_pos_world.y, 0}).xy();
         float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
 
         float relative_heading = utils::quatToYaw(relative_orientation);
-
+        
+        // Check if outside observation radius
         if(relative_pos.length() > ctx.data().params.observationRadius)
         {
             continue;
         }
+
+        // Check if outside view cone angle
+        Vector2 to_other_dir_world = relative_pos_world.normalize();
+        Vector3 to_other_dir_world_3d = {to_other_dir_world.x, to_other_dir_world.y, 0.0f};
+        float cos_angle = forward_vec.dot(to_other_dir_world_3d);
+        float angle = std::acos(cos_angle);
+        
+        // If angle is greater than half the view cone angle, skip this agent
+        if(angle > ctx.data().params.viewConeHalfAngle)
+        {
+            continue;
+        }
+
         partner_obs.obs[arrIndex++] = {
             .speed = relative_speed,
             .position = relative_pos,
