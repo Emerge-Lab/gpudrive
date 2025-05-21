@@ -211,7 +211,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
         const VehicleSize &other_size = ctx.get<VehicleSize>(other);
 
         Vector2 relative_pos_world = (other_position - pos).xy();
-        relative_pos = rot.inv().rotateVec({relative_pos_world.x, relative_pos_world.y, 0}).xy();
+        Vector2 relative_pos = rot.inv().rotateVec({relative_pos_world.x, relative_pos_world.y, 0}).xy();
         float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
@@ -225,8 +225,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
         }
 
         // Check if outside view cone angle
-        Vector2 to_other_dir_world = relative_pos_world.normalize();
-        Vector3 to_other_dir_world_3d = {to_other_dir_world.x, to_other_dir_world.y, 0.0f};
+        Vector3 to_other_dir_world_3d = {relative_pos_world.x, relative_pos_world.y, 0};
+        to_other_dir_world_3d = to_other_dir_world_3d.normalize();
         float cos_angle = forward_vec.dot(to_other_dir_world_3d);
         float angle = std::acos(cos_angle);
         

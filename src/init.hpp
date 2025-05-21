@@ -112,6 +112,7 @@ namespace madrona_gpudrive
     {
         float polylineReductionThreshold;
         float observationRadius;
+        float viewConeHalfAngle;
         RewardParams rewardParams;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         uint32_t maxNumControlledAgents = 10000;                               // Arbitrary high number to by default control all vehicles
