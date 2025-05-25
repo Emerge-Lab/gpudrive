@@ -32,44 +32,22 @@ namespace madrona_gpudrive
         // Set number of states to the size of the state array
         size_t numStates = std::min(j.at("state").size(), static_cast<size_t>(consts::kTrajectoryLength));
         tl_state.numStates = numStates;
+        static const std::unordered_map<std::string, TLState> state_map = {
+                    {"unknown", TLState::Unknown},
+                    {"stop", TLState::Stop},
+                    {"caution", TLState::Caution},
+                    {"go", TLState::Go}
+        };
 
         // Process each timestep
         for (size_t t = 0; t < numStates; t++) {
             // Get the state string and convert to enum
             if (t < j.at("state").size()) {
                 std::string state_str = j.at("state")[t];
-                if (state_str == "unknown") {
-                    tl_state.state[t] = TLState::Unknown;
-                } else if (state_str == "stop") {
-                    tl_state.state[t] = TLState::Stop;
-                } else if (state_str == "caution") {
-                    tl_state.state[t] = TLState::Caution;
-                } else if (state_str == "go") {
-                    tl_state.state[t] = TLState::Go;
-                } else {
-                    tl_state.state[t] = TLState::Unknown;
-                }
+                auto it = state_map.find(state_str);
+                tl_state.state[t] = (it != state_map.end()) ? it->second : TLState::Unknown;
             } else {
                 tl_state.state[t] = TLState::Unknown;
-            }
-
-            // Get coordinates
-            if (t < j.at("x").size()) {
-                tl_state.x[t] = j.at("x")[t];
-            } else {
-                tl_state.x[t] = 0.0f;
-            }
-
-            if (t < j.at("y").size()) {
-                tl_state.y[t] = j.at("y")[t];
-            } else {
-                tl_state.y[t] = 0.0f;
-            }
-
-            if (t < j.at("z").size()) {
-                tl_state.z[t] = j.at("z")[t];
-            } else {
-                tl_state.z[t] = 0.0f;
             }
 
             // Get time index and lane id
@@ -78,23 +56,16 @@ namespace madrona_gpudrive
             } else {
                 tl_state.timeIndex[t] = -1;
             }
-
-            if (t < j.at("lane_id").size()) {
-                // Lane ID is already stored from key, but also save per timestep
-                tl_state.laneIds[t] = j.at("lane_id")[t];
-            } else {
-                tl_state.laneIds[t] = tl_state.laneId;
-            }
         }
+
+        tl_state.x = j.at("x")[0];
+        tl_state.y = j.at("y")[0];
+        tl_state.z = j.at("z")[0];
 
         // Fill any remaining timesteps with default values
         for (size_t t = numStates; t < consts::kTrajectoryLength; t++) {
             tl_state.state[t] = TLState::Unknown;
-            tl_state.x[t] = 0.0f;
-            tl_state.y[t] = 0.0f;
-            tl_state.z[t] = 0.0f;
             tl_state.timeIndex[t] = -1;
-            tl_state.laneIds[t] = tl_state.laneId;
         }
     }
 
@@ -554,48 +525,9 @@ namespace madrona_gpudrive
             map.hasTrafficLights = (map.numTrafficLights > 0);
 
             size_t idx = 0;
-            for (auto it = tl_states.begin(); it != tl_states.end() && idx < map.numTrafficLights; ++it) {
-                // Get the lane ID directly as int using atoi instead of stoi
-                // atoi doesn't throw exceptions for invalid inputs
-                int32_t lane_id = std::atoi(it.key().c_str());
-
-                // Process the traffic light state data
-                const auto& tl_data = it.value();
-
-                // Store the lane ID
-                map.trafficLightStates[idx].laneId = lane_id;
-
-                // Get the number of states
-                size_t numStates = std::min(tl_data.at("state").size(), static_cast<size_t>(MAX_TL_STATES));
-                map.trafficLightStates[idx].numStates = numStates;
-
-                // Process each state
-                for (size_t t = 0; t < numStates; ++t) {
-                    // Get state value
-                    std::string state_str = tl_data.at("state")[t];
-                    if (state_str == "unknown") {
-                        map.trafficLightStates[idx].state[t] = TLState::Unknown;
-                    } else if (state_str == "stop") {
-                        map.trafficLightStates[idx].state[t] = TLState::Stop;
-                    } else if (state_str == "caution") {
-                        map.trafficLightStates[idx].state[t] = TLState::Caution;
-                    } else if (state_str == "go") {
-                        map.trafficLightStates[idx].state[t] = TLState::Go;
-                    } else {
-                        map.trafficLightStates[idx].state[t] = TLState::Unknown;
-                    }
-
-                    // Get coordinates
-                    map.trafficLightStates[idx].x[t] = tl_data.at("x")[t];
-                    map.trafficLightStates[idx].y[t] = tl_data.at("y")[t];
-                    map.trafficLightStates[idx].z[t] = tl_data.at("z")[t];
-
-                    // Get time index and lane ID
-                    map.trafficLightStates[idx].timeIndex[t] = tl_data.at("time_index")[t];
-                    map.trafficLightStates[idx].laneIds[t] = tl_data.at("lane_id")[t];
-                }
-
-                ++idx;
+            for (size_t i = 0; i < j.at("tl_states").size(); i++)
+            {
+                j.at("tl_states")[i].get_to(map.trafficLightStates[i]);
             }
         } else {
             map.numTrafficLights = 0;

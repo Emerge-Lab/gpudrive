@@ -449,22 +449,31 @@ namespace madrona_gpudrive
     struct TrafficLightState
     {
         // Lane ID for this traffic light
-        int32_t laneId;
+        int32_t laneId = 0;
 
         // Arrays of state data for each timestep
-        TLState state[consts::kTrajectoryLength-1];
-        float x[consts::kTrajectoryLength-1];
-        float y[consts::kTrajectoryLength-1];
-        float z[consts::kTrajectoryLength-1];
-        int32_t timeIndex[consts::kTrajectoryLength-1];
-        int32_t laneIds[consts::kTrajectoryLength-1];
+        TLState state[consts::kTrajectoryLength-1] = {};
+        float x = 0;
+        float y = 0;
+        float z = 0;
+        int32_t timeIndex[consts::kTrajectoryLength-1] = {};
+        int32_t laneIds = 0;
 
         // Number of valid states
-        uint32_t numStates;
+        uint32_t numStates = 0;
     };
 
     // 1 (TLState) + 3 (x,y,z coordinates) + 2 (timeIndex, laneId) = 6
-    const size_t TrafficLightsExportSize = 6 * consts::kTrajectoryLength-1;
+    const size_t TrafficLightsStateExportSize = 1 + (consts::kTrajectoryLength - 1) * 2 + 3 + 2;
+    static_assert(sizeof(TrafficLightState) == sizeof(int32_t) * TrafficLightsStateExportSize);
+
+    struct TrafficLights
+    {
+        TrafficLightState trafficLights[consts::kMaxTrafficLightCount];
+    };
+
+    const size_t TrafficLightsExportSize = consts::kMaxTrafficLightCount * TrafficLightsStateExportSize;
+    static_assert(sizeof(TrafficLights) == sizeof(int32_t) * TrafficLightsExportSize);
 
     struct MetaData
     {

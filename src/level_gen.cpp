@@ -495,6 +495,14 @@ void createPersistentEntities(Engine &ctx) {
             other_agents.e[out_idx++] = other_agent;
         }
     }
+
+    // Init traffic lights
+    for(CountT i = 0; i < map.numTrafficLights; i++)
+    {
+        auto &trafficLight = ctx.singleton<TrafficLights>().trafficLights[i];
+        trafficLight = map.trafficLightStates[i];
+    }
+
 }
 
 static void resetPersistentEntities(Engine &ctx)

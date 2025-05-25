@@ -42,8 +42,8 @@ enum class ExportID : uint32_t {
     MapName,
     ScenarioId,
     VBDTrajectory,
-    NumExports,
-    TrafficLightState
+    TrafficLightState,
+    NumExports // NumExports should always be the last entry in this enum
 };
 
 // Stores values for the ObjectID component that links entities to
