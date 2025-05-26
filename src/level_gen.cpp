@@ -501,6 +501,9 @@ void createPersistentEntities(Engine &ctx) {
     {
         auto &trafficLight = ctx.singleton<TrafficLights>().trafficLights[i];
         trafficLight = map.trafficLightStates[i];
+        trafficLight.x -= ctx.singleton<WorldMeans>().mean.x;
+        trafficLight.y -= ctx.singleton<WorldMeans>().mean.y;
+        trafficLight.z -= ctx.singleton<WorldMeans>().mean.z;
     }
 
 }
