@@ -496,7 +496,7 @@ void createPersistentEntities(Engine &ctx) {
         }
     }
 
-    // Init traffic lights
+
     for(CountT i = 0; i < map.numTrafficLights; i++)
     {
         auto &trafficLight = ctx.singleton<TrafficLights>().trafficLights[i];

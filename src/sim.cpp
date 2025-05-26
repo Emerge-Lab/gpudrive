@@ -60,7 +60,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<MapType>();
     registry.registerComponent<MetaData>();
     registry.registerComponent<VBDTrajectory>();
-    registry.registerSingleton<TrafficLightState>();
+    registry.registerSingleton<TrafficLights>();
     registry.registerSingleton<WorldReset>();
     registry.registerSingleton<Shape>();
     registry.registerSingleton<Map>();
@@ -84,7 +84,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.exportSingleton<DeletedAgents>((uint32_t)ExportID::DeletedAgents);
     registry.exportSingleton<MapName>((uint32_t)ExportID::MapName);
     registry.exportSingleton<ScenarioId>((uint32_t)ExportID::ScenarioId);
-    registry.exportSingleton<TrafficLightState>((uint32_t)ExportID::TrafficLightState);
+    registry.exportSingleton<TrafficLights>((uint32_t)ExportID::TrafficLights);
 
     registry.exportColumn<AgentInterface, Action>(
         (uint32_t)ExportID::Action);
@@ -868,7 +868,7 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
     //         Progress,
     //         OtherAgents,
     //         EntityType,
-    //         CollisionDetectionEvent,
+    //         CollisionDetectionEvent,f
     //         AgentInterfaceEntity
     //     >>({clear_tmp});
 

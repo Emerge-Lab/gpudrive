@@ -42,7 +42,7 @@ enum class ExportID : uint32_t {
     MapName,
     ScenarioId,
     VBDTrajectory,
-    TrafficLightState,
+    TrafficLights,
     NumExports // NumExports should always be the last entry in this enum
 };
 

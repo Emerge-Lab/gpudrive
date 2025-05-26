@@ -26,11 +26,8 @@ namespace madrona_gpudrive
 
     void from_json(const nlohmann::json &j, TrafficLightState &tl_state)
     {
-        // Get the lane ID from the key and store it
-        tl_state.laneId = std::stoi(j.begin().key());
-
         // Set number of states to the size of the state array
-        size_t numStates = std::min(j.at("state").size(), static_cast<size_t>(consts::kTrajectoryLength));
+        size_t numStates = std::max(j.at("state").size(), static_cast<size_t>(consts::kTrajectoryLength));
         tl_state.numStates = numStates;
         static const std::unordered_map<std::string, TLState> state_map = {
                     {"unknown", TLState::Unknown},
@@ -58,9 +55,10 @@ namespace madrona_gpudrive
             }
         }
 
-        tl_state.x = j.at("x")[0];
-        tl_state.y = j.at("y")[0];
-        tl_state.z = j.at("z")[0];
+        tl_state.x = static_cast<int32_t>(j.at("x")[0]);
+        tl_state.y = static_cast<int32_t>(j.at("y")[0]);
+        tl_state.z = static_cast<int32_t>(j.at("z")[0]);
+        tl_state.laneId = static_cast<int32_t>(j.at("lane_id")[0]);
 
         // Fill any remaining timesteps with default values
         for (size_t t = numStates; t < consts::kTrajectoryLength; t++) {
@@ -521,13 +519,15 @@ namespace madrona_gpudrive
         // Process traffic light states if present
         if (j.contains("tl_states")) {
             const auto& tl_states = j.at("tl_states");
-            map.numTrafficLights = std::min(tl_states.size(), static_cast<size_t>(MAX_TL_STATES));
+            map.numTrafficLights = std::max(tl_states.size(), static_cast<size_t>(consts::kMaxTrafficLightCount));
             map.hasTrafficLights = (map.numTrafficLights > 0);
 
             size_t idx = 0;
-            for (size_t i = 0; i < j.at("tl_states").size(); i++)
+            for (auto &kv : tl_states.items())
             {
-                j.at("tl_states")[i].get_to(map.trafficLightStates[i]);
+                if (idx >= map.numTrafficLights)
+                    break;
+                kv.value().get_to(map.trafficLightStates[idx++]);
             }
         } else {
             map.numTrafficLights = 0;

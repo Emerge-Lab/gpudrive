@@ -10,7 +10,6 @@ namespace madrona_gpudrive
     constexpr size_t MAX_ROADS = 956;
     constexpr size_t MAX_POSITIONS = 91;
     constexpr size_t MAX_GEOMETRY = 1746;
-    constexpr size_t MAX_TL_STATES = 16;
 
     // Cannot use Madrona::math::Vector2 because it is not a POD type.
     // Getting all zeros if using any madrona types.
@@ -30,7 +29,6 @@ namespace madrona_gpudrive
         MapVector2 goalPosition;
         EntityType type;
         MetaData metadata;
-        TrafficLightState trafficLights;
 
         uint32_t numPositions;
         uint32_t numHeadings;
@@ -57,7 +55,7 @@ namespace madrona_gpudrive
     {
         MapObject objects[MAX_OBJECTS];
         MapRoad roads[MAX_ROADS];
-        TrafficLightState trafficLightStates[MAX_TL_STATES]; 
+        TrafficLightState trafficLightStates[consts::kMaxTrafficLightCount]; 
 
         uint32_t numObjects;
         uint32_t numRoads;
