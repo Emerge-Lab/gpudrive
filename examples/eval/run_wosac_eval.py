@@ -158,7 +158,7 @@ def rollout(
                 figsize=(10, 10),
                 trajectory=env.reference_path[0, :, :].to("cpu"),
             )
-            agent_observation_frames[idx].append(img_from_fig(agent_obs))
+            agent_observation_frames[0].append(img_from_fig(agent_obs))
 
         # Get next observation
         next_obs = env.get_obs(control_mask)
@@ -278,19 +278,20 @@ if __name__ == "__main__":
     NUM_DATA_BATCHES = 1
     INIT_STEPS = 10
     DATASET_SIZE = 1000
-    RENDER = True
+    RENDER = False
     LOG_DIR = "examples/eval/figures_data/wosac/"
     GUIDANCE_MODE = (
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
-    GUIDANCE_DROPOUT_MODE = "end_points_only"  # Options: "max", "avg", "remove_all"
-    GUIDANCE_DROPOUT_PROB = 0.99
+    GUIDANCE_DROPOUT_MODE = "end_points_only"  # Options: "max", "avg", "remove_all", "end_points_only"
+    GUIDANCE_DROPOUT_PROB = 1.0
     SMOOTHEN_TRAJECTORY = True
 
     DATA_JSON = "data/processed/wosac/validation_interactive/json"
     DATA_TFRECORD = "data/processed/wosac/validation_interactive/tfrecord"
 
-    CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_20_26_57_786_002100.pt"
+    CPT_PATH = "examples/experimental/models/model_guidance_logs__R_10000__05_19_14_40_25_153_004745.pt"
+    
 
     # Create data loader
     val_loader = SceneDataLoader(

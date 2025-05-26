@@ -1400,7 +1400,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Apply dropout mask if specified
         # Note: currently only supported for masked observations
-        if self.config.guidance_dropout_prob > 0 or self.config.guidance_dropout_mode == "remove_all" and hasattr(
+        if self.config.guidance_dropout_prob > 0 or self.config.guidance_dropout_mode == "end_points_only" or self.config.guidance_dropout_mode == "end_points_only" and hasattr(
             self, "guidance_dropout_mask"
         ):
             self.guidance_obs[
@@ -1944,8 +1944,8 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
-        guidance_dropout_mode="end_points_only",
-        guidance_dropout_prob=0.9999,  # 0.95,
+        guidance_dropout_mode="max",
+        guidance_dropout_prob=1.0,  
     )
     render_config = RenderConfig()
 
