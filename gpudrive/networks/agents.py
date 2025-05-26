@@ -52,7 +52,6 @@ class Agent(nn.Module):
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )
-
         self.road_map_idx = self.partner_obs_idx + (
             constants.ROAD_GRAPH_TOP_K * constants.ROAD_GRAPH_FEAT_DIM
         )
@@ -65,7 +64,7 @@ class Agent(nn.Module):
                     constants.LOG_TRAJECTORY_LENGTH * 2
                 )
             if self.config["add_reference_speed"]:
-                # TODO: Change to reference path-length (90) if using the vbd_amortized trajs
+                # Assumption: Guidance traj is of length 91
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
             if self.config["add_reference_heading"]:
                 self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
@@ -73,11 +72,11 @@ class Agent(nn.Module):
 
         # Shared embedding networks for both actor and critic
         self.ego_embed = nn.Sequential(
-            layer_init(nn.Linear(self.ego_state_idx, embed_dim)),
-            nn.LayerNorm(embed_dim),
+            layer_init(nn.Linear(self.ego_state_idx, 64)),
+            nn.LayerNorm(64),
             self.act_func,
             nn.Dropout(self.dropout),
-            layer_init(nn.Linear(embed_dim, embed_dim)),
+            layer_init(nn.Linear(64, 64)),
         )
 
         self.partner_embed = nn.Sequential(
@@ -106,7 +105,10 @@ class Agent(nn.Module):
 
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 64)),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
+            self.act_func,
+            layer_init(nn.Linear(256, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, 1), std=1.0),
@@ -114,7 +116,10 @@ class Agent(nn.Module):
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 2) * embed_dim, 64)),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
+            self.act_func,
+            layer_init(nn.Linear(256, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
@@ -282,7 +287,7 @@ class SeparateActorCriticAgent(nn.Module):
             self.act_func,
             layer_init(
                 nn.Linear(32, 1), std=1.0
-            ),  # Fixed the dimension (was 32)
+            ),  
         )
 
         # Actor network

@@ -27,6 +27,7 @@ from gpudrive.env.env_torch import GPUDriveTorchEnv
 from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.observation import GlobalEgoState
 from gpudrive.integrations.vbd.sim_agent.sim_actor import VBDTest
+import madrona_gpudrive
 
 
 def load_vbd_model(model_path, device="cpu", max_cont_agents=64):
@@ -76,8 +77,8 @@ def main():
     args = parser.parse_args()
 
     # Always use CPU device
-    device = "cpu"
-    MAX_CONTROLLED_AGENTS = 64
+    device = "cuda"
+    MAX_CONTROLLED_AGENTS = 32
     print(f"Loading VBD model on {device}...")
     vbd_model = load_vbd_model(args.model_path, device, MAX_CONTROLLED_AGENTS)
 
@@ -106,7 +107,7 @@ def main():
             dataset_size=args.num_scenes,
             file_prefix="",
         ),
-        render_config=RenderConfig(render_3d=True),
+        render_config=RenderConfig(),
         max_cont_agents=MAX_CONTROLLED_AGENTS,  # Maximum number of agents to control per scene
         device=device,
     )
@@ -115,8 +116,8 @@ def main():
     output_trajectories = torch.zeros(
         gpudrive_env.num_worlds,
         gpudrive_env.max_agent_count,
-        env_config.episode_len,
-        5,
+        madrona_gpudrive.kTrajectoryLength,
+        6,
     )
 
     # Save init steps from logs
@@ -124,17 +125,20 @@ def main():
         gpudrive_env.sim.expert_trajectory_tensor(),
         num_worlds=gpudrive_env.num_worlds,
         max_agents=gpudrive_env.max_agent_count,
-        device=device,
+        device="cpu",
     )
 
-    output_trajectories[:, :, :INIT_STEPS, :2] = log_trajectory.pos_xy[
-        :, :, :INIT_STEPS
+    output_trajectories[:, :, : INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
+        :, :, : INIT_STEPS + 1
     ]
-    output_trajectories[:, :, :INIT_STEPS, 2] = log_trajectory.yaw[
-        :, :, :INIT_STEPS, 0
+    output_trajectories[:, :, : INIT_STEPS + 1, 2] = log_trajectory.yaw[
+        :, :, : INIT_STEPS + 1, 0
     ]
-    output_trajectories[:, :, :INIT_STEPS, 3:] = log_trajectory.vel_xy[
-        :, :, :INIT_STEPS
+    output_trajectories[:, :, : INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
+        :, :, : INIT_STEPS + 1
+    ]
+    output_trajectories[:, :, : INIT_STEPS + 1, 5] = log_trajectory.valids[
+        :, :, : INIT_STEPS + 1, 0
     ]
 
     # Action tensor to step through simulation
@@ -149,7 +153,7 @@ def main():
 
     # World means for VBD outputs
     world_means = (
-        gpudrive_env.sim.world_means_tensor().to_torch()[:, :2].to(device)
+        gpudrive_env.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
     )
 
     for _ in range(int(args.num_scenes / args.batch_size)):
@@ -158,11 +162,11 @@ def main():
             init_steps=gpudrive_env.init_steps
         )
         # Controlled agent mask
-        world_agent_indices = scene_context["agents_id"]
+        world_agent_indices = scene_context["agents_id"].to("cpu")
 
         # Generate VBD output
         predictions = vbd_model.sample_denoiser(scene_context)
-        vbd_output = predictions["denoised_trajs"].to(device).detach()
+        vbd_output = predictions["denoised_trajs"].to("cpu").detach()
 
         for i in range(gpudrive_env.num_worlds):
             # Get controlled agent indices for this world
@@ -181,30 +185,33 @@ def main():
                 i, valid_world_indices, :, 2
             ]
             predicted_actions[i, valid_world_indices, :, 4:6] = vbd_output[
-                i, valid_world_indices, :, 3:
+                i, valid_world_indices, :, 3:5
             ]
 
             # Populate output trajectories
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS:, :2
+                i, valid_world_indices, INIT_STEPS + 1 :, :2
             ] = vbd_output[i, valid_world_indices, :, :2] - world_means[
                 i
             ].view(
                 1, 1, 2
             )
             output_trajectories[
-                i, valid_world_indices, INIT_STEPS:, 2:
+                i, valid_world_indices, INIT_STEPS + 1 :, 2:5
             ] = vbd_output[i, valid_world_indices, :, 2:]
+            output_trajectories[
+                i, valid_world_indices, INIT_STEPS + 1 :, 5
+            ] = 1.0
 
         # Save to each file's json
         index_to_id = GlobalEgoState.from_tensor(
-            gpudrive_env.sim.absolute_self_observation_tensor(), device=device
+            gpudrive_env.sim.absolute_self_observation_tensor(), device="cpu"
         ).id
 
-        filenames = gpudrive_env.get_scenario_ids()
+        filenames = gpudrive_env.get_env_filenames()
 
         for i in range(gpudrive_env.num_worlds):
-            filename = f"{filenames[i]}.json"
+            filename = f"{filenames[i]}"
             with open(f"{args.input_dir}/{filename}", "r") as f:
                 data = json.load(f)
 

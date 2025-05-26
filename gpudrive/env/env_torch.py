@@ -36,6 +36,7 @@ from gpudrive.env.dataset import SceneDataLoader
 from gpudrive.integrations.vbd.data.utils import process_scenario_data
 
 from gpudrive.utils.preprocess import smooth_scenario
+import madrona_gpudrive
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
@@ -82,8 +83,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize simulator
         self.sim = self._initialize_simulator(params, self.data_batch)
 
-        self.init_steps = self.config.init_steps
-
         # Controlled agents setup
         self.cont_agent_mask = self.get_controlled_agents_mask()
         self.max_agent_count = self.cont_agent_mask.shape[1]
@@ -97,6 +96,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         self.setup_guidance()
+
+        self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         if self.config.reward_type == "reward_conditioned":
             # Use default condition_mode from config or fall back to "random"
@@ -124,6 +125,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dtype=np.float32,
         )
 
+        # Action space setup
         # Action space setup
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
@@ -157,16 +159,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 trajectory_tensor, self.backend, self.device
             )
         elif self.guidance_mode == "vbd_online":
+            # Load pre-trained Versatile Behavior Diffusion (VBD) model
+            self.vbd_model = self._load_vbd_model(
+                model_path=self.config.vbd_model_path
+            )
 
             self.init_steps = max(self.init_steps, 10)
             print(
                 f"\n[Note] Guidance mode '{self.guidance_mode}' requires at least {self.init_steps} initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
             )
 
-            # Load pre-trained Versatile Behavior Diffusion (VBD) model
-            self.vbd_model = self._load_vbd_model(
-                model_path=self.config.vbd_model_path
-            )
             # Construct scene context dict for the VBD model
             scene_context = self.construct_context(init_steps=self.init_steps)
 
@@ -175,9 +177,69 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Query the model online for the reference trajectory
             predicted = self.vbd_model.sample_denoiser(scene_context)
 
+            # Pad first 10 steps with logs
+            trajectory_tensor = self.sim.expert_trajectory_tensor()
+            log_trajectory = LogTrajectory.from_tensor(
+                trajectory_tensor,
+                self.num_worlds,
+                self.max_agent_count,
+                self.backend,
+                self.device,
+            )
+
+            reference_trajectory = torch.zeros(
+                self.num_worlds,
+                self.max_agent_count,
+                madrona_gpudrive.kTrajectoryLength,
+                6,
+            ).to(self.device)
+            reference_trajectory[
+                :, :, : self.init_steps + 1, :2
+            ] = log_trajectory.pos_xy[:, :, : self.init_steps + 1]
+            reference_trajectory[
+                :, :, : self.init_steps + 1, 2
+            ] = log_trajectory.yaw[:, :, : self.init_steps + 1, 0]
+            reference_trajectory[
+                :, :, : self.init_steps + 1, 3:5
+            ] = log_trajectory.vel_xy[:, :, : self.init_steps + 1]
+            reference_trajectory[
+                :, :, : self.init_steps + 1, 5
+            ] = log_trajectory.valids[:, :, : self.init_steps + 1, 0]
+
+            vbd_predictions = (
+                predicted["denoised_trajs"].to(self.device).detach()
+            )
+
+            # Get the world means
+            world_means = (
+                self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
+            )
+
+            # Add vbd predictions to the reference trajectory
+            for i in range(self.num_worlds):
+                # Get controlled agent indices for this world
+                valid_mask = scene_context["agents_id"][i] >= 0
+                valid_world_indices = scene_context["agents_id"][i][valid_mask]
+
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps + 1 :, :2
+                ] = vbd_predictions[
+                    i, valid_world_indices, :, :2
+                ] - world_means[
+                    i
+                ].view(
+                    1, 1, 2
+                )
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps + 1 :, 2:5
+                ] = vbd_predictions[i, valid_world_indices, :, 2:5]
+                reference_trajectory[
+                    i, valid_world_indices, self.init_steps + 1 :, 5
+                ] = 1
+
             # Wrap predictions into a VBDTrajectoryOnline object
             self.reference_trajectory = VBDTrajectoryOnline.from_tensor(
-                vbd_predictions=predicted["denoised_trajs"],
+                vbd_predictions=reference_trajectory,
                 mean_pos_xy=self.sim.world_means_tensor().to_torch()[:, :2],
                 backend=self.backend,
                 device=self.device,
@@ -242,9 +304,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 - 'agents_id': Unique identifiers for each agent
                 - 'anchors': Reference points
         """
-        means_xy = (
-            self.sim.world_means_tensor().to_torch()[:, :2].to(self.device)
-        )
+        means_xy = self.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
 
         # Get the logged trajectory and restore the mean
         log_trajectory = LogTrajectory.from_tensor(
@@ -252,7 +312,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.num_worlds,
             self.max_agent_count,
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         log_trajectory.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -262,7 +322,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_road_graph = GlobalRoadGraphPoints.from_tensor(
             roadgraph_tensor=self.sim.map_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_road_graph.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -273,7 +333,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         global_agent_obs = GlobalEgoState.from_tensor(
             abs_self_obs_tensor=self.sim.absolute_self_observation_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         global_agent_obs.restore_mean(
             mean_x=means_xy[:, 0], mean_y=means_xy[:, 1]
@@ -281,7 +341,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         metadata = Metadata.from_tensor(
             metadata_tensor=self.sim.metadata_tensor(),
             backend=self.backend,
-            device=self.device,
+            device="cpu",
         )
         context_dict = process_scenario_data(
             max_controlled_agents=self.max_cont_agents,
@@ -291,9 +351,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory=log_trajectory,
             episode_len=self.episode_len,
             init_steps=init_steps,
-            raw_agent_types=self.sim.info_tensor().to_torch()[:, :, 4],
+            raw_agent_types=self.sim.info_tensor().to_torch().cpu()[:, :, 4],
             metadata=metadata,
         )
+
+        if self.device != "cpu":
+            # Move tensors to the specified device
+            for key in context_dict:
+                if isinstance(context_dict[key], torch.Tensor):
+                    context_dict[key] = context_dict[key].to(self.device)
 
         return context_dict
 
@@ -501,12 +567,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             # Zero out only the reset environments
             self.previous_action_value_tensor[reset_mask] = 0.0
             # Reset the guidance points hit tensor for the reset environments
-            # TODO: Fix for asynchronous resets
+            # TODO(dc): Fix for asynchronous resets
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
 
         else:
             self.previous_action_value_tensor.zero_()
             self.guidance_points_hit, _ = self.guidance_points_within_reach()
+
+        # Dropout mask for guidance points
+        # Assumption: all worlds are reset at the same time
+        if self.config.guidance_dropout_prob > 0:
+            self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         return self.get_obs(mask)
 
@@ -593,6 +664,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         elif self.config.reward_type == "guided_autonomy":
 
             step_in_world = self.step_in_world[:, 0, :].squeeze(-1)
+
+            actual_agent_speed = (
+                self.sim.self_observation_tensor().to_torch()[:, :, 0].clone()
+            )
 
             # 1. Get base rewards defined by user
             self.base_rewards = (
@@ -685,7 +760,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 guidance_points_hit_count
                 / (self.reference_trajectory.valids.sum(axis=[2, 3]) + 1e-5),
                 min=0,
-                max=1,
+                max=0.1,
             )
 
             # We want agents that are parked to stay parked, and generally
@@ -709,55 +784,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             completed_route_mask = (route_progress >= 0.99).float()
 
-            # b). Add a bonus for being close to the reference end position
+            # b). Jerk penalty for completed routes
             if torch.any(completed_route_mask > 0):
-                # Extract the last valid reference position for each world, agent
-                # valid_mask is [1, 64, 91] and reference_trajectory.pos_xy is [1, 64, 91, 2]
-                # We need to find the last valid position for each world-agent pair
-                agent_states = GlobalEgoState.from_tensor(
-                    self.sim.absolute_self_observation_tensor(),
-                    self.backend,
-                    self.device,
-                )
+                # Apply a penalty for jerk because we want agents to keep going straight
+                # when they have already passed the end of the route
+                # if they turn, the jerk penalty should cancel out the position bonus
+                if hasattr(self, "action_diff"):
+                    acceleration_jerk = self.action_diff[:, :, 0] ** 2
+                    steering_jerk = self.action_diff[:, :, 1] ** 2
 
-                # Get indices of last valid positions for each reference trajectory
-                last_valid_indices = torch.argmax(
-                    is_valid
-                    * torch.arange(is_valid.shape[2], device=is_valid.device),
-                    dim=2,
-                )
+                    acceleration_penalty = 1.0 - torch.exp(-acceleration_jerk)
+                    steering_penalty = 1.0 - torch.exp(-steering_jerk)
 
-                # Create indices for gathering
-                batch_indices = torch.zeros_like(
-                    last_valid_indices
-                )  # Shape: [1, 64]
-                agent_indices = torch.arange(
-                    is_valid.shape[1], device=is_valid.device
-                ).expand_as(
-                    last_valid_indices
-                )  # Shape: [1, 64]
+                    jerk_penalty = -0.001 * (
+                        acceleration_penalty + steering_penalty
+                    )
 
-                # Gather the last valid reference positions
-                last_valid_positions = self.reference_trajectory.pos_xy[
-                    batch_indices, agent_indices, last_valid_indices
-                ]
+                end_of_route_jerk = jerk_penalty * completed_route_mask
 
-                distance = torch.norm(
-                    agent_states.pos_xy - last_valid_positions, dim=2
-                )
-
-                # Add bonus for being close to the reference end position
-                # Using exponential decay: bonus = scale * exp(-distance/th)
-                distance_threshold = 0.5
-                max_position_bonus = 0.01
-
-                position_bonus = max_position_bonus * torch.exp(
-                    -distance / distance_threshold
-                )
-
-                position_bonus = position_bonus * completed_route_mask
-
-                self.route_reward += position_bonus
+                self.route_reward += end_of_route_jerk
 
             self.guidance_reward = self.route_reward.clone()
 
@@ -779,10 +824,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     ]
                     .squeeze(-1)
                     .bool()
-                )
-
-                actual_agent_speed = (
-                    self.sim.self_observation_tensor().to_torch()[:, :, 0]
                 )
 
                 actual_agent_heading = self.agent_states.rotation_angle
@@ -841,6 +882,118 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return rewards
 
+    def create_guidance_dropout_mask(self):
+        """
+        Create guidance dropout mask based on the specified dropout mode.
+
+        Args:
+            mask: Optional pre-existing mask to modify
+            dropout_mode: Either "max" (default) or "avg"
+                - "max": dropout_prob represents the maximum dropout probability
+                - "avg": dropout_prob represents the average dropout probability
+
+        Returns:
+            A boolean mask where True indicates keeping the point, False indicates dropping it
+        """
+        dropout_prob = self.config.guidance_dropout_prob
+        num_controlled = self.cont_agent_mask.sum().item()
+        self.dropout_mode = self.config.guidance_dropout_mode
+
+        if self.dropout_mode == "remove_all":
+            # If the mode is "remove_all", we want to drop all points
+            # so the agents receive no guidance
+            return torch.zeros(
+                (num_controlled, self.reference_traj_len),
+                device=self.device,
+                dtype=torch.bool,
+            )
+        else:
+            # 1 if we want to keep the point, 0 if we want to drop it
+            guidance_dropout_mask = torch.ones(
+                (num_controlled, self.reference_traj_len),
+                device=self.device,
+                dtype=torch.bool,
+            )
+
+            is_valid = (
+                self.reference_trajectory.valids[self.cont_agent_mask]
+                .squeeze(-1)
+                .bool()
+            )
+
+            if dropout_prob > 0.0:
+
+                if self.dropout_mode == "max":
+                    # Generate random dropout rates for each agent between 0 and dropout_prob
+                    agent_dropout_probs = (
+                        torch.rand(num_controlled, device=self.device)
+                        * dropout_prob
+                    )
+                elif self.dropout_mode == "avg":
+                    # Use the same dropout probability for all agents (equal to dropout_prob)
+                    agent_dropout_probs = torch.full(
+                        (num_controlled,), dropout_prob, device=self.device
+                    )
+                else:
+                    raise ValueError(
+                        f"Unsupported dropout mode: {self.config.dropout_mode}"
+                    )
+
+                for agent_idx in range(num_controlled):
+                    agent_valid_mask = is_valid[agent_idx]
+                    agent_valid_indices = torch.where(agent_valid_mask)[0]
+
+                    # Get agent-specific dropout probability
+                    agent_dropout_prob = agent_dropout_probs[agent_idx]
+
+                    if (
+                        len(agent_valid_indices) > 2
+                    ):  # Only apply dropout if we have more than 2 points
+                        if self.dropout_mode == "max":
+                            # Keep first and last points, apply dropout to middle points
+                            middle_indices = agent_valid_indices[1:-1]
+
+                            # Generate random dropout mask for middle points
+                            dropout = (
+                                torch.rand(
+                                    len(middle_indices), device=self.device
+                                )
+                                < agent_dropout_prob
+                            )
+
+                            # Apply dropout to middle points (set to False for points to drop)
+                            guidance_dropout_mask[
+                                agent_idx, middle_indices
+                            ] = ~dropout
+
+                        elif self.dropout_mode == "avg":
+                            # Calculate how many points to drop to achieve the desired average dropout rate
+                            middle_indices = agent_valid_indices[
+                                :-1
+                            ]  # All valid points except the last one
+                            num_middle = len(middle_indices)
+
+                            # Number of points to drop to achieve the desired average
+                            num_to_drop = int(
+                                np.ceil(
+                                    (agent_dropout_prob.item() * num_middle)
+                                )
+                            )
+
+                            if num_to_drop > 0 and num_middle > 0:
+                                # Randomly select points to drop
+                                drop_indices = middle_indices[
+                                    torch.randperm(num_middle)[:num_to_drop]
+                                ]
+                                guidance_dropout_mask[
+                                    agent_idx, drop_indices
+                                ] = False
+
+                return guidance_dropout_mask
+
+            else:
+                return guidance_dropout_mask
+
     def guidance_points_within_reach(self):
         # Get actual agent positions
         self.agent_states = GlobalEgoState.from_tensor(
@@ -857,7 +1010,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dim=-1,
         )
 
-        points_within_reach = distances < self.config.dist_to_goal_threshold
+        points_within_reach = (
+            distances < self.config.dist_to_goal_threshold
+        ) & self.reference_trajectory.valids.bool().squeeze(-1)
 
         return points_within_reach, distances
 
@@ -1039,6 +1194,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return torch.zeros(0, device=self.device)
 
         guidance = []
+        guidance_orig = []
 
         if mask is None:
 
@@ -1124,8 +1280,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return torch.cat(guidance, dim=-1).flatten(start_dim=2)
 
         else:
-            batch_size = mask.sum()
-
             valid_timesteps_mask = self.reference_trajectory.valids.bool()[
                 mask
             ]
@@ -1142,12 +1296,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
             if self.config.add_reference_speed:
-                reference_speed = (
-                    self.reference_trajectory.ref_speed[mask].clone()
-                    / constants.MAX_SPEED
-                )
+                reference_speed = self.reference_trajectory.ref_speed[
+                    mask
+                ].clone()
                 reference_speed[~valid_timesteps_mask] = constants.INVALID_ID
-                guidance.append(reference_speed)
+
+                reference_speed_normalized = (
+                    reference_speed / constants.MAX_SPEED
+                )
+                guidance_orig.append(reference_speed)
+                guidance.append(reference_speed_normalized)
 
             if self.config.add_reference_pos_xy:
                 global_reference_xy = self.reference_trajectory.pos_xy.clone()[
@@ -1190,6 +1348,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.reference_path = local_reference_xy_orig
 
                 guidance.append(reference_path)
+                guidance_orig.append(local_reference_xy_orig)
 
             if self.config.add_reference_heading:
                 reference_headings = self.reference_trajectory.yaw[
@@ -1203,7 +1362,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
                 # Normalize by 2pi to ensure values are in [-1, 1]
-                reference_headings = (
+                reference_headings_normalized = (
                     reference_headings / constants.MAX_ORIENTATION_RAD
                 )
 
@@ -1211,11 +1370,30 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 reference_headings[
                     ~valid_timesteps_mask
                 ] = constants.INVALID_ID
-                guidance.append(reference_headings)
+                guidance.append(reference_headings_normalized)
+                guidance_orig.append(reference_headings)
 
-        self.guidance_obs = torch.cat(guidance, dim=-1)
+        self.guidance_obs = torch.cat(guidance_orig, dim=-1)
 
-        return self.guidance_obs.flatten(start_dim=1)
+        # Apply dropout mask if specified
+        # Note: currently only supported for masked observations
+        if self.config.guidance_dropout_prob > 0 and hasattr(
+            self, "guidance_dropout_mask"
+        ):
+            self.guidance_obs[
+                ~self.guidance_dropout_mask
+            ] = constants.INVALID_ID
+            self.reference_path[
+                ~self.guidance_dropout_mask
+            ] = constants.INVALID_ID
+
+        self.valid_guidance_points = torch.sum(
+            self.guidance_obs[:, :, 0] != constants.INVALID_ID, axis=1
+        )
+
+        guidance = torch.cat(guidance, dim=-1)
+
+        return guidance.flatten(start_dim=1)
 
     def _get_ego_state(self, mask=None) -> torch.Tensor:
         """Get the ego state."""
@@ -1237,12 +1415,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.speed.unsqueeze(-1),
             ego_state.vehicle_length.unsqueeze(-1),
             ego_state.vehicle_width.unsqueeze(-1),
-            ego_state.is_collided.unsqueeze(-1),
             ego_state.steer_angle.unsqueeze(-1),
         ]
 
         if mask is None:
 
+            # TODO(dc): Make this one exactly the same as for the masked case
             # New: Give agent sense of progress / history
             # 1. Overall trajectory progress (percentage of valid points hit)
             total_valid = self.reference_trajectory.valids.clone().sum(
@@ -1281,25 +1459,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 return torch.cat(base_fields, dim=-1)
         else:
 
-            # New: Give agent sense of progress / history
-            # 1. Overall trajectory progress (percentage of valid points hit)
-            total_valid = (
-                self.reference_trajectory.valids[mask]
-                .clone()
-                .sum(dim=1)
-                .squeeze(-1)
-            )
-            valid_hits_so_far = self.guidance_points_hit.clone()[mask].sum(
-                dim=-1
-            )
+            # New: Give agent sense of progress
+            # 1. Overall trajectory progress
+            # Only increment route progress for visible points hit (those that
+            # are not dropped out)
+            total_valid = self.guidance_dropout_mask.sum(axis=1)
+            valid_hits_so_far = self.guidance_points_hit.clone()[mask]
+            visible_hits_so_far = (
+                valid_hits_so_far * self.guidance_dropout_mask
+            ).sum(dim=-1)
 
             # Handle the case where there are zero valid points
             # If total_valid is 0, we consider the route 100% complete (progress = 1.0)
             self.route_progress = torch.where(
-                total_valid > 0,
-                valid_hits_so_far / (total_valid + 1e-5),  # Normal case
+                total_valid >= 1,
+                visible_hits_so_far / (total_valid + 1e-5),  # Normal case
                 torch.ones_like(
-                    valid_hits_so_far
+                    visible_hits_so_far
                 ),  # When agent has no valid points
             )
 
@@ -1577,6 +1753,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
+        
+        self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
@@ -1698,10 +1876,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return sim_states, agent_views
 
+    def render(self, focus_env_idx=0, focus_agent_idx=[0, 1]):
+        """Quick rendering function for debugging."""
+
+        sim_states = self.vis.plot_simulator_state(
+            env_indices=[focus_env_idx],
+            zoom_radius=70,
+            time_steps=[self.step_in_world[0, 0, 0].item()],
+            plot_guidance_pos_xy=True,
+        )
+
+        agent_views = []
+        for agent_idx in focus_agent_idx:
+            agent_obs = self.vis.plot_agent_observation(
+                env_idx=focus_env_idx,
+                agent_idx=agent_idx,
+                figsize=(10, 10),
+                trajectory=self.reference_path[agent_idx, :, :],
+                step_reward=self.guidance_reward[
+                    focus_env_idx, agent_idx
+                ].item(),
+                route_progress=self.route_progress[agent_idx],
+            )
+            agent_views.append(agent_obs)
+
+        return sim_states, agent_views
+
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1, 2, 3]
+    FOCUS_AGENTS = [0, 1, 2, 3, 4]
 
     env_config = EnvConfig(
         guidance=True,
@@ -1714,12 +1918,13 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
+        guidance_dropout_prob=0.9,  # 0.95,
     )
     render_config = RenderConfig()
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_json_1",
+        root="data/processed/wosac/validation_json_100",
         batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,
@@ -1731,7 +1936,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,  # Number of agents to control
+        max_cont_agents=32,  # Number of agents to control
         device="cpu",
     )
 

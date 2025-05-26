@@ -366,15 +366,15 @@ namespace madrona_gpudrive
 
     struct VBDTrajectory
     {
-        // For each agent, store the full VBD trajectory (x, y, yaw, vx, vy)
-        // The tensor has shape [traj_length, 5]
-        float trajectories[consts::episodeLen][5];
+        // For each agent, store the full VBD trajectory (x, y, yaw, vx, vy, valid)
+        // The tensor has shape [traj_length, 6]
+        float trajectories[consts::kTrajectoryLength][6];
 
         static inline void zero(VBDTrajectory& vbd_traj)
         {
-            for (int i = 0; i < consts::episodeLen; i++)
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
             {
-                for (int j = 0; j < 5; j++)
+                for (int j = 0; j < 6; j++)
                 {
                     vbd_traj.trajectories[i][j] = 0.0f;
                 }
@@ -382,7 +382,7 @@ namespace madrona_gpudrive
         }
     };
 
-    const size_t VBDTrajectoryExportSize = consts::episodeLen * 5;
+    const size_t VBDTrajectoryExportSize = consts::kTrajectoryLength * 6;
 
     static_assert(sizeof(VBDTrajectory) == sizeof(float) * VBDTrajectoryExportSize);
 

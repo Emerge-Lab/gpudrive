@@ -45,6 +45,26 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
+    
+    if config.continue_training:
+        print("Loading checkpoint...")
+        # Load checkpoint
+        saved_cpt = torch.load(
+        f=config.model_cpt,
+            weights_only=False,
+        )
+
+        # Create policy architecture from saved checkpoint
+        agent = Agent(
+            config=saved_cpt["config"],
+            embed_dim=saved_cpt["model_arch"]["embed_dim"],
+            action_dim=saved_cpt["action_dim"],
+        )
+
+        # Load the model parameters
+        agent.load_state_dict(saved_cpt["parameters"])
+        return agent
+    
     return Agent(
         config=config.environment,
         embed_dim=config.train.network.embed_dim,
@@ -124,6 +144,7 @@ def run(
     add_reference_heading: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
+    guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
 
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
@@ -139,6 +160,7 @@ def run(
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
+    cpu_offload: Annotated[Optional[int], typer.Option(help="Whether to offload the buffer to cpu")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
     resample_interval: Annotated[Optional[int], typer.Option(help="The interval for resampling scenes")] = None,
     resample_dataset_size: Annotated[Optional[int], typer.Option(help="The size of the dataset to sample from")] = None,
@@ -188,6 +210,7 @@ def run(
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
         "collision_behavior": collision_behavior,
+        "guidance_dropout_prob": guidance_dropout_prob,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),
@@ -224,6 +247,7 @@ def run(
         "resample_dataset_size": resample_dataset_size,
         "total_timesteps": total_timesteps,
         "ent_coef": ent_coef,
+        "cpu_offload": None if cpu_offload is None else bool(cpu_offload),
         "update_epochs": update_epochs,
         "batch_size": batch_size,
         "minibatch_size": minibatch_size,

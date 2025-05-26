@@ -8,9 +8,9 @@ namespace madrona_gpudrive {
 
 namespace consts {
 
-inline constexpr madrona::CountT kMaxAgentCount = 64;
+inline constexpr madrona::CountT kMaxAgentCount = 32;
 inline constexpr madrona::CountT kMaxRoadEntityCount = 10000;
-inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 128;
+inline constexpr madrona::CountT kMaxAgentMapObservationsCount = 186;
 inline constexpr madrona::CountT kMaxTrafficLightCount = 16;
 
 inline constexpr bool useEstimatedYaw = true;
@@ -23,7 +23,7 @@ inline constexpr float worldLength = 40.f;
 // This factor rescales the length of the vehicles by a tiny amount
 // To account for the fact that noise occasionally puts vehicles into initial
 // collisions. This is a dataset artifact that we are handling here like this.
-inline constexpr float vehicleLengthScale = 0.9f;
+inline constexpr float vehicleLengthScale = 1.0f;
 
 // Each unit of distance forward (+ y axis) rewards the agents by this amount
 inline constexpr float rewardPerDist = 0.05f;

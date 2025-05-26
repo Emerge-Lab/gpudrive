@@ -627,9 +627,11 @@ def process_data(args):
         datasets = ["validation"]
     elif args.dataset == "testing":
         datasets = ["testing"]
+    elif args.dataset == "validation_interactive":
+        datasets = ["validation_interactive"]
     else:
         raise ValueError(
-            "Invalid dataset name. Must be one of: 'all', 'train', 'validation', or 'testing'"
+            "Invalid dataset name. Must be one of: 'all', 'train', 'validation', 'testing', or 'validation_interactive'."
         )
 
     for dataset in datasets:

@@ -25,15 +25,15 @@ ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
 }
 
 AGENT_COLOR_BY_STATE = {
-    "ok": "#4B77BE",  # Controlled and doing fine
+    "ok": "#2a52be",  # Controlled and doing fine
     "collided": "r",  # Controlled and collided
     "off_road": "orange",  # Controlled and off-road
     "log_replay": "#787878",  # Agents marked as expert controlled or static
 }
 
 REL_OBS_OBJ_COLORS = {
-    "ego": "#0066ff",
-    "ego_goal": "#0099cc",
+    "ego": "#2a52be",
+    "ego_goal": "#2a52be",
     "other_agents": "#ff884d",
 }
 AGENT_COLOR_BY_POLICY = ["g", "b", "p"]

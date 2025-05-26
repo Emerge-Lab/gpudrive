@@ -11,9 +11,9 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    GUIDANCE_MODE = "log_replay"
+    GUIDANCE_MODE = "vbd_online"
     DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
-    SAVE_PATH = "examples/eval/figures_data/"
+    SAVE_PATH = "examples/eval/figures_data/guidance/"
 
     env_config = EnvConfig(
         dynamics_model="classic",
@@ -23,8 +23,8 @@ if __name__ == "__main__":
         add_reference_heading=True,
         add_reference_speed=True,
         add_reference_pos_xy=True,
-        init_mode="wosac_train",
-        smoothen_trajectory=True,
+        init_mode="wosac_eval",
+        smoothen_trajectory=False,
     )
     render_config = RenderConfig()
 
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,
-        device="cpu",
+        max_cont_agents=32,
+        device="cuda",
     )
 
     obs = env.reset(env.cont_agent_mask)
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     )
 
     np.save(
-        f"{SAVE_PATH}reference_{GUIDANCE_MODE}_smooth.npy", reference_traj_np
+        f"{SAVE_PATH}reference_{GUIDANCE_MODE}.npy", reference_traj_np
     )
     print(f"Saved reference trajectory for {GUIDANCE_MODE} mode.")
