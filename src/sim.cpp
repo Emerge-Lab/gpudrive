@@ -225,9 +225,9 @@ inline void collectPartnerObsSystem(Engine &ctx,
         }
 
         // Check if outside view cone angle
-        Vector3 to_other_dir_world_3d = {relative_pos_world.x, relative_pos_world.y, 0};
-        to_other_dir_world_3d = to_other_dir_world_3d.normalize();
-        float cos_angle = forward_vec.dot(to_other_dir_world_3d);
+        // Vector3 to_other_dir_world_3d = {relative_pos_world.x, relative_pos_world.y, 0};
+        // to_other_dir_world_3d = to_other_dir_world_3d.normalize();
+        float cos_angle = relative_pos.x/ relative_pos.length();
         float angle = std::acos(cos_angle);
         
         // If angle is greater than half the view cone angle, skip this agent
