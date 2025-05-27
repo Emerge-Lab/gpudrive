@@ -891,9 +891,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dropout_mode: Either "max" (default) or "avg"
                 - "max": dropout_prob represents the maximum dropout probability
                 - "avg": dropout_prob represents the average dropout probability
+                - "end_points_only": only keep the first and last points of the trajectory
 
         Returns:
-            A boolean mask where True indicates keeping the point, False indicates dropping it
+            A boolean mask where True indicates keeping the point, False indicates dropping it.
         """
         dropout_prob = self.config.guidance_dropout_prob
         num_controlled = self.cont_agent_mask.sum().item()
@@ -907,10 +908,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 device=self.device,
                 dtype=torch.bool,
             )
-        
+
         elif self.dropout_mode == "end_points_only":
             # Remove all points except the first and last
-            is_valid = self.reference_trajectory.valids[self.cont_agent_mask].squeeze(-1).bool()
+            is_valid = (
+                self.reference_trajectory.valids[self.cont_agent_mask]
+                .squeeze(-1)
+                .bool()
+            )
             guidance_dropout_mask = torch.zeros(
                 (num_controlled, self.reference_traj_len),
                 device=self.device,
@@ -923,11 +928,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if len(agent_valid_indices) > 0:
                     first_valid_indices = agent_valid_indices[0]
                     last_valid_indices = agent_valid_indices[-1]
-                    guidance_dropout_mask[agent_idx, first_valid_indices] = True
+                    guidance_dropout_mask[
+                        agent_idx, first_valid_indices
+                    ] = True
                     guidance_dropout_mask[agent_idx, last_valid_indices] = True
-            
+
             return guidance_dropout_mask
-            
+
         else:
             # 1 if we want to keep the point, 0 if we want to drop it
             guidance_dropout_mask = torch.ones(
@@ -950,7 +957,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         torch.rand(num_controlled, device=self.device)
                         * dropout_prob
                     )
-                    
+
                 elif self.dropout_mode == "avg":
                     # Use the same dropout probability for all agents (equal to dropout_prob)
                     agent_dropout_probs = torch.full(
@@ -968,48 +975,23 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     # Get agent-specific dropout probability
                     agent_dropout_prob = agent_dropout_probs[agent_idx]
 
-                    if (
-                        len(agent_valid_indices) > 2
-                    ):  # Only apply dropout if we have more than 2 points
-                        if self.dropout_mode == "max":
-                            # Keep first and last points, apply dropout to middle points
-                            middle_indices = agent_valid_indices[0:-1]
+                    if len(agent_valid_indices) > 1:
+                        # Always keep last point
+                        middle_indices = agent_valid_indices[:-1]
 
-                            # Generate random dropout mask for middle points
-                            dropout = (
-                                torch.rand(
-                                    len(middle_indices), device=self.device
-                                )
-                                < agent_dropout_prob
-                            )
+                        # Generate random dropout mask for middle points
+                        dropout = (
+                            torch.rand(len(middle_indices), device=self.device)
+                            < agent_dropout_prob
+                        )
 
-                            # Apply dropout to middle points (set to False for points to drop)
-                            guidance_dropout_mask[
-                                agent_idx, middle_indices
-                            ] = ~dropout
+                        # Apply dropout to middle points (set to False for points to drop)
+                        guidance_dropout_mask[
+                            agent_idx, middle_indices
+                        ] = ~dropout
 
-                        elif self.dropout_mode == "avg":
-                            # Calculate how many points to drop to achieve the desired average dropout rate
-                            middle_indices = agent_valid_indices[
-                                :-1
-                            ]  # All valid points except the last one
-                            num_middle = len(middle_indices)
-
-                            # Number of points to drop to achieve the desired average
-                            num_to_drop = int(
-                                np.ceil(
-                                    (agent_dropout_prob.item() * num_middle)
-                                )
-                            )
-
-                            if num_to_drop > 0 and num_middle > 0:
-                                # Randomly select points to drop
-                                drop_indices = middle_indices[
-                                    torch.randperm(num_middle)[:num_to_drop]
-                                ]
-                                guidance_dropout_mask[
-                                    agent_idx, drop_indices
-                                ] = False
+                # Now set all invalid points to False for bookkeeping
+                guidance_dropout_mask[~is_valid] = False
 
                 return guidance_dropout_mask
 
@@ -1400,20 +1382,21 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Apply dropout mask if specified
         # Note: currently only supported for masked observations
-        if self.config.guidance_dropout_prob > 0 or self.config.guidance_dropout_mode == "end_points_only" or self.config.guidance_dropout_mode == "end_points_only" and hasattr(
-            self, "guidance_dropout_mask"
+        if (
+            self.config.guidance_dropout_prob > 0.0
+            or self.config.guidance_dropout_mode == "end_points_only"
         ):
             self.guidance_obs[
                 ~self.guidance_dropout_mask
             ] = constants.INVALID_ID
-            
+
             self.reference_path[
                 ~self.guidance_dropout_mask
             ] = constants.INVALID_ID
-            
+
             self.guidance_obs_norm[
                 ~self.guidance_dropout_mask
-            ] = constants.INVALID_ID    
+            ] = constants.INVALID_ID
 
         self.valid_guidance_points = torch.sum(
             self.guidance_obs_norm[:, :, 0] != constants.INVALID_ID, axis=1
@@ -1779,7 +1762,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
-        
+
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
     def get_expert_actions(self):
@@ -1944,8 +1927,8 @@ if __name__ == "__main__":
         dynamics_model="delta_local",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
-        guidance_dropout_mode="max",
-        guidance_dropout_prob=1.0,  
+        guidance_dropout_mode="avg",
+        guidance_dropout_prob=1.0,
     )
     render_config = RenderConfig()
 
