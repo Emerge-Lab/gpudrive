@@ -49,12 +49,12 @@ def main():
     parser.add_argument(
         "--input_dir",
         help="Directory containing input JSON files",
-        default="data/processed/wosac/validation_json_100",
+        default="data/processed/wosac/validation/json",
     )
     parser.add_argument(
         "--output_dir",
         help="Directory for output JSON files",
-        default="data/processed/wosac/validation_json_100",
+        default="data/processed/validation/json",
     )
     parser.add_argument(
         "--batch_size", type=int, default=10, help="Batch size for processing"
@@ -112,51 +112,52 @@ def main():
         device=device,
     )
 
-    # Final VBD trajectories to write
-    output_trajectories = torch.zeros(
-        gpudrive_env.num_worlds,
-        gpudrive_env.max_agent_count,
-        madrona_gpudrive.kTrajectoryLength,
-        6,
-    )
-
-    # Save init steps from logs
-    log_trajectory = LogTrajectory.from_tensor(
-        gpudrive_env.sim.expert_trajectory_tensor(),
-        num_worlds=gpudrive_env.num_worlds,
-        max_agents=gpudrive_env.max_agent_count,
-        device="cpu",
-    )
-
-    output_trajectories[:, :, : INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
-        :, :, : INIT_STEPS + 1
-    ]
-    output_trajectories[:, :, : INIT_STEPS + 1, 2] = log_trajectory.yaw[
-        :, :, : INIT_STEPS + 1, 0
-    ]
-    output_trajectories[:, :, : INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
-        :, :, : INIT_STEPS + 1
-    ]
-    output_trajectories[:, :, : INIT_STEPS + 1, 5] = log_trajectory.valids[
-        :, :, : INIT_STEPS + 1, 0
-    ]
-
-    # Action tensor to step through simulation
-    predicted_actions = torch.zeros(
-        (
-            gpudrive_env.num_worlds,
-            gpudrive_env.max_agent_count,
-            gpudrive_env.episode_len - INIT_STEPS,
-            10,
-        )
-    )
-
-    # World means for VBD outputs
-    world_means = (
-        gpudrive_env.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
-    )
 
     for _ in range(int(args.num_scenes / args.batch_size)):
+        # Final VBD trajectories to write
+        output_trajectories = torch.zeros(
+            gpudrive_env.num_worlds,
+            gpudrive_env.max_agent_count,
+            madrona_gpudrive.kTrajectoryLength,
+            6,
+        )
+
+        # Save init steps from logs
+        log_trajectory = LogTrajectory.from_tensor(
+            gpudrive_env.sim.expert_trajectory_tensor(),
+            num_worlds=gpudrive_env.num_worlds,
+            max_agents=gpudrive_env.max_agent_count,
+            device="cpu",
+        )
+
+        output_trajectories[:, :, : INIT_STEPS + 1, :2] = log_trajectory.pos_xy[
+            :, :, : INIT_STEPS + 1
+        ]
+        output_trajectories[:, :, : INIT_STEPS + 1, 2] = log_trajectory.yaw[
+            :, :, : INIT_STEPS + 1, 0
+        ]
+        output_trajectories[:, :, : INIT_STEPS + 1, 3:5] = log_trajectory.vel_xy[
+            :, :, : INIT_STEPS + 1
+        ]
+        output_trajectories[:, :, : INIT_STEPS + 1, 5] = log_trajectory.valids[
+            :, :, : INIT_STEPS + 1, 0
+        ]
+
+        # Action tensor to step through simulation
+        predicted_actions = torch.zeros(
+            (
+                gpudrive_env.num_worlds,
+                gpudrive_env.max_agent_count,
+                gpudrive_env.episode_len - INIT_STEPS,
+                10,
+            )
+        )
+
+        # World means for VBD outputs
+        world_means = (
+            gpudrive_env.sim.world_means_tensor().to_torch()[:, :2].to("cpu")
+        )
+
         # Generate VBD input
         scene_context = gpudrive_env.construct_context(
             init_steps=gpudrive_env.init_steps
@@ -208,10 +209,10 @@ def main():
             gpudrive_env.sim.absolute_self_observation_tensor(), device="cpu"
         ).id
 
-        filenames = gpudrive_env.get_env_filenames()
+        filenames = gpudrive_env.get_scenario_ids()
 
         for i in range(gpudrive_env.num_worlds):
-            filename = f"{filenames[i]}"
+            filename = f"{filenames[i]}.json"
             with open(f"{args.input_dir}/{filename}", "r") as f:
                 data = json.load(f)
 
