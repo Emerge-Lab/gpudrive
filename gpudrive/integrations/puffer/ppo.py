@@ -154,12 +154,16 @@ def evaluate(data):
             obs_device = obs.to(config.device)
 
         with profile.eval_forward, torch.no_grad():
+            if  config.env == 'gpudriveHistory':
+                obs_device = data.vecenv.get_history_batch(combine = True)
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
                 actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
+            
+                 
             else:
                 actions, logprob, _, value = policy(obs_device)
 
@@ -683,9 +687,10 @@ class Utilization(Thread):
             self.cpu_util.append(psutil.cpu_percent())
             mem = psutil.virtual_memory()
             self.cpu_mem.append(mem.active / mem.total)
-            self.gpu_util.append(torch.cuda.utilization())
-            free, total = torch.cuda.mem_get_info()
-            self.gpu_mem.append(free / total)
+            if torch.cuda.is_available():
+                self.gpu_util.append(torch.cuda.utilization())
+                free, total = torch.cuda.mem_get_info()
+                self.gpu_mem.append(free / total)
             time.sleep(self.delay)
 
     def stop(self):
