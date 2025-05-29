@@ -1876,32 +1876,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         return sim_states, agent_views
 
-    def render(self, focus_env_idx=0, focus_agent_idx=[0, 1]):
-        """Quick rendering function for debugging."""
-
-        sim_states = self.vis.plot_simulator_state(
-            env_indices=[focus_env_idx],
-            zoom_radius=70,
-            time_steps=[self.step_in_world[0, 0, 0].item()],
-            plot_guidance_pos_xy=True,
-        )
-
-        agent_views = []
-        for agent_idx in focus_agent_idx:
-            agent_obs = self.vis.plot_agent_observation(
-                env_idx=focus_env_idx,
-                agent_idx=agent_idx,
-                figsize=(10, 10),
-                trajectory=self.reference_path[agent_idx, :, :],
-                step_reward=self.guidance_reward[
-                    focus_env_idx, agent_idx
-                ].item(),
-                route_progress=self.route_progress[agent_idx],
-            )
-            agent_views.append(agent_obs)
-
-        return sim_states, agent_views
-
 
 if __name__ == "__main__":
 
@@ -1924,7 +1898,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_json_100",
+        root="data/processed/validation",
         batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,

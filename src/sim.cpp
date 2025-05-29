@@ -229,6 +229,16 @@ inline void collectPartnerObsSystem(Engine &ctx,
         {
             continue;
         }
+
+        float cos_angle = relative_pos.x/relative_pos.length();
+        float angle = std::acos(cos_angle);
+
+        // Only include agents that are within the view cone
+        if(angle > ctx.data().params.viewConeHalfAngle)
+        {
+            continue;
+        }
+
         partner_obs.obs[arrIndex++] = {
             .speed = relative_speed,
             .position = relative_pos,
