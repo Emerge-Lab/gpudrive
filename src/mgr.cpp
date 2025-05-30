@@ -426,10 +426,33 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
 
         int64_t worldIdx{0};
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
         for (auto const &scene : mgr_cfg.scenes) {
-	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
-							  ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
+            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
+                                                        ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            
+            int64_t controllable_objects{0};  
+            for (const auto object : map_->objects) {  
+                auto startPos = object.position[0];
+                if (object.valid[0] && !object.markAsExpert && 
+                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                    controllable_objects++;
+                }
+            }
+            
+            if (controllable_objects == 0) {
+                delete map_;
+                std::uniform_int_distribution<> dis(0, worldIdx - 1);
+                int random_number = dis(gen);
+                Map* copied_map = new Map(*world_inits[random_number].map); 
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, copied_map, &(mgr_cfg.params)};
+            } else {
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+            }
+
         }
         assert(worldIdx == numWorlds);
 
@@ -501,11 +524,34 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         int64_t worldIdx{0};
 
-        for (auto const &scene : mgr_cfg.scenes)
-        {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+
+        for (auto const &scene : mgr_cfg.scenes) {
             Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
-                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+                                                        ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            
+            int64_t controllable_objects{0};  
+            for (const auto object : map_->objects) {  
+                auto startPos = object.position[0];
+                if (object.valid[0] && !object.markAsExpert && 
+                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                    controllable_objects++;
+                }
+            }
+            
+            if (controllable_objects == 0) {
+                delete map_;
+                std::uniform_int_distribution<> dis(0, worldIdx - 1);
+                int random_number = dis(gen);
+                Map* copied_map = new Map(*world_inits[random_number].map); 
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, copied_map, &(mgr_cfg.params)};
+            } else {
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+            }
+
         }
         assert(worldIdx == numWorlds);
 
@@ -551,11 +597,11 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 	    numWorlds
         };
 
+
         for (size_t i = 0; i < mgr_cfg.scenes.size(); i++) {
           auto &init = world_inits[i];
           delete init.map;
         }
-
         return cpu_impl;
     } break;
     default: MADRONA_UNREACHABLE();
@@ -604,6 +650,22 @@ void Manager::setMaps(const std::vector<std::string> &maps)
         {
             Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
                                                                       ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+
+
+            int64_t controllable_objects{0};  
+            for (const auto object : map->objects) {  
+                auto startPos = object.position[0];
+                if (object.valid[0] && !object.markAsExpert && 
+                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                    controllable_objects++;
+                }
+            }
+  
+            if (controllable_objects == 0) {
+                delete map;
+                continue; 
+            }
             Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
             REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
             madrona::cu::deallocGPU(map);
@@ -632,6 +694,23 @@ void Manager::setMaps(const std::vector<std::string> &maps)
             // Parse the map string into your MapData structure
             Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
                                                                       ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+
+            
+
+            int64_t controllable_objects{0};  
+            for (const auto object : map->objects) {  
+                auto startPos = object.position[0];
+                if (object.valid[0] && !object.markAsExpert && 
+                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                    controllable_objects++;
+                }
+            }
+  
+            if (controllable_objects == 0) {
+                delete map;
+                continue; 
+            }
 
             Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
             memcpy(mapDevicePtr, map, sizeof(Map));
