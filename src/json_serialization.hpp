@@ -31,90 +31,128 @@ namespace madrona_gpudrive
 
         float zPositions[10];
 
-        for (const auto &pos : j.at("position"))
-        {
-            if (i < MAX_POSITIONS)
+        // Check if position array exists and process it
+        if (j.contains("position") && j.at("position").is_array()) {
+            for (const auto &pos : j.at("position"))
             {
-                from_json(pos, obj.position[i]);
-                obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
-                obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
-
-                // Store z position separately
-                if (i < 10)
+                if (i < MAX_POSITIONS)
                 {
-                    float z = extract_z_from_position(pos);
-                    zPositions[i] = z;
-                }
+                    from_json(pos, obj.position[i]);
+                    obj.mean.x += (obj.position[i].x - obj.mean.x)/(i+1);
+                    obj.mean.y += (obj.position[i].y - obj.mean.y)/(i+1);
 
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
+                    // Store z position separately
+                    if (i < 10)
+                    {
+                        float z = extract_z_from_position(pos);
+                        zPositions[i] = z;
+                    }
+
+                    ++i;
+                }
+                else
+                {
+                    break; // Avoid overflow
+                }
             }
         }
         obj.numPositions = i;
-        j.at("width").get_to(obj.vehicle_size.width);
-        j.at("length").get_to(obj.vehicle_size.length);
-        j.at("height").get_to(obj.vehicle_size.height);
-        j.at("id").get_to(obj.id);
+        
+        // Check if required fields exist before accessing
+        if (j.contains("width")) {
+            j.at("width").get_to(obj.vehicle_size.width);
+        } else {
+            obj.vehicle_size.width = 0.0f;
+        }
+        
+        if (j.contains("length")) {
+            j.at("length").get_to(obj.vehicle_size.length);
+        } else {
+            obj.vehicle_size.length = 0.0f;
+        }
+        
+        if (j.contains("height")) {
+            j.at("height").get_to(obj.vehicle_size.height);
+        } else {
+            obj.vehicle_size.height = 0.0f;
+        }
+        
+        if (j.contains("id")) {
+            j.at("id").get_to(obj.id);
+        } else {
+            obj.id = 0;
+        }
 
         i = 0;
-        for (const auto &h : j.at("heading"))
-        {
-            if (i < MAX_POSITIONS)
+        if (j.contains("heading") && j.at("heading").is_array()) {
+            for (const auto &h : j.at("heading"))
             {
-                h.get_to(obj.heading[i]);
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
+                if (i < MAX_POSITIONS)
+                {
+                    h.get_to(obj.heading[i]);
+                    ++i;
+                }
+                else
+                {
+                    break; // Avoid overflow
+                }
             }
         }
         obj.numHeadings = i;
 
         i = 0;
-        for (const auto &v : j.at("velocity"))
-        {
-            if (i < MAX_POSITIONS)
+        if (j.contains("velocity") && j.at("velocity").is_array()) {
+            for (const auto &v : j.at("velocity"))
             {
-                from_json(v, obj.velocity[i]);
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
+                if (i < MAX_POSITIONS)
+                {
+                    from_json(v, obj.velocity[i]);
+                    ++i;
+                }
+                else
+                {
+                    break; // Avoid overflow
+                }
             }
         }
         obj.numVelocities = i;
 
         i = 0;
-        for (const auto &v : j.at("valid"))
-        {
-            if (i < MAX_POSITIONS)
+        if (j.contains("valid") && j.at("valid").is_array()) {
+            for (const auto &v : j.at("valid"))
             {
-                v.get_to(obj.valid[i]);
-                ++i;
-            }
-            else
-            {
-                break; // Avoid overflow
+                if (i < MAX_POSITIONS)
+                {
+                    v.get_to(obj.valid[i]);
+                    ++i;
+                }
+                else
+                {
+                    break; // Avoid overflow
+                }
             }
         }
         obj.numValid = i;
 
-
-        from_json(j.at("goalPosition"), obj.goalPosition);
-        std::string type = j.at("type");
-        if(type == "vehicle")
-            obj.type = EntityType::Vehicle;
-        else if(type == "pedestrian")
-            obj.type = EntityType::Pedestrian;
-        else if(type == "cyclist")
-            obj.type = EntityType::Cyclist;
-        else
+        if (j.contains("goalPosition")) {
+            from_json(j.at("goalPosition"), obj.goalPosition);
+        } else {
+            obj.goalPosition = {0.0f, 0.0f};
+        }
+        
+        if (j.contains("type")) {
+            std::string type = j.at("type");
+            if(type == "vehicle")
+                obj.type = EntityType::Vehicle;
+            else if(type == "pedestrian")
+                obj.type = EntityType::Pedestrian;
+            else if(type == "cyclist")
+                obj.type = EntityType::Cyclist;
+            else
+                obj.type = EntityType::None;
+        } else {
             obj.type = EntityType::None;
+        }
 
         std::string markAsExpertKey = "mark_as_expert";
         if (j.contains(markAsExpertKey)) {
@@ -128,9 +166,9 @@ namespace madrona_gpudrive
         // Store in the avgZ field of map object
         float avgZ = 0.0f;
         float avg_count = 0.0f;
-        for (int zi = 0; zi < 10; zi++) {
+        for (int zi = 0; zi < 10 && zi < obj.numValid; zi++) {
             // Only consider valid z positions
-            if (obj.valid[zi]) {
+            if (zi < obj.numValid && obj.valid[zi]) {
                 avgZ += zPositions[zi];
                 avg_count += 1;
             }
@@ -152,11 +190,11 @@ namespace madrona_gpudrive
         }
 
         // If VBD trajectories exist in the JSON, read them
-        if (j.contains("vbd_trajectory")) {
+        if (j.contains("vbd_trajectory") && j.at("vbd_trajectory").is_array()) {
             int vbd_idx = 0;
             for (const auto &vbd_traj : j.at("vbd_trajectory")) {
                 if (vbd_idx < consts::kTrajectoryLength) {
-                    if (!vbd_traj.is_null()) {
+                    if (!vbd_traj.is_null() && vbd_traj.is_array() && vbd_traj.size() >= 6) {
                         obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
                         obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
                         obj.vbd_trajectories[vbd_idx][2] = vbd_traj.at(2).get<float>();
