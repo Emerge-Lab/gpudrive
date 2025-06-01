@@ -132,6 +132,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         # Action space setup
+        self._cache_agent_types()
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
         self.num_agents = self.cont_agent_mask.sum().item()
@@ -1260,9 +1261,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 device=self.device,
             )
 
-        # Cache agent types
-        info_tensor = self.sim.info_tensor().to_torch()
-        self.agent_types = info_tensor[:, :, 4].long()
 
     def _get_guidance(self, mask=None) -> torch.Tensor:
         """Receive (expert) suggestions from pre-trained model or logs."""
@@ -1835,8 +1833,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
-        info_tensor = self.sim.info_tensor().to_torch()
-        self.agent_types = info_tensor[:, :, 4].long()
+        self._cache_agent_types()
 
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.

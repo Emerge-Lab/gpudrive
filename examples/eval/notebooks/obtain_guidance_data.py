@@ -46,15 +46,6 @@ if __name__ == "__main__":
 
     obs = env.reset(env.cont_agent_mask)
 
-        
-    # Get agent types
-    agent_types = LocalEgoState.from_tensor(
-        self_obs_tensor=env.sim.self_observation_tensor(),
-        backend='torch',
-        device="cpu",
-        #mask=mask,
-    ).agent_type
-
     # Save for analysis
     reference_traj = torch.cat(
         [
@@ -62,6 +53,7 @@ if __name__ == "__main__":
             env.reference_trajectory.vel_xy,
             env.reference_trajectory.yaw,
             env.reference_trajectory.valids,
+            env.agent_types,
         ],
         dim=-1,
     )
