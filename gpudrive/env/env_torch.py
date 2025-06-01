@@ -1235,10 +1235,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.config.pedestrian_accel_range,
                 self.config.pedestrian_steer_range,
             ),  # Pedestrian
-            PADDING_AGENT: (
-                self.config.vehicle_accel_range,
-                self.config.vehicle_steer_range,
-            ),  # Padding
         }
 
         self.type_action_tensors = {}
