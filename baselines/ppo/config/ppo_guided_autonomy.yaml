@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_1
+data_dir: data/processed/wosac/validation_interactive/json
 continue_training: false
 model_cpt: null
 
@@ -44,8 +44,6 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 13
   action_space_accel_disc: 7
-  max_steer_angle: 1.57  # pi/2 = 1.57, pi/3 = 1.05
-  max_accel_value: 4.0
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
 
@@ -111,7 +109,7 @@ train:
   # # # Rendering # # #
   render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 200 # Render every k iterations
+  render_interval: 10 # Render every k iterations
   render_every_t: 5 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
   render_agent_idx: [0] # Agent observations to render

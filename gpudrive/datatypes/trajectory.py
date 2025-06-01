@@ -206,12 +206,12 @@ class VBDTrajectoryOnline:
 class VBDTrajectory:
     """A class to represent the VBD predicted trajectories.
     Initialized from `vbd_trajectory_tensor` (src/bindings.cpp).
-    Shape: (num_worlds, max_agents, traj_len, 5)
-            where traj_len is 90 - initialization steps.
+    Shape: (num_worlds, max_agents, traj_len, 6)
+            where traj_len is 91
 
     Attributes:
-        trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 5) containing
-            position (x, y), heading (yaw), and velocity (vx, vy) for each timestep.
+        trajectories: Tensor of shape (num_worlds, max_agents, traj_len, 6) containing
+            position (x, y), heading (yaw), velocity (vx, vy) and valid flag for each timestep.
     """
 
     def __init__(self, vbd_traj_tensor: torch.Tensor):

@@ -86,6 +86,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters object with road reduction settings.
         """
         params.observationRadius = self.config.obs_radius
+        params.viewConeHalfAngle = self.config.view_cone_half_angle
         if self.config.road_obs_algorithm == "k_nearest_roadpoints":
             params.roadObservationAlgorithm = (
                 madrona_gpudrive.FindRoadObservationsWith.KNearestEntitiesWithRadiusFiltering

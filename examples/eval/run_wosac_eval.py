@@ -333,27 +333,8 @@ if __name__ == "__main__":
         remove_non_vehicles=config.remove_non_vehicles,
         lidar_obs=False,
         obs_radius=config.obs_radius,
-        max_steer_angle=config.max_steer_angle,
-        max_accel_value=config.max_accel_value,
         action_space_steer_disc=config.action_space_steer_disc,
         action_space_accel_disc=config.action_space_accel_disc,
-        # Override action space
-        steer_actions=torch.round(
-            torch.linspace(
-                -config.max_steer_angle,
-                config.max_steer_angle,
-                config.action_space_steer_disc,
-            ),
-            decimals=3,
-        ),
-        accel_actions=torch.round(
-            torch.linspace(
-                -config.max_accel_value,
-                config.max_accel_value,
-                config.action_space_accel_disc,
-            ),
-            decimals=3,
-        ),
         init_mode="wosac_eval",
         init_steps=INIT_STEPS,
         guidance_mode=GUIDANCE_MODE,
@@ -401,7 +382,8 @@ if __name__ == "__main__":
             scenario_rollouts.append(
                 sim_agents_submission_pb2.ScenarioRollouts(
                     joint_scenes=[
-                        joint_scene[scenario_id] for joint_scene in joint_scene_list
+                        joint_scene[scenario_id]
+                        for joint_scene in joint_scene_list
                     ],
                     scenario_id=scenario_id,
                 )
@@ -411,7 +393,7 @@ if __name__ == "__main__":
             os.path.join(DATA_TFRECORD, f"{scenario_id}.tfrecords")
             for scenario_id in scenario_ids
         ]
-        
+
         wosac_metrics.update(
             tf_record_paths,
             scenario_rollouts,

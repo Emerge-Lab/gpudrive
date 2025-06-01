@@ -89,7 +89,7 @@ class LocalEgoState:
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
-        self.steer_angle /= (torch.pi / 3)
+        self.steer_angle /= torch.pi / 3
 
     @property
     def shape(self) -> tuple[int, ...]:

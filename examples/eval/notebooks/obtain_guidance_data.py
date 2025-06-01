@@ -7,7 +7,7 @@ from gpudrive.env.config import EnvConfig, RenderConfig
 from gpudrive.env.dataset import SceneDataLoader
 import torch
 import numpy as np
-
+from gpudrive.datatypes.observation import LocalEgoState
 
 if __name__ == "__main__":
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         config=env_config,
         data_loader=train_loader,
         max_cont_agents=32,
-        device="cuda",
+        device="cpu",
     )
 
     obs = env.reset(env.cont_agent_mask)
@@ -53,6 +53,7 @@ if __name__ == "__main__":
             env.reference_trajectory.vel_xy,
             env.reference_trajectory.yaw,
             env.reference_trajectory.valids,
+            env.agent_types,
         ],
         dim=-1,
     )
