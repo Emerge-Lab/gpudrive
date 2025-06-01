@@ -39,6 +39,12 @@ from gpudrive.utils.preprocess import smooth_scenario
 import madrona_gpudrive
 
 
+# Agent types
+VEHICLE_AGENT = int(madrona_gpudrive.EntityType.Vehicle)
+CYCLIST_AGENT = int(madrona_gpudrive.EntityType.Cyclist)
+PEDESTRIAN_AGENT = int(madrona_gpudrive.EntityType.Pedestrian)
+
+
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -125,7 +131,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             dtype=np.float32,
         )
 
-        # Action space setup
         # Action space setup
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
@@ -1028,33 +1033,49 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
     def _apply_actions(self, actions):
         """Apply the actions to the simulator."""
-
         if (
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
             or self.config.dynamics_model == "delta_local"
         ):
-            if actions.dim() == 2:  # (num_worlds, max_agent_count)
-                # Map action indices to action values if indices are provided
+            if actions.dim() == 2:
                 actions = (
                     torch.nan_to_num(actions, nan=0).long().to(self.device)
                 )
-                self.action_value_tensor = self.action_keys_tensor[actions]
+
+                # Choose mapping based on config
+                if (
+                    self.config.use_type_aware_actions
+                    and self.config.dynamics_model == "classic"
+                ):
+                    self.action_value_tensor = self._map_type_aware_actions(
+                        actions
+                    )
+                else:
+                    self.action_value_tensor = self.action_keys_tensor[actions]
 
             elif actions.dim() == 3:
                 if actions.shape[2] == 1:
                     actions = actions.squeeze(dim=2).to(self.device)
-                    self.action_value_tensor = self.action_keys_tensor[actions]
-                else:  # Assuming we are given the actual action values
+                    if (
+                        self.config.use_type_aware_actions
+                        and self.config.dynamics_model == "classic"
+                    ):
+                        self.action_value_tensor = (
+                            self._map_type_aware_actions(actions)
+                        )
+                    else:
+                        self.action_value_tensor = self.action_keys_tensor[
+                            actions
+                        ]
+                else:
                     self.action_value_tensor = actions.to(self.device)
             else:
                 raise ValueError(f"Invalid action shape: {actions.shape}")
-
         else:
             self.action_value_tensor = actions.to(self.device)
 
         if not hasattr(self, "previous_action_value_tensor"):
-            # Initialize with current actions on first call
             self.previous_action_value_tensor = (
                 self.action_value_tensor.clone()
             )
@@ -1068,13 +1089,28 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 self.action_value_tensor.clone()
             )
 
-        # Calculate action differences (jerk)
         self.action_diff = (
             self.action_value_tensor - self.previous_action_value_tensor
         )
         self.previous_action_value_tensor = self.action_value_tensor.clone()
-
         self._copy_actions_to_simulator(self.action_value_tensor)
+
+    def _map_type_aware_actions(self, action_indices):
+        """Map action indices to type-specific action values."""
+        action_values = self.action_keys_tensor[
+            action_indices
+        ]  # Start with default (vehicle ranges)
+
+        # Override with type-specific actions
+        for agent_type in [CYCLIST_AGENT, PEDESTRIAN_AGENT]:
+            type_mask = self.agent_types == agent_type
+            if torch.any(type_mask):
+                type_action_tensor = self.type_action_tensors[agent_type]
+                action_values[type_mask] = type_action_tensor[
+                    action_indices[type_mask]
+                ]
+
+        return action_values
 
     def _copy_actions_to_simulator(self, actions):
         """Copy the provided actions to the simulator."""
@@ -1110,25 +1146,46 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.config.dynamics_model == "classic"
             or self.config.dynamics_model == "bicycle"
         ):
-            self.steer_actions = self.config.steer_actions.to(self.device)
-            self.accel_actions = self.config.accel_actions.to(self.device)
+
+            # Use vehicle ranges for the base action space
+            self.steer_actions = torch.round(
+                torch.linspace(
+                    self.config.vehicle_steer_range[0],
+                    self.config.vehicle_steer_range[1],
+                    self.config.action_space_steer_disc,
+                ),
+                decimals=3,
+            ).to(self.device)
+            self.accel_actions = torch.round(
+                torch.linspace(
+                    self.config.vehicle_accel_range[0],
+                    self.config.vehicle_accel_range[1],
+                    self.config.action_space_accel_disc,
+                ),
+                decimals=3,
+            ).to(self.device)
             self.head_actions = self.config.head_tilt_actions.to(self.device)
+
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
+
+            # If type-aware actions are enabled, setup the type-specific mappings
+            if self.config.use_type_aware_actions:
+                self._setup_type_aware_mappings()
+
         elif self.config.dynamics_model == "state":
             self.x = self.config.x.to(self.device)
             self.y = self.config.y.to(self.device)
             self.yaw = self.config.yaw.to(self.device)
             self.vx = self.config.vx.to(self.device)
             self.vy = self.config.vy.to(self.device)
-
         else:
             raise ValueError(
                 f"Invalid dynamics model: {self.config.dynamics_model}"
             )
 
-        # Create a mapping from action indices to action values
+        # Create standard action mapping (same for both cases)
         self.action_key_to_values = {}
         self.values_to_action_key = {}
         if products is not None:
@@ -1153,39 +1210,63 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ]
             ).to(self.device)
 
-            return Discrete(n=int(len(self.action_key_to_values)))
+            self.action_space = Discrete(n=int(len(self.action_key_to_values)))
+            return self.action_space
         else:
-            return Discrete(n=1)
+            self.action_space = Discrete(n=1)
+            return self.action_space
 
-    def _set_continuous_action_space(self) -> None:
-        """Configure the continuous action space."""
-        if self.config.dynamics_model == "delta_local":
-            self.dx = self.config.dx.to(self.device)
-            self.dy = self.config.dy.to(self.device)
-            self.dyaw = self.config.dyaw.to(self.device)
-            action_1 = self.dx.clone().cpu().numpy()
-            action_2 = self.dy.clone().cpu().numpy()
-            action_3 = self.dyaw.clone().cpu().numpy()
-        elif self.config.dynamics_model == "classic":
-            self.steer_actions = self.config.steer_actions.to(self.device)
-            self.accel_actions = self.config.accel_actions.to(self.device)
-            self.head_actions = torch.tensor([0], device=self.device)
-            action_1 = self.steer_actions.clone().cpu().numpy()
-            action_2 = self.accel_actions.clone().cpu().numpy()
-            action_3 = self.head_actions.clone().cpu().numpy()
-        else:
-            raise ValueError(
-                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
+    def _setup_type_aware_mappings(self):
+        """Setup type-specific action mappings."""
+        steer_disc = self.config.action_space_steer_disc
+        accel_disc = self.config.action_space_accel_disc
+
+        # Create type-specific action ranges
+        type_ranges = {
+            VEHICLE_AGENT: (
+                self.config.vehicle_accel_range,
+                self.config.vehicle_steer_range,
+            ),  # Vehicle
+            CYCLIST_AGENT: (
+                self.config.cyclist_accel_range,
+                self.config.cyclist_steer_range,
+            ),  # Cyclist
+            PEDESTRIAN_AGENT: (
+                self.config.pedestrian_accel_range,
+                self.config.pedestrian_steer_range,
+            ),  # Pedestrian
+            PADDING_AGENT: (
+                self.config.vehicle_accel_range,
+                self.config.vehicle_steer_range,
+            ),  # Padding
+        }
+
+        self.type_action_tensors = {}
+
+        for agent_type, (accel_range, steer_range) in type_ranges.items():
+            # Create discrete actions for this agent type
+            accel_values = torch.linspace(
+                accel_range[0], accel_range[1], accel_disc, device=self.device
+            )
+            steer_values = torch.linspace(
+                steer_range[0], steer_range[1], steer_disc, device=self.device
             )
 
-        action_space = Tuple(
-            (
-                Box(action_1.min(), action_1.max(), shape=(1,)),
-                Box(action_2.min(), action_2.max(), shape=(1,)),
-                Box(action_3.min(), action_3.max(), shape=(1,)),
+            # Create action tensor for this type
+            type_products = list(
+                product(accel_values, steer_values, self.head_actions)
             )
-        )
-        return action_space
+            self.type_action_tensors[agent_type] = torch.tensor(
+                [
+                    [accel.item(), steer.item(), head.item()]
+                    for accel, steer, head in type_products
+                ],
+                device=self.device,
+            )
+
+        # Cache agent types
+        info_tensor = self.sim.info_tensor().to_torch()
+        self.agent_types = info_tensor[:, :, 4].long()
 
     def _get_guidance(self, mask=None) -> torch.Tensor:
         """Receive (expert) suggestions from pre-trained model or logs."""
@@ -1633,7 +1714,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return bev.bev_segmentation_map.flatten(start_dim=2)
 
     def get_obs(self, mask=None):
-        """Get observation: Combine different types of environment information into a single tensor.
+        """
+        Get observation: Combine different types of environment information
+        into a single tensor.
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
@@ -1756,6 +1839,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
+        info_tensor = self.sim.info_tensor().to_torch()
+        self.agent_types = info_tensor[:, :, 4].long()
+
     def get_expert_actions(self):
         """Get expert actions for the full trajectories across worlds.
 
@@ -1821,6 +1907,101 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             log_trajectory.vel_xy,
             log_trajectory.yaw,
         )
+
+    def _cache_agent_types(self):
+        """Cache agent types from info tensor."""
+        info_tensor = self.sim.info_tensor().to_torch()
+        self.agent_types = info_tensor[
+            :, :, 4
+        ].long()  # Shape: [num_worlds, max_agents]
+
+    def _setup_type_aware_actions(self):
+        """Setup type-aware action mappings using predefined physical ranges."""
+        # Create action tensors for each agent type using same discrete counts
+        self.type_action_tensors = {}
+
+        steer_disc = self.config.action_space_steer_disc
+        accel_disc = self.config.action_space_accel_disc
+
+        # Vehicle actions (type 0)
+        vehicle_accel = torch.linspace(
+            self.config.vehicle_accel_range[0],
+            self.config.vehicle_accel_range[1],
+            accel_disc,
+            device=self.device,
+        )
+        vehicle_steer = torch.linspace(
+            self.config.vehicle_steer_range[0],
+            self.config.vehicle_steer_range[1],
+            steer_disc,
+            device=self.device,
+        )
+
+        # Cyclist actions (type 1)
+        cyclist_accel = torch.linspace(
+            self.config.cyclist_accel_range[0],
+            self.config.cyclist_accel_range[1],
+            accel_disc,
+            device=self.device,
+        )
+        cyclist_steer = torch.linspace(
+            self.config.cyclist_steer_range[0],
+            self.config.cyclist_steer_range[1],
+            steer_disc,
+            device=self.device,
+        )
+
+        # Pedestrian actions (type 2)
+        pedestrian_accel = torch.linspace(
+            self.config.pedestrian_accel_range[0],
+            self.config.pedestrian_accel_range[1],
+            accel_disc,
+            device=self.device,
+        )
+        pedestrian_steer = torch.linspace(
+            self.config.pedestrian_steer_range[0],
+            self.config.pedestrian_steer_range[1],
+            steer_disc,
+            device=self.device,
+        )
+
+        # Vehicle action tensor
+        vehicle_products = list(
+            product(vehicle_accel, vehicle_steer, self.head_actions)
+        )
+        self.type_action_tensors[0] = torch.tensor(
+            [
+                [accel.item(), steer.item(), head.item()]
+                for accel, steer, head in vehicle_products
+            ],
+            device=self.device,
+        )
+
+        # Cyclist action tensor
+        cyclist_products = list(
+            product(cyclist_accel, cyclist_steer, self.head_actions)
+        )
+        self.type_action_tensors[1] = torch.tensor(
+            [
+                [accel.item(), steer.item(), head.item()]
+                for accel, steer, head in cyclist_products
+            ],
+            device=self.device,
+        )
+
+        # Pedestrian action tensor
+        pedestrian_products = list(
+            product(pedestrian_accel, pedestrian_steer, self.head_actions)
+        )
+        self.type_action_tensors[2] = torch.tensor(
+            [
+                [accel.item(), steer.item(), head.item()]
+                for accel, steer, head in pedestrian_products
+            ],
+            device=self.device,
+        )
+
+        self._cache_agent_types()
 
     def get_env_filenames(self):
         """Obtain the tfrecord filename for each world, mapping world indices to map names."""
@@ -1889,7 +2070,7 @@ if __name__ == "__main__":
         add_reference_heading=False,
         reward_type="guided_autonomy",
         init_mode="wosac_train",
-        dynamics_model="delta_local",  # "state", #"classic",
+        dynamics_model="classic",  # "state", #"classic",
         smoothen_trajectory=False,
         add_previous_action=True,
         guidance_dropout_prob=0.9,  # 0.95,
@@ -1898,8 +2079,8 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_interactive",
-        batch_size=1,
+        root="data/processed/wosac/validation_interactive/json",
+        batch_size=10,
         dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,
@@ -1930,8 +2111,8 @@ if __name__ == "__main__":
         print(f"Step: {env.step_in_world[0, 0, 0].item()}")
 
         # Step the environment
-        expert_actions, _, _, _ = env.get_expert_actions()
-        env.step_dynamics(expert_actions[:, :, time_step, :])
+        # env.step_dynamics(expert_actions[:, :, time_step, :])
+        env.step_dynamics(torch.zeros_like(control_mask))
 
         obs = env.get_obs(control_mask)
         reward = env.get_rewards()

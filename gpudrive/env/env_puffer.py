@@ -168,8 +168,6 @@ class PufferGPUDrive(PufferEnv):
         dynamics_model="classic",
         action_space_steer_disc=13,
         action_space_accel_disc=7,
-        max_steer_angle=1.57,
-        max_accel_value=4.0,
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -293,22 +291,8 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=lidar_obs,
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
-            max_steer_angle=max_steer_angle,
-            max_accel_value=max_accel_value,
             action_space_steer_disc=action_space_steer_disc,
             action_space_accel_disc=action_space_accel_disc,
-            # Override action space
-            steer_actions = torch.round(torch.linspace(
-                    -max_steer_angle, max_steer_angle, action_space_steer_disc
-                ),
-                decimals=3,
-                ),
-            accel_actions = torch.round(
-                torch.linspace(
-                    -max_accel_value, max_accel_value, action_space_accel_disc
-                ),
-                decimals=3,
-            )
         )
         render_config = RenderConfig(
             render_3d=render_3d,

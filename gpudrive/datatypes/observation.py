@@ -41,7 +41,6 @@ class LocalEgoState:
             self.is_goal_reached = self_obs_tensor[:, 7]
             self.id = self_obs_tensor[:, 8]
             self.steer_angle = self_obs_tensor[:, 9]
-            self.agent_type = self_obs_tensor[:, 10].long()
         else:
             self.speed = self_obs_tensor[:, :, 0]
             self.vehicle_length = self_obs_tensor[:, :, 1] * AGENT_SCALE
@@ -53,7 +52,6 @@ class LocalEgoState:
             self.is_goal_reached = self_obs_tensor[:, :, 7]
             self.id = self_obs_tensor[:, :, 8]
             self.steer_angle = self_obs_tensor[:, :, 9]
-            self.agent_type = self_obs_tensor[:, :, 10].long()
 
     @classmethod
     def from_tensor(
