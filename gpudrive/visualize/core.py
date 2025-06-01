@@ -2027,14 +2027,14 @@ class MatplotlibVisualizer:
         ax.add_patch(observation_circle)
 
         # Add V lines for view cone boundaries
-        x1 = self.env_config.obs_radius * np.cos(self.env_config.view_cone_half_angle)
-        y1 = self.env_config.obs_radius * np.sin(self.env_config.view_cone_half_angle)
+        # x1 = self.env_config.obs_radius * np.cos(self.env_config.view_cone_half_angle)
+        # y1 = self.env_config.obs_radius * np.sin(self.env_config.view_cone_half_angle)
 
-        x2 = self.env_config.obs_radius * np.cos(-self.env_config.view_cone_half_angle)
-        y2 = self.env_config.obs_radius * np.sin(-self.env_config.view_cone_half_angle)
+        # x2 = self.env_config.obs_radius * np.cos(-self.env_config.view_cone_half_angle)
+        # y2 = self.env_config.obs_radius * np.sin(-self.env_config.view_cone_half_angle)
 
-        ax.add_line(Line2D([0, x1], [0, y1], color="#FF9900", linewidth=1.5, linestyle="--"))
-        ax.add_line(Line2D([0, x2], [0, y2], color="#FF9900", linewidth=1.5, linestyle="--"))
+        # ax.add_line(Line2D([0, x1], [0, y1], color="#FF9900", linewidth=1.5, linestyle="--"))
+        # ax.add_line(Line2D([0, x2], [0, y2], color="#FF9900", linewidth=1.5, linestyle="--"))
 
         ax.set_xticks([])
         ax.set_yticks([])
