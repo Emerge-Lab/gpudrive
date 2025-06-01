@@ -76,12 +76,12 @@ class EnvConfig:
     vehicle_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
 
     # Cyclist action ranges
-    cyclist_accel_range: Tuple[float, float] = (-2.5, 2.5)  # m/s²
-    cyclist_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
+    cyclist_accel_range: Tuple[float, float] = (-2.5, 2.5)    # m/s²
+    cyclist_steer_range: Tuple[float, float] = (-2.09, 2.09)  # radians (±120°)
 
     # Pedestrian action ranges
     pedestrian_accel_range: Tuple[float, float] = (-1.5, 1.5)  # m/s²
-    pedestrian_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
+    pedestrian_steer_range: Tuple[float, float] = (-3.14, 3.14)  # radians (±180°)
 
     head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
