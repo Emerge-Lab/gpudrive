@@ -194,13 +194,14 @@ namespace madrona_gpudrive
             int vbd_idx = 0;
             for (const auto &vbd_traj : j.at("vbd_trajectory")) {
                 if (vbd_idx < consts::kTrajectoryLength) {
-                    if (!vbd_traj.is_null() && vbd_traj.is_array() && vbd_traj.size() >= 6) {
-                        obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
-                        obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
-                        obj.vbd_trajectories[vbd_idx][2] = vbd_traj.at(2).get<float>();
-                        obj.vbd_trajectories[vbd_idx][3] = vbd_traj.at(3).get<float>();
-                        obj.vbd_trajectories[vbd_idx][4] = vbd_traj.at(4).get<float>();
-                        obj.vbd_trajectories[vbd_idx][5] = vbd_traj.at(5).get<float>();
+                    if (!vbd_traj.is_null() && vbd_traj.is_array()) {
+                        size_t traj_size = vbd_traj.size();
+                        if (traj_size > 0) obj.vbd_trajectories[vbd_idx][0] = vbd_traj.at(0).get<float>();
+                        if (traj_size > 1) obj.vbd_trajectories[vbd_idx][1] = vbd_traj.at(1).get<float>();
+                        if (traj_size > 2) obj.vbd_trajectories[vbd_idx][2] = vbd_traj.at(2).get<float>();
+                        if (traj_size > 3) obj.vbd_trajectories[vbd_idx][3] = vbd_traj.at(3).get<float>();
+                        if (traj_size > 4) obj.vbd_trajectories[vbd_idx][4] = vbd_traj.at(4).get<float>();
+                        if (traj_size > 5) obj.vbd_trajectories[vbd_idx][5] = vbd_traj.at(5).get<float>();
                     }
                 }
                 vbd_idx++;
