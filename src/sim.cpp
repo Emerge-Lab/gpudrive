@@ -194,6 +194,8 @@ inline void collectSelfObsSystem(Engine &ctx,
     const Info& info = ctx.get<Info>(agent_iface.e);
     self_obs.goalState = info.reachedGoal ? 1.f : 0.f;
     self_obs.steerAngle = vel.angular.z;
+    self_obs.type = (float)ctx.get<EntityType>(agent_iface.e);
+    std::cout << "Self Obs Type: " << self_obs.type << std::endl;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,

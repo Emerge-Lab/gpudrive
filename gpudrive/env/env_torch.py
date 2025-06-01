@@ -1753,7 +1753,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
-        
+
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
     def get_expert_actions(self):
@@ -1898,7 +1898,7 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/validation",
+        root="data/processed/wosac/validation_interactive",
         batch_size=1,
         dataset_size=100,
         sample_with_replacement=False,
