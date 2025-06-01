@@ -11,8 +11,8 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    GUIDANCE_MODE = "vbd_online"
-    DATASET = "data/processed/wosac/validation_json_100"  # Ensure VBD trajectory structures are in here
+    GUIDANCE_MODE = "log_replay"
+    DATASET = "data/processed/wosac/validation_interactive/json"  # Ensure VBD trajectory structures are in here
     SAVE_PATH = "examples/eval/figures_data/guidance/"
 
     env_config = EnvConfig(
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     train_loader = SceneDataLoader(
         root=DATASET,
-        batch_size=10,
+        batch_size=100,
         dataset_size=100,
         sample_with_replacement=False,
         shuffle=False,

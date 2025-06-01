@@ -126,7 +126,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
         # Action space setup
-        # Action space setup
         self._setup_action_space(action_type)
         self.single_action_space = self.action_space
         self.num_agents = self.cont_agent_mask.sum().item()

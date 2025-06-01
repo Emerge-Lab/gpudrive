@@ -95,10 +95,10 @@ def rollout(
     next_obs = env.reset(mask=control_mask)
 
     # Guidance logging
-    num_guidance_points = env.valid_guidance_points
+    num_guidance_points = env.valid_guidance_points.cpu().numpy()
     guidance_densities = num_guidance_points / env.reference_traj_len
     print(
-        f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
+        f"Avg guidance points per agent: {num_guidance_points.mean():.2f} (min: {num_guidance_points.min()}) which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
     )
 
     # Get scenario ids
@@ -272,19 +272,19 @@ if __name__ == "__main__":
 
     # Settings
     MAX_AGENTS = madrona_gpudrive.kMaxAgentCount  
-    NUM_ENVS = 10
+    NUM_ENVS = 50 #115
     DEVICE = "cuda"  # where to run the env rollouts
-    NUM_ROLLOUTS_PER_BATCH = 1
-    NUM_DATA_BATCHES = 1
+    NUM_ROLLOUTS_PER_BATCH = 1 #32
+    NUM_DATA_BATCHES = 1 #2
     INIT_STEPS = 10
     DATASET_SIZE = 1000
-    RENDER = False
+    RENDER = True
     LOG_DIR = "examples/eval/figures_data/wosac/"
     GUIDANCE_MODE = (
         "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
     )
-    GUIDANCE_DROPOUT_MODE = "end_points_only"  # Options: "max", "avg", "remove_all", "end_points_only"
-    GUIDANCE_DROPOUT_PROB = 1.0
+    GUIDANCE_DROPOUT_MODE = "avg"  # Options: "max", "avg", "remove_all", "end_points_only"
+    GUIDANCE_DROPOUT_PROB = 0.95
     SMOOTHEN_TRAJECTORY = True
 
     DATA_JSON = "data/processed/wosac/validation_interactive/json"
@@ -292,7 +292,6 @@ if __name__ == "__main__":
 
     CPT_PATH = "examples/experimental/models/model_guidance_logs__R_10000__05_19_14_40_25_153_004745.pt"
     
-
     # Create data loader
     val_loader = SceneDataLoader(
         root=DATA_JSON,
@@ -303,12 +302,11 @@ if __name__ == "__main__":
         file_prefix="",
         seed=10,
     )
+    
+    print(f"{len(set(val_loader.dataset))} unique files in dataloader.")
 
     # Load agent
     agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
-
-    # config = load_config("baselines/ppo/config/ppo_guided_autonomy.yaml")
-    # config = config.environment
 
     config = agent.config
 
