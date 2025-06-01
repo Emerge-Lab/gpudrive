@@ -68,24 +68,26 @@ class EnvConfig:
     )
 
     # Action space settings (if discretized)
+    # Type-aware action space settings
+    use_type_aware_actions: bool = True  # Toggles type-aware action mapping: if False, use vehicle ranges for all agents
+
+    # Vehicle action ranges
+    vehicle_accel_range: Tuple[float, float] = (-4.0, 4.0)  # m/s²
+    vehicle_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
+
+    # Cyclist action ranges
+    cyclist_accel_range: Tuple[float, float] = (-2.5, 2.5)    # m/s²
+    cyclist_steer_range: Tuple[float, float] = (-2.09, 2.09)  # radians (±120°)
+
+    # Pedestrian action ranges
+    pedestrian_accel_range: Tuple[float, float] = (-1.5, 1.5)  # m/s²
+    pedestrian_steer_range: Tuple[float, float] = (-3.14, 3.14)  # radians (±180°)
+
+    head_tilt_actions: torch.Tensor = torch.Tensor([0])
+
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
     action_space_accel_disc: int = 7
-    max_steer_angle: float = 1.57  # in radians: pi/2 = 1.57, pi/3 = 1.05
-    max_accel_value: float = 4.0
-    steer_actions: torch.Tensor = torch.round(
-        torch.linspace(
-            -max_steer_angle, max_steer_angle, action_space_steer_disc
-        ),
-        decimals=3,
-    )
-    accel_actions: torch.Tensor = torch.round(
-        torch.linspace(
-            -max_accel_value, max_accel_value, action_space_accel_disc
-        ),
-        decimals=3,
-    )
-    head_tilt_actions: torch.Tensor = torch.Tensor([0])
 
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
