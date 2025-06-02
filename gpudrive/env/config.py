@@ -57,7 +57,8 @@ class EnvConfig:
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 50.0  # Radius for road observations
-    view_cone_half_angle: float = torch.pi  # Half-angle for view cone setting
+    view_cone_half_angle: float = torch.pi / 1.5  # Half-angle for view cone setting
+    view_occlude_objects: bool = False  # True: Vehicles are removed from observations if they are occluded by other vehicles
     polyline_reduction_threshold: float = (
         0.1  # Threshold for polyline reduction
     )

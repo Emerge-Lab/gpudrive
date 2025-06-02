@@ -51,6 +51,7 @@ namespace madrona_gpudrive
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("viewConeHalfAngle", &Parameters::viewConeHalfAngle)
+            .def_rw("viewOccludeObjects", &Parameters::viewOccludeObjects)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("goalBehaviour", &Parameters::goalBehaviour)

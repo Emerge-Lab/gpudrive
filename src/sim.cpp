@@ -196,6 +196,102 @@ inline void collectSelfObsSystem(Engine &ctx,
     self_obs.steerAngle = vel.angular.z;
 }
 
+struct ViewField {
+    const Position& position;
+    const float heading;
+    const float viewRadius;
+    const float viewAngle;
+
+    ViewField(const Position& position, const float heading, const float viewRadius, const float viewAngle)
+        : position(position), heading(heading), viewRadius(viewRadius), viewAngle(viewAngle) {}
+};
+
+// Broad-phase filtering: Get dynamic objects that are potentially visible within the view field
+inline std::vector<Entity> visibleCandidatesDynamic(Engine &ctx, 
+                                                    const ViewField &vf,
+                                                    const OtherAgents &other_agents,
+                                                    Entity self_entity) {
+    std::vector<Entity> candidates;
+    
+    // Simple radius-based broad phase filtering for now
+    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents - 1; ++agentIdx) {
+        Entity other = other_agents.e[agentIdx];
+        if (other == self_entity) continue; // Don't include self
+        
+        const Position &other_pos = ctx.get<Position>(other);
+        Vector2 relative_pos = (other_pos - vf.position).xy();
+        
+        // Check if within view radius
+        if (relative_pos.length() <= vf.viewRadius) {
+            // Check if within view cone
+            Vector2 forward_dir = {cosf(vf.heading), sinf(vf.heading)};
+            Vector2 normalized_relative_pos = relative_pos / relative_pos.length();
+            float dot_product = normalized_relative_pos.dot(forward_dir);
+            float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
+            
+            if (angle <= vf.viewAngle * 0.5f) {
+                candidates.push_back(other);
+            }
+        }
+    }
+    
+    return candidates;
+}
+
+// Broad-phase filtering: Get static road objects that are potentially visible within the view field
+inline std::vector<Entity> visibleCandidatesStatic(Engine &ctx,
+                                                   const ViewField &vf) {
+    std::vector<Entity> candidates;
+    
+    // Simple radius-based broad phase filtering for roads
+    for (CountT roadIdx = 0; roadIdx < ctx.data().numRoads; ++roadIdx) {
+        Entity road = ctx.data().roads[roadIdx];
+        const Position &road_pos = ctx.get<Position>(road);
+        Vector2 relative_pos = (road_pos - vf.position).xy();
+        
+        // Check if within view radius
+        if (relative_pos.length() <= vf.viewRadius) {
+            // Check if within view cone
+            Vector2 forward_dir = {cosf(vf.heading), sinf(vf.heading)};
+            Vector2 normalized_relative_pos = relative_pos / relative_pos.length();
+            float dot_product = normalized_relative_pos.dot(forward_dir);
+            float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
+            
+            if (angle <= vf.viewAngle * 0.5f) {
+                candidates.push_back(road);
+            }
+        }
+    }
+    
+    return candidates;
+}
+
+// Narrow-phase filtering: Check for occlusion using simple ray casting
+inline void filterByOcclusion(Engine &ctx,
+                              const ViewField &vf,
+                              std::vector<Entity> &objects) {
+    auto &bvh = ctx.singleton<broadphase::BVH>();
+    Vector3 observer_pos = {vf.position.x, vf.position.y, vf.position.z};
+    
+    // Filter out occluded objects
+    objects.erase(std::remove_if(objects.begin(), objects.end(), 
+        [&](Entity target) {
+            const Position &target_pos = ctx.get<Position>(target);
+            Vector3 target_pos_3d = {target_pos.x, target_pos.y, target_pos.z};
+            
+            Vector3 ray_dir = (target_pos_3d - observer_pos).normalize();
+            float target_distance = (target_pos_3d - observer_pos).length();
+            
+            // Trace ray from observer to target
+            float hit_t;
+            Vector3 hit_normal;
+            Entity hit_entity = bvh.traceRay(observer_pos, ray_dir, &hit_t, &hit_normal, target_distance - 0.1f);
+            
+            // If we hit something before reaching the target, it's occluded
+            return (hit_entity != Entity::none() && hit_entity != target);
+        }), objects.end());
+}
+
 inline void collectPartnerObsSystem(Engine &ctx,
                               const Position &pos,
                               const Rotation &rot,
@@ -205,13 +301,33 @@ inline void collectPartnerObsSystem(Engine &ctx,
     if(ctx.data().params.disableClassicalObs)
         return;
 
+    // User config
+    // viewRadius (float), viewConeHalfAngle (float), viewOccludeObjects (bool; False = no filtering), 
+
+    // to write partner features into array
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
 
-    CountT arrIndex = 0; CountT agentIdx = 0;
-    while(agentIdx < ctx.data().numAgents - 1)
-    {
-        Entity other = other_agents.e[agentIdx++];
+    // Get agent's heading from rotation
+    float heading = utils::quatToYaw(rot);
+    float viewRadius = ctx.data().params.observationRadius;
+    float viewAngle = ctx.data().params.viewConeHalfAngle * 2.0f; // Convert half-angle to full angle
+    
+    ViewField vf(pos, heading, viewRadius, viewAngle);
 
+    // broad phase: remove if not in view field + remove self
+    auto objectsDynamic = visibleCandidatesDynamic(ctx, vf, other_agents, agent_iface.e);
+        
+    // narrow phase: raycast to get occlusion by other dynamic objects
+    if (ctx.data().params.viewOccludeObjects) {
+        filterByOcclusion(ctx, vf, objectsDynamic);
+    }
+
+    // add observations to array partner_obs.obs based on filtered list
+    CountT arrIndex = 0;
+    for (Entity other : objectsDynamic) {
+        // future optimization: k nearest maybe in case of many agents in view
+        if (arrIndex >= consts::kMaxAgentCount - 1) break;
+        
         const Position &other_position = ctx.get<Position>(other);
         const Velocity &other_velocity = ctx.get<Velocity>(other);
         const Rotation &other_rot = ctx.get<Rotation>(other);
@@ -222,22 +338,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
         float relative_speed = other_velocity.linear.length(); // Design decision: return the speed of the other agent directly
 
         Rotation relative_orientation = rot.inv() * other_rot;
-
         float relative_heading = utils::quatToYaw(relative_orientation);
-
-        if(relative_pos.length() > ctx.data().params.observationRadius)
-        {
-            continue;
-        }
-
-        float cos_angle = relative_pos.x/relative_pos.length();
-        float angle = std::acos(cos_angle);
-
-        // Only include agents that are within the view cone
-        if(angle > ctx.data().params.viewConeHalfAngle)
-        {
-            continue;
-        }
 
         partner_obs.obs[arrIndex++] = {
             .speed = relative_speed,
@@ -248,6 +349,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
             .id = (float)ctx.get<AgentID>(ctx.get<AgentInterfaceEntity>(other).e).id
         };
     }
+    
+    // Zero out remaining entries
     while(arrIndex < consts::kMaxAgentCount - 1) {
         partner_obs.obs[arrIndex++] = PartnerObservation::zero();
     }
@@ -263,6 +366,17 @@ inline void collectMapObservationsSystem(Engine &ctx,
 
     auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
 
+    // User config (some of it not implemented yet, but assume it will be): 
+    // viewRadius (float), viewConeHalfAngle (float), viewOccludeObjects (bool; False = no filtering), 
+
+    // Get agent's heading from rotation
+    float heading = utils::quatToYaw(rot);
+    float view_radius = ctx.data().params.observationRadius;
+    float view_angle = ctx.data().params.viewConeHalfAngle * 2.0f;
+    
+    ViewField vf(pos, heading, view_radius, view_angle);
+    auto objectsStatic = visibleCandidatesStatic(ctx, vf);
+
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
         selectKNearestRoadEntities<consts::kMaxAgentMapObservationsCount>(
@@ -273,9 +387,11 @@ inline void collectMapObservationsSystem(Engine &ctx,
     assert(alg == FindRoadObservationsWith::AllEntitiesWithRadiusFiltering);
 
     utils::ReferenceFrame referenceFrame(pos.xy(), rot);
-    CountT arrIndex = 0; CountT roadIdx = 0;
-    while(roadIdx < ctx.data().numRoads && arrIndex < consts::kMaxAgentMapObservationsCount) {
-        Entity road = ctx.data().roads[roadIdx++];
+    CountT arrIndex = 0;
+    
+    for (Entity road : objectsStatic) {
+        if (arrIndex >= consts::kMaxAgentMapObservationsCount) break;
+        
         auto roadPos = ctx.get<Position>(road);
         auto roadRot = ctx.get<Rotation>(road);
 
@@ -285,9 +401,12 @@ inline void collectMapObservationsSystem(Engine &ctx,
         }
 
         map_obs.obs[arrIndex] = referenceFrame.observationOf(
-            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), static_cast<float>(ctx.get<RoadMapId>(road).id), ctx.get<MapType>(road));
+            roadPos, roadRot, ctx.get<Scale>(road), ctx.get<EntityType>(road), 
+            static_cast<float>(ctx.get<RoadMapId>(road).id), ctx.get<MapType>(road));
         arrIndex++;
     }
+    
+    // Zero out remaining entries
     while (arrIndex < consts::kMaxAgentMapObservationsCount) {
         map_obs.obs[arrIndex++] = MapObservation::zero();
     }
