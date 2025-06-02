@@ -405,6 +405,40 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
     const int64_t numWorlds = mgr_cfg.scenes.size();
 
+
+    std::vector<int> valid_scene_indices;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::cout << "Filtering scenes for controllable objects..." << std::endl;
+
+    for (int i = 0; i < mgr_cfg.scenes.size(); i++) {
+        // Quick CPU check for controllable objects
+        Map *cpu_map = (Map *)MapReader::parseAndWriteOut(mgr_cfg.scenes[i], 
+                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+        
+        int64_t controllable_objects = 0;
+        int total_objects = cpu_map->numObjects; // Adjust field name as needed
+        
+        for (int obj_idx = 0; obj_idx < total_objects; obj_idx++) {
+            const auto& object = cpu_map->objects[obj_idx];
+            auto startPos = object.position[0];
+            if (object.valid[0] && !object.markAsExpert &&
+                std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) +
+                        std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                controllable_objects++;
+            }
+        }
+        
+        if (controllable_objects != 46) {
+            valid_scene_indices.push_back(i);
+        }
+        
+        delete cpu_map;
+    }
+
+
+
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -522,36 +556,30 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         HeapArray<WorldInit> world_inits(numWorlds);
 
-        int64_t worldIdx{0};
 
         std::random_device rd;
         std::mt19937 gen(rd());
 
 
+        // Now use valid scenes in your original loop
+        int64_t worldIdx = 0;
         for (auto const &scene : mgr_cfg.scenes) {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
-                                                        ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            // Check if current scene index is in valid_scene_indices
+            int current_scene_idx = &scene - &mgr_cfg.scenes[0]; // Get current index
             
-            int64_t controllable_objects{0};  
-            for (const auto object : map_->objects) {  
-                auto startPos = object.position[0];
-                if (object.valid[0] && !object.markAsExpert && 
-                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
-                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
-                    controllable_objects++;
-                }
-            }
-            
-            if (controllable_objects == 0) {
-                delete map_;
-                std::uniform_int_distribution<> dis(0, worldIdx - 1);
-                int random_number = dis(gen);
-                Map* copied_map = new Map(*world_inits[random_number].map); 
-                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, copied_map, &(mgr_cfg.params)};
+            if (std::find(valid_scene_indices.begin(), valid_scene_indices.end(), current_scene_idx) != valid_scene_indices.end()) {
+                // Valid scene - parse on CPU
+                Map *cpu_map = (Map *)MapReader::parseAndWriteOut(scene, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, cpu_map, &(mgr_cfg.params)};
             } else {
-                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+                // Invalid scene - use a random valid scene
+                std::uniform_int_distribution<> dis(0, valid_scene_indices.size() - 1);
+                int random_valid_idx = valid_scene_indices[dis(gen)];
+                const auto &random_scene = mgr_cfg.scenes[random_valid_idx];
+                
+                Map *cpu_map = (Map *)MapReader::parseAndWriteOut(random_scene, ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, cpu_map, &(mgr_cfg.params)};
             }
-
         }
         assert(worldIdx == numWorlds);
 
