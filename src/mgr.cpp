@@ -430,7 +430,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             }
         }
         
-        if (controllable_objects != 46) {
+        if (controllable_objects > 0) {
             valid_scene_indices.push_back(i);
         }
         
@@ -459,34 +459,24 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
 
-        int64_t worldIdx{0};
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
+        int64_t worldIdx = 0;
         for (auto const &scene : mgr_cfg.scenes) {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
-                                                        ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-            
-            int64_t controllable_objects{0};  
-            for (const auto object : map_->objects) {  
-                auto startPos = object.position[0];
-                if (object.valid[0] && !object.markAsExpert && 
-                    std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
-                            std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
-                    controllable_objects++;
-                }
-            }
-            
-            if (controllable_objects == 0) {
-                delete map_;
-                std::uniform_int_distribution<> dis(0, worldIdx - 1);
-                int random_number = dis(gen);
-                Map* copied_map = new Map(*world_inits[random_number].map); 
-                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, copied_map, &(mgr_cfg.params)};
-            } else {
-                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
-            }
+            // Check if current scene index is in valid_scene_indices
+            int current_scene_idx = &scene - &mgr_cfg.scenes[0]; // Get current index
 
+            if (std::find(valid_scene_indices.begin(), valid_scene_indices.end(), current_scene_idx) != valid_scene_indices.end()) {
+                // Valid scene - parse on GPU
+                Map *gpu_map = (Map *)MapReader::parseAndWriteOut(scene, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, gpu_map, &(mgr_cfg.params)};
+            } else {
+                // Invalid scene - use a random valid scene
+                std::uniform_int_distribution<> dis(0, valid_scene_indices.size() - 1);
+                int random_valid_idx = valid_scene_indices[dis(gen)];
+                const auto &random_scene = mgr_cfg.scenes[random_valid_idx];
+
+                Map *gpu_map = (Map *)MapReader::parseAndWriteOut(random_scene, ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, gpu_map, &(mgr_cfg.params)};
+            }
         }
         assert(worldIdx == numWorlds);
 
