@@ -958,9 +958,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if dropout_prob > 0.0:
 
                 if self.dropout_mode == "max":
-                    # Generate random dropout rates for each agent between 0 and dropout_prob
+                    # Sample dropout probabilities from a Beta distribution
                     agent_dropout_probs = (
-                        torch.rand(num_controlled, device=self.device)
+                        torch.distributions.Beta(3.0, 1).sample(
+                            (num_controlled,)
+                        )
                         * dropout_prob
                     )
 
@@ -1264,7 +1266,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ],
                 device=self.device,
             )
-
 
     def _get_guidance(self, mask=None) -> torch.Tensor:
         """Receive (expert) suggestions from pre-trained model or logs."""
@@ -1839,7 +1840,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             controlled_agent_mask=self.cont_agent_mask,
             reference_trajectory=self.reference_trajectory,
         )
-        
+
         self.guidance_dropout_mask = self.create_guidance_dropout_mask()
 
         self._cache_agent_types()
