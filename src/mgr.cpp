@@ -423,9 +423,11 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         for (int obj_idx = 0; obj_idx < total_objects; obj_idx++) {
             const auto& object = cpu_map->objects[obj_idx];
             auto startPos = object.position[0];
+            auto distance = std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + std::pow(object.goalPosition.y - startPos.y, 2));
             if (object.valid[0] && !object.markAsExpert &&
-                std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) +
-                        std::pow(object.goalPosition.y - startPos.y, 2)) >= consts::staticThreshold) {
+                distance >= consts::staticThreshold &&
+                object.type ==  EntityType::Vehicle
+                ) {
                 controllable_objects++;
             }
         }
