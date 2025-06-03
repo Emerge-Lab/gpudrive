@@ -4,7 +4,7 @@ test_dataset_size: 10_000 # Number of test scenarios to evaluate on
 # Environment settings
 train_dir: data/processed/training 
 test_dir: data/processed/validation
-file_prefix: null
+file_prefix: null # Controls the file prefix used when searching files in SceneDataLoader, defaults to tfrecord (WOMD data)
 
 num_worlds: 50 # Number of parallel environments for evaluation
 max_controlled_agents: 64 # Maximum number of agents controlled by the model.
