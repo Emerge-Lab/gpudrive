@@ -207,14 +207,15 @@ struct ViewField {
 };
 
 // Broad-phase filtering: Get dynamic objects that are potentially visible within the view field
-inline std::vector<Entity> visibleCandidatesDynamic(Engine &ctx, 
-                                                    const ViewField &vf,
-                                                    const OtherAgents &other_agents,
-                                                    Entity self_entity) {
-    std::vector<Entity> candidates;
+inline CountT visibleCandidatesDynamic(Engine &ctx, 
+                                       const ViewField &vf,
+                                       const OtherAgents &other_agents,
+                                       Entity self_entity,
+                                       Entity* candidates_buffer) {
+    CountT count = 0;
     
     // Simple radius-based broad phase filtering for now
-    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents - 1; ++agentIdx) {
+    for (CountT agentIdx = 0; agentIdx < ctx.data().numAgents - 1 && count < consts::kMaxAgentCount - 1; ++agentIdx) {
         Entity other = other_agents.e[agentIdx];
         if (other == self_entity) continue; // Don't include self
         
@@ -230,21 +231,22 @@ inline std::vector<Entity> visibleCandidatesDynamic(Engine &ctx,
             float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
             
             if (angle <= vf.viewAngle * 0.5f) {
-                candidates.push_back(other);
+                candidates_buffer[count++] = other;
             }
         }
     }
     
-    return candidates;
+    return count;
 }
 
 // Broad-phase filtering: Get static road objects that are potentially visible within the view field
-inline std::vector<Entity> visibleCandidatesStatic(Engine &ctx,
-                                                   const ViewField &vf) {
-    std::vector<Entity> candidates;
+inline CountT visibleCandidatesStatic(Engine &ctx,
+                                      const ViewField &vf,
+                                      Entity* candidates_buffer) {
+    CountT count = 0;
     
     // Simple radius-based broad phase filtering for roads
-    for (CountT roadIdx = 0; roadIdx < ctx.data().numRoads; ++roadIdx) {
+    for (CountT roadIdx = 0; roadIdx < ctx.data().numRoads && count < consts::kMaxAgentMapObservationsCount; ++roadIdx) {
         Entity road = ctx.data().roads[roadIdx];
         const Position &road_pos = ctx.get<Position>(road);
         Vector2 relative_pos = (road_pos - vf.position).xy();
@@ -258,54 +260,59 @@ inline std::vector<Entity> visibleCandidatesStatic(Engine &ctx,
             float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
             
             if (angle <= vf.viewAngle * 0.5f) {
-                candidates.push_back(road);
+                candidates_buffer[count++] = road;
             }
         }
     }
     
-    return candidates;
+    return count;
 }
 
 // Narrow-phase filtering: Check for occlusion using simple ray casting
 inline void filterByOcclusion(Engine &ctx,
                               const ViewField &vf,
-                              std::vector<Entity> &objects) {
+                              Span<Entity> objects) {
     auto &bvh = ctx.singleton<broadphase::BVH>();
     Vector3 observer_pos = {vf.position.x, vf.position.y, vf.position.z};
     
-    // Filter out occluded objects
-    objects.erase(std::remove_if(objects.begin(), objects.end(), 
-        [&](Entity target) {
-            const Position &target_pos = ctx.get<Position>(target);
-            Vector3 target_pos_3d = {target_pos.x, target_pos.y, target_pos.z};
-            
-            Vector3 ray_dir = (target_pos_3d - observer_pos).normalize();
-            float target_distance = (target_pos_3d - observer_pos).length();
-            
-            // Trace ray from observer to target
-            float hit_t;
-            Vector3 hit_normal;
-            Entity hit_entity = bvh.traceRay(observer_pos, ray_dir, &hit_t, &hit_normal, target_distance - 0.1f);
-            
-            // If we hit something before reaching the target, it's occluded
-            return (hit_entity != Entity::none() && hit_entity != target);
-        }), objects.end()); // erase-remove idiom
+    // Filter out occluded objects in-place
+    CountT write_idx = 0;
+    for (CountT read_idx = 0; read_idx < objects.size(); ++read_idx) {
+        Entity target = objects[read_idx];
+        const Position &target_pos = ctx.get<Position>(target);
+        Vector3 target_pos_3d = {target_pos.x, target_pos.y, target_pos.z};
+        
+        Vector3 ray_dir = (target_pos_3d - observer_pos).normalize();
+        float target_distance = (target_pos_3d - observer_pos).length();
+        
+        // Trace ray from observer to target
+        float hit_t;
+        Vector3 hit_normal;
+        Entity hit_entity = bvh.traceRay(observer_pos, ray_dir, &hit_t, &hit_normal, target_distance - 0.1f);
+        
+        // If we didn't hit something before reaching the target, it's not occluded
+        if (hit_entity == Entity::none() || hit_entity == target) {
+            objects[write_idx++] = target;
+        }
+    }
+    
+    // Update the effective size (though we can't change span size, caller needs to track this)
+    // This is handled by returning the new count
 }
 
-inline void filterByOcclusionAll(Engine &ctx,
-                                 const ViewField &vf, // Contains observer's position
-                                 std::vector<Entity> &objects_to_filter // List of potential targets
-                                 )
+inline CountT filterByOcclusionAll(Engine &ctx,
+                                   const ViewField &vf, // Contains observer's position
+                                   Span<Entity> objects_to_filter // List of potential targets
+                                   )
 {
     using namespace madrona::math;
 
     Vector3 observer_pos_3d = {vf.position.x, vf.position.y, vf.position.z};
 
-    std::vector<Entity> visible_entities;
-    visible_entities.reserve(objects_to_filter.size());
+    CountT visible_count = 0;
 
-
-    for (Entity& target_entity : objects_to_filter) {
+    for (CountT target_idx = 0; target_idx < objects_to_filter.size(); ++target_idx) {
+        Entity target_entity = objects_to_filter[target_idx];
         const Position& target_pos_comp = ctx.get<Position>(target_entity);
         const Rotation& target_rot_comp = ctx.get<Rotation>(target_entity);
         const VehicleSize& target_vehicle_size = ctx.get<VehicleSize>(target_entity);
@@ -338,7 +345,8 @@ inline void filterByOcclusionAll(Engine &ctx,
             Vector3 normalized_ray_dir_to_target_corner = vec_observer_to_target_corner / dist_to_target_corner;
 
             bool corner_ray_occluded = false;
-            for (Entity& potential_occluder_entity : objects_to_filter) {
+            for (CountT occluder_idx = 0; occluder_idx < objects_to_filter.size(); ++occluder_idx) {
+                Entity potential_occluder_entity = objects_to_filter[occluder_idx];
                 if (potential_occluder_entity == target_entity) {
                     continue; // Don't check occlusion against self
                 }
@@ -383,11 +391,11 @@ inline void filterByOcclusionAll(Engine &ctx,
         }
 
         if (unoccluded_corner_rays > 0) {
-            visible_entities.push_back(target_entity);
+            objects_to_filter[visible_count++] = target_entity;
         }
     }
     
-    objects_to_filter = visible_entities;
+    return visible_count;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,
@@ -413,17 +421,19 @@ inline void collectPartnerObsSystem(Engine &ctx,
     ViewField vf(pos, heading, viewRadius, viewAngle);
 
     // broad phase: remove if not in view field + remove self
-    auto objectsDynamic = visibleCandidatesDynamic(ctx, vf, other_agents, agent_iface.e);
+    Entity objectsDynamicBuffer[consts::kMaxAgentCount - 1];
+    CountT dynamicCount = visibleCandidatesDynamic(ctx, vf, other_agents, agent_iface.e, objectsDynamicBuffer);
+    Span<Entity> objectsDynamic(objectsDynamicBuffer, dynamicCount);
         
     // narrow phase: raycast to get occlusion by other dynamic objects
     if (ctx.data().params.viewOccludeObjects) {
-        //filterByOcclusion(ctx, vf, objectsDynamic);
-        filterByOcclusionAll(ctx, vf, objectsDynamic);
+        dynamicCount = filterByOcclusionAll(ctx, vf, objectsDynamic);
     }
 
     // add observations to array partner_obs.obs based on filtered list
     CountT arrIndex = 0;
-    for (Entity other : objectsDynamic) {
+    for (CountT i = 0; i < dynamicCount; ++i) {
+        Entity other = objectsDynamicBuffer[i];
         // future optimization: k nearest maybe in case of many agents in view
         if (arrIndex >= consts::kMaxAgentCount - 1) break;
         
@@ -474,7 +484,13 @@ inline void collectMapObservationsSystem(Engine &ctx,
     float view_angle = ctx.data().params.viewConeHalfAngle * 2.0f;
     
     ViewField vf(pos, heading, view_radius, view_angle);
-    auto objectsStatic = visibleCandidatesStatic(ctx, vf);
+    
+    // broad phase: remove if not in view field + remove self
+    Entity objectsStaticBuffer[consts::kMaxAgentMapObservationsCount];
+    CountT staticCount = visibleCandidatesStatic(ctx, vf, objectsStaticBuffer);
+
+    // Further filtering: narrow phase based on occlusion from dynamic objects
+    // But this would require removing the parallelism of the collectPartnerObsSystem and collectMapObservationsSystem
 
     const auto alg = ctx.data().params.roadObservationAlgorithm;
     if (alg == FindRoadObservationsWith::KNearestEntitiesWithRadiusFiltering) {
@@ -488,7 +504,8 @@ inline void collectMapObservationsSystem(Engine &ctx,
     utils::ReferenceFrame referenceFrame(pos.xy(), rot);
     CountT arrIndex = 0;
     
-    for (Entity road : objectsStatic) {
+    for (CountT i = 0; i < staticCount; ++i) {
+        Entity road = objectsStaticBuffer[i];
         if (arrIndex >= consts::kMaxAgentMapObservationsCount) break;
         
         auto roadPos = ctx.get<Position>(road);
