@@ -289,7 +289,88 @@ inline void filterByOcclusion(Engine &ctx,
             
             // If we hit something before reaching the target, it's occluded
             return (hit_entity != Entity::none() && hit_entity != target);
-        }), objects.end());
+        }), objects.end()); // erase-remove idiom
+}
+
+inline void filterByOcclusionAll(Engine &ctx,
+                                 const ViewField &vf, // Contains observer's position
+                                 std::vector<Entity> &objects_to_filter // List of potential targets
+                                 )
+{
+    using namespace madrona::math;
+
+    Vector3 observer_pos_3d = {vf.position.x, vf.position.y, vf.position.z};
+
+    std::vector<Entity> visible_entities;
+    visible_entities.reserve(objects_to_filter.size());
+
+
+    for (Entity target_entity : objects_to_filter) {
+        const Position& target_pos_comp = ctx.get<Position>(target_entity);
+        // Assuming Position component includes Z, or it's implicitly handled (e.g., all agents at a fixed Z for this check if needed)
+        Vector3 target_pos_3d = {target_pos_comp.x, target_pos_comp.y, target_pos_comp.z}; 
+
+        Vector3 vec_observer_to_target = target_pos_3d - observer_pos_3d;
+        float dist_to_target = vec_observer_to_target.length();
+        
+        if (dist_to_target < 0.1f) { // add to visible if really close
+            visible_entities.push_back(target_entity);
+            continue;
+        }
+        Vector3 normalized_ray_dir_to_target = vec_observer_to_target / dist_to_target;
+
+        bool is_target_occluded = false;
+
+        for (Entity potential_occluder_entity : objects_to_filter) {
+            if (potential_occluder_entity == target_entity) {
+                continue; // Don't check occlusion against self
+            }
+
+            const Position& occluder_pos_comp = ctx.get<Position>(potential_occluder_entity);
+            const Rotation& occluder_rot_comp = ctx.get<Rotation>(potential_occluder_entity);
+            const VehicleSize& occluder_vehicle_size = ctx.get<VehicleSize>(potential_occluder_entity);
+
+            Diag3x3 occluder_dims_from_vehicle_size = {
+                occluder_vehicle_size.width,
+                occluder_vehicle_size.length,
+                occluder_vehicle_size.height 
+            };
+
+
+            // unit aabb
+            AABB local_aabb = {
+                {-0.5f, -0.5f, -0.5f},
+                { 0.5f,  0.5f,  0.5f}
+            };
+            
+            // transform unit aabb to world space
+            AABB world_occluder_aabb = local_aabb.applyTRS(
+                occluder_pos_comp, 
+                occluder_rot_comp,
+                occluder_dims_from_vehicle_size
+            );
+
+            // inverse ray direction
+            Diag3x3 inv_ray_d = {
+                (normalized_ray_dir_to_target.x == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.x) : 1.f / normalized_ray_dir_to_target.x,
+                (normalized_ray_dir_to_target.y == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.y) : 1.f / normalized_ray_dir_to_target.y,
+                (normalized_ray_dir_to_target.z == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.z) : 1.f / normalized_ray_dir_to_target.z
+            };
+
+            float hit_t_occluder = 0.f; 
+            // Check intersection from a small epsilon away from observer up to just before the target
+            if (world_occluder_aabb.rayIntersects(observer_pos_3d, inv_ray_d, 0.01f, dist_to_target - 0.01f, hit_t_occluder)) {
+                is_target_occluded = true;
+                break; 
+            }
+        }
+
+        if (!is_target_occluded) {
+            visible_entities.push_back(target_entity);
+        }
+    }
+
+    objects_to_filter = visible_entities;
 }
 
 inline void collectPartnerObsSystem(Engine &ctx,
@@ -319,7 +400,8 @@ inline void collectPartnerObsSystem(Engine &ctx,
         
     // narrow phase: raycast to get occlusion by other dynamic objects
     if (ctx.data().params.viewOccludeObjects) {
-        filterByOcclusion(ctx, vf, objectsDynamic);
+        //filterByOcclusion(ctx, vf, objectsDynamic);
+        filterByOcclusionAll(ctx, vf, objectsDynamic);
     }
 
     // add observations to array partner_obs.obs based on filtered list
