@@ -305,71 +305,88 @@ inline void filterByOcclusionAll(Engine &ctx,
     visible_entities.reserve(objects_to_filter.size());
 
 
-    for (Entity target_entity : objects_to_filter) {
+    for (Entity& target_entity : objects_to_filter) {
         const Position& target_pos_comp = ctx.get<Position>(target_entity);
-        // Assuming Position component includes Z, or it's implicitly handled (e.g., all agents at a fixed Z for this check if needed)
-        Vector3 target_pos_3d = {target_pos_comp.x, target_pos_comp.y, target_pos_comp.z}; 
+        const Rotation& target_rot_comp = ctx.get<Rotation>(target_entity);
+        const VehicleSize& target_vehicle_size = ctx.get<VehicleSize>(target_entity);
 
-        Vector3 vec_observer_to_target = target_pos_3d - observer_pos_3d;
-        float dist_to_target = vec_observer_to_target.length();
-        
-        if (dist_to_target < 0.1f) { // add to visible if really close
-            visible_entities.push_back(target_entity);
-            continue;
-        }
-        Vector3 normalized_ray_dir_to_target = vec_observer_to_target / dist_to_target;
+        Vector3 target_world_center = {target_pos_comp.x, target_pos_comp.y, target_pos_comp.z};
 
-        bool is_target_occluded = false;
+        float half_width = target_vehicle_size.width / 2.f;
+        float half_length = target_vehicle_size.length / 2.f;
+        float half_height = target_vehicle_size.height / 2.f;
 
-        for (Entity potential_occluder_entity : objects_to_filter) {
-            if (potential_occluder_entity == target_entity) {
-                continue; // Don't check occlusion against self
-            }
+        Vector3 local_corners[8] = {
+            {-half_width, -half_length, -half_height}, { half_width, -half_length, -half_height},
+            {-half_width,  half_length, -half_height}, { half_width,  half_length, -half_height},
+            {-half_width, -half_length,  half_height}, { half_width, -half_length,  half_height},
+            {-half_width,  half_length,  half_height}, { half_width,  half_length,  half_height}
+        };
 
-            const Position& occluder_pos_comp = ctx.get<Position>(potential_occluder_entity);
-            const Rotation& occluder_rot_comp = ctx.get<Rotation>(potential_occluder_entity);
-            const VehicleSize& occluder_vehicle_size = ctx.get<VehicleSize>(potential_occluder_entity);
+        int unoccluded_corner_rays = 0;
 
-            Diag3x3 occluder_dims_from_vehicle_size = {
-                occluder_vehicle_size.width,
-                occluder_vehicle_size.length,
-                occluder_vehicle_size.height 
-            };
-
-
-            // unit aabb
-            AABB local_aabb = {
-                {-0.5f, -0.5f, -0.5f},
-                { 0.5f,  0.5f,  0.5f}
-            };
+        for (int i = 0; i < 8; ++i) { // check all corners
+            Vector3 target_corner_world = target_world_center + target_rot_comp.rotateVec(local_corners[i]);
             
-            // transform unit aabb to world space
-            AABB world_occluder_aabb = local_aabb.applyTRS(
-                occluder_pos_comp, 
-                occluder_rot_comp,
-                occluder_dims_from_vehicle_size
-            );
+            Vector3 vec_observer_to_target_corner = target_corner_world - observer_pos_3d;
+            float dist_to_target_corner = vec_observer_to_target_corner.length();
 
-            // inverse ray direction
-            Diag3x3 inv_ray_d = {
-                (normalized_ray_dir_to_target.x == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.x) : 1.f / normalized_ray_dir_to_target.x,
-                (normalized_ray_dir_to_target.y == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.y) : 1.f / normalized_ray_dir_to_target.y,
-                (normalized_ray_dir_to_target.z == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target.z) : 1.f / normalized_ray_dir_to_target.z
-            };
+            if (dist_to_target_corner < 0.1f) { // add to visible if really close
+                unoccluded_corner_rays++;
+                break; // early return since one clear ray is enough
+            }
+            Vector3 normalized_ray_dir_to_target_corner = vec_observer_to_target_corner / dist_to_target_corner;
 
-            float hit_t_occluder = 0.f; 
-            // Check intersection from a small epsilon away from observer up to just before the target
-            if (world_occluder_aabb.rayIntersects(observer_pos_3d, inv_ray_d, 0.01f, dist_to_target - 0.01f, hit_t_occluder)) {
-                is_target_occluded = true;
-                break; 
+            bool corner_ray_occluded = false;
+            for (Entity& potential_occluder_entity : objects_to_filter) {
+                if (potential_occluder_entity == target_entity) {
+                    continue; // Don't check occlusion against self
+                }
+
+                const Position& occluder_pos_comp = ctx.get<Position>(potential_occluder_entity);
+                const Rotation& occluder_rot_comp = ctx.get<Rotation>(potential_occluder_entity);
+                const VehicleSize& occluder_vehicle_size = ctx.get<VehicleSize>(potential_occluder_entity);
+
+                Diag3x3 occluder_dims_from_vehicle_size = {
+                    occluder_vehicle_size.width, 
+                    occluder_vehicle_size.length,
+                    occluder_vehicle_size.height 
+                };
+
+                AABB local_aabb = {
+                    {-0.5f, -0.5f, -0.5f},
+                    { 0.5f,  0.5f,  0.5f}
+                };
+                
+                AABB world_occluder_aabb = local_aabb.applyTRS(
+                    occluder_pos_comp, 
+                    occluder_rot_comp,
+                    occluder_dims_from_vehicle_size
+                );
+
+                // inverse ray direction
+                Diag3x3 inv_ray_d = {
+                    (normalized_ray_dir_to_target_corner.x == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.x) : 1.f / normalized_ray_dir_to_target_corner.x,
+                    (normalized_ray_dir_to_target_corner.y == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.y) : 1.f / normalized_ray_dir_to_target_corner.y,
+                    (normalized_ray_dir_to_target_corner.z == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.z) : 1.f / normalized_ray_dir_to_target_corner.z
+                };
+
+                float hit_t_occluder = 0.f; 
+                if (world_occluder_aabb.rayIntersects(observer_pos_3d, inv_ray_d, 0.01f, dist_to_target_corner - 0.01f, hit_t_occluder)) {
+                    corner_ray_occluded = true;
+                    break; 
+                }
+            }
+            if (!corner_ray_occluded) {
+                unoccluded_corner_rays++;
             }
         }
 
-        if (!is_target_occluded) {
+        if (unoccluded_corner_rays > 0) {
             visible_entities.push_back(target_entity);
         }
     }
-
+    
     objects_to_filter = visible_entities;
 }
 
