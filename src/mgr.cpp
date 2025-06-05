@@ -205,6 +205,35 @@ struct Manager::CUDAImpl final : Manager::Impl {
 };
 #endif
 
+
+// static void countControllableObjects(
+//     const MapObject* objects,
+//     int total_objects,
+//     int* controllable_count,
+//     float static_threshold
+// ) {
+//     int obj_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+//     if (obj_idx >= total_objects) return;
+    
+//     const auto& object = objects[obj_idx];
+    
+//     // Check if object meets controllable criteria
+//     if (object.valid[0] && !objec__global__t.markAsExpert && 
+//         object.type == EntityType::Vehicle) {
+        
+//         auto startPos = object.position[0];
+//         float distance = sqrtf(
+//             powf(object.goalPosition.x - startPos.x, 2.0f) + 
+//             powf(object.goalPosition.y - startPos.y, 2.0f)
+//         );
+        
+//         if (distance >= static_threshold) {
+//             atomicAdd(controllable_count, 1);
+//         }
+//     }
+// }
+
 static void loadRenderObjects(render::RenderManager &render_mgr)
 {
     std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
@@ -405,6 +434,43 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
     const int64_t numWorlds = mgr_cfg.scenes.size();
 
+
+    std::vector<int> valid_scene_indices;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::cout << "Filtering scenes for controllable objects..." << std::endl;
+
+    // Filter scenes using CPU parsing but keeping GPU workflow
+    for (int i = 0; i < mgr_cfg.scenes.size(); i++) {
+        // Use CPU mode for quick filtering check
+        Map *cpu_map = (Map *)MapReader::parseAndWriteOut(mgr_cfg.scenes[i], 
+                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+        
+        int64_t controllable_objects = 0;
+        int total_objects = cpu_map->numObjects;
+        
+        for (int obj_idx = 0; obj_idx < total_objects; obj_idx++) {
+            const auto& object = cpu_map->objects[obj_idx];
+            auto startPos = object.position[0];
+            auto distance = std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                                    std::pow(object.goalPosition.y - startPos.y, 2));
+            if (object.valid[0] && !object.markAsExpert &&
+                distance >= consts::staticThreshold &&
+                object.type == EntityType::Vehicle) {
+                controllable_objects++;
+            }
+        }
+        
+        if (controllable_objects > 0) {
+            valid_scene_indices.push_back(i);
+        }
+        
+        delete cpu_map;
+    }
+
+    std::cout << "Found " << valid_scene_indices.size() << " valid scenes with controllable objects." << std::endl;
+
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -421,16 +487,33 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         HeapArray<WorldInit> world_inits(numWorlds);
 
-
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
 
+
+        // Now load only the valid scenes for world initialization using CUDA mode
         int64_t worldIdx{0};
-        for (auto const &scene : mgr_cfg.scenes) {
-	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
-							  ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+        for (int scene_idx : valid_scene_indices) {
+            if (worldIdx >= numWorlds) break; // Safety check
+            
+            const auto& scene = mgr_cfg.scenes[scene_idx];
+            Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                          ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
         }
+        
+        // If we have fewer valid scenes than worlds, cycle through them
+        while (worldIdx < numWorlds) {
+            for (int scene_idx : valid_scene_indices) {
+                if (worldIdx >= numWorlds) break;
+                
+                const auto& scene = mgr_cfg.scenes[scene_idx];
+                Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                              ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
+            }
+        }
+        
         assert(worldIdx == numWorlds);
 
         Optional<RenderGPUState> render_gpu_state =
@@ -467,6 +550,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
         Action *agent_actions_buffer =
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
+        
         madrona::cu::deallocGPU(paramsDevicePtr);
         for (int64_t i = 0; i < numWorlds; i++) {
           auto &init = world_inits[i];
@@ -482,7 +566,7 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             std::move(gpu_exec),
             std::move(render_gpu_state),
             std::move(render_mgr),
-	    numWorlds
+            numWorlds
         };
 
 #else
