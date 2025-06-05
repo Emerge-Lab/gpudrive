@@ -201,9 +201,10 @@ struct ViewField {
     const float heading;
     const float viewRadius;
     const float viewAngle;
+    const float headAngle;
 
-    ViewField(const Position& position, const float heading, const float viewRadius, const float viewAngle)
-        : position(position), heading(heading), viewRadius(viewRadius), viewAngle(viewAngle) {}
+    ViewField(const Position& position, const float heading, const float viewRadius, const float viewAngle, const float headAngle)
+        : position(position), heading(heading), viewRadius(viewRadius), viewAngle(viewAngle), headAngle(headAngle) {}
 };
 
 // Broad-phase filtering: Get dynamic objects that are potentially visible within the view field
@@ -225,7 +226,7 @@ inline CountT visibleCandidatesDynamic(Engine &ctx,
         // Check if within view radius
         if (relative_pos.length() <= vf.viewRadius) {
             // Check if within view cone
-            Vector2 forward_dir = {cosf(vf.heading), sinf(vf.heading)};
+            Vector2 forward_dir = {cosf(vf.heading + vf.headAngle), sinf(vf.heading + vf.headAngle)};
             Vector2 normalized_relative_pos = relative_pos / relative_pos.length();
             float dot_product = normalized_relative_pos.dot(forward_dir);
             float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
@@ -254,7 +255,7 @@ inline CountT visibleCandidatesStatic(Engine &ctx,
         // Check if within view radius
         if (relative_pos.length() <= vf.viewRadius) {
             // Check if within view cone
-            Vector2 forward_dir = {cosf(vf.heading), sinf(vf.heading)};
+            Vector2 forward_dir = {cosf(vf.heading + vf.headAngle), sinf(vf.heading + vf.headAngle)};
             Vector2 normalized_relative_pos = relative_pos / relative_pos.length();
             float dot_product = normalized_relative_pos.dot(forward_dir);
             float angle = acosf(fmaxf(-1.0f, fminf(1.0f, dot_product))); // clamp to [-1, 1]
@@ -412,13 +413,14 @@ inline void collectPartnerObsSystem(Engine &ctx,
 
     // to write partner features into array
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
-
     // Get agent's heading from rotation
     float heading = utils::quatToYaw(rot);
     float viewRadius = ctx.data().params.observationRadius;
     float viewAngle = ctx.data().params.viewConeHalfAngle * 2.0f; // Convert half-angle to full angle
+    const Action &action = ctx.get<Action>(agent_iface.e);
+    float headAngle = ctx.get<ControlledState>(agent_iface.e).controlled ? action.classic.headAngle : 0.f;
     
-    ViewField vf(pos, heading, viewRadius, viewAngle);
+    ViewField vf(pos, heading, viewRadius, viewAngle, headAngle);
 
     // broad phase: remove if not in view field + remove self
     Entity objectsDynamicBuffer[consts::kMaxAgentCount - 1];
@@ -482,8 +484,10 @@ inline void collectMapObservationsSystem(Engine &ctx,
     float heading = utils::quatToYaw(rot);
     float view_radius = ctx.data().params.observationRadius;
     float view_angle = ctx.data().params.viewConeHalfAngle * 2.0f;
+    const Action &action = ctx.get<Action>(agent_iface.e);
+    float headAngle = ctx.get<ControlledState>(agent_iface.e).controlled ? action.classic.headAngle : 0.f;
     
-    ViewField vf(pos, heading, view_radius, view_angle);
+    ViewField vf(pos, heading, view_radius, view_angle, headAngle);
     
     // broad phase: remove if not in view field + remove self
     Entity objectsStaticBuffer[consts::kMaxAgentMapObservationsCount];

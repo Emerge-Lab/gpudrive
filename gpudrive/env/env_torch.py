@@ -1165,8 +1165,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 decimals=3,
             ).to(self.device)
-            self.head_actions = self.config.head_tilt_actions.to(self.device)
-
+            self.head_actions = torch.round(
+                torch.linspace(
+                    self.config.head_tilt_action_range[0],
+                    self.config.head_tilt_action_range[1],
+                    self.config.action_space_head_tilt_disc,
+                ),
+                decimals=3,
+            ).to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -2045,6 +2051,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     focus_env_idx, agent_idx
                 ].item(),
                 route_progress=self.route_progress[agent_idx],
+                previous_actions=self.previous_action_value_tensor # for head angle
             )
             agent_views.append(agent_obs)
 
