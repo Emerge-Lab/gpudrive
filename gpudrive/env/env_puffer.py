@@ -259,7 +259,7 @@ class PufferGPUDrive(PufferEnv):
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
         # Set working directory to the base directory 'gpudrive'
-        working_dir = os.path.join(Path.cwd(), "../gpudrive")
+        working_dir = os.path.join(Path.cwd(), "../gpudrive-emerge")
         os.chdir(working_dir)
 
         # Make env
@@ -665,6 +665,7 @@ class PufferGPUDrive(PufferEnv):
                     ),
                     step_reward=self.env.guidance_reward[0, agent_idx].item(),
                     route_progress=self.env.route_progress[agent_idx].item(),
+                    previous_actions=self.env.previous_action_value_tensor,
                 )
                 self.agent_frames[agent_idx].append(img_from_fig(agent_obs))
 
