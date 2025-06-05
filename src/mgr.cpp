@@ -441,9 +441,9 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
     std::cout << "Filtering scenes for controllable objects..." << std::endl;
 
-    // Filter scenes using CPU parsing but keeping GPU workflow
+
     for (int i = 0; i < mgr_cfg.scenes.size(); i++) {
-        // Use CPU mode for quick filtering check
+
         Map *cpu_map = (Map *)MapReader::parseAndWriteOut(mgr_cfg.scenes[i], 
                             ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
         
@@ -455,9 +455,15 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
             auto startPos = object.position[0];
             auto distance = std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
                                     std::pow(object.goalPosition.y - startPos.y, 2));
+
+            auto isAgentStatic = distance < consts::staticThreshold;
+            auto isAgentAVehicle = object.type == EntityType::Vehicle;
+
+            auto staticFlag = !isAgentStatic || ((mgr_cfg).params).isStaticAgentControlled;
+            auto vehicleFlag = isAgentAVehicle || !mgr_cfg.params.IgnoreNonVehicles;
             if (object.valid[0] && !object.markAsExpert &&
-                distance >= consts::staticThreshold &&
-                object.type == EntityType::Vehicle) {
+                staticFlag &&
+                vehicleFlag) {
                 controllable_objects++;
             }
         }
@@ -584,12 +590,25 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         HeapArray<WorldInit> world_inits(numWorlds);
 
         int64_t worldIdx{0};
-
-        for (auto const &scene : mgr_cfg.scenes)
-        {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
-                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+        for (int scene_idx : valid_scene_indices) {
+            if (worldIdx >= numWorlds) break; // Safety check
+            
+            const auto& scene = mgr_cfg.scenes[scene_idx];
+            Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                          ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, &(mgr_cfg.params)};
+        }
+        
+        // If we have fewer valid scenes than worlds, cycle through them
+        while (worldIdx < numWorlds) {
+            for (int scene_idx : valid_scene_indices) {
+                if (worldIdx >= numWorlds) break;
+                
+                const auto& scene = mgr_cfg.scenes[scene_idx];
+                Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                              ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, &(mgr_cfg.params)};
+            }
         }
         assert(worldIdx == numWorlds);
 
