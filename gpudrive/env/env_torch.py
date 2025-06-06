@@ -462,6 +462,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         off_road_weight=-0.5,
         world_time_steps=None,
         log_distance_weight=0.01,
+        get_reward_conditioned = False,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -493,7 +494,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-        elif self.config.reward_type == "reward_conditioned":
+        elif self.config.reward_type == "reward_conditioned" or get_reward_conditioned:
             # Extract individual weight components from the tensor
             # Shape: [num_worlds, max_agents, 3]
             if self.reward_weights_tensor is None:
@@ -742,7 +743,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self, mask=None) -> torch.Tensor:
+    def _get_ego_state(self, mask=None,get_reward_conditioned = False) -> torch.Tensor:
         """Get the ego state."""
 
         if not self.config.ego_state:
@@ -758,7 +759,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            if self.config.reward_type == "reward_conditioned":
+            if self.config.reward_type == "reward_conditioned" or get_reward_conditioned:
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -1155,13 +1156,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reshape back to original format
         return traj_features.reshape(original_shape)
 
-    def get_obs(self, mask=None):
+    def get_obs(self, mask=None,get_reward_conditioned=False):
         """Get observation: Combine different types of environment information into a single tensor.
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
         # Base observations
-        ego_states = self._get_ego_state(mask)
+        ego_states = self._get_ego_state(mask,get_reward_conditioned)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
 
