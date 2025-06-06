@@ -2038,8 +2038,8 @@ class MatplotlibVisualizer:
         x2_rot = self.env_config.obs_radius * np.cos(angle2_rad)
         y2_rot = self.env_config.obs_radius * np.sin(angle2_rad)
 
-        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="#FF9900", linewidth=1.5, linestyle="--"))
-        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="#FF9900", linewidth=1.5, linestyle="--"))
+        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
+        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
 
         # Plot observation radius as an Arc
         obs_arc = Arc((0,0),
@@ -2048,9 +2048,9 @@ class MatplotlibVisualizer:
                       angle=0, # Default orientation
                       theta1=np.degrees(angle2_rad),
                       theta2=np.degrees(angle1_rad),
-                      color="black",
-                      linestyle="-",
-                      linewidth=1.0,
+                      color="k", 
+                      linestyle="-", 
+                      linewidth=1.0, 
                       alpha=0.7)
         ax.add_patch(obs_arc)
 
