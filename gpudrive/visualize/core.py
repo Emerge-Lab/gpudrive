@@ -547,7 +547,7 @@ class MatplotlibVisualizer:
             )  # Use absolute values for coloring
 
             # Set up a colormap for weights
-            weight_cmap = plt.cm.coolwarm
+            weight_cmap = sns.color_palette("Spectral", as_cmap=True)
             weight_norm = plt.Normalize(
                 vmin=weight_values.min().item(),
                 vmax=weight_values.max().item(),
@@ -651,7 +651,7 @@ class MatplotlibVisualizer:
                     weight_sm, cax=cbar_ax, orientation="horizontal"
                 )
                 cbar.set_label(
-                    f"Conditioning param value", fontsize=15 * marker_scale
+                    f"Guidance Dropout Ratio", fontsize=15 * marker_scale
                 )
                 cbar.ax.tick_params(labelsize=12 * marker_scale)
             except Exception as e:

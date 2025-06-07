@@ -27,7 +27,7 @@ MAX_AGENTS = (
     madrona_gpudrive.kMaxAgentCount
 )  # TODO: Set to 128 for real eval
 NUM_ENVS = 1
-DEVICE = "cuda"  # where to run the env rollouts
+DEVICE = "cpu"  # where to run the env rollouts
 INIT_STEPS = 10
 DATASET_SIZE = 5
 RENDER = True
@@ -41,89 +41,96 @@ SMOOTHEN_TRAJECTORY = True
 
 DATA_PATH = "data/processed/wosac/validation_interactive/json"
 
-CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_14_16_54_46_975_002500.pt"
+CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_31_15_21_48_144_014500.pt"
 
 # Load agent
 agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
 
 config = agent.config
 
+# Create data loader
+val_loader = SceneDataLoader(
+    root=DATA_PATH,
+    batch_size=NUM_ENVS,
+    dataset_size=DATASET_SIZE,
+    sample_with_replacement=False,
+    shuffle=True,
+    file_prefix="",
+    seed=10,
+)
+
+# Override default environment settings to match those the agent was trained with
+# TODO(dc): Clean this up
+env_config = EnvConfig(
+    ego_state=config.ego_state,
+    road_map_obs=config.road_map_obs,
+    partner_obs=config.partner_obs,
+    reward_type=config.reward_type,
+    guidance_speed_weight=config.guidance_speed_weight,
+    guidance_heading_weight=config.guidance_heading_weight,
+    smoothness_weight=config.smoothness_weight,
+    norm_obs=config.norm_obs,
+    add_previous_action=config.add_previous_action,
+    guidance=config.guidance,
+    add_reference_pos_xy=config.add_reference_pos_xy,
+    add_reference_speed=config.add_reference_speed,
+    add_reference_heading=config.add_reference_heading,
+    dynamics_model=config.dynamics_model,
+    collision_behavior=config.collision_behavior,
+    goal_behavior=config.goal_behavior,
+    polyline_reduction_threshold=config.polyline_reduction_threshold,
+    remove_non_vehicles=config.remove_non_vehicles,
+    lidar_obs=False,
+    obs_radius=config.obs_radius,
+    max_steer_angle=config.max_steer_angle,
+    max_accel_value=config.max_accel_value,
+    action_space_steer_disc=config.action_space_steer_disc,
+    action_space_accel_disc=config.action_space_accel_disc,
+    # Override action space
+    steer_actions=torch.round(
+        torch.linspace(
+            -config.max_steer_angle,
+            config.max_steer_angle,
+            config.action_space_steer_disc,
+        ),
+        decimals=3,
+    ),
+    accel_actions=torch.round(
+        torch.linspace(
+            -config.max_accel_value,
+            config.max_accel_value,
+            config.action_space_accel_disc,
+        ),
+        decimals=3,
+    ),
+    init_mode="wosac_eval",
+    init_steps=INIT_STEPS,
+    guidance_mode=GUIDANCE_MODE,
+    guidance_dropout_prob=GUIDANCE_DROPOUT_PROB_RANGE[0],  # Set to 0 for the first run
+    guidance_dropout_mode=GUIDANCE_DROPOUT_MODE,
+    smoothen_trajectory=SMOOTHEN_TRAJECTORY,
+)
+
+# Make environment
+env = GPUDriveTorchEnv(
+    config=env_config,
+    data_loader=val_loader,
+    max_cont_agents=MAX_AGENTS,
+    device=DEVICE,
+)
+
 # Save Trajectories:
 all_trajectories = []
 
-# For each guidance density, create the env, rollout and collect agent trajectories
+# For each guidance density, rollout and collect agent trajectories
 for GUIDANCE_DROPOUT_PROB in GUIDANCE_DROPOUT_PROB_RANGE:
+    
+    # Update the environment configuration for the current guidance dropout probability
+    env.config.guidance_dropout_prob = GUIDANCE_DROPOUT_PROB
+    control_mask = env.cont_agent_mask.clone().cpu()
+    next_obs = env.reset(mask=control_mask)
+
     trajectories = []
-    # Create data loader
-    val_loader = SceneDataLoader(
-        root=DATA_PATH,
-        batch_size=NUM_ENVS,
-        dataset_size=DATASET_SIZE,
-        sample_with_replacement=False,
-        shuffle=True,
-        file_prefix="",
-        seed=10,
-    )
-
-    # Override default environment settings to match those the agent was trained with
-    # TODO(dc): Clean this up
-    env_config = EnvConfig(
-        ego_state=config.ego_state,
-        road_map_obs=config.road_map_obs,
-        partner_obs=config.partner_obs,
-        reward_type=config.reward_type,
-        guidance_speed_weight=config.guidance_speed_weight,
-        guidance_heading_weight=config.guidance_heading_weight,
-        smoothness_weight=config.smoothness_weight,
-        norm_obs=config.norm_obs,
-        add_previous_action=config.add_previous_action,
-        guidance=config.guidance,
-        add_reference_pos_xy=config.add_reference_pos_xy,
-        add_reference_speed=config.add_reference_speed,
-        add_reference_heading=config.add_reference_heading,
-        dynamics_model=config.dynamics_model,
-        collision_behavior=config.collision_behavior,
-        goal_behavior=config.goal_behavior,
-        polyline_reduction_threshold=config.polyline_reduction_threshold,
-        remove_non_vehicles=config.remove_non_vehicles,
-        lidar_obs=False,
-        obs_radius=config.obs_radius,
-        max_steer_angle=config.max_steer_angle,
-        max_accel_value=config.max_accel_value,
-        action_space_steer_disc=config.action_space_steer_disc,
-        action_space_accel_disc=config.action_space_accel_disc,
-        # Override action space
-        steer_actions=torch.round(
-            torch.linspace(
-                -config.max_steer_angle,
-                config.max_steer_angle,
-                config.action_space_steer_disc,
-            ),
-            decimals=3,
-        ),
-        accel_actions=torch.round(
-            torch.linspace(
-                -config.max_accel_value,
-                config.max_accel_value,
-                config.action_space_accel_disc,
-            ),
-            decimals=3,
-        ),
-        init_mode="wosac_eval",
-        init_steps=INIT_STEPS,
-        guidance_mode=GUIDANCE_MODE,
-        guidance_dropout_prob=GUIDANCE_DROPOUT_PROB,
-        guidance_dropout_mode=GUIDANCE_DROPOUT_MODE,
-        smoothen_trajectory=SMOOTHEN_TRAJECTORY,
-    )
-
-    # Make environment
-    env = GPUDriveTorchEnv(
-        config=env_config,
-        data_loader=val_loader,
-        max_cont_agents=MAX_AGENTS,
-        device=DEVICE,
-    )
 
     # Zero out actions for parked vehicles
     info = Info.from_tensor(
@@ -135,10 +142,6 @@ for GUIDANCE_DROPOUT_PROB in GUIDANCE_DROPOUT_PROB_RANGE:
     zero_action_mask = (info.off_road == 1) | (
         info.collided_with_vehicle == 1
     ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
-
-    control_mask = env.cont_agent_mask.clone().cpu()
-
-    next_obs = env.reset(mask=control_mask)
 
     # Guidance logging
     num_guidance_points = env.valid_guidance_points
@@ -214,8 +217,8 @@ fig = env.vis.plot_simulator_state(
     zoom_radius=70,
     multiple_rollouts=True,
     line_alpha=0.5,
-    line_width=1.0,
-    weights=GUIDANCE_DROPOUT_PROB_RANGE,
+    line_width=1.2,
+    weights= GUIDANCE_DROPOUT_PROB_RANGE,
     colorbar=True,
 )[0]
 
