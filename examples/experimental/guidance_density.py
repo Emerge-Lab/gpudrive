@@ -27,16 +27,16 @@ MAX_AGENTS = (
     madrona_gpudrive.kMaxAgentCount
 )  # TODO: Set to 128 for real eval
 NUM_ENVS = 1
-DEVICE = "cpu"  # where to run the env rollouts
+DEVICE = "cuda"  # where to run the env rollouts
 INIT_STEPS = 10
-DATASET_SIZE = 5
+DATASET_SIZE = 20
 RENDER = True
 LOG_DIR = "examples/eval/figures_data/wosac/"
 GUIDANCE_MODE = (
     "log_replay"  # Options: "vbd_amortized", "vbd_online", "log_replay"
 )
 GUIDANCE_DROPOUT_MODE = "avg"  # Options: "max", "avg", "remove_all"
-GUIDANCE_DROPOUT_PROB_RANGE = np.arange(0.0, 1.1, 0.1)
+GUIDANCE_DROPOUT_PROB_RANGE = np.arange(0.0, 1.1, 0.33)
 SMOOTHEN_TRAJECTORY = True
 
 DATA_PATH = "data/processed/wosac/validation_interactive/json"
@@ -82,27 +82,8 @@ env_config = EnvConfig(
     remove_non_vehicles=config.remove_non_vehicles,
     lidar_obs=False,
     obs_radius=config.obs_radius,
-    max_steer_angle=config.max_steer_angle,
-    max_accel_value=config.max_accel_value,
     action_space_steer_disc=config.action_space_steer_disc,
     action_space_accel_disc=config.action_space_accel_disc,
-    # Override action space
-    steer_actions=torch.round(
-        torch.linspace(
-            -config.max_steer_angle,
-            config.max_steer_angle,
-            config.action_space_steer_disc,
-        ),
-        decimals=3,
-    ),
-    accel_actions=torch.round(
-        torch.linspace(
-            -config.max_accel_value,
-            config.max_accel_value,
-            config.action_space_accel_disc,
-        ),
-        decimals=3,
-    ),
     init_mode="wosac_eval",
     init_steps=INIT_STEPS,
     guidance_mode=GUIDANCE_MODE,
@@ -119,108 +100,120 @@ env = GPUDriveTorchEnv(
     device=DEVICE,
 )
 
-# Save Trajectories:
-all_trajectories = []
+scene_count = 0
+while scene_count < DATASET_SIZE:
 
-# For each guidance density, rollout and collect agent trajectories
-for GUIDANCE_DROPOUT_PROB in GUIDANCE_DROPOUT_PROB_RANGE:
+    # Save Trajectories:
+    all_trajectories = []
     
-    # Update the environment configuration for the current guidance dropout probability
-    env.config.guidance_dropout_prob = GUIDANCE_DROPOUT_PROB
-    control_mask = env.cont_agent_mask.clone().cpu()
-    next_obs = env.reset(mask=control_mask)
+    # For each guidance density, rollout and collect agent trajectories
+    for GUIDANCE_DROPOUT_PROB in GUIDANCE_DROPOUT_PROB_RANGE:
+        
+        # Update the environment configuration for the current guidance dropout probability
+        env.config.guidance_dropout_prob = GUIDANCE_DROPOUT_PROB
+        control_mask = env.cont_agent_mask.clone().cpu()
+        next_obs = env.reset(mask=control_mask)
 
-    trajectories = []
+        trajectories = []
 
-    # Zero out actions for parked vehicles
-    info = Info.from_tensor(
-        env.sim.info_tensor(),
-        backend=env.backend,
-        device=env.device,
-    )
-
-    zero_action_mask = (info.off_road == 1) | (
-        info.collided_with_vehicle == 1
-    ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
-
-    # Guidance logging
-    num_guidance_points = env.valid_guidance_points
-    guidance_densities = num_guidance_points / env.reference_traj_len
-    print(
-        f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
-    )
-
-    pos_xy = GlobalEgoState.from_tensor(
-            env.sim.absolute_self_observation_tensor(),
+        # Zero out actions for parked vehicles
+        info = Info.from_tensor(
+            env.sim.info_tensor(),
             backend=env.backend,
-            device="cpu",
-        ).pos_xy[control_mask]
-
-    trajectories.append(pos_xy)
-
-    done_list = [env.get_dones()]
-
-    for time_step in range(env.episode_len - env.init_steps):
-
-        # Predict actions
-        action, _, _, _ = agent(next_obs)
-
-        action_template = torch.zeros(
-            (env.num_worlds, madrona_gpudrive.kMaxAgentCount), dtype=torch.int64, device=env.device
+            device=env.device,
         )
-        action_template[control_mask] = action.to(env.device)
 
-        # Find the integer key for the "do nothing" action (zero steering, zero acceleration)
-        # Check using env.action_key_to_values[DO_NOTHING_ACTION_INT]
-        DO_NOTHING_ACTION_INT = [
-            key
-            for key, value in env.action_key_to_values.items()
-            if abs(value[0]) == 0.0
-            and abs(value[1]) == 0.0
-            and abs(value[2]) == 0.0
-        ][0]
-        action_template[zero_action_mask] = DO_NOTHING_ACTION_INT
+        zero_action_mask = (info.off_road == 1) | (
+            info.collided_with_vehicle == 1
+        ) & (info.type == int(madrona_gpudrive.EntityType.Vehicle))
 
-        # Step
-        env.step_dynamics(action_template)
+        # Guidance logging
+        num_guidance_points = env.valid_guidance_points
+        guidance_densities = num_guidance_points / env.reference_traj_len
+        print(
+            f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
+        )
 
-        # Get next observation
-        next_obs = env.get_obs(control_mask)
-
-        # Save to trajectories
         pos_xy = GlobalEgoState.from_tensor(
-            env.sim.absolute_self_observation_tensor(),
-            backend=env.backend,
-            device="cpu",
-        ).pos_xy[control_mask]
+                env.sim.absolute_self_observation_tensor(),
+                backend=env.backend,
+                device="cpu",
+            ).pos_xy[control_mask]
+
         trajectories.append(pos_xy)
 
-        # NOTE(dc): Make sure to decouple the obs from the reward function
-        reward = env.get_rewards()
-        done = env.get_dones()
-        done_list.append(done)
-    
-    _ = done_list.pop()
+        done_list = [env.get_dones()]
 
-    trajectories = torch.stack(trajectories, dim=0).cpu().permute(1, 0, 2)
-    all_trajectories.append(trajectories)
+        for time_step in range(env.episode_len - env.init_steps):
 
-all_trajectories = torch.stack(all_trajectories, dim=0).cpu()
-all_trajectories = all_trajectories.unsqueeze(0)
+            # Predict actions
+            action, _, _, _ = agent(next_obs)
 
-# Plot trajectories and save
-_ = env.reset(mask=control_mask)
+            action_template = torch.zeros(
+                (env.num_worlds, madrona_gpudrive.kMaxAgentCount), dtype=torch.int64, device=env.device
+            )
+            action_template[control_mask] = action.to(env.device)
 
-fig = env.vis.plot_simulator_state(
-    env_indices=[0],
-    agent_positions=all_trajectories,
-    zoom_radius=70,
-    multiple_rollouts=True,
-    line_alpha=0.5,
-    line_width=1.2,
-    weights= GUIDANCE_DROPOUT_PROB_RANGE,
-    colorbar=True,
-)[0]
+            # Find the integer key for the "do nothing" action (zero steering, zero acceleration)
+            # Check using env.action_key_to_values[DO_NOTHING_ACTION_INT]
+            DO_NOTHING_ACTION_INT = [
+                key
+                for key, value in env.action_key_to_values.items()
+                if abs(value[0]) == 0.0
+                and abs(value[1]) == 0.0
+                and abs(value[2]) == 0.0
+            ][0]
+            action_template[zero_action_mask] = DO_NOTHING_ACTION_INT
 
-img = Image.fromarray(img_from_fig(fig))
-img.save('guidance_density.png')
+            # Step
+            env.step_dynamics(action_template)
+
+            # Get next observation
+            next_obs = env.get_obs(control_mask)
+
+            # Save to trajectories
+            pos_xy = GlobalEgoState.from_tensor(
+                env.sim.absolute_self_observation_tensor(),
+                backend=env.backend,
+                device="cpu",
+            ).pos_xy[control_mask]
+            trajectories.append(pos_xy)
+
+            # NOTE(dc): Make sure to decouple the obs from the reward function
+            reward = env.get_rewards()
+            done = env.get_dones()
+            done_list.append(done)
+        
+        _ = done_list.pop()
+
+        trajectories = torch.stack(trajectories, dim=0).cpu().permute(1, 0, 2)
+        all_trajectories.append(trajectories)
+
+    all_trajectories = torch.stack(all_trajectories, dim=0).cpu()
+    all_trajectories = all_trajectories.unsqueeze(0)
+
+    # Plot trajectories and save
+    _ = env.reset(mask=control_mask)
+
+    fig = env.vis.plot_simulator_state(
+        env_indices=[0],
+        agent_positions=all_trajectories,
+        zoom_radius=45,
+        multiple_rollouts=True,
+        line_alpha=0.8,
+        line_width=1.5,
+        weights= 1 - GUIDANCE_DROPOUT_PROB_RANGE,
+        colorbar=True,
+        center_agent_indices= [0],
+    )[0]
+
+    img = Image.fromarray(img_from_fig(fig))
+    img.save(f'guidance_density/{scene_count}.png')
+    scene_count += 1
+
+    try:
+        env.swap_data_batch()
+    except StopIteration:
+        # If we run out of scenes, break the loop
+        print("No more scenes in the dataset.")
+        break
