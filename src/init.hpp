@@ -120,6 +120,7 @@ namespace madrona_gpudrive
         float polylineReductionThreshold;
         float observationRadius;
         float viewConeHalfAngle;
+        bool removeOccludedAgents;
         RewardParams rewardParams;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         GoalBehaviour goalBehaviour = GoalBehaviour::Remove;  // Default to current behavior

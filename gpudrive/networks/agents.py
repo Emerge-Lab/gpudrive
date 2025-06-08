@@ -125,6 +125,55 @@ class Agent(nn.Module):
             layer_init(nn.Linear(64, action_dim), std=0.01),
         )
 
+    @classmethod
+    def load_from_local_checkpoint(
+        cls, checkpoint_path, map_location="cpu", **kwargs
+    ):
+        """
+        Loads an Agent model from a local .pt checkpoint file.
+        This is designed to work with checkpoints created by `baselines/ppo/ppo_guided_autonomy.py`.
+
+        Args:
+            checkpoint_path (str): Path to the .pt file.
+            map_location (str or torch.device): Specifies how to remap storage locations.
+                                                Defaults to 'cpu'.
+            **kwargs: Additional arguments for the Agent constructor
+                      (e.g., act_func, dropout, top_k).
+                      These will override the default values in the constructor if provided.
+        """
+        # Load the checkpoint file
+        # Setting weights_only=False can be a security risk. Only use with trusted checkpoints.
+        saved_cpt = torch.load(
+            checkpoint_path, map_location=map_location, weights_only=False
+        )
+
+        # Extract parameters for model instantiation from the checkpoint
+        config = saved_cpt["config"]
+        embed_dim = saved_cpt["model_arch"]["embed_dim"]
+        action_dim = saved_cpt["action_dim"]
+
+        # Instantiate the model
+        model = cls(
+            config=config,
+            embed_dim=embed_dim,
+            action_dim=action_dim,
+            **kwargs,
+        )
+
+        # Load the state dict from the checkpoint file
+        if "parameters" in saved_cpt:
+            model.load_state_dict(saved_cpt["parameters"])
+        elif "model_state_dict" in saved_cpt:
+            model.load_state_dict(saved_cpt["model_state_dict"])
+        elif "state_dict" in saved_cpt:
+            model.load_state_dict(saved_cpt["state_dict"])
+        else:
+            # Assume the checkpoint file directly contains the model's state_dict
+            model.load_state_dict(saved_cpt)
+
+        model.eval()  # Set the model to evaluation mode
+        return model
+
     def forward(self, x, action=None):
         """Forward pass through the network.
         Args:

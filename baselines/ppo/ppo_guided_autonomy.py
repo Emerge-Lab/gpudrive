@@ -146,6 +146,17 @@ def run(
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
 
+    action_space_steer_disc: Annotated[Optional[int], typer.Option(help="Discretization for steer action")] = None,
+    action_space_accel_disc: Annotated[Optional[int], typer.Option(help="Discretization for acceleration action")] = None,
+    action_space_head_tilt_disc: Annotated[Optional[int], typer.Option(help="Discretization for head tilt action")] = None,
+
+    vehicle_steer_range: Annotated[Optional[list[float]], typer.Option(help="The vehicle steer range, e.g. --vehicle-steer-range -1.57 --vehicle-steer-range 1.57")] = None,
+    vehicle_accel_range: Annotated[Optional[list[float]], typer.Option(help="The vehicle accel range, e.g. --vehicle-accel-range -4.0 --vehicle-accel-range 4.0")] = None,
+    head_tilt_action_range: Annotated[Optional[list[float]], typer.Option(help="The head tilt action range, e.g. --head-tilt-action-range -0.7854 --head-tilt-action-range 0.7854")] = None,
+    
+    view_cone_half_angle: Annotated[Optional[float], typer.Option(help="The half angle for the view cone")] = None,
+    remove_occluded_agents: Annotated[Optional[int], typer.Option(help="Whether to occlude objects in view; 0 or 1")] = None,
+
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
     randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
@@ -209,8 +220,16 @@ def run(
         "dist_to_goal_threshold": dist_to_goal_threshold,
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
+        "view_cone_half_angle": view_cone_half_angle,
+        "remove_occluded_agents": None if remove_occluded_agents is None else bool(remove_occluded_agents),
         "collision_behavior": collision_behavior,
         "guidance_dropout_prob": guidance_dropout_prob,
+        "action_space_steer_disc": action_space_steer_disc,
+        "action_space_accel_disc": action_space_accel_disc,
+        "action_space_head_tilt_disc": action_space_head_tilt_disc,
+        "vehicle_steer_range": vehicle_steer_range,
+        "vehicle_accel_range": vehicle_accel_range,
+        "head_tilt_action_range": head_tilt_action_range,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),

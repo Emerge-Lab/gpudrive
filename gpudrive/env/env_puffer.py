@@ -665,6 +665,7 @@ class PufferGPUDrive(PufferEnv):
                     ),
                     step_reward=self.env.guidance_reward[0, agent_idx].item(),
                     route_progress=self.env.route_progress[agent_idx].item(),
+                    previous_actions=self.env.previous_action_value_tensor,
                 )
                 self.agent_frames[agent_idx].append(img_from_fig(agent_obs))
 
