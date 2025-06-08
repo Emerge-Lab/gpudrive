@@ -331,21 +331,58 @@ inline CountT filterByOcclusionAll(Engine &ctx,
             {-half_width,  half_length,  half_height}, { half_width,  half_length,  half_height}
         };
 
-        int unoccluded_corner_rays = 0;
+        constexpr CountT num_points_to_check = 8 + 12 * consts::kNumOcclusionEdgeSamples;
+        madrona::math::Vector3 local_points_to_check[num_points_to_check];
+        CountT point_idx = 0;
 
-        for (int i = 0; i < 8; ++i) { // check all corners
-            Vector3 target_corner_world = target_world_center + target_rot_comp.rotateVec(local_corners[i]);
+        for (int i = 0; i < 8; ++i) {
+            local_points_to_check[point_idx++] = local_corners[i];
+        }
+
+        // add points on edge to check if config is set
+        if constexpr (consts::kNumOcclusionEdgeSamples > 0) {
+            // sample uniformly along edge
+            auto add_edge_points = [&](const Vector3& start, const Vector3& end) {
+                for (CountT i = 1; i <= consts::kNumOcclusionEdgeSamples; ++i) {
+                    float t = (float)i / (float)(consts::kNumOcclusionEdgeSamples + 1);
+                    local_points_to_check[point_idx++] = start + t * (end - start);
+                }
+            };
+
+            // Edges along x
+            add_edge_points(local_corners[0], local_corners[1]);
+            add_edge_points(local_corners[2], local_corners[3]);
+            add_edge_points(local_corners[4], local_corners[5]);
+            add_edge_points(local_corners[6], local_corners[7]);
+
+            // Edges along y
+            add_edge_points(local_corners[0], local_corners[2]);
+            add_edge_points(local_corners[1], local_corners[3]);
+            add_edge_points(local_corners[4], local_corners[6]);
+            add_edge_points(local_corners[5], local_corners[7]);
+
+            // Edges along z
+            add_edge_points(local_corners[0], local_corners[4]);
+            add_edge_points(local_corners[1], local_corners[5]);
+            add_edge_points(local_corners[2], local_corners[6]);
+            add_edge_points(local_corners[3], local_corners[7]);
+        }
+
+        bool is_visible = false;
+
+        for (CountT i = 0; i < num_points_to_check; ++i) { // check all points
+            Vector3 target_point_world = target_world_center + target_rot_comp.rotateVec(local_points_to_check[i]);
             
-            Vector3 vec_observer_to_target_corner = target_corner_world - observer_pos_3d;
-            float dist_to_target_corner = vec_observer_to_target_corner.length();
+            Vector3 vec_observer_to_target_point = target_point_world - observer_pos_3d;
+            float dist_to_target_point = vec_observer_to_target_point.length();
 
-            if (dist_to_target_corner < 0.1f) { // add to visible if really close
-                unoccluded_corner_rays++;
+            if (dist_to_target_point < 0.1f) { // add to visible if really close
+                is_visible = true;
                 break; // early return since one clear ray is enough
             }
-            Vector3 normalized_ray_dir_to_target_corner = vec_observer_to_target_corner / dist_to_target_corner;
+            Vector3 normalized_ray_dir_to_target_point = vec_observer_to_target_point / dist_to_target_point;
 
-            bool corner_ray_occluded = false;
+            bool point_ray_occluded = false;
             for (CountT occluder_idx = 0; occluder_idx < objects_to_filter.size(); ++occluder_idx) {
                 Entity potential_occluder_entity = objects_to_filter[occluder_idx];
                 if (potential_occluder_entity == target_entity) {
@@ -375,23 +412,24 @@ inline CountT filterByOcclusionAll(Engine &ctx,
 
                 // inverse ray direction
                 Diag3x3 inv_ray_d = {
-                    (normalized_ray_dir_to_target_corner.x == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.x) : 1.f / normalized_ray_dir_to_target_corner.x,
-                    (normalized_ray_dir_to_target_corner.y == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.y) : 1.f / normalized_ray_dir_to_target_corner.y,
-                    (normalized_ray_dir_to_target_corner.z == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_corner.z) : 1.f / normalized_ray_dir_to_target_corner.z
+                    (normalized_ray_dir_to_target_point.x == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_point.x) : 1.f / normalized_ray_dir_to_target_point.x,
+                    (normalized_ray_dir_to_target_point.y == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_point.y) : 1.f / normalized_ray_dir_to_target_point.y,
+                    (normalized_ray_dir_to_target_point.z == 0.f) ? copysignf(FLT_MAX, normalized_ray_dir_to_target_point.z) : 1.f / normalized_ray_dir_to_target_point.z
                 };
 
                 float hit_t_occluder = 0.f; 
-                if (world_occluder_aabb.rayIntersects(observer_pos_3d, inv_ray_d, 0.01f, dist_to_target_corner - 0.01f, hit_t_occluder)) {
-                    corner_ray_occluded = true;
+                if (world_occluder_aabb.rayIntersects(observer_pos_3d, inv_ray_d, 0.01f, dist_to_target_point - 0.01f, hit_t_occluder)) {
+                    point_ray_occluded = true;
                     break; 
                 }
             }
-            if (!corner_ray_occluded) {
-                unoccluded_corner_rays++;
+            if (!point_ray_occluded) {
+                is_visible = true;
+                break;
             }
         }
 
-        if (unoccluded_corner_rays > 0) {
+        if (is_visible) {
             objects_to_filter[visible_count++] = target_entity;
         }
     }
