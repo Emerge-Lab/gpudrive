@@ -447,7 +447,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
         return;
 
     // User config
-    // viewRadius (float), viewConeHalfAngle (float), viewOccludeObjects (bool; False = no filtering), 
+    // viewRadius (float), viewConeHalfAngle (float), removeOccludedAgents (bool; False = no filtering), 
 
     // to write partner features into array
     auto &partner_obs = ctx.get<PartnerObservations>(agent_iface.e);
@@ -466,7 +466,7 @@ inline void collectPartnerObsSystem(Engine &ctx,
     Span<Entity> objectsDynamic(objectsDynamicBuffer, dynamicCount);
         
     // narrow phase: raycast to get occlusion by other dynamic objects
-    if (ctx.data().params.viewOccludeObjects) {
+    if (ctx.data().params.removeOccludedAgents) {
         dynamicCount = filterByOcclusionAll(ctx, vf, objectsDynamic);
     }
 
@@ -516,7 +516,7 @@ inline void collectMapObservationsSystem(Engine &ctx,
     auto &map_obs = ctx.get<AgentMapObservations>(agent_iface.e);
 
     // User config (some of it not implemented yet, but assume it will be): 
-    // viewRadius (float), viewConeHalfAngle (float), viewOccludeObjects (bool; False = no filtering), 
+    // viewRadius (float), viewConeHalfAngle (float), removeOccludedAgents (bool; False = no filtering), 
 
     // Get agent's heading from rotation
     float heading = utils::quatToYaw(rot);

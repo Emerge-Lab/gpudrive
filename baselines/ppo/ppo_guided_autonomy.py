@@ -155,7 +155,7 @@ def run(
     head_tilt_action_range: Annotated[Optional[list[float]], typer.Option(help="The head tilt action range, e.g. --head-tilt-action-range -0.7854 --head-tilt-action-range 0.7854")] = None,
     
     view_cone_half_angle: Annotated[Optional[float], typer.Option(help="The half angle for the view cone")] = None,
-    view_occlude_objects: Annotated[Optional[int], typer.Option(help="Whether to occlude objects in view; 0 or 1")] = None,
+    remove_occluded_agents: Annotated[Optional[int], typer.Option(help="Whether to occlude objects in view; 0 or 1")] = None,
 
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
@@ -221,7 +221,7 @@ def run(
         "sampling_seed": sampling_seed,
         "obs_radius": obs_radius,
         "view_cone_half_angle": view_cone_half_angle,
-        "view_occlude_objects": None if view_occlude_objects is None else bool(view_occlude_objects),
+        "remove_occluded_agents": None if remove_occluded_agents is None else bool(remove_occluded_agents),
         "collision_behavior": collision_behavior,
         "guidance_dropout_prob": guidance_dropout_prob,
         "action_space_steer_disc": action_space_steer_disc,
