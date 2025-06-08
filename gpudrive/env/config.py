@@ -57,7 +57,7 @@ class EnvConfig:
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 50.0  # Radius for road observations
-    view_cone_half_angle: float = torch.pi / 3  # Half-angle for view cone setting
+    view_cone_half_angle: float = torch.pi  # Half-angle for view cone setting
     view_occlude_objects: bool = False  # True: Vehicles are removed from observations if they are occluded by other vehicles
     polyline_reduction_threshold: float = (
         0.1  # Threshold for polyline reduction
@@ -90,7 +90,7 @@ class EnvConfig:
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
     action_space_accel_disc: int = 7
-    action_space_head_tilt_disc: int = 7
+    action_space_head_tilt_disc: int = 1
 
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
