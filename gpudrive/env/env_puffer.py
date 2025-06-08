@@ -259,7 +259,7 @@ class PufferGPUDrive(PufferEnv):
         self.total_agents = self.max_cont_agents_per_env * self.num_worlds
 
         # Set working directory to the base directory 'gpudrive'
-        working_dir = os.path.join(Path.cwd(), "../gpudrive-emerge")
+        working_dir = os.path.join(Path.cwd(), "../gpudrive")
         os.chdir(working_dir)
 
         # Make env
