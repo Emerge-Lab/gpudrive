@@ -1,0 +1,108 @@
+{
+  "os":  "Linux-5.14.0-284.86.1.el9_2.x86_64-x86_64-with-glibc2.34",
+  "python":  "CPython 3.11.8",
+  "startedAt":  "2025-06-03T06:01:33.991654Z",
+  "args":  [
+    "/home/mad10149/adaptive_driving_agent/gpudrive/baselines/ppo/config/ppo_base_puffer2.yaml"
+  ],
+  "program":  "/home/mad10149/adaptive_driving_agent/gpudrive/baselines/ppo/ppo_pufferlib.py",
+  "codePath":  "baselines/ppo/ppo_pufferlib.py",
+  "git":  {
+    "remote":  "https://github.com/Emerge-Lab/gpudrive",
+    "commit":  "b862c57cde7c942dddd71e054170f586cc028490"
+  },
+  "email":  "moncef.djafri@polytechnique.edu",
+  "root":  "/home/mad10149/adaptive_driving_agent/gpudrive/gpudrive",
+  "host":  "gr018.hpc.nyu.edu",
+  "executable":  "/scratch/mad10149/miniforge3/envs/gpudrive/bin/python",
+  "cpu_count":  48,
+  "cpu_count_logical":  48,
+  "gpu":  "Quadro RTX 8000",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "83845120000",
+      "used":  "15860211712"
+    }
+  },
+  "memory":  {
+    "total":  "404880871424"
+  },
+  "cpu":  {
+    "count":  48,
+    "countLogical":  48
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "Quadro RTX 8000",
+      "memoryTotal":  "48318382080",
+      "cudaCores":  4608,
+      "architecture":  "Turing"
+    }
+  ],
+  "slurm":  {
+    "cluster_name":  "greene",
+    "conf":  "/opt/slurm/etc/slurm.conf",
+    "cpu_bind":  "quiet,mask_cpu:0x000004000000",
+    "cpu_bind_list":  "0x000004000000",
+    "cpu_bind_type":  "mask_cpu:",
+    "cpu_bind_verbose":  "quiet",
+    "cpus_on_node":  "1",
+    "cpus_per_task":  "1",
+    "distribution":  "cyclic",
+    "gpus_on_node":  "1",
+    "gtids":  "0",
+    "job_account":  "pr_100_tandon_priority",
+    "job_cpus_per_node":  "1",
+    "job_end_time":  "1748957391",
+    "job_gid":  "4693396",
+    "job_gpus":  "0",
+    "job_group":  "mad10149",
+    "job_id":  "61343926",
+    "job_name":  "bash",
+    "job_nodelist":  "gr018",
+    "job_num_nodes":  "1",
+    "job_partition":  "rtx8000,tandon_a100_2,tandon_a100_1,stake_a100_2,stake_a100_1,v100,a100_2,a100_1,h100_1,gpu_misc_v100",
+    "job_qos":  "gpu48",
+    "job_start_time":  "1748928591",
+    "job_uid":  "4693396",
+    "job_user":  "mad10149",
+    "jobid":  "61343926",
+    "jobtmp":  "/state/partition1/job-61343926",
+    "launch_node_ipaddr":  "10.32.32.5",
+    "localid":  "0",
+    "mem_per_node":  "10240",
+    "nnodes":  "1",
+    "nodeid":  "0",
+    "nodelist":  "gr018",
+    "nprocs":  "1",
+    "ntasks":  "1",
+    "ntasks_per_node":  "1",
+    "prio_process":  "0",
+    "procid":  "0",
+    "pty_port":  "58652",
+    "pty_win_col":  "97",
+    "pty_win_row":  "9",
+    "script_context":  "prolog_task",
+    "srun_comm_host":  "10.32.32.5",
+    "srun_comm_port":  "58653",
+    "step_gpus":  "2",
+    "step_id":  "0",
+    "step_launcher_port":  "58653",
+    "step_nodelist":  "gr018",
+    "step_num_nodes":  "1",
+    "step_num_tasks":  "1",
+    "step_tasks_per_node":  "1",
+    "stepid":  "0",
+    "submit_dir":  "/scratch/mad10149/miniforge3/envs",
+    "submit_host":  "log-2.hpc.nyu.edu",
+    "task_pid":  "372914",
+    "tasks_per_node":  "1",
+    "tmpdir":  "/state/partition1/job-61343926",
+    "topology_addr":  "gr018",
+    "topology_addr_pattern":  "node",
+    "tres_per_task":  "cpu:1",
+    "umask":  "0022"
+  },
+  "cudaVersion":  "12.2"
+}

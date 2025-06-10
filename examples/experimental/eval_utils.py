@@ -38,7 +38,7 @@ class RandomPolicy:
 
 def load_policy(path_to_cpt, model_name, device, env=None):
     """Load a policy from a given path."""
-
+    print("loading policy")
     # Load the saved checkpoint
     if model_name == "random_baseline":
         return RandomPolicy(env.action_space.n)
@@ -51,13 +51,16 @@ def load_policy(path_to_cpt, model_name, device, env=None):
         )
 
         logging.info(f"Load model from {path_to_cpt}/{model_name}.pt")
-
+        print("creating neural net")
         # Create policy architecture from saved checkpoint
         policy = NeuralNet(
             input_dim=saved_cpt["model_arch"]["input_dim"],
-            action_dim=saved_cpt["action_dim"],
+            action_dim=saved_cpt["acti  on_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+            config=env.config,
         ).to(device)
+
+        print("neural net created")
 
         # Load the model parameters
         policy.load_state_dict(saved_cpt["parameters"])
@@ -76,6 +79,8 @@ def rollout(
     zoom_radius: int = 100,
     return_agent_positions: bool = False,
     center_on_ego: bool = False,
+    set_agent_type: bool = False,
+    agent_weights=None,
 ):
     """
     Perform a rollout of a policy in the environment.
@@ -99,7 +104,10 @@ def rollout(
     agent_positions = torch.zeros((env.num_worlds, env.max_agent_count, episode_len, 2))
     
     # Reset episode
-    next_obs = env.reset()
+    if set_agent_type and agent_weights is not None:
+        next_obs = env.reset(agent_type=agent_weights, condition_mode="fixed")
+    else:
+        next_obs = env.reset()
 
     # Storage
     goal_achieved = torch.zeros((num_worlds, max_agent_count), device=device)

@@ -767,9 +767,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_x,
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
-                        self.reward_weights_tensor[:, :, 0],
-                        self.reward_weights_tensor[:, :, 1],
-                        self.reward_weights_tensor[:, :, 2],
+                        self.reward_weights_tensor[:, :, 0].squeeze(-1),
+                        self.reward_weights_tensor[:, :, 1].squeeze(-1),
+                        self.reward_weights_tensor[:, :, 2].squeeze(-1),
                     ]
                 ).permute(1, 2, 0)
 
@@ -795,9 +795,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         ego_state.rel_goal_x,
                         ego_state.rel_goal_y,
                         ego_state.is_collided,
-                        self.reward_weights_tensor[mask][:, 0],
-                        self.reward_weights_tensor[mask][:, 1],
-                        self.reward_weights_tensor[mask][:, 2],
+                        self.reward_weights_tensor[:, :, 0].squeeze(-1),
+                        self.reward_weights_tensor[:, :, 1].squeeze(-1),
+                        self.reward_weights_tensor[:, :, 2].squeeze(-1),
                     ]
                 ).permute(1, 0)
             else:

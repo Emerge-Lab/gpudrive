@@ -95,12 +95,18 @@ class NeuralNet(
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
 
+        self.vbd_in_obs = False # Default initialization
+
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
         self.partner_obs_idx = (
             constants.PARTNER_FEAT_DIM * self.max_controlled_agents
         )
+        print("config")
+        print(config)
         if config is not None:
+            print("config is not None")
+            print(config)
             self.config = Box(config)
             if "reward_type" in self.config:
                 if self.config.reward_type == "reward_conditioned":
@@ -108,8 +114,10 @@ class NeuralNet(
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
                     self.partner_obs_idx += 3
-
-            self.vbd_in_obs = self.config.vbd_in_obs
+            if "vbd_in_obs" in self.config:
+                self.vbd_in_obs = self.config.vbd_in_obs # This will now override the default if config is present
+            else:
+                self.vbd_in_obs = False
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5

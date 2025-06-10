@@ -1,0 +1,126 @@
+_wandb:
+    value:
+        cli_version: 0.19.1
+        code_path: code/baselines/ppo/ppo_pufferlib.py
+        m: []
+        python_version: 3.11.8
+        t:
+            "1":
+                - 1
+                - 49
+                - 55
+            "2":
+                - 1
+                - 49
+                - 55
+            "3":
+                - 2
+                - 3
+                - 13
+                - 14
+                - 15
+                - 16
+                - 23
+                - 55
+                - 61
+            "4": 3.11.8
+            "5": 0.19.1
+            "8":
+                - 5
+            "12": 0.19.1
+            "13": linux-x86_64
+environment:
+    value:
+        action_space_accel_disc: 7
+        action_space_steer_disc: 13
+        collision_behavior: ignore
+        collision_weight: -0.75
+        dataset_size: "500"
+        dist_to_goal_threshold: 2
+        dynamics_model: classic
+        ego_state: true
+        goal_achieved_weight: 1
+        init_steps: 0
+        k_unique_scenes: 500
+        lidar_obs: false
+        max_controlled_agents: 64
+        name: gpudrive
+        norm_obs: true
+        num_worlds: 500
+        obs_radius: 50
+        off_road_weight: -0.75
+        partner_obs: true
+        polyline_reduction_threshold: 0.1
+        remove_non_vehicles: true
+        reward_type: weighted_combination
+        road_map_obs: true
+        sampling_seed: 42
+        use_vbd: false
+        vbd_in_obs: false
+        vbd_model_path: gpudrive/integrations/vbd/weights/epoch=18.ckpt
+        vbd_trajectory_weight: 0.1
+exp_id:
+    value: PPO_75_75_1____S_500__06_03_01_41_26_354
+network_arch:
+    value:
+        class_name: NeuralNet
+        dropout: 0.01
+        hidden_dim: 128
+        input_dim: 64
+        num_parameters: 51228
+network_class:
+    value: NeuralNet
+train:
+    value:
+        anneal_lr: false
+        batch_size: 131072
+        bptt_horizon: 1
+        checkpoint_interval: 400
+        checkpoint_path: ./runs
+        clip_coef: 0.2
+        clip_vloss: false
+        compile: false
+        compile_mode: reduce-overhead
+        cpu_offload: false
+        device: cuda
+        ent_coef: 0.0001
+        env: gpudrive
+        exp_id: PPO_75_75_1____S_500__06_03_01_41_26_354
+        gae_lambda: 0.95
+        gamma: 0.99
+        learning_rate: "3e-4"
+        log_window: 1000
+        max_grad_norm: 0.5
+        minibatch_size: 8192
+        network:
+            class_name: NeuralNet
+            dropout: 0.01
+            hidden_dim: 128
+            input_dim: 64
+            num_parameters: 51228
+        norm_adv: true
+        render: false
+        render_3d: true
+        render_format: mp4
+        render_fps: 15
+        render_interval: 1
+        render_k_scenarios: 10
+        resample_dataset_size: 10000
+        resample_interval: 2000000
+        resample_scenes: false
+        sample_with_replacement: true
+        seed: 42
+        shuffle_dataset: false
+        target_kl: null
+        torch_deterministic: false
+        total_timesteps: 1000000000
+        update_epochs: 4
+        vf_clip_coef: 0.2
+        vf_coef: 0.3
+        zoom_radius: 50
+vec:
+    value:
+        backend: native
+        env_batch_size: 1
+        num_workers: 1
+        zero_copy: false

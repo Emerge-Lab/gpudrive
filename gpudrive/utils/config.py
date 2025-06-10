@@ -9,7 +9,7 @@ def load_config(cfg: str) -> Box:
     Returns:
         Box: Box representation of configurations.
     """
-    with open(f"{cfg}.yaml", "r") as stream:
+    with open(f"{cfg}", "r") as stream:
         config = Box(yaml.safe_load(stream))
     return config
 

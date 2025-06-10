@@ -1,0 +1,84 @@
+{
+  "os":  "Linux-5.14.0-284.86.1.el9_2.x86_64-x86_64-with-glibc2.34",
+  "python":  "CPython 3.11.8",
+  "startedAt":  "2025-06-03T14:08:48.451987Z",
+  "args":  [
+    "/home/mad10149/adaptive_driving_agent/gpudrive/baselines/ppo/config/ppo_base_puffer3.yaml"
+  ],
+  "program":  "/home/mad10149/adaptive_driving_agent/gpudrive/baselines/ppo/ppo_pufferlib.py",
+  "codePath":  "baselines/ppo/ppo_pufferlib.py",
+  "git":  {
+    "remote":  "https://github.com/Emerge-Lab/gpudrive",
+    "commit":  "b862c57cde7c942dddd71e054170f586cc028490"
+  },
+  "email":  "moncef.djafri@polytechnique.edu",
+  "root":  "/home/mad10149/adaptive_driving_agent/gpudrive/gpudrive",
+  "host":  "gr004.hpc.nyu.edu",
+  "executable":  "/scratch/mad10149/miniforge3/envs/gpudrive/bin/python",
+  "cpu_count":  48,
+  "cpu_count_logical":  48,
+  "gpu":  "Quadro RTX 8000",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "83845120000",
+      "used":  "16447725568"
+    }
+  },
+  "memory":  {
+    "total":  "404880871424"
+  },
+  "cpu":  {
+    "count":  48,
+    "countLogical":  48
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "Quadro RTX 8000",
+      "memoryTotal":  "48318382080",
+      "cudaCores":  4608,
+      "architecture":  "Turing"
+    }
+  ],
+  "slurm":  {
+    "cluster_name":  "(null)",
+    "conf":  "/opt/slurm/etc/slurm.conf",
+    "cpus_on_node":  "1",
+    "cpus_per_task":  "1",
+    "gpus_on_node":  "1",
+    "gtids":  "0",
+    "job_account":  "pr_100_tandon_priority",
+    "job_cpus_per_node":  "1",
+    "job_end_time":  "1748995605",
+    "job_gid":  "4693396",
+    "job_gpus":  "0",
+    "job_id":  "61365964",
+    "job_name":  "ppo_SP",
+    "job_nodelist":  "gr004",
+    "job_num_nodes":  "1",
+    "job_partition":  "rtx8000",
+    "job_qos":  "gpu48",
+    "job_start_time":  "1748959605",
+    "job_uid":  "4693396",
+    "job_user":  "mad10149",
+    "jobid":  "61365964",
+    "jobtmp":  "/state/partition1/job-61365964",
+    "localid":  "0",
+    "mem_per_node":  "51200",
+    "nnodes":  "1",
+    "nodeid":  "0",
+    "nodelist":  "gr004",
+    "prio_process":  "0",
+    "procid":  "0",
+    "script_context":  "prolog_task",
+    "submit_dir":  "/home/mad10149",
+    "submit_host":  "log-2.hpc.nyu.edu",
+    "task_pid":  "3260386",
+    "tasks_per_node":  "1",
+    "tmpdir":  "/state/partition1/job-61365964",
+    "topology_addr":  "gr004",
+    "topology_addr_pattern":  "node",
+    "tres_per_task":  "cpu:1"
+  },
+  "cudaVersion":  "12.2"
+}
