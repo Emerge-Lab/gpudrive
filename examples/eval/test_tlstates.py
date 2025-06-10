@@ -42,7 +42,7 @@ if __name__ == "__main__":
     env = GPUDriveTorchEnv(
         config=env_config,
         data_loader=train_loader,
-        max_cont_agents=64,  # Number of agents to control
+        max_cont_agents=32,  # Number of agents to control
         device="cpu",
     )
 
@@ -54,3 +54,8 @@ if __name__ == "__main__":
 
     print("tl_states.shape", tl_states.shape)
     print("tl_states", tl_states.max())
+    
+    
+    from gpudrive.datatypes.observation import TrafficLightObs
+    tl_obs = TrafficLightObs.from_tensor(tl_states_tensor=env.sim.tl_state_tensor())
+    print("tl_obs", tl_obs)

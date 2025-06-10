@@ -374,12 +374,11 @@ class TrafficLightObs:
     A dataclass that represents traffic light information in the scenario.
 
     This data struct contains the time series of traffic light information.
-    It contains the state (unknown, stop, caution, go), position,
-    and lane ID across the 90 recorded timesteps.
+    It contains the state (unknown, stop, caution, go), position, and lane_ids.
 
     Initialized from tl_states_tensor (from Manager.trafficLightTensor()).
     For details, see `TrafficLightState` in src/types.hpp.
-    Shape: (num_worlds, max_traffic_lights, num_timesteps, 6).
+    Shape: (num_worlds, max_traffic_lights, num_timesteps * features).
 
     Attributes:
         state: The state of each traffic light (0=unknown, 1=stop, 2=caution, 3=go)
@@ -401,27 +400,22 @@ class TrafficLightObs:
     current_time: int = 0  # Default to the first timestep
 
     def __init__(
-        self, tl_states_tensor: torch.Tensor, mask=None, current_time=0
+        self, tl_states_tensor: torch.Tensor, current_time=0,
     ):
         """Initializes the traffic light observation from a tensor."""
-        self.mask = mask
-        self.current_time = current_time
-
-        if self.mask is not None:  # Used for training
-            self.data = tl_states_tensor[self.mask]
-        else:
-            # Traffic light state (0=unknown, 1=stop, 2=caution, 3=go)
-            self.state = tl_states_tensor[:, :, :, 0].long()
-            # Position coordinates
-            self.pos_x = tl_states_tensor[:, :, :, 1]
-            self.pos_y = tl_states_tensor[:, :, :, 2]
-            self.pos_z = tl_states_tensor[:, :, :, 3]
-            # Time index and lane ID
-            self.time_index = tl_states_tensor[:, :, :, 4].long()
-            self.lane_id = tl_states_tensor[:, :, :, 5].long()
-
-            # Create a mask for valid traffic lights (lane_id != -1)
-            self.valid_mask = (self.lane_id != -1).float()
+        traj_length = constants.LOG_TRAJECTORY_LENGTH
+        self.tl_states = tl_states_tensor[:, :, :traj_length-1]
+        self.lane_id = tl_states_tensor[:, :, traj_length-1:traj_length]
+        self.tl_xyz = tl_states_tensor[:, :, traj_length:traj_length + 3]
+        self.time_index = tl_states_tensor[:, :, traj_length + 3:traj_length + 4]
+        # Unpack features
+        # - lane_id
+        # - state for each traffic light, for each time step (90 * 1)
+        # - (xyz) * 1
+        # - timeIndex * 90
+        # - valid
+        
+        
 
     @classmethod
     def from_tensor(
@@ -429,7 +423,6 @@ class TrafficLightObs:
         tl_states_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
-        mask=None,
         current_time=0,
     ):
         """Creates a TrafficLightObs from a tensor.
@@ -438,7 +431,6 @@ class TrafficLightObs:
             tl_states_tensor: The traffic light state tensor from the simulation
             backend: Which backend to use ("torch" or "jax")
             device: The device to place tensors on
-            mask: Optional mask to apply to the tensor
             current_time: The current timestep to use (default: 0)
 
         Returns:
@@ -446,47 +438,30 @@ class TrafficLightObs:
         """
         if backend == "torch":
             tensor = tl_states_tensor.to_torch().clone().to(device)
-            obj = cls(tensor, mask=mask, current_time=current_time)
+            obj = cls(tensor, current_time=current_time)
             return obj
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
 
     def normalize(self):
         """Normalizes the traffic light observation coordinates."""
-        if self.mask is not None:
-            # Normalize position coordinates if using mask
-            normalize_min_max_inplace(
-                tensor=self.data[:, :, :, 1],  # x coordinate
-                min_val=constants.MIN_REL_COORD,
-                max_val=constants.MAX_REL_COORD,
-            )
-            normalize_min_max_inplace(
-                tensor=self.data[:, :, :, 2],  # y coordinate
-                min_val=constants.MIN_REL_COORD,
-                max_val=constants.MAX_REL_COORD,
-            )
-            normalize_min_max_inplace(
-                tensor=self.data[:, :, :, 3],  # z coordinate
-                min_val=constants.MIN_Z_COORD,
-                max_val=constants.MAX_Z_COORD,
-            )
-        else:
-            # Normalize position coordinates
-            self.pos_x = normalize_min_max(
-                tensor=self.pos_x,
-                min_val=constants.MIN_REL_COORD,
-                max_val=constants.MAX_REL_COORD,
-            )
-            self.pos_y = normalize_min_max(
-                tensor=self.pos_y,
-                min_val=constants.MIN_REL_COORD,
-                max_val=constants.MAX_REL_COORD,
-            )
-            self.pos_z = normalize_min_max(
-                tensor=self.pos_z,
-                min_val=constants.MIN_Z_COORD,
-                max_val=constants.MAX_Z_COORD,
-            )
+      
+        # Normalize position coordinates
+        self.pos_x = normalize_min_max(
+            tensor=self.pos_x,
+            min_val=constants.MIN_REL_COORD,
+            max_val=constants.MAX_REL_COORD,
+        )
+        self.pos_y = normalize_min_max(
+            tensor=self.pos_y,
+            min_val=constants.MIN_REL_COORD,
+            max_val=constants.MAX_REL_COORD,
+        )
+        self.pos_z = normalize_min_max(
+            tensor=self.pos_z,
+            min_val=constants.MIN_Z_COORD,
+            max_val=constants.MAX_Z_COORD,
+        )
 
     def one_hot_encode_states(self):
         """One-hot encodes the traffic light states.
@@ -505,98 +480,7 @@ class TrafficLightObs:
         ) * self.valid_mask.unsqueeze(-1)
 
         return self.state_onehot
-
-    def get_current_timestep(self):
-        """Returns the data for the current timestep only.
-
-        Returns:
-            A dict with the traffic light data for the current timestep
-        """
-        return {
-            "state": self.state[:, :, self.current_time],
-            "pos_x": self.pos_x[:, :, self.current_time],
-            "pos_y": self.pos_y[:, :, self.current_time],
-            "pos_z": self.pos_z[:, :, self.current_time],
-            "time_index": self.time_index[:, :, self.current_time],
-            "lane_id": self.lane_id[:, :, self.current_time],
-            "valid_mask": self.valid_mask[:, :, self.current_time],
-        }
-
-    def set_current_time(self, time_idx):
-        """Sets the current timestep for convenient access.
-
-        Args:
-            time_idx: The timestep index to use
-        """
-        max_time = self.state.shape[2] - 1
-        self.current_time = min(max(0, time_idx), max_time)
-
-    def get_stop_light_mask(self, time_idx=None):
-        """Returns a mask of traffic lights in the stop state.
-
-        Args:
-            time_idx: Optional specific timestep (defaults to current_time)
-
-        Returns:
-            A tensor with 1.0 for stop lights and 0.0 for others
-        """
-        time_idx = self.current_time if time_idx is None else time_idx
-        return (self.state[:, :, time_idx] == 1).float() * self.valid_mask[
-            :, :, time_idx
-        ]
-
-    def get_caution_light_mask(self, time_idx=None):
-        """Returns a mask of traffic lights in the caution state.
-
-        Args:
-            time_idx: Optional specific timestep (defaults to current_time)
-
-        Returns:
-            A tensor with 1.0 for caution lights and 0.0 for others
-        """
-        time_idx = self.current_time if time_idx is None else time_idx
-        return (self.state[:, :, time_idx] == 2).float() * self.valid_mask[
-            :, :, time_idx
-        ]
-
-    def get_go_light_mask(self, time_idx=None):
-        """Returns a mask of traffic lights in the go state.
-
-        Args:
-            time_idx: Optional specific timestep (defaults to current_time)
-
-        Returns:
-            A tensor with 1.0 for go lights and 0.0 for others
-        """
-        time_idx = self.current_time if time_idx is None else time_idx
-        return (self.state[:, :, time_idx] == 3).float() * self.valid_mask[
-            :, :, time_idx
-        ]
-
-    def predict_state_changes(self, future_window=10):
-        """Analyzes when traffic lights will change state within a future window.
-
-        Args:
-            future_window: Number of timesteps to look ahead
-
-        Returns:
-            Dictionary with time-to-change predictions for each traffic light
-        """
-        current_states = self.state[:, :, self.current_time]
-        time_to_change = torch.ones_like(current_states) * -1
-
-        # Look ahead to find when lights change
-        max_time = min(self.current_time + future_window, self.state.shape[2])
-        for t in range(self.current_time + 1, max_time):
-            # Where the state changes and we haven't recorded a change yet
-            changed = (self.state[:, :, t] != current_states) & (
-                time_to_change == -1
-            )
-            # Record the time delta to the change
-            time_to_change[changed] = t - self.current_time
-
-        return time_to_change * self.valid_mask[:, :, self.current_time]
-
+    
     @property
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, max_traffic_lights, num_timesteps)."""
