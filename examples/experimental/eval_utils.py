@@ -444,7 +444,7 @@ def multi_policy_rollout(
     # Initialize storage
     num_worlds = env.num_worlds
     max_agent_count = env.max_agent_count
-    episode_len = env.config.episode_len
+    episode_len = 91
     sim_state_frames = {env_id: [] for env_id in range(num_worlds)}
     agent_positions = torch.zeros((num_worlds, max_agent_count, episode_len, 2))
 
@@ -483,6 +483,7 @@ def multi_policy_rollout(
             policy_data['env_to_step_in_trial_dict'] = {
             f"world_{i}": 0 for i in range(num_worlds)
             }
+
     for trial in range(trials):
         episode_lengths = torch.zeros(num_worlds)
         next_obs = env.reset()
@@ -504,8 +505,7 @@ def multi_policy_rollout(
                 if live_mask.any():
                     agent_observations = next_obs[live_mask]
                     if 'history' in policy_data:
-                        if time_step == 18:
-                            pass
+
                         live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
                         live_keys = [tuple(indice.tolist()) for indice in live_indices]
                         observations_list = []
@@ -609,20 +609,20 @@ def multi_policy_rollout(
             # Process completed worlds
             num_dones_per_world = (dones & control_mask).sum(dim=1)
             total_controlled_agents = control_mask.sum(dim=1)
-            done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
+            # done_worlds = (num_dones_per_world == total_controlled_agents).nonzero(as_tuple=True)[0]
 
-            for world in done_worlds:
-                if world in active_worlds:
-                    active_worlds.remove(world)
-                    episode_lengths[world] = time_step
+            # for world in done_worlds:
+            #     if world in active_worlds:
+            #         active_worlds.remove(world)
+            #         episode_lengths[world] = time_step
 
             if return_agent_positions:
                 global_agent_states = GlobalEgoState.from_tensor(env.sim.absolute_self_observation_tensor())
                 agent_positions[:, :, time_step, 0] = global_agent_states.pos_x
                 agent_positions[:, :, time_step, 1] = global_agent_states.pos_y
 
-            if not active_worlds:  
-                break               
+            # if not active_worlds:  
+            #     break               
     
     metrics =compute_metrics(policy_metrics,policies)
 
