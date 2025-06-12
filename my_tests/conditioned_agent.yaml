@@ -1,0 +1,105 @@
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: data/processed/examples
+continue_training: false
+model_cpt: null
+viewConeHalfAngle : false 
+
+
+
+environment:
+  # name: "gpudrive"
+  num_worlds: 4
+  # k_unique_scenes: 75
+  max_controlled_agents: 1
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  norm_obs: true
+  remove_non_vehicles: true
+  lidar_obs: false
+  # Reward conditioning enabled:
+  reward_type: "reward_conditioned"
+  condition_mode: "fixed"
+  collision_weight_lb: -1.0
+  collision_weight_ub: -0.1
+  goal_achieved_weight_lb: 0.5
+  goal_achieved_weight_ub: 2.0
+  off_road_weight_lb: -1.0
+  off_road_weight_ub: -0.1
+  dynamics_model: "classic"
+  collision_behavior: "ignore"
+  dist_to_goal_threshold: 2.0
+  polyline_reduction_threshold: 0.1
+  # sampling_seed: 42
+  obs_radius: 50.0
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  # use_vbd: false
+  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+  init_steps: 11
+  # vbd_trajectory_weight: 0.1
+  # vbd_in_obs: false
+  guidance: false
+
+wandb:
+  entity: ""
+  project: "gpudrive"
+  group: "test"
+  mode: "online"
+  tags: ["ppo", "ff"]
+
+train:
+  exp_id: PPO
+  seed: 42
+  cpu_offload: false
+  device: "cuda"
+  bptt_horizon: 1
+  compile: false
+  compile_mode: "reduce-overhead"
+  resample_scenes: false
+  resample_dataset_size: 10000
+  resample_interval: 2000000
+  sample_with_replacement: true
+  shuffle_dataset: false
+  torch_deterministic: false
+  total_timesteps: 1000000000
+  batch_size: 131072
+  minibatch_size: 8192
+  learning_rate: 3e-4
+  anneal_lr: false
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0001
+  vf_coef: 0.3
+  max_grad_norm: 0.5
+  target_kl: null
+  log_window: 1000
+  network:
+    input_dim: 64
+    hidden_dim: 128
+    dropout: 0.01
+    class_name: "NeuralNet"
+    num_parameters: 0
+  checkpoint_interval: 400
+  checkpoint_path: "./runs"
+  render: false
+  render_3d: true
+  render_interval: 1
+  render_k_scenarios: 10
+  render_format: "mp4"
+  render_fps: 15
+  zoom_radius: 50
+
+vec:
+  backend: "native"
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false

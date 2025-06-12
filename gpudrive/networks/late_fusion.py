@@ -109,7 +109,8 @@ class NeuralNet(
                     self.ego_state_idx += 3
                     self.partner_obs_idx += 3
 
-            self.vbd_in_obs = self.config.vbd_in_obs
+            if hasattr(self, "vbd_in_obs"): 
+                self.vbd_in_obs = self.config.vbd_in_obs
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5
@@ -144,7 +145,7 @@ class NeuralNet(
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
 
-        if self.vbd_in_obs:
+        if hasattr(self, "vbd_in_obs") and self.vbd_in_obs:
             self.vbd_embed = nn.Sequential(
                 pufferlib.pytorch.layer_init(
                     nn.Linear(self.vbd_size, input_dim)
@@ -169,7 +170,7 @@ class NeuralNet(
 
     def encode_observations(self, observation):
 
-        if self.vbd_in_obs:
+        if hasattr(self, "vbd_in_obs") and self.vbd_in_obs:
             (
                 ego_state,
                 road_objects,
@@ -182,7 +183,7 @@ class NeuralNet(
         # Embed the ego state
         ego_embed = self.ego_embed(ego_state)
 
-        if self.vbd_in_obs:
+        if hasattr(self, "vbd_in_obs") and self.vbd_in_obs:
             vbd_embed = self.vbd_embed(vbd_predictions)
             # Concatenate the VBD predictions with the ego state embedding
             ego_embed = torch.cat([ego_embed, vbd_embed], dim=1)
@@ -225,7 +226,7 @@ class NeuralNet(
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
 
-        if self.vbd_in_obs:
+        if hasattr(self, "vbd_in_obs") and self.vbd_in_obs:
             # Extract the VBD predictions (last 455 elements)
             vbd_predictions = obs_flat[:, -self.vbd_size :]
 
@@ -242,7 +243,7 @@ class NeuralNet(
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
 
-        if self.vbd_in_obs:
+        if hasattr(self, "vbd_in_obs") and self.vbd_in_obs:
             return ego_state, road_objects, road_graph, vbd_predictions
         else:
             return ego_state, road_objects, road_graph

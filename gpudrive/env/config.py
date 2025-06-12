@@ -53,6 +53,8 @@ class EnvConfig:
         0.1  # Threshold for polyline reduction
     )
 
+    action_space_steer_disc: int = 13  # Discretization for steering actions
+    action_space_accel_disc: int = 7
     # Dynamics model
     dynamics_model: str = (
         "classic"  # Options: "classic", "bicycle", "delta_local", or "state"

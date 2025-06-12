@@ -68,7 +68,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             # Use default condition_mode from config or fall back to "random"
             condition_mode = getattr(self.config, "condition_mode", "random")
-            agent_type = getattr(self.config, "agent_type", None)
+            agent_type = getattr(self.config, "agent_type", torch.zeros(3))
             self._set_reward_weights(
                 condition_mode=condition_mode, agent_type=agent_type
             )
@@ -364,6 +364,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         elif condition_mode == "fixed":
             # Use custom provided weights
+
             if agent_type is None or not isinstance(agent_type, torch.Tensor):
                 raise ValueError(
                     "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
