@@ -121,10 +121,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             sim_object=self.sim,
             controlled_agent_mask=self.cont_agent_mask,
             goal_radius=self.config.dist_to_goal_threshold,
-            backend=self.backend,
+            # backend=self.backend,
             num_worlds=self.num_worlds,
             render_config=self.render_config,
             env_config=self.config,
+            reference_trajectory = None
         )
 
     def _initialize_vbd(self):
@@ -364,7 +365,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         elif condition_mode == "fixed":
             # Use custom provided weights
-
             if agent_type is None or not isinstance(agent_type, torch.Tensor):
                 raise ValueError(
                     "For condition_mode='fixed', agent_type must be a tensor of shape [3]"
