@@ -1067,5 +1067,4 @@ render::RenderManager & Manager::getRenderManager()
 {
     return *impl_->renderMgr;
 }
-
 }

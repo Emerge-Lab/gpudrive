@@ -366,7 +366,6 @@ def update_history(history_dict,partner_obs,log_history_step,current_step, trial
 
         
         return history_dict
-                
        
 
 def get_history_batch(history_dict,k_trials,observations,device):
