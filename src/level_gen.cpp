@@ -501,9 +501,12 @@ void createPersistentEntities(Engine &ctx) {
     {
         auto &trafficLight = ctx.singleton<TrafficLights>().trafficLights[i];
         trafficLight = map.trafficLightStates[i];
-        trafficLight.x -= ctx.singleton<WorldMeans>().mean.x;
-        trafficLight.y -= ctx.singleton<WorldMeans>().mean.y;
-        trafficLight.z -= ctx.singleton<WorldMeans>().mean.z;
+        
+        for (size_t t = 0; t < consts::kTrajectoryLength-1; t++) {
+            trafficLight.x[t] -= ctx.singleton<WorldMeans>().mean.x;
+            trafficLight.y[t] -= ctx.singleton<WorldMeans>().mean.y;
+            trafficLight.z[t] -= ctx.singleton<WorldMeans>().mean.z;
+        }
     }
 
 }

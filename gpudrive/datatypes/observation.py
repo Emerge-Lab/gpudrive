@@ -406,8 +406,11 @@ class TrafficLightObs:
         traj_length = constants.LOG_TRAJECTORY_LENGTH
         self.tl_states = tl_states_tensor[:, :, 1:traj_length]
         self.lane_id = tl_states_tensor[:, :, 0]
-        self.tl_xyz = tl_states_tensor[:, :, traj_length:traj_length + 3]
-        self.time_index = tl_states_tensor[:, :, traj_length + 3:traj_length + 4]
+        # self.tl_xyz = tl_states_tensor[:, :, traj_length:traj_length + 3]
+        self.pos_x = tl_states_tensor[:, :, traj_length:2*traj_length - 1]
+        self.pos_y = tl_states_tensor[:, :, 2*traj_length - 1:3*traj_length - 2]
+        self.pos_z = tl_states_tensor[:, :, 3*traj_length - 2:4*traj_length - 3]
+        self.time_index = tl_states_tensor[:, :, 4*traj_length - 3:5*traj_length - 4]
         # Unpack features
         # - lane_id
         # - state for each traffic light, for each time step (90 * 1)

@@ -69,4 +69,5 @@ if __name__ == "__main__":
         print("  State max:", tl_obs.tl_states[0][i].max().item())
         print("  State min:", tl_obs.tl_states[0][i].min().item())
         print("  Lane id:", tl_obs.lane_id[0][i].item())
-        print("  Position:", tl_obs.tl_xyz[0][i].tolist())
+        # print("  Position:", tl_obs.tl_xyz[0][i].tolist())
+        print("  Position shapes:", tl_obs.pos_x.shape, tl_obs.pos_y.shape, tl_obs.pos_z.shape)

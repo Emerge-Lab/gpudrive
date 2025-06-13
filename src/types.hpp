@@ -453,16 +453,16 @@ namespace madrona_gpudrive
 
         // Arrays of state data for each timestep
         TLState state[consts::kTrajectoryLength-1] = {};
-        int32_t x = 0;
-        int32_t y = 0;
-        int32_t z = 0;
+        float x [consts::kTrajectoryLength-1] = {};
+        float y [consts::kTrajectoryLength-1] = {};
+        float z [consts::kTrajectoryLength-1] = {};
         int32_t timeIndex[consts::kTrajectoryLength-1] = {};
         // Number of valid states
         int32_t numStates = 0;
     };
 
-    // 1 (TLState) + 3 (x,y,z coordinates) + 2 (timeIndex, laneId) = 6
-    const size_t TrafficLightsStateExportSize = 1 + (consts::kTrajectoryLength - 1) * 2 + 3 + 1;
+    // 1 (lane_id) + 5 (state, x, y, z, timeIndex) + 1(numStates) = 6
+    const size_t TrafficLightsStateExportSize = 1 + (consts::kTrajectoryLength - 1) * 5 + 1;
     static_assert(sizeof(TrafficLightState) == sizeof(int32_t) * TrafficLightsStateExportSize);
 
     struct TrafficLights

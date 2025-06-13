@@ -47,6 +47,32 @@ namespace madrona_gpudrive
                 tl_state.state[t] = TLState::Unknown;
             }
 
+            // Get the x,y,z positions in a more interpretable fashion
+            if(t < j.at("x").size())
+            {
+                tl_state.x[t] = j.at("x")[t].get<float>();
+            }
+            else
+            {
+                tl_state.x[t] = -1000.0f;
+            }
+            if(t < j.at("y").size())
+            {
+                tl_state.y[t] = j.at("y")[t].get<float>();
+            }
+            else
+            {
+                tl_state.y[t] = -1000.0f;
+            }
+            if(t < j.at("z").size())
+            {
+                tl_state.z[t] = j.at("z")[t].get<float>();
+            }
+            else
+            {
+                tl_state.z[t] = -1000.0f;
+            }
+
             // Get time index and lane id
             if (t < j.at("time_index").size()) {
                 tl_state.timeIndex[t] = j.at("time_index")[t];
@@ -55,9 +81,6 @@ namespace madrona_gpudrive
             }
         }
 
-        tl_state.x = static_cast<int32_t>(j.at("x")[0]);
-        tl_state.y = static_cast<int32_t>(j.at("y")[0]);
-        tl_state.z = static_cast<int32_t>(j.at("z")[0]);
         tl_state.laneId = static_cast<int32_t>(j.at("lane_id")[0]);
 
         // Fill any remaining timesteps with default values
