@@ -51,7 +51,7 @@ def multi_policy_rollout(
     if reward_conditioning_present:
         env.reward_weights_tensor = torch.zeros(
             env.num_worlds,
-            env.max_cont_agents,  # This should be 64 to match your mask
+            64,  # This should be 64 to match your mask
             3,  # collision, goal_achieved, off_road
             device=env.device,
         )
@@ -73,7 +73,7 @@ def multi_policy_rollout(
 
 
     
-    next_obs = env.reset()
+    
 
     if reward_conditioning_present:
         reward_conditioned_obs = env.get_obs(get_reward_conditioned = True)
@@ -109,7 +109,7 @@ def multi_policy_rollout(
 
     
     for trial in range(k_trials):
-
+        next_obs = env.reset()
         episode_lengths = torch.zeros(num_worlds)
         
         active_worlds = list(range(num_worlds))
