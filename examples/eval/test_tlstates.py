@@ -52,10 +52,21 @@ if __name__ == "__main__":
 
     tl_states = env.sim.tl_state_tensor().to_torch()
 
-    print("tl_states.shape", tl_states.shape)
-    print("tl_states", tl_states.max())
+    # print("tl_states.shape", tl_states.shape)
+    # print("tl_states", tl_states.max())
+    # print(tl_states.min())
+    # print("tl_states", tl_states)
     
     
     from gpudrive.datatypes.observation import TrafficLightObs
     tl_obs = TrafficLightObs.from_tensor(tl_states_tensor=env.sim.tl_state_tensor())
-    print("tl_obs", tl_obs)
+    print("tl_obs", tl_obs.shape)
+    # Print info for each traffic light in the first scenario (index 0)
+    for i in range(tl_obs.tl_states[0].shape[0]):
+        print(f"Traffic light {i}:")
+        print("  States are:", tl_obs.tl_states[0][i])
+        print("State shape:", tl_obs.tl_states[0][i].shape)
+        print("  State max:", tl_obs.tl_states[0][i].max().item())
+        print("  State min:", tl_obs.tl_states[0][i].min().item())
+        print("  Lane id:", tl_obs.lane_id[0][i].item())
+        print("  Position:", tl_obs.tl_xyz[0][i].tolist())

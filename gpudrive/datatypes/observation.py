@@ -404,8 +404,8 @@ class TrafficLightObs:
     ):
         """Initializes the traffic light observation from a tensor."""
         traj_length = constants.LOG_TRAJECTORY_LENGTH
-        self.tl_states = tl_states_tensor[:, :, :traj_length-1]
-        self.lane_id = tl_states_tensor[:, :, traj_length-1:traj_length]
+        self.tl_states = tl_states_tensor[:, :, 1:traj_length]
+        self.lane_id = tl_states_tensor[:, :, 0]
         self.tl_xyz = tl_states_tensor[:, :, traj_length:traj_length + 3]
         self.time_index = tl_states_tensor[:, :, traj_length + 3:traj_length + 4]
         # Unpack features
@@ -484,4 +484,4 @@ class TrafficLightObs:
     @property
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, max_traffic_lights, num_timesteps)."""
-        return self.state.shape
+        return self.tl_states.shape
