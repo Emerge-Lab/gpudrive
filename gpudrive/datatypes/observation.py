@@ -449,7 +449,6 @@ class TrafficLightObs:
         tl_states_tensor: madrona_gpudrive.madrona.Tensor,
         backend="torch",
         device="cuda",
-        current_time=0,
     ):
         """Creates a TrafficLightObs from a tensor.
 
@@ -464,7 +463,7 @@ class TrafficLightObs:
         """
         if backend == "torch":
             tensor = tl_states_tensor.to_torch().clone().to(device)
-            obj = cls(tensor, current_time=current_time)
+            obj = cls(tensor)
             return obj
         elif backend == "jax":
             raise NotImplementedError("JAX backend not implemented yet.")
