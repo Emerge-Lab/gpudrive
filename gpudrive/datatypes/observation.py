@@ -374,7 +374,7 @@ class TrafficLightObs:
     A dataclass that represents traffic light information in the scenario.
 
     This data struct contains the time series of traffic light information.
-    It contains the state (unknown, stop, caution, go), position, and lane_ids.
+    It contains the state (unknown: 0, stop: 1, caution: 2, go: 3), position, and lane_ids.
 
     Initialized from tl_states_tensor (from Manager.trafficLightTensor()).
     For details, see `TrafficLightState` in src/types.hpp.
@@ -397,28 +397,53 @@ class TrafficLightObs:
     time_index: torch.Tensor
     lane_id: torch.Tensor
     valid_mask: torch.Tensor
-    current_time: int = 0  # Default to the first timestep
+    current_time: int = 0
 
     def __init__(
-        self, tl_states_tensor: torch.Tensor, current_time=0,
+        self,
+        tl_states_tensor: torch.Tensor,
+        current_time=0,
     ):
         """Initializes the traffic light observation from a tensor."""
         traj_length = constants.LOG_TRAJECTORY_LENGTH
-        self.tl_states = tl_states_tensor[:, :, 1:traj_length]
-        self.lane_id = tl_states_tensor[:, :, 0]
-        # self.tl_xyz = tl_states_tensor[:, :, traj_length:traj_length + 3]
-        self.pos_x = tl_states_tensor[:, :, traj_length:2*traj_length - 1]
-        self.pos_y = tl_states_tensor[:, :, 2*traj_length - 1:3*traj_length - 2]
-        self.pos_z = tl_states_tensor[:, :, 3*traj_length - 2:4*traj_length - 3]
-        self.time_index = tl_states_tensor[:, :, 4*traj_length - 3:5*traj_length - 4]
-        # Unpack features
-        # - lane_id
-        # - state for each traffic light, for each time step (90 * 1)
-        # - (xyz) * 1
-        # - timeIndex * 90
-        # - valid
-        
-        
+
+        # Calculate indices based on C++ struct layout:
+        # laneId (1) + state[traj_length] + x[traj_length] + y[traj_length] + z[traj_length] + timeIndex[traj_length] + numStates (1)
+
+        lane_id_end_idx = 1
+        state_end_idx = lane_id_end_idx + traj_length
+        pos_x_end_idx = state_end_idx + traj_length
+        pos_y_end_idx = pos_x_end_idx + traj_length
+        pos_z_end_idx = pos_y_end_idx + traj_length
+        time_index_end_idx = pos_z_end_idx + traj_length
+
+        # Extract fields according to C++ struct layout
+        # See `TrafficLightState` in src/types.hpp for details
+        self.lane_id = tl_states_tensor[:, :, 0]  # Single lane ID value
+        self.state = tl_states_tensor[
+            :, :, lane_id_end_idx:state_end_idx
+        ]  # state[traj_length]
+        self.pos_x = tl_states_tensor[
+            :, :, state_end_idx:pos_x_end_idx
+        ]  # x[traj_length]
+        self.pos_y = tl_states_tensor[
+            :, :, pos_x_end_idx:pos_y_end_idx
+        ]  # y[traj_length]
+        self.pos_z = tl_states_tensor[
+            :, :, pos_y_end_idx:pos_z_end_idx
+        ]  # z[traj_length]
+        self.time_index = tl_states_tensor[
+            :, :, pos_z_end_idx:time_index_end_idx
+        ]  # timeIndex[traj_length]
+        self.num_states = tl_states_tensor[
+            :, :, time_index_end_idx
+        ]  # Single numStates value
+
+        # Create a valid mask based on numStates
+        # Traffic lights are valid if they have numStates > 0
+        self.valid_mask = self.num_states > 0
+
+        self.current_time = current_time
 
     @classmethod
     def from_tensor(
@@ -448,7 +473,7 @@ class TrafficLightObs:
 
     def normalize(self):
         """Normalizes the traffic light observation coordinates."""
-      
+
         # Normalize position coordinates
         self.pos_x = normalize_min_max(
             tensor=self.pos_x,
@@ -483,8 +508,8 @@ class TrafficLightObs:
         ) * self.valid_mask.unsqueeze(-1)
 
         return self.state_onehot
-    
+
     @property
     def shape(self) -> tuple[int, ...]:
         """Shape: (num_worlds, max_traffic_lights, num_timesteps)."""
-        return self.tl_states.shape
+        return self.state.shape
