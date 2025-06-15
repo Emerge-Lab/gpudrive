@@ -402,7 +402,7 @@ class TrafficLightObs:
     def __init__(
         self,
         tl_states_tensor: torch.Tensor,
-        current_time=0,
+
     ):
         """Initializes the traffic light observation from a tensor."""
         traj_length = constants.LOG_TRAJECTORY_LENGTH
@@ -425,13 +425,13 @@ class TrafficLightObs:
         ]  # state[traj_length]
         self.pos_x = tl_states_tensor[
             :, :, state_end_idx:pos_x_end_idx
-        ]  # x[traj_length]
+        ].float()  # x[traj_length]
         self.pos_y = tl_states_tensor[
             :, :, pos_x_end_idx:pos_y_end_idx
-        ]  # y[traj_length]
+        ].float()  # y[traj_length]
         self.pos_z = tl_states_tensor[
             :, :, pos_y_end_idx:pos_z_end_idx
-        ]  # z[traj_length]
+        ].float()  # z[traj_length]
         self.time_index = tl_states_tensor[
             :, :, pos_z_end_idx:time_index_end_idx
         ]  # timeIndex[traj_length]
@@ -442,8 +442,6 @@ class TrafficLightObs:
         # Create a valid mask based on numStates
         # Traffic lights are valid if they have numStates > 0
         self.valid_mask = self.num_states > 0
-
-        self.current_time = current_time
 
     @classmethod
     def from_tensor(
@@ -490,7 +488,6 @@ class TrafficLightObs:
             min_val=constants.MIN_Z_COORD,
             max_val=constants.MAX_Z_COORD,
         )
-
     def one_hot_encode_states(self):
         """One-hot encodes the traffic light states.
 
