@@ -901,6 +901,19 @@ Tensor Manager::metadataTensor() const {
     );
 }
 
+Tensor Manager::trafficLightTensor() const
+{
+    return impl_->exportTensor(
+        ExportID::TrafficLights, 
+        TensorElementType::Float32,
+        {
+            impl_->numWorlds, 
+            consts::kMaxTrafficLightCount, 
+            TrafficLightsStateExportSize
+        }
+    );
+}
+
 Tensor Manager::vbdTrajectoryTensor() const {
     return impl_->exportTensor(
         ExportID::VBDTrajectory, TensorElementType::Float32,

@@ -55,10 +55,13 @@ namespace madrona_gpudrive
     {
         MapObject objects[MAX_OBJECTS];
         MapRoad roads[MAX_ROADS];
+        TrafficLightState trafficLightStates[consts::kMaxTrafficLightCount]; 
 
         uint32_t numObjects;
         uint32_t numRoads;
         uint32_t numRoadSegments;
+        uint32_t numTrafficLights;  
+        bool hasTrafficLights;   
         MapVector2 mean;
 
         char mapName[32];

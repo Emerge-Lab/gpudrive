@@ -437,6 +437,41 @@ namespace madrona_gpudrive
     const size_t ScenarioIdExportSize = 32;
     static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
 
+    enum class TLState : int32_t
+    {
+        Unknown = 0,
+        Stop = 1,
+        Caution = 2,
+        Go = 3
+    };
+
+    struct TrafficLightState
+    {
+        // Lane ID for this traffic light
+        float laneId = 0;
+
+        // Arrays of state data for each timestep
+        float state[consts::kTrajectoryLength] = {};
+        float x [consts::kTrajectoryLength] = {};
+        float y [consts::kTrajectoryLength] = {};
+        float z [consts::kTrajectoryLength] = {};
+        float timeIndex[consts::kTrajectoryLength] = {};
+        // Number of valid states
+        float numStates = 0;
+    };
+
+    // 1 (lane_id) + 5 (state, x, y, z, timeIndex) + 1 (numStates) = 6
+    const size_t TrafficLightsStateExportSize = 1 + (consts::kTrajectoryLength) * 5 + 1;
+    static_assert(sizeof(TrafficLightState) == sizeof(float) * TrafficLightsStateExportSize);
+
+    struct TrafficLights
+    {
+        TrafficLightState trafficLights[consts::kMaxTrafficLightCount];
+    };
+
+    const size_t TrafficLightsExportSize = consts::kMaxTrafficLightCount * TrafficLightsStateExportSize;
+    static_assert(sizeof(TrafficLights) == sizeof(float) * TrafficLightsExportSize);
+
     struct MetaData
     {
         float isSdc;
@@ -475,9 +510,7 @@ namespace madrona_gpudrive
                                 AgentID,
                                 MetaData,
                                 VBDTrajectory,
-
                                 ControlledState // Drive Logic
-
                                 >
     {
     };

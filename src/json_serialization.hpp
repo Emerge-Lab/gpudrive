@@ -24,6 +24,73 @@ namespace madrona_gpudrive
         return 0.0f; // Default z value if not provided
     }
 
+    void from_json(const nlohmann::json &j, TrafficLightState &tl_state)
+    {
+        // Set number of states to the size of the state array
+        size_t numStates = std::max(j.at("state").size(), static_cast<size_t>(consts::kTrajectoryLength));
+        tl_state.numStates = numStates;
+        static const std::unordered_map<std::string, TLState> state_map = {
+                    {"unknown", TLState::Unknown},
+                    {"stop", TLState::Stop},
+                    {"caution", TLState::Caution},
+                    {"go", TLState::Go}
+        };
+
+        // Process each timestep
+        for (size_t t = 0; t < numStates; t++) {
+            // Get the state string and convert to enum
+            if (t < j.at("state").size()) {
+                std::string state_str = j.at("state")[t];
+                auto it = state_map.find(state_str);
+                TLState enum_state = (it != state_map.end()) ? it->second : TLState::Unknown;  // ADD THIS LINE
+                tl_state.state[t] = static_cast<float>(enum_state);  // Cast enum to float
+            } else {
+                tl_state.state[t] = static_cast<float>(TLState::Unknown);  // Cast enum to float
+            }
+
+            // Get the x,y,z positions in a more interpretable fashion
+            if(t < j.at("x").size())
+            {
+                tl_state.x[t] = j.at("x")[t].get<float>();
+            }
+            else
+            {
+                tl_state.x[t] = -1000.0f;
+            }
+            if(t < j.at("y").size())
+            {
+                tl_state.y[t] = j.at("y")[t].get<float>();
+            }
+            else
+            {
+                tl_state.y[t] = -1000.0f;
+            }
+            if(t < j.at("z").size())
+            {
+                tl_state.z[t] = j.at("z")[t].get<float>();
+            }
+            else
+            {
+                tl_state.z[t] = -1000.0f;
+            }
+
+            // Get time index and lane id
+            if (t < j.at("time_index").size()) {
+                tl_state.timeIndex[t] = j.at("time_index")[t];
+            } else {
+                tl_state.timeIndex[t] = -1;
+            }
+        }
+
+        tl_state.laneId = static_cast<int32_t>(j.at("lane_id")[0]);
+
+        // Fill any remaining timesteps with default values
+        for (size_t t = numStates; t < consts::kTrajectoryLength; t++) {
+            tl_state.state[t] = static_cast<float>(TLState::Unknown);
+            tl_state.timeIndex[t] = -1;
+        }
+    }
+
     void from_json(const nlohmann::json &j, MapObject &obj)
     {
         obj.mean = {0,0};
@@ -543,5 +610,23 @@ namespace madrona_gpudrive
             ++idx;
         }
         map.numRoadSegments = countRoadPoints;
+
+        // Process traffic light states if present
+        if (j.contains("tl_states")) {
+            const auto& tl_states = j.at("tl_states");
+            map.numTrafficLights = std::max(tl_states.size(), static_cast<size_t>(consts::kMaxTrafficLightCount));
+            map.hasTrafficLights = (map.numTrafficLights > 0);
+
+            size_t idx = 0;
+            for (auto &kv : tl_states.items())
+            {
+                if (idx >= map.numTrafficLights)
+                    break;
+                kv.value().get_to(map.trafficLightStates[idx++]);
+            }
+        } else {
+            map.numTrafficLights = 0;
+            map.hasTrafficLights = false;
+        }
     }
 }
