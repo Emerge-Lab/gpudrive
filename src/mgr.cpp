@@ -905,7 +905,7 @@ Tensor Manager::trafficLightTensor() const
 {
     return impl_->exportTensor(
         ExportID::TrafficLights, 
-        TensorElementType::Int32,
+        TensorElementType::Float32,
         {
             impl_->numWorlds, 
             consts::kMaxTrafficLightCount, 

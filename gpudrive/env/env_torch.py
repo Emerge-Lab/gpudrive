@@ -1905,7 +1905,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1, 2, 3, 4]
+    FOCUS_AGENTS = [0] #[0, 1, 2, 3, 4]
 
     env_config = EnvConfig(
         guidance=True,

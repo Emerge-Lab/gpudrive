@@ -42,9 +42,10 @@ namespace madrona_gpudrive
             if (t < j.at("state").size()) {
                 std::string state_str = j.at("state")[t];
                 auto it = state_map.find(state_str);
-                tl_state.state[t] = (it != state_map.end()) ? it->second : TLState::Unknown;
+                TLState enum_state = (it != state_map.end()) ? it->second : TLState::Unknown;  // ADD THIS LINE
+                tl_state.state[t] = static_cast<float>(enum_state);  // Cast enum to float
             } else {
-                tl_state.state[t] = TLState::Unknown;
+                tl_state.state[t] = static_cast<float>(TLState::Unknown);  // Cast enum to float
             }
 
             // Get the x,y,z positions in a more interpretable fashion
@@ -85,7 +86,7 @@ namespace madrona_gpudrive
 
         // Fill any remaining timesteps with default values
         for (size_t t = numStates; t < consts::kTrajectoryLength; t++) {
-            tl_state.state[t] = TLState::Unknown;
+            tl_state.state[t] = static_cast<float>(TLState::Unknown);
             tl_state.timeIndex[t] = -1;
         }
     }
