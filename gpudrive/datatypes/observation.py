@@ -397,7 +397,6 @@ class TrafficLightObs:
     time_index: torch.Tensor
     lane_id: torch.Tensor
     valid_mask: torch.Tensor
-    current_time: int = 0
 
     def __init__(
         self,
@@ -456,7 +455,6 @@ class TrafficLightObs:
             tl_states_tensor: The traffic light state tensor from the simulation
             backend: Which backend to use ("torch" or "jax")
             device: The device to place tensors on
-            current_time: The current timestep to use (default: 0)
 
         Returns:
             A TrafficLightObs instance
