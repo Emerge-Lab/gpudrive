@@ -59,10 +59,30 @@ For instance, with `dynamics_model: str = "classic"`, the default action space i
 
 ```Python
 # Action space (joint discrete)
-head_tilt_actions: torch.Tensor = torch.Tensor([0])
-steer_actions: torch.Tensor = torch.round(torch.linspace(-1.0, 1.0, 13), decimals=3)
-accel_actions: torch.Tensor = torch.round(torch.linspace(-3, 3, 7), decimals=3)
+action_space_steer_disc: int = 13
+action_space_accel_disc: int = 7
+action_space_head_tilt_disc: int = 1
+
+# Type-aware action space settings
+use_type_aware_actions: bool = True  # Toggles type-aware action mapping: if False, use vehicle ranges for all agents
+
+# Vehicle action ranges
+vehicle_accel_range: Tuple[float, float] = (-4.0, 4.0)  # m/s²
+vehicle_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
+
+# Cyclist action ranges
+cyclist_accel_range: Tuple[float, float] = (-2.5, 2.5)    # m/s²
+cyclist_steer_range: Tuple[float, float] = (-2.09, 2.09)  # radians (±120°)
+
+# Pedestrian action ranges
+pedestrian_accel_range: Tuple[float, float] = (-1.5, 1.5)  # m/s²
+pedestrian_steer_range: Tuple[float, float] = (-3.14, 3.14)  # radians (±180°)
+
+# Head tilt action range
+head_tilt_action_range: Tuple[float, float] = (-0.7854, 0.7854)  # radians (±45°)
 ```
+The head tilt action is relevant when the view cone is not 360° (see below).
+
 
 ### Continuous
 
@@ -88,6 +108,19 @@ lidar_obs: bool = True # Use LiDAR data
 | **lidar_obs**                          | `(max_num_agents_in_scene, 3, num_lidar_samples, 4)`    | LiDAR data                                                                                                                 | LiDAR rays; number of points can be set by adjusting `numLidarSamples` in `src/consts.hpp`. Default is 30 points.                                                                                                                    |
 
 ---
+
+### Restriced Observation Space
+
+By default, _every_ road segment and agent within a radius of 50m of the ego is observable and added to partner_obs and road_map_obs, respectively.
+
+The observation can be restriced in various ways:
+- **smaller observation radius**: By default the radius is set to 50m. This can be changed using the `obs_radius` option.
+
+- **smaller view cone**: Instead of observing 360° around the vehicle, the view can be restricted to a cone using the `view_cone_half_angle` config parameter. By default the _half_ angle is set to $\pi = 180°$, i.e. a full 360° view. Using the head tilt action, the heading of the view angle can be changed (within the given range) without changing the heading of the vehicle (the direction of driving). Relevant parameters: `view_cone_half_angle`, `action_space_head_tilt_disc`, `head_tilt_action_range`
+
+
+- **remove agents that are occluded**: Agents that are not technically not visible because they are hidden behind other agents are not added to partner_obs if `remove_occluded_agents = True`. This is determined by casting rays: If one ray hits the vehicle without occlusion, the agent is considered visible. By default, the 8 corners as well as the midpoints of each edge of the bounding box are checked. The number of sampled points on the edge of the bounding box can be set in `consts.hpp`
+
 
 ### Data Structures
 

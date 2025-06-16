@@ -49,6 +49,10 @@ inline constexpr float lidarAngle = madrona::math::pi / 3; // The angle between 
 // Bev observation constants
 inline constexpr int bev_rasterization_resolution = 200;
 
+// Number of points to sample on each edge of a bounding box for occlusion checks.
+// If set to 0, only corners of AABB are checked. If set to 1, midpoints of edges are also checked etc.
+inline constexpr madrona::CountT kNumOcclusionEdgeSamples = 1;
+
 // Time (seconds) per step
 inline constexpr float deltaT = 0.04f;
 

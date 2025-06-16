@@ -5,7 +5,8 @@ matplotlib.use("Agg")
 from typing import Tuple, Optional, List, Dict, Any, Union
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Arc
+from matplotlib.lines import Line2D
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
@@ -1801,6 +1802,8 @@ class MatplotlibVisualizer:
         trajectory: Optional[np.ndarray] = None,
         step_reward: Optional[float] = None,
         route_progress: Optional[float] = None,
+        head_angle: Optional[float] = 0.0,
+        previous_actions: Optional[torch.Tensor] = None
     ):
         """
         Plot observation from agent POV to inspect the information available
@@ -2112,18 +2115,45 @@ class MatplotlibVisualizer:
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
 
-        # Add a circle representing the observation radius
-        observation_circle = Circle(
-            (0, 0),  # Center at origin
-            radius=self.env_config.obs_radius,
-            color="black",
-            fill=False,
-            linestyle="-",
-            linewidth=1.0,
-            alpha=0.7,
-        )
+        # Add V lines for view cone boundaries
+        # must be classic or bicycle to have head angle
+        if previous_actions is not None and \
+           hasattr(self.env_config, 'dynamics_model') and \
+           self.env_config.dynamics_model in ["classic", "bicycle"] and \
+           previous_actions.ndim == 3 and \
+           env_idx < previous_actions.shape[0] and \
+           agent_idx < previous_actions.shape[1] and \
+           previous_actions.shape[2] == 3: # Expected shape [worlds, agents, 3 (accel, steer, head)]
+            headAngle = previous_actions[env_idx, agent_idx, 2].item()
+        else:
+            headAngle = head_angle
 
-        ax.add_patch(observation_circle)
+        # Calculate angles for the arc and view cone lines, incorporating head_angle_to_use
+        angle1_rad = headAngle + self.env_config.view_cone_half_angle
+        angle2_rad = headAngle - self.env_config.view_cone_half_angle
+
+        x1_rot = self.env_config.obs_radius * np.cos(angle1_rad)
+        y1_rot = self.env_config.obs_radius * np.sin(angle1_rad)
+
+        x2_rot = self.env_config.obs_radius * np.cos(angle2_rad)
+        y2_rot = self.env_config.obs_radius * np.sin(angle2_rad)
+
+        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
+        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
+
+        # Plot observation radius as an Arc
+        obs_arc = Arc((0,0),
+                      width=2*self.env_config.obs_radius,
+                      height=2*self.env_config.obs_radius,
+                      angle=0, # Default orientation
+                      theta1=np.degrees(angle2_rad),
+                      theta2=np.degrees(angle1_rad),
+                      color="k", 
+                      linestyle="-", 
+                      linewidth=1.0, 
+                      alpha=0.7)
+        ax.add_patch(obs_arc)
+
         ax.set_xticks([])
         ax.set_yticks([])
         plt.axis("off")

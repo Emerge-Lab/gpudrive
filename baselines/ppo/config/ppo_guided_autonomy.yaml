@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_json_1
+data_dir: data/processed/wosac/validation_interactive/json
 continue_training: false
 model_cpt: null
 
@@ -42,17 +42,21 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
   sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
   obs_radius: 50.0 # Visibility radius of the agents
+  view_cone_half_angle: 3.14159 # -> 360° total view field
+  view_occlude_objects: false
   action_space_steer_disc: 13
   action_space_accel_disc: 7
-  max_steer_angle: 1.57  # pi/2 = 1.57, pi/3 = 1.05
-  max_accel_value: 4.0
+  action_space_head_tilt_disc: 1
+  vehicle_steer_range: [-1.57, 1.57]  # pi/2 = 1.57, pi/3 = 1.05
+  vehicle_accel_range: [-4.0, 4.0]
+  head_tilt_action_range: [-0.7854, 0.7854] # radians (±45°)
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
 
 wandb:
   entity: ""
   project: "humanlike"
-  group: "debug_mini"
+  group: ""
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -111,7 +115,7 @@ train:
   # # # Rendering # # #
   render: true # Determines whether to render the environment (note: will slow down training)
   render_3d: false # Render simulator state in 3d or 2d
-  render_interval: 200 # Render every k iterations
+  render_interval: 10 # Render every k iterations
   render_every_t: 5 # Render every k timesteps
   render_k_scenarios: 1 # Number of scenarios to render
   render_agent_idx: [0] # Agent observations to render

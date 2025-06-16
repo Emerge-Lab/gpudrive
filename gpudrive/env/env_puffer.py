@@ -168,8 +168,15 @@ class PufferGPUDrive(PufferEnv):
         dynamics_model="classic",
         action_space_steer_disc=13,
         action_space_accel_disc=7,
-        max_steer_angle=1.57,
-        max_accel_value=4.0,
+        action_space_head_tilt_disc=1,
+        use_type_aware_actions=True,
+        vehicle_accel_range=(-4.0, 4.0),
+        vehicle_steer_range=(-1.57, 1.57),
+        cyclist_accel_range=(-2.5, 2.5),
+        cyclist_steer_range=(-2.09, 2.09),
+        pedestrian_accel_range=(-1.5, 1.5),
+        pedestrian_steer_range=(-3.14, 3.14),
+        head_tilt_action_range=(-0.7854, 0.7854),
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -198,6 +205,8 @@ class PufferGPUDrive(PufferEnv):
         guidance_dropout_prob=0.0,
         remove_non_vehicles=False,
         obs_radius=50.0,
+        view_cone_half_angle=3.14159,
+        remove_occluded_agents=False,
         track_realism_metrics=False,
         track_n_worlds=2,
         render=False,
@@ -293,22 +302,20 @@ class PufferGPUDrive(PufferEnv):
             lidar_obs=lidar_obs,
             disable_classic_obs=True if lidar_obs else False,
             obs_radius=obs_radius,
-            max_steer_angle=max_steer_angle,
-            max_accel_value=max_accel_value,
             action_space_steer_disc=action_space_steer_disc,
             action_space_accel_disc=action_space_accel_disc,
-            # Override action space
-            steer_actions = torch.round(torch.linspace(
-                    -max_steer_angle, max_steer_angle, action_space_steer_disc
-                ),
-                decimals=3,
-                ),
-            accel_actions = torch.round(
-                torch.linspace(
-                    -max_accel_value, max_accel_value, action_space_accel_disc
-                ),
-                decimals=3,
-            )
+            action_space_head_tilt_disc=action_space_head_tilt_disc,
+            use_type_aware_actions=use_type_aware_actions,
+            vehicle_accel_range=vehicle_accel_range,
+            vehicle_steer_range=vehicle_steer_range,
+            cyclist_accel_range=cyclist_accel_range,
+            cyclist_steer_range=cyclist_steer_range,
+            pedestrian_accel_range=pedestrian_accel_range,
+            pedestrian_steer_range=pedestrian_steer_range,
+            head_tilt_action_range=head_tilt_action_range,
+            view_cone_half_angle=view_cone_half_angle,
+            remove_occluded_agents=remove_occluded_agents,
+            **{k: v for k, v in kwargs.items() if hasattr(EnvConfig, k)}
         )
         render_config = RenderConfig(
             render_3d=render_3d,
@@ -681,6 +688,7 @@ class PufferGPUDrive(PufferEnv):
                     ),
                     step_reward=self.env.guidance_reward[0, agent_idx].item(),
                     route_progress=self.env.route_progress[agent_idx].item(),
+                    previous_actions=self.env.previous_action_value_tensor,
                 )
                 self.agent_frames[agent_idx].append(img_from_fig(agent_obs))
 
