@@ -7,6 +7,9 @@ def multi_policy_rollout(
     env,
     policies, 
     device,
+    env_collision_weight: float = -0.75,
+    env_off_road_weight: float = -0.75,
+    env_goal_achieved_weight: float =1, 
     deterministic: bool = False,
     render_sim_state: bool = False,
     render_every_n_steps: int = 1,
@@ -84,7 +87,8 @@ def multi_policy_rollout(
                 "goal_achieved": torch.zeros((num_worlds, max_agent_count), device=device),
                 "collided": torch.zeros((num_worlds, max_agent_count), device=device),
                 "off_road": torch.zeros((num_worlds, max_agent_count), device=device),
-                "reward": torch.zeros((num_worlds, max_agent_count), device=device),
+                "agent_reward":  torch.zeros((num_worlds, max_agent_count), device=device),
+                "real_reward": torch.zeros((num_worlds, max_agent_count), device=device),
             } for trial in range(k_trials)
         } for policy_name in policies
     }
@@ -103,9 +107,7 @@ def multi_policy_rollout(
                                                                     policy_data['history']['log_history'],
                                                                     partner_obs_dim,
                                                                     device)
-                policy_data['env_to_step_in_trial_dict'] = {
-                f"world_{i}": 0 for i in range(num_worlds)
-                }
+  
 
     
     for trial in range(k_trials):
@@ -116,6 +118,9 @@ def multi_policy_rollout(
         control_mask = env.cont_agent_mask
         live_agent_mask = control_mask.clone()
 
+        world_time_steps = {
+                f"world_{i}": 0 for i in range(num_worlds)
+                }
 
         for time_step in range(episode_len):
             print(f't: {time_step}')
@@ -167,14 +172,9 @@ def multi_policy_rollout(
                                 history_dict=policy_data['history_dicts'][key],
                                 partner_obs=all_partner_observations[world_key][agent_key],
                                 log_history_step=policy_data['history']['log_history'],
-                                current_step=policy_data['env_to_step_in_trial_dict'][f'world_{world_key}'],
+                                current_step=world_time_steps[f'world_{world_key}'],
                                 trial=trial
                                 )
-
-                        live_worlds = list(set([idx[0] for idx in live_keys]))
-                        for world in live_worlds:
-                            policy_data['env_to_step_in_trial_dict'][f'world_{world}'] += 1 
-
      
 
                     else:
@@ -183,7 +183,13 @@ def multi_policy_rollout(
                         )
 
         
-      
+            if live_agent_mask.any():
+                live_indices = torch.nonzero(live_agent_mask).view(-1, live_agent_mask.dim())
+                live_keys = [tuple(indice.tolist()) for indice in live_indices]
+                live_worlds = list(set([idx[0] for idx in live_keys]))
+                for world in live_worlds:
+                    world_time_steps[f'world_{world}'] += 1 
+
             
             combined_mask = torch.zeros_like(live_agent_mask, dtype=torch.bool)
             for live_mask in policy_live_masks.values():
@@ -242,16 +248,24 @@ def multi_policy_rollout(
                 policy_metrics[policy_name][trial]["collided"][live_mask] += infos.collided[live_mask]
                 policy_metrics[policy_name][trial]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
                 if 'reward_conditioning' not in policy_data:
-                    reward =env.get_rewards(
+                    agent_reward =env.get_rewards(
                     collision_weight=policy_data['weights']['collision_weight'],
                     off_road_weight=policy_data['weights']['off_road_weight'],
                     goal_achieved_weight=policy_data['weights']['goal_achieved_weight'],
                     )
                     
                 else:
-                    reward = env.get_rewards(get_reward_conditioned = True)
+                    agent_reward = env.get_rewards(get_reward_conditioned = True)
+                
+                real_reward = env.get_rewards(
+                    collision_weight = env_collision_weight,
+                    off_road_weight = env_off_road_weight,
+                    goal_achieved_weight = env_goal_achieved_weight
 
-                policy_metrics[policy_name][trial]["reward"][live_mask] += reward[live_mask]
+                )
+
+                policy_metrics[policy_name][trial]["agent_reward"][live_mask] += agent_reward[live_mask]
+                policy_metrics[policy_name][trial]["real_reward"][live_mask] += real_reward[live_mask]
 
             live_agent_mask[dones] = False
 
@@ -320,26 +334,39 @@ def compute_metrics(policy_metrics,policies,trials):
             controlled_per_scene = policy_data['mask'].sum(dim=1)
             
 
-
             policy_metrics[policy_name][trial]['off_road_count'] = (policy_metrics[policy_name][trial]["off_road"] > 0).float().sum(axis=1)
             policy_metrics[policy_name][trial]['collided_count'] = (policy_metrics[policy_name][trial]["collided"] > 0).float().sum(axis=1)
             policy_metrics[policy_name][trial]['goal_achieved_count'] = (policy_metrics[policy_name][trial]['goal_achieved'] > 0).float().sum(axis=1)
-            policy_metrics[policy_name][trial]['reward_count'] = (policy_metrics[policy_name][trial]['reward'] > 0).float().sum(axis=1)
+            policy_metrics[policy_name][trial]['agent_reward_count'] = (policy_metrics[policy_name][trial]['agent_reward'] > 0).float().sum(axis=1)
+            policy_metrics[policy_name][trial]['real_reward_count'] = (policy_metrics[policy_name][trial]['real_reward'] > 0).float().sum(axis=1)
+
 
             policy_metrics[policy_name][trial]['off_road_per_world'] = policy_metrics[policy_name][trial]['off_road_count'] / controlled_per_scene
             policy_metrics[policy_name][trial]['collided_per_world'] = policy_metrics[policy_name][trial]['collided_count'] / controlled_per_scene 
             policy_metrics[policy_name][trial]['goal_achieved_per_world'] = policy_metrics[policy_name][trial]['goal_achieved_count'] / controlled_per_scene
-            policy_metrics[policy_name][trial]['reward_per_world'] = policy_metrics[policy_name][trial]['reward_count'] / controlled_per_scene
+            policy_metrics[policy_name][trial]['agent_reward_per_world'] = policy_metrics[policy_name][trial]['agent_reward_count'] / controlled_per_scene
+            policy_metrics[policy_name][trial]['real_reward_per_world'] = policy_metrics[policy_name][trial]['real_reward_count'] / controlled_per_scene
 
-            policy_metrics[policy_name][trial]['frac_off_road'] = torch.mean(policy_metrics[policy_name][trial]['off_road_per_world'])
-            policy_metrics[policy_name][trial]['frac_collided'] = torch.mean(policy_metrics[policy_name][trial]['collided_per_world'])
-            policy_metrics[policy_name][trial]['frac_goal_achieved'] = torch.mean(policy_metrics[policy_name][trial]['goal_achieved_per_world'])
-            policy_metrics[policy_name][trial]['frac_reward'] = torch.mean(policy_metrics[policy_name][trial]['reward_per_world'])
+            policy_metrics[policy_name][trial]['frac_off_road'] = policy_metrics[policy_name][trial]['off_road_count'].sum() /  controlled_per_scene.sum()
+            policy_metrics[policy_name][trial]['frac_collided'] = policy_metrics[policy_name][trial]['collided_count'].sum() /controlled_per_scene.sum()
+            policy_metrics[policy_name][trial]['frac_goal_achieved'] = policy_metrics[policy_name][trial]['goal_achieved_count'].sum() / controlled_per_scene.sum()
+            policy_metrics[policy_name][trial]['frac_agent_reward'] = policy_metrics[policy_name][trial]['agent_reward_count'].sum() / controlled_per_scene.sum()
+            policy_metrics[policy_name][trial]['frac_real_reward'] = policy_metrics[policy_name][trial]['real_reward_count'].sum() / controlled_per_scene.sum()
+            
             # Add standard deviations
-            policy_metrics[policy_name][trial]['frac_off_road_std'] = torch.std(policy_metrics[policy_name][trial]['off_road_per_world'])
-            policy_metrics[policy_name][trial]['frac_collided_std'] = torch.std(policy_metrics[policy_name][trial]['collided_per_world'])
-            policy_metrics[policy_name][trial]['frac_goal_achieved_std'] = torch.std(policy_metrics[policy_name][trial]['goal_achieved_per_world'])
-            policy_metrics[policy_name][trial]['frac_reward_std'] = torch.std(policy_metrics[policy_name][trial]['reward_per_world'])
+            controlled_mask = policy_data['mask']
+
+            off_road_mask = (policy_metrics[policy_name][trial]["off_road"] > 0)[controlled_mask]
+            collided_mask = (policy_metrics[policy_name][trial]["collided"] > 0)[controlled_mask]
+            goal_achieved_mask = (policy_metrics[policy_name][trial]["goal_achieved"] > 0)[controlled_mask]
+            agent_reward_mask = (policy_metrics[policy_name][trial]["agent_reward"] > 0)[controlled_mask]
+            real_reward_mask = (policy_metrics[policy_name][trial]["real_reward"] > 0)[controlled_mask]
+
+            policy_metrics[policy_name][trial]['frac_off_road_std'] = off_road_mask.float().std()
+            policy_metrics[policy_name][trial]['frac_collided_std'] = collided_mask.float().std()
+            policy_metrics[policy_name][trial]['frac_goal_achieved_std'] = goal_achieved_mask.float().std()
+            policy_metrics[policy_name][trial]['frac_agent_reward_std'] = agent_reward_mask.float().std()
+            policy_metrics[policy_name][trial]['frac_real_reward_std'] = real_reward_mask.float().std()
             
 
     return policy_metrics
@@ -358,7 +385,6 @@ def initialise_history(k_trials,episode_len,log_history_step,partner_obs_shape,d
 
 
 def update_history(history_dict,partner_obs,log_history_step,current_step, trial):
-
         if current_step % log_history_step ==0:
 
             step_index = current_step // log_history_step
