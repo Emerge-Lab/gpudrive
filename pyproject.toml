@@ -55,7 +55,7 @@ test = [
 
 vbd = [
     "lightning",
-    "jaxlib",
+    "jaxlib==0.5.3",  # see https://github.com/Emerge-Lab/gpudrive/issues/464
     "waymo-waymax @ git+https://github.com/waymo-research/waymax.git@main",
 ]
 
