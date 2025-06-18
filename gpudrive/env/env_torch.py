@@ -68,7 +68,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         ):
             # Use default condition_mode from config or fall back to "random"
             condition_mode = getattr(self.config, "condition_mode", "random")
-            agent_type = getattr(self.config, "agent_type", None)
+            agent_type = getattr(self.config, "agent_type", torch.zeros(3))
             self._set_reward_weights(
                 condition_mode=condition_mode, agent_type=agent_type
             )
@@ -462,6 +462,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         off_road_weight=-0.5,
         world_time_steps=None,
         log_distance_weight=0.01,
+        reward_tensor = None,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -484,7 +485,31 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
+        elif self.config.reward_type == "reward_conditioned" or reward_tensor is not None:
+            # Extract individual weight components from the tensor
+            # Shape: [num_worlds, max_agents, 3]
+            if self.reward_weights_tensor is None:
+                self._set_reward_weights()
+            
+            if reward_tensor is not None:
+                self.reward_weights_tensor = reward_tensor
+
+            # Apply the weights in a vectorized manner
+            # Each index in dimension 2 corresponds to a specific weight:
+            # 0: collision, 1: goal_achieved, 2: off_road
+           
+            
+            weighted_rewards = (
+                self.reward_weights_tensor[:, :, 0] * collided
+                + self.reward_weights_tensor[:, :, 1] * goal_achieved
+                + self.reward_weights_tensor[:, :, 2] * off_road
+            )
+            print("avg goal reward across agents", weighted_rewards[self.cont_agent_mask].sum() / self.cont_agent_mask.sum())
+
+            return weighted_rewards
+
         elif self.config.reward_type == "weighted_combination":
+
             weighted_rewards = (
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
@@ -493,22 +518,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             return weighted_rewards
 
-        elif self.config.reward_type == "reward_conditioned":
-            # Extract individual weight components from the tensor
-            # Shape: [num_worlds, max_agents, 3]
-            if self.reward_weights_tensor is None:
-                self._set_reward_weights()
 
-            # Apply the weights in a vectorized manner
-            # Each index in dimension 2 corresponds to a specific weight:
-            # 0: collision, 1: goal_achieved, 2: off_road
-            weighted_rewards = (
-                self.reward_weights_tensor[:, :, 0] * collided
-                + self.reward_weights_tensor[:, :, 1] * goal_achieved
-                + self.reward_weights_tensor[:, :, 2] * off_road
-            )
-
-            return weighted_rewards
 
         elif self.config.reward_type == "distance_to_vdb_trajs":
             # Reward based on distance to VBD predicted trajectories
@@ -742,7 +752,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self, mask=None) -> torch.Tensor:
+    def _get_ego_state(self, mask=None,reward_tensor=None) -> torch.Tensor:
         """Get the ego state."""
 
         if not self.config.ego_state:
@@ -758,7 +768,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.normalize()
 
         if mask is None:
-            if self.config.reward_type == "reward_conditioned":
+            if self.config.reward_type == "reward_conditioned" or reward_tensor is not None:
+                if reward_tensor is not None:
+                    self.reward_weights_tensor = reward_tensor
                 return torch.stack(
                     [
                         ego_state.speed,
@@ -1155,13 +1167,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reshape back to original format
         return traj_features.reshape(original_shape)
 
-    def get_obs(self, mask=None):
+    def get_obs(self, mask=None,reward_tensor=None):
         """Get observation: Combine different types of environment information into a single tensor.
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
         # Base observations
-        ego_states = self._get_ego_state(mask)
+        ego_states = self._get_ego_state(mask,reward_tensor)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
 
