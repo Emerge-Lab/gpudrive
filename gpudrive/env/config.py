@@ -145,7 +145,7 @@ class EnvConfig:
     vbd_in_obs: bool = False
 
     ### filter for controllable objects
-    minimum_controllable_objects = 0
+    minimum_controllable_objects: int  = 0
     
 
 class SelectionDiscipline(Enum):

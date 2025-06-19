@@ -666,30 +666,115 @@ void Manager::setMaps(const std::vector<std::string> &maps)
     assert(impl_->cfg.scenes.size() == maps.size());
     impl_->cfg.scenes = maps;
 
+    std::vector<int> valid_scene_indices;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::cout << "Filtering scenes for controllable objects..." << std::endl;
+
+    for (int i = 0; i < impl_->cfg.scenes.size(); i++) {
+        Map *cpu_map = (Map *)MapReader::parseAndWriteOut(impl_->cfg.scenes[i], 
+                            ExecMode::CPU,  impl_->cfg.params.polylineReductionThreshold);
+        
+        int64_t controllable_objects = 0;
+        int total_objects = cpu_map->numObjects;
+        
+        for (int obj_idx = 0; obj_idx < total_objects; obj_idx++) {
+            const auto& object = cpu_map->objects[obj_idx];
+            auto startPos = object.position[0];
+            auto distance = std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                                    std::pow(object.goalPosition.y - startPos.y, 2));
+
+            auto isAgentStatic = distance < consts::staticThreshold;
+            auto isAgentAVehicle = object.type == EntityType::Vehicle;
+
+            auto staticFlag = !isAgentStatic || ((impl_->cfg).params).isStaticAgentControlled;
+            auto vehicleFlag = isAgentAVehicle || ! impl_->cfg.params.IgnoreNonVehicles;
+            if (object.valid[0] && !object.markAsExpert &&
+                staticFlag &&
+                vehicleFlag) {
+                controllable_objects++;
+            }
+        }
+        
+        if (controllable_objects >= impl_->cfg.params.minimumControllableObjects) {
+            valid_scene_indices.push_back(i);
+        }
+        
+        delete cpu_map;
+    }
+    std::cout << "Found " << valid_scene_indices.size() << " valid scenes with controllable objects." << std::endl;
+
     ResetMap resetmap{
         1,
     };
+
+    std::vector<int32_t> worldIndices;
 
     if (impl_->cfg.execMode == madrona::ExecMode::CUDA)
     {
 #ifdef MADRONA_CUDA_SUPPORT
         auto &gpu_exec = static_cast<CUDAImpl *>(impl_.get())->gpuExec;
-        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        
+        // Create a vector to track which worlds are valid
+        std::vector<int32_t> validWorldIndices;
+        size_t world_idx = 0;
+
+        // First pass: process valid scenes in order
+        for (size_t map_idx = 0; map_idx < maps.size() && world_idx < maps.size(); map_idx++)
         {
-            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
-                                                                      ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
-            Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
-            REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
-            madrona::cu::deallocGPU(map);
+            // Check if this scene index is in valid_scene_indices
+            if (std::find(valid_scene_indices.begin(), valid_scene_indices.end(), map_idx) != valid_scene_indices.end())
+            {
+                Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[map_idx],
+                                                                        ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+                
+                Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+                REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
+                madrona::cu::deallocGPU(map);
 
-            auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
-            REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+                auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+                REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
 
-            // reset agents to delete
-            auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
-            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
-            REQ_CUDA(cudaMemset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t)));
+                // reset agents to delete
+                auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+                int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+                REQ_CUDA(cudaMemset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t)));
+                
+                // Track this as a valid world index
+                validWorldIndices.push_back(world_idx);
+                world_idx++;
+            }
         }
+
+        // Second pass: cycle through valid scenes to fill remaining worlds
+        while (world_idx < maps.size())
+        {
+            for (int scene_idx : valid_scene_indices)
+            {
+                if (world_idx >= maps.size()) break;
+                
+                Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[scene_idx],
+                                                                        ExecMode::CUDA, impl_->cfg.params.polylineReductionThreshold));
+                
+                Map *mapDevicePtr = (Map *)gpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+                REQ_CUDA(cudaMemcpy(mapDevicePtr, map, sizeof(Map), cudaMemcpyHostToDevice));
+                madrona::cu::deallocGPU(map);
+
+                auto resetMapPtr = (ResetMap *)gpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+                REQ_CUDA(cudaMemcpy(resetMapPtr, &resetmap, sizeof(ResetMap), cudaMemcpyHostToDevice));
+
+                // reset agents to delete
+                auto agentsToDeleteDevicePtr = (int32_t *)gpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+                int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+                REQ_CUDA(cudaMemset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t)));
+                
+                validWorldIndices.push_back(world_idx);
+                world_idx++;
+            }
+        }
+        
+        worldIndices = validWorldIndices;
 
 #else
         // Handle the case where CUDA support is not available
@@ -698,35 +783,72 @@ void Manager::setMaps(const std::vector<std::string> &maps)
     }
     else
     {
-
         auto &cpu_exec = static_cast<CPUImpl *>(impl_.get())->cpuExec;
 
-        for (size_t world_idx = 0; world_idx < maps.size(); world_idx++)
+        // Create a vector to track which worlds are valid
+        std::vector<int32_t> validWorldIndices;
+        size_t world_idx = 0;
+
+        for (size_t map_idx = 0; map_idx < maps.size() && world_idx < maps.size(); map_idx++)
         {
-            // Parse the map string into your MapData structure
-            Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[world_idx],
-                                                                      ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
-
-            Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
-            memcpy(mapDevicePtr, map, sizeof(Map));
-            delete map;
-
-            auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
-            memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
-
-            // reset agents to delete
-            auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
-            int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
-            memset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t));
+            // Check if this scene index is in valid_scene_indices
+            if (std::find(valid_scene_indices.begin(), valid_scene_indices.end(), map_idx) != valid_scene_indices.end())
+            {
+                // Parse the map string into your MapData structure
+                Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[map_idx],
+                                                                        ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+                
+                Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+                memcpy(mapDevicePtr, map, sizeof(Map));
+                delete map;
+                
+                auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+                memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+                
+                // reset agents to delete
+                auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+                int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+                memset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t));
+                
+                // Track this as a valid world index
+                validWorldIndices.push_back(world_idx);
+                world_idx++;
+            }
         }
+
+        // If we need to fill remaining worlds by cycling through valid scenes
+        while (world_idx < maps.size())
+        {
+            for (int scene_idx : valid_scene_indices)
+            {
+                if (world_idx >= maps.size()) break;
+                
+                // Parse the map string into your MapData structure
+                Map *map = static_cast<Map *>(MapReader::parseAndWriteOut(maps[scene_idx],
+                                                                        ExecMode::CPU, impl_->cfg.params.polylineReductionThreshold));
+                
+                Map *mapDevicePtr = (Map *)cpu_exec.getExported((uint32_t)ExportID::Map) + world_idx;
+                memcpy(mapDevicePtr, map, sizeof(Map));
+                delete map;
+                
+                auto resetMapPtr = (ResetMap *)cpu_exec.getExported((uint32_t)ExportID::ResetMap) + world_idx;
+                memcpy(resetMapPtr, &resetmap, sizeof(ResetMap));
+                
+                // reset agents to delete
+                auto agentsToDeleteDevicePtr = (int32_t *)cpu_exec.getExported((uint32_t)ExportID::DeletedAgents);
+                int32_t *agentsToDeletePtr = agentsToDeleteDevicePtr + world_idx * consts::kMaxAgentCount;
+                memset(agentsToDeletePtr, -1, consts::kMaxAgentCount * sizeof(int32_t));
+                
+                validWorldIndices.push_back(world_idx);
+                world_idx++;
+            }
+        }
+        
+        worldIndices = validWorldIndices;
     }
 
-    // Vector of range on integers from 0 to the number of worlds
-    std::vector<int32_t> worldIndices(impl_->cfg.scenes.size());
-    std::iota(worldIndices.begin(), worldIndices.end(), 0);
     reset(worldIndices);
 }
-
 Tensor Manager::deletedAgentsTensor() const
 {
     return impl_->exportTensor(ExportID::DeletedAgents, TensorElementType::Int32,
