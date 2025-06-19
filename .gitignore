@@ -27,11 +27,15 @@ data/raw/*
 data/processed/validation/*
 data/processed/training/*
 data/processed/testing/*
+data/processed/validation_interactive/*
 data/processed/pop_play/*
 data/processed/hand_designed/*
-analyze/figures/*
+figures/
+checkpoints/
+figures_data/
 data/other/*
 wosac/
+data/processed/validation_random/*
 
 # Logging
 /wandb

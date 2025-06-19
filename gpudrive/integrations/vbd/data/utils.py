@@ -34,11 +34,11 @@ def filter_topk_roadgraph_points(global_road_graph, reference_points, topk):
         raise NotImplementedError("Not enough points in roadgraph.")
 
     elif topk < global_road_graph.num_points:
-        roadgraph_xy = np.asarray(global_road_graph.xy[0])
+        roadgraph_xy = np.asarray(global_road_graph.xy[0].cpu())
         distances = np.linalg.norm(
             reference_points[..., None, :] - roadgraph_xy, axis=-1
         )
-        valid_distances = np.where(global_road_graph.id > 0, distances, float("inf"))
+        valid_distances = np.where(global_road_graph.id.cpu() > 0, distances, float("inf"))
         top_idx = np.argpartition(valid_distances, topk, axis=-1)[..., :topk]
 
         # Gather the topk points by slicing along the indices
@@ -206,9 +206,9 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
                     global_agent_obs.vehicle_width[w, a].repeat(init_steps + 1),
                     global_agent_obs.vehicle_height[w, a].repeat(init_steps + 1),
                 ],
-            ).numpy()
+            ).cpu().numpy()
             
-            mask = log_trajectory.valids[w, a, :init_steps+1].numpy()
+            mask = log_trajectory.valids[w, a, :init_steps+1].cpu().numpy()
             agents_history[w, i] *= mask
             
             agents_future[w, i] = torch.column_stack(
@@ -219,9 +219,9 @@ def process_agents_vectorized(num_worlds, max_cont_agents, init_steps, global_ag
                     log_trajectory.vel_xy[w, a, init_steps:, 0],
                     log_trajectory.vel_xy[w, a, init_steps:, 1],
                 ],
-            ).numpy()
+            ).cpu().numpy()
             
-            mask = log_trajectory.valids[w, a, init_steps:].numpy()
+            mask = log_trajectory.valids[w, a, init_steps:].cpu().numpy()
             agents_future[w, i] *= mask
     
     # Map agent types for all worlds at once (this is vectorized)
@@ -261,11 +261,11 @@ def process_world_roadgraph(global_road_graph, world_idx, agents_history, agents
                     sorted_map_ids.append(map_ids[j][i])
     
     # Extract roadgraph properties
-    roadgraph_points_x = np.asarray(global_road_graph.x[world_idx])
-    roadgraph_points_y = np.asarray(global_road_graph.y[world_idx])
-    roadgraph_points_heading = np.asarray(global_road_graph.orientation[world_idx])
-    roadgraph_points_types = np.asarray(global_road_graph.vbd_type[world_idx])
-    road_graph_points_ids = np.asarray(global_road_graph.id[world_idx])
+    roadgraph_points_x = np.asarray(global_road_graph.x[world_idx].cpu())
+    roadgraph_points_y = np.asarray(global_road_graph.y[world_idx].cpu())
+    roadgraph_points_heading = np.asarray(global_road_graph.orientation[world_idx].cpu())
+    roadgraph_points_types = np.asarray(global_road_graph.vbd_type[world_idx].cpu())
+    road_graph_points_ids = np.asarray(global_road_graph.id[world_idx].cpu())
     
     # Build polylines
     polylines = []

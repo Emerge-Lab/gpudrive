@@ -95,7 +95,6 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
-        self.vbd_in_obs = False
 
         # Ego state base fields
         self.ego_state_idx = constants.EGO_FEAT_DIM
@@ -107,10 +106,9 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-            if "add_reference_path" in self.config:
+            if "add_reference_pos_xy" in self.config:
                 self.ego_state_idx += 2 * 91
 
-            self.vbd_in_obs = self.config.vbd_in_obs
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )
@@ -147,17 +145,6 @@ class NeuralNet(
             nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
-
-        if self.vbd_in_obs:
-            self.vbd_embed = nn.Sequential(
-                pufferlib.pytorch.layer_init(
-                    nn.Linear(self.vbd_size, input_dim)
-                ),
-                nn.LayerNorm(input_dim),
-                self.act_func,
-                nn.Dropout(self.dropout),
-                pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
-            )
 
         self.shared_embed = nn.Sequential(
             nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),

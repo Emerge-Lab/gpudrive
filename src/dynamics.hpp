@@ -25,28 +25,26 @@ namespace madrona_gpudrive
 
         float speed = velocity.linear.length();
         float yaw = utils::quatToYaw(rotation);
-        // Average speed
-        const float v{clipSpeed(speed + 0.5f * action.classic.acceleration * dt)};
-        const float tanDelta{tanf(action.classic.steering)};
-        // Assume center of mass lies at the middle of length, then l / L == 0.5.
-        const float beta{std::atan(0.5f * tanDelta)};
-        const math::Vector2 d{polarToVector2D(v, yaw + beta)};
-        const float w{v * std::cos(beta) * tanDelta / size.length};
-
-        // model.position += d * dt;
-        // model.heading = utils::AngleAdd(model.heading, w * dt);
-        // model.speed = clipSpeed(model.speed + action.acceleration * dt);
-        float new_yaw = utils::AngleAdd(yaw, w * dt);
-        float new_speed = clipSpeed(speed + action.classic.acceleration * dt);
-        position.x += d.x * dt;
-        position.y += d.y * dt;
-        position.z = 1;
-        rotation = Quat::angleAxis(new_yaw, madrona::math::up);
+        float x_dot = speed * cosf(yaw);
+        float y_dot = speed * sinf(yaw);
+        float theta_dot = speed * tanf(velocity.angular.z) / (0.8 * size.length);
+        float delta_dot = action.classic.steering;
+        // Update the yaw
+        float new_yaw = utils::AngleAdd(yaw, theta_dot * dt);
+        // Update the speed
+        float new_speed = speed + action.classic.acceleration * dt;
         velocity.linear.x = new_speed * cosf(new_yaw);
         velocity.linear.y = new_speed * sinf(new_yaw);
-        velocity.linear.z = 0;
-        velocity.angular = Vector3::zero();
-        velocity.angular.z = w;
+        // Update the position
+        position.x = position.x + x_dot * dt;
+        position.y = position.y + y_dot * dt;
+        // Update the rotation
+        rotation = Quat::angleAxis(new_yaw, madrona::math::up);
+        // Update the angular velocity
+        velocity.angular.z = utils::AngleAdd(velocity.angular.z, delta_dot * dt);
+        // clip angular z between -pi/3 and pi/3
+        velocity.angular.z = fmaxf(-madrona::math::pi / 3.0, fminf(velocity.angular.z, madrona::math::pi / 3.0));
+
     }
 
     inline void forwardBicycleModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)

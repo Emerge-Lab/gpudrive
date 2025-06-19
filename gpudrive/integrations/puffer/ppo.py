@@ -40,8 +40,6 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
-    if vecenv.use_vbd:
-        msg += f" | Using VBD"
     print_dashboard(
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )
@@ -117,7 +115,11 @@ def evaluate(data):
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
 
-    data.vecenv.clear_render_storage()
+    # Check if there are unfinished rendered episodes
+    render_envs_to_reset = [
+        key for key, lst in data.vecenv.frames.items() if len(lst) == 0
+    ]
+    data.vecenv.clear_render_storage(env_list_to_clear=render_envs_to_reset)
 
     config, profile, experience = data.config, data.profile, data.experience
 
@@ -555,12 +557,14 @@ class Experience:
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == "cuda" and cpu_offload
+        # TODO(ev) remove
+        pin = False
         self.obs = torch.zeros(
             batch_size,
             *obs_shape,
             dtype=obs_dtype,
             pin_memory=pin,
-            device=device if not pin else "cpu",
+            device=device if not cpu_offload else "cpu",
         )
         self.actions = torch.zeros(
             batch_size, *atn_shape, dtype=int, pin_memory=pin
@@ -672,6 +676,12 @@ class Experience:
         self.b_values = self.b_values[b_flat]
         self.b_returns = self.b_advantages + self.b_values
 
+        if self.b_obs.max() > 1.0 or self.b_obs.min() < -1.0:
+            print(
+                f"Warning: The batch of observations contains features outside the range [-1, 1]."
+                f"Please check your observation normalization; min {self.b_obs.min()}, max {self.b_obs.max()}"
+            )
+
 
 class Utilization(Thread):
     def __init__(self, delay=1, maxlen=20):
@@ -744,10 +754,8 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
 
     return model_path
 
-
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
-
 
 def seed_everything(seed, torch_deterministic):
     random.seed(seed)

@@ -40,33 +40,43 @@ class Agent(nn.Module):
         self.action_dim = action_dim
         self.top_k = top_k
 
-        # Indices for unpacking the observation modalities
-        self.ego_state_idx = (
-            9
-            if self.config["reward_type"] == "reward_conditioned"
-            else constants.EGO_FEAT_DIM
-        )
-        if self.config[
-            "add_reference_path"
-        ]:  # Every agent receives a reference path
-            # NOTE: Hardcoded to 91 for now
-            self.ego_state_idx += 91 * 3
+        # Indices for unpacking the different observation modalities
+        self.ego_state_idx = constants.EGO_FEAT_DIM
+        if self.config["reward_type"] == "reward_conditioned":
+            self.ego_state_idx += 3
+        if self.config["add_previous_action"]:
+            self.ego_state_idx += 2
 
-        if self.config["add_reference_speed"]:
-            self.ego_state_idx += 1
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1
         self.partner_obs_idx = self.ego_state_idx + (
             constants.PARTNER_FEAT_DIM * self.max_observable_agents
         )
+        self.road_map_idx = self.partner_obs_idx + (
+            constants.ROAD_GRAPH_TOP_K * constants.ROAD_GRAPH_FEAT_DIM
+        )
+
+        if self.config["guidance"]:
+            self.guidance_feature_dim = 0
+            # One-hot encoding signalling the next time step
+            if self.config["add_reference_pos_xy"]:
+                self.guidance_feature_dim += (
+                    constants.LOG_TRAJECTORY_LENGTH * 2
+                )
+            if self.config["add_reference_speed"]:
+                # Assumption: Guidance traj is of length 91
+                self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
+            if self.config["add_reference_heading"]:
+                self.guidance_feature_dim += constants.LOG_TRAJECTORY_LENGTH
+            self.guidance_idx = self.road_map_idx + self.guidance_feature_dim
 
         # Shared embedding networks for both actor and critic
         self.ego_embed = nn.Sequential(
-            layer_init(nn.Linear(self.ego_state_idx, embed_dim)),
-            nn.LayerNorm(embed_dim),
+            layer_init(nn.Linear(self.ego_state_idx, 64)),
+            nn.LayerNorm(64),
             self.act_func,
             nn.Dropout(self.dropout),
-            layer_init(nn.Linear(embed_dim, embed_dim)),
+            layer_init(nn.Linear(64, 64)),
         )
 
         self.partner_embed = nn.Sequential(
@@ -85,21 +95,84 @@ class Agent(nn.Module):
             layer_init(nn.Linear(embed_dim, embed_dim)),
         )
 
+        self.guidance_embed = nn.Sequential(
+            layer_init(nn.Linear(self.guidance_feature_dim, embed_dim)),
+            nn.LayerNorm(embed_dim),
+            self.act_func,
+            nn.Dropout(self.dropout),
+            layer_init(nn.Linear(embed_dim, embed_dim)),
+        )
+
         # Critic network
         self.critic = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 1) * embed_dim, 32)),
-            nn.LayerNorm(32),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
             self.act_func,
-            layer_init(nn.Linear(32, 1), std=1.0),
+            layer_init(nn.Linear(256, 64)),
+            nn.LayerNorm(64),
+            self.act_func,
+            layer_init(nn.Linear(64, 1), std=1.0),
         )
 
         # Actor network
         self.actor = nn.Sequential(
-            layer_init(nn.Linear((2 * top_k + 1) * embed_dim, 64)),
+            layer_init(nn.Linear(((2 * top_k + 1) * embed_dim) + 64, 256)),
+            nn.LayerNorm(256),
+            self.act_func,
+            layer_init(nn.Linear(256, 64)),
             nn.LayerNorm(64),
             self.act_func,
             layer_init(nn.Linear(64, action_dim), std=0.01),
         )
+
+    @classmethod
+    def load_from_local_checkpoint(
+        cls, checkpoint_path, map_location="cpu", **kwargs
+    ):
+        """
+        Loads an Agent model from a local .pt checkpoint file.
+        This is designed to work with checkpoints created by `baselines/ppo/ppo_guided_autonomy.py`.
+
+        Args:
+            checkpoint_path (str): Path to the .pt file.
+            map_location (str or torch.device): Specifies how to remap storage locations.
+                                                Defaults to 'cpu'.
+            **kwargs: Additional arguments for the Agent constructor
+                      (e.g., act_func, dropout, top_k).
+                      These will override the default values in the constructor if provided.
+        """
+        # Load the checkpoint file
+        # Setting weights_only=False can be a security risk. Only use with trusted checkpoints.
+        saved_cpt = torch.load(
+            checkpoint_path, map_location=map_location, weights_only=False
+        )
+
+        # Extract parameters for model instantiation from the checkpoint
+        config = saved_cpt["config"]
+        embed_dim = saved_cpt["model_arch"]["embed_dim"]
+        action_dim = saved_cpt["action_dim"]
+
+        # Instantiate the model
+        model = cls(
+            config=config,
+            embed_dim=embed_dim,
+            action_dim=action_dim,
+            **kwargs,
+        )
+
+        # Load the state dict from the checkpoint file
+        if "parameters" in saved_cpt:
+            model.load_state_dict(saved_cpt["parameters"])
+        elif "model_state_dict" in saved_cpt:
+            model.load_state_dict(saved_cpt["model_state_dict"])
+        elif "state_dict" in saved_cpt:
+            model.load_state_dict(saved_cpt["state_dict"])
+        else:
+            # Assume the checkpoint file directly contains the model's state_dict
+            model.load_state_dict(saved_cpt)
+
+        model.eval()  # Set the model to evaluation mode
+        return model
 
     def forward(self, x, action=None):
         """Forward pass through the network.
@@ -109,12 +182,13 @@ class Agent(nn.Module):
                 If None, a new actions are sampled.
         """
         # Unpack into modalities
-        ego_state, partner_obs, road_graph = self.unpack_obs(x)
+        ego_state, partner_obs, road_graph, guidance = self.unpack_obs(x)
 
         # Use shared embedding networks for both actor and critic
         ego_embed = self.ego_embed(ego_state)
         partner_embed = self.partner_embed(partner_obs)
         road_embed = self.road_map_embed(road_graph)
+        guidance_embed = self.guidance_embed(guidance)
 
         # Take top k features from partner and road embeddings
         partner_max_pool = torch.topk(partner_embed, k=self.top_k, dim=1)[
@@ -127,7 +201,10 @@ class Agent(nn.Module):
         )
 
         # Concatenate the embeddings
-        z = torch.cat([ego_embed, partner_max_pool, road_max_pool], dim=-1)
+        z = torch.cat(
+            [ego_embed, partner_max_pool, road_max_pool, guidance_embed],
+            dim=-1,
+        )
 
         # Pass to the actor and critic networks
         logits = self.actor(z)
@@ -151,7 +228,8 @@ class Agent(nn.Module):
 
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
-        roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
+        roadgraph_obs = obs_flat[:, self.partner_obs_idx : self.road_map_idx]
+        guidance = obs_flat[:, self.road_map_idx :]
 
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
@@ -160,7 +238,7 @@ class Agent(nn.Module):
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
 
-        return ego_state, road_objects, road_graph
+        return ego_state, road_objects, road_graph, guidance
 
 
 class SeparateActorCriticAgent(nn.Module):
@@ -191,7 +269,7 @@ class SeparateActorCriticAgent(nn.Module):
             else constants.EGO_FEAT_DIM
         )
         if self.config[
-            "add_reference_path"
+            "add_reference_pos_xy"
         ]:  # Every agent receives a reference path
             self.ego_state_idx += 91 * 2
 
@@ -258,7 +336,7 @@ class SeparateActorCriticAgent(nn.Module):
             self.act_func,
             layer_init(
                 nn.Linear(32, 1), std=1.0
-            ),  # Fixed the dimension (was 32)
+            ),  
         )
 
         # Actor network

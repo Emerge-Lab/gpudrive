@@ -219,8 +219,8 @@ namespace madrona_gpudrive
         obj.metadata.difficulty = 0;
 
         // Initialize VBD trajectories to zeros
-        for (int i = 0; i < consts::episodeLen; i++) {
-            for (int j = 0; j < 5; j++) {
+        for (int i = 0; i < consts::kTrajectoryLength; i++) {
+            for (int j = 0; j < 6; j++) {
                 obj.vbd_trajectories[i][j] = 0.0f;
             }
         }
@@ -300,6 +300,7 @@ namespace madrona_gpudrive
         const int64_t num_segments = geometry.size() - 1;
         const int64_t sample_every_n_ = 1;
         const int64_t num_sampled_points = (num_segments + sample_every_n_ - 1) / sample_every_n_ + 1;
+        
         if (num_segments >= 10 && (road.type == EntityType::RoadLane || road.type == EntityType::RoadEdge || road.type == EntityType::RoadLine))
         {
             std::vector<bool> skip(num_sampled_points, false); // This list tracks the points that are skipped
@@ -325,9 +326,19 @@ namespace madrona_gpudrive
                     }
                     if (k_2 >= num_sampled_points)
                         break;
-                    auto point1 = geometry_points_[k * sample_every_n_];
-                    auto point2 = geometry_points_[k_1 * sample_every_n_];
-                    auto point3 = geometry_points_[k_2 * sample_every_n_];
+                    
+                    // Add bounds checking for geometry_points_ access
+                    int64_t idx1 = k * sample_every_n_;
+                    int64_t idx2 = k_1 * sample_every_n_;
+                    int64_t idx3 = k_2 * sample_every_n_;
+                    
+                    if (idx1 >= geometry_size || idx2 >= geometry_size || idx3 >= geometry_size) {
+                        break;
+                    }
+                    
+                    auto point1 = geometry_points_[idx1];
+                    auto point2 = geometry_points_[idx2];
+                    auto point3 = geometry_points_[idx3];
                     float_t area = 0.5 * std::abs((point1.x - point3.x) * (point2.y - point1.y) - (point1.x - point2.x) * (point3.y - point1.y));
                     if (area < polylineReductionThreshold)
                     {                       // If the area is less than the threshold, then we skip the middle point
@@ -344,34 +355,43 @@ namespace madrona_gpudrive
 
             // Create the road lines
             k = 0;
-            skip[0] = false;
-            skip[num_sampled_points - 1] = false;
+            if (num_sampled_points > 0) {
+                skip[0] = false;
+            }
+            if (num_sampled_points > 1) {
+                skip[num_sampled_points - 1] = false;
+            }
             std::vector<MapVector2> new_geometry_points; // This list stores the points that are not skipped
             while (k < num_sampled_points)
             {
-                if (!skip[k])
+                int64_t idx = k * sample_every_n_;
+                if (idx < geometry_size && !skip[k])
                 {
-                    new_geometry_points.push_back(geometry_points_[k * sample_every_n_]); // Add the point to the list if it is not skipped
+                    new_geometry_points.push_back(geometry_points_[idx]); // Add the point to the list if it is not skipped
                 }
                 k++;
             }
             for (size_t i = 0; i < new_geometry_points.size(); i++)
             {
-                if(i==MAX_GEOMETRY)
+                if(i >= MAX_GEOMETRY)
                     break;
                 road.geometry[i] = new_geometry_points[i]; // Create the road lines
             }
-            road.numPoints = new_geometry_points.size();
+            road.numPoints = std::min(new_geometry_points.size(), static_cast<size_t>(MAX_GEOMETRY));
         }
         else
         {
             for (int64_t i = 0; i < num_sampled_points ; ++i)
             {
-                if(i==MAX_GEOMETRY)
+                if(i >= MAX_GEOMETRY)
                     break;
-                road.geometry[i] = geometry_points_[i * sample_every_n_]; 
+                int64_t idx = i * sample_every_n_;
+                if (idx >= geometry_size) {
+                    break;
+                }
+                road.geometry[i] = geometry_points_[idx];
             }
-            road.numPoints = num_sampled_points;
+            road.numPoints = std::min(static_cast<size_t>(num_sampled_points), static_cast<size_t>(MAX_GEOMETRY));
         }
 
         road.id = getValueOrDefault<uint32_t>(j, "id", -1);
@@ -484,7 +504,7 @@ namespace madrona_gpudrive
             // Set additional metadata if needed
             int sdc_id = map.objects[0].id;
             if (tracks_to_predict_indices.find(sdc_index) != tracks_to_predict_indices.end()) {
-                map.objects[0].metadata.isTrackToPredict = 1;
+                map.objects[0].metadata.isTrackToPredict = 1.0f;
                 // Find and set difficulty
                 for (const auto& track : tracks_to_predict) {
                     if (getValueOrDefault<int>(track, "track_index", -1) == sdc_index) {
@@ -494,12 +514,12 @@ namespace madrona_gpudrive
                 }
             }
             if (objects_of_interest_ids.find(sdc_id) != objects_of_interest_ids.end()) {
-                map.objects[0].metadata.isObjectOfInterest = 1;
+                map.objects[0].metadata.isObjectOfInterest = 1.0f;
             }
-            
+
             idToObjIdx[sdc_id] = 0;
             idx = 1;
-            
+
             // Remove SDC from sets to avoid double processing
             tracks_to_predict_indices.erase(sdc_index);
             objects_of_interest_ids.erase(sdc_id);
@@ -520,13 +540,13 @@ namespace madrona_gpudrive
                         break;
                     }
                 }
-                
+
                 // Check if also object of interest
                 if (objects_of_interest_ids.find(map.objects[idx].id) != objects_of_interest_ids.end()) {
-                    map.objects[idx].metadata.isObjectOfInterest = 1;
+                    map.objects[idx].metadata.isObjectOfInterest = 1.0f;
                     objects_of_interest_ids.erase(map.objects[idx].id);
                 }
-                
+
                 idToObjIdx[map.objects[idx].id] = idx;
                 idx++;
             }
@@ -558,7 +578,7 @@ namespace madrona_gpudrive
                 idx++;
             }
         }
-        
+
         // Process roads
         auto roads = getValueOrDefault<simdjson::dom::array>(j, "roads", {});
         map.numRoads = std::min(roads.size(), static_cast<size_t>(MAX_ROADS));

@@ -37,7 +37,7 @@ namespace madrona_gpudrive
         uint32_t id;
         MapVector2 mean;
         bool markAsExpert{false};
-        float vbd_trajectories[consts::episodeLen][5];  // x, y, yaw, vx, vy
+        float vbd_trajectories[consts::kTrajectoryLength][6];  // x, y, yaw, vx, vy, valid
     };
 
     struct MapRoad
@@ -55,10 +55,13 @@ namespace madrona_gpudrive
     {
         MapObject objects[MAX_OBJECTS];
         MapRoad roads[MAX_ROADS];
+        TrafficLightState trafficLightStates[consts::kMaxTrafficLightCount]; 
 
         uint32_t numObjects;
         uint32_t numRoads;
         uint32_t numRoadSegments;
+        uint32_t numTrafficLights;  
+        bool hasTrafficLights;   
         MapVector2 mean;
 
         char mapName[32];
@@ -119,6 +122,8 @@ namespace madrona_gpudrive
     {
         float polylineReductionThreshold;
         float observationRadius;
+        float viewConeHalfAngle;
+        bool removeOccludedAgents;
         RewardParams rewardParams;
         CollisionBehaviour collisionBehaviour = CollisionBehaviour::AgentStop; // Default: AgentStop
         GoalBehaviour goalBehaviour = GoalBehaviour::Remove;  // Default to current behavior
@@ -131,8 +136,9 @@ namespace madrona_gpudrive
         bool enableLidar = false;
         bool disableClassicalObs = false;
         DynamicsModel dynamicsModel = DynamicsModel::Classic;
-        bool readFromTracksToPredict = false;       // Default: false - for womd_tracks_to_predict initialization mode
+        bool readFromTracksToPredict = false;       // Default: false - for wosac initialization mode
         uint32_t initSteps = 0;
+        bool controlExperts = false; // Default: false - for wosac initialization mode
     };
 
     struct WorldInit

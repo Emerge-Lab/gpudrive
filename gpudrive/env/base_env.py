@@ -62,7 +62,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         if (
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
-            or self.config.reward_type == "follow_waypoints"
+            or self.config.reward_type == "guided_autonomy"
             or self.config.reward_type == "reward_conditioned"
         ):
             reward_params.rewardType = (
@@ -86,6 +86,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters object with road reduction settings.
         """
         params.observationRadius = self.config.obs_radius
+        params.viewConeHalfAngle = self.config.view_cone_half_angle
+        params.removeOccludedAgents = self.config.remove_occluded_agents
         if self.config.road_obs_algorithm == "k_nearest_roadpoints":
             params.roadObservationAlgorithm = (
                 madrona_gpudrive.FindRoadObservationsWith.KNearestEntitiesWithRadiusFiltering
@@ -117,11 +119,16 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
         params.rewardParams = self._set_reward_params()
         params.maxNumControlledAgents = self.max_cont_agents
-        if self.config.init_mode == "womd_tracks_to_predict":
+        if self.config.init_mode == "wosac_eval":
             # Bypasses all gpudrive initialization rules and directly reads from the tracks_to_predict
             # flag in the WOMD dataset metadata
             params.readFromTracksToPredict = True
             params.isStaticAgentControlled = True
+            params.controlExperts = True
+        elif self.config.init_mode == "wosac_train":
+            params.readFromTracksToPredict = True
+            params.isStaticAgentControlled = True
+            params.controlExperts = False
         elif self.config.init_mode == "all_objects":
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False
@@ -160,7 +167,15 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
         params = self._set_goal_behavior(params)
-        self.init_steps = getattr(self.config, "init_steps", 0)
+    
+        if self.config.guidance and self.config.guidance_mode == "vbd_online":
+            self.init_steps = max(self.config.init_steps, 10)
+            print(
+                f"\n[Note] Guidance mode '{self.config.guidance_mode}' requires at least 10 initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
+            )
+        else:
+            self.init_steps = getattr(self.config, "init_steps", 0)
+            
         params.initSteps = self.init_steps
 
         return params
