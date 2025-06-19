@@ -405,6 +405,50 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
 
     const int64_t numWorlds = mgr_cfg.scenes.size();
 
+
+
+    std::vector<int> valid_scene_indices;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::cout << "Filtering scenes for controllable objects..." << std::endl;
+
+
+    for (int i = 0; i < mgr_cfg.scenes.size(); i++) {
+
+        Map *cpu_map = (Map *)MapReader::parseAndWriteOut(mgr_cfg.scenes[i], 
+                            ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+        
+        int64_t controllable_objects = 0;
+        int total_objects = cpu_map->numObjects;
+        
+        for (int obj_idx = 0; obj_idx < total_objects; obj_idx++) {
+            const auto& object = cpu_map->objects[obj_idx];
+            auto startPos = object.position[0];
+            auto distance = std::sqrt(std::pow(object.goalPosition.x - startPos.x, 2) + 
+                                    std::pow(object.goalPosition.y - startPos.y, 2));
+
+            auto isAgentStatic = distance < consts::staticThreshold;
+            auto isAgentAVehicle = object.type == EntityType::Vehicle;
+
+            auto staticFlag = !isAgentStatic || ((mgr_cfg).params).isStaticAgentControlled;
+            auto vehicleFlag = isAgentAVehicle || !mgr_cfg.params.IgnoreNonVehicles;
+            if (object.valid[0] && !object.markAsExpert &&
+                staticFlag &&
+                vehicleFlag) {
+                controllable_objects++;
+            }
+        }
+        
+        if (controllable_objects >= mgr_cfg.params.minimumControllableObjects) {
+            valid_scene_indices.push_back(i);
+        }
+        
+        delete cpu_map;
+    }
+
+    std::cout << "Found " << valid_scene_indices.size() << " valid scenes with controllable objects." << std::endl;
+
     switch (mgr_cfg.execMode) {
     case ExecMode::CUDA: {
 #ifdef MADRONA_CUDA_SUPPORT
@@ -425,12 +469,29 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         Parameters* paramsDevicePtr = (Parameters*)cu::allocGPU(sizeof(Parameters));
         REQ_CUDA(cudaMemcpy(paramsDevicePtr, &(mgr_cfg.params), sizeof(Parameters), cudaMemcpyHostToDevice));
 
+        // Now load only the valid scenes for world initialization using CUDA mode
         int64_t worldIdx{0};
-        for (auto const &scene : mgr_cfg.scenes) {
-	    Map *map = (Map *)MapReader::parseAndWriteOut(scene,
-							  ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+        for (int scene_idx : valid_scene_indices) {
+            if (worldIdx >= numWorlds) break; // Safety check
+            
+            const auto& scene = mgr_cfg.scenes[scene_idx];
+            Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                          ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
             world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
         }
+        
+        // If we have fewer valid scenes than worlds, cycle through them
+        while (worldIdx < numWorlds) {
+            for (int scene_idx : valid_scene_indices) {
+                if (worldIdx >= numWorlds) break;
+                
+                const auto& scene = mgr_cfg.scenes[scene_idx];
+                Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                              ExecMode::CUDA, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, paramsDevicePtr};
+            }
+        }
+        
         assert(worldIdx == numWorlds);
 
         Optional<RenderGPUState> render_gpu_state =
@@ -500,12 +561,25 @@ Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
         HeapArray<WorldInit> world_inits(numWorlds);
 
         int64_t worldIdx{0};
-
-        for (auto const &scene : mgr_cfg.scenes)
-        {
-            Map *map_ = (Map *)MapReader::parseAndWriteOut(scene,
-                                                           ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
-            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map_, &(mgr_cfg.params)};
+        for (int scene_idx : valid_scene_indices) {
+            if (worldIdx >= numWorlds) break; // Safety check
+            
+            const auto& scene = mgr_cfg.scenes[scene_idx];
+            Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                          ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+            world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, &(mgr_cfg.params)};
+        }
+        
+        // If we have fewer valid scenes than worlds, cycle through them
+        while (worldIdx < numWorlds) {
+            for (int scene_idx : valid_scene_indices) {
+                if (worldIdx >= numWorlds) break;
+                
+                const auto& scene = mgr_cfg.scenes[scene_idx];
+                Map *map = (Map *)MapReader::parseAndWriteOut(scene,
+                                              ExecMode::CPU, mgr_cfg.params.polylineReductionThreshold);
+                world_inits[worldIdx++] = WorldInit{episode_mgr, phys_obj_mgr, map, &(mgr_cfg.params)};
+            }
         }
         assert(worldIdx == numWorlds);
 

@@ -144,6 +144,9 @@ class EnvConfig:
     vbd_trajectory_weight: float = 0.01
     vbd_in_obs: bool = False
 
+    ### filter for controllable objects
+    minimum_controllable_objects = 0
+    
 
 class SelectionDiscipline(Enum):
     """Enum for selecting scenes discipline in dataset configuration."""

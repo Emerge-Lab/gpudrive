@@ -108,10 +108,12 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         params = madrona_gpudrive.Parameters()
-        
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
         )
+
+        params.minimumControllableObjects = self.config.minimum_controllable_objects
+
         params.rewardParams = self._set_reward_params()
         params.maxNumControlledAgents = self.max_cont_agents
         if self.config.init_mode == "womd_tracks_to_predict":
@@ -155,6 +157,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
+
 
         return params
 
