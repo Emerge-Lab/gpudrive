@@ -8,8 +8,8 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
-  k_unique_scenes: 100 # Number of unique scenes to sample from
+  num_worlds: 10 # Number of parallel environments
+  k_unique_scenes: 10 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "reward_conditioned" # Options: "weighted_combination", "reward_conditioned", "follow_waypoints"
+  reward_type: "reward_conditioned" # Options: "weighted_combination", "reward_conditioned", "guided_autonomy"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -42,16 +42,11 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   action_space_steer_disc: 13
   action_space_accel_disc: 7
   init_steps: 0 # Warmup steps
-  # Versatile Behavior Diffusion (VBD): This will slow down training
-  use_vbd: false
-  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
-  vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
-  vbd_in_obs: false
 
 wandb:
   entity: ""
   project: "kshotagents"
-  group: "separate_actor_critic"
+  group: "debug_mini"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
@@ -110,7 +105,7 @@ train:
   render_format: "mp4" # Options: gif, mp4
   render_fps: 20 # Frames per second
   zoom_radius: 100
-  plot_waypoints: true
+  plot_guidance_pos_xy: true
 
 vec:
   backend: "native" # Only native is currently supported

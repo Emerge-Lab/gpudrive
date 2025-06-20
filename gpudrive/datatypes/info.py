@@ -12,7 +12,9 @@ class Info:
         """Initializes the ego state with an observation tensor."""
         self.off_road = info_tensor[:, :, 0]
         self.collided = info_tensor[:, :, 1:3].sum(axis=2)
+        self.collided_with_vehicle = info_tensor[:, :, 1]
         self.goal_achieved = info_tensor[:, :, 3]
+        self.type = info_tensor[:, :, 4]
 
     @classmethod
     def from_tensor(

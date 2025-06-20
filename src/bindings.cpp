@@ -23,6 +23,7 @@ namespace madrona_gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("kTrajectoryLength") = consts::kTrajectoryLength;
         m.attr("episodeLen") = consts::episodeLen;
         m.attr("numLidarSamples") = consts::numLidarSamples;
         m.attr("vehicleScale") = consts::vehicleLengthScale;
@@ -49,6 +50,8 @@ namespace madrona_gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
+            .def_rw("viewConeHalfAngle", &Parameters::viewConeHalfAngle)
+            .def_rw("removeOccludedAgents", &Parameters::removeOccludedAgents)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("goalBehaviour", &Parameters::goalBehaviour)
@@ -61,7 +64,8 @@ namespace madrona_gpudrive
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled)
             .def_rw("readFromTracksToPredict", &Parameters::readFromTracksToPredict)
-            .def_rw("initSteps", &Parameters::initSteps);
+            .def_rw("initSteps", &Parameters::initSteps)
+            .def_rw("controlExperts", &Parameters::controlExperts);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
@@ -139,6 +143,7 @@ namespace madrona_gpudrive
             .def("set_maps", &Manager::setMaps)
             .def("world_means_tensor", &Manager::worldMeansTensor)
             .def("metadata_tensor", &Manager::metadataTensor)
+            .def("tl_state_tensor", &Manager::trafficLightTensor)
             .def("vbd_trajectory_tensor", &Manager::vbdTrajectoryTensor)
             .def("map_name_tensor", &Manager::mapNameTensor)
             .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {

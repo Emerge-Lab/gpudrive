@@ -109,8 +109,8 @@ static inline void populateVBDTrajectory(Engine &ctx, const Entity &agent, const
     auto &vbd_trajectory = ctx.get<VBDTrajectory>(agent_iface);
     
     // Copy VBD trajectories from the map object
-    for (int i = 0; i < consts::episodeLen; i++) {
-        for (int j = 0; j < 5; j++) {
+    for (int i = 0; i < consts::kTrajectoryLength; i++) {
+        for (int j = 0; j < 6; j++) {
             vbd_trajectory.trajectories[i][j] = agentInit.vbd_trajectories[i][j];
         }
     }
@@ -133,12 +133,20 @@ static inline bool isAgentControllable(Engine &ctx, Entity agent, bool markAsExp
         if (ctx.get<Trajectory>(agent_iface).valids[initSteps] == 0) {
             return false;
         }
+        else if (!ctx.data().params.controlExperts && markAsExpert) {
+            return false;
+        }
         else {
             return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents;
         }
     }
     
     // Original logic for other initialization modes
+    if (ctx.data().params.controlExperts) {
+        return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
+           ctx.get<Trajectory>(agent_iface).valids[0] &&
+           ctx.get<ResponseType>(agent) == ResponseType::Dynamic;        
+    }
     return ctx.data().numControlledAgents < ctx.data().params.maxNumControlledAgents &&
            ctx.get<Trajectory>(agent_iface).valids[0] &&
            ctx.get<ResponseType>(agent) == ResponseType::Dynamic &&
@@ -487,6 +495,20 @@ void createPersistentEntities(Engine &ctx) {
             other_agents.e[out_idx++] = other_agent;
         }
     }
+
+
+    for(CountT i = 0; i < map.numTrafficLights; i++)
+    {
+        auto &trafficLight = ctx.singleton<TrafficLights>().trafficLights[i];
+        trafficLight = map.trafficLightStates[i];
+        
+        for (size_t t = 0; t < consts::kTrajectoryLength-1; t++) {
+            trafficLight.x[t] -= ctx.singleton<WorldMeans>().mean.x;
+            trafficLight.y[t] -= ctx.singleton<WorldMeans>().mean.y;
+            trafficLight.z[t] -= ctx.singleton<WorldMeans>().mean.z;
+        }
+    }
+
 }
 
 static void resetPersistentEntities(Engine &ctx)

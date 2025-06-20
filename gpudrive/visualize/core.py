@@ -5,7 +5,8 @@ matplotlib.use("Agg")
 from typing import Tuple, Optional, List, Dict, Any, Union
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Arc
+from matplotlib.lines import Line2D
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
@@ -22,9 +23,12 @@ from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
+    LidarObs,
+    TrafficLightObs,
 )
 from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
+from gpudrive.env import constants
 from gpudrive.visualize.color import (
     ROAD_GRAPH_COLORS,
     ROAD_GRAPH_TYPE_NAMES,
@@ -41,8 +45,8 @@ class MatplotlibVisualizer:
         self,
         sim_object,
         controlled_agent_mask,
+        reference_trajectory,
         goal_radius,
-        backend: str,
         num_worlds: int,
         render_config: Dict[str, Any],
         env_config: Dict[str, Any],
@@ -53,15 +57,20 @@ class MatplotlibVisualizer:
         self.goal_radius = goal_radius
         self.num_worlds = num_worlds
         self.render_config = render_config
-        self.figsize = (15, 15)
+        self.figsize = (10, 10)
         self.env_config = env_config
         self.render_3d = render_config.render_3d
-        self.vehicle_height = (
-            render_config.vehicle_height
-        )  # Default vehicle height
-        self.initialize_static_scenario_data(controlled_agent_mask)
+        self.vehicle_height = render_config.vehicle_height
+        self.initialize_static_scenario_data(
+            controlled_agent_mask=controlled_agent_mask,
+            reference_trajectory=reference_trajectory,
+        )
 
-    def initialize_static_scenario_data(self, controlled_agent_mask):
+    def initialize_static_scenario_data(
+        self,
+        controlled_agent_mask,
+        reference_trajectory,
+    ):
         """
         Initialize key information for visualization based on the
         current batch of scenarios.
@@ -76,25 +85,18 @@ class MatplotlibVisualizer:
             backend=self.backend,
             device=self.device,
         )
-        self.controlled_agent_mask = controlled_agent_mask
+        self.controlled_agent_mask = controlled_agent_mask.clone().to(
+            self.device
+        )
 
         if isinstance(controlled_agent_mask, ArrayImpl):
             self.controlled_agent_mask = torch.from_numpy(
                 np.array(controlled_agent_mask)
             )
 
-        self.controlled_agent_mask = self.controlled_agent_mask.to(self.device)
-
-        self.log_trajectory = LogTrajectory.from_tensor(
-            self.sim_object.expert_trajectory_tensor(),
-            self.num_worlds,
-            self.controlled_agent_mask.shape[1],
-            backend=self.backend,
-            device=self.device,
-        )
-
-        self.vbd_trajectory = VBDTrajectory.from_tensor(
-            self.sim_object.vbd_trajectory_tensor(),
+        self.trajectory = reference_trajectory
+        self.tl_obs = TrafficLightObs.from_tensor(
+            tl_states_tensor=self.sim_object.tl_state_tensor(),
             backend=self.backend,
             device=self.device,
         )
@@ -105,8 +107,8 @@ class MatplotlibVisualizer:
         time_steps: Optional[List[int]] = None,
         center_agent_indices: Optional[List[int]] = None,
         zoom_radius: int = 100,
-        plot_waypoints: bool = False,
-        plot_vbd_trajectory: bool = False,
+        plot_guidance_pos_xy: bool = False,
+        plot_guidance_up_to_time: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
         policy_masks: Optional[Dict[int, Dict[str, torch.Tensor]]] = None,
@@ -126,7 +128,7 @@ class MatplotlibVisualizer:
             center_agent_indices: Optional list of center agent indices for zooming.
             figsize: Tuple for figure size of each subplot.
             zoom_radius: Radius for zooming in around the center agent.
-            plot_waypoints: If True, plots the waypoints from the human replays.
+            plot_guidance_pos_xy: If True, plots the waypoints from the human replays.
             agent_positions: Optional tensor to plot rolled out agent positions.
             backward_goals: If True, plots backward goals for controlled agents.
             policy_mask: dict
@@ -257,7 +259,6 @@ class MatplotlibVisualizer:
         line_width_scale = max(self.figsize) / 15
 
         if policy_masks:
-
             world_based_policy_mask = {}
 
             for policy_name, (fn, mask) in policy_masks.items():
@@ -265,7 +266,6 @@ class MatplotlibVisualizer:
                     if world not in world_based_policy_mask:
                         world_based_policy_mask[world] = {}
                     world_based_policy_mask[world][policy_name] = mask[world]
-
         else:
             world_based_policy_mask = None
 
@@ -273,19 +273,27 @@ class MatplotlibVisualizer:
         for idx, (env_idx, time_step, center_agent_idx) in enumerate(
             zip(env_indices, time_steps, center_agent_indices)
         ):
+            # Create a completely new figure and axis for each environment to prevent carryover
+            plt.close(
+                "all"
+            )  # Close all existing figures first to prevent memory leaks
 
-            # Initialize figure and axes from cached road graph
-            fig, ax = plt.subplots(
-                figsize=self.figsize,
-                subplot_kw={"projection": "3d"} if self.render_3d else {},
-            )
+            # Initialize a new figure for each environment
+            fig = plt.figure(figsize=self.figsize)
+
+            # Create a new axis with proper projection
             if self.render_3d:
+                ax = fig.add_subplot(111, projection="3d")
                 ax.view_init(elev=30, azim=45)  # Set default 3D view angle
+            else:
+                ax = fig.add_subplot(111)
+
+            # Set up the figure and axis
             fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-            ax.clear()  # Clear any existing content
             ax.set_aspect("equal", adjustable="box")
-            figs.append(fig)  # Add the new figure
-            plt.close(fig)  # Close the figure to prevent carryover
+
+            # Add to figures list - use a copy to ensure it's detached from the current matplotlib state
+            figs.append(fig)
 
             # Get control mask and omit out-of-bound agents (dead agents)
             controlled = self.controlled_agent_mask[env_idx, :]
@@ -308,23 +316,23 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
             )
 
-            if plot_waypoints:
-                self._plot_waypoints(
+            if plot_guidance_pos_xy:
+                self._plot_reference_xy(
                     ax=ax,
                     control_mask=controlled_live,
                     env_idx=env_idx,
-                    log_trajectory=self.log_trajectory,
+                    trajectory=self.trajectory,
                     line_width_scale=line_width_scale,
+                    plot_guidance_up_to_time=plot_guidance_up_to_time,
                 )
 
-            if plot_vbd_trajectory:
-                self._plot_vbd_trajectory(
-                    ax=ax,
-                    control_mask=controlled_live,
-                    env_idx=env_idx,
-                    vbd_trajectory=self.vbd_trajectory,
-                    line_width_scale=line_width_scale,
-                )
+            self._plot_traffic_lights(
+                ax=ax,
+                env_idx=env_idx,
+                tl_obs=self.tl_obs,
+                time_step=time_step if time_step is not None else 0,
+                marker_size_scale=marker_scale,
+            )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -371,6 +379,44 @@ class MatplotlibVisualizer:
                 center_x = 0  # Default center x-coordinate
                 center_y = 0  # Default center y-coordinate
 
+            time_step = (
+                self.env_config.episode_len
+                - self.sim_object.steps_remaining_tensor().to_torch()[
+                    env_idx, 0
+                ]
+            ).item()
+
+            # Add time step text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.95,  # y position in axes coordinates (95% from bottom)
+                f"t = {time_step}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
+
+            time_step = (
+                self.env_config.episode_len
+                - self.sim_object.steps_remaining_tensor().to_torch()[
+                    env_idx, 0
+                ]
+            ).item()
+
+            # Add time step text to the figure
+            ax.text(
+                0.05,  # x position in axes coordinates (5% from left)
+                0.95,  # y position in axes coordinates (95% from bottom)
+                f"t = {time_step}",
+                transform=ax.transAxes,  # Use axes coordinates
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+            )
+
             # Set zoom window around the center
             ax.set_xlim(center_x - zoom_radius, center_x + zoom_radius)
             ax.set_ylim(center_y - zoom_radius, center_y + zoom_radius)
@@ -389,8 +435,11 @@ class MatplotlibVisualizer:
 
             ax.set_axis_off()
 
-        for fig in figs:
+            # Apply tight layout to current figure
             fig.tight_layout(pad=2, rect=[0.00, 0.00, 0.9, 1])
+
+            # Close the figure to prevent memory leaks and cleanup
+            plt.close(fig)
 
         return figs
 
@@ -626,91 +675,208 @@ class MatplotlibVisualizer:
 
         return None
 
-    def _plot_waypoints(
+    def _plot_reference_xy(
         self,
         ax: matplotlib.axes.Axes,
         env_idx: int,
         control_mask: torch.Tensor,
-        log_trajectory: LogTrajectory,
+        trajectory,
         line_width_scale: int = 1.0,
+        plot_guidance_up_to_time: bool = False,
     ):
         """Plot the log replay trajectory for controlled agents in either 2D or 3D."""
         if self.render_3d:
-            # Get trajectory points
-            trajectory_points = log_trajectory.pos_xy[
-                env_idx, control_mask, :, :
-            ].numpy()
-
-            # Set a fixed height for trajectory visualization
-            trajectory_height = 0.05  # Small height above ground
-
-            # Plot trajectories for each controlled agent
-            for agent_trajectory in trajectory_points:
-                # Filter out invalid points (zeros or out of bounds)
-                valid_mask = (
-                    (agent_trajectory[:, 0] != 0)
-                    & (agent_trajectory[:, 1] != 0)
-                    & (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS)
-                    & (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS)
+            # Get trajectory points - make a clean copy to avoid reference issues
+            try:
+                trajectory_points = (
+                    trajectory.pos_xy[env_idx, control_mask, :, :]
+                    .clone()
+                    .numpy()
                 )
-                valid_points = agent_trajectory[valid_mask]
 
-                if len(valid_points) > 1:
-                    # Create segments for the trajectory
-                    segments = []
-                    for i in range(len(valid_points) - 1):
-                        segment = np.array(
-                            [
-                                [
-                                    valid_points[i, 0],
-                                    valid_points[i, 1],
-                                    trajectory_height,
-                                ],
-                                [
-                                    valid_points[i + 1, 0],
-                                    valid_points[i + 1, 1],
-                                    trajectory_height,
-                                ],
-                            ]
-                        )
-                        segments.append(segment)
+                # Set a fixed height for trajectory visualization
+                trajectory_height = 0.05  # Small height above ground
 
-                    # Create line collection with fade effect
-                    colors = np.zeros((len(segments), 4))
-                    colors[:, 1] = 0.9  # Green component
-                    colors[:, 3] = np.linspace(
-                        0.2, 0.6, len(segments)
-                    )  # Alpha gradient
-
-                    lc = Line3DCollection(
-                        segments, colors=colors, linewidth=2 * line_width_scale
+                # Plot trajectories for each controlled agent
+                for agent_trajectory in trajectory_points:
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (agent_trajectory[:, 0] != 0)
+                        & (agent_trajectory[:, 1] != 0)
+                        & (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS)
+                        & (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS)
                     )
-                    ax.add_collection3d(lc)
+                    valid_points = agent_trajectory[valid_mask]
 
-                    # Add points at trajectory positions
-                    ax.scatter3D(
-                        valid_points[:, 0],
-                        valid_points[:, 1],
-                        np.full_like(valid_points[:, 0], trajectory_height),
-                        color="lightgreen",
-                        s=10,
-                        alpha=0.5,
+                    if len(valid_points) > 1:
+                        # Create segments for the trajectory
+                        segments = []
+                        for i in range(len(valid_points) - 1):
+                            segment = np.array(
+                                [
+                                    [
+                                        valid_points[i, 0],
+                                        valid_points[i, 1],
+                                        trajectory_height,
+                                    ],
+                                    [
+                                        valid_points[i + 1, 0],
+                                        valid_points[i + 1, 1],
+                                        trajectory_height,
+                                    ],
+                                ]
+                            )
+                            segments.append(segment)
+
+                        # Create line collection with fade effect
+                        colors = np.zeros((len(segments), 4))
+                        colors[:, 1] = 0.9  # Green component
+                        colors[:, 3] = np.linspace(
+                            0.2, 0.6, len(segments)
+                        )  # Alpha gradient
+
+                        # Create a fresh line collection for each plot
+                        lc = Line3DCollection(
+                            segments,
+                            colors=colors,
+                            linewidth=2 * line_width_scale,
+                        )
+                        ax.add_collection3d(lc)
+
+                        # Add points at trajectory positions - creating a new scatter object each time
+                        ax.scatter3D(
+                            valid_points[:, 0],
+                            valid_points[:, 1],
+                            np.full_like(
+                                valid_points[:, 0], trajectory_height
+                            ),
+                            color="lightgreen",
+                            s=10,
+                            alpha=0.5,
+                            zorder=0,
+                        )
+            except Exception as e:
+                print(f"Error plotting 3D reference trajectory: {e}")
+        else:
+            try:
+
+                if plot_guidance_up_to_time:
+                    # Get the time step for the current environment
+                    time_step = (
+                        self.env_config.episode_len
+                        - self.sim_object.steps_remaining_tensor().to_torch()[
+                            env_idx, 0
+                        ]
+                    ).item()
+
+                    # Limit the trajectory to the specified time step
+                    # Create a new scatter plot for this specific environment and control mask
+                    pos_x_context = (
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, :time_step, 0
+                        ]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y_context = (
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, :time_step, 1
+                        ]
+                        .cpu()
+                        .numpy()
+                    )
+
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x_context != 0)
+                        & (pos_y_context != 0)
+                        & (np.abs(pos_x_context) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y_context) < OUT_OF_BOUNDS)
+                    )
+
+                    ax.scatter(
+                        pos_x_context,
+                        pos_y_context,
+                        color="#f4a261",
+                        linewidth=0.1 * line_width_scale,
+                        alpha=0.7,
+                        s=25,
                         zorder=0,
                     )
-        else:
-            # Original 2D plotting
-            ax.scatter(
-                log_trajectory.pos_xy[env_idx, control_mask, :, 0]
-                .cpu()
-                .numpy(),
-                log_trajectory.pos_xy[env_idx, control_mask, :, 1]
-                .cpu()
-                .numpy(),
-                color="lightgreen",
-                linewidth=0.35 * line_width_scale,
-                alpha=0.35,
-                zorder=0,
-            )
+
+                    pos_x = (
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, time_step:, 0
+                        ]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y = (
+                        trajectory.pos_xy.clone()[
+                            env_idx, control_mask, time_step:, 1
+                        ]
+                        .cpu()
+                        .numpy()
+                    )
+
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x != 0)
+                        & (pos_y != 0)
+                        & (np.abs(pos_x) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y) < OUT_OF_BOUNDS)
+                    )
+
+                    # Apply mask if any valid points exist
+                    if np.any(valid_mask):
+                        pos_x = pos_x[valid_mask]
+                        pos_y = pos_y[valid_mask]
+
+                    ax.scatter(
+                        pos_x,
+                        pos_y,
+                        color="g",
+                        s=25,
+                        alpha=0.25,
+                        zorder=0,
+                    )
+
+                else:
+                    pos_x = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :, 0]
+                        .cpu()
+                        .numpy()
+                    )
+                    pos_y = (
+                        trajectory.pos_xy.clone()[env_idx, control_mask, :, 1]
+                        .cpu()
+                        .numpy()
+                    )
+
+                    # Filter out invalid points (zeros or out of bounds)
+                    valid_mask = (
+                        (pos_x != 0)
+                        & (pos_y != 0)
+                        & (np.abs(pos_x) < OUT_OF_BOUNDS)
+                        & (np.abs(pos_y) < OUT_OF_BOUNDS)
+                    )
+
+                    # Apply mask if any valid points exist
+                    if np.any(valid_mask):
+                        pos_x = pos_x[valid_mask]
+                        pos_y = pos_y[valid_mask]
+
+                    # Create a fresh scatter plot
+                    ax.scatter(
+                        pos_x,
+                        pos_y,
+                        color="g",
+                        s=25,
+                        alpha=0.1,
+                        zorder=0,
+                    )
+            except Exception as e:
+                print(f"Error plotting 2D reference trajectory: {e}")
 
     def _plot_vbd_trajectory(
         self,
@@ -794,87 +960,91 @@ class MatplotlibVisualizer:
                 zorder=0,
             )
 
-    def _plot_vbd_trajectory(
+    def _plot_traffic_lights(
         self,
         ax: matplotlib.axes.Axes,
         env_idx: int,
-        control_mask: torch.Tensor,
-        vbd_trajectory: VBDTrajectory,
-        line_width_scale: int = 1.0,
+        tl_obs: "TrafficLightObs",
+        time_step: int = 0,
+        marker_size_scale: float = 1.0,
     ):
-        """Plot the VBD trajectory for controlled agents in either 2D or 3D."""
-        if self.render_3d:
-            # Get trajectory points
-            trajectory_points = vbd_trajectory.pos_xy[
-                env_idx, control_mask, :, :
-            ].numpy()
+        """Plot traffic light states as colored dots.
 
-            # Set a fixed height for trajectory visualization
-            trajectory_height = 0.05
+        Args:
+            ax: Matplotlib axis to plot on
+            env_idx: Environment index
+            tl_obs: Traffic light observation object
+            time_step: Current time step
+            marker_size_scale: Scale factor for marker size
+        """
 
-            # Plot trajectories for each controlled agent
-            for agent_trajectory in trajectory_points:
-                # Filter out invalid points (zeros or out of bounds)
-                valid_mask = (
-                    (agent_trajectory[:, 0] != 0)
-                    & (agent_trajectory[:, 1] != 0)
-                    & (np.abs(agent_trajectory[:, 0]) < OUT_OF_BOUNDS)
-                    & (np.abs(agent_trajectory[:, 1]) < OUT_OF_BOUNDS)
+        # Traffic light state colors
+        TL_STATE_COLORS = {
+            0: "#C5C5C5",  # Unknown - gray
+            1: "r",  # Stop - red
+            2: "tab:orange",  # Caution - orange
+            3: "g",  # Go - green
+        }
+
+        # Get valid traffic lights for this environment
+        valid_mask = tl_obs.valid_mask[env_idx, :]
+        if not valid_mask.any():
+            return
+
+        # Clamp time_step to available data
+        max_time_idx = tl_obs.state.shape[2] - 1
+        time_step = min(time_step, max_time_idx)
+
+        # Get traffic light data for valid lights at current time step
+        valid_indices = torch.where(valid_mask)[0]
+
+        for tl_idx in valid_indices:
+            # Get position (use first valid position if time series)
+            pos_x = tl_obs.pos_x[env_idx, tl_idx, time_step].item()
+            pos_y = tl_obs.pos_y[env_idx, tl_idx, time_step].item()
+
+            # Skip if position is invalid (0,0 or out of bounds)
+            if (
+                (pos_x == 0 and pos_y == 0)
+                or abs(pos_x) > 1000
+                or abs(pos_y) > 1000
+            ):
+                continue
+
+            # Get current state
+            state = int(tl_obs.state[env_idx, tl_idx, time_step].item())
+            state = max(0, min(3, state))  # Clamp to valid range
+
+            color = TL_STATE_COLORS[state]
+
+            if self.render_3d:
+                # Plot as elevated marker in 3D
+                height = 0.2  # Height above ground for visibility
+                ax.scatter3D(
+                    [pos_x],
+                    [pos_y],
+                    [height],
+                    color=color,
+                    s=60 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.8,
+                    zorder=10,
                 )
-                valid_points = agent_trajectory[valid_mask]
-
-                if len(valid_points) > 1:
-                    # Create segments for the trajectory
-                    segments = []
-                    for i in range(len(valid_points) - 1):
-                        segment = np.array(
-                            [
-                                [
-                                    valid_points[i, 0],
-                                    valid_points[i, 1],
-                                    trajectory_height,
-                                ],
-                                [
-                                    valid_points[i + 1, 0],
-                                    valid_points[i + 1, 1],
-                                    trajectory_height,
-                                ],
-                            ]
-                        )
-                        segments.append(segment)
-
-                    # Create line collection with fade effect
-                    colors = np.zeros((len(segments), 4))
-                    colors[:, 1] = 0.9  # Green component
-                    colors[:, 3] = np.linspace(
-                        0.2, 0.6, len(segments)
-                    )  # Alpha gradient
-
-                    lc = Line3DCollection(
-                        segments, colors=colors, linewidth=2 * line_width_scale
-                    )
-                    ax.add_collection3d(lc)
-
-                    # Add points at trajectory positions
-                    ax.scatter3D(
-                        valid_points[:, 0],
-                        valid_points[:, 1],
-                        np.full_like(valid_points[:, 0], trajectory_height),
-                        color="lightgreen",
-                        s=10,
-                        alpha=0.5,
-                        zorder=0,
-                    )
-        else:
-            # Original 2D plotting
-            ax.scatter(
-                vbd_trajectory.pos_xy[env_idx, control_mask, :, 0].numpy(),
-                vbd_trajectory.pos_xy[env_idx, control_mask, :, 1].numpy(),
-                color="lightgreen",
-                linewidth=0.35 * line_width_scale,
-                alpha=0.35,
-                zorder=0,
-            )
+            else:
+                # Plot as 2D marker
+                ax.scatter(
+                    pos_x,
+                    pos_y,
+                    color=color,
+                    s=30 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.9,
+                    zorder=10,
+                )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
@@ -1166,7 +1336,7 @@ class MatplotlibVisualizer:
                             radius,
                             height,
                             facecolor="#c04000",
-                            alpha=0.9,
+                            alpha=0.7,
                         )
                 else:
                     for x, y in zip(x_coords, y_coords):
@@ -1177,7 +1347,7 @@ class MatplotlibVisualizer:
                             facecolor="#c04000",
                             edgecolor="none",
                             linewidth=3.0,
-                            alpha=0.9,
+                            alpha=0.6,
                         )
 
             elif road_point_type == int(madrona_gpudrive.EntityType.CrossWalk):
@@ -1295,7 +1465,7 @@ class MatplotlibVisualizer:
         alpha: Optional[float] = 1.0,
         as_center_pts: bool = False,
         label: Optional[str] = None,
-        plot_goal_points: bool = True,
+        plot_goal_points: bool = False,
         line_width_scale: int = 1.0,
         marker_size_scale: int = 1.0,
         extended_goals: Optional[Dict[str, torch.Tensor]] = None,
@@ -1451,7 +1621,7 @@ class MatplotlibVisualizer:
         # Plot goals
         if plot_goal_points:
             for mask, color in [
-                (is_ok_mask, AGENT_COLOR_BY_STATE["ok"]),
+                (is_ok_mask, "#f4a261"),  # AGENT_COLOR_BY_STATE["ok"]),
                 (is_offroad_mask, AGENT_COLOR_BY_STATE["off_road"]),
                 (is_collided_mask, AGENT_COLOR_BY_STATE["collided"]),
             ]:
@@ -1491,9 +1661,10 @@ class MatplotlibVisualizer:
                         goal_x,
                         goal_y,
                         s=5 * marker_size_scale,
-                        linewidth=1.5 * line_width_scale,
+                        linewidth=2.0 * line_width_scale,
                         c=color,
                         marker="o",
+                        zorder=3,
                     )
                     for x, y in zip(goal_x, goal_y):
                         circle = Circle(
@@ -1502,6 +1673,8 @@ class MatplotlibVisualizer:
                             color=color,
                             fill=False,
                             linestyle="--",
+                            linewidth=3 * line_width_scale,
+                            zorder=3,
                         )
                         ax.add_patch(circle)
 
@@ -1621,58 +1794,16 @@ class MatplotlibVisualizer:
                 bboxes_static, AGENT_COLOR_BY_STATE["log_replay"]
             )
 
-    def _plot_expert_trajectories(
-        self,
-        ax: matplotlib.axes.Axes,
-        env_idx: int,
-        expert_trajectories: torch.Tensor,
-        response_type: Any,
-    ) -> None:
-        """Plot expert trajectories.
-        Args:
-            ax: Matplotlib axis for plotting.
-            env_idx: Environment index to select specific environment agents.
-            expert_trajectories: The global state of expert from `LogTrajectory`.
-        """
-        if self.vis_config.draw_expert_trajectories:
-            controlled_mask = self.controlled_agents[env_idx, :]
-            non_controlled_mask = (
-                ~response_type.static[env_idx, :]
-                & response_type.moving[env_idx, :]
-                & ~controlled_mask
-            )
-            mask = (
-                controlled_mask
-                if self.vis_config.draw_only_controllable_veh
-                else controlled_mask | non_controlled_mask
-            )
-            agent_indices = torch.where(mask)[0]
-            trajectories = expert_trajectories[env_idx][mask]
-            for idx, trajectory in zip(agent_indices, trajectories):
-                color = (
-                    AGENT_COLOR_BY_STATE["ok"]
-                    if controlled_mask[idx]
-                    else AGENT_COLOR_BY_STATE["log_replay"]
-                )
-                for step in trajectory:
-                    x, y = step[:2].numpy()
-                    if x < OUT_OF_BOUNDS and y < OUT_OF_BOUNDS:
-                        ax.add_patch(
-                            Circle(
-                                (x, y),
-                                radius=0.3,
-                                color=color,
-                                fill=True,
-                                alpha=0.5,
-                            )
-                        )
-
     def plot_agent_observation(
         self,
         agent_idx: int,
         env_idx: int,
         figsize: Tuple[int, int] = (10, 10),
         trajectory: Optional[np.ndarray] = None,
+        step_reward: Optional[float] = None,
+        route_progress: Optional[float] = None,
+        head_angle: Optional[float] = 0.0,
+        previous_actions: Optional[torch.Tensor] = None
     ):
         """
         Plot observation from agent POV to inspect the information available
@@ -1684,30 +1815,47 @@ class MatplotlibVisualizer:
                 Should be of shape (N, 2) where N is the number of points and each point
                 is an (x, y) coordinate. Defaults to None.
         """
-        observation_ego = LocalEgoState.from_tensor(
-            self_obs_tensor=self.sim_object.self_observation_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
 
-        observation_roadgraph = LocalRoadGraphPoints.from_tensor(
-            local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
+        observation_ego = None
+        if self.env_config.ego_state:
+            observation_ego = LocalEgoState.from_tensor(
+                self_obs_tensor=self.sim_object.self_observation_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
-        observation_partner = PartnerObs.from_tensor(
-            partner_obs_tensor=self.sim_object.partner_observations_tensor(),
-            backend=self.backend,
-            device="cpu",
-        )
+        observation_roadgraph = None
+        if self.env_config.road_map_obs:
+            observation_roadgraph = LocalRoadGraphPoints.from_tensor(
+                local_roadgraph_tensor=self.sim_object.agent_roadmap_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
 
-        # Check if agent index is valid, otherwise return None
-        if observation_ego.id[env_idx, agent_idx] == -1:
-            return None, None
+        observation_partner = None
+        if self.env_config.partner_obs:
+            observation_partner = PartnerObs.from_tensor(
+                partner_obs_tensor=self.sim_object.partner_observations_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        lidar_obs = (
+            None  # Note: Lidar obs are in global coordinates by default
+        )
+        if self.env_config.lidar_obs:
+            lidar_obs = LidarObs.from_tensor(
+                lidar_tensor=self.sim_object.lidar_tensor(),
+                backend=self.backend,
+                device="cpu",
+            )
+
+        marker_scale = max(figsize) / 15
+        line_width_scale = max(figsize) / 15
 
         fig, ax = plt.subplots(figsize=figsize)
-        ax.clear()  # Clear any previous plots
+        self._cleanup_axis(ax)
+
         ax.set_aspect("equal", adjustable="box")
 
         # Plot roadgraph if provided
@@ -1736,7 +1884,7 @@ class MatplotlibVisualizer:
                     x_points,
                     y_points,
                     c=[ROAD_GRAPH_COLORS[road_type]],
-                    s=8,
+                    s=8 * marker_scale,
                     label=type_name,
                 )
 
@@ -1763,28 +1911,28 @@ class MatplotlibVisualizer:
                         [y_start - width_dy, y_end - width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start + width_dx, x_end + width_dx],
                         [y_start + width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_start - width_dx, x_start + width_dx],
                         [y_start - width_dy, y_start + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
                     ax.plot(
                         [x_end - width_dx, x_end + width_dx],
                         [y_end - width_dy, y_end + width_dy],
                         color=ROAD_GRAPH_COLORS[road_type],
                         alpha=0.5,
-                        linewidth=1.0,
+                        linewidth=line_width_scale,
                     )
 
         # Plot partner agents if provided
@@ -1815,9 +1963,14 @@ class MatplotlibVisualizer:
                 ].squeeze(),
                 color=REL_OBS_OBJ_COLORS["other_agents"],
                 alpha=1.0,
+                line_width_scale=line_width_scale * 2.0,
             )
 
         if observation_ego is not None:
+            # Check if agent index is valid, otherwise return None
+            if observation_ego.id[env_idx, agent_idx] == -1:
+                return None, None
+
             ego_agent_color = (
                 "r"
                 if observation_ego.is_collided[env_idx, agent_idx]
@@ -1835,7 +1988,7 @@ class MatplotlibVisualizer:
                 orientation=0.0,
                 color=ego_agent_color,
                 alpha=1.0,
-                label="Ego agent",
+                line_width_scale=2.3,
             )
 
             # Add an arrow for speed
@@ -1849,40 +2002,35 @@ class MatplotlibVisualizer:
                 head_length=1.1,
                 fc="k",
                 ec="k",
-                zorder=1,
+                zorder=10,
             )
 
-            # ax.scatter(
-            #     observation_ego.rel_goal_x[env_idx, agent_idx],
-            #     observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     s=5,
-            #     linewidth=1.5,
-            #     c=ego_agent_color,
-            #     marker="x",
-            # )
+        if lidar_obs is not None:
+            num_lidar_samples = lidar_obs.num_lidar_samples * 3
 
-            # circle = Circle(
-            #     (
-            #         observation_ego.rel_goal_x[env_idx, agent_idx],
-            #         observation_ego.rel_goal_y[env_idx, agent_idx],
-            #     ),
-            #     radius=self.goal_radius,
-            #     color=ego_agent_color,
-            #     fill=False,
-            #     linestyle="--",
-            # )
-            # ax.add_patch(circle)
+            ego_lidar_pos_xy = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 2:4]
+                .flatten(end_dim=1)
+                .cpu()
+                .numpy()
+            )
 
-            # observation_radius = Circle(
-            #     (0, 0),
-            #     radius=self.env_config.obs_radius,
-            #     color="#000000",
-            #     linewidth=0.8,
-            #     fill=False,
-            #     linestyle="-",
-            # )
-            # ax.add_patch(observation_radius)
-            plt.axis("off")
+            ego_lidar_entity_types = (
+                lidar_obs.all_lidar_samples[env_idx, agent_idx, :, :, 1]
+                .flatten()
+                .cpu()
+                .numpy()
+            )
+
+            for lidar_sample_idx in range(num_lidar_samples):
+                ax.scatter(
+                    ego_lidar_pos_xy[lidar_sample_idx, 0],
+                    ego_lidar_pos_xy[lidar_sample_idx, 1],
+                    s=2,
+                    marker="o",
+                    c="k",
+                    alpha=0.5,
+                )
 
         time_step = (
             self.env_config.episode_len
@@ -1891,49 +2039,150 @@ class MatplotlibVisualizer:
             ]
         ).item()
 
-        # Add time step text to the figure
         ax.text(
-            0.05,  # x position in axes coordinates (5% from left)
-            0.95,  # y position in axes coordinates (95% from bottom)
-            f"t = {time_step}",
-            transform=ax.transAxes,  # Use axes coordinates
+            0.05,
+            0.90,
+            r"$O_{t}$ for " + f"t = {time_step}",
+            transform=ax.transAxes,
             fontsize=15,
             color="black",
             ha="left",
             va="top",
+            bbox=dict(facecolor="white", alpha=1.0, edgecolor="none", pad=3),
         )
 
-        attn_reference_idx = torch.where(trajectory[:, 2] == 1)[0]
+        if step_reward is not None:
+            reward_color = (
+                "g" if step_reward > 0 else "r" if step_reward < 0 else "black"
+            )
+
+            ax.text(
+                0.05,
+                0.85,
+                r"$R_{t+1} = $" + f"{step_reward:.3f}",
+                transform=ax.transAxes,
+                fontsize=15,
+                color=reward_color,
+                ha="left",
+                va="top",
+                bbox=dict(
+                    facecolor="white", alpha=1.0, edgecolor="none", pad=3
+                ),
+            )
+
+        if route_progress is not None:
+            ax.text(
+                0.05,
+                0.80,
+                f"Route progress = {route_progress:.2f}",
+                transform=ax.transAxes,
+                fontsize=15,
+                color="black",
+                ha="left",
+                va="top",
+                bbox=dict(
+                    facecolor="white", alpha=1.0, edgecolor="none", pad=3
+                ),
+            )
 
         if trajectory is not None and len(trajectory) > 0:
+            mask = trajectory[:, 0] != constants.INVALID_ID
             # Plot the trajectory as a line
             ax.scatter(
-                trajectory[:, 0],  # x coordinates
-                trajectory[:, 1],  # y coordinates
+                trajectory[:, 0][mask].cpu(),  # x coordinates
+                trajectory[:, 1][mask].cpu(),  # y coordinates
                 color="g",
-                linewidth=0.3,
+                linewidth=0.01 * line_width_scale,
                 marker="o",
-                alpha=0.2,
+                alpha=0.6,
                 zorder=0,
             )
-            # Add a purple star above the reference position
-            if len(attn_reference_idx) > 0:
-                ref_idx = attn_reference_idx[0]
-                ref_x = trajectory[ref_idx, 0]
-                ref_y = trajectory[ref_idx, 1]
 
-                ax.scatter(
-                    ref_x,
-                    ref_y,
-                    color="#9D00FF",
-                    marker="*",
-                    s=120,
-                    zorder=10,
-                )
+            # Draw a circle around every point in the trajectory
+            for i in range(trajectory.shape[0]):
+                if mask[i]:
+                    # Draw a circle around the trajectory point
+                    circle = Circle(
+                        (trajectory[i, 0].cpu(), trajectory[i, 1].cpu()),
+                        radius=self.env_config.guidance_pos_xy_radius,
+                        color="#d4a373",
+                        fill=False,
+                        linestyle="--",
+                        alpha=0.3,
+                    )
+                    ax.add_patch(circle)
 
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
+
+        # Add V lines for view cone boundaries
+        # must be classic or bicycle to have head angle
+        if previous_actions is not None and \
+           hasattr(self.env_config, 'dynamics_model') and \
+           self.env_config.dynamics_model in ["classic", "bicycle"] and \
+           previous_actions.ndim == 3 and \
+           env_idx < previous_actions.shape[0] and \
+           agent_idx < previous_actions.shape[1] and \
+           previous_actions.shape[2] == 3: # Expected shape [worlds, agents, 3 (accel, steer, head)]
+            headAngle = previous_actions[env_idx, agent_idx, 2].item()
+        else:
+            headAngle = head_angle
+
+        # Calculate angles for the arc and view cone lines, incorporating head_angle_to_use
+        angle1_rad = headAngle + self.env_config.view_cone_half_angle
+        angle2_rad = headAngle - self.env_config.view_cone_half_angle
+
+        x1_rot = self.env_config.obs_radius * np.cos(angle1_rad)
+        y1_rot = self.env_config.obs_radius * np.sin(angle1_rad)
+
+        x2_rot = self.env_config.obs_radius * np.cos(angle2_rad)
+        y2_rot = self.env_config.obs_radius * np.sin(angle2_rad)
+
+        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
+        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
+
+        # Plot observation radius as an Arc
+        obs_arc = Arc((0,0),
+                      width=2*self.env_config.obs_radius,
+                      height=2*self.env_config.obs_radius,
+                      angle=0, # Default orientation
+                      theta1=np.degrees(angle2_rad),
+                      theta2=np.degrees(angle1_rad),
+                      color="k", 
+                      linestyle="-", 
+                      linewidth=1.0, 
+                      alpha=0.7)
+        ax.add_patch(obs_arc)
+
         ax.set_xticks([])
         ax.set_yticks([])
+        plt.axis("off")
 
         return fig
+
+    def _cleanup_axis(self, ax):
+        """Clean up all collections and artists from the axis."""
+        if self.render_3d:
+            # Clean 3D collections
+            for collection in ax.collections[:]:
+                collection.remove()
+
+            # Clean lines
+            for line in ax.lines[:]:
+                line.remove()
+        else:
+            # Clean 2D collections
+            for collection in ax.collections[:]:
+                collection.remove()
+
+            # Clean patches
+            for patch in ax.patches[:]:
+                patch.remove()
+
+            # Clean lines
+            for line in ax.lines[:]:
+                line.remove()
+
+            # Clean texts
+            for text in ax.texts[:]:
+                text.remove()

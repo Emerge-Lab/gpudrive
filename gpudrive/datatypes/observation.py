@@ -40,6 +40,7 @@ class LocalEgoState:
             self.is_collided = self_obs_tensor[:, 6]
             self.is_goal_reached = self_obs_tensor[:, 7]
             self.id = self_obs_tensor[:, 8]
+            self.steer_angle = self_obs_tensor[:, 9]
         else:
             self.speed = self_obs_tensor[:, :, 0]
             self.vehicle_length = self_obs_tensor[:, :, 1] * AGENT_SCALE
@@ -50,6 +51,7 @@ class LocalEgoState:
             self.is_collided = self_obs_tensor[:, :, 6]
             self.is_goal_reached = self_obs_tensor[:, :, 7]
             self.id = self_obs_tensor[:, :, 8]
+            self.steer_angle = self_obs_tensor[:, :, 9]
 
     @classmethod
     def from_tensor(
@@ -87,6 +89,7 @@ class LocalEgoState:
             min_val=constants.MIN_REL_GOAL_COORD,
             max_val=constants.MAX_REL_GOAL_COORD,
         )
+        self.steer_angle /= torch.pi / 3
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -290,7 +293,7 @@ class PartnerObs:
 @dataclass
 class LidarObs:
     """Dataclass representing the scenario view through LiDAR sensors.
-        - Shape: (num_worlds, num_agents, 3, num_lidar_points, 4).
+        - Shape: (num_worlds, num_agents, 3, num_lidar_samples, 4).
         - Axis 2 represents the agent samples, road edge samples, and road line samples.
         - Axis 3 represents the lidar points per type, which can be configured in src/consts.hpp as `numLidarSamples`.
         - Axis 4 represents the depth, type and x, y, values of the lidar points.
@@ -317,8 +320,13 @@ class LidarObs:
             raise NotImplementedError("JAX backend not implemented yet.")
 
     @property
+    def num_lidar_samples(self) -> int:
+        """Number of lidar samples per type."""
+        return self.all_lidar_samples.shape[3]
+
+    @property
     def shape(self) -> tuple[int, ...]:
-        """Shape: (num_worlds, num_agents, 3, num_lidar_points, 4)."""
+        """Shape: (num_worlds, num_agents, 3, num_lidar_samples, 4)."""
         return self.all_lidar_samples.shape
 
 
@@ -358,3 +366,144 @@ class BevObs:
             self.bev_segmentation_map.long(),
             num_classes=constants.NUM_MADRONA_ENTITY_TYPES,  # From size of Madrona EntityType
         )
+
+
+@dataclass
+class TrafficLightObs:
+    """
+    A dataclass that represents traffic light information in the scenario.
+
+    This data struct contains the time series of traffic light information.
+    It contains the state (unknown: 0, stop: 1, caution: 2, go: 3), position, and lane_ids.
+
+    Initialized from tl_states_tensor (from Manager.trafficLightTensor()).
+    For details, see `TrafficLightState` in src/types.hpp.
+    Shape: (num_worlds, max_traffic_lights, num_timesteps * features).
+
+    Attributes:
+        state: The state of each traffic light (0=unknown, 1=stop, 2=caution, 3=go)
+        pos_x: X-coordinate of the traffic light
+        pos_y: Y-coordinate of the traffic light
+        pos_z: Z-coordinate of the traffic light
+        time_index: Time index of the traffic light state
+        lane_id: Lane ID associated with the traffic light
+        valid_mask: Boolean mask indicating valid traffic lights
+    """
+
+    state: torch.Tensor
+    pos_x: torch.Tensor
+    pos_y: torch.Tensor
+    pos_z: torch.Tensor
+    time_index: torch.Tensor
+    lane_id: torch.Tensor
+    valid_mask: torch.Tensor
+
+    def __init__(
+        self,
+        tl_states_tensor: torch.Tensor,
+
+    ):
+        """Initializes the traffic light observation from a tensor."""
+        traj_length = constants.LOG_TRAJECTORY_LENGTH
+
+        # Calculate indices based on C++ struct layout:
+        # laneId (1) + state[traj_length] + x[traj_length] + y[traj_length] + z[traj_length] + timeIndex[traj_length] + numStates (1)
+
+        lane_id_end_idx = 1
+        state_end_idx = lane_id_end_idx + traj_length
+        pos_x_end_idx = state_end_idx + traj_length
+        pos_y_end_idx = pos_x_end_idx + traj_length
+        pos_z_end_idx = pos_y_end_idx + traj_length
+        time_index_end_idx = pos_z_end_idx + traj_length
+
+        # Extract fields according to C++ struct layout
+        # See `TrafficLightState` in src/types.hpp for details
+        self.lane_id = tl_states_tensor[:, :, 0]  # Single lane ID value
+        self.state = tl_states_tensor[
+            :, :, lane_id_end_idx:state_end_idx
+        ]  # state[traj_length]
+        self.pos_x = tl_states_tensor[
+            :, :, state_end_idx:pos_x_end_idx
+        ].float()  # x[traj_length]
+        self.pos_y = tl_states_tensor[
+            :, :, pos_x_end_idx:pos_y_end_idx
+        ].float()  # y[traj_length]
+        self.pos_z = tl_states_tensor[
+            :, :, pos_y_end_idx:pos_z_end_idx
+        ].float()  # z[traj_length]
+        self.time_index = tl_states_tensor[
+            :, :, pos_z_end_idx:time_index_end_idx
+        ]  # timeIndex[traj_length]
+        self.num_states = tl_states_tensor[
+            :, :, time_index_end_idx
+        ]  # Single numStates value
+
+        # Create a valid mask based on numStates
+        # Traffic lights are valid if they have numStates > 0
+        self.valid_mask = self.num_states > 0
+
+    @classmethod
+    def from_tensor(
+        cls,
+        tl_states_tensor: madrona_gpudrive.madrona.Tensor,
+        backend="torch",
+        device="cuda",
+    ):
+        """Creates a TrafficLightObs from a tensor.
+
+        Args:
+            tl_states_tensor: The traffic light state tensor from the simulation
+            backend: Which backend to use ("torch" or "jax")
+            device: The device to place tensors on
+
+        Returns:
+            A TrafficLightObs instance
+        """
+        if backend == "torch":
+            tensor = tl_states_tensor.to_torch().clone().to(device)
+            obj = cls(tensor)
+            return obj
+        elif backend == "jax":
+            raise NotImplementedError("JAX backend not implemented yet.")
+
+    def normalize(self):
+        """Normalizes the traffic light observation coordinates."""
+
+        # Normalize position coordinates
+        self.pos_x = normalize_min_max(
+            tensor=self.pos_x,
+            min_val=constants.MIN_REL_COORD,
+            max_val=constants.MAX_REL_COORD,
+        )
+        self.pos_y = normalize_min_max(
+            tensor=self.pos_y,
+            min_val=constants.MIN_REL_COORD,
+            max_val=constants.MAX_REL_COORD,
+        )
+        self.pos_z = normalize_min_max(
+            tensor=self.pos_z,
+            min_val=constants.MIN_Z_COORD,
+            max_val=constants.MAX_Z_COORD,
+        )
+    def one_hot_encode_states(self):
+        """One-hot encodes the traffic light states.
+
+        Converts the state values to one-hot encoded vectors with 4 classes:
+        0: Unknown
+        1: Stop
+        2: Caution
+        3: Go
+        """
+        # Make sure values are in range 0-3
+        state_clamped = torch.clamp(self.state, 0, 3)
+        # One-hot encode
+        self.state_onehot = torch.nn.functional.one_hot(
+            state_clamped, num_classes=4
+        ) * self.valid_mask.unsqueeze(-1)
+
+        return self.state_onehot
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape: (num_worlds, max_traffic_lights, num_timesteps)."""
+        return self.state.shape
