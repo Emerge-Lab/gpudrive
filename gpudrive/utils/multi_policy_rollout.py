@@ -43,42 +43,7 @@ def multi_policy_rollout(
     episode_len = env.config.episode_len
     sim_state_frames = {env_id: [] for env_id in range(num_worlds)}
     agent_positions = torch.zeros((num_worlds, max_agent_count, episode_len, 2))
-
-    reward_conditioning_present = False
-
-    for policy_name, policy_data in policies.items():
-        if 'reward_conditioning' in policy_data:
-            reward_conditioning_present = True
-
-
-    if reward_conditioning_present:
-        reward_weights_tensor = torch.ones(
-            env.num_worlds,
-            64,  # This should be 64 to match your mask
-            3,  # collision, goal_achieved, off_road
-            device=env.device,
-        )
-        for policy_name, policy_data in policies.items():
-            if 'reward_conditioning' in policy_data:
-                mask = policy_data['mask'] 
-
-                collision_weight = torch.tensor(policy_data['reward_conditioning']['collision_weight'], device=env.device)
-                goal_weight = torch.tensor(policy_data['reward_conditioning']['goal_achieved_weight'], device=env.device)
-                offroad_weight = torch.tensor(policy_data['reward_conditioning']['off_road_weight'], device=env.device)
-
-                # collision_tensor = mask * collision_weight
-                # goal_tensor = mask * goal_weight
-                # offroad_tensor = mask * offroad_weight
-
-                reward_weights_tensor[:, :, 0] *= collision_weight
-                reward_weights_tensor[:, :, 1] *= goal_weight
-                reward_weights_tensor[:, :, 2] *= offroad_weight
-                policy_data['reward_tensor'] = reward_weights_tensor
-
-
-    
-    
-
+   
 
     policy_metrics = {
         policy_name: {
@@ -95,18 +60,7 @@ def multi_policy_rollout(
     all_partner_observations = env._get_partner_obs()
     partner_obs_dim = all_partner_observations.shape[2]
 
-    for policy,policy_data in policies.items():
-            if 'history' in policy_data:
-                controlled_indices = torch.nonzero(policy_data['mask']).squeeze()
-                controlled_keys = [tuple(indice.tolist()) for indice in controlled_indices]
-                policy_data['history_dicts'] ={}
-                for keys in controlled_keys:
-                    policy_data['history_dicts'][keys] =initialise_history(policy_data['history']['trials'],
-                                                                        policy_data['history']['num_steps'],
-                                                                    policy_data['history']['log_history'],
-                                                                    partner_obs_dim,
-                                                                    device)
-  
+
 
     
     for trial in range(k_trials):
@@ -115,7 +69,7 @@ def multi_policy_rollout(
         
         active_worlds = list(range(num_worlds))
         control_mask = env.cont_agent_mask
-        live_agent_mask = control_mask.clone()
+        live_mask = control_mask.clone()
 
         world_time_steps = {
                 f"world_{i}": 0 for i in range(num_worlds)
@@ -124,93 +78,35 @@ def multi_policy_rollout(
         for time_step in range(episode_len):
             print(f't: {time_step}')
 
-            policy_live_masks = {name: policy_data['mask'] & live_agent_mask for name, policy_data in policies.items()}
 
 
-            actions = {}
-            for policy_name, policy_data in policies.items():
-                live_mask = policy_live_masks[policy_name]
-                if live_mask.any():
-                    if 'reward_conditioning'  in policy_data:
-                        
+            action_template = torch.zeros((num_worlds, max_agent_count), dtype=torch.int64, device=device) ## can condense and simplify this
 
-                        reward_conditioned_obs = env.get_obs(reward_tensor=policy_data["reward_tensor"])
-
-                        actions[policy_name], _, _, _   = policy_data['func'](
-                            reward_conditioned_obs[live_mask], deterministic=deterministic
-                        )
-
-                    elif 'history' in policy_data:
-                        live_observations = next_obs[live_mask]
-                        live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
-                        live_keys = [tuple(indice.tolist()) for indice in live_indices]
-
-                        observations_list = []
-                        for idx, key in enumerate(live_keys):
-                            world_key = key[0]
-                            agent_key = key[1]
-                            observation = next_obs[world_key][agent_key]
-                            assert torch.all(observation == live_observations[idx]), "mismatch"
-                            observation_with_history = get_history_batch(policy_data['history_dicts'][key],
-                                                                policy_data['history']['trials'],
-                                                                observation,
-                                                                device)
-
-                            observations_list.append(observation_with_history)
-
-                        agent_observations = torch.vstack(observations_list)
-
-
-                        actions[policy_name], _, _, _  = policy_data['func'](
-                            agent_observations, deterministic=deterministic
-                        )
-                                    
-                        for idx,key in enumerate(live_keys):
-                            
-                            world_key = key[0]
-                            agent_key = key[1]
-                            # assert torch.all(partner_obs[idx] == all_partner_observations[world_key][agent_key]), "mismatch"
-                            policy_data['history_dicts'][key] = update_history(
-                                history_dict=policy_data['history_dicts'][key],
-                                partner_obs=all_partner_observations[world_key][agent_key],
-                                log_history_step=policy_data['history']['log_history'],
-                                current_step=world_time_steps[f'world_{world_key}'],
-                                trial=trial
-                                )
-     
-
-                    else:
-                        actions[policy_name], _, _, _ = policy_data['func'](
-                            next_obs[live_mask], deterministic=deterministic
-                        )
-
+            for policy_name,policy in policies.items():
+                if  torch.any(live_mask & policy.mask):
+                    action,_,_,_ = policy.get_action(env,live_mask)
+                    action_template[live_mask & policy.mask] = action.to(dtype=action_template.dtype, device=device)
+                    if hasattr(policy,'history_dicts'):
+                         policy.update_history(env,live_mask, trial, world_time_steps)
+                         
+               
         
-            if live_agent_mask.any():
-                live_indices = torch.nonzero(live_agent_mask).view(-1, live_agent_mask.dim())
+            if live_mask.any():
+                live_indices = torch.nonzero(live_mask).view(-1, live_mask.dim())
                 live_keys = [tuple(indice.tolist()) for indice in live_indices]
                 live_worlds = list(set([idx[0] for idx in live_keys]))
                 for world in live_worlds:
                     world_time_steps[f'world_{world}'] += 1 
 
-            
-            combined_mask = torch.zeros_like(live_agent_mask, dtype=torch.bool)
-            for live_mask in policy_live_masks.values():
-                combined_mask |= live_mask
-            assert torch.all(live_agent_mask == combined_mask), "Live agent mask mismatch!"
 
-            action_template = torch.zeros((num_worlds, max_agent_count), dtype=torch.int64, device=device) ## can condense and simplify this
 
-            for policy_name, action in actions.items():
-                live_mask = policy_live_masks[policy_name]
-                if action.numel() > 0:
-                    action_template[live_mask] = action.to(dtype=action_template.dtype, device=device)
 
             env.step_dynamics(action_template)
 
             if render_sim_state and len(active_worlds) > 0:
                     
                     has_live_agent = torch.where(
-                        live_agent_mask[active_worlds, :].sum(axis=1) > 0
+                        live_mask[active_worlds, :].sum(axis=1) > 0
                     )[0].tolist()
 
                     if time_step % render_every_n_steps == 0:
@@ -232,11 +128,7 @@ def multi_policy_rollout(
                             )
 
 
-            # Update observations and agent statuses
-            next_obs = env.get_obs()
 
-                
-            all_partner_observations =  env._get_partner_obs()
                 
             dones = env.get_dones().bool()
             infos = env.get_infos()
@@ -244,20 +136,20 @@ def multi_policy_rollout(
      
 
 
-            for policy_name, live_mask in policy_live_masks.items():
-                policy_metrics[policy_name][trial]["off_road"][live_mask] += infos.off_road[live_mask]
-                policy_metrics[policy_name][trial]["collided"][live_mask] += infos.collided[live_mask]
-                policy_metrics[policy_name][trial]["goal_achieved"][live_mask] += infos.goal_achieved[live_mask]
-                if 'reward_conditioning' not in policy_data:
+            for policy_name,policy in policies.items():
+                policy_metrics[policy_name][trial]["off_road"][live_mask & policy.mask] += infos.off_road[live_mask & policy.mask]
+                policy_metrics[policy_name][trial]["collided"][live_mask & policy.mask] += infos.collided[live_mask & policy.mask]
+                policy_metrics[policy_name][trial]["goal_achieved"][live_mask & policy.mask] += infos.goal_achieved[live_mask & policy.mask]
+                if not hasattr(policy,'reward_tensor'):
                     agent_reward =env.get_rewards(
-                    collision_weight=policy_data['weights']['collision_weight'],
-                    off_road_weight=policy_data['weights']['off_road_weight'],
-                    goal_achieved_weight=policy_data['weights']['goal_achieved_weight'],
+                    collision_weight=policy.collision_weight,
+                    off_road_weight=policy.off_road_weight,
+                    goal_achieved_weight=policy.goal_achieved_weight,
                     )
 
                 else:
-                    agent_reward = env.get_rewards(reward_tensor=policy_data['reward_tensor'] )
-                    # print(f"agent_reward: {agent_reward[live_mask].sum()/ live_mask.sum() if live_mask.sum() > 0 else 0}")
+                    agent_reward = env.get_rewards(reward_tensor = policy.reward_tensor )
+
                 
                 real_reward = env.get_rewards(
                     collision_weight = env_collision_weight,
@@ -269,7 +161,7 @@ def multi_policy_rollout(
                 policy_metrics[policy_name][trial]["agent_reward"][live_mask] += agent_reward[live_mask]
                 policy_metrics[policy_name][trial]["real_reward"][live_mask] += real_reward[live_mask]
 
-            live_agent_mask[dones] = False
+            live_mask[dones] = False
 
             # Process completed worlds
             num_dones_per_world = (dones & control_mask).sum(dim=1)
@@ -330,9 +222,9 @@ def create_data_table(data):
     print(goal_achieved_table, "\n")
 
 def compute_metrics(policy_metrics,policies,trials):
-    for policy_name, policy_data in policies.items():
+    for policy_name, policy in policies.items():
         for trial in range(trials):
-            controlled_mask = policy_data['mask']
+            controlled_mask = policy.mask
             num_controlled = controlled_mask.sum()
             
 
