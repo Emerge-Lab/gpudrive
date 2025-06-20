@@ -1223,6 +1223,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self.action_space = Discrete(n=1)
             return self.action_space
 
+    def _set_continuous_action_space(self) -> None:
+        """Configure the continuous action space."""
+        if self.config.dynamics_model == "delta_local":
+            self.dx = self.config.dx.to(self.device)
+            self.dy = self.config.dy.to(self.device)
+            self.dyaw = self.config.dyaw.to(self.device)
+            action_1 = self.dx.clone().cpu().numpy()
+            action_2 = self.dy.clone().cpu().numpy()
+            action_3 = self.dyaw.clone().cpu().numpy()
+        elif self.config.dynamics_model == "classic":
+            self.steer_actions = self.config.steer_actions.to(self.device)
+            self.accel_actions = self.config.accel_actions.to(self.device)
+            self.head_actions = torch.tensor([0], device=self.device)
+            action_1 = self.steer_actions.clone().cpu().numpy()
+            action_2 = self.accel_actions.clone().cpu().numpy()
+            action_3 = self.head_actions.clone().cpu().numpy()
+        else:
+            raise ValueError(
+                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
+            )
+
+        action_space = Tuple(
+            (
+                Box(action_1.min(), action_1.max(), shape=(1,)),
+                Box(action_2.min(), action_2.max(), shape=(1,)),
+                Box(action_3.min(), action_3.max(), shape=(1,)),
+            )
+        )
+        return action_space
+
     def _setup_type_aware_mappings(self):
         """Setup type-specific action mappings."""
         steer_disc = self.config.action_space_steer_disc
