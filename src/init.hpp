@@ -8,7 +8,7 @@ namespace madrona_gpudrive
     // Constants computed from train files.
     constexpr size_t MAX_OBJECTS = 515;
     constexpr size_t MAX_ROADS = 956;
-    constexpr size_t MAX_POSITIONS = 91;
+    constexpr size_t MAX_POSITIONS = consts::maxEpisodeLength;
     constexpr size_t MAX_GEOMETRY = 1746;
 
     // Cannot use Madrona::math::Vector2 because it is not a POD type.
@@ -124,6 +124,7 @@ namespace madrona_gpudrive
         bool disableClassicalObs = false;
         DynamicsModel dynamicsModel = DynamicsModel::Classic;
         bool readFromTracksToPredict = false;       // Default: false - for womd_tracks_to_predict initialization mode
+        uint32_t episode_length = 91;
     };
 
     struct WorldInit
