@@ -161,19 +161,17 @@ def run(
     # fmt: off
     # Environment options
     num_worlds: Annotated[Optional[int], typer.Option(help="Number of parallel envs")] = None,
+    max_controlled_agents: Annotated[Optional[int], typer.Option(help="Number of controlled agents")] = None,
     k_unique_scenes: Annotated[Optional[int], typer.Option(help="The number of unique scenes to sample")] = None,
     collision_weight: Annotated[Optional[float], typer.Option(help="The weight for collision penalty")] = None,
     off_road_weight: Annotated[Optional[float], typer.Option(help="The weight for off-road penalty")] = None,
     goal_achieved_weight: Annotated[Optional[float], typer.Option(help="The weight for goal-achieved reward")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
+    randomize_rewards: Annotated[Optional[int], typer.Option(help="If reward_type == reward_conditioned, choose the condition_mode; 0 or 1")] = 0,
     sampling_seed: Annotated[Optional[int], typer.Option(help="The seed for sampling scenes")] = None,
     obs_radius: Annotated[Optional[float], typer.Option(help="The radius for the observation")] = None,
     collision_behavior: Annotated[Optional[str], typer.Option(help="The collision behavior; 'ignore' or 'remove'")] = None,
     remove_non_vehicles: Annotated[Optional[int], typer.Option(help="Remove non-vehicles from the scene; 0 or 1")] = None,
-    use_vbd: Annotated[Optional[bool], typer.Option(help="Use VBD model for trajectory predictions")] = False,
-    vbd_model_path: Annotated[Optional[str], typer.Option(help="Path to VBD model checkpoint")] = None,
-    vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
-    vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
@@ -201,9 +199,20 @@ def run(
     # Load default configs
     config = load_config(config_path)
 
+    if config.environment.reward_type == "reward_conditioned":
+        if bool(randomize_rewards):
+            config.environment.condition_mode = "random"
+            config.train.exp_id = "random_weights"
+        else:
+            config.environment.condition_mode = (
+                "fixed"  # Use the same type for every agent
+            )
+            config.train.exp_id = "fixed_weights"
+
     # Override configs with command-line arguments
     env_config = {
         "num_worlds": num_worlds,
+        "max_controlled_agents": max_controlled_agents,
         "k_unique_scenes": k_unique_scenes,
         "collision_weight": collision_weight,
         "off_road_weight": off_road_weight,
@@ -215,10 +224,6 @@ def run(
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),
-        "use_vbd": use_vbd,
-        "vbd_model_path": vbd_model_path,
-        "vbd_trajectory_weight": vbd_trajectory_weight,
-        "vbd_in_obs": vbd_in_obs,
         "init_steps": init_steps,
     }
     config.environment.update(

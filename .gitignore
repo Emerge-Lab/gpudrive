@@ -27,9 +27,15 @@ data/raw/*
 data/processed/validation/*
 data/processed/training/*
 data/processed/testing/*
-data/processed/sampled/*
+data/processed/validation_interactive/*
+data/processed/pop_play/*
 data/processed/hand_designed/*
-analyze/figures/*
+figures/
+checkpoints/
+figures_data/
+data/other/*
+wosac/
+data/processed/validation_random/*
 
 # Logging
 /wandb
@@ -251,6 +257,10 @@ examples/experimental/logs/*
 
 # Sbatch scripts
 *.sh
+
+# Dataset
+wosac/
+other/
 
 # Videos
 videos/

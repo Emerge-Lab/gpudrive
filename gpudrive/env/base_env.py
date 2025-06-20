@@ -3,6 +3,7 @@ from gpudrive.env.config import RenderMode
 import madrona_gpudrive
 import abc
 
+
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
     def __init__(self, backend="torch"):
         super().__init__()
@@ -61,10 +62,12 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         if (
             self.config.reward_type == "sparse_on_goal_achieved"
             or self.config.reward_type == "weighted_combination"
-            or self.config.reward_type == "distance_to_logs"
+            or self.config.reward_type == "guided_autonomy"
             or self.config.reward_type == "reward_conditioned"
         ):
-            reward_params.rewardType = madrona_gpudrive.RewardType.OnGoalAchieved
+            reward_params.rewardType = (
+                madrona_gpudrive.RewardType.OnGoalAchieved
+            )
         else:
             raise ValueError(f"Invalid reward type: {self.config.reward_type}")
 
@@ -83,6 +86,8 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters object with road reduction settings.
         """
         params.observationRadius = self.config.obs_radius
+        params.viewConeHalfAngle = self.config.view_cone_half_angle
+        params.removeOccludedAgents = self.config.remove_occluded_agents
         if self.config.road_obs_algorithm == "k_nearest_roadpoints":
             params.roadObservationAlgorithm = (
                 madrona_gpudrive.FindRoadObservationsWith.KNearestEntitiesWithRadiusFiltering
@@ -108,22 +113,28 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         )
 
         params = madrona_gpudrive.Parameters()
-        
+
         params.polylineReductionThreshold = (
             self.config.polyline_reduction_threshold
         )
         params.rewardParams = self._set_reward_params()
         params.maxNumControlledAgents = self.max_cont_agents
-        if self.config.init_mode == "womd_tracks_to_predict":
-            # Bypasses all gpudrive initialization rules and directly reads from the tracks_to_predict 
+        if self.config.init_mode == "wosac_eval":
+            # Bypasses all gpudrive initialization rules and directly reads from the tracks_to_predict
             # flag in the WOMD dataset metadata
             params.readFromTracksToPredict = True
+            params.isStaticAgentControlled = True
+            params.controlExperts = True
+        elif self.config.init_mode == "wosac_train":
+            params.readFromTracksToPredict = True
+            params.isStaticAgentControlled = True
+            params.controlExperts = False
         elif self.config.init_mode == "all_objects":
             params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = False
             params.IgnoreNonVehicles = False
-        elif self.config.init_mode == "all_valid": 
-            params.isStaticAgentControlled = True    
+        elif self.config.init_mode == "all_valid":
+            params.isStaticAgentControlled = True
             params.initOnlyValidAgentsAtFirstStep = True
             params.IgnoreNonVehicles = self.config.remove_non_vehicles
         elif self.config.init_mode == "all_non_trivial":
@@ -132,7 +143,7 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             params.IgnoreNonVehicles = self.config.remove_non_vehicles
         else:
             raise ValueError(f"Invalid init mode: {self.config.init_mode}")
-        
+
         params.dynamicsModel = self.dynamics_model_dict[
             self.config.dynamics_model
         ]
@@ -155,6 +166,17 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
                 self.config.partner_obs = False
         params = self._set_collision_behavior(params)
         params = self._set_road_reduction_params(params)
+        params = self._set_goal_behavior(params)
+    
+        if self.config.guidance and self.config.guidance_mode == "vbd_online":
+            self.init_steps = max(self.config.init_steps, 10)
+            print(
+                f"\n[Note] Guidance mode '{self.config.guidance_mode}' requires at least 10 initialization steps to provide sufficient scene context for the diffusion model. Automatically setting simulator time to t = {self.init_steps}. \n"
+            )
+        else:
+            self.init_steps = getattr(self.config, "init_steps", 0)
+            
+        params.initSteps = self.init_steps
 
         return params
 
@@ -217,16 +239,41 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             object: Updated parameters with collision behavior settings.
         """
         if self.config.collision_behavior == "ignore":
-            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.Ignore
+            params.collisionBehaviour = (
+                madrona_gpudrive.CollisionBehaviour.Ignore
+            )
         elif self.config.collision_behavior == "remove":
             params.collisionBehaviour = (
                 madrona_gpudrive.CollisionBehaviour.AgentRemoved
             )
         elif self.config.collision_behavior == "stop":
-            params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.AgentStop
+            params.collisionBehaviour = (
+                madrona_gpudrive.CollisionBehaviour.AgentStop
+            )
         else:
             raise ValueError(
                 f"Invalid collision behavior: {self.config.collision_behavior}"
+            )
+        return params
+
+    def _set_goal_behavior(self, params):
+        """Configures the behavior when an agent reaches its goal.
+
+        Args:
+            params (object): Parameters object to update based on goal behavior.
+
+        Returns:
+            object: Updated parameters with goal behavior settings.
+        """
+        if self.config.goal_behavior == "remove":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Remove
+        elif self.config.goal_behavior == "stop":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Stop
+        elif self.config.goal_behavior == "ignore":
+            params.goalBehaviour = madrona_gpudrive.GoalBehaviour.Ignore
+        else:
+            raise ValueError(
+                f"Invalid goal behavior: {self.config.goal_behavior}"
             )
         return params
 

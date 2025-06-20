@@ -23,6 +23,7 @@ namespace madrona_gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
+        m.attr("kTrajectoryLength") = consts::kTrajectoryLength;
         m.attr("episodeLen") = consts::episodeLen;
         m.attr("numLidarSamples") = consts::numLidarSamples;
         m.attr("vehicleScale") = consts::vehicleLengthScale;
@@ -49,8 +50,11 @@ namespace madrona_gpudrive
             .def(nb::init<>()) // Default constructor
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
+            .def_rw("viewConeHalfAngle", &Parameters::viewConeHalfAngle)
+            .def_rw("removeOccludedAgents", &Parameters::removeOccludedAgents)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
+            .def_rw("goalBehaviour", &Parameters::goalBehaviour)
             .def_rw("maxNumControlledAgents", &Parameters::maxNumControlledAgents)
             .def_rw("IgnoreNonVehicles", &Parameters::IgnoreNonVehicles)
             .def_rw("roadObservationAlgorithm", &Parameters::roadObservationAlgorithm)
@@ -59,13 +63,21 @@ namespace madrona_gpudrive
             .def_rw("enableLidar", &Parameters::enableLidar)
             .def_rw("disableClassicalObs", &Parameters::disableClassicalObs)
             .def_rw("isStaticAgentControlled", &Parameters::isStaticAgentControlled)
-            .def_rw("readFromTracksToPredict", &Parameters::readFromTracksToPredict);
+            .def_rw("readFromTracksToPredict", &Parameters::readFromTracksToPredict)
+            .def_rw("initSteps", &Parameters::initSteps)
+            .def_rw("controlExperts", &Parameters::controlExperts);
 
         // Define CollisionBehaviour enum
         nb::enum_<CollisionBehaviour>(m, "CollisionBehaviour")
-            .value("AgentStop", CollisionBehaviour::AgentStop)
-            .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
-            .value("Ignore", CollisionBehaviour::Ignore);
+        .value("AgentStop", CollisionBehaviour::AgentStop)
+        .value("AgentRemoved", CollisionBehaviour::AgentRemoved)
+        .value("Ignore", CollisionBehaviour::Ignore);
+
+        // Define GoalBehaviour enum
+        nb::enum_<GoalBehaviour>(m, "GoalBehaviour")
+        .value("Remove", GoalBehaviour::Remove)
+        .value("Stop", GoalBehaviour::Stop)
+        .value("Ignore", GoalBehaviour::Ignore);
 
         nb::enum_<DynamicsModel>(m, "DynamicsModel")
             .value("Classic", DynamicsModel::Classic)
@@ -131,6 +143,8 @@ namespace madrona_gpudrive
             .def("set_maps", &Manager::setMaps)
             .def("world_means_tensor", &Manager::worldMeansTensor)
             .def("metadata_tensor", &Manager::metadataTensor)
+            .def("tl_state_tensor", &Manager::trafficLightTensor)
+            .def("vbd_trajectory_tensor", &Manager::vbdTrajectoryTensor)
             .def("map_name_tensor", &Manager::mapNameTensor)
             .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {
                 std::unordered_map<int32_t, std::vector<int32_t>> agents_to_delete;

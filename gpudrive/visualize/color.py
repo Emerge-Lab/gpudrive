@@ -12,6 +12,7 @@ ROAD_GRAPH_COLORS = {
     4: np.array([200, 200, 200]) / 255.0,  # 'Crosswalk' (Light Gray)
     5: np.array([0.85, 0.65, 0.13]),  # 'SpeedBump' (Dark yellow)
     6: np.array([255, 0, 0]) / 255.0,  # 'StopSign' (Red)
+    7: np.array([0.0, 0.0, 0.0]),  # 'RoadEdge' (Black)
 }
 
 ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
@@ -24,15 +25,15 @@ ROAD_GRAPH_TYPE_NAMES = {  # 1-6 ; 0 is None (padding)
 }
 
 AGENT_COLOR_BY_STATE = {
-    "ok": "#4B77BE",  # Controlled and doing fine
+    "ok": "#2a52be",  # Controlled and doing fine
     "collided": "r",  # Controlled and collided
     "off_road": "orange",  # Controlled and off-road
-    "log_replay": "#c7c7c7",  # Agents marked as expert controlled or static
+    "log_replay": "#787878",  # Agents marked as expert controlled or static
 }
 
 REL_OBS_OBJ_COLORS = {
-    "ego": "#0066ff",
-    "ego_goal": "#0099cc",
+    "ego": "#2a52be",
+    "ego_goal": "#2a52be",
     "other_agents": "#ff884d",
 }
-AGENT_COLOR_BY_POLICY= ['g','b','p']
+AGENT_COLOR_BY_POLICY = ["g", "b", "p"]

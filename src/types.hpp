@@ -64,7 +64,7 @@ namespace madrona_gpudrive
         NUM_TYPES = 21,
     };
 
-    struct AgentID 
+    struct AgentID
     {
         int32_t id;
     };
@@ -92,7 +92,7 @@ namespace madrona_gpudrive
 
     struct ResetMap {
         int32_t reset;
-    };   
+    };
 
     struct DeletedAgents {
         int32_t deletedAgents[consts::kMaxAgentCount];
@@ -132,7 +132,7 @@ namespace madrona_gpudrive
         ClassicAction classic;
         DeltaAction delta;
         StateAction state;
-        
+
         static inline Action zero()
         {
             return Action{
@@ -191,7 +191,9 @@ namespace madrona_gpudrive
         VehicleSize vehicle_size;
         Goal goal;
         float collisionState;
+        float goalState;
         float id;
+        float steerAngle;
         static inline SelfObservation zero()
         {
             return SelfObservation{
@@ -199,11 +201,13 @@ namespace madrona_gpudrive
                 .vehicle_size = {0, 0, 0},
                 .goal = {.position = {0, 0}},
                 .collisionState = 0,
-                .id = -1};
+                .goalState = 0,
+                .id = -1,
+                .steerAngle = 0};
         }
     };
 
-    const size_t SelfObservationExportSize = 8; // 1 + 3 + 2 + 1 + 1
+    const size_t SelfObservationExportSize = 10; // 1 + 3 + 2 + 1 + 1 + 1
 
     static_assert(sizeof(SelfObservation) == sizeof(float) * SelfObservationExportSize);
 
@@ -310,7 +314,7 @@ namespace madrona_gpudrive
     {
         BevObservation obs[consts::bev_rasterization_resolution][consts::bev_rasterization_resolution];
     };
-    
+
     const size_t BevObservationExportSize = 1;
 
     static_assert(sizeof(BevObservations) == BevObservationExportSize * sizeof(float) * consts::bev_rasterization_resolution * consts::bev_rasterization_resolution);
@@ -359,6 +363,28 @@ namespace madrona_gpudrive
     const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
 
     static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
+
+    struct VBDTrajectory
+    {
+        // For each agent, store the full VBD trajectory (x, y, yaw, vx, vy, valid)
+        // The tensor has shape [traj_length, 6]
+        float trajectories[consts::kTrajectoryLength][6];
+
+        static inline void zero(VBDTrajectory& vbd_traj)
+        {
+            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            {
+                for (int j = 0; j < 6; j++)
+                {
+                    vbd_traj.trajectories[i][j] = 0.0f;
+                }
+            }
+        }
+    };
+
+    const size_t VBDTrajectoryExportSize = consts::kTrajectoryLength * 6;
+
+    static_assert(sizeof(VBDTrajectory) == sizeof(float) * VBDTrajectoryExportSize);
 
     struct Shape
     {
@@ -411,24 +437,60 @@ namespace madrona_gpudrive
     const size_t ScenarioIdExportSize = 32;
     static_assert(sizeof(ScenarioId) == sizeof(char32_t) * ScenarioIdExportSize);
 
-    //Metadata struct : using agent IDs.
+    enum class TLState : int32_t
+    {
+        Unknown = 0,
+        Stop = 1,
+        Caution = 2,
+        Go = 3
+    };
+
+    struct TrafficLightState
+    {
+        // Lane ID for this traffic light
+        float laneId = 0;
+
+        // Arrays of state data for each timestep
+        float state[consts::kTrajectoryLength] = {};
+        float x [consts::kTrajectoryLength] = {};
+        float y [consts::kTrajectoryLength] = {};
+        float z [consts::kTrajectoryLength] = {};
+        float timeIndex[consts::kTrajectoryLength] = {};
+        // Number of valid states
+        float numStates = 0;
+    };
+
+    // 1 (lane_id) + 5 (state, x, y, z, timeIndex) + 1 (numStates) = 6
+    const size_t TrafficLightsStateExportSize = 1 + (consts::kTrajectoryLength) * 5 + 1;
+    static_assert(sizeof(TrafficLightState) == sizeof(float) * TrafficLightsStateExportSize);
+
+    struct TrafficLights
+    {
+        TrafficLightState trafficLights[consts::kMaxTrafficLightCount];
+    };
+
+    const size_t TrafficLightsExportSize = consts::kMaxTrafficLightCount * TrafficLightsStateExportSize;
+    static_assert(sizeof(TrafficLights) == sizeof(float) * TrafficLightsExportSize);
+
     struct MetaData
     {
-        int32_t isSdc;
-        int32_t isObjectOfInterest;
-        int32_t isTrackToPredict;
-        int32_t difficulty;
+        float isSdc;
+        float isObjectOfInterest;
+        float isTrackToPredict;
+        float difficulty;
+        float avgZ;
 
         static inline void zero(MetaData& metadata)
         {
-            metadata.isSdc = -1;
-            metadata.isObjectOfInterest = -1;
-            metadata.isTrackToPredict = -1;
-            metadata.difficulty = -1;
+            metadata.isSdc = -1.0f;
+            metadata.isObjectOfInterest = -1.0f;
+            metadata.isTrackToPredict = -1.0f;
+            metadata.difficulty = -1.0f;
+            metadata.avgZ = 0.0f;
         }
     };
-    const size_t MetaDataExportSize = 4;
-    static_assert(sizeof(MetaData) == sizeof(int32_t) * MetaDataExportSize);
+    const size_t MetaDataExportSize = 5;
+    static_assert(sizeof(MetaData) == sizeof(int32_t) * (MetaDataExportSize - 1) + sizeof(float));
 
     struct AgentInterface : public madrona::Archetype<
                                 Action,
@@ -447,9 +509,8 @@ namespace madrona_gpudrive
                                 Trajectory,
                                 AgentID,
                                 MetaData,
-
+                                VBDTrajectory,
                                 ControlledState // Drive Logic
-
                                 >
     {
     };

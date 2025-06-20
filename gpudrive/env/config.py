@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 import torch
 
 import madrona_gpudrive
@@ -30,6 +30,20 @@ class EnvConfig:
     partner_obs: bool = True  # Include partner vehicle info in observations
     bev_obs: bool = False  # Include rasterized Bird's Eye View observations centered on ego vehicle
     norm_obs: bool = True  # Normalize observations
+    add_previous_action: bool = True  # Previous action time agent has taken
+
+    # Guidance settings; these are used to direct the agent's behavior and
+    # will be included in the observations if set to True
+    guidance: bool = True
+    guidance_mode: str = "log_replay"  # Options: "log_replay", "vbd_amortized", "vbd_online", "goals_only"
+    # Ways to guide the agent
+    add_reference_pos_xy: bool = True  # (x, y) position time series
+    add_reference_speed: bool = True  # speed time series
+    add_reference_heading: bool = True  # heading time series
+    smoothen_trajectory: bool = True  # Filters out the trajectory
+    guidance_pos_xy_radius: float = 1.0  # Tightness of the positions guidance
+    guidance_dropout_prob: float = 0.0  # Probability of dropping the points
+    guidance_dropout_mode: str = "max"  # Options: "max", "avg", "remove_all"
 
     # Maximum number of controlled agents in the scene
     max_controlled_agents: int = madrona_gpudrive.kMaxAgentCount
@@ -40,15 +54,11 @@ class EnvConfig:
     disable_classic_obs: bool = False  # Disable classic observations
     lidar_obs: bool = False  # Use LiDAR in observations
 
-    # Set the weights for the reward components
-    # R = a * collided + b * goal_achieved + c * off_road
-    collision_weight: float = 0.0
-    goal_achieved_weight: float = 1.0
-    off_road_weight: float = 0.0
-
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations
     obs_radius: float = 50.0  # Radius for road observations
+    view_cone_half_angle: float = torch.pi  # Half-angle for view cone setting
+    remove_occluded_agents: bool = False  # True: Vehicles are removed from observations if they are occluded by other vehicles
     polyline_reduction_threshold: float = (
         0.1  # Threshold for polyline reduction
     )
@@ -59,14 +69,28 @@ class EnvConfig:
     )
 
     # Action space settings (if discretized)
+    # Type-aware action space settings
+    use_type_aware_actions: bool = True  # Toggles type-aware action mapping: if False, use vehicle ranges for all agents
+
+    # Vehicle action ranges
+    vehicle_accel_range: Tuple[float, float] = (-4.0, 4.0)  # m/s²
+    vehicle_steer_range: Tuple[float, float] = (-1.57, 1.57)  # radians
+
+    # Cyclist action ranges
+    cyclist_accel_range: Tuple[float, float] = (-2.5, 2.5)    # m/s²
+    cyclist_steer_range: Tuple[float, float] = (-2.09, 2.09)  # radians (±120°)
+
+    # Pedestrian action ranges
+    pedestrian_accel_range: Tuple[float, float] = (-1.5, 1.5)  # m/s²
+    pedestrian_steer_range: Tuple[float, float] = (-3.14, 3.14)  # radians (±180°)
+
+    # Head tilt action range
+    head_tilt_action_range: Tuple[float, float] = (-0.7854, 0.7854)  # radians (±45°)
+
     # Classic or Invertible Bicycle dynamics model
-    steer_actions: torch.Tensor = torch.round(
-        torch.linspace(-torch.pi, torch.pi, 13), decimals=3
-    )
-    accel_actions: torch.Tensor = torch.round(
-        torch.linspace(-4.0, 4.0, 7), decimals=3
-    )
-    head_tilt_actions: torch.Tensor = torch.Tensor([0])
+    action_space_steer_disc: int = 13
+    action_space_accel_disc: int = 7
+    action_space_head_tilt_disc: int = 1
 
     # Delta Local dynamics model
     dx: torch.Tensor = torch.round(torch.linspace(-2.0, 2.0, 20), decimals=3)
@@ -89,25 +113,47 @@ class EnvConfig:
     vy: torch.Tensor = torch.round(torch.linspace(-10.0, 10.0, 10), decimals=3)
 
     # Collision behavior settings
-    collision_behavior: str = "remove"  # Options: "remove", "stop", "ignore"
+    collision_behavior: str = "ignore"  # Options: "remove", "stop", "ignore"
 
     # Scene configuration
-    remove_non_vehicles: bool = True  # Remove non-vehicle entities from scene
+    remove_non_vehicles: bool = False  # Remove non-vehicle entities from scene
 
     # Initialization steps: Number of steps to take before the episode starts
     init_steps: int = 0
 
+    # Goal behavior settings
+    goal_behavior: str = "ignore"  # Options: "stop", "ignore", "remove"
+
     # Reward settings
-    reward_type: str = "sparse_on_goal_achieved"
-    # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
+    reward_type: str = "guided_autonomy"
+    # Alternatively, "weighted_combination", "guided_autonomy", "reward_conditioned"
+
+    # If reward_type is "guided_autonomy", the following parameters are used
+    guidance_speed_weight: float = (
+        0.005  # Importance of matching suggested speeds
+    )
+    guidance_heading_weight: float = (
+        0.005  # Importance of matching suggested headings
+    )
+    smoothness_weight: float = 0.0
+
+    # If reward_type is "reward_conditioned", the following parameters are used
+    # Weights for the reward components
+    collision_weight: float = -0.1
+    goal_achieved_weight: float = 1.0
+    off_road_weight: float = -0.1
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
+    # If condition_mode is "fixed", set the agent weights here
+    agent_type: Optional[Union[str, torch.Tensor]] = torch.Tensor(
+        [-0.75, 1.0, -0.75]
+    )  # weights for collision, goal_achieved, off_road
 
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
     goal_achieved_weight_lb: float = 1.0
-    goal_achieved_weight_ub: float = 2.0
+    goal_achieved_weight_ub: float = 3.0
     off_road_weight_lb: float = -1.0
     off_road_weight_ub: float = 0.0
 
@@ -134,15 +180,10 @@ class EnvConfig:
     agent_size_scale: float = madrona_gpudrive.vehicleScale
 
     # Initialization mode
-    init_mode: str = (
-        "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid
-    )
+    init_mode: str = "all_non_trivial"  # Options: all_non_trivial, all_objects, all_valid, wosac_eval, wosac_train
 
-    # VBD model settings
-    use_vbd: bool = False
-    vbd_model_path: str = None
-    vbd_trajectory_weight: float = 0.01
-    vbd_in_obs: bool = False
+    # Versatile Behavior Diffusion (VBD)
+    vbd_model_path: str = "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
 
 
 class SelectionDiscipline(Enum):

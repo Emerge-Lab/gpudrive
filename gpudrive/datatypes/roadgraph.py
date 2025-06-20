@@ -116,8 +116,8 @@ class GlobalRoadGraphPoints:
 
     def restore_xy(self):
         """Shifts x, y from the midpoint to the starting point of a segment, along the heading angle."""
-        self.x -= self.segment_length * np.cos(self.orientation)
-        self.y -= self.segment_length * np.sin(self.orientation)
+        self.x -= self.segment_length * torch.cos(self.orientation)
+        self.y -= self.segment_length * torch.sin(self.orientation)
 
         # Get the dimensions
         num_worlds, num_road_points = self.x.shape

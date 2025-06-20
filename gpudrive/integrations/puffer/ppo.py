@@ -40,8 +40,6 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
-    if vecenv.use_vbd:
-        msg += f" | Using VBD"
     print_dashboard(
         config.env, utilization, 0, 0, profile, losses, {}, msg, clear=True
     )
@@ -113,11 +111,15 @@ def evaluate(data):
         and data.resample_buffer >= data.config.resample_interval
         and data.config.resample_dataset_size > data.vecenv.num_worlds
     ):
-        print(f"Resampling scenarios at global step {data.global_step}")
+        data.msg = f"Resampling scenarios at global step {data.global_step}"
         data.vecenv.resample_scenario_batch()
         data.resample_buffer = 0
 
-    data.vecenv.clear_render_storage()
+    # Check if there are unfinished rendered episodes
+    render_envs_to_reset = [
+        key for key, lst in data.vecenv.frames.items() if len(lst) == 0
+    ]
+    data.vecenv.clear_render_storage(env_list_to_clear=render_envs_to_reset)
 
     config, profile, experience = data.config, data.profile, data.experience
 
@@ -208,17 +210,20 @@ def evaluate(data):
 
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
+        if (
+            sum(data.infos["train/num_completed_episodes"])
+            > data.config.log_window
+        ):
             for k, v in data.infos.items():
                 try:
-                    if "num_completed_episodes" in k:
+                    if "train/num_completed_episodes" in k:
                         data.stats[k] = np.sum(v)
                     else:
                         data.stats[k] = np.mean(v)
 
                     # Log variance for goal and collision metrics
                     if "goal" in k:
-                        data.stats[f"std_{k}"] = np.std(v)
+                        data.stats[f"{k}_std"] = np.std(v)
                 except:
                     continue
 
@@ -383,6 +388,7 @@ def train(data):
             ):
 
                 data.last_log_time = time.perf_counter()
+
                 data.wandb.log(
                     {
                         "performance/controlled_agent_sps": profile.controlled_agent_sps,
@@ -393,14 +399,17 @@ def train(data):
                         "performance/epoch": data.epoch,
                         "performance/uptime": profile.uptime,
                         "train/learning_rate": data.optimizer.param_groups[0]["lr"],
-                        **{f"metrics/{k}": v for k, v in data.stats.items()},
+                        "train/advantages": data.wandb.Histogram(advantages_np),
+                        "train/advantages_var": np.var(advantages_np),
+                        "train/advantages_mean": np.mean(advantages_np),
+                        **{f"{k}": v for k, v in data.stats.items()},
                         **{f"train/{k}": v for k, v in data.losses.items()},
                     }
                 )
 
             if bool(data.stats):
                 data.wandb.log({
-                    **{f"metrics/{k}": v for k, v in data.stats.items()},
+                    **{f"{k}": v for k, v in data.stats.items()},
                 })
 
             # fmt: on
@@ -548,12 +557,14 @@ class Experience:
 
         obs_dtype = pufferlib.pytorch.numpy_to_torch_dtype_dict[obs_dtype]
         pin = device == "cuda" and cpu_offload
+        # TODO(ev) remove
+        pin = False
         self.obs = torch.zeros(
             batch_size,
             *obs_shape,
             dtype=obs_dtype,
             pin_memory=pin,
-            device=device if not pin else "cpu",
+            device=device if not cpu_offload else "cpu",
         )
         self.actions = torch.zeros(
             batch_size, *atn_shape, dtype=int, pin_memory=pin
@@ -665,6 +676,12 @@ class Experience:
         self.b_values = self.b_values[b_flat]
         self.b_returns = self.b_advantages + self.b_values
 
+        if self.b_obs.max() > 1.0 or self.b_obs.min() < -1.0:
+            print(
+                f"Warning: The batch of observations contains features outside the range [-1, 1]."
+                f"Please check your observation normalization; min {self.b_obs.min()}, max {self.b_obs.max()}"
+            )
+
 
 class Utilization(Thread):
     def __init__(self, delay=1, maxlen=20):
@@ -716,6 +733,7 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
         "action_dim": data.uncompiled_policy.action_dim,
         "exp_id": config.exp_id,
         "num_params": config.network["num_parameters"],
+        "config": data.policy.config,
     }
 
     torch.save(state, model_path)
@@ -736,10 +754,8 @@ def save_checkpoint(data, save_checkpoint_to_wandb=True):
 
     return model_path
 
-
 def count_params(policy):
     return sum(p.numel() for p in policy.parameters() if p.requires_grad)
-
 
 def seed_everything(seed, torch_deterministic):
     random.seed(seed)

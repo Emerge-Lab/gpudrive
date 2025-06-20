@@ -82,7 +82,8 @@ class NeuralNet(
         act_func="tanh",
         max_controlled_agents=64,
         obs_dim=2984,  # Size of the flattened observation vector (hardcoded)
-        config=None,  # Optional config
+        config=None,  # Optional config,
+        **kwargs,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -95,11 +96,9 @@ class NeuralNet(
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
 
-        # Indices for unpacking the observation
+        # Ego state base fields
         self.ego_state_idx = constants.EGO_FEAT_DIM
-        self.partner_obs_idx = (
-            constants.PARTNER_FEAT_DIM * self.max_controlled_agents
-        )
+
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
@@ -107,9 +106,12 @@ class NeuralNet(
                     # Agents know their "type", consisting of three weights
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
-                    self.partner_obs_idx += 3
+            if "add_reference_pos_xy" in self.config:
+                self.ego_state_idx += 2 * 91
 
-            self.vbd_in_obs = self.config.vbd_in_obs
+        self.partner_obs_idx = self.ego_state_idx + (
+            constants.PARTNER_FEAT_DIM * self.max_observable_agents
+        )
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5
@@ -143,17 +145,6 @@ class NeuralNet(
             nn.Dropout(self.dropout),
             pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
         )
-
-        if self.vbd_in_obs:
-            self.vbd_embed = nn.Sequential(
-                pufferlib.pytorch.layer_init(
-                    nn.Linear(self.vbd_size, input_dim)
-                ),
-                nn.LayerNorm(input_dim),
-                self.act_func,
-                nn.Dropout(self.dropout),
-                pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
-            )
 
         self.shared_embed = nn.Sequential(
             nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
@@ -234,7 +225,6 @@ class NeuralNet(
         else:
             # Without VBD, all remaining elements are road graph observations
             roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
-
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
         )

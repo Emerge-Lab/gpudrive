@@ -1,0 +1,114 @@
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: data/processed/pop_play
+continue_training: false
+model_cpt: null
+
+environment: # Overrides default environment configs (see pygpudrive/env/config.py)
+  name: "gpudrive"
+  num_worlds: 10 # Number of parallel environments
+  k_unique_scenes: 10 # Number of unique scenes to sample from
+  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  norm_obs: true
+  remove_non_vehicles: false # If false, all agents are included (vehicles, pedestrians, cyclists)
+  lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
+  reward_type: "reward_conditioned" # Options: "weighted_combination", "reward_conditioned", "guided_autonomy"
+  collision_weight: -0.75
+  off_road_weight: -0.75
+  goal_achieved_weight: 1.0
+  init_mode: all_non_trivial
+
+  # If reward_type is "reward_conditioned", the following parameters are used
+  randomize_rewards: true
+  condition_mode: random # Options: random, fixed
+  collision_weight_lb: -3.0
+  collision_weight_ub: 0.0
+  goal_achieved_weight_lb: 1.0
+  goal_achieved_weight_ub: 3.0
+  off_road_weight_lb: -3.0
+  off_road_weight_ub: 0.0
+
+  dynamics_model: "classic"
+  collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
+  dist_to_goal_threshold: 2.0
+  polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
+  sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
+  obs_radius: 50.0 # Visibility radius of the agents
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  init_steps: 0 # Warmup steps
+
+wandb:
+  entity: ""
+  project: "kshotagents"
+  group: "debug_mini"
+  mode: "online" # Options: online, offline, disabled
+  tags: ["ppo", "ff"]
+
+train:
+  exp_id: # Set dynamically in the script if needed
+  seed: 42
+  cpu_offload: false
+  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  bptt_horizon: 1
+  compile: false
+  compile_mode: "reduce-overhead"
+
+  # # # Data sampling # # #
+  resample_scenes: false
+  resample_dataset_size: 500 # Number of unique scenes to sample from
+  resample_interval: 2_000_000
+  sample_with_replacement: false
+  shuffle_dataset: false
+
+  # # # PPO # # #
+  torch_deterministic: false
+  total_timesteps: 2_000_000_000
+  batch_size: 131072
+  minibatch_size: 8192
+  learning_rate: 3e-4
+  anneal_lr: true
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.001
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: null
+  log_window: 1000
+
+  # # # Network # # #
+  network:
+    embed_dim: 64 # Embedding of the input features
+    dropout: 0.01
+    class_name: "Agent"
+    num_parameters: 0 # Total trainable parameters, to be filled at runtime
+
+  # # # Checkpointing # # #
+  checkpoint_interval: 250 # Save policy every k iterations
+  checkpoint_path: "./runs"
+
+  # # # Rendering # # #
+  render: false # Determines whether to render the environment (note: will slow down training)
+  render_3d: false # Render simulator state in 3d or 2d
+  render_interval: 50 # Render every k iterations
+  render_k_scenarios: 1 # Number of scenarios to render
+  render_format: "mp4" # Options: gif, mp4
+  render_fps: 20 # Frames per second
+  zoom_radius: 100
+  plot_guidance_pos_xy: true
+
+vec:
+  backend: "native" # Only native is currently supported
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false

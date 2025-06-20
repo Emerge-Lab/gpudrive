@@ -70,9 +70,11 @@ public:
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
     MGR_EXPORT madrona::py::Tensor metadataTensor() const;
+    MGR_EXPORT madrona::py::Tensor trafficLightTensor() const;
     MGR_EXPORT madrona::py::Tensor deletedAgentsTensor() const;
     MGR_EXPORT madrona::py::Tensor mapNameTensor() const;
     MGR_EXPORT madrona::py::Tensor scenarioIdTensor() const;
+    MGR_EXPORT madrona::py::Tensor vbdTrajectoryTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
     // These functions are used by the viewer to control the simulation

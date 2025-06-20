@@ -22,7 +22,7 @@ readme = "README.md"
 description = "A GPU-accelerated, multi-agent driving simulator"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.26.4",
+    "numpy>=1.23.0",
     "gymnasium",
     "pygame",
     "matplotlib==3.9",
