@@ -619,7 +619,7 @@ inline void doneSystem(Engine &ctx,
 }
 
 void collisionDetectionSystem(Engine &ctx,
-                              const CandidateCollision &candidateCollision) {
+    const CandidateCollision &candidateCollision) {
 
     auto isInvalidExpertOrDone = [&](const Loc &candidate) -> bool
     {
@@ -656,7 +656,6 @@ void collisionDetectionSystem(Engine &ctx,
 
     if (isInvalidExpertOrDone(candidateCollision.a) || 
         isInvalidExpertOrDone(candidateCollision.b)) {
-
         return;
     }
 
@@ -689,54 +688,79 @@ void collisionDetectionSystem(Engine &ctx,
     EntityType aEntityType = ctx.get<EntityType>(candidateCollision.a);
     EntityType bEntityType = ctx.get<EntityType>(candidateCollision.b);
 
+    // Check for existing collision pairs to ignore
     for(auto &pair : ctx.data().collisionPairs)
     {
         if((pair.first == aEntityType && pair.second == bEntityType) ||
-           (pair.first == bEntityType && pair.second == aEntityType))
+            (pair.first == bEntityType && pair.second == aEntityType))
         {
             return;
         }
     }
 
-    auto maybeCollisionDetectionEventA =
-        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
-    if (maybeCollisionDetectionEventA.valid()) {
+    // Implement the specific collision logic
+    // Use existing logic for road element detection:
+    // Road elements have EntityType > None && EntityType <= StopSign
+
+    // Check collisions based on entity types
+    bool shouldRegisterCollisionA = false;
+    bool shouldRegisterCollisionB = false;
+    
+    // Process collisions for Entity A
+    if (aEntityType == EntityType::Vehicle || aEntityType == EntityType::Cyclist) {
+        // Vehicles and Cyclists always register collisions
+        shouldRegisterCollisionA = true;
+    } else if (aEntityType == EntityType::Pedestrian) {
+    // Pedestrians don't register collisions with road elements but can collide with other agents
+    if (!(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)) {
+        shouldRegisterCollisionA = true;
+    }
+    } else {
+        // Non-agent entities (like Road elements) don't need special handling
+        shouldRegisterCollisionA = true;
+    }
+
+    // Process collisions for Entity B
+    if (bEntityType == EntityType::Vehicle || bEntityType == EntityType::Cyclist) {
+        // Vehicles and Cyclists always register collisions
+        shouldRegisterCollisionB = true;
+    } else if (bEntityType == EntityType::Pedestrian) {
+        // Pedestrians don't register collisions with road elements but can collide with other agents
+    if (!(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)) {
+        shouldRegisterCollisionB = true;
+    }
+    } else {
+        // Non-agent entities (like Road elements) don't need special handling
+        shouldRegisterCollisionB = true;
+    }
+
+    // Register collision for entity A if applicable
+    auto maybeCollisionDetectionEventA = ctx.getCheck<CollisionDetectionEvent>(candidateCollision.a);
+    if (maybeCollisionDetectionEventA.valid() && shouldRegisterCollisionA) {
         maybeCollisionDetectionEventA.value().hasCollided.store_relaxed(1);
         auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.a).e;
-        if(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)
-        {
+        if (bEntityType > EntityType::None && bEntityType <= EntityType::StopSign) {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
-        }
-        else if(bEntityType == EntityType::Vehicle)
-        {
+        } else if (bEntityType == EntityType::Vehicle) {
             ctx.get<Info>(agent_iface).collidedWithVehicle = 1;
-        }
-        else if(bEntityType <= EntityType::Cyclist)
-        {
+        } else if (bEntityType == EntityType::Pedestrian || bEntityType == EntityType::Cyclist) {
             ctx.get<Info>(agent_iface).collidedWithNonVehicle = 1;
         }
     }
 
-    auto maybeCollisionDetectionEventB =
-        ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
-    if (maybeCollisionDetectionEventB.valid()) {
+    // Register collision for entity B if applicable
+    auto maybeCollisionDetectionEventB = ctx.getCheck<CollisionDetectionEvent>(candidateCollision.b);
+    if (maybeCollisionDetectionEventB.valid() && shouldRegisterCollisionB) {
         maybeCollisionDetectionEventB.value().hasCollided.store_relaxed(1);
         auto agent_iface = ctx.get<AgentInterfaceEntity>(candidateCollision.b).e;
-        if(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)
-        {
+        if (aEntityType > EntityType::None && aEntityType <= EntityType::StopSign) {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
-        }
-        else if(aEntityType == EntityType::Vehicle)
-        {
+        } else if (aEntityType == EntityType::Vehicle) {
             ctx.get<Info>(agent_iface).collidedWithVehicle = 1;
-        }
-        else if(aEntityType <= EntityType::Cyclist)
-        {
+        } else if (aEntityType == EntityType::Pedestrian || aEntityType == EntityType::Cyclist) {
             ctx.get<Info>(agent_iface).collidedWithNonVehicle = 1;
         }
     }
-
-
 }
 
 // Helper function for sorting nodes in the taskgraph.
