@@ -1171,8 +1171,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 decimals=3,
             ).to(self.device)
-            self.head_actions = self.config.head_tilt_actions.to(self.device)
-
+            self.head_actions = torch.round(
+                torch.linspace(
+                    self.config.head_tilt_action_range[0],
+                    self.config.head_tilt_action_range[1],
+                    self.config.action_space_head_tilt_disc,
+                ),
+                decimals=3,
+            ).to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -1222,6 +1228,36 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         else:
             self.action_space = Discrete(n=1)
             return self.action_space
+
+    def _set_continuous_action_space(self) -> None:
+        """Configure the continuous action space."""
+        if self.config.dynamics_model == "delta_local":
+            self.dx = self.config.dx.to(self.device)
+            self.dy = self.config.dy.to(self.device)
+            self.dyaw = self.config.dyaw.to(self.device)
+            action_1 = self.dx.clone().cpu().numpy()
+            action_2 = self.dy.clone().cpu().numpy()
+            action_3 = self.dyaw.clone().cpu().numpy()
+        elif self.config.dynamics_model == "classic":
+            self.steer_actions = self.config.steer_actions.to(self.device)
+            self.accel_actions = self.config.accel_actions.to(self.device)
+            self.head_actions = torch.tensor([0], device=self.device)
+            action_1 = self.steer_actions.clone().cpu().numpy()
+            action_2 = self.accel_actions.clone().cpu().numpy()
+            action_3 = self.head_actions.clone().cpu().numpy()
+        else:
+            raise ValueError(
+                f"Continuous action space is currently not supported for dynamics_model: {self.config.dynamics_model}."
+            )
+
+        action_space = Tuple(
+            (
+                Box(action_1.min(), action_1.max(), shape=(1,)),
+                Box(action_2.min(), action_2.max(), shape=(1,)),
+                Box(action_3.min(), action_3.max(), shape=(1,)),
+            )
+        )
+        return action_space
 
     def _setup_type_aware_mappings(self):
         """Setup type-specific action mappings."""
@@ -2055,6 +2091,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     focus_env_idx, agent_idx
                 ].item(),
                 route_progress=self.route_progress[agent_idx],
+                previous_actions=self.previous_action_value_tensor # for head angle
             )
             agent_views.append(agent_obs)
 
@@ -2063,7 +2100,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0, 1, 2, 3, 4]
+    FOCUS_AGENTS = [0] #[0, 1, 2, 3, 4]
 
     env_config = EnvConfig(
         guidance=True,
@@ -2083,8 +2120,8 @@ if __name__ == "__main__":
 
     # Create data loader
     train_loader = SceneDataLoader(
-        root="data/processed/wosac/validation_interactive/json",
-        batch_size=10,
+        root="data/processed/tl",
+        batch_size=1,
         dataset_size=100,
         sample_with_replacement=True,
         shuffle=False,
@@ -2120,7 +2157,7 @@ if __name__ == "__main__":
 
         obs = env.get_obs(control_mask)
         reward = env.get_rewards()
-        if time_step % 10 == 0 or time_step > env.episode_len - 3:
+        if time_step % 20 == 0 or time_step > env.episode_len - 3:
             sim_states, agent_obs = env.render(focus_agent_idx=FOCUS_AGENTS)
             sim_frames.append(img_from_fig(sim_states[0]))
             for i in FOCUS_AGENTS:

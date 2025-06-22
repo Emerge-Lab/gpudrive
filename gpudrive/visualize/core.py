@@ -5,7 +5,7 @@ matplotlib.use("Agg")
 from typing import Tuple, Optional, List, Dict, Any, Union
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Arc
 from matplotlib.lines import Line2D
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
@@ -24,6 +24,7 @@ from gpudrive.datatypes.observation import (
     GlobalEgoState,
     PartnerObs,
     LidarObs,
+    TrafficLightObs,
 )
 from gpudrive.datatypes.trajectory import LogTrajectory, VBDTrajectory
 from gpudrive.datatypes.control import ResponseType
@@ -94,6 +95,11 @@ class MatplotlibVisualizer:
             )
 
         self.trajectory = reference_trajectory
+        self.tl_obs = TrafficLightObs.from_tensor(
+            tl_states_tensor=self.sim_object.tl_state_tensor(),
+            backend=self.backend,
+            device=self.device,
+        )
 
     def plot_simulator_state(
         self,
@@ -319,6 +325,14 @@ class MatplotlibVisualizer:
                     line_width_scale=line_width_scale,
                     plot_guidance_up_to_time=plot_guidance_up_to_time,
                 )
+
+            self._plot_traffic_lights(
+                ax=ax,
+                env_idx=env_idx,
+                tl_obs=self.tl_obs,
+                time_step=time_step if time_step is not None else 0,
+                marker_size_scale=marker_scale,
+            )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -945,6 +959,92 @@ class MatplotlibVisualizer:
                 alpha=0.35,
                 zorder=0,
             )
+
+    def _plot_traffic_lights(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        tl_obs: "TrafficLightObs",
+        time_step: int = 0,
+        marker_size_scale: float = 1.0,
+    ):
+        """Plot traffic light states as colored dots.
+
+        Args:
+            ax: Matplotlib axis to plot on
+            env_idx: Environment index
+            tl_obs: Traffic light observation object
+            time_step: Current time step
+            marker_size_scale: Scale factor for marker size
+        """
+
+        # Traffic light state colors
+        TL_STATE_COLORS = {
+            0: "#C5C5C5",  # Unknown - gray
+            1: "r",  # Stop - red
+            2: "tab:orange",  # Caution - orange
+            3: "g",  # Go - green
+        }
+
+        # Get valid traffic lights for this environment
+        valid_mask = tl_obs.valid_mask[env_idx, :]
+        if not valid_mask.any():
+            return
+
+        # Clamp time_step to available data
+        max_time_idx = tl_obs.state.shape[2] - 1
+        time_step = min(time_step, max_time_idx)
+
+        # Get traffic light data for valid lights at current time step
+        valid_indices = torch.where(valid_mask)[0]
+
+        for tl_idx in valid_indices:
+            # Get position (use first valid position if time series)
+            pos_x = tl_obs.pos_x[env_idx, tl_idx, time_step].item()
+            pos_y = tl_obs.pos_y[env_idx, tl_idx, time_step].item()
+
+            # Skip if position is invalid (0,0 or out of bounds)
+            if (
+                (pos_x == 0 and pos_y == 0)
+                or abs(pos_x) > 1000
+                or abs(pos_y) > 1000
+            ):
+                continue
+
+            # Get current state
+            state = int(tl_obs.state[env_idx, tl_idx, time_step].item())
+            state = max(0, min(3, state))  # Clamp to valid range
+
+            color = TL_STATE_COLORS[state]
+
+            if self.render_3d:
+                # Plot as elevated marker in 3D
+                height = 0.2  # Height above ground for visibility
+                ax.scatter3D(
+                    [pos_x],
+                    [pos_y],
+                    [height],
+                    color=color,
+                    s=60 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.8,
+                    zorder=10,
+                )
+            else:
+                # Plot as 2D marker
+                ax.scatter(
+                    pos_x,
+                    pos_y,
+                    color=color,
+                    s=30 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.9,
+                    zorder=10,
+                )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
@@ -1702,6 +1802,8 @@ class MatplotlibVisualizer:
         trajectory: Optional[np.ndarray] = None,
         step_reward: Optional[float] = None,
         route_progress: Optional[float] = None,
+        head_angle: Optional[float] = 0.0,
+        previous_actions: Optional[torch.Tensor] = None
     ):
         """
         Plot observation from agent POV to inspect the information available
@@ -2013,28 +2115,44 @@ class MatplotlibVisualizer:
         ax.set_xlim((-self.env_config.obs_radius, self.env_config.obs_radius))
         ax.set_ylim((-self.env_config.obs_radius, self.env_config.obs_radius))
 
-        # Add a circle representing the observation radius
-        observation_circle = Circle(
-            (0, 0),  # Center at origin
-            radius=self.env_config.obs_radius,
-            color="black",
-            fill=False,
-            linestyle="-",
-            linewidth=1.0,
-            alpha=0.7,
-        )
-
-        ax.add_patch(observation_circle)
-
         # Add V lines for view cone boundaries
-        # x1 = self.env_config.obs_radius * np.cos(self.env_config.view_cone_half_angle)
-        # y1 = self.env_config.obs_radius * np.sin(self.env_config.view_cone_half_angle)
+        # must be classic or bicycle to have head angle
+        if previous_actions is not None and \
+           hasattr(self.env_config, 'dynamics_model') and \
+           self.env_config.dynamics_model in ["classic", "bicycle"] and \
+           previous_actions.ndim == 3 and \
+           env_idx < previous_actions.shape[0] and \
+           agent_idx < previous_actions.shape[1] and \
+           previous_actions.shape[2] == 3: # Expected shape [worlds, agents, 3 (accel, steer, head)]
+            headAngle = previous_actions[env_idx, agent_idx, 2].item()
+        else:
+            headAngle = head_angle
 
-        # x2 = self.env_config.obs_radius * np.cos(-self.env_config.view_cone_half_angle)
-        # y2 = self.env_config.obs_radius * np.sin(-self.env_config.view_cone_half_angle)
+        # Calculate angles for the arc and view cone lines, incorporating head_angle_to_use
+        angle1_rad = headAngle + self.env_config.view_cone_half_angle
+        angle2_rad = headAngle - self.env_config.view_cone_half_angle
 
-        # ax.add_line(Line2D([0, x1], [0, y1], color="#FF9900", linewidth=1.5, linestyle="--"))
-        # ax.add_line(Line2D([0, x2], [0, y2], color="#FF9900", linewidth=1.5, linestyle="--"))
+        x1_rot = self.env_config.obs_radius * np.cos(angle1_rad)
+        y1_rot = self.env_config.obs_radius * np.sin(angle1_rad)
+
+        x2_rot = self.env_config.obs_radius * np.cos(angle2_rad)
+        y2_rot = self.env_config.obs_radius * np.sin(angle2_rad)
+
+        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
+        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
+
+        # Plot observation radius as an Arc
+        obs_arc = Arc((0,0),
+                      width=2*self.env_config.obs_radius,
+                      height=2*self.env_config.obs_radius,
+                      angle=0, # Default orientation
+                      theta1=np.degrees(angle2_rad),
+                      theta2=np.degrees(angle1_rad),
+                      color="k", 
+                      linestyle="-", 
+                      linewidth=1.0, 
+                      alpha=0.7)
+        ax.add_patch(obs_arc)
 
         ax.set_xticks([])
         ax.set_yticks([])

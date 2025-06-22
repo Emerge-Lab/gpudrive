@@ -51,6 +51,7 @@ namespace madrona_gpudrive
             .def_rw("polylineReductionThreshold", &Parameters::polylineReductionThreshold)
             .def_rw("observationRadius", &Parameters::observationRadius)
             .def_rw("viewConeHalfAngle", &Parameters::viewConeHalfAngle)
+            .def_rw("removeOccludedAgents", &Parameters::removeOccludedAgents)
             .def_rw("rewardParams", &Parameters::rewardParams)
             .def_rw("collisionBehaviour", &Parameters::collisionBehaviour)
             .def_rw("goalBehaviour", &Parameters::goalBehaviour)
@@ -142,6 +143,7 @@ namespace madrona_gpudrive
             .def("set_maps", &Manager::setMaps)
             .def("world_means_tensor", &Manager::worldMeansTensor)
             .def("metadata_tensor", &Manager::metadataTensor)
+            .def("tl_state_tensor", &Manager::trafficLightTensor)
             .def("vbd_trajectory_tensor", &Manager::vbdTrajectoryTensor)
             .def("map_name_tensor", &Manager::mapNameTensor)
             .def("deleteAgents", [](Manager &self, nb::dict py_agents_to_delete) {
