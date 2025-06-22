@@ -20,6 +20,7 @@ from gpudrive.datatypes.metadata import Metadata
 from gpudrive.datatypes.info import Info
 from gpudrive.utils.checkpoint import load_agent
 from gpudrive.visualize.utils import img_from_fig
+from gpudrive.datatypes.trajectory import to_local_frame
 import madrona_gpudrive
 
 # Env Settings
@@ -60,7 +61,6 @@ val_loader = SceneDataLoader(
 )
 
 # Override default environment settings to match those the agent was trained with
-# TODO(dc): Clean this up
 env_config = EnvConfig(
     ego_state=config.ego_state,
     road_map_obs=config.road_map_obs,
@@ -100,11 +100,47 @@ env = GPUDriveTorchEnv(
     device=DEVICE,
 )
 
+def transform_trajectories_to_local_frame(global_trajectories, ego_pos, ego_yaw, device):
+    """
+    Transform trajectories from simulator coordinates to local (ego-centric) coordinates.
+    
+    Args:
+        global_trajectories: Tensor of shape [n_rollouts, n_steps, 2] (x, y positions in simulator coords)
+        ego_pos: Tensor of shape [2] (ego x, y position in simulator coords)
+        ego_yaw: Scalar tensor (ego heading angle)
+        device: Device to run computations on
+        
+    Returns:
+        local_trajectories: Tensor of shape [n_rollouts, n_steps, 2] in ego frame
+    """
+    n_rollouts, n_steps, _ = global_trajectories.shape
+    local_trajectories = torch.zeros_like(global_trajectories)
+    
+    for rollout_idx in range(n_rollouts):
+        for step_idx in range(n_steps):
+            global_pos = global_trajectories[rollout_idx, step_idx, :]
+            local_pos = to_local_frame(
+                global_pos_xy=global_pos.unsqueeze(0),  # Add batch dimension
+                ego_pos=ego_pos,
+                ego_yaw=ego_yaw,
+                device=device,
+            )
+            local_trajectories[rollout_idx, step_idx, :] = local_pos.squeeze(0)
+    
+    return local_trajectories
+
+# Create output directory
+os.makedirs('guidance_density', exist_ok=True)
+
 scene_count = 0
 while scene_count < DATASET_SIZE:
 
-    # Save Trajectories:
-    all_trajectories = []
+    # Save Trajectories for the first controlled agent in global coordinates
+    all_global_trajectories = []
+    
+    # Get the first controlled agent index for this scene
+    control_mask = env.cont_agent_mask.clone().cpu()
+    first_controlled_agent_idx = torch.where(control_mask[0])[0][0].item()
     
     # For each guidance density, rollout and collect agent trajectories
     for GUIDANCE_DROPOUT_PROB in GUIDANCE_DROPOUT_PROB_RANGE:
@@ -114,7 +150,7 @@ while scene_count < DATASET_SIZE:
         control_mask = env.cont_agent_mask.clone().cpu()
         next_obs = env.reset(mask=control_mask)
 
-        trajectories = []
+        global_trajectories = []
 
         # Zero out actions for parked vehicles
         info = Info.from_tensor(
@@ -134,13 +170,16 @@ while scene_count < DATASET_SIZE:
             f"Avg guidance points per agent: {num_guidance_points.cpu().numpy().mean():.2f} which is {guidance_densities.mean().item()*100:.2f} % of the trajectory length (mode = {env.config.guidance_dropout_mode}) \n"
         )
 
-        pos_xy = GlobalEgoState.from_tensor(
-                env.sim.absolute_self_observation_tensor(),
-                backend=env.backend,
-                device="cpu",
-            ).pos_xy[control_mask]
-
-        trajectories.append(pos_xy)
+        # Get position in simulator coordinates (with world mean already subtracted)
+        global_agent_states = GlobalEgoState.from_tensor(
+            env.sim.absolute_self_observation_tensor(),
+            backend=env.backend,
+            device="cpu",
+        )
+        
+        # Store trajectory for the first controlled agent only (already in simulator coordinates)
+        first_agent_pos = global_agent_states.pos_xy[0, first_controlled_agent_idx, :]
+        global_trajectories.append(first_agent_pos)
 
         done_list = [env.get_dones()]
 
@@ -155,7 +194,6 @@ while scene_count < DATASET_SIZE:
             action_template[control_mask] = action.to(env.device)
 
             # Find the integer key for the "do nothing" action (zero steering, zero acceleration)
-            # Check using env.action_key_to_values[DO_NOTHING_ACTION_INT]
             DO_NOTHING_ACTION_INT = [
                 key
                 for key, value in env.action_key_to_values.items()
@@ -171,44 +209,122 @@ while scene_count < DATASET_SIZE:
             # Get next observation
             next_obs = env.get_obs(control_mask)
 
-            # Save to trajectories
-            pos_xy = GlobalEgoState.from_tensor(
+            # Save to trajectories in simulator coordinates (world mean already subtracted)
+            global_agent_states = GlobalEgoState.from_tensor(
                 env.sim.absolute_self_observation_tensor(),
                 backend=env.backend,
                 device="cpu",
-            ).pos_xy[control_mask]
-            trajectories.append(pos_xy)
+            )
+            
+            # Store trajectory for the first controlled agent only (already in simulator coordinates)
+            first_agent_pos = global_agent_states.pos_xy[0, first_controlled_agent_idx, :]
+            global_trajectories.append(first_agent_pos)
 
-            # NOTE(dc): Make sure to decouple the obs from the reward function
             reward = env.get_rewards()
             done = env.get_dones()
             done_list.append(done)
         
         _ = done_list.pop()
 
-        trajectories = torch.stack(trajectories, dim=0).cpu().permute(1, 0, 2)
-        all_trajectories.append(trajectories)
+        # Stack trajectories for this rollout: shape [n_steps, 2]
+        rollout_trajectory = torch.stack(global_trajectories, dim=0)
+        all_global_trajectories.append(rollout_trajectory)
 
-    all_trajectories = torch.stack(all_trajectories, dim=0).cpu()
-    all_trajectories = all_trajectories.unsqueeze(0)
-
-    # Plot trajectories and save
+    # Stack all rollouts: shape [n_rollouts, n_steps, 2]
+    all_global_trajectories = torch.stack(all_global_trajectories, dim=0)
+    
+    # Reset environment to get the initial state for egocentric transformation
+    control_mask = env.cont_agent_mask.clone().cpu()
+    env.config.guidance_dropout_prob = 0.0  # Reset to no dropout for final state
     _ = env.reset(mask=control_mask)
+    
+    # Get ego agent's initial position and heading for coordinate transformation
+    # Use simulator coordinates (world mean already subtracted) - this is what to_local_frame expects
+    global_agent_states = GlobalEgoState.from_tensor(
+        env.sim.absolute_self_observation_tensor(),
+        backend=env.backend,
+        device="cpu",
+    )
+    
+    ego_pos = global_agent_states.pos_xy[0, first_controlled_agent_idx, :]  # [x, y] in simulator coords
+    ego_yaw = global_agent_states.rotation_angle[0, first_controlled_agent_idx]  # scalar
+    
+    # Transform all trajectories to ego-centric coordinates
+    local_trajectories = transform_trajectories_to_local_frame(
+        all_global_trajectories, ego_pos, ego_yaw, device="cpu"
+    )
+    
+    # Create a combined trajectory array with weights for coloring
+    # Shape: [n_rollouts, n_steps, 2]
+    trajectory_weights = 1 - GUIDANCE_DROPOUT_PROB_RANGE  # Higher weight = more guidance
+    
+    # Plot using the egocentric view
+    fig = env.vis.plot_agent_observation(
+        env_idx=0,
+        agent_idx=first_controlled_agent_idx,
+        figsize=(12, 12),
+        trajectory=None,  # We'll modify the function to handle multiple trajectories
+        step_reward=None,
+        route_progress=None,
+    )
+    
+    # Manually add the multiple trajectories with different colors based on guidance density
+    if fig is not None:
+        ax = fig.get_axes()[0]
+        
+        # Color trajectories based on guidance density
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        
+        # Create colormap for guidance density
+        colors = sns.color_palette("viridis", len(GUIDANCE_DROPOUT_PROB_RANGE))
+        
+        for rollout_idx, (trajectory, dropout_prob) in enumerate(zip(local_trajectories, GUIDANCE_DROPOUT_PROB_RANGE)):
+            # Filter out invalid points
+            valid_mask = (
+                (trajectory[:, 0] != 0) & 
+                (trajectory[:, 1] != 0) & 
+                (torch.abs(trajectory[:, 0]) < 1000) & 
+                (torch.abs(trajectory[:, 1]) < 1000)
+            )
+            
+            if valid_mask.sum() > 1:
+                valid_trajectory = trajectory[valid_mask]
+                
+                # Plot trajectory line
+                ax.plot(
+                    valid_trajectory[:, 0].cpu().numpy(),
+                    valid_trajectory[:, 1].cpu().numpy(),
+                    color=colors[rollout_idx],
+                    linewidth=2.0,
+                    alpha=0.8,
+                    label=f'Guidance: {(1-dropout_prob)*100:.0f}%'
+                )
+                
+                # Plot trajectory points
+                ax.scatter(
+                    valid_trajectory[:, 0].cpu().numpy(),
+                    valid_trajectory[:, 1].cpu().numpy(),
+                    color=colors[rollout_idx],
+                    s=15,
+                    alpha=0.6,
+                    zorder=10
+                )
+        
+        # Add legend
+        ax.legend(loc='upper right', fontsize=8, framealpha=0.8)
+        
+        # Add title
+        ax.set_title(f'Egocentric View - Scene {scene_count}\nAgent {first_controlled_agent_idx} Trajectories by Guidance Density', 
+                    fontsize=14, pad=20)
+        
+        # Save the figure
+        img = Image.fromarray(img_from_fig(fig))
+        img.save(f'guidance_density/scene_{scene_count}_agent_{first_controlled_agent_idx}.png')
+        
+        plt.close(fig)
 
-    fig = env.vis.plot_simulator_state(
-        env_indices=[0],
-        agent_positions=all_trajectories,
-        zoom_radius=45,
-        multiple_rollouts=True,
-        line_alpha=0.8,
-        line_width=1.5,
-        weights= 1 - GUIDANCE_DROPOUT_PROB_RANGE,
-        colorbar=True,
-        center_agent_indices= [0],
-    )[0]
-
-    img = Image.fromarray(img_from_fig(fig))
-    img.save(f'guidance_density/{scene_count}.png')
+    print(f"Processed scene {scene_count} with agent {first_controlled_agent_idx}")
     scene_count += 1
 
     try:
@@ -217,3 +333,5 @@ while scene_count < DATASET_SIZE:
         # If we run out of scenes, break the loop
         print("No more scenes in the dataset.")
         break
+
+print(f"Generated {scene_count} egocentric visualization figures in 'guidance_density/' directory")
