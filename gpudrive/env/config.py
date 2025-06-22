@@ -85,7 +85,7 @@ class EnvConfig:
     pedestrian_steer_range: Tuple[float, float] = (-3.14, 3.14)  # radians (±180°)
 
     # Head tilt action range
-    head_tilt_action_range: Tuple[float, float] = (-0.7854, 0.7854)  # radians (±45°)
+    head_tilt_action_range: Tuple[float, float] = (0.0, 0.0)  # radians (±45°)
 
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
