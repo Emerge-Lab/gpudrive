@@ -176,7 +176,7 @@ class PufferGPUDrive(PufferEnv):
         cyclist_steer_range=(-2.09, 2.09),
         pedestrian_accel_range=(-1.5, 1.5),
         pedestrian_steer_range=(-3.14, 3.14),
-        head_tilt_action_range=(-0.7854, 0.7854),
+        head_tilt_action_range=(0.0, 0.0), 
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -203,6 +203,7 @@ class PufferGPUDrive(PufferEnv):
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1,
         guidance_dropout_prob=0.0,
+        guidance_dropout_mode="max",
         remove_non_vehicles=False,
         obs_radius=50.0,
         view_cone_half_angle=3.14159,
@@ -252,6 +253,7 @@ class PufferGPUDrive(PufferEnv):
         self.add_reference_speed = add_reference_speed
         self.add_reference_heading = add_reference_heading
         self.guidance_dropout_prob = guidance_dropout_prob
+        self.guidance_dropout_mode = guidance_dropout_mode
 
         self.render = render
         self.render_interval = render_interval
@@ -288,6 +290,7 @@ class PufferGPUDrive(PufferEnv):
             add_previous_action=add_previous_action,
             guidance=guidance,
             guidance_dropout_prob=guidance_dropout_prob,
+            guidance_dropout_mode=guidance_dropout_mode,
             add_reference_pos_xy=add_reference_pos_xy,
             add_reference_speed=add_reference_speed,
             add_reference_heading=add_reference_heading,

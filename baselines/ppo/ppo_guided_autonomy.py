@@ -145,7 +145,6 @@ def run(
     add_previous_action: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     smoothen_trajectory: Annotated[Optional[int], typer.Option(help="0 or 1")] = None,
     guidance_dropout_prob: Annotated[Optional[float], typer.Option(help="The dropout probability for the guidance")] = None,
-
     action_space_steer_disc: Annotated[Optional[int], typer.Option(help="Discretization for steer action")] = None,
     action_space_accel_disc: Annotated[Optional[int], typer.Option(help="Discretization for acceleration action")] = None,
     action_space_head_tilt_disc: Annotated[Optional[int], typer.Option(help="Discretization for head tilt action")] = None,
@@ -156,6 +155,7 @@ def run(
     
     view_cone_half_angle: Annotated[Optional[float], typer.Option(help="The half angle for the view cone")] = None,
     remove_occluded_agents: Annotated[Optional[int], typer.Option(help="Whether to occlude objects in view; 0 or 1")] = None,
+    guidance_dropout_mode: Annotated[Optional[str], typer.Option(help="The dropout mode for the guidance; 'max', 'avg', or 'end_points_only'")] = "max",
 
     smoothness_weight: Annotated[Optional[float], typer.Option(help="Scale for realism rewards")] = None,
     dist_to_goal_threshold: Annotated[Optional[float], typer.Option(help="The distance threshold for goal-achieved")] = None,
@@ -230,6 +230,7 @@ def run(
         "vehicle_steer_range": vehicle_steer_range,
         "vehicle_accel_range": vehicle_accel_range,
         "head_tilt_action_range": head_tilt_action_range,
+        "guidance_dropout_mode": guidance_dropout_mode,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),

@@ -265,7 +265,7 @@ def save_script(filename, file_path, fields, params, param_order=None, exclude_n
 
 if __name__ == "__main__":
 
-    group = "10k_dropout_v3" 
+    group = "10k_dropout_4real" 
     fields = {
         "time_h": 47,  # Max time per job (job will finish if run is done before)
         "num_gpus": 1,  # GPUs per job
@@ -283,13 +283,13 @@ if __name__ == "__main__":
         "k_unique_scenes": [700],
         "resample_interval": [5_000_000],
         "batch_size": [1],
-        "guidance_dropout_prob": [0.0, 0.95],
-        "off_road_weight": [-0.1, -0.01, 0.0],
+        "guidance_dropout_prob": [1.0],
+        "guidance_dropout_mode": ["max"],
         "resample_dataset_size": [10_000],
         "total_timesteps": [5_000_000_000],
         "batch_size": [1048576],
         "minibatch_size": [16384],
-        "ent_coef": [0.01],
+        "ent_coef": [0.01, 0.003, 0.005],
         "vf_coef": [0.5],
         "update_epochs": [1],
         "render": [0],
