@@ -2161,20 +2161,20 @@ class MatplotlibVisualizer:
                 )
             )
 
-            # Plot observation radius as an Arc
-            obs_arc = Arc(
-                (0, 0),
-                width=2 * self.env_config.obs_radius,
-                height=2 * self.env_config.obs_radius,
-                angle=0,  # Default orientation
-                theta1=np.degrees(angle2_rad),
-                theta2=np.degrees(angle1_rad),
-                color="k",
-                linestyle="-",
-                linewidth=1.0,
-                alpha=0.7,
-            )
-            ax.add_patch(obs_arc)
+        # Plot observation radius as an Arc
+        obs_arc = Arc(
+            (0, 0),
+            width=2 * self.env_config.obs_radius,
+            height=2 * self.env_config.obs_radius,
+            angle=0,  # Default orientation
+            theta1=np.degrees(angle2_rad),
+            theta2=np.degrees(angle1_rad),
+            color="k",
+            linestyle="-",
+            linewidth=1.0,
+            alpha=0.7,
+        )
+        ax.add_patch(obs_arc)
 
         ax.set_xticks([])
         ax.set_yticks([])
