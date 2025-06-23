@@ -42,7 +42,7 @@ SMOOTHEN_TRAJECTORY = True
 
 DATA_PATH = "data/processed/wosac/validation_interactive/json"
 
-CPT_PATH = "checkpoints/model_guidance_logs__R_10000__05_31_15_21_48_144_014500.pt"
+CPT_PATH = "checkpoints/model_guidance_logs__R_10000__06_07_13_55_31_201_013500.pt"
 
 # Load agent
 agent = load_agent(path_to_cpt=CPT_PATH).to(DEVICE)
@@ -272,12 +272,22 @@ while scene_count < DATASET_SIZE:
     if fig is not None:
         ax = fig.get_axes()[0]
         
+        # Clear any existing legend
+        legend = ax.get_legend()
+        if legend:
+            legend.remove()
+        
         # Color trajectories based on guidance density
         import matplotlib.pyplot as plt
         import seaborn as sns
         
-        # Create colormap for guidance density
-        colors = sns.color_palette("viridis", len(GUIDANCE_DROPOUT_PROB_RANGE))
+        # Create colormap for guidance density (reverse so high guidance = dark, low guidance = light)
+        colors = sns.color_palette("mako", len(GUIDANCE_DROPOUT_PROB_RANGE))
+        colors = colors[::-1]  # Reverse the color order
+        
+        # Store trajectory lines for legend
+        trajectory_lines = []
+        trajectory_labels = []
         
         for rollout_idx, (trajectory, dropout_prob) in enumerate(zip(local_trajectories, GUIDANCE_DROPOUT_PROB_RANGE)):
             # Filter out invalid points
@@ -292,14 +302,18 @@ while scene_count < DATASET_SIZE:
                 valid_trajectory = trajectory[valid_mask]
                 
                 # Plot trajectory line
-                ax.plot(
+                line, = ax.plot(
                     valid_trajectory[:, 0].cpu().numpy(),
                     valid_trajectory[:, 1].cpu().numpy(),
                     color=colors[rollout_idx],
                     linewidth=2.0,
-                    alpha=0.8,
-                    label=f'Guidance: {(1-dropout_prob)*100:.0f}%'
+                    alpha=0.5,
+                    zorder=1
                 )
+                
+                # Store for legend
+                trajectory_lines.append(line)
+                trajectory_labels.append(f'Guidance: {(1-dropout_prob)*100:.0f}%')
                 
                 # Plot trajectory points
                 ax.scatter(
@@ -307,12 +321,12 @@ while scene_count < DATASET_SIZE:
                     valid_trajectory[:, 1].cpu().numpy(),
                     color=colors[rollout_idx],
                     s=15,
-                    alpha=0.6,
-                    zorder=10
+                    alpha=0.4,
+                    zorder=1
                 )
         
-        # Add legend
-        ax.legend(loc='upper right', fontsize=8, framealpha=0.8)
+        # Add legend with only trajectory lines
+        ax.legend(trajectory_lines, trajectory_labels, loc='upper right', fontsize=14, framealpha=0.9)
         
         # Add title
         ax.set_title(f'Egocentric View - Scene {scene_count}\nAgent {first_controlled_agent_idx} Trajectories by Guidance Density', 

@@ -26,7 +26,7 @@ def parse_args():
                         default="data/processed/wosac/validation_interactive/json",
                         help='Path to dataset')
     parser.add_argument('--checkpoint_path', type=str,
-                        default="checkpoints/model_guidance_logs__R_10000__05_31_15_21_48_144_014500.pt",
+                        default="checkpoints/model_guidance_logs__R_10000__06_07_13_55_31_201_013500.pt",
                         help='Path to agent checkpoint')
     parser.add_argument('--output_dir', type=str, default='guidance_gifs',
                         help='Output directory for GIFs')
