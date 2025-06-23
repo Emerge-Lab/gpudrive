@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: data/processed/wosac/validation_interactive/json
+data_dir: /scratch/kj2676/gpudrive/data/processed/training
 continue_training: false
 model_cpt: null
 
@@ -24,7 +24,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   add_reference_speed: true # If true, the reference speeds are added to the ego observation
   add_reference_heading: true # If true, the reference heading are added to the ego observation
   smoothen_trajectory: true # If true, the velocities and headings are smoothed
-  guidance_dropout_prob: 0.0 # Probability of out guidance points
+  guidance_dropout_prob: 1.0 # Probability of out guidance points
   guidance_dropout_mode: "max"
 
   # Reward function
@@ -48,9 +48,6 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   action_space_steer_disc: 13
   action_space_accel_disc: 7
   action_space_head_tilt_disc: 1
-  vehicle_steer_range: [-1.57, 1.57]  # pi/2 = 1.57, pi/3 = 1.05
-  vehicle_accel_range: [-4.0, 4.0]
-  head_tilt_action_range: [0, 0] 
   init_steps: 0 # Warmup steps
   goal_achieved_weight: 0.0
 
