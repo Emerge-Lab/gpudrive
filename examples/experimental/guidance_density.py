@@ -333,8 +333,7 @@ while scene_count < DATASET_SIZE:
                     fontsize=14, pad=20)
         
         # Save the figure
-        img = Image.fromarray(img_from_fig(fig))
-        img.save(f'guidance_density/scene_{scene_count}_agent_{first_controlled_agent_idx}.png')
+        fig.savefig(f'guidance_density/scene_{scene_count}_agent_{first_controlled_agent_idx}.pdf', format='pdf', bbox_inches='tight')
         
         plt.close(fig)
 
