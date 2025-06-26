@@ -896,8 +896,21 @@ Tensor Manager::scenarioIdTensor() const {
 
 Tensor Manager::metadataTensor() const {
     return impl_->exportTensor(
-        ExportID::MetaData, TensorElementType::Int32,
+        ExportID::MetaData, TensorElementType::Float32,
         {impl_->numWorlds, consts::kMaxAgentCount, MetaDataExportSize}
+    );
+}
+
+Tensor Manager::trafficLightTensor() const
+{
+    return impl_->exportTensor(
+        ExportID::TrafficLights, 
+        TensorElementType::Float32,
+        {
+            impl_->numWorlds, 
+            consts::kMaxTrafficLightCount, 
+            TrafficLightsStateExportSize
+        }
     );
 }
 
