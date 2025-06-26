@@ -22,6 +22,7 @@ from gpudrive.datatypes.observation import (
     LocalEgoState,
     GlobalEgoState,
     PartnerObs,
+    TrafficLightObs,
 )
 from gpudrive.datatypes.trajectory import LogTrajectory
 from gpudrive.datatypes.control import ResponseType
@@ -90,6 +91,12 @@ class MatplotlibVisualizer:
             self.num_worlds,
             self.controlled_agent_mask.shape[1],
             backend=self.backend,
+        )
+
+        self.tl_obs = TrafficLightObs.from_tensor(
+            tl_states_tensor=self.sim_object.tl_state_tensor(),
+            backend=self.backend,
+            device=self.device,
         )
 
     def plot_simulator_state(
@@ -312,6 +319,14 @@ class MatplotlibVisualizer:
                 marker_size_scale=marker_scale,
                 extended_goals=extended_goals,
                 world_based_policy_mask=world_based_policy_mask,
+            )
+
+            self._plot_traffic_lights(
+                ax=ax,
+                env_idx=env_idx,
+                tl_obs=self.tl_obs,
+                time_step=time_step if time_step is not None else 0,
+                marker_size_scale=marker_scale,
             )
 
             if agent_positions is not None:
@@ -548,6 +563,91 @@ class MatplotlibVisualizer:
                 alpha=0.35,
                 zorder=0,
             )
+
+    def _plot_traffic_lights(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        tl_obs: "TrafficLightObs",
+        time_step: int = 0,
+        marker_size_scale: float = 1.0,
+    ):
+        """Plot traffic light states as colored dots.
+        Args:
+            ax: Matplotlib axis to plot on
+            env_idx: Environment index
+            tl_obs: Traffic light observation object
+            time_step: Current time step
+            marker_size_scale: Scale factor for marker size
+        """
+
+        # Traffic light state colors
+        TL_STATE_COLORS = {
+            0: "#C5C5C5",  # Unknown - gray
+            1: "r",  # Stop - red
+            2: "tab:orange",  # Caution - orange
+            3: "g",  # Go - green
+        }
+
+        # Get valid traffic lights for this environment
+        valid_mask = tl_obs.valid_mask[env_idx, :]
+        if not valid_mask.any():
+            return
+
+        # Clamp time_step to available data
+        max_time_idx = tl_obs.state.shape[2] - 1
+        time_step = min(time_step, max_time_idx)
+
+        # Get traffic light data for valid lights at current time step
+        valid_indices = torch.where(valid_mask)[0]
+
+        for tl_idx in valid_indices:
+            # Get position (use first valid position if time series)
+            pos_x = tl_obs.pos_x[env_idx, tl_idx, time_step].item()
+            pos_y = tl_obs.pos_y[env_idx, tl_idx, time_step].item()
+
+            # Skip if position is invalid (0,0 or out of bounds)
+            if (
+                (pos_x == 0 and pos_y == 0)
+                or abs(pos_x) > 1000
+                or abs(pos_y) > 1000
+            ):
+                continue
+
+            # Get current state
+            state = int(tl_obs.state[env_idx, tl_idx, time_step].item())
+            state = max(0, min(3, state))  # Clamp to valid range
+
+            color = TL_STATE_COLORS[state]
+
+            if self.render_3d:
+                # Plot as elevated marker in 3D
+                height = 0.2  # Height above ground for visibility
+                ax.scatter3D(
+                    [pos_x],
+                    [pos_y],
+                    [height],
+                    color=color,
+                    s=60 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.8,
+                    zorder=10,
+                )
+            else:
+                # Plot as 2D marker
+                ax.scatter(
+                    pos_x,
+                    pos_y,
+                    color=color,
+                    s=30 * marker_size_scale,
+                    marker="o",
+                    edgecolors="black",
+                    linewidth=0.5,
+                    alpha=0.9,
+                    zorder=10,
+                )
 
     def _get_endpoints(self, x, y, length, yaw):
         """Compute the start and end points of a road segment."""
