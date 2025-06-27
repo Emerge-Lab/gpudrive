@@ -76,9 +76,7 @@ def multi_policy_rollout(
                 }
 
         for time_step in range(episode_len):
-            print(f't: {time_step}')
-
-
+            print(f'\rStep: {time_step+1}/{episode_len}', end='', flush=True)
 
             action_template = torch.zeros((num_worlds, max_agent_count), dtype=torch.int64, device=device) ## can condense and simplify this
 
@@ -127,13 +125,9 @@ def multi_policy_rollout(
                                 img_from_fig(sim_state_figures[idx])
                             )
 
-
-
                 
             dones = env.get_dones().bool()
             infos = env.get_infos()
-
-     
 
 
             for policy_name,policy in policies.items():
@@ -151,12 +145,7 @@ def multi_policy_rollout(
                     agent_reward = env.get_rewards(reward_tensor = policy.reward_tensor )
 
                 
-                real_reward = env.get_rewards(
-                    collision_weight = env_collision_weight,
-                    off_road_weight = env_off_road_weight,
-                    goal_achieved_weight = env_goal_achieved_weight
-
-                )
+                real_reward = env.get_rewards(collision_weight = env_collision_weight, off_road_weight = env_off_road_weight, goal_achieved_weight = env_goal_achieved_weight)
 
                 policy_metrics[policy_name][trial]["agent_reward"][live_mask] += agent_reward[live_mask]
                 policy_metrics[policy_name][trial]["real_reward"][live_mask] += real_reward[live_mask]
@@ -223,44 +212,36 @@ def create_data_table(data):
 
 def compute_metrics(policy_metrics,policies,trials):
     for policy_name, policy in policies.items():
+        controlled_mask = policy.mask
+        num_controlled = controlled_mask.sum()
+        
         for trial in range(trials):
-            controlled_mask = policy.mask
-            num_controlled = controlled_mask.sum()
-            
+            # 1D tensors of size num_worlds containing ego agent counts and rewards (for policy = pi_1)
+            off_counts   = policy_metrics[policy_name][trial]["off_road"][controlled_mask].float()
+            coll_counts  = policy_metrics[policy_name][trial]["collided"][controlled_mask].float()
+            goal_counts  = policy_metrics[policy_name][trial]["goal_achieved"][controlled_mask].float()
+            agent_rews   = policy_metrics[policy_name][trial]["agent_reward"][controlled_mask].float()
+            real_rews    = policy_metrics[policy_name][trial]["real_reward"][controlled_mask].float()
 
-            policy_metrics[policy_name][trial]['off_road_count'] = (policy_metrics[policy_name][trial]["off_road"][controlled_mask]).float()
-            policy_metrics[policy_name][trial]['collided_count'] = (policy_metrics[policy_name][trial]["collided"][controlled_mask]).float()
-            policy_metrics[policy_name][trial]['goal_achieved_count'] =( policy_metrics[policy_name][trial]['goal_achieved'][controlled_mask]).float()
-            policy_metrics[policy_name][trial]['agent_reward_count'] =( policy_metrics[policy_name][trial]['agent_reward'][controlled_mask]).float()
-            policy_metrics[policy_name][trial]['real_reward_count'] = (policy_metrics[policy_name][trial]['real_reward'][controlled_mask]).float()
+            policy_metrics[policy_name][trial]['off_road_count']      = off_counts
+            policy_metrics[policy_name][trial]['collided_count']     = coll_counts
+            policy_metrics[policy_name][trial]['goal_achieved_count'] = goal_counts
+            policy_metrics[policy_name][trial]['agent_reward_count']  = agent_rews
+            policy_metrics[policy_name][trial]['real_reward_count']   = real_rews
 
+            # Compute means
+            policy_metrics[policy_name][trial]['frac_off_road']       = off_counts.sum()  / num_controlled
+            policy_metrics[policy_name][trial]['frac_collided']       = coll_counts.sum() / num_controlled
+            policy_metrics[policy_name][trial]['frac_goal_achieved']  = goal_counts.sum() / num_controlled
+            policy_metrics[policy_name][trial]['frac_agent_reward']   = agent_rews.sum()  / num_controlled
+            policy_metrics[policy_name][trial]['frac_real_reward']    = real_rews.sum()   / num_controlled
 
-            # policy_metrics[policy_name][trial]['off_road_per_world'] = policy_metrics[policy_name][trial]['off_road_count'] / controlled_per_scene
-            # policy_metrics[policy_name][trial]['collided_per_world'] = policy_metrics[policy_name][trial]['collided_count'] / controlled_per_scene 
-            # policy_metrics[policy_name][trial]['goal_achieved_per_world'] = policy_metrics[policy_name][trial]['goal_achieved_count'] / controlled_per_scene
-            # policy_metrics[policy_name][trial]['agent_reward_per_world'] = policy_metrics[policy_name][trial]['agent_reward_count'] / controlled_per_scene
-            # policy_metrics[policy_name][trial]['real_reward_per_world'] = policy_metrics[policy_name][trial]['real_reward_count'] / controlled_per_scene
-
-            policy_metrics[policy_name][trial]['frac_off_road'] = policy_metrics[policy_name][trial]['off_road_count'].sum() /  num_controlled 
-            policy_metrics[policy_name][trial]['frac_collided'] = policy_metrics[policy_name][trial]['collided_count'].sum() / num_controlled 
-            policy_metrics[policy_name][trial]['frac_goal_achieved'] = policy_metrics[policy_name][trial]['goal_achieved_count'].sum() / num_controlled 
-            policy_metrics[policy_name][trial]['frac_agent_reward'] = policy_metrics[policy_name][trial]['agent_reward_count'].sum() / num_controlled 
-            policy_metrics[policy_name][trial]['frac_real_reward'] = policy_metrics[policy_name][trial]['real_reward_count'].sum() / num_controlled 
-            
-            # Add standard deviations
-            
-
-            off_road_mask = (policy_metrics[policy_name][trial]["off_road"] > 0)[controlled_mask]
-            collided_mask = (policy_metrics[policy_name][trial]["collided"] > 0)[controlled_mask]
-            goal_achieved_mask = (policy_metrics[policy_name][trial]["goal_achieved"] > 0)[controlled_mask]
-            agent_reward_mask = (policy_metrics[policy_name][trial]["agent_reward"] > 0)[controlled_mask]
-            real_reward_mask = (policy_metrics[policy_name][trial]["real_reward"] > 0)[controlled_mask]
-
-            policy_metrics[policy_name][trial]['frac_off_road_std'] = off_road_mask.float().std()
-            policy_metrics[policy_name][trial]['frac_collided_std'] = collided_mask.float().std()
-            policy_metrics[policy_name][trial]['frac_goal_achieved_std'] = goal_achieved_mask.float().std()
-            policy_metrics[policy_name][trial]['frac_agent_reward_std'] = agent_reward_mask.float().std()
-            policy_metrics[policy_name][trial]['frac_real_reward_std'] = real_reward_mask.float().std()
+            # Compute std
+            policy_metrics[policy_name][trial]['off_road_std']        = off_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['collided_std']        = coll_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['goal_achieved_std']   = goal_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['agent_reward_std']    = agent_rews.std(unbiased=False)
+            policy_metrics[policy_name][trial]['real_reward_std']     = real_rews.std(unbiased=False)
             
 
     return policy_metrics
