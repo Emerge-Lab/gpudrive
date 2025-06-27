@@ -237,11 +237,11 @@ def compute_metrics(policy_metrics,policies,trials):
             policy_metrics[policy_name][trial]['frac_real_reward']    = real_rews.sum()   / num_controlled
 
             # Compute std
-            policy_metrics[policy_name][trial]['off_road_std']        = off_counts.std(unbiased=False)
-            policy_metrics[policy_name][trial]['collided_std']        = coll_counts.std(unbiased=False)
-            policy_metrics[policy_name][trial]['goal_achieved_std']   = goal_counts.std(unbiased=False)
-            policy_metrics[policy_name][trial]['agent_reward_std']    = agent_rews.std(unbiased=False)
-            policy_metrics[policy_name][trial]['real_reward_std']     = real_rews.std(unbiased=False)
+            policy_metrics[policy_name][trial]['frac_off_road_std']        = off_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['frac_collided_std']        = coll_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['frac_goal_achieved_std']   = goal_counts.std(unbiased=False)
+            policy_metrics[policy_name][trial]['frac_agent_reward_std']    = agent_rews.std(unbiased=False)
+            policy_metrics[policy_name][trial]['frac_real_reward_std']     = real_rews.std(unbiased=False)
             
 
     return policy_metrics
