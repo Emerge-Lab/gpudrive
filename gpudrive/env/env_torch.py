@@ -1165,14 +1165,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 decimals=3,
             ).to(self.device)
-            self.head_actions = torch.round(
-                torch.linspace(
-                    self.config.head_tilt_action_range[0],
-                    self.config.head_tilt_action_range[1],
-                    self.config.action_space_head_tilt_disc,
-                ),
-                decimals=3,
-            ).to(self.device)
+            if hasattr(self.config, "head_tilt_actions"):
+                self.head_actions = torch.tensor(
+                    self.config.head_tilt_actions,
+                    dtype=torch.float32,
+                    device=self.device,
+                )
+                self.action_space_head_tilt_disc = len(self.config.head_tilt_actions)
+            else:
+                self.head_actions = torch.round(
+                    torch.linspace(
+                        self.config.head_tilt_action_range[0],
+                        self.config.head_tilt_action_range[1],
+                        self.config.action_space_head_tilt_disc,
+                    ),
+                    decimals=3,
+                ).to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )

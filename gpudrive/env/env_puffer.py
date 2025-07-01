@@ -177,6 +177,7 @@ class PufferGPUDrive(PufferEnv):
         pedestrian_accel_range=(-1.5, 1.5),
         pedestrian_steer_range=(-3.14, 3.14),
         head_tilt_action_range=(-0.7854, 0.7854),
+        head_tilt_actions=None,
         ego_state=True,
         road_map_obs=True,
         partner_obs=True,
@@ -313,6 +314,7 @@ class PufferGPUDrive(PufferEnv):
             pedestrian_accel_range=pedestrian_accel_range,
             pedestrian_steer_range=pedestrian_steer_range,
             head_tilt_action_range=head_tilt_action_range,
+            head_tilt_actions=head_tilt_actions,
             view_cone_half_angle=view_cone_half_angle,
             remove_occluded_agents=remove_occluded_agents,
             **{k: v for k, v in kwargs.items() if hasattr(EnvConfig, k)}
