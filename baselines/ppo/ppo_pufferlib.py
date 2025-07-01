@@ -156,7 +156,7 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "/home/charliemolony/adaptive_driving_agent/gpudrive/baselines/ppo/config/ppo_base_puffer.yaml",
+    ] = "gpudrive/baselines/ppo/config/ppo_base_puffer.yaml",
     *,
     # fmt: off
     # Environment options
