@@ -45,7 +45,7 @@ class Agent(nn.Module):
         if self.config["reward_type"] == "reward_conditioned":
             self.ego_state_idx += 3
         if self.config["add_previous_action"]:
-            self.ego_state_idx += 2
+            self.ego_state_idx += 3
 
         self.max_controlled_agents = madrona_gpudrive.kMaxAgentCount
         self.max_observable_agents = self.max_controlled_agents - 1

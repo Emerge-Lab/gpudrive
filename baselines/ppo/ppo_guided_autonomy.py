@@ -153,6 +153,7 @@ def run(
     vehicle_steer_range: Annotated[Optional[list[float]], typer.Option(help="The vehicle steer range, e.g. --vehicle-steer-range -1.57 --vehicle-steer-range 1.57")] = None,
     vehicle_accel_range: Annotated[Optional[list[float]], typer.Option(help="The vehicle accel range, e.g. --vehicle-accel-range -4.0 --vehicle-accel-range 4.0")] = None,
     head_tilt_action_range: Annotated[Optional[list[float]], typer.Option(help="The head tilt action range, e.g. --head-tilt-action-range -0.7854 --head-tilt-action-range 0.7854")] = None,
+    head_tilt_actions: Annotated[Optional[list[float]], typer.Option(help="A list of specific head tilt actions to use.")] = None,
     
     view_cone_half_angle: Annotated[Optional[float], typer.Option(help="The half angle for the view cone")] = None,
     remove_occluded_agents: Annotated[Optional[int], typer.Option(help="Whether to occlude objects in view; 0 or 1")] = None,
@@ -230,6 +231,7 @@ def run(
         "vehicle_steer_range": vehicle_steer_range,
         "vehicle_accel_range": vehicle_accel_range,
         "head_tilt_action_range": head_tilt_action_range,
+        "head_tilt_actions": head_tilt_actions,
         "remove_non_vehicles": None
         if remove_non_vehicles is None
         else bool(remove_non_vehicles),
