@@ -72,6 +72,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             self._set_reward_weights(
                 condition_mode=condition_mode, agent_type=agent_type
             )
+        self.entropy_tensor = None
+        if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned:
+            # Create a tensor with random weights between the bounds
+            self.entropy_tensor = torch.rand(self.num_worlds, self.max_cont_agents) * (self.config.entropy_weight_up - self.config.entropy_weight_lb) + self.config.entropy_weight_lb
+            self.entropy_index = 6
+            if self.config.reward_type  == "reward_conditioned":
+                # If reward_conditioned, we add the entropy tensor to the obs
+                self.entropy_index += 3
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -771,58 +779,79 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             if self.config.reward_type == "reward_conditioned" or reward_tensor is not None:
                 if reward_tensor is not None:
                     self.reward_weights_tensor = reward_tensor
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                        self.reward_weights_tensor[:, :, 0],
-                        self.reward_weights_tensor[:, :, 1],
-                        self.reward_weights_tensor[:, :, 2],
-                    ]
-                ).permute(1, 2, 0)
+                
+                # Base state components
+                state_components = [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                    self.reward_weights_tensor[:, :, 0],
+                    self.reward_weights_tensor[:, :, 1],
+                    self.reward_weights_tensor[:, :, 2],
+                ]
+                
+                # Add entropy tensor if available
+                if self.entropy_tensor is not None:
+                    state_components.append(self.entropy_tensor)
+                
+                return torch.stack(state_components).permute(1, 2, 0)
 
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 2, 0)
+                # Base state components
+                state_components = [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
+                
+                # Add entropy tensor if available
+                if self.entropy_tensor is not None:
+                    state_components.append(self.entropy_tensor)
+                
+                return torch.stack(state_components).permute(1, 2, 0)
 
         else:
             if self.config.reward_type == "reward_conditioned":
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                        self.reward_weights_tensor[mask][:, 0],
-                        self.reward_weights_tensor[mask][:, 1],
-                        self.reward_weights_tensor[mask][:, 2],
-                    ]
-                ).permute(1, 0)
+                # Base state components
+                state_components = [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                    self.reward_weights_tensor[mask][:, 0],
+                    self.reward_weights_tensor[mask][:, 1],
+                    self.reward_weights_tensor[mask][:, 2],
+                ]
+                
+                # Add entropy tensor if available (needs masking)
+                if self.entropy_tensor is not None:
+                    state_components.append(self.entropy_tensor[mask])
+                
+                return torch.stack(state_components).permute(1, 0)
             else:
-                return torch.stack(
-                    [
-                        ego_state.speed,
-                        ego_state.vehicle_length,
-                        ego_state.vehicle_width,
-                        ego_state.rel_goal_x,
-                        ego_state.rel_goal_y,
-                        ego_state.is_collided,
-                    ]
-                ).permute(1, 0)
+                # Base state components
+                state_components = [
+                    ego_state.speed,
+                    ego_state.vehicle_length,
+                    ego_state.vehicle_width,
+                    ego_state.rel_goal_x,
+                    ego_state.rel_goal_y,
+                    ego_state.is_collided,
+                ]
+                
+                # Add entropy tensor if available (needs masking)
+                if self.entropy_tensor is not None:
+                    state_components.append(self.entropy_tensor[mask])
+                
+                return torch.stack(state_components).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
         """Get partner observations."""

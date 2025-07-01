@@ -156,7 +156,7 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
 def run(
     config_path: Annotated[
         str, typer.Argument(help="The path to the default configuration file")
-    ] = "baselines/ppo/config/ppo_base_puffer.yaml",
+    ] = "/home/charliemolony/adaptive_driving_agent/gpudrive/baselines/ppo/config/ppo_base_puffer.yaml",
     *,
     # fmt: off
     # Environment options
@@ -176,7 +176,7 @@ def run(
     vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
     # Train options
-    seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = 42,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
     anneal_lr: Annotated[Optional[int], typer.Option(help="Whether to anneal the learning rate over time; 0 or 1")] = None,
     resample_scenes: Annotated[Optional[int], typer.Option(help="Whether to resample scenes during training; 0 or 1")] = None,
@@ -220,6 +220,7 @@ def run(
         "vbd_trajectory_weight": vbd_trajectory_weight,
         "vbd_in_obs": vbd_in_obs,
         "init_steps": init_steps,
+        "entropy_conditioned": config.environment.entropy_conditioned,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
@@ -242,6 +243,7 @@ def run(
         "render": None if render is None else bool(render),
         "gamma": gamma,
         "vf_coef": vf_coef,
+
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
