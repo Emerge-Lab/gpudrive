@@ -76,6 +76,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned:
             # Create a tensor with random weights between the bounds
             self.entropy_tensor = torch.rand(self.num_worlds, self.max_cont_agents) * (self.config.entropy_weight_up - self.config.entropy_weight_lb) + self.config.entropy_weight_lb
+            self.entropy_tensor = self.entropy_tensor.to(self.device)
             self.entropy_index = 6
             if self.config.reward_type  == "reward_conditioned":
                 # If reward_conditioned, we add the entropy tensor to the obs
