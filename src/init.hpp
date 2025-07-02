@@ -55,13 +55,13 @@ namespace madrona_gpudrive
     {
         MapObject objects[MAX_OBJECTS];
         MapRoad roads[MAX_ROADS];
-        TrafficLightState trafficLightStates[consts::kMaxTrafficLightCount]; 
+        TrafficLightState trafficLightStates[consts::kMaxTrafficLightCount];
 
         uint32_t numObjects;
         uint32_t numRoads;
         uint32_t numRoadSegments;
-        uint32_t numTrafficLights;  
-        bool hasTrafficLights;   
+        uint32_t numTrafficLights;
+        bool hasTrafficLights;
         MapVector2 mean;
 
         char mapName[32];
@@ -70,6 +70,61 @@ namespace madrona_gpudrive
 
         // Constructor
         Map() = default;
+    };
+    
+    struct MapVector2Quantized
+    {
+        int8_t x;
+        int8_t y;
+    };
+
+    struct MapObjectQuantized
+    {
+        MapVector2Quantized position[MAX_POSITIONS];
+        VehicleSize vehicle_size;
+        int8_t heading[MAX_POSITIONS];
+        MapVector2Quantized velocity[MAX_POSITIONS];
+        bool valid[MAX_POSITIONS];
+        MapVector2Quantized goalPosition;
+        EntityType type;
+        MetaData metadata;
+
+        uint32_t numPositions;
+        uint32_t numHeadings;
+        uint32_t numVelocities;
+        uint32_t numValid;
+        uint32_t id;
+        MapVector2 mean;
+        bool markAsExpert{false};
+    };
+
+    struct MapRoadQuantized
+    {
+        // std::array<MapPosition, MAX_POSITIONS> geometry;
+        MapVector2Quantized geometry[MAX_GEOMETRY];
+        uint32_t id;
+        MapType mapType;
+        EntityType type;
+        uint32_t numPoints;
+        MapVector2 mean;
+    };
+
+    struct MapQuantized
+    {
+        MapObjectQuantized objects[MAX_OBJECTS];
+        MapRoadQuantized roads[MAX_ROADS];
+
+        uint32_t numObjects;
+        uint32_t numRoads;
+        uint32_t numRoadSegments;
+        MapVector2 mean;
+
+        char mapName[32];
+
+        char scenarioId[32];
+
+        // Constructor
+        MapQuantized() = default;
     };
 
     struct EpisodeManager
