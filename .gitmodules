@@ -1,6 +1,6 @@
 [submodule "external/madrona"]
 	path = external/madrona
-	url = https://github.com/shacklettbp/madrona.git
+	url = https://github.com/m-naumann/madrona.git
 [submodule "external/json"]
 	path = external/json
 	url = https://github.com/nlohmann/json.git
