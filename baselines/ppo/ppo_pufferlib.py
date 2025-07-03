@@ -175,6 +175,7 @@ def run(
     vbd_trajectory_weight: Annotated[Optional[float], typer.Option(help="Weight for VBD trajectory deviation penalty")] = 0.1,
     vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
+    entropy_conditioned: Annotated[Optional[bool], typer.Option(help="Add entropy to agent observations")] = False,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = 42,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -220,7 +221,6 @@ def run(
         "vbd_trajectory_weight": vbd_trajectory_weight,
         "vbd_in_obs": vbd_in_obs,
         "init_steps": init_steps,
-        "entropy_conditioned": config.environment.entropy_conditioned,
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}
