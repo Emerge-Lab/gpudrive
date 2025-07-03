@@ -114,7 +114,7 @@ class EnvConfig:
     # Define upper and lower bounds for entropy weight if using entropy_conditioned
     entropy_weight_lb: float = 0.0
     entropy_weight_up: float = 1.0
-    entropy_conditioned: bool = True # change to false when fix config 
+    entropy_conditioned: bool = False # change to false when fix config 
 
     dist_to_goal_threshold: float = (
         2.0  # Radius around goal considered as "goal achieved"
