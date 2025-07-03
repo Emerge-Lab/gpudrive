@@ -3,3 +3,4 @@ Dockerfile
 !.git
 !.gitignore
 !.gitmodules
+!.python-version
