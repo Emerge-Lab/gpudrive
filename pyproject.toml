@@ -5,7 +5,7 @@ requires = [
     "cmake>=3.18",
     "ninja",
 ]
-build-backend = "madrona-py-build"
+build-backend = "madrona_py_build"
 backend-path = ["external/madrona/py"]
 wheel-directory = "build"
 
