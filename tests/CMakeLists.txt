@@ -27,7 +27,7 @@ add_executable(my_tests
 target_link_libraries(my_tests
     gtest_main
     gpudrive_mgr
-    nlohmann_json::nlohmann_json
+    madrona_json
     madrona_libcxx
 )
 
