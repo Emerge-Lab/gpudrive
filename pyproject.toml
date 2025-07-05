@@ -5,7 +5,7 @@ requires = [
     "cmake>=3.18",
     "ninja",
 ]
-build-backend = "madrona-py-build"
+build-backend = "madrona_py_build"
 backend-path = ["external/madrona/py"]
 wheel-directory = "build"
 
@@ -22,7 +22,7 @@ readme = "README.md"
 description = "A GPU-accelerated, multi-agent driving simulator"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.26.4",
+    "numpy>=1.26.4,<2",
     "gymnasium",
     "pygame",
     "matplotlib==3.9",
@@ -39,25 +39,28 @@ dependencies = [
     "tqdm",
     "jax",
     "huggingface_hub",
+    "cmake==4.0.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 pufferlib = [
-    "pufferlib>=2.0.6",
+    "pufferlib>=2.0.6,<3",
 ]
 sb3 = [
     "stable-baselines3==2.3.2",
 ]
-
 test = [
     "pytest>=8.2.1",
 ]
-
 vbd = [
     "lightning",
     "jaxlib==0.5.3",  # see https://github.com/Emerge-Lab/gpudrive/issues/464
     "waymo-waymax @ git+https://github.com/waymo-research/waymax.git@main",
 ]
+
+[tool.uv]
+default-groups = "all"
+cache-dir = "./.uv_cache"
 
 [tool.madrona.packages.madrona_gpudrive]
 ext-only = true

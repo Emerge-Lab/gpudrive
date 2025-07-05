@@ -1,7 +1,10 @@
 GPUDrive
 ========
 
-![Python version](https://img.shields.io/badge/Python-3.11-blue) [![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+[![Paper](https://img.shields.io/badge/arXiv-2408.01584-b31b1b.svg)](https://arxiv.org/abs/2408.01584)
+[![GitHub CI](https://github.com/Emerge-Lab/gpudrive/actions/workflows/ci.yml/badge.svg)](https://github.com/Emerge-Lab/gpudrive/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Emerge-Lab/gpudrive)](LICENSE)
+![Python version](https://img.shields.io/badge/Python-3.11-blue)
 
 An extremely fast, data-driven driving simulator written in C++.
 
@@ -66,19 +69,12 @@ For Windows, open the cloned repository in Visual Studio and build the project u
 
 Next, set up a Python environment
 
-#### With pyenv (Recommended)
+#### With uv (Recommended)
 
 Create a virtual environment:
 
 ```bash
-pyenv virtualenv 3.11 gpudrive
-pyenv activate gpudrive
-```
-
-Set it for the current project directory (optional):
-
-```bash
-pyenv local gpudrive
+uv sync --frozen
 ```
 
 #### With conda
@@ -124,14 +120,14 @@ Ensure you have the following installed:
 Once installed, you can build the container with:
 
 ```bash
-DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag my_image:latest --progress=plain .
+DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=true --tag gpudrive:latest --progress=plain .
 ```
 
 ### Running the Container
 To run the container with GPU support and shared memory:
 
 ```bash
-docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace my_image:latest /bin/bash
+docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace gpudrive:latest /bin/bash
 ```
 
 </details>
