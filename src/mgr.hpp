@@ -70,6 +70,7 @@ public:
     MGR_EXPORT madrona::py::Tensor expertTrajectoryTensor() const;
     MGR_EXPORT madrona::py::Tensor worldMeansTensor() const;
     MGR_EXPORT madrona::py::Tensor metadataTensor() const;
+    MGR_EXPORT madrona::py::Tensor trafficLightTensor() const;
     MGR_EXPORT madrona::py::Tensor deletedAgentsTensor() const;
     MGR_EXPORT madrona::py::Tensor mapNameTensor() const;
     MGR_EXPORT madrona::py::Tensor scenarioIdTensor() const;
