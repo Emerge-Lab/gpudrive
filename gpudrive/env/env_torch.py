@@ -624,7 +624,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # True if the agent is in collision with another road object
         # (i.e. a cyclist, pedestrian or vehicle)
-        collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
+        collided_with_vehicle = info_tensor[:, :, 1:2].to(torch.float)
+        collided_with_oru = info_tensor[:, :, 2:3].to(torch.float)
+
+        # Zero-out pedestrian-pedestrian collisions
+        # (there are too many are false positives due to labeling errors)
+        is_pedestrian = self.agent_types == PEDESTRIAN_AGENT
+        collided_with_oru[is_pedestrian] = 0.0
+        
+        collided = collided_with_vehicle + collided_with_oru
+
         goal_achieved = info_tensor[:, :, 3].to(torch.float)
 
         if self.config.reward_type == "sparse_on_goal_achieved":
@@ -2091,7 +2100,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     focus_env_idx, agent_idx
                 ].item(),
                 route_progress=self.route_progress[agent_idx],
-                previous_actions=self.previous_action_value_tensor # for head angle
+                previous_actions=self.previous_action_value_tensor,  # for head angle
             )
             agent_views.append(agent_obs)
 
@@ -2100,7 +2109,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
 if __name__ == "__main__":
 
-    FOCUS_AGENTS = [0] #[0, 1, 2, 3, 4]
+    FOCUS_AGENTS = [0]  # [0, 1, 2, 3, 4]
 
     env_config = EnvConfig(
         guidance=True,
