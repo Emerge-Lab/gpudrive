@@ -389,7 +389,7 @@ class TrafficLightObs:
 
     ):
         """Initializes the traffic light observation from a tensor."""
-        traj_length = constants.LOG_TRAJECTORY_LENGTH
+        traj_length = constants.LOG_TRAJECTORY_LEN
 
         # Calculate indices based on C++ struct layout:
         # laneId (1) + state[traj_length] + x[traj_length] + y[traj_length] + z[traj_length] + timeIndex[traj_length] + numStates (1)
