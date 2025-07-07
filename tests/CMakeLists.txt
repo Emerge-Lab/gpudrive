@@ -16,10 +16,7 @@ include_directories(
 
 # Add your test file(s) to the add_executable command
 add_executable(my_tests
-    bicyclemodel.cpp
-    test_utils.cpp
     CollisionDetectionTests.cpp
-    observationTest.cpp
     EgocentricRoadObservationTests.cpp
 )
 
@@ -27,7 +24,7 @@ add_executable(my_tests
 target_link_libraries(my_tests
     gtest_main
     gpudrive_mgr
-    nlohmann_json::nlohmann_json
+    madrona_json
     madrona_libcxx
 )
 
