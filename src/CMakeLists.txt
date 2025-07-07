@@ -33,7 +33,7 @@ target_link_libraries(gpudrive_mgr
     PUBLIC
         madrona_python_utils
     PRIVATE
-        madrona_json
+        nlohmann_json::nlohmann_json
         gpudrive_cpu_impl
         madrona_mw_cpu
         madrona_common

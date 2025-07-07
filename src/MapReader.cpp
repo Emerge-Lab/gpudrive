@@ -36,13 +36,8 @@ madrona_gpudrive::Map *copyToArrayOnHostOrDevice(const madrona_gpudrive::Map *in
 
 namespace madrona_gpudrive {
 
-simdjson::dom::parser& MapReader::getParser() {
-  static simdjson::dom::parser parser;
-  return parser;
-}
-
-MapReader::MapReader(const std::string &pathToFile){
-  in_ = pathToFile;
+MapReader::MapReader(const std::string &pathToFile) : in_(pathToFile) {
+  assert(in_.is_open());
   map_ = new madrona_gpudrive::Map();
 }
 
@@ -51,13 +46,10 @@ MapReader::~MapReader() {
 }
 
 void MapReader::doParse(float polylineReductionThreshold) {
-    // Parse with simdjson
-    auto& parser = getParser();
-    simdjson::dom::element doc;
-    auto error = parser.load(in_).get(doc);
+  nlohmann::json rawJson;
+  in_ >> rawJson;
 
-    // Parse the document into the map
-    from_json(doc, *map_, polylineReductionThreshold);
+  from_json(rawJson, *map_, polylineReductionThreshold);
 }
 
 madrona_gpudrive::Map* MapReader::parseAndWriteOut(const std::string &path,
