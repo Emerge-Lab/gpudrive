@@ -41,7 +41,6 @@ enum class ExportID : uint32_t {
     DeletedAgents,
     MapName,
     ScenarioId,
-    TrafficLights,
     NumExports
 };
 
