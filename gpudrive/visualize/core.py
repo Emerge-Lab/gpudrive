@@ -615,7 +615,15 @@ class MatplotlibVisualizer:
                 continue
 
             # Get current state
-            state = int(tl_obs.state[env_idx, tl_idx, time_step].item())
+            try:
+                state = int(tl_obs.state[env_idx, tl_idx, time_step].item())
+            except ValueError as e:
+                print(
+                    f"Error converting traffic light state to int for env "
+                    f"{env_idx}, tl {tl_idx}, time {time_step}: {e}. "
+                    "Skipping this traffic light."
+                )
+                continue
             state = max(0, min(3, state))  # Clamp to valid range
 
             color = TL_STATE_COLORS[state]
