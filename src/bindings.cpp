@@ -23,7 +23,7 @@ namespace madrona_gpudrive
         m.attr("kMaxAgentCount") = consts::kMaxAgentCount;
         m.attr("kMaxRoadEntityCount") = consts::kMaxRoadEntityCount;
         m.attr("kMaxAgentMapObservationsCount") = consts::kMaxAgentMapObservationsCount;
-                m.attr("episodeLen") = consts::episodeLen;
+        m.attr("episodeLen") = consts::episodeLen;
         m.attr("numLidarSamples") = consts::numLidarSamples;
         m.attr("vehicleScale") = consts::vehicleLengthScale;
 
@@ -144,7 +144,6 @@ namespace madrona_gpudrive
 
                 self.deleteAgents(agents_to_delete);
             })
-            .def("tl_state_tensor", &Manager::trafficLightTensor)
             .def("deleted_agents_tensor", &Manager::deletedAgentsTensor)
             .def("map_name_tensor", &Manager::mapNameTensor)
             .def("scenario_id_tensor", &Manager::scenarioIdTensor);
