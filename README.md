@@ -71,11 +71,26 @@ Next, set up a Python environment
 
 #### With uv (Recommended)
 
-Create a virtual environment:
+Create a virtual environment and install the Python components of the repository:
 
 ```bash
 uv sync --frozen
 ```
+
+#### With pyenv
+
+ Create a virtual environment:
+
+ ```bash
+ pyenv virtualenv 3.11 gpudrive
+ pyenv activate gpudrive
+ ```
+
+ Set it for the current project directory (optional):
+
+ ```bash
+ pyenv local gpudrive
+ ```
 
 #### With conda
 
@@ -86,18 +101,18 @@ conda activate gpudrive
 
 ### Install Python package
 
-Finally, install the Python components of the repository using pip:
+Finally, install the Python components of the repository using pip (this step is not required for the `uv` installation):
 
 ```bash
 # macOS and Linux.
 pip install -e .
 ```
 
-Optional depencies include [pufferlib], [sb3], [vbd], and [tests].
+Dependency-groups include `pufferlib`, `sb3`, `vbd`, and `tests`.
 
 ```bash
 # On Windows.
-pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=PATH_TO_YOUR_BUILD_DIR on Windows
+pip install -e . -Cpackages.madrona_escape_room.ext-out-dir=<PATH_TO_YOUR_BUILD_DIR on Windows>
 ```
 
 </details>
