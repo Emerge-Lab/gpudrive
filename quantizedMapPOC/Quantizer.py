@@ -26,7 +26,7 @@ class Standardizer:
 
     def fit(self, x: torch.Tensor):
         self.mean = torch.mean(x)
-        self.std = torch.std(x)
+        self.std = torch.std(x, unbiased=False)
         if self.std == 0.0 or torch.isnan(self.std):
             self.std = 1.0
             
@@ -91,8 +91,8 @@ def train(x: torch.Tensor, c: torch.nn.Parameter, d: torch.nn.Parameter, Qmin=-1
         if train_logs:
             if step % 100 == 0:
                 print(f"Step {step}: Loss = {loss.item()}, c = {c.item()}, d = {d.item()}")
-                print("Quantized values:", x_q)
-                print("Dequantized values:", x_hat)
+                # print("Quantized values:", x_q)
+                # print("Dequantized values:", x_hat)
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

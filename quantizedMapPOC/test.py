@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import Quantizer
 import json
 import os
+import time
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -69,7 +70,7 @@ def geometries_fake_quantization_file(json_file_path, Qmin=-128, Qmax=127):
     with open(json_file_path, 'w') as f:
         json.dump(data, f)
 
-def fake_quantization(x: torch.tensor, Qmin=-128, Qmax=127):
+def fake_quantization(x: torch.tensor, Qmin=-128, Qmax=127, train_logs=True):
     normalizer = Quantizer.Standardizer(Qmin=Qmin, Qmax=Qmax)
     normalizer.fit(x)
 
@@ -84,7 +85,7 @@ def fake_quantization(x: torch.tensor, Qmin=-128, Qmax=127):
     # Initialize as learnable parameters
     c = torch.nn.Parameter(torch.tensor((fmax-fmin)/(Qmax-Qmin), device=device))  # scale
     d = torch.nn.Parameter(torch.tensor((fmax*Qmin-fmin*Qmax)/(Qmax-Qmin), device=device))  # zero-point
-    Quantizer.train(x_scale, c, d, Qmin=Qmin, Qmax=Qmax, train_logs=False)
+    Quantizer.train(x_scale, c, d, Qmin=Qmin, Qmax=Qmax, train_logs=train_logs)
     if c.item() != 0.0:
         x_q_final = torch.round((x_scale - d) / c).clamp(Qmin, Qmax)
     else:
@@ -105,7 +106,7 @@ class QuantizerAnalysis:
     
 
 
-def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-128, Qmax=127, save_files=True):
+def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-128, Qmax=127, save_files=True, train_logs=True):
 
     if save_files:
         if not os.path.exists(json_file_dir_quantized):
@@ -113,9 +114,10 @@ def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-1
 
     # Create Analyzer
     analyzer = []
-    
+    start_time = time.time()
     json_files = [f for f in os.listdir(json_file_dir) if f.endswith('.json')]
     for json_file_i,json_file in enumerate(json_files):
+        i_start_time = time.time()
         json_file_path = os.path.join(json_file_dir, json_file)
         geometries = get_geometries(json_file_path)
         print(f'Number of road objects in {json_file_i+1}th file: {len(geometries)}')
@@ -124,8 +126,8 @@ def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-1
             x = torch.tensor([g.x for g in road[1]], device=device, dtype=torch.float32)
             y = torch.tensor([g.y for g in road[1]], device=device, dtype=torch.float32)
 
-            x_hat = fake_quantization(x, Qmin=Qmin, Qmax=Qmax)
-            y_hat = fake_quantization(y, Qmin=Qmin, Qmax=Qmax)
+            x_hat = fake_quantization(x, Qmin=Qmin, Qmax=Qmax, train_logs=train_logs)
+            y_hat = fake_quantization(y, Qmin=Qmin, Qmax=Qmax, train_logs=train_logs)
 
             x_mse = F.mse_loss(x, x_hat).item()
             y_mse = F.mse_loss(y, y_hat).item()
@@ -156,9 +158,14 @@ def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-1
 
             with open(os.path.join(json_file_dir_quantized, json_file), 'w') as f:
                 json.dump(data, f)
+        
+        i_end_time = time.time()
+        print(f"Processed {len(geometries)} roads in {i_end_time - i_start_time:.2f} seconds for file: {json_file}")
     
+    end_time = time.time()
+    print(f"Processed {len(json_files)} files in {end_time - start_time:.2f} seconds")
     # Save analyzer data to a .csv file
-    analyzer_file_path = '/quantizedMapPOC/quantizer_analysis.csv'
+    analyzer_file_path = '/scratch/pm3881/gpudrive/quantizedMapPOC/quantizer_analysis.csv'
     with open(analyzer_file_path, 'w') as f:
         f.write("road_id,road_length,x_mse,y_mse,scenario_file_name\n")
         for analysis in analyzer:
@@ -167,19 +174,25 @@ def geometries_fake_quantization(json_file_dir, json_file_dir_quantized, Qmin=-1
     # Print basic statistics for analyzer
     print(f"Total roads processed: {len(analyzer)}")
     # print avg x_mse and y_mse
-    avg_x_mse = sum(a.x_mse for a in analyzer) / len(analyzer)
-    avg_y_mse = sum(a.y_mse for a in analyzer) / len(analyzer)
-    print(f"Average x MSE: {avg_x_mse}")
-    print(f"Average y MSE: {avg_y_mse}")
+    avg_x_mse = 0.0
+    avg_y_mse = 0.0
+    if len(analyzer) > 0:
+        avg_x_mse = sum(a.x_mse for a in analyzer) / len(analyzer)
+        avg_y_mse = sum(a.y_mse for a in analyzer) / len(analyzer)
+        print(f"Average x MSE: {avg_x_mse}")
+        print(f"Average y MSE: {avg_y_mse}")
 
     # Std of x_mse and y_mse
-    std_x_mse = (sum((a.x_mse - avg_x_mse) ** 2 for a in analyzer) / len(analyzer)) ** 0.5
-    std_y_mse = (sum((a.y_mse - avg_y_mse) ** 2 for a in analyzer) / len(analyzer)) ** 0.5
+    std_x_mse = 0.0
+    std_y_mse = 0.0
+    if len(analyzer) > 0:
+        std_x_mse = (sum((a.x_mse - avg_x_mse) ** 2 for a in analyzer) / len(analyzer)) ** 0.5
+        std_y_mse = (sum((a.y_mse - avg_y_mse) ** 2 for a in analyzer) / len(analyzer)) ** 0.5
     print(f"Std of x MSE: {std_x_mse}")
     print(f"Std of y MSE: {std_y_mse}")
 
 if __name__ == "__main__":
-    geometries = get_geometries('data/processed/tl/tfrecord-00000-of-00150_2a173b334be3d32c.json')
+    geometries = get_geometries('/scratch/pm3881/gpudrive/data/processed/tl/tfrecord-00000-of-00150_2a173b334be3d32c.json')
     print(f'Number of road objects: {len(geometries)}')
 
     geom = [g[1] for g in geometries if g[0] == 267][0]
@@ -260,4 +273,4 @@ if __name__ == "__main__":
 
 
     # geometries_fake_quantization('data/processed/tl/tfrecord-00000-of-00150_2a173b334be3d32c.json', Qmin=-128, Qmax=127)
-    geometries_fake_quantization(json_file_dir='data/processed/training', json_file_dir_quantized='data/processed/training_fake_quantized', Qmin=-128, Qmax=127, save_files=False)
+    geometries_fake_quantization(json_file_dir='/scratch/pm3881/gpudrive/data/processed/tl', json_file_dir_quantized='/scratch/pm3881/gpudrive/data/processed/tl_fake_quantized', Qmin=-128, Qmax=127, save_files=False, train_logs=False)
