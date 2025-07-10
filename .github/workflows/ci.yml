@@ -19,16 +19,24 @@ jobs:
       - name: Build Docker image
         run: docker build --tag gpudrive:latest .
 
-      - name: Run smoke test inside Docker container
+      - name: Run smoke test inside Docker container (using a here document)
         run: |
-          docker run --rm gpudrive:latest /bin/bash -c "
-            echo 'Dummy cuda' \
-            && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
-            && export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH \
-            && echo 'Modifications to run without extra data' \
-            && sed -i 's|train_path: \"data/processed/training\"|train_path: \"data/processed/examples\"|g' examples/experimental/config/visualization_config.yaml \
-            && sed -i '/# Load policy/{N;N;N;N;N;N;s|# Load policy\n    policy = load_policy(\n        path_to_cpt=config.cpt_path,\n        model_name=config.cpt_name,\n        device=config.device,\n        env=env,\n    )|from gpudrive.networks.late_fusion import NeuralNet\n    policy = NeuralNet.from_pretrained(\"daphne-cornelisse/policy_S10_000_02_27\")|}' examples/experimental/viz_rollouts.py \
-            && echo 'Modifications to run without GPU' \
-            && sed -i 's/device=\"cuda\"/device=\"cpu\"/g' gpudrive/datatypes/observation.py \
-            && uv run python examples/experimental/viz_rollouts.py
-          "
+          docker run --rm gpudrive:latest /bin/bash -c "$(cat << 'EOF'
+          #!/bin/bash
+          set -e
+          set -x
+          export DEBIAN_FRONTEND=noninteractive
+          echo 'Dummy cuda'
+          ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
+          export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH
+          echo 'Modifications to run without extra data'
+          sed -i 's|train_path: \"data/processed/training\"|train_path: \"data/processed/examples\"|g' examples/experimental/config/visualization_config.yaml
+          sed -i '/# Load policy/{N;N;N;N;N;N;s|# Load policy\n    policy = load_policy(\n        path_to_cpt=config.cpt_path,\n        model_name=config.cpt_name,\n        device=config.device,\n        env=env,\n    )|from gpudrive.networks.late_fusion import NeuralNet\n    policy = NeuralNet.from_pretrained(\"daphne-cornelisse/policy_S10_000_02_27\")|}' examples/experimental/viz_rollouts.py
+          echo 'Modifications to run without GPU'
+          sed -i 's/device=\"cuda\"/device=\"cpu\"/g' gpudrive/datatypes/observation.py
+          export PYTHONFAULTHANDLER=1
+          ulimit -c unlimited
+          echo 'Run smoketest'
+          /gpudrive/.venv/bin/python examples/experimental/viz_rollouts.py
+          EOF
+          )"

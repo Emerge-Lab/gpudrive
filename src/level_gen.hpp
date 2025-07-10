@@ -50,6 +50,7 @@ void destroyWorld(Engine &ctx);
     {
         ctx.get<Position>(road) = pos;
         ctx.get<Rotation>(road) = rot;
+        ctx.get<Velocity>(road) = Velocity{madrona::math::Vector3::zero(), madrona::math::Vector3::zero()};
         ctx.get<Scale>(road) = scale;
         ctx.get<EntityType>(road) = type;
         ctx.get<ObjectID>(road) = objId;
