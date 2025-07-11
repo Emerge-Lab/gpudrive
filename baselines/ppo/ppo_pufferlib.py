@@ -20,6 +20,7 @@ from gpudrive.integrations.puffer import ppo
 from gpudrive.env.env_puffer import PufferGPUDrive
 
 from gpudrive.networks.late_fusion import NeuralNet
+from gpudrive.networks.history_late_fusion import NeuralNetWithHistory
 from gpudrive.env.dataset import SceneDataLoader
 
 import pufferlib
@@ -29,6 +30,8 @@ from rich.console import Console
 
 import typer
 from typer import Typer
+
+
 
 app = Typer()
 
@@ -48,36 +51,72 @@ def load_config(config_path):
 
 def make_agent(env, config):
     """Create a policy based on the environment."""
+    history_config = config.environment.get("history_config", None)
 
-    if config.continue_training:
-        print("Loading checkpoint...")
-        # Load checkpoint
-        saved_cpt = torch.load(
-            f=config.model_cpt,
-            map_location=config.train.device,
-            weights_only=False,
-        )
-        policy = NeuralNet(
-            input_dim=saved_cpt["model_arch"]["input_dim"],
-            action_dim=saved_cpt["action_dim"],
-            hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
-            config=config.environment,
-        )
+    if history_config is None:
+        if config.continue_training:
+            print("Loading checkpoint...")
+            # Load checkpoint
+            saved_cpt = torch.load(
+                f=config.model_cpt,
+                map_location=config.train.device,
+                weights_only=False,
+            )
+            policy = NeuralNet(
+                input_dim=saved_cpt["model_arch"]["input_dim"],
+                action_dim=saved_cpt["action_dim"],
+                hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+                config=config.environment,
+            )
 
-        # Load the model parameters
-        policy.load_state_dict(saved_cpt["parameters"])
+            # Load the model parameters
+            policy.load_state_dict(saved_cpt["parameters"])
 
-        return policy
+            return policy
 
-    else:
-        # Start from scratch
-        return NeuralNet(
-            input_dim=config.train.network.input_dim,
-            action_dim=env.single_action_space.n,
-            hidden_dim=config.train.network.hidden_dim,
-            dropout=config.train.network.dropout,
-            config=config.environment,
-        )
+        else:
+            # Start from scratch
+            return NeuralNet(
+                input_dim=config.train.network.input_dim,
+                action_dim=env.single_action_space.n,
+                hidden_dim=config.train.network.hidden_dim,
+                dropout=config.train.network.dropout,
+                config=config.environment,
+            )
+    else:   
+        if config.continue_training:
+            print("Loading checkpoint...")
+            # Load checkpoint
+            saved_cpt = torch.load(
+                f=config.model_cpt,
+                map_location=config.train.device,
+                weights_only=False,
+            )
+            policy = NeuralNetWithHistory(
+                input_dim=saved_cpt["model_arch"]["input_dim"],
+                action_dim=saved_cpt["action_dim"],
+                hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
+                config=config.environment,
+            )
+
+            # Load the model parameters
+            policy.load_state_dict(saved_cpt["parameters"])
+
+            return policy
+
+        else:
+
+            return NeuralNetWithHistory(
+                    input_dim=config.train.network.input_dim,
+                    action_dim=env.single_action_space.n,
+                    hidden_dim=config.train.network.hidden_dim,
+                    dropout=config.train.network.dropout,
+                    config=config.environment,
+                    k_trials=config.environment.history_config.trials,
+                    num_steps= config.environment.history_config.num_steps,
+                    log_history = config.environment.history_config.log_history_step,
+                    closest_k_partners_in_history=config.environment.history_config.closest_k_partners_in_history
+                )
 
 
 def train(args, vecenv):
@@ -176,6 +215,8 @@ def run(
     vbd_in_obs: Annotated[Optional[bool], typer.Option(help="Include VBD predictions in the observation")] = False,
     init_steps: Annotated[Optional[int], typer.Option(help="Environment warmup steps")] = 0,
     entropy_conditioned: Annotated[Optional[bool], typer.Option(help="Add entropy to agent observations")] = False,
+    history_config: Annotated[Optional[str], typer.Option(help="history config in sub yaml format")] = None,
+    condition_mode:  Annotated[Optional[str], typer.Option(help="how reward conditioning is defined")] = None,
     # Train options
     seed: Annotated[Optional[int], typer.Option(help="The seed for training")] = 42,
     learning_rate: Annotated[Optional[float], typer.Option(help="The learning rate for training")] = None,
@@ -221,6 +262,8 @@ def run(
         "vbd_trajectory_weight": vbd_trajectory_weight,
         "vbd_in_obs": vbd_in_obs,
         "init_steps": init_steps,
+        "history_config": history_config,
+        'condition_mode': condition_mode
     }
     config.environment.update(
         {k: v for k, v in env_config.items() if v is not None}

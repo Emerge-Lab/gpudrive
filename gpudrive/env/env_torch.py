@@ -34,6 +34,7 @@ from gpudrive.utils.geometry import normalize_min_max
 from gpudrive.integrations.vbd.data_utils import process_scenario_data
 
 
+
 class GPUDriveTorchEnv(GPUDriveGymEnv):
     """Torch Gym Environment that interfaces with the GPU Drive simulator."""
 
@@ -63,15 +64,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Initialize reward weights tensor if using reward_conditioned
         self.reward_weights_tensor = None
         if (
-            hasattr(self.config, "reward_type")
-            and self.config.reward_type == "reward_conditioned"
+            self.config.reward_type == "reward_conditioned"
         ):
-            # Use default condition_mode from config or fall back to "random"
+            # Use default condition_mode from config or fall back to "same_per_world"
             condition_mode = getattr(self.config, "condition_mode", "random")
             agent_type = getattr(self.config, "agent_type", torch.zeros(3))
             self._set_reward_weights(
                 condition_mode=condition_mode, agent_type=agent_type
             )
+
+            
+
         self.entropy_tensor = None
         if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned:
             # Create a tensor with random weights between the bounds
@@ -389,6 +392,38 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 .unsqueeze(0)
                 .expand(num_envs, self.max_cont_agents, 3)
             )
+        elif condition_mode == "same_per_world":
+
+
+            scaled_values = torch.ones(
+                num_envs,
+                64,  # This should be 64 to match your mask
+                3,   # collision, goal_achieved, off_road
+                device=self.device,
+            )
+
+            for world_idx in range(num_envs):
+                # Sample one weight per reward type for this world
+                collision_weight = torch.FloatTensor(1).uniform_(
+                    self.config.collision_weight_lb, 
+                    self.config.collision_weight_ub
+                ).item()
+                
+                goal_achieved_weight = torch.FloatTensor(1).uniform_(
+                    self.config.goal_achieved_weight_lb, 
+                    self.config.goal_achieved_weight_ub
+                ).item()
+                
+                off_road_weight = torch.FloatTensor(1).uniform_(
+                    self.config.off_road_weight_lb, 
+                    self.config.off_road_weight_ub
+                ).item()
+                
+                # Apply the same weight to all 64 actions for this world
+                scaled_values[world_idx, :, 0] = collision_weight
+                scaled_values[world_idx, :, 1] = goal_achieved_weight
+                scaled_values[world_idx, :, 2] = off_road_weight
+
 
         else:
             raise ValueError(f"Unknown condition_mode: {condition_mode}")
@@ -513,7 +548,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + self.reward_weights_tensor[:, :, 1] * goal_achieved
                 + self.reward_weights_tensor[:, :, 2] * off_road
             )
-            print("avg goal reward across agents", weighted_rewards[self.cont_agent_mask].sum() / self.cont_agent_mask.sum())
 
             return weighted_rewards
 

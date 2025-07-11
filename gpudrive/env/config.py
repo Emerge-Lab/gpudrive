@@ -106,8 +106,8 @@ class EnvConfig:
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
-    goal_achieved_weight_lb: float = 1.0
-    goal_achieved_weight_ub: float = 2.0
+    goal_achieved_weight_lb: float = 0.0
+    goal_achieved_weight_ub: float = 1.0
     off_road_weight_lb: float = -1.0
     off_road_weight_ub: float = 0.0
 
@@ -150,7 +150,7 @@ class EnvConfig:
     vbd_in_obs: bool = False
 
     ### filter for controllable objects
-    minimum_controllable_objects: int  = 0
+    minimum_controllable_objects: int  = 1
     
 
 class SelectionDiscipline(Enum):
