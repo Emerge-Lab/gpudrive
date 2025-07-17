@@ -400,16 +400,17 @@ def waymo_to_scenario(
     # Create collision managers
     road_collision_manager = trimesh.collision.CollisionManager()
     road_collision_manager.add_object("road_edges", edge_mesh)
-    agent_collision_manager = trimesh.collision.CollisionManager()
+    agent_collision_manager = trimesh.collision.CollisionManager() # All agents
     trajectory_collision_manager = trimesh.collision.CollisionManager()
-
+    # Non-pedestrian collision managers for road edge collisions 
+    non_ped_agent_collision_manager = trimesh.collision.CollisionManager()
     
     # Construct object states
     objects = []
     for track in protobuf.tracks:
         obj = _init_object(track)
         if obj is not None:
-            if obj["type"] not in ["vehicle", "cyclist"]:
+            if obj["type"] not in ["vehicle", "cyclist", "pedestrian"]:
                 obj["mark_as_expert"] = False
                 objects.append(obj)
                 continue
@@ -431,49 +432,55 @@ def waymo_to_scenario(
                     obj["width"],
                     obj["height"]
                 )
+
+                # Add to general agent collision manager
                 agent_collision_manager.add_object(str(obj["id"]), initial_box)
 
-                # Create trajectory mesh
-                if False in obj["valid"]:
-                    # Create trajectory segments of only valid positions
-                    trajectory_segments = []
-                    for i in range(len(obj["position"]) - 1):
-                        if obj["valid"][i] and obj["valid"][i + 1]:
-                            trajectory_segments.append(
-                                [
-                                    [
-                                        obj["position"][i]["x"],
-                                        obj["position"][i]["y"],
-                                        obj["position"][i]["z"],
-                                    ],
-                                    [
-                                        obj["position"][i + 1]["x"],
-                                        obj["position"][i + 1]["y"],
-                                        obj["position"][i + 1]["z"],
-                                    ],
-                                ]
-                            )
-                else:
-                    obj_vertices = [
-                        [pos["x"], pos["y"], pos["z"]] for pos in obj["position"]
-                    ]
-                    trajectory_segments = [
-                        [obj_vertices[i], obj_vertices[i + 1]]
-                        for i in range(len(obj_vertices) - 1)
-                    ]
+                # Add to non-pedestrian collision manager if not a pedestrian
+                if obj["type"] != "pedestrian":
+                    non_ped_agent_collision_manager.add_object(str(obj["id"]), initial_box)
 
-                trajectory_segments = _filter_small_segments(trajectory_segments)
-                if len(trajectory_segments) > 0:
-                    trajectory_mesh = _generate_mesh(trajectory_segments)
-                    trajectory_collision_manager.add_object(str(obj["id"]), trajectory_mesh)
-                
+                    # Create trajectory mesh for non-pedestrians
+                    if False in obj["valid"]:
+                        # Create trajectory segments of only valid positions
+                        trajectory_segments = []
+                        for i in range(len(obj["position"]) - 1):
+                            if obj["valid"][i] and obj["valid"][i + 1]:
+                                trajectory_segments.append(
+                                    [
+                                        [
+                                            obj["position"][i]["x"],
+                                            obj["position"][i]["y"],
+                                            obj["position"][i]["z"],
+                                        ],
+                                        [
+                                            obj["position"][i + 1]["x"],
+                                            obj["position"][i + 1]["y"],
+                                            obj["position"][i + 1]["z"],
+                                        ],
+                                    ]
+                                )
+                    else:
+                        obj_vertices = [
+                            [pos["x"], pos["y"], pos["z"]] for pos in obj["position"]
+                        ]
+                        trajectory_segments = [
+                            [obj_vertices[i], obj_vertices[i + 1]]
+                            for i in range(len(obj_vertices) - 1)
+                        ]
+
+                    trajectory_segments = _filter_small_segments(trajectory_segments)
+                    if len(trajectory_segments) > 0:
+                        trajectory_mesh = _generate_mesh(trajectory_segments)
+                        trajectory_collision_manager.add_object(str(obj["id"]), trajectory_mesh)
+                    
                 objects.append(obj)
     
     # Check collisions between all init agent positions
     _, agent_collision_pairs = agent_collision_manager.in_collision_internal(return_names=True)
     
-    # Check collisions between init agent positions and road edges
-    _, road_collision_pairs = agent_collision_manager.in_collision_other(
+    # Check collisions between init agent positions and road edges (vehicles, cyclists)
+    _, road_collision_pairs = non_ped_agent_collision_manager.in_collision_other(
         road_collision_manager, return_names=True
     )
 
@@ -500,7 +507,7 @@ def waymo_to_scenario(
     
     # Update mark_as_expert based on initial collisions
     for index, obj in enumerate(objects):
-        if obj["type"] in ["vehicle", "cyclist"]:
+        if obj["type"] in ["vehicle", "cyclist", "pedestrian"]:
             if str(obj["id"]) in colliding_agents:
                 objects[index]["mark_as_expert"] = True
             else:
