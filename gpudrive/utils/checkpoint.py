@@ -30,7 +30,7 @@ def load_policy(path_to_cpt, model_name, device, env_config=None):
     return policy.eval()
 
 
-def load_agent(path_to_cpt):
+def load_agent(path_to_cpt, device="cuda"):
     """
     Load a trained agent from checkpoint file and return it in evaluation mode.
 
@@ -44,6 +44,7 @@ def load_agent(path_to_cpt):
     saved_cpt = torch.load(
         f=path_to_cpt,
         weights_only=False,
+        map_location=device,
     )
 
     # Create policy architecture from saved checkpoint

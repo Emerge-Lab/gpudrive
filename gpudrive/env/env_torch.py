@@ -114,7 +114,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         self.previous_action_value_tensor = torch.zeros(
-            (self.num_worlds, self.max_cont_agents, 3), device=self.device
+            (self.num_worlds, self.max_agent_count, 3), device=self.device
         )
 
         # Setup action and observation spaces
@@ -1165,14 +1165,22 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 ),
                 decimals=3,
             ).to(self.device)
-            self.head_actions = torch.round(
-                torch.linspace(
-                    self.config.head_tilt_action_range[0],
-                    self.config.head_tilt_action_range[1],
-                    self.config.action_space_head_tilt_disc,
-                ),
-                decimals=3,
-            ).to(self.device)
+            if hasattr(self.config, "head_tilt_actions"):
+                self.head_actions = torch.tensor(
+                    self.config.head_tilt_actions,
+                    dtype=torch.float32,
+                    device=self.device,
+                )
+                self.action_space_head_tilt_disc = len(self.config.head_tilt_actions)
+            else:
+                self.head_actions = torch.round(
+                    torch.linspace(
+                        self.config.head_tilt_action_range[0],
+                        self.config.head_tilt_action_range[1],
+                        self.config.action_space_head_tilt_disc,
+                    ),
+                    decimals=3,
+                ).to(self.device)
             products = product(
                 self.accel_actions, self.steer_actions, self.head_actions
             )
@@ -1556,7 +1564,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if self.config.add_previous_action:
                 normalized_prev_actions = (
-                    self.previous_action_value_tensor[:, :, :2]
+                    self.previous_action_value_tensor[:, :, :3]
                     / constants.MAX_ACTION_VALUE
                 )
                 base_fields.append(normalized_prev_actions)
@@ -1598,7 +1606,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
             if self.config.add_previous_action:
                 normalized_prev_actions = (
-                    self.previous_action_value_tensor[:, :, :2][mask]
+                    self.previous_action_value_tensor[:, :, :3][mask]
                     / constants.MAX_ACTION_VALUE
                 )
                 base_fields.append(normalized_prev_actions)

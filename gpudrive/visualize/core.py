@@ -95,11 +95,14 @@ class MatplotlibVisualizer:
             )
 
         self.trajectory = reference_trajectory
-        self.tl_obs = TrafficLightObs.from_tensor(
-            tl_states_tensor=self.sim_object.tl_state_tensor(),
-            backend=self.backend,
-            device=self.device,
-        )
+        try:
+            self.tl_obs = TrafficLightObs.from_tensor(
+                tl_states_tensor=self.sim_object.tl_state_tensor(),
+                backend=self.backend,
+                device=self.device,
+            )
+        except AttributeError:
+            self.tl_obs = None
 
     def plot_simulator_state(
         self,
@@ -326,13 +329,14 @@ class MatplotlibVisualizer:
                     plot_guidance_up_to_time=plot_guidance_up_to_time,
                 )
 
-            self._plot_traffic_lights(
-                ax=ax,
-                env_idx=env_idx,
-                tl_obs=self.tl_obs,
-                time_step=time_step if time_step is not None else 0,
-                marker_size_scale=marker_scale,
-            )
+            if self.tl_obs is not None:
+                self._plot_traffic_lights(
+                    ax=ax,
+                    env_idx=env_idx,
+                    tl_obs=self.tl_obs,
+                    time_step=time_step if time_step is not None else 0,
+                    marker_size_scale=marker_scale,
+                )
 
             # Draw the agents
             self._plot_filtered_agent_bounding_boxes(
@@ -2138,8 +2142,10 @@ class MatplotlibVisualizer:
         x2_rot = self.env_config.obs_radius * np.cos(angle2_rad)
         y2_rot = self.env_config.obs_radius * np.sin(angle2_rad)
 
-        ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
-        ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
+        # Don't plot if view cone is 360° (just for aesthetics)
+        if self.env_config.view_cone_half_angle < 3.14:
+            ax.add_line(Line2D([0, x1_rot], [0, y1_rot], color="k", linewidth=1.0, linestyle="-"))
+            ax.add_line(Line2D([0, x2_rot], [0, y2_rot], color="k", linewidth=1.0, linestyle="-"))
 
         # Plot observation radius as an Arc
         obs_arc = Arc((0,0),

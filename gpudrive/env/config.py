@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, List
 import torch
 
 import madrona_gpudrive
@@ -86,7 +86,8 @@ class EnvConfig:
 
     # Head tilt action range
     head_tilt_action_range: Tuple[float, float] = (-0.7854, 0.7854)  # radians (±45°)
-
+    head_tilt_actions: Optional[List[float]] = None
+    
     # Classic or Invertible Bicycle dynamics model
     action_space_steer_disc: int = 13
     action_space_accel_disc: int = 7
