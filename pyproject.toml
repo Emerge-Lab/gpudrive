@@ -62,6 +62,23 @@ vbd = [
 default-groups = "all"
 cache-dir = "./.uv_cache"
 
+# Use the CUDA index for torch on Linux
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cuda", marker = "platform_system == 'Linux'" },
+    { index = "pytorch-cpu", marker = "platform_system != 'Linux'" }
+]
+
 [tool.madrona.packages.madrona_gpudrive]
 ext-only = true
 ext-out-dir = "build"
