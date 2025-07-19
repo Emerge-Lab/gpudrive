@@ -4,14 +4,43 @@ import madrona_gpudrive
 import abc
 
 class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
+    """
+    An abstract base class for GPU-accelerated driving simulation environments.
+
+    This class provides the core structure for interfacing with the GPUDrive
+    simulator, supporting both PyTorch and JAX backends. It handles the
+    initialization of the simulation, parameter setup, and defines the
+    abstract methods that backend-specific classes must implement.
+
+    Attributes:
+        backend (str): The deep learning backend to use ('torch' or 'jax').
+    """
     def __init__(self, backend="torch"):
+        """
+        Initializes the GPUDriveGymEnv.
+
+        Args:
+            backend (str, optional): The deep learning backend to use.
+                Defaults to "torch".
+
+        Raises:
+            ValueError: If an unsupported backend is specified.
+        """
         super().__init__()
         self.backend = backend
         if self.backend not in ["torch", "jax"]:
             raise ValueError("Unsupported backend; use 'torch' or 'jax'")
 
     def to_tensor(self, x):
-        """Convert simulator data to the correct tensor type for the specified backend."""
+        """
+        Convert simulator data to the correct tensor type for the specified backend.
+
+        Args:
+            x: The data to convert.
+
+        Returns:
+            The data converted to a backend-specific tensor.
+        """
         if self.backend == "torch":
             return x.to_torch()
         elif self.backend == "jax":
@@ -19,42 +48,46 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def reset(self):
-        """Reset the dynamics to inital state.
-        Args:
-            scenario: Scenario used to generate the initial state.
-            rng: Optional random number generator for stochastic environments.
+        """
+        Reset the dynamics to the initial state.
 
-            Returns:
-                The initial observations.
+        Returns:
+            The initial observations.
         """
 
     @abc.abstractmethod
     def step_dynamics(self, actions):
-        """Advance the dynamics by one step.
+        """
+        Advance the dynamics by one step.
 
         Args:
             actions: The actions to apply to the environment.
-
-        Returns: None.
         """
 
     @abc.abstractmethod
-    def get_dones():
-        """Returns the done flags for the environment."""
+    def get_dones(self):
+        """
+        Returns the done flags for the environment.
+        """
 
     @abc.abstractmethod
-    def get_infos():
-        """Returns the info tensor for the environment."""
+    def get_infos(self):
+        """
+        Returns the info tensor for the environment.
+        """
 
     @abc.abstractmethod
-    def get_rewards():
-        """Returns the reward tensor for the environment."""
+    def get_rewards(self):
+        """
+        Returns the reward tensor for the environment.
+        """
 
     def _set_reward_params(self):
-        """Configures the reward parameters based on environment settings.
+        """
+        Configures the reward parameters based on environment settings.
 
         Returns:
-            object: Configured reward parameters.
+            madrona_gpudrive.RewardParams: Configured reward parameters.
         """
         reward_params = madrona_gpudrive.RewardParams()
 
@@ -74,13 +107,14 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         return reward_params
 
     def _set_road_reduction_params(self, params):
-        """Configures the road reduction parameters.
+        """
+        Configures the road reduction parameters.
 
         Args:
-            params (object): Parameters object to be modified.
+            params (madrona_gpudrive.Parameters): Parameters object to be modified.
 
         Returns:
-            object: Updated parameters object with road reduction settings.
+            madrona_gpudrive.Parameters: Updated parameters object with road reduction settings.
         """
         params.observationRadius = self.config.obs_radius
         if self.config.road_obs_algorithm == "k_nearest_roadpoints":
@@ -94,10 +128,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         return params
 
     def _setup_environment_parameters(self):
-        """Sets up various parameters required for the environment simulation.
+        """
+        Sets up various parameters required for the environment simulation.
 
         Returns:
-            object: Configured parameters for the simulation.
+            madrona_gpudrive.Parameters: Configured parameters for the simulation.
         """
         # Dict with supported dynamics models
         self.dynamics_model_dict = dict(
@@ -159,13 +194,15 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         return params
 
     def _initialize_simulator(self, params, data_batch):
-        """Initializes the simulation with the specified parameters.
+        """
+        Initializes the simulation with the specified parameters.
 
         Args:
-            params (object): Parameters for initializing the simulation.
+            params (madrona_gpudrive.Parameters): Parameters for initializing the simulation.
+            data_batch: The initial batch of scene data.
 
         Returns:
-            SimManager: A simulation manager instance configured with given parameters.
+            madrona_gpudrive.SimManager: A simulation manager instance configured with given parameters.
         """
         exec_mode = (
             madrona_gpudrive.madrona.ExecMode.CPU
@@ -192,10 +229,11 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         return sim
 
     def _setup_action_space(self, action_type):
-        """Sets up the action space based on the specified type.
+        """
+        Sets up the action space based on the specified type.
 
         Args:
-            action_type (str): Type of action space to set up.
+            action_type (str): Type of action space to set up ('discrete' or 'continuous').
 
         Raises:
             ValueError: If the specified action type is not supported.
@@ -208,13 +246,14 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
             raise ValueError(f"Action space not supported: {action_type}")
 
     def _set_collision_behavior(self, params):
-        """Defines the behavior when a collision occurs.
+        """
+        Defines the behavior when a collision occurs.
 
         Args:
-            params (object): Parameters object to update based on collision behavior.
+            params (madrona_gpudrive.Parameters): Parameters object to update based on collision behavior.
 
         Returns:
-            object: Updated parameters with collision behavior settings.
+            madrona_gpudrive.Parameters: Updated parameters with collision behavior settings.
         """
         if self.config.collision_behavior == "ignore":
             params.collisionBehaviour = madrona_gpudrive.CollisionBehaviour.Ignore
@@ -231,11 +270,14 @@ class GPUDriveGymEnv(gym.Env, metaclass=abc.ABCMeta):
         return params
 
     def close(self):
-        """Destroy the simulator and visualizer."""
+        """
+        Destroy the simulator and visualizer.
+        """
         del self.sim
 
     def normalize_tensor(self, x, min_val, max_val):
-        """Normalizes an array of values to the range [-1, 1].
+        """
+        Normalizes an array of values to the range [-1, 1].
 
         Args:
             x (np.array): Array of values to normalize.

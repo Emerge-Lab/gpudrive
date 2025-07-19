@@ -31,6 +31,11 @@ using namespace madrona::py;
 
 namespace madrona_gpudrive {
 
+/**
+ * @brief Represents the state of the GPU used for rendering.
+ * This struct holds handles to the rendering API library, the API manager,
+ * and the GPU itself.
+ */
 struct RenderGPUState {
     render::APILibHandle apiLib;
     render::APIManager apiMgr;
@@ -38,6 +43,15 @@ struct RenderGPUState {
 };
 
 
+/**
+ * @brief Initializes the GPU state for rendering.
+ *
+ * This function loads the default rendering API library, initializes the
+ * rendering API manager, and selects a GPU.
+ *
+ * @param mgr_cfg The manager configuration.
+ * @return An optional containing the rendering GPU state if successful.
+ */
 static inline Optional<RenderGPUState> initRenderGPUState(
     const Manager::Config &mgr_cfg)
 {
@@ -56,6 +70,17 @@ static inline Optional<RenderGPUState> initRenderGPUState(
     };
 }
 
+/**
+ * @brief Initializes the render manager.
+ *
+ * This function creates a render manager with the specified configuration,
+ * using either the provided external rendering device or the one initialized
+ * in the render GPU state.
+ *
+ * @param mgr_cfg The manager configuration.
+ * @param render_gpu_state The rendering GPU state.
+ * @return An optional containing the render manager if successful.
+ */
 static inline Optional<render::RenderManager> initRenderManager(
     const Manager::Config &mgr_cfg,
     const Optional<RenderGPUState> &render_gpu_state)
@@ -87,6 +112,13 @@ static inline Optional<render::RenderManager> initRenderManager(
     });
 }
 
+/**
+ * @brief The implementation of the Manager class.
+ *
+ * This struct holds the implementation details for the Manager,
+ * separating the interface from the implementation. It contains
+ * the configuration, loaders, and managers required for the simulation.
+ */
 struct Manager::Impl {
     Config cfg;
     PhysicsLoader physicsLoader;
@@ -126,6 +158,12 @@ struct Manager::Impl {
     static inline Impl * init(const Config &cfg);
 };
 
+/**
+ * @brief The CPU implementation of the Manager.
+ *
+ * This struct provides the CPU-specific implementation of the Manager,
+ * using a TaskGraphExecutor to run the simulation on the CPU.
+ */
 struct Manager::CPUImpl final : Manager::Impl {
     using TaskGraphT =
         TaskGraphExecutor<Engine, Sim, Sim::Config, WorldInit>;
@@ -165,6 +203,12 @@ struct Manager::CPUImpl final : Manager::Impl {
 };
 
 #ifdef MADRONA_CUDA_SUPPORT
+/**
+ * @brief The CUDA implementation of the Manager.
+ *
+ * This struct provides the CUDA-specific implementation of the Manager,
+ * using an MWCudaExecutor to run the simulation on the GPU.
+ */
 struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
     MWCudaLaunchGraph stepGraph;
@@ -205,6 +249,14 @@ struct Manager::CUDAImpl final : Manager::Impl {
 };
 #endif
 
+/**
+ * @brief Loads rendering objects from disk and configures the render manager.
+ *
+ * This function loads object models, materials, and textures, and sets up
+ * the lighting for the scene.
+ *
+ * @param render_mgr The render manager to configure.
+ */
 static void loadRenderObjects(render::RenderManager &render_mgr)
 {
     std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
@@ -266,6 +318,14 @@ static void loadRenderObjects(render::RenderManager &render_mgr)
     });
 }
 
+/**
+ * @brief Loads physics objects from disk and configures the physics loader.
+ *
+ * This function loads collision shapes for the simulation objects and sets up
+ * their physical properties, such as mass and friction.
+ *
+ * @param loader The physics loader to configure.
+ */
 static void loadPhysicsObjects(PhysicsLoader &loader)
 {
     std::array<std::string, (size_t)SimObject::NumObjects - 1> asset_paths;
@@ -385,6 +445,12 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
+/**
+ * @brief Checks if the road observation algorithm is valid.
+ *
+ * @param algo The road observation algorithm to check.
+ * @return True if the algorithm is valid, false otherwise.
+ */
 bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
     madrona::CountT roadObservationsCount =
         sizeof(AgentMapObservations) / sizeof(MapObservation);
@@ -396,6 +462,15 @@ bool isRoadObservationAlgorithmValid(FindRoadObservationsWith algo) {
             roadObservationsCount == consts::kMaxAgentMapObservationsCount);
 }
 
+/**
+ * @brief Initializes the implementation of the Manager.
+ *
+ * This function creates either a CPU or CUDA implementation of the Manager,
+ * depending on the execution mode specified in the configuration.
+ *
+ * @param mgr_cfg The manager configuration.
+ * @return A pointer to the initialized implementation.
+ */
 Manager::Impl * Manager::Impl::init(const Manager::Config &mgr_cfg) {
     Sim::Config sim_cfg;
     sim_cfg.enableLidar = mgr_cfg.params.enableLidar;

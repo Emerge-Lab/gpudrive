@@ -200,20 +200,9 @@ To get started, see these entry points:
   <img src="assets/GPUDrive_docs_flow.png" width="1300" title="Getting started">
 </p> -->
 
-<!-- ## 📈 Tests
+## Documentation
 
-To further test the setup, you can run the pytests in the root directory:
-
-```bash
-pytest
-```
-
-To test if the simulator compiled correctly (and python lib did not), try running the headless program from the build directory.
-
-```bash
-cd build
-./headless CPU 1 # Run on CPU, 1 step
-``` -->
+For a detailed explanation of the project structure, build process, and a tour of the codebase, please see our [documentation](./docs/project_structure.md).
 
 ## Pre-trained policies
 
@@ -380,4 +369,4 @@ If you use GPUDrive in your research, please cite our ICLR 2025 paper
 
 ## Contributing
 
-If you encounter a bug, notice a missing feature, or want to contribute, feel free to create an issue or reach out! We'd be excited to have you involved in the project.
+We welcome contributions to GPUDrive! If you encounter a bug, have a feature request, or want to contribute to the code, please feel free to create an issue or a pull request on our GitHub repository. We appreciate your help in making GPUDrive better.

@@ -19,14 +19,22 @@
 
 namespace madrona_gpudrive {
 
-// The Manager class encapsulates the linkage between the outside training
-// code and the internal simulation state (src/sim.hpp / src/sim.cpp)
-//
-// Manager is responsible for initializing the simulator, loading physics
-// and rendering assets off disk, and mapping ECS components to tensors
-// for learning
+/**
+ * @brief The Manager class encapsulates the linkage between the outside training
+ * code and the internal simulation state (src/sim.hpp / src/sim.cpp).
+ *
+ * Manager is responsible for initializing the simulator, loading physics
+ * and rendering assets off disk, and mapping ECS components to tensors
+ * for learning. It acts as the main interface for controlling and interacting
+ * with the simulation from external code, such as Python.
+ */
 class Manager {
 public:
+    /**
+     * @brief Configuration for the Manager.
+     * This struct holds settings for execution mode, GPU ID, scenes,
+     * and rendering options.
+     */
     struct Config {
         madrona::ExecMode execMode; // CPU or CUDA
         int gpuID; // Which GPU for CUDA backend?
@@ -46,11 +54,21 @@ public:
     MGR_EXPORT Manager(const Config &cfg);
     MGR_EXPORT ~Manager();
 
+    /**
+     * @brief Advances the simulation by one step.
+     */
     MGR_EXPORT void step();
+
+    /**
+     * @brief Resets the specified worlds.
+     * @param worldsToReset A vector of world indices to reset.
+     */
     MGR_EXPORT void reset(std::vector<int32_t> worldsToReset);
 
-    // These functions export Tensor objects that link the ECS
-    // simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
+    /**
+     * @brief These functions export Tensor objects that link the ECS
+     * simulation state to the python bindings / PyTorch tensors (src/bindings.cpp)
+     */
     MGR_EXPORT madrona::py::Tensor actionTensor() const;
     MGR_EXPORT madrona::py::Tensor rewardTensor() const;
     MGR_EXPORT madrona::py::Tensor doneTensor() const;
@@ -75,20 +93,36 @@ public:
     MGR_EXPORT madrona::py::Tensor scenarioIdTensor() const;
     madrona::py::Tensor rgbTensor() const;
     madrona::py::Tensor depthTensor() const;
-    // These functions are used by the viewer to control the simulation
-    // with keyboard inputs in place of DNN policy actions
+
+    /**
+     * @brief These functions are used by the viewer to control the simulation
+     * with keyboard inputs in place of DNN policy actions.
+     */
     MGR_EXPORT void triggerReset(int32_t world_idx);
     MGR_EXPORT void setAction(int32_t world_idx, int32_t agent_idx,
                               float acceleration, float steering,
                               float headAngle);
+
+    /**
+     * @brief Sets the maps for the simulation worlds.
+     * @param maps A vector of map data strings.
+     */
     MGR_EXPORT void setMaps(const std::vector<std::string> &maps);
 
+    /**
+     * @brief Deletes agents from the simulation worlds.
+     * @param agentsToDelete A map from world index to a vector of agent IDs to delete.
+     */
     MGR_EXPORT void deleteAgents(const std::unordered_map<int32_t, std::vector<int32_t>> &agentsToDelete);
   
     // TODO: remove parameters
     MGR_EXPORT std::vector<Shape>
     getShapeTensorFromDeviceMemory();
 
+    /**
+     * @brief Gets the render manager.
+     * @return A reference to the render manager.
+     */
     madrona::render::RenderManager & getRenderManager();
 
   private:

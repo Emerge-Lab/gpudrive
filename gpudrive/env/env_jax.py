@@ -19,7 +19,25 @@ from gpudrive.env.config import EnvConfig, RenderConfig, SceneConfig
 
 
 class GPUDriveJaxEnv(GPUDriveGymEnv):
-    """Jax Gym Environment that interfaces with the GPU Drive simulator."""
+    """
+    A JAX-based Gymnasium environment that interfaces with the GPUDrive simulator.
+
+    This class handles the simulation setup, state management, and interaction
+    with the C++ simulation core, providing a standard reinforcement learning
+    environment interface for JAX users.
+
+    Args:
+        config (EnvConfig): Environment configuration object.
+        data_loader (SceneDataLoader): Data loader for traffic scenarios.
+        max_cont_agents (int): Maximum number of controlled agents.
+        device (str, optional): The device to run the simulation on ('cuda' or 'cpu').
+            Defaults to "cuda".
+        action_type (str, optional): The type of action space ('discrete' or 'continuous').
+            Defaults to "discrete".
+        render_config (RenderConfig, optional): Configuration for rendering.
+            Defaults to RenderConfig().
+        backend (str, optional): The deep learning backend. Defaults to "jax".
+    """
 
     def __init__(
         self,
@@ -89,16 +107,31 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         )
 
     def reset(self):
-        """Reset the worlds and return the initial observations."""
+        """
+        Reset the worlds and return the initial observations.
+
+        Returns:
+            jnp.ndarray: The initial observations.
+        """
         self.sim.reset(list(range(self.num_worlds)))
         return self.get_obs()
 
     def get_dones(self):
-        """Get dones for all agents."""
+        """
+        Get dones for all agents.
+
+        Returns:
+            jnp.ndarray: A JAX array of done flags.
+        """
         return self.sim.done_tensor().to_jax().squeeze(axis=2)
 
     def get_infos(self):
-        """Get info for all agents."""
+        """
+        Get info for all agents.
+
+        Returns:
+            jnp.ndarray: A JAX array containing info.
+        """
         return self.sim.info_tensor().to_jax()
 
     def get_rewards(
@@ -107,7 +140,17 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         collision_weight=0.75,
         goal_achieved_weight=1.0,
     ):
-        """Get rewards for all agents."""
+        """
+        Get rewards for all agents.
+
+        Args:
+            off_road_weight (float, optional): Weight for the off-road penalty.
+            collision_weight (float, optional): Weight for the collision penalty.
+            goal_achieved_weight (float, optional): Weight for the goal achievement reward.
+
+        Returns:
+            jnp.ndarray: A JAX array of rewards.
+        """
         if self.config.reward_type == "sparse_on_goal_achieved":
             self.sim.reward_tensor().to_jax().squeeze(axis=2)
 
@@ -129,7 +172,12 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
             return rewards
 
     def step_dynamics(self, actions):
-        """Step the simulator."""
+        """
+        Step the simulator.
+
+        Args:
+            actions (jnp.ndarray): The actions to apply.
+        """
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
@@ -257,12 +305,13 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         )
 
     def get_obs(self):
-        """Get observation: Aggregate multi-modal environment information into
-            a single flattened tensor. All information is in the shape of
-            (num_worlds, max_agent_count, num_features).
+        """
+        Get observation: Aggregate multi-modal environment information into
+        a single flattened tensor. All information is in the shape of
+        (num_worlds, max_agent_count, num_features).
 
         Returns:
-            jnp.array: (num_worlds, max_agent_count, num_features)
+            jnp.ndarray: (num_worlds, max_agent_count, num_features)
         """
 
         ego_states = self._get_ego_state()
@@ -312,9 +361,11 @@ class GPUDriveJaxEnv(GPUDriveGymEnv):
         return state
 
     def process_partner_obs(self, obs):
-        """Normalize partner state features.
+        """
+        Normalize partner state features.
+
         Args:
-            obs: jnp.array of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
+            obs (jnp.ndarray): jnp.array of shape (num_worlds, kMaxAgentCount, kMaxAgentCount - 1, num_features)
         """
 
         # Speed

@@ -20,12 +20,24 @@ namespace RenderingSystem = madrona::render::RenderingSystem;
 
 namespace madrona_gpudrive {
 
+/**
+ * @brief Get the current step of the simulation.
+ *
+ * @param stepsRemaining The number of steps remaining in the episode.
+ * @return The current step count.
+ */
 CountT getCurrentStep(const StepsRemaining &stepsRemaining) {
   return consts::episodeLen - stepsRemaining.t;
 }
 
-// Register all the ECS components and archetypes that will be
-// used in the simulation
+/**
+ * @brief Register all the ECS components and archetypes that will be
+ * used in the simulation. This function is called during initialization
+ * to set up the ECS registry.
+ *
+ * @param registry The ECS registry to register components and archetypes with.
+ * @param cfg The simulation configuration.
+ */
 void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 {
     base::registerTypes(registry);
@@ -119,10 +131,21 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::MetaData);
 }
 
+/**
+ * @brief Cleans up the world by destroying all entities.
+ *
+ * @param ctx The engine context.
+ */
 static inline void cleanupWorld(Engine &ctx) {
     destroyWorld(ctx);
 }
 
+/**
+ * @brief Initializes the world by resetting the physics system,
+ * assigning a new episode ID, and creating the world entities.
+ *
+ * @param ctx The engine context.
+ */
 static inline void initWorld(Engine &ctx)
 {
     phys::PhysicsSystem::reset(ctx);
@@ -144,9 +167,14 @@ static inline void initWorld(Engine &ctx)
     resetWorld(ctx);
 }
 
-// This system runs in TaskGraphID::Reset and checks if the code external to the
-// application has forced a reset by writing to the WorldReset singleton. If a
-// reset is needed, cleanup the existing world and generate a new one.
+/**
+ * @brief This system runs in TaskGraphID::Reset and checks if the code external to the
+ * application has forced a reset by writing to the WorldReset singleton. If a
+ * reset is needed, cleanup the existing world and generate a new one.
+ *
+ * @param ctx The engine context.
+ * @param reset The WorldReset singleton component.
+ */
 inline void resetSystem(Engine &ctx, WorldReset &reset)
 {
     if (reset.reset == 0)
@@ -165,6 +193,19 @@ inline void resetSystem(Engine &ctx, WorldReset &reset)
     initWorld(ctx);
 }
 
+/**
+ * @brief Collects self-observation data for an agent, including speed,
+ * vehicle size, relative goal position, and collision state.
+ *
+ * @param ctx The engine context.
+ * @param size The vehicle size.
+ * @param pos The agent's position.
+ * @param rot The agent's rotation.
+ * @param vel The agent's velocity.
+ * @param goal The agent's goal.
+ * @param collisionEvent The collision detection event.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void collectSelfObsSystem(Engine &ctx,
                            const VehicleSize &size,
                            const Position &pos,
@@ -185,6 +226,15 @@ inline void collectSelfObsSystem(Engine &ctx,
     self_obs.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
+/**
+ * @brief Collects observations of other agents (partners) in the vicinity.
+ *
+ * @param ctx The engine context.
+ * @param pos The ego agent's position.
+ * @param rot The ego agent's rotation.
+ * @param other_agents The other agents in the world.
+ * @param agent_iface The ego agent's interface entity.
+ */
 inline void collectPartnerObsSystem(Engine &ctx,
                               const Position &pos,
                               const Rotation &rot,
@@ -232,6 +282,14 @@ inline void collectPartnerObsSystem(Engine &ctx,
     }
 }
 
+/**
+ * @brief Collects observations of the road map from the agent's perspective.
+ *
+ * @param ctx The engine context.
+ * @param pos The agent's position.
+ * @param rot The agent's rotation.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void collectMapObservationsSystem(Engine &ctx,
                                         const Position &pos,
                                         const Rotation &rot,
@@ -272,8 +330,13 @@ inline void collectMapObservationsSystem(Engine &ctx,
     }
 }
 
-// Make the agents easier to control by zeroing out their velocity
-// after each step.
+/**
+ * @brief Make the agents easier to control by zeroing out their velocity
+ * after each step.
+ *
+ * @param ctx The engine context.
+ * @param vel The velocity component of the agent.
+ */
 inline void agentZeroVelSystem(Engine &,
                                Velocity &vel)
 {
@@ -284,6 +347,19 @@ inline void agentZeroVelSystem(Engine &,
 }
 
 
+/**
+ * @brief Updates the agent's position and rotation based on the applied action
+ * and the selected dynamics model.
+ *
+ * @param e The engine context.
+ * @param agent_iface The agent's interface entity.
+ * @param size The vehicle size.
+ * @param rotation The agent's rotation.
+ * @param position The agent's position.
+ * @param velocity The agent's velocity.
+ * @param collisionEvent The collision detection event.
+ * @param responseType The agent's response type.
+ */
 inline void movementSystem(Engine &e,
                            const AgentInterfaceEntity &agent_iface,
                            VehicleSize &size,
@@ -375,15 +451,28 @@ inline void movementSystem(Engine &e,
     }
 }
 
+/**
+ * @brief Encodes the entity type into a float value.
+ *
+ * @param type The entity type.
+ * @return The encoded float value.
+ */
 static inline float encodeType(EntityType type)
 {
     return (float)type;
 }
 
-// Launches consts::numLidarSamples per agent.
-// This system is specially optimized in the GPU version:
-// a warp of threads is dispatched for each invocation of the system
-// and each thread in the warp traces one lidar ray for the agent.
+/**
+ * @brief Launches consts::numLidarSamples per agent.
+ * This system is specially optimized in the GPU version:
+ * a warp of threads is dispatched for each invocation of the system
+ * and each thread in the warp traces one lidar ray for the agent.
+ *
+ * @param ctx The engine context.
+ * @param e The agent entity.
+ * @param agent_iface The agent's interface entity.
+ * @param entityType The entity type.
+ */
 inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent_iface,
                         EntityType &entityType) {
     Lidar &lidar = ctx.get<Lidar>(agent_iface.e);
@@ -452,6 +541,16 @@ inline void lidarSystem(Engine &ctx, Entity e, const AgentInterfaceEntity &agent
 #endif
 }
 
+/**
+ * @brief Collects bird's-eye view (BEV) observations for the agent.
+ * This involves rasterizing the surrounding road and other agents into a grid.
+ *
+ * @param ctx The engine context.
+ * @param pos The agent's position.
+ * @param rot The agent's rotation.
+ * @param other_agents The other agents in the world.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void collectBevObservationsSystem(Engine &ctx,
                         const Position &pos,
                         const Rotation &rot,
@@ -547,9 +646,16 @@ inline void collectBevObservationsSystem(Engine &ctx,
     }
 }
 
-// Computes reward for each agent and keeps track of the max distance achieved
-// so far through the challenge. Continuous reward is provided for any new
-// distance achieved.
+/**
+ * @brief Computes reward for each agent and keeps track of the max distance achieved
+ * so far through the challenge. Continuous reward is provided for any new
+ * distance achieved.
+ *
+ * @param ctx The engine context.
+ * @param position The agent's position.
+ * @param goal The agent's goal.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void rewardSystem(Engine &ctx,
                          const Position &position,
                          const Goal &goal,
@@ -579,14 +685,27 @@ inline void rewardSystem(Engine &ctx,
     // out_reward.v = fmaxf(fminf(out_reward.v, 1.f), 0.f);
 }
 
+/**
+ * @brief Tracks the number of steps remaining in the episode.
+ *
+ * @param ctx The engine context.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void stepTrackerSystem(Engine &ctx, const AgentInterfaceEntity &agent_iface) {
     StepsRemaining &stepsRemaining = ctx.get<StepsRemaining>(agent_iface.e);
     --stepsRemaining.t;
 }
 
-// Keep track of the number of steps remaining in the episode and
-// notify training that an episode has completed by
-// setting done = 1 on the final step of the episode
+/**
+ * @brief Keep track of the number of steps remaining in the episode and
+ * notify training that an episode has completed by
+ * setting done = 1 on the final step of the episode.
+ *
+ * @param ctx The engine context.
+ * @param position The agent's position.
+ * @param goal The agent's goal.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void doneSystem(Engine &ctx,
                       const Position &position,
                       const Goal &goal,
@@ -618,6 +737,12 @@ inline void doneSystem(Engine &ctx,
     }
 }
 
+/**
+ * @brief Detects collisions between candidate pairs of entities.
+ *
+ * @param ctx The engine context.
+ * @param candidateCollision The candidate collision pair.
+ */
 void collisionDetectionSystem(Engine &ctx,
                               const CandidateCollision &candidateCollision) {
 
@@ -739,11 +864,18 @@ void collisionDetectionSystem(Engine &ctx,
 
 }
 
-// Helper function for sorting nodes in the taskgraph.
-// Sorting is only supported / required on the GPU backend,
-// since the CPU backend currently keeps separate tables for each world.
-// This will likely change in the future with sorting required for both
-// environments
+/**
+ * @brief Helper function for sorting nodes in the taskgraph.
+ * Sorting is only supported / required on the GPU backend,
+ * since the CPU backend currently keeps separate tables for each world.
+ * This will likely change in the future with sorting required for both
+ * environments.
+ *
+ * @tparam ArchetypeT The archetype to sort.
+ * @param builder The task graph builder.
+ * @param deps The dependencies of the sort node.
+ * @return The node ID of the post-sort reset node.
+ */
 #ifdef MADRONA_GPU_MODE
 template <typename ArchetypeT>
 TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
@@ -759,6 +891,17 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
+/**
+ * @brief Collects absolute observations for the agent, including position,
+ * rotation, goal, and vehicle size.
+ *
+ * @param ctx The engine context.
+ * @param position The agent's position.
+ * @param rotation The agent's rotation.
+ * @param goal The agent's goal.
+ * @param vehicleSize The agent's vehicle size.
+ * @param agent_iface The agent's interface entity.
+ */
 inline void collectAbsoluteObservationsSystem(Engine &ctx,
                                               const Position &position,
                                               const Rotation &rotation,
@@ -775,6 +918,15 @@ inline void collectAbsoluteObservationsSystem(Engine &ctx,
     out.id = ctx.get<AgentID>(agent_iface.e).id;
 }
 
+/**
+ * @brief Sets up the rest of the tasks in the task graph, including
+ * broadphase collision detection, reward calculation, and observation collection.
+ *
+ * @param builder The task graph builder.
+ * @param cfg The simulation configuration.
+ * @param dependencies The dependencies of the tasks.
+ * @param decrementStep Whether to decrement the step counter.
+ */
 void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
                       Span<const TaskGraphNodeID> dependencies,
                       bool decrementStep) {
@@ -935,6 +1087,12 @@ void setupRestOfTasks(TaskGraphBuilder &builder, const Sim::Config &cfg,
 #endif
 }
 
+/**
+ * @brief Sets up the tasks for a single simulation step.
+ *
+ * @param builder The task graph builder.
+ * @param cfg The simulation configuration.
+ */
 static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto moveSystem = builder.addToGraph<ParallelForNode<Engine,
         movementSystem,
@@ -950,6 +1108,12 @@ static void setupStepTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     setupRestOfTasks(builder, cfg, {moveSystem}, true);
 }
 
+/**
+ * @brief Sets up the tasks for resetting the simulation.
+ *
+ * @param builder The task graph builder.
+ * @param cfg The simulation configuration.
+ */
 static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     auto reset =
         builder.addToGraph<ParallelForNode<Engine, resetSystem, WorldReset>>(
@@ -958,6 +1122,12 @@ static void setupResetTasks(TaskGraphBuilder &builder, const Sim::Config &cfg) {
     setupRestOfTasks(builder, cfg, {reset}, false);
 }
 
+/**
+ * @brief Sets up the task graphs for the simulation.
+ *
+ * @param taskgraph_mgr The task graph manager.
+ * @param cfg The simulation configuration.
+ */
 void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg) {
     setupResetTasks(taskgraph_mgr.init(TaskGraphID::Reset), cfg);
     setupStepTasks(taskgraph_mgr.init(TaskGraphID::Step), cfg);

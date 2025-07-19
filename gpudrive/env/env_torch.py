@@ -35,7 +35,25 @@ from gpudrive.integrations.vbd.data_utils import process_scenario_data
 
 
 class GPUDriveTorchEnv(GPUDriveGymEnv):
-    """Torch Gym Environment that interfaces with the GPU Drive simulator."""
+    """
+    A PyTorch-based Gymnasium environment that interfaces with the GPUDrive simulator.
+
+    This class handles the simulation setup, state management, and interaction
+    with the C++ simulation core, providing a standard reinforcement learning
+    environment interface.
+
+    Args:
+        config (EnvConfig): Environment configuration object.
+        data_loader (SceneDataLoader): Data loader for traffic scenarios.
+        max_cont_agents (int): Maximum number of controlled agents.
+        device (str, optional): The device to run the simulation on ('cuda' or 'cpu').
+            Defaults to "cuda".
+        action_type (str, optional): The type of action space ('discrete' or 'continuous').
+            Defaults to "discrete".
+        render_config (RenderConfig, optional): Configuration for rendering.
+            Defaults to RenderConfig().
+        backend (str, optional): The deep learning backend. Defaults to "torch".
+    """
 
     def __init__(
         self,
@@ -131,9 +149,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         """
         Initialize the Versatile Behavior Diffusion (VBD) model and related
         components. Link: https://arxiv.org/abs/2404.02524.
-
-        Args:
-            config: Configuration object containing VBD settings.
         """
         self.use_vbd = self.config.use_vbd
         self.vbd_trajectory_weight = self.config.vbd_trajectory_weight
@@ -236,18 +251,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _set_reward_weights(
         self, env_idx_list=None, condition_mode="random", agent_type=None
     ):
-        """Set agent reward weights for all or specific environments.
+        """
+        Set agent reward weights for all or specific environments.
 
         Args:
-            env_idx_list: List of environment indices to generate new weights for.
-                        If None, all environments are updated.
-            condition_mode: Determines how reward weights are sampled:
-                        - "random": Random sampling within bounds (default for training)
-                        - "fixed": Use predefined agent_type weights (for testing)
-                        - "preset": Use a specific preset from agent_type parameter
-            agent_type: Specifies which preset weights to use if condition_mode is "preset" or "fixed"
-                    If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced"
-                    If condition_mode is "fixed", should be a tensor of shape [3] with weight values
+            env_idx_list (list, optional): List of environment indices to generate new weights for.
+                If None, all environments are updated.
+            condition_mode (str, optional): Determines how reward weights are sampled:
+                - "random": Random sampling within bounds (default for training)
+                - "fixed": Use predefined agent_type weights (for testing)
+                - "preset": Use a specific preset from agent_type parameter.
+            agent_type (str or torch.Tensor, optional): Specifies which preset weights to use or custom weights.
+                If condition_mode is "preset", can be one of: "cautious", "aggressive", "balanced".
+                If condition_mode is "fixed", should be a tensor of shape [3] with weight values.
         """
         if self.reward_weights_tensor is None:
             self.reward_weights_tensor = torch.zeros(
@@ -396,16 +412,17 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         condition_mode=None,
         agent_type=None,
     ):
-        """Reset the worlds and return the initial observations.
+        """
+        Reset the worlds and return the initial observations.
 
         Args:
-            mask: Optional mask indicating which agents to return observations for
-            env_idx_list: Optional list of environment indices to reset
-            condition_mode: Determines how reward weights are sampled:
-                        - "random": Random sampling within bounds (default for training)
-                        - "fixed": Use predefined agent_type weights (for testing)
-                        - "preset": Use a specific preset from agent_type parameter
-            agent_type: Specifies which preset weights to use or custom weights
+            mask (torch.Tensor, optional): Optional mask indicating which agents to return observations for.
+            env_idx_list (list, optional): Optional list of environment indices to reset.
+            condition_mode (str, optional): Determines how reward weights are sampled.
+            agent_type (str or torch.Tensor, optional): Specifies which preset weights to use or custom weights.
+
+        Returns:
+            torch.Tensor: The initial observations.
         """
         if env_idx_list is not None:
             self.sim.reset(env_idx_list)
@@ -440,6 +457,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return self.get_obs(mask)
 
     def get_dones(self):
+        """
+        Get the done flags for all agents.
+
+        Returns:
+            torch.Tensor: A tensor of done flags.
+        """
         return (
             self.sim.done_tensor()
             .to_torch()
@@ -449,6 +472,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def get_infos(self):
+        """
+        Get info for all agents.
+
+        Returns:
+            Info: An Info object containing various pieces of information.
+        """
         return Info.from_tensor(
             self.sim.info_tensor(),
             backend=self.backend,
@@ -463,13 +492,25 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         world_time_steps=None,
         log_distance_weight=0.01,
     ):
-        """Obtain the rewards for the current step.
+        """
+        Obtain the rewards for the current step.
+
         By default, the reward is a weighted combination of the following components:
         - collision
         - goal_achieved
         - off_road
 
         The importance of each component is determined by the weights.
+
+        Args:
+            collision_weight (float, optional): Weight for collision penalty.
+            goal_achieved_weight (float, optional): Weight for goal achievement reward.
+            off_road_weight (float, optional): Weight for off-road penalty.
+            world_time_steps (torch.Tensor, optional): The current time steps for each world.
+            log_distance_weight (float, optional): Weight for distance to logged trajectory reward.
+
+        Returns:
+            torch.Tensor: The calculated rewards for each agent.
         """
 
         # Return the weighted combination of the reward components
@@ -593,6 +634,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             return weighted_rewards
 
     def step_dynamics(self, actions):
+        """
+        Step the simulator forward in time.
+
+        Args:
+            actions (torch.Tensor): The actions to apply to the agents.
+        """
         if actions is not None:
             self._apply_actions(actions)
         self.sim.step()
@@ -1156,7 +1203,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return traj_features.reshape(original_shape)
 
     def get_obs(self, mask=None):
-        """Get observation: Combine different types of environment information into a single tensor.
+        """
+        Get observation: Combine different types of environment information into a single tensor.
+
+        Args:
+            mask (torch.Tensor, optional): Optional mask indicating which agents to return observations for.
+
         Returns:
             torch.Tensor: (num_worlds, max_agent_count, num_features)
         """
@@ -1195,13 +1247,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return obs
 
     def get_controlled_agents_mask(self):
-        """Get the control mask. Shape: [num_worlds, max_agent_count]"""
+        """
+        Get the control mask.
+
+        Returns:
+            torch.Tensor: Shape: [num_worlds, max_agent_count]
+        """
         return (
             self.sim.controlled_state_tensor().to_torch().clone() == 1
         ).squeeze(axis=2)
 
     def advance_sim_with_log_playback(self, init_steps=0):
-        """Advances the simulator by stepping the objects with the logged human trajectories.
+        """
+        Advances the simulator by stepping the objects with the logged human trajectories.
 
         Args:
             init_steps (int): Number of warmup steps.
@@ -1224,11 +1282,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def remove_agents_by_id(
         self, perc_to_rmv_per_scene, remove_controlled_agents=True
     ):
-        """Delete random agents in scenarios.
+        """
+        Delete random agents in scenarios.
 
         Args:
-            perc_to_rmv_per_scene (float): Percentage of agents to remove per scene
-            remove_controlled_agents (bool): If True, removes controlled agents. If False, removes uncontrolled agents
+            perc_to_rmv_per_scene (float): Percentage of agents to remove per scene.
+            remove_controlled_agents (bool): If True, removes controlled agents.
+                If False, removes uncontrolled agents.
         """
         # Obtain agent ids
         agent_ids = LocalEgoState.from_tensor(
@@ -1370,13 +1430,15 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 )
 
     def get_expert_actions(self):
-        """Get expert actions for the full trajectories across worlds.
+        """
+        Get expert actions for the full trajectories across worlds.
 
         Returns:
-            expert_actions: Inferred or logged actions for the agents.
-            expert_speeds: Speeds from the logged trajectories.
-            expert_positions: Positions from the logged trajectories.
-            expert_yaws: Heading from the logged trajectories.
+            tuple: A tuple containing:
+                - expert_actions (torch.Tensor): Inferred or logged actions for the agents.
+                - expert_positions (torch.Tensor): Positions from the logged trajectories.
+                - expert_speeds (torch.Tensor): Speeds from the logged trajectories.
+                - expert_yaws (torch.Tensor): Heading from the logged trajectories.
         """
 
         log_trajectory = LogTrajectory.from_tensor(
@@ -1435,7 +1497,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
 
     def get_env_filenames(self):
-        """Obtain the tfrecord filename for each world, mapping world indices to map names."""
+        """
+        Obtain the tfrecord filename for each world, mapping world indices to map names.
+
+        Returns:
+            dict: A dictionary mapping world indices to filenames.
+        """
 
         map_name_integers = self.sim.map_name_tensor().to_torch()
         filenames = {}
@@ -1449,7 +1516,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return filenames
 
     def get_scenario_ids(self):
-        """Obtain the scenario ID for each world."""
+        """
+        Obtain the scenario ID for each world.
+
+        Returns:
+            dict: A dictionary mapping world indices to scenario IDs.
+        """
         scenario_id_integers = self.sim.scenario_id_tensor().to_torch()
         scenario_ids = {}
 

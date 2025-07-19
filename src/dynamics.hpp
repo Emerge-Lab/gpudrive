@@ -8,6 +8,19 @@ using namespace madrona::math;
 namespace madrona_gpudrive
 {
 
+    /**
+     * @brief Implements the forward kinematics model for vehicle movement.
+     *
+     * This function updates the vehicle's position, rotation, and velocity based on
+     * the given acceleration and steering actions. It uses a simple kinematic model
+     * that is easy to control and computationally efficient.
+     *
+     * @param action The action to apply to the vehicle.
+     * @param size The size of the vehicle.
+     * @param rotation The current rotation of the vehicle.
+     * @param position The current position of the vehicle.
+     * @param velocity The current velocity of the vehicle.
+     */
     inline void forwardKinematics(const Action &action, VehicleSize &size, Rotation &rotation, Position &position, Velocity &velocity)
     {
         const float maxSpeed{std::numeric_limits<float>::max()};
@@ -49,6 +62,19 @@ namespace madrona_gpudrive
         velocity.angular.z = w;
     }
 
+    /**
+     * @brief Implements the forward bicycle model for vehicle movement.
+     *
+     * This function updates the vehicle's state using a bicycle model, which is a
+     * more realistic representation of vehicle dynamics than the simple kinematic
+     * model. It considers the vehicle's wheelbase and steering angle to calculate
+     * the new position and orientation.
+     *
+     * @param action The action to apply to the vehicle.
+     * @param rotation The current rotation of the vehicle.
+     * @param position The current position of the vehicle.
+     * @param velocity The current velocity of the vehicle.
+     */
     inline void forwardBicycleModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // Clip acceleration and steering
@@ -80,6 +106,19 @@ namespace madrona_gpudrive
         rotation = Quat::angleAxis(new_yaw, madrona::math::up);
     }
 
+    /**
+     * @brief Implements a forward delta model for vehicle movement.
+     *
+     * This function updates the vehicle's state by applying deltas to its
+     * position and yaw. It provides a simple way to control the vehicle's
+     * movement by specifying changes in its state rather than forces or
+     * accelerations.
+     *
+     * @param action The action to apply to the vehicle.
+     * @param rotation The current rotation of the vehicle.
+     * @param position The current position of the vehicle.
+     * @param velocity The current velocity of the vehicle.
+     */
     inline void forwardDeltaModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {
         // start delta model
@@ -114,6 +153,19 @@ namespace madrona_gpudrive
 
     }
 
+    /**
+     * @brief Implements the inverse bicycle model to infer actions from state changes.
+     *
+     * This function calculates the acceleration and steering actions that would
+     * result in the transition from the current state to the target state,
+     * according to the bicycle model.
+     *
+     * @param rotation The current rotation of the vehicle.
+     * @param velocity The current velocity of the vehicle.
+     * @param targetRotation The target rotation of the vehicle.
+     * @param targetVelocity The target velocity of the vehicle.
+     * @return The inferred action.
+     */
     inline Action inverseBicycleModel(const Rotation &rotation, const Velocity &velocity, const Rotation &targetRotation, const Velocity &targetVelocity)
     {
         const float dt{0.1};
@@ -148,6 +200,18 @@ namespace madrona_gpudrive
 
     }
 
+    /**
+     * @brief Implements the inverse delta model to infer actions from state changes.
+     *
+     * This function calculates the deltas in position and yaw that correspond
+     * to the transition from the current state to the target state.
+     *
+     * @param rotation The current rotation of the vehicle.
+     * @param position The current position of the vehicle.
+     * @param targetRotation The target rotation of the vehicle.
+     * @param targetPosition The target position of the vehicle.
+     * @return The inferred action.
+     */
     inline Action inverseDeltaModel(const Rotation &rotation, const Position &position, const Rotation &targetRotation, const Position &targetPosition)
     {
         Action action{.delta = {0, 0, 0}};
@@ -183,6 +247,19 @@ namespace madrona_gpudrive
 
     }
 
+    /**
+     * @brief Implements a forward state model for vehicle movement.
+     *
+     * This function directly sets the vehicle's state (position, rotation, and
+     * velocity) from the given action. This model is useful for scenarios where
+     * the vehicle's state is controlled by an external system, such as a
+     * pre-recorded trajectory.
+     *
+     * @param action The action containing the new state of the vehicle.
+     * @param rotation The current rotation of the vehicle.
+     * @param position The current position of the vehicle.
+     * @param velocity The current velocity of the vehicle.
+     */
     inline void forwardStateModel(Action &action, Rotation &rotation, Position &position, Velocity &velocity)
     {        
         // No clipping happening here. 
