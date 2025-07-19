@@ -20,7 +20,7 @@ static void registerRigidBodyEntity(
     ctx.get<broadphase::LeafID>(e) = PhysicsSystem::registerEntity(ctx, e, obj_id);
 }
 
-static inline void resetAgentInterface(Engine &ctx, Entity agent_iface, EntityType type, ResponseType resp_type, int32_t steps_remaining= consts::episodeLen, int32_t done = 0) {
+static inline void resetAgentInterface(Engine &ctx, Entity agent_iface, EntityType type, ResponseType resp_type, int32_t steps_remaining, int32_t done = 0) {
     ctx.get<StepsRemaining>(agent_iface).t = steps_remaining;
     ctx.get<Done>(agent_iface).v = done;
     ctx.get<Reward>(agent_iface).v = 0;
@@ -46,7 +46,7 @@ static inline void resetAgent(Engine &ctx, Entity agent) {
     }
     ctx.get<Action>(agent_iface) = getZeroAction(ctx.data().params.dynamicsModel);
 
-    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent));
+    resetAgentInterface(ctx, agent_iface, ctx.get<EntityType>(agent), ctx.get<ResponseType>(agent), ctx.singleton<EpisodeLength>().episode_length);
 
 #ifndef GPUDRIVE_DISABLE_NARROW_PHASE
     ctx.get<CollisionDetectionEvent>(agent).hasCollided.store_release(0);

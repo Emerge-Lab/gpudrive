@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
         mgr.step();
         stepCtr++;
 
-        if(stepCtr % consts::episodeLen == 0) {
+        if(stepCtr % 91 == 0) { // TODO: change to episode length
             mgr.reset({0});
         }
 
