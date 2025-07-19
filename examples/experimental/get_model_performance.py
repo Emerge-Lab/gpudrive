@@ -64,6 +64,7 @@ if __name__ == "__main__":
             else 1000,
             sample_with_replacement=False,
             shuffle=False,
+            file_prefix=eval_config.file_predix
         )
 
         test_loader = SceneDataLoader(
@@ -74,6 +75,7 @@ if __name__ == "__main__":
             else 1000,
             sample_with_replacement=False,
             shuffle=True,
+            file_prefix=eval_config.file_predix
         )
 
         # Rollouts

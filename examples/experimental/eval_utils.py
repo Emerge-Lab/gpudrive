@@ -35,6 +35,9 @@ class RandomPolicy:
         )
         return random_action, None, None, None
 
+class ExpertReplayPolicy:
+    def __init__(self):
+        pass
 
 def load_policy(path_to_cpt, model_name, device, env=None):
     """Load a policy from a given path."""
@@ -42,7 +45,8 @@ def load_policy(path_to_cpt, model_name, device, env=None):
     # Load the saved checkpoint
     if model_name == "random_baseline":
         return RandomPolicy(env.action_space.n)
-
+    if model_name == "expert_replay":
+        return ExpertReplayPolicy()
     else:  # Load a trained model
         saved_cpt = torch.load(
             f=f"{path_to_cpt}/{model_name}.pt",
@@ -110,22 +114,26 @@ def rollout(
     
     control_mask = env.cont_agent_mask
     live_agent_mask = control_mask.clone()
-
+    expert_actions, _, _, _ = env.get_expert_actions()
+    
     for time_step in range(episode_len):
         
         print(f't: {time_step}')
         
         # Get actions for active agents
         if live_agent_mask.any():
-            action, _, _, _ = policy(
-                next_obs[live_agent_mask], deterministic=deterministic
-            )
+            if isinstance(policy, ExpertReplayPolicy):
+                action_template = expert_actions[:, :, time_step, :]
+            else:
+                action, _, _, _ = policy(
+                    next_obs[live_agent_mask], deterministic=deterministic
+                )
 
-            # Insert actions into a template
-            action_template = torch.zeros(
-                (num_worlds, max_agent_count), dtype=torch.int64, device=device
-            )
-            action_template[live_agent_mask] = action.to(device)
+                # Insert actions into a template
+                action_template = torch.zeros(
+                    (num_worlds, max_agent_count), dtype=torch.int64, device=device
+                )
+                action_template[live_agent_mask] = action.to(device)
 
             # Step the environment
             env.step_dynamics(action_template)
@@ -274,7 +282,8 @@ def make_env(config, train_loader, render_3d=False):
         data_loader=train_loader,
         max_cont_agents=config.max_controlled_agents,
         device=config.device,
-        render_config=render_config
+        render_config=render_config,
+        action_type=config.action_type,
     )
 
     return env
