@@ -8,12 +8,10 @@ from collections import Counter
 from gpudrive.env.config import EnvConfig, RenderConfig
 
 from gpudrive.env.env_torch import GPUDriveTorchEnv
-from gpudrive.datatypes.observation import (
-    LocalEgoState,
-)
 
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.visualize.utils import color_onehot_segmentation_map
 
 from pufferlib.environment import PufferEnv
 from gpudrive import GPU_DRIVE_DATA_DIR
@@ -66,6 +64,7 @@ class PufferGPUDrive(PufferEnv):
         render_format="mp4",
         render_fps=15,
         zoom_radius=50,
+        render_backend="array",
         buf=None,
         **kwargs,
     ):
@@ -97,6 +96,7 @@ class PufferGPUDrive(PufferEnv):
         self.render_format = render_format
         self.render_fps = render_fps
         self.zoom_radius = zoom_radius
+        self.render_backend = render_backend
 
         # VBD
         self.vbd_model_path = vbd_model_path
@@ -422,19 +422,32 @@ class PufferGPUDrive(PufferEnv):
             np.where(np.array(list(self.rendering_in_progress.values())))[0]
         )
         time_steps = list(self.episode_lengths[envs_to_render, 0])
-
+        
         if len(envs_to_render) > 0:
-            sim_state_figures = self.env.vis.plot_simulator_state(
-                env_indices=envs_to_render,
-                time_steps=time_steps,
-                zoom_radius=self.zoom_radius,
-            )
-
-            for idx, render_env_idx in enumerate(envs_to_render):
-                self.frames[render_env_idx].append(
-                    img_from_fig(sim_state_figures[idx])
+            if self.render_backend == "matplotlib":
+                # Render bird's eye view using matplotlib
+                sim_state_figures = self.env.vis.plot_simulator_state(
+                    env_indices=envs_to_render,
+                    time_steps=time_steps,
+                    zoom_radius=self.zoom_radius,
                 )
 
+                for idx, render_env_idx in enumerate(envs_to_render):
+                    self.frames[render_env_idx].append(
+                        img_from_fig(sim_state_figures[idx])
+                    )
+            else:
+                # Render bird's eye view using raster scan algorithm 
+                bev = self.env.sim.bev_observation_tensor().to_torch()
+                # Convert the BEV observation to a colored segmentation map
+                # If the tensor is one-hot encoded segmentation data
+                colored_bev = color_onehot_segmentation_map(bev, 'cpu')
+                agent_idx = 0
+                
+                self.frames[render_env_idx].append(
+                    colored_bev[agent_idx, :]
+                )
+                
     def resample_scenario_batch(self):
         """Sample and set new batch of WOMD scenarios."""
 
