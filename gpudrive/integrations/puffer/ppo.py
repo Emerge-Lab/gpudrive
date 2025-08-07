@@ -205,17 +205,12 @@ def evaluate(data):
 
     with profile.eval_misc:
         data.stats = {}
-
         # Store the average across K done worlds across last N rollouts
         # ensure we are logging an unbiased estimate of the performance
-        if sum(data.infos["num_completed_episodes"]) > data.config.log_window:
+        if len(data.infos["perc_goal_achieved"]) > data.config.log_window:
             for k, v in data.infos.items():
                 try:
-                    if "num_completed_episodes" in k:
-                        data.stats[k] = np.sum(v)
-                    else:
-                        data.stats[k] = np.mean(v)
-
+                    data.stats[k] = np.mean(v)
                     # Log variance for goal and collision metrics
                     if "goal" in k:
                         data.stats[f"std_{k}"] = np.std(v)
