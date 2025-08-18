@@ -17,11 +17,15 @@ from threading import Thread
 from collections import defaultdict, deque
 
 import torch
-
+from box import Box
 import pufferlib
 import pufferlib.utils
 import pufferlib.pytorch
-
+from gpudrive.env.dataset import SceneDataLoader
+from gpudrive.env.config import EnvConfig
+from gpudrive.utils.multi_policy_rollout import generate_history_agent_data
+from gpudrive.env.env_torch import GPUDriveTorchEnv
+import dataclasses 
 torch.set_float32_matmul_precision("high")
 
 # Fast Cython GAE implementation
@@ -39,6 +43,9 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     losses = make_losses()
 
     utilization = Utilization()
+
+    if hasattr(config, "validation_environment"):
+        validation_env = ValidationEnvironment(config=config.validation_environment, device= config.train.device)
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
     if vecenv.use_vbd:
         msg += f" | Using VBD"
@@ -101,6 +108,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
         msg=msg,
         last_log_time=0,
         utilization=utilization,
+        validation_env = validation_env,
     )
 
 
@@ -417,8 +425,22 @@ def train(data):
             # fmt: on
 
         if data.epoch % config.checkpoint_interval == 0 or done_training:
+        
             save_checkpoint(data)
             data.msg = f"Checkpoint saved at update {data.epoch}"
+
+        if data.epoch % config.eval_interval == 0 or done_training:
+            
+            history_config -= data.validation_env.history_config
+            history_config['policy'] = data.policy
+
+            data.validation_env.experiment_config['policies'] = [history_config, data.validation_env.co_player_config]
+
+
+
+            eval_data=generate_history_agent_data(data.validation_env.env, data.validation_env.data_loader, config)
+            
+
 
 
 def close(data):
@@ -763,3 +785,69 @@ def seed_everything(seed, torch_deterministic):
     if seed is not None:
         torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = torch_deterministic
+
+
+class ValidationEnvironment:
+    def __init__(self,config, device):
+        max_agents = config.max_controlled_agents
+
+        device = config.device
+
+
+        self.data_loader = SceneDataLoader(
+            root=config.scenes_folder,
+            batch_size=config.num_worlds,
+            dataset_size=config.dataset_size,
+            sample_with_replacement=config.sample_with_replacement,
+            shuffle= config.shuffle_dataset,
+        )
+
+        env_config = dataclasses.replace(
+            EnvConfig(),
+            ego_state=config.ego_state,
+            road_map_obs=config.road_map_obs,
+            partner_obs=config.partner_obs,
+            reward_type=config.reward_type,
+            norm_obs=config.norm_obs,
+            dynamics_model=config.dynamics_model,
+            collision_behavior=config.collision_behavior,
+            dist_to_goal_threshold=config.dist_to_goal_threshold,
+            polyline_reduction_threshold=config.polyline_reduction_threshold,
+            remove_non_vehicles=config.remove_non_vehicles,
+            lidar_obs=config.lidar_obs,
+            disable_classic_obs=config.lidar_obs,
+            obs_radius=config.obs_radius,
+            steer_actions = torch.round(
+                torch.linspace(-torch.pi, torch.pi, config.action_space_steer_disc), decimals=3  
+            ),
+            accel_actions = torch.round(
+                torch.linspace(-4.0, 4.0, config.action_space_accel_disc), decimals=3
+            ),
+            minimum_controllable_objects = config.minimum_controllable_objects)
+        
+        self.env = GPUDriveTorchEnv(
+            config=env_config,
+            data_loader=self.data_loader,
+            max_cont_agents=config.max_controlled_agents,
+            device=device,
+        
+        )
+
+        self.history_config = config.get("history_config")
+
+        self.co_player_config = config.get("co_players")
+
+        self.history_config['name'] = "history"
+        
+        self.experiment_config = config
+
+
+     
+          
+
+
+
+
+
+
+

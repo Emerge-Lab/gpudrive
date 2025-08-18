@@ -2,7 +2,7 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: '/scratch/kj2676/gpudrive/data/processed/training'
+data_dir: '/home/charliemolony/adaptive_driving_agent/gpudrive/data/processed/examples'
 continue_training: false
 model_cpt: null
 
@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination"
+  reward_type: "reward_conditioned" # Options: "reward_conditioned", "weighted_combination", "none"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -29,13 +29,17 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   obs_radius: 50.0 # Visibility radius of the agents
   action_space_steer_disc: 13
   action_space_accel_disc: 7
-  entropy_conditioned: True 
+  entropy_conditioned: false 
+  condition_mode: 'random'
+
+
   # Versatile Behavior Diffusion (VBD): This will slow down training
   use_vbd: false
   vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
   init_steps: 11
   vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
   vbd_in_obs: false
+
 
 
 wandb:
@@ -49,15 +53,15 @@ train:
   exp_id: PPO # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
-  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  device: "cpu"  # Dynamically set to cuda if available, else cpu
   bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
 
   # # # Data sampling # # #
-  resample_scenes: false
-  resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 2_000_000
+  resample_scenes: true
+  resample_dataset_size: 1000 # Number of unique scenes to sample from
+  resample_interval: 10000
   sample_with_replacement: true
   shuffle_dataset: false
 
