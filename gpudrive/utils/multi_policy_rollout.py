@@ -665,12 +665,12 @@ def generate_history_agent_data(env, data_loader, config, device='cuda'):
                     n = data['collided'].numel()
                     df[df_key]['frac_collided_se'] = (data['collided'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
-                if 'agent_reward' in data and data['agent_reward'].sum().item() > 0:
+                if 'agent_reward' in data and data['agent_reward'].sum().item():
                     df[df_key]['frac_agent_reward'] = float(data['agent_reward'].sum().item() / data['num_controlled'].sum().item())
                     n = data['agent_reward'].numel()
                     df[df_key]['frac_agent_reward_se'] = (data['agent_reward'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
-                if 'real_reward' in data and data['real_reward'].sum().item() > 0:
+                if 'real_reward' in data and data['real_reward'].sum().item():
                     df[df_key]['frac_real_reward'] = float(data['real_reward'].sum().item() / data['num_controlled'].sum().item())
                     n = data['real_reward'].numel()
                     df[df_key]['frac_real_reward_se'] = (data['real_reward'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0

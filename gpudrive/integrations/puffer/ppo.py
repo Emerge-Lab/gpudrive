@@ -64,7 +64,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
 
     if hasattr(config, "validation_environment"):
-        validation_env = ValidationEnvironment(config=config.get("validation_environment"), history_config = vecenv.history_config, device= config.device)
+        validation_env = ValidationEnvironment(config=config.get("validation_environment"), history_config = vecenv.history_config, vecenv = vecenv, device= config.device)
     else:
         validation_env = None
 
@@ -813,7 +813,7 @@ def seed_everything(seed, torch_deterministic):
 
 
 class ValidationEnvironment:
-    def __init__(self,config, history_config,device):
+    def __init__(self,config, history_config, vecenv, device):
 
         self.data_loader = SceneDataLoader(
             root=config.data_set,
@@ -859,6 +859,9 @@ class ValidationEnvironment:
 
         self.history_agent['name'] = "history"
         self.history_agent['history'] = history_config
+        self.history_agent['collision_weight'] = vecenv.collision_weight
+        self.history_agent['goal_achieved_weight'] = vecenv.goal_achieved_weight
+        self.history_agent['off_road_weight'] = vecenv.off_road_weight
 
         co_players_config = config.get("co_players_config")
 
@@ -871,64 +874,8 @@ class ValidationEnvironment:
 
         self.experiment_config['k_trials'] = history_config.k_trials
 
-        
-
-    def compare_first_last_trials(self, df, policies, history_policy):
-        """
-        Compare performance between first and last trials
-        
-        Args:
-            df: Dictionary with keys (trial, history_policy_name, policy_name)
-            policies: List of policy dictionaries
-            history_policy: History policy dictionary
-            k_trials: Number of trials
-        
-        Returns:
-            Dictionary containing first trial scores, last trial scores, and differences
-        """
-        results = {
-            'first_trial': {},  # {policy_name: {metric: value}}
-            'last_trial': {},   # {policy_name: {metric: value}}
-            'differences': {},  # {policy_name: {metric: difference (last - first)}}
-        }
-        
-        history_name = history_policy['name']
-        first_trial = 0
-        last_trial = self.k_trials - 1
-        
-        for policy in policies:
-            policy_name = policy['name']
-            
-            first_key = (first_trial, history_name, policy_name)
-            last_key = (last_trial, history_name, policy_name)
-            
-            first_data = df.get(first_key, {})
-            last_data = df.get(last_key, {})
-            
-            results['first_trial'][policy_name] = dict(first_data)
-            results['last_trial'][policy_name] = dict(last_data)
-            results['differences'][policy_name] = {}
-            
-            # Calculate differences for common metrics
-            common_metrics = set(first_data.keys()) & set(last_data.keys())
-            
-            for metric in common_metrics:
-                first_val = first_data[metric]
-                last_val = last_data[metric]
-                
-                if isinstance(first_val, (int, float)) and isinstance(last_val, (int, float)):
-                    difference = last_val - first_val
-                    results['differences'][policy_name][metric] = difference
-        
-        return results
 
 
         
-          
 
-
-
-
-
-
-
+   
