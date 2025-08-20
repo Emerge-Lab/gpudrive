@@ -295,8 +295,8 @@ def configure_policies(policies_list,  policy_mask, device, num_worlds):
         if 'history' in policy:
             history_config = policy['history']
             episode_len = history_config.get( 'episode_len',91)
-            log_history_step = history_config.get('log_history', 10)
-            trials = history_config.get('trials', 5)
+            log_history_step = history_config.get('log_history_step', 10)
+            trials = history_config.get('k_trials', 5)
             partner_obs_shape = history_config.get('partner_obs_shape',378)
             closest_k_partners_in_history = history_config.get('closest_k_partners_in_history','all')
 
@@ -307,22 +307,22 @@ def configure_policies(policies_list,  policy_mask, device, num_worlds):
             }
 
             if hasattr(policy, "policy"):
-                policy_func_data = policy.policy
+                policy_func = policy.policy
             else:
                 policy_func_data = torch.load(policy['file'], map_location=device, weights_only=False)
-            
-            policy_func = NeuralNetWithHistory( 
-            input_dim=policy_func_data["model_arch"]["input_dim"],
-            action_dim=policy_func_data["action_dim"],
-            hidden_dim=policy_func_data["model_arch"]["hidden_dim"],
-            k_trials=trials,
-            num_steps=episode_len,
-            log_history = log_history_step,
-            closest_k_partners_in_history=closest_k_partners_in_history,
-            )  
+                
+                policy_func = NeuralNetWithHistory( 
+                input_dim=policy_func_data["model_arch"]["input_dim"],
+                action_dim=policy_func_data["action_dim"],
+                hidden_dim=policy_func_data["model_arch"]["hidden_dim"],
+                k_trials=trials,
+                num_steps=episode_len,
+                log_history = log_history_step,
+                closest_k_partners_in_history=closest_k_partners_in_history,
+                )  
 
-            policy_func.load_state_dict(policy_func_data['parameters'])
-            policy_func.to(device)
+                policy_func.load_state_dict(policy_func_data['parameters'])
+                policy_func.to(device)
     
             agents[policy_key] = HistoryAgent(
                 name=policy_name,
@@ -336,7 +336,7 @@ def configure_policies(policies_list,  policy_mask, device, num_worlds):
                 closest_k_partners_in_history =closest_k_partners_in_history,
                 collision_weight=reward_weights['collision_weight'],
                 goal_achieved_weight=reward_weights['goal_achieved_weight'],
-                off_road_weight=reward_weights['off_road_weight']
+                off_road_weight=reward_weights['off_road_weight'],
             )
             
         elif policy.get('reward_conditioning', False):
@@ -374,6 +374,7 @@ def configure_policies(policies_list,  policy_mask, device, num_worlds):
             if policy['name'] == 'reliable agent':
                 policy_func = NeuralNet.from_pretrained("daphne-cornelisse/policy_S10_000_02_27").to(device)
             else:
+                config = Box()
                 config['reward_type'] = 'weighted_combination'
                 policy_func_data = torch.load(policy['file'], map_location=device, weights_only=False)
                 policy_func = NeuralNet(
@@ -555,7 +556,11 @@ def generate_history_agent_data(env, data_loader, config, device='cuda'):
 
     policies = config.policies
     
-    history_policies = [p for p in policies if p['name'].lower() == 'history']
+    # history_policies = [p for p in policies if p['name'].lower() == 'history']
+    history_policies = []
+    for p in policies:
+        if p['name'].lower() == 'history':
+            history_policies.append(p)
     
     if len(history_policies) == 0:
         raise ValueError("History policy not found in policies list")
@@ -613,33 +618,28 @@ def generate_history_agent_data(env, data_loader, config, device='cuda'):
                     if isinstance(metric_value, torch.Tensor):
                         val_shape = metric_value.shape
                         val_preview = metric_value.flatten()[:3].tolist() if metric_value.numel() > 0 else []
-                        print(f"  {metric_name}: {val_type} {val_shape} {val_preview}...")
-                    else:
-                        print(f"  {metric_name}: {val_type} {metric_value}")
+
+
                     
                     if metric_name not in agent_results[trial][key]:
                         if isinstance(metric_value, torch.Tensor):
                             agent_results[trial][key][metric_name] = metric_value.to(device).clone().unsqueeze(0)
-                            print(f"    → Initialized tensor with unsqueeze")
+
                         else:
                             agent_results[trial][key][metric_name] = torch.tensor([metric_value], device=device)
-                            print(f"    → Initialized from value as 1D tensor")
                     else:
                         if isinstance(metric_value, torch.Tensor):
                             new_val = metric_value.to(device).unsqueeze(0)
                             agent_results[trial][key][metric_name] = torch.cat([agent_results[trial][key][metric_name], new_val])
-                            print(f"    → Concatenated tensor")
+
                         else:
                             new_val = torch.tensor([metric_value], device=device)
                             agent_results[trial][key][metric_name] = torch.cat([agent_results[trial][key][metric_name], new_val])
-                            print(f"    → Concatenated from value")
 
                     val = metric_value.sum().item() if isinstance(metric_value, torch.Tensor) and metric_value.ndim > 0 else float(metric_value)
                     df[(trial, history_policy['name'], policy2['name'])][metric_name] += val
-                    print(f"    → DF aggregated: {val}")
-                
-                print(f"  Current DF state: {dict(df[(trial, history_policy['name'], policy2['name'])])}")
-                print("-" * 50)
+
+
 
 
     for policy2 in policies:
@@ -652,23 +652,28 @@ def generate_history_agent_data(env, data_loader, config, device='cuda'):
 
                 if 'goal_achieved' in data and data['goal_achieved'].sum().item() > 0:
                     df[df_key]['frac_goal_achieved'] = float(data['goal_achieved'].sum().item() / data['num_controlled'].sum().item())
-                    df[df_key]['frac_goal_achieved_std'] = data['goal_achieved'].std(unbiased=True).item() if data['goal_achieved'].numel() > 1 else 0.0
+                    n = data['goal_achieved'].numel()
+                    df[df_key]['frac_goal_achieved_se'] = (data['goal_achieved'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
                 if 'off_road' in data and data['off_road'].sum().item() > 0:
                     df[df_key]['frac_off_road'] = float(data['off_road'].sum().item() / data['num_controlled'].sum().item())
-                    df[df_key]['frac_off_road_std'] = data['off_road'].std(unbiased=True).item() if data['off_road'].numel() > 1 else 0.0
+                    n = data['off_road'].numel()
+                    df[df_key]['frac_off_road_se'] = (data['off_road'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
                 if 'collided' in data and data['collided'].sum().item() > 0:
                     df[df_key]['frac_collided'] = float(data['collided'].sum().item() / data['num_controlled'].sum().item())
-                    df[df_key]['frac_collided_std'] = data['collided'].std(unbiased=True).item() if data['collided'].numel() > 1 else 0.0
+                    n = data['collided'].numel()
+                    df[df_key]['frac_collided_se'] = (data['collided'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
                 if 'agent_reward' in data and data['agent_reward'].sum().item() > 0:
                     df[df_key]['frac_agent_reward'] = float(data['agent_reward'].sum().item() / data['num_controlled'].sum().item())
-                    df[df_key]['frac_agent_reward_std'] = data['agent_reward'].std(unbiased=True).item() if data['agent_reward'].numel() > 1 else 0.0
+                    n = data['agent_reward'].numel()
+                    df[df_key]['frac_agent_reward_se'] = (data['agent_reward'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
                 if 'real_reward' in data and data['real_reward'].sum().item() > 0:
                     df[df_key]['frac_real_reward'] = float(data['real_reward'].sum().item() / data['num_controlled'].sum().item())
-                    df[df_key]['frac_real_reward_std'] = data['real_reward'].std(unbiased=True).item() if data['real_reward'].numel() > 1 else 0.0
+                    n = data['real_reward'].numel()
+                    df[df_key]['frac_real_reward_se'] = (data['real_reward'].std(unbiased=True) / torch.sqrt(torch.tensor(float(n)))).item() if n > 1 else 0.0
 
                 df[df_key]['num_controlled'] += data['num_controlled'].sum().item()
 

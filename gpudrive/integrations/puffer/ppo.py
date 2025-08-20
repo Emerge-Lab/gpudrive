@@ -44,8 +44,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
 
     utilization = Utilization()
 
-    if hasattr(config, "validation_environment"):
-        validation_env = ValidationEnvironment(config=config.validation_environment, device= config.train.device)
+
     msg = f"Model Size: {abbreviate(count_params(policy))} parameters"
     if vecenv.use_vbd:
         msg += f" | Using VBD"
@@ -62,6 +61,12 @@ def create(config, vecenv, policy, optimizer=None, wandb=None):
     # Log initial data coverage
     vecenv.wandb_obj = wandb
     vecenv.log_data_coverage()
+
+
+    if hasattr(config, "validation_environment"):
+        validation_env = ValidationEnvironment(config=config.get("validation_environment"), history_config = vecenv.history_config, device= config.device)
+    else:
+        validation_env = None
 
     lstm = policy.lstm if hasattr(policy, "lstm") else None
 
@@ -429,17 +434,37 @@ def train(data):
             save_checkpoint(data)
             data.msg = f"Checkpoint saved at update {data.epoch}"
 
-        if data.epoch % config.eval_interval == 0 or done_training:
+        validation_env = data.get("validation_env")
+
+        if validation_env:
+            if data.epoch % validation_env.eval_interval == 0 or done_training:
+                
+                history_agent = data.validation_env.history_agent
+                history_agent['policy'] = data.policy
+
+                data.validation_env.experiment_config['policies'] = [history_agent] +  data.validation_env.co_player_policies
+
+                eval_data, _ ,_  = generate_history_agent_data(data.validation_env.env, data.validation_env.data_loader, data.validation_env.experiment_config,data.config.device)
+
+                trial_0_env_reward, trial_end_env_reward  = 0,0
+                 
+                for exp_id, exp_vals in eval_data.items():
+                    trial = exp_id[0]
+                    
+                    for metric_name, metric_val in exp_vals.items():
+                        if metric_name == "num_controlled":
+                            continue
+                        data.wandb.log({f"validation/trial_{trial}:{metric_name}": metric_val})
+                        if metric_name == "real_reward":
+                            if trial ==0:
+                                trial_0_env_reward = metric_val
+                            trial_end_env_reward = metric_val
             
-            history_config -= data.validation_env.history_config
-            history_config['policy'] = data.policy
+                data.wandb.log({"validation/delta_reward": trial_end_env_reward - trial_0_env_reward})
+                    
+                    
 
-            data.validation_env.experiment_config['policies'] = [history_config, data.validation_env.co_player_config]
-
-
-
-            eval_data=generate_history_agent_data(data.validation_env.env, data.validation_env.data_loader, config)
-            
+                
 
 
 
@@ -788,18 +813,14 @@ def seed_everything(seed, torch_deterministic):
 
 
 class ValidationEnvironment:
-    def __init__(self,config, device):
-        max_agents = config.max_controlled_agents
-
-        device = config.device
-
+    def __init__(self,config, history_config,device):
 
         self.data_loader = SceneDataLoader(
-            root=config.scenes_folder,
+            root=config.data_set,
             batch_size=config.num_worlds,
-            dataset_size=config.dataset_size,
-            sample_with_replacement=config.sample_with_replacement,
-            shuffle= config.shuffle_dataset,
+            dataset_size=config.k_unique_scenes,
+            sample_with_replacement=config.get("sample_with_replacement", False),
+            shuffle= config.get("shuffle_dataset", False),
         )
 
         env_config = dataclasses.replace(
@@ -823,7 +844,7 @@ class ValidationEnvironment:
             accel_actions = torch.round(
                 torch.linspace(-4.0, 4.0, config.action_space_accel_disc), decimals=3
             ),
-            minimum_controllable_objects = config.minimum_controllable_objects)
+            minimum_controllable_objects = config.get("minimum_controllable_objects",1 ))
         
         self.env = GPUDriveTorchEnv(
             config=env_config,
@@ -833,16 +854,76 @@ class ValidationEnvironment:
         
         )
 
-        self.history_config = config.get("history_config")
+        self.eval_interval = config.eval_interval
+        self.history_agent = Box()
 
-        self.co_player_config = config.get("co_players")
+        self.history_agent['name'] = "history"
+        self.history_agent['history'] = history_config
 
-        self.history_config['name'] = "history"
+        co_players_config = config.get("co_players_config")
+
+        self.co_player_policies = [p for p in co_players_config]
+
+
+        
         
         self.experiment_config = config
 
+        self.experiment_config['k_trials'] = history_config.k_trials
 
-     
+        
+
+    def compare_first_last_trials(self, df, policies, history_policy):
+        """
+        Compare performance between first and last trials
+        
+        Args:
+            df: Dictionary with keys (trial, history_policy_name, policy_name)
+            policies: List of policy dictionaries
+            history_policy: History policy dictionary
+            k_trials: Number of trials
+        
+        Returns:
+            Dictionary containing first trial scores, last trial scores, and differences
+        """
+        results = {
+            'first_trial': {},  # {policy_name: {metric: value}}
+            'last_trial': {},   # {policy_name: {metric: value}}
+            'differences': {},  # {policy_name: {metric: difference (last - first)}}
+        }
+        
+        history_name = history_policy['name']
+        first_trial = 0
+        last_trial = self.k_trials - 1
+        
+        for policy in policies:
+            policy_name = policy['name']
+            
+            first_key = (first_trial, history_name, policy_name)
+            last_key = (last_trial, history_name, policy_name)
+            
+            first_data = df.get(first_key, {})
+            last_data = df.get(last_key, {})
+            
+            results['first_trial'][policy_name] = dict(first_data)
+            results['last_trial'][policy_name] = dict(last_data)
+            results['differences'][policy_name] = {}
+            
+            # Calculate differences for common metrics
+            common_metrics = set(first_data.keys()) & set(last_data.keys())
+            
+            for metric in common_metrics:
+                first_val = first_data[metric]
+                last_val = last_data[metric]
+                
+                if isinstance(first_val, (int, float)) and isinstance(last_val, (int, float)):
+                    difference = last_val - first_val
+                    results['differences'][policy_name][metric] = difference
+        
+        return results
+
+
+        
           
 
 
