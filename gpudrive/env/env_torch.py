@@ -513,7 +513,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + self.reward_weights_tensor[:, :, 1] * goal_achieved
                 + self.reward_weights_tensor[:, :, 2] * off_road
             )
-            print("avg goal reward across agents", weighted_rewards[self.cont_agent_mask].sum() / self.cont_agent_mask.sum())
+            
 
             return weighted_rewards
 
