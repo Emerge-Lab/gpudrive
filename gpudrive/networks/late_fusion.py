@@ -100,6 +100,10 @@ class NeuralNet(
         self.partner_obs_idx = (
             constants.PARTNER_FEAT_DIM * self.max_controlled_agents
         )
+        
+        # Set default value for vbd_in_obs
+        self.vbd_in_obs = False
+        
         if config is not None:
             self.config = Box(config)
             if "reward_type" in self.config:
@@ -109,7 +113,9 @@ class NeuralNet(
                     self.ego_state_idx += 3
                     self.partner_obs_idx += 3
 
-            self.vbd_in_obs = self.config.vbd_in_obs
+            # Override default if config contains vbd_in_obs
+            if hasattr(self.config, 'vbd_in_obs'):
+                self.vbd_in_obs = self.config.vbd_in_obs
 
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5

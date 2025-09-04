@@ -42,9 +42,9 @@ class EnvConfig:
 
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
-    collision_weight: float = 0.0
+    collision_weight: float = -0.5
     goal_achieved_weight: float = 1.0
-    off_road_weight: float = 0.0
+    off_road_weight: float = -0.5
 
     # Road observation algorithm settings
     road_obs_algorithm: str = "linear"  # Algorithm for road observations

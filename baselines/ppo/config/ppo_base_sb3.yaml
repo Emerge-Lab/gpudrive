@@ -1,5 +1,5 @@
 data_dir: "data/processed/examples"
-num_worlds: 100
+num_worlds: 30
 k_unique_scenes: 4
 device: "cuda"  # or "cpu"
 
