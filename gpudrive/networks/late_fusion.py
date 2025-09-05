@@ -94,6 +94,7 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
+        self.vbd_in_obs = config.get('vbd_in_obs',False) if config else False
 
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
@@ -108,8 +109,6 @@ class NeuralNet(
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
                     self.partner_obs_idx += 3
-            
-            self.vbd_in_obs = self.config.get('vbd_in_obs',False)
             if self.config.get('entropy_conditioned',False):
                 # If entropy conditioned, we add the entropy tensor to the obs
                 self.ego_state_idx += 1
@@ -224,7 +223,6 @@ class NeuralNet(
             tuple: If vbd_in_obs is True, returns (ego_state, road_objects, road_graph, vbd_predictions).
                 Otherwise, returns (ego_state, road_objects, road_graph).
         """
-
         # Unpack modalities
         ego_state = obs_flat[:, : self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
