@@ -109,7 +109,7 @@ class NeuralNet(
                     # that determine the reward (collision, goal, off-road)
                     self.ego_state_idx += 3
                     self.partner_obs_idx += 3
-            if self.config.get('entropy_conditioned',False):
+            if self.config.get('entropy_conditioned', False):
                 # If entropy conditioned, we add the entropy tensor to the obs
                 self.ego_state_idx += 1
                 self.partner_obs_idx += 1
