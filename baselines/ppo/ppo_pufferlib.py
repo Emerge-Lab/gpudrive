@@ -62,6 +62,7 @@ def make_agent(env, config):
             action_dim=saved_cpt["action_dim"],
             hidden_dim=saved_cpt["model_arch"]["hidden_dim"],
             config=config.environment,
+            max_controlled_agents=config.environment.max_controlled_agents,
         )
 
         # Load the model parameters
@@ -77,6 +78,8 @@ def make_agent(env, config):
             hidden_dim=config.train.network.hidden_dim,
             dropout=config.train.network.dropout,
             config=config.environment,
+            max_controlled_agents=config.environment.max_controlled_agents,
+            obs_dim=env.obs_size,
         )
 
 

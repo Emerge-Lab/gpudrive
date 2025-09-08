@@ -107,10 +107,11 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         self._initialize_vbd()
 
         # Setup action and observation spaces
+        initial_obs = self.get_obs(self.cont_agent_mask)
         self.observation_space = Box(
             low=-1.0,
             high=1.0,
-            shape=(self.get_obs(self.cont_agent_mask).shape[-1],),
+            shape=(initial_obs.shape[-1],),
         )
 
         self.single_observation_space = gymnasium.spaces.Box(
@@ -776,56 +777,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.norm_obs:
             ego_state.normalize()
 
+        # Handle reward tensor override
+        if reward_tensor is not None:
+            self.reward_weights_tensor = reward_tensor
+            
+        # Base state components
+        state_components = [
+            ego_state.speed,
+            ego_state.vehicle_length,
+            ego_state.vehicle_width,
+            ego_state.rel_goal_x,
+            ego_state.rel_goal_y,
+            ego_state.is_collided,
+        ]
+        
+        # Add all conditioning components
+        state_components.extend(self._get_conditioning_components(mask))
+        
+        # Return with correct permutation based on mask
         if mask is None:
-            # Base state components
-            state_components = [
-                ego_state.speed,
-                ego_state.vehicle_length,
-                ego_state.vehicle_width,
-                ego_state.rel_goal_x,
-                ego_state.rel_goal_y,
-                ego_state.is_collided,
-            ]
-            
-            # Add reward weights if reward conditioned
-            if hasattr(self.config, "reward_type") and (self.config.reward_type == "reward_conditioned" or reward_tensor is not None):
-                if reward_tensor is not None:
-                    self.reward_weights_tensor = reward_tensor
-                state_components.extend([
-                    self.reward_weights_tensor[:, :, 0],
-                    self.reward_weights_tensor[:, :, 1], 
-                    self.reward_weights_tensor[:, :, 2],
-                ])
-            
-            # Add entropy tensor if entropy conditioned
-            if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned and self.entropy_tensor is not None:
-                state_components.append(self.entropy_tensor)
-            
             return torch.stack(state_components).permute(1, 2, 0)
-
         else:
-            # Base state components
-            state_components = [
-                ego_state.speed,
-                ego_state.vehicle_length,
-                ego_state.vehicle_width,
-                ego_state.rel_goal_x,
-                ego_state.rel_goal_y,
-                ego_state.is_collided,
-            ]
-            
-            # Add reward weights if reward conditioned
-            if hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned":
-                state_components.extend([
-                    self.reward_weights_tensor[mask][:, 0],
-                    self.reward_weights_tensor[mask][:, 1],
-                    self.reward_weights_tensor[mask][:, 2],
-                ])
-            
-            # Add entropy tensor if entropy conditioned (needs masking)
-            if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned and self.entropy_tensor is not None:
-                state_components.append(self.entropy_tensor[mask])
-            
             return torch.stack(state_components).permute(1, 0)
 
     def _get_partner_obs(self, mask=None):
@@ -1209,6 +1181,34 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
         return obs
+
+    def _get_conditioning_components(self, mask=None):
+        """Get all conditioning components in the correct order."""
+        components = []
+        
+        # Add reward weights if reward conditioned
+        if hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned":
+            if mask is None:
+                components.extend([
+                    self.reward_weights_tensor[:, :, 0],
+                    self.reward_weights_tensor[:, :, 1], 
+                    self.reward_weights_tensor[:, :, 2],
+                ])
+            else:
+                components.extend([
+                    self.reward_weights_tensor[mask][:, 0],
+                    self.reward_weights_tensor[mask][:, 1],
+                    self.reward_weights_tensor[mask][:, 2],
+                ])
+        
+        # Add entropy tensor if entropy conditioned
+        if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned and self.entropy_tensor is not None:
+            if mask is None:
+                components.append(self.entropy_tensor)
+            else:
+                components.append(self.entropy_tensor[mask])
+        
+        return components
 
     def get_controlled_agents_mask(self):
         """Get the control mask. Shape: [num_worlds, max_agent_count]"""

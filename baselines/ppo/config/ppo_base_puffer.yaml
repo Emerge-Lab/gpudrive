@@ -17,7 +17,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   norm_obs: true
   remove_non_vehicles: true # If false, all agents are included (vehicles, pedestrians, cyclists)
   lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
-  reward_type: "weighted_combination" # Options: "reward_conditioned", "weighted_combination", "none"
+  reward_type: "reward_conditioned" # Options: "reward_conditioned", "weighted_combination", "none"
   collision_weight: -0.75
   off_road_weight: -0.75
   goal_achieved_weight: 1.0
@@ -40,21 +40,21 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
   vbd_in_obs: false
 
-  co_players_config:
-  - file: "/n/home01/mkulkarni/projects/ada/rew_conditioned_0321.pt"
-    name: "Reward Conditioned"
-    type: 'reward_conditioned'
-    collision_lb: -1
-    off_road_lb: -1
-    goal_achieved_lb: 1
-    collision_ub: -0.75
-    off_road_ub: -0.75
-    goal_achieved_ub: 1
+  # co_players_config:
+  # - file: "/n/home01/mkulkarni/projects/ada/rew_conditioned_0321.pt"
+  #   name: "Reward Conditioned"
+  #   type: 'reward_conditioned'
+  #   collision_lb: -1
+  #   off_road_lb: -1
+  #   goal_achieved_lb: 1
+  #   collision_ub: -0.75
+  #   off_road_ub: -0.75
+  #   goal_achieved_ub: 1
 
 
 
 wandb:
-  entity: ""
+  entity: "emerge_"
   project: "gpudrive"
   group: "test"
   mode: "online" # Options: online, offline, disabled

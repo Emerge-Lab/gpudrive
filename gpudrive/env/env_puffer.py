@@ -58,6 +58,7 @@ class PufferGPUDrive(PufferEnv):
         use_vbd=False,
         vbd_model_path=None,
         vbd_trajectory_weight=0.1,
+        entropy_conditioned=False,
         render=False,
         render_3d=True,
         render_interval=50,
@@ -137,6 +138,7 @@ class PufferGPUDrive(PufferEnv):
             use_vbd=use_vbd,
             vbd_model_path=vbd_model_path,
             vbd_trajectory_weight=vbd_trajectory_weight,
+            entropy_conditioned=entropy_conditioned,
         )
 
         render_config = RenderConfig(

@@ -81,7 +81,7 @@ class NeuralNet(
         dropout=0.00,
         act_func="tanh",
         max_controlled_agents=64,
-        obs_dim=2984,  # Size of the flattened observation vector (hardcoded)
+        obs_dim=None,  # Size of the flattened observation vector (calculated if None)
         config=None,  # Optional config
     ):
         super().__init__()
@@ -90,32 +90,37 @@ class NeuralNet(
         self.action_dim = action_dim
         self.max_controlled_agents = max_controlled_agents
         self.max_observable_agents = max_controlled_agents - 1
-        self.obs_dim = obs_dim
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
         self.vbd_in_obs = config.get('vbd_in_obs',False) if config else False
+        
+        # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
+        self.vbd_size = 91 * 5
 
         # Indices for unpacking the observation
         self.ego_state_idx = constants.EGO_FEAT_DIM
         self.partner_obs_idx = (
             constants.PARTNER_FEAT_DIM * self.max_controlled_agents
         )
+        
+        # Calculate extra dimensions needed for conditioning
+        conditioning_dims = self._get_conditioning_dims(config)
+        self.ego_state_idx += conditioning_dims
+        self.partner_obs_idx += conditioning_dims
+        
+        # Calculate obs_dim if not provided
+        if obs_dim is None:
+            import madrona_gpudrive
+            road_graph_size = madrona_gpudrive.kMaxAgentMapObservationsCount * constants.ROAD_GRAPH_FEAT_DIM
+            self.obs_dim = self.partner_obs_idx + road_graph_size
+            if self.vbd_in_obs:
+                self.obs_dim += self.vbd_size
+        else:
+            self.obs_dim = obs_dim
+        
         if config is not None:
             self.config = Box(config)
-            if "reward_type" in self.config:
-                if self.config.reward_type == "reward_conditioned":
-                    # Agents know their "type", consisting of three weights
-                    # that determine the reward (collision, goal, off-road)
-                    self.ego_state_idx += 3
-                    self.partner_obs_idx += 3
-            if self.config.get('entropy_conditioned', False):
-                # If entropy conditioned, we add the entropy tensor to the obs
-                self.ego_state_idx += 1
-                self.partner_obs_idx += 1
-      
-        # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
-        self.vbd_size = 91 * 5
 
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -169,6 +174,19 @@ class NeuralNet(
         self.critic = pufferlib.pytorch.layer_init(
             nn.Linear(hidden_dim, 1), std=1
         )
+
+    def _get_conditioning_dims(self, config):
+        """Calculate the number of extra features needed for conditioning."""
+        extra_dims = 0
+        if config is not None:
+            config_box = Box(config)
+            # Add 3 dimensions for reward conditioning
+            if "reward_type" in config_box and config_box.reward_type == "reward_conditioned":
+                extra_dims += 3
+            # Add 1 dimension for entropy conditioning  
+            if config_box.get('entropy_conditioned', False):
+                extra_dims += 1
+        return extra_dims
 
     def encode_observations(self, observation):
 
