@@ -103,6 +103,9 @@ class EnvConfig:
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
+    condition_type: str = "all"  # Options: "reward", "entropy", "all"
+    oracle_mode: bool = False
+
     # Define upper and lower bounds for reward components if using reward_conditioned
     collision_weight_lb: float = -1.0
     collision_weight_ub: float = 0.0
@@ -114,7 +117,6 @@ class EnvConfig:
     # Define upper and lower bounds for entropy weight if using entropy_conditioned
     entropy_weight_lb: float = 0.0
     entropy_weight_up: float = 1.0
-    entropy_conditioned: bool = False # change to false when fix config 
 
     dist_to_goal_threshold: float = (
         2.0  # Radius around goal considered as "goal achieved"

@@ -62,25 +62,18 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Initialize reward weights tensor if using reward_conditioned
         self.reward_weights_tensor = None
-        if (
-            hasattr(self.config, "reward_type")
-            and self.config.reward_type == "reward_conditioned"
-        ):
-            # Use default condition_mode from config or fall back to "random"
+        self.entropy_tensor = None
+        ctype = getattr(self.config, "condition_type", "all")
+        if ctype in ("reward", "all"):
             condition_mode = getattr(self.config, "condition_mode", "random")
             agent_type = getattr(self.config, "agent_type", torch.zeros(3))
-            self._set_reward_weights(
-                condition_mode=condition_mode, agent_type=agent_type
+            self._set_reward_weights(condition_mode=condition_mode, agent_type=agent_type)
+        if ctype in ("entropy", "all"):
+            self.entropy_tensor = (
+                torch.rand(self.num_worlds, self.max_cont_agents, device=self.device)
+                * (self.config.entropy_weight_up - self.config.entropy_weight_lb)
+                + self.config.entropy_weight_lb
             )
-        self.entropy_tensor = None
-        if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned:
-            # Create a tensor with random weights between the bounds
-            self.entropy_tensor = torch.rand(self.num_worlds, self.max_cont_agents) * (self.config.entropy_weight_up - self.config.entropy_weight_lb) + self.config.entropy_weight_lb
-            self.entropy_tensor = self.entropy_tensor.to(self.device)
-            self.entropy_index = 6
-            if hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned":
-                # If reward_conditioned, the entropy comes after the 3 reward weights
-                self.entropy_index += 3
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -495,29 +488,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
 
-        elif self.config.reward_type == "reward_conditioned" or reward_tensor is not None:
-            # Extract individual weight components from the tensor
-            # Shape: [num_worlds, max_agents, 3]
-            if self.reward_weights_tensor is None:
-                self._set_reward_weights()
-            
-            if reward_tensor is not None:
-                self.reward_weights_tensor = reward_tensor
-
-            # Apply the weights in a vectorized manner
-            # Each index in dimension 2 corresponds to a specific weight:
-            # 0: collision, 1: goal_achieved, 2: off_road
-           
-            
-            weighted_rewards = (
-                self.reward_weights_tensor[:, :, 0] * collided
-                + self.reward_weights_tensor[:, :, 1] * goal_achieved
-                + self.reward_weights_tensor[:, :, 2] * off_road
-            )
-            
-
-            return weighted_rewards
-
         elif self.config.reward_type == "weighted_combination":
 
             weighted_rewards = (
@@ -527,7 +497,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
 
             return weighted_rewards
-
 
 
         elif self.config.reward_type == "distance_to_vdb_trajs":
@@ -1185,29 +1154,19 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
     def _get_conditioning_components(self, mask=None):
         """Get all conditioning components in the correct order."""
         components = []
-        
-        # Add reward weights if reward conditioned
-        if hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned":
+        ctype = getattr(self.config, "condition_type", "all")
+        if ctype in ("reward", "all") and self.reward_weights_tensor is not None:
             if mask is None:
                 components.extend([
                     self.reward_weights_tensor[:, :, 0],
-                    self.reward_weights_tensor[:, :, 1], 
+                    self.reward_weights_tensor[:, :, 1],
                     self.reward_weights_tensor[:, :, 2],
                 ])
             else:
-                components.extend([
-                    self.reward_weights_tensor[mask][:, 0],
-                    self.reward_weights_tensor[mask][:, 1],
-                    self.reward_weights_tensor[mask][:, 2],
-                ])
-        
-        # Add entropy tensor if entropy conditioned
-        if hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned and self.entropy_tensor is not None:
-            if mask is None:
-                components.append(self.entropy_tensor)
-            else:
-                components.append(self.entropy_tensor[mask])
-        
+                rw = self.reward_weights_tensor[mask]
+                components.extend([rw[:, 0], rw[:, 1], rw[:, 2]])
+        if ctype in ("entropy", "all") and self.entropy_tensor is not None:
+            components.append(self.entropy_tensor if mask is None else self.entropy_tensor[mask])
         return components
     
     def get_co_player_conditioning(self):

@@ -127,8 +127,9 @@ class NeuralNet(
         if self.oracle_mode:
             has_reward = has_entropy = False
             if config:
-                has_reward = config.get("reward_type") == "reward_conditioned"
-                has_entropy = config.get("entropy_conditioned", False)
+                ctype = config.get("condition_type", "all")
+                has_reward = ctype in ("reward", "all")
+                has_entropy = ctype in ("entropy", "all")
             
             conditioning_size = (3 if has_reward else 0) + (1 if has_entropy else 0)
             assert conditioning_size > 0
@@ -203,11 +204,10 @@ class NeuralNet(
         extra_dims = 0
         if config is not None:
             config_box = Box(config)
-            # Add 3 dimensions for reward conditioning
-            if "reward_type" in config_box and config_box.reward_type == "reward_conditioned":
+            ctype = config_box.get('condition_type', 'all')
+            if ctype in ('reward', 'all'):
                 extra_dims += 3
-            # Add 1 dimension for entropy conditioning  
-            if config_box.get('entropy_conditioned', False):
+            if ctype in ('entropy', 'all'):
                 extra_dims += 1
         return extra_dims
 
