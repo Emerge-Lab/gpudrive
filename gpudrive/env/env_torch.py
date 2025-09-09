@@ -74,6 +74,12 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 * (self.config.entropy_weight_up - self.config.entropy_weight_lb)
                 + self.config.entropy_weight_lb
             )
+        # Expose the index of entropy coefficient inside ego features for external losses
+        # Base ego features count
+        base_ego_feat_dim = 6
+        self.entropy_index = None
+        if ctype in ("entropy", "all"):
+            self.entropy_index = base_ego_feat_dim + (3 if ctype in ("reward", "all") else 0)
 
         # Environment parameter setup
         params = self._setup_environment_parameters()
@@ -416,20 +422,14 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             env_idx_list = list(range(self.num_worlds))
             self.sim.reset(env_idx_list)
 
-        # Re-initialize reward weights if using reward_conditioned
-        if (
-            hasattr(self.config, "reward_type")
-            and self.config.reward_type == "reward_conditioned"
-        ):
-            # Use the specified condition_mode or default to the config setting
+        # Re-initialize reward weights if conditioning includes reward
+        if getattr(self.config, "condition_type", "all") in ("reward", "all"):
             mode = (
                 condition_mode
                 if condition_mode is not None
                 else getattr(self.config, "condition_mode", "random")
             )
-            self._set_reward_weights(
-                env_idx_list, condition_mode=mode, agent_type=agent_type
-            )
+            self._set_reward_weights(env_idx_list, condition_mode=mode, agent_type=agent_type)
 
         self.world_time_steps.zero_()
 
@@ -1170,9 +1170,9 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return components
     
     def get_co_player_conditioning(self):
-
-        has_reward_conditioning = hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned"
-        has_entropy_conditioning = hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned
+        ctype = getattr(self.config, "condition_type", "all")
+        has_reward_conditioning = ctype in ("reward", "all")
+        has_entropy_conditioning = ctype in ("entropy", "all")
         if (not has_reward_conditioning and not has_entropy_conditioning) or not self.cont_agent_mask.any():
             return None
 

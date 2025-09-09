@@ -242,7 +242,7 @@ class NeuralNet(
             batch_size, num_agents, conditioning_size = co_player_conditioning.shape
             conditioning_embed = self.oracle_conditioning_embed(co_player_conditioning.reshape(batch_size * num_agents, conditioning_size))
             conditioning_embed = conditioning_embed.view(batch_size, num_agents, -1)
-            conditioning_pooled = conditioning_embed.max(dim=1)
+            conditioning_pooled = conditioning_embed.amax(dim=1)
             embed = torch.cat([embed, conditioning_pooled], dim=1)
 
         return self.shared_embed(embed)

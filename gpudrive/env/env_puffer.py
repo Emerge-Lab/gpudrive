@@ -58,7 +58,6 @@ class PufferGPUDrive(PufferEnv):
         use_vbd=False,
         vbd_model_path=None,
         vbd_trajectory_weight=0.1,
-        entropy_conditioned=False,
         render=False,
         render_3d=True,
         render_interval=50,
@@ -68,6 +67,8 @@ class PufferGPUDrive(PufferEnv):
         render_fps=15,
         zoom_radius=50,
         buf=None,
+        condition_type="all",
+        oracle_mode=False,
         **kwargs,
     ):
         assert buf is None, "GPUDrive set up only for --vec native"
@@ -138,7 +139,8 @@ class PufferGPUDrive(PufferEnv):
             use_vbd=use_vbd,
             vbd_model_path=vbd_model_path,
             vbd_trajectory_weight=vbd_trajectory_weight,
-            entropy_conditioned=entropy_conditioned,
+            condition_type=condition_type,
+            oracle_mode=oracle_mode,
         )
 
         render_config = RenderConfig(
