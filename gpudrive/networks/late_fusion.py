@@ -83,6 +83,7 @@ class NeuralNet(
         max_controlled_agents=64,
         obs_dim=None,  # Size of the flattened observation vector (calculated if None)
         config=None,  # Optional config
+        oracle_mode=False,  # Enable oracle to observe co-player conditioning
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -93,6 +94,7 @@ class NeuralNet(
         self.num_modes = 3  # Ego, partner, road graph
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
+        self.oracle_mode = oracle_mode
         self.vbd_in_obs = config.get('vbd_in_obs',False) if config else False
         
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
@@ -121,6 +123,23 @@ class NeuralNet(
         
         if config is not None:
             self.config = Box(config)
+
+        if self.oracle_mode:
+            has_reward = has_entropy = False
+            if config:
+                has_reward = config.get("reward_type") == "reward_conditioned"
+                has_entropy = config.get("entropy_conditioned", False)
+            
+            conditioning_size = (3 if has_reward else 0) + (1 if has_entropy else 0)
+            assert conditioning_size > 0
+            
+            self.oracle_conditioning_embed = nn.Sequential(
+                pufferlib.pytorch.layer_init(nn.Linear(conditioning_size, input_dim)),
+                nn.LayerNorm(input_dim),
+                self.act_func,
+                nn.Dropout(self.dropout),
+                pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
+            )
 
         self.ego_embed = nn.Sequential(
             pufferlib.pytorch.layer_init(
@@ -163,8 +182,12 @@ class NeuralNet(
                 pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
             )
 
+        shared_input_dim = self.input_dim * self.num_modes
+        if self.oracle_mode:
+            shared_input_dim += self.input_dim
+            
         self.shared_embed = nn.Sequential(
-            nn.Linear(self.input_dim * self.num_modes, self.hidden_dim),
+            nn.Linear(shared_input_dim, self.hidden_dim),
             nn.Dropout(self.dropout),
         )
 
@@ -188,7 +211,7 @@ class NeuralNet(
                 extra_dims += 1
         return extra_dims
 
-    def encode_observations(self, observation):
+    def encode_observations(self, observation, co_player_conditioning=None):
 
         if self.vbd_in_obs:
             (
@@ -212,17 +235,20 @@ class NeuralNet(
         partner_embed, _ = self.partner_embed(road_objects).max(dim=1)
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
 
-        # Concatenate the embeddings
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
+        
+        if self.oracle_mode:
+            assert co_player_conditioning is not None
+            batch_size, num_agents, conditioning_size = co_player_conditioning.shape
+            conditioning_embed = self.oracle_conditioning_embed(co_player_conditioning.reshape(batch_size * num_agents, conditioning_size))
+            conditioning_embed = conditioning_embed.view(batch_size, num_agents, -1)
+            conditioning_pooled = conditioning_embed.max(dim=1)
+            embed = torch.cat([embed, conditioning_pooled], dim=1)
 
         return self.shared_embed(embed)
 
-    def forward(self, obs, action=None, deterministic=False):
-
-        # Encode the observations
-        hidden = self.encode_observations(obs)
-
-        # Decode the actions
+    def forward(self, obs, action=None, deterministic=False, co_player_conditioning=None):
+        hidden = self.encode_observations(obs, co_player_conditioning)
         value = self.critic(hidden)
         logits = self.actor(hidden)
 

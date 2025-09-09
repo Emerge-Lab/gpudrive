@@ -1209,6 +1209,42 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 components.append(self.entropy_tensor[mask])
         
         return components
+    
+    def get_co_player_conditioning(self):
+
+        has_reward_conditioning = hasattr(self.config, "reward_type") and self.config.reward_type == "reward_conditioned"
+        has_entropy_conditioning = hasattr(self.config, "entropy_conditioned") and self.config.entropy_conditioned
+        if (not has_reward_conditioning and not has_entropy_conditioning) or not self.cont_agent_mask.any():
+            return None
+
+        active_agent_positions = torch.nonzero(self.cont_agent_mask, as_tuple=False)
+        world_indices = active_agent_positions[:, 0]
+        agent_indices = active_agent_positions[:, 1]
+        num_active_agents = active_agent_positions.shape[0]
+        max_co_players = self.max_cont_agents - 1
+        num_agents_per_world = self.cont_agent_mask.shape[1]
+
+        co_player_mask = self.cont_agent_mask[world_indices].clone()
+        co_player_mask[torch.arange(num_active_agents, device=self.device), agent_indices] = False
+
+        all_agent_ids = torch.arange(num_agents_per_world, device=self.device).unsqueeze(0).expand(num_active_agents, -1)
+        masked_agent_ids = torch.where(co_player_mask, all_agent_ids, all_agent_ids + num_agents_per_world)
+        co_player_indices = torch.topk(-masked_agent_ids, k=max_co_players, dim=1).indices
+        co_player_valid = co_player_mask.gather(1, co_player_indices)
+
+        outputs = []
+
+        if has_reward_conditioning and getattr(self, "reward_weights_tensor", None) is not None:
+            reward_weights = self.reward_weights_tensor[world_indices].gather(
+                1, co_player_indices.unsqueeze(-1).expand(num_active_agents, max_co_players, 3)
+            ) * co_player_valid.unsqueeze(-1)
+            outputs.append(reward_weights)
+
+        if has_entropy_conditioning and getattr(self, "entropy_tensor", None) is not None:
+            entropy_weights = (self.entropy_tensor[world_indices].gather(1, co_player_indices) * co_player_valid).unsqueeze(-1)
+            outputs.append(entropy_weights)
+
+        return torch.cat(outputs, dim=-1) if outputs else None
 
     def get_controlled_agents_mask(self):
         """Get the control mask. Shape: [num_worlds, max_agent_count]"""

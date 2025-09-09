@@ -80,6 +80,7 @@ def make_agent(env, config):
             config=config.environment,
             max_controlled_agents=config.environment.max_controlled_agents,
             obs_dim=env.obs_size,
+            oracle_mode=getattr(config.train.network, 'oracle_mode', False),
         )
 
 

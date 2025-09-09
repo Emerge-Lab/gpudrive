@@ -167,14 +167,20 @@ def evaluate(data):
             obs_device = obs.to(config.device)
 
         with profile.eval_forward, torch.no_grad():
+            oracle_mode = getattr(policy, 'oracle_mode', False) or getattr(data.uncompiled_policy, 'oracle_mode', False)
+            co_player_conditioning = None
+            
+            if oracle_mode:
+                co_player_conditioning = data.vecenv.env.get_co_player_conditioning()
+            
             if lstm_h is not None:
                 h = lstm_h[:, env_id]
                 c = lstm_c[:, env_id]
-                actions, logprob, _, value, (h, c) = policy(obs_device, (h, c))
+                actions, logprob, _, value, (h, c) = policy(obs_device, (h, c), co_player_conditioning=co_player_conditioning)
                 lstm_h[:, env_id] = h
                 lstm_c[:, env_id] = c
             else:
-                actions, logprob, _, value = policy(obs_device)
+                actions, logprob, _, value = policy(obs_device, co_player_conditioning=co_player_conditioning)
 
             if config.device == "cuda":
                 torch.cuda.synchronize()
@@ -272,9 +278,17 @@ def train(data):
                 ret = experience.b_returns[mb]
 
             with profile.train_forward:
+                oracle_mode = getattr(data.policy, 'oracle_mode', False) or getattr(data.uncompiled_policy, 'oracle_mode', False)
+                train_co_player_conditioning = None
+                
+                if oracle_mode:
+                    full_conditioning = data.vecenv.env.get_co_player_conditioning()
+                    mb_indices = experience.b_idxs_obs[mb].flatten()
+                    train_co_player_conditioning = full_conditioning[mb_indices] if full_conditioning is not None else None
+                
                 if experience.lstm_h is not None:
                     _, newlogprob, entropy, newvalue, lstm_state = data.policy(
-                        obs, state=lstm_state, action=atn
+                        obs, state=lstm_state, action=atn, co_player_conditioning=train_co_player_conditioning
                     )
                     lstm_state = (
                         lstm_state[0].detach(),
@@ -286,6 +300,7 @@ def train(data):
                             -1, *data.vecenv.single_observation_space.shape
                         ),
                         action=atn,
+                        co_player_conditioning=train_co_player_conditioning,
                     )
 
                 if config.device == "cuda":
