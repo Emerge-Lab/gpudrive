@@ -465,7 +465,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         off_road_weight=-0.5,
         world_time_steps=None,
         log_distance_weight=0.01,
-        reward_tensor = None,
+        reward_tensor=None,
     ):
         """Obtain the rewards for the current step.
         By default, the reward is a weighted combination of the following components:
@@ -731,7 +731,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         )
         return action_space
 
-    def _get_ego_state(self, mask=None,reward_tensor=None) -> torch.Tensor:
+    def _get_ego_state(self, mask=None, reward_tensor=None) -> torch.Tensor:
         """Get the ego state."""
 
         if not self.config.ego_state:
@@ -749,7 +749,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Handle reward tensor override
         if reward_tensor is not None:
             self.reward_weights_tensor = reward_tensor
-            
+
         # Base state components
         state_components = [
             ego_state.speed,
@@ -759,10 +759,10 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             ego_state.rel_goal_y,
             ego_state.is_collided,
         ]
-        
+
         # Add all conditioning components
         state_components.extend(self._get_conditioning_components(mask))
-        
+
         # Return with correct permutation based on mask
         if mask is None:
             return torch.stack(state_components).permute(1, 2, 0)
@@ -1112,64 +1112,49 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         # Reshape back to original format
         return traj_features.reshape(original_shape)
 
-    def get_obs(self, mask=None,reward_tensor=None):
-        """Get observation: Combine different types of environment information into a single tensor.
-        Returns:
-            torch.Tensor: (num_worlds, max_agent_count, num_features)
-        """
-        # Base observations
-        ego_states = self._get_ego_state(mask,reward_tensor)
+    def get_obs(self, mask=None, reward_tensor=None):
+        ego_states = self._get_ego_state(mask, reward_tensor)
         partner_observations = self._get_partner_obs(mask)
         road_map_observations = self._get_road_map_obs(mask)
+
+        obs_components = [ego_states, partner_observations, road_map_observations]
 
         if (
             self.use_vbd
             and self.vbd_model is not None
             and self.config.vbd_in_obs
         ):
-            # Add ego-centric VBD trajectories
             vbd_observations = self._get_vbd_obs(mask)
+            obs_components.append(vbd_observations)
 
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                    vbd_observations,
-                ),
-                dim=-1,
-            )
-        else:
-            obs = torch.cat(
-                (
-                    ego_states,
-                    partner_observations,
-                    road_map_observations,
-                ),
-                dim=-1,
-            )
+        if getattr(self.config, 'oracle_mode', False):
+            oracle_obs = self.get_co_player_conditioning(mask)
+            if oracle_obs is not None:
+                obs_components.append(oracle_obs)
 
-        return obs
+        return torch.cat(obs_components, dim=-1)
 
     def _get_conditioning_components(self, mask=None):
-        """Get all conditioning components in the correct order."""
         components = []
         ctype = getattr(self.config, "condition_type", "all")
         if ctype in ("reward", "all") and self.reward_weights_tensor is not None:
             if mask is None:
                 components.extend([
                     self.reward_weights_tensor[:, :, 0],
-                    self.reward_weights_tensor[:, :, 1],
-                    self.reward_weights_tensor[:, :, 2],
+                    self.reward_weights_tensor[:, :, 1], 
+                    self.reward_weights_tensor[:, :, 2]
                 ])
             else:
                 rw = self.reward_weights_tensor[mask]
                 components.extend([rw[:, 0], rw[:, 1], rw[:, 2]])
         if ctype in ("entropy", "all") and self.entropy_tensor is not None:
-            components.append(self.entropy_tensor if mask is None else self.entropy_tensor[mask])
+            if mask is None:
+                components.append(self.entropy_tensor)
+            else:
+                components.append(self.entropy_tensor[mask])
         return components
-    
-    def get_co_player_conditioning(self):
+
+    def get_co_player_conditioning(self, mask=None):
         ctype = getattr(self.config, "condition_type", "all")
         has_reward_conditioning = ctype in ("reward", "all")
         has_entropy_conditioning = ctype in ("entropy", "all")
@@ -1203,7 +1188,20 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             entropy_weights = (self.entropy_tensor[world_indices].gather(1, co_player_indices) * co_player_valid).unsqueeze(-1)
             outputs.append(entropy_weights)
 
-        return torch.cat(outputs, dim=-1) if outputs else None
+        assert len(outputs) != 0
+        co_player_conditioning = torch.cat(outputs, dim=-1) if outputs else None
+
+        if mask is not None:
+            return co_player_conditioning.flatten(start_dim=1)
+        else:
+            conditioning_size = co_player_conditioning.shape[-1]
+            world_conditioning = torch.zeros(
+                self.num_worlds, self.max_agent_count, max_co_players * conditioning_size,
+                device=self.device, dtype=co_player_conditioning.dtype
+            )
+            world_conditioning[world_indices, agent_indices] = co_player_conditioning.flatten(start_dim=1)
+            return world_conditioning
+
 
     def get_controlled_agents_mask(self):
         """Get the control mask. Shape: [num_worlds, max_agent_count]"""

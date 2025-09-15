@@ -2,14 +2,14 @@ mode: "train"
 use_rnn: false
 eval_model_path: null
 baseline: false
-data_dir: "/n/home01/mkulkarni/projects/ada/gpudrive/data/processed/examples"
+data_dir: "/n/netscratch/pehlevan_lab/Lab/mkulkarni/data/data/processed/training/"
 continue_training: false
 model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 200 # Number of parallel environments
-  k_unique_scenes: 200 # Number of unique scenes to sample from
+  k_unique_scenes: 10000 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
   road_map_obs: true
@@ -32,6 +32,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   condition_type: "all"
   oracle_mode: true
   condition_mode: 'random'
+  entropy_weight_up: 0.05
 
 
   # Versatile Behavior Diffusion (VBD): This will slow down training
@@ -72,16 +73,16 @@ train:
 
   # # # Data sampling # # #
   resample_scenes: true
-  resample_dataset_size: 1000 # Number of unique scenes to sample from
-  resample_interval: 10000
+  resample_dataset_size: 10_000 # Number of unique scenes to sample from
+  resample_interval: 5_000_000
   sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 1_000_000_000
-  batch_size: 512
-  minibatch_size: 16
+  total_timesteps: 4_000_000_000
+  batch_size: 524288
+  minibatch_size: 16384
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99

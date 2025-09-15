@@ -95,8 +95,7 @@ class NeuralNet(
         self.dropout = dropout
         self.act_func = nn.Tanh() if act_func == "tanh" else nn.GELU()
         self.oracle_mode = oracle_mode
-        self.vbd_in_obs = config.get('vbd_in_obs',False) if config else False
-        
+        self.vbd_in_obs = config.get('vbd_in_obs', False) if config else False
         # Calculate the VBD predictions size: 91 timesteps * 5 features = 455
         self.vbd_size = 91 * 5
 
@@ -113,7 +112,6 @@ class NeuralNet(
         
         # Calculate obs_dim if not provided
         if obs_dim is None:
-            import madrona_gpudrive
             road_graph_size = madrona_gpudrive.kMaxAgentMapObservationsCount * constants.ROAD_GRAPH_FEAT_DIM
             self.obs_dim = self.partner_obs_idx + road_graph_size
             if self.vbd_in_obs:
@@ -131,11 +129,13 @@ class NeuralNet(
                 has_reward = ctype in ("reward", "all")
                 has_entropy = ctype in ("entropy", "all")
             
-            conditioning_size = (3 if has_reward else 0) + (1 if has_entropy else 0)
-            assert conditioning_size > 0
+            self.oracle_conditioning_size = (3 if has_reward else 0) + (1 if has_entropy else 0)
+            assert self.oracle_conditioning_size > 0
+            self.oracle_max_co_players = self.max_controlled_agents - 1
+            self.oracle_total_conditioning_size = self.oracle_max_co_players * self.oracle_conditioning_size
             
             self.oracle_conditioning_embed = nn.Sequential(
-                pufferlib.pytorch.layer_init(nn.Linear(conditioning_size, input_dim)),
+                pufferlib.pytorch.layer_init(nn.Linear(self.oracle_conditioning_size, input_dim)),
                 nn.LayerNorm(input_dim),
                 self.act_func,
                 nn.Dropout(self.dropout),
@@ -183,10 +183,10 @@ class NeuralNet(
                 pufferlib.pytorch.layer_init(nn.Linear(input_dim, input_dim)),
             )
 
-        shared_input_dim = self.input_dim * self.num_modes
         if self.oracle_mode:
-            shared_input_dim += self.input_dim
-            
+            self.num_modes += 1
+
+        shared_input_dim = self.input_dim * self.num_modes
         self.shared_embed = nn.Sequential(
             nn.Linear(shared_input_dim, self.hidden_dim),
             nn.Dropout(self.dropout),
@@ -211,15 +211,15 @@ class NeuralNet(
                 extra_dims += 1
         return extra_dims
 
-    def encode_observations(self, observation, co_player_conditioning=None):
+    def encode_observations(self, observation):
 
-        if self.vbd_in_obs:
-            (
-                ego_state,
-                road_objects,
-                road_graph,
-                vbd_predictions,
-            ) = self.unpack_obs(observation)
+        vbd_predictions = oracle_conditioning = None
+        if self.vbd_in_obs and not self.oracle_mode:
+            ego_state, road_objects, road_graph, vbd_predictions = self.unpack_obs(observation)
+        elif not self.vbd_in_obs and self.oracle_mode:
+            ego_state, road_objects, road_graph, oracle_conditioning = self.unpack_obs(observation)
+        elif self.vbd_in_obs and self.oracle_mode:
+            ego_state, road_objects, road_graph, vbd_predictions, oracle_conditioning = self.unpack_obs(observation)
         else:
             ego_state, road_objects, road_graph = self.unpack_obs(observation)
 
@@ -236,19 +236,16 @@ class NeuralNet(
         road_map_embed, _ = self.road_map_embed(road_graph).max(dim=1)
 
         embed = torch.cat([ego_embed, partner_embed, road_map_embed], dim=1)
-        
+
         if self.oracle_mode:
-            assert co_player_conditioning is not None
-            batch_size, num_agents, conditioning_size = co_player_conditioning.shape
-            conditioning_embed = self.oracle_conditioning_embed(co_player_conditioning.reshape(batch_size * num_agents, conditioning_size))
-            conditioning_embed = conditioning_embed.view(batch_size, num_agents, -1)
-            conditioning_pooled = conditioning_embed.amax(dim=1)
-            embed = torch.cat([embed, conditioning_pooled], dim=1)
+            assert oracle_conditioning is not None
+            conditioning_embed, _ = self.oracle_conditioning_embed(oracle_conditioning).max(dim=1)
+            embed = torch.cat([embed, conditioning_embed], dim=1)
 
         return self.shared_embed(embed)
 
-    def forward(self, obs, action=None, deterministic=False, co_player_conditioning=None):
-        hidden = self.encode_observations(obs, co_player_conditioning)
+    def forward(self, obs, action=None, deterministic=False):
+        hidden = self.encode_observations(obs)
         value = self.critic(hidden)
         logits = self.actor(hidden)
 
@@ -258,28 +255,19 @@ class NeuralNet(
 
     def unpack_obs(self, obs_flat):
         """
-        Unpack the flattened observation into the ego state, visible simulator state.
-
-        Args:
-            obs_flat (torch.Tensor): Flattened observation tensor of shape (batch_size, obs_dim).
-
-        Returns:
-            tuple: If vbd_in_obs is True, returns (ego_state, road_objects, road_graph, vbd_predictions).
-                Otherwise, returns (ego_state, road_objects, road_graph).
+            Unpack flattened observations into
+              1) ego_state
+              2) partner_obs
+              3) road_graph
+              4) vbd_predictions           (if `self.vbd_in_obs` is True)
+              5) oracle_conditioning_3d    (if `self.oracle_mode` is True)
         """
-        # Unpack modalities
-        ego_state = obs_flat[:, : self.ego_state_idx]
-        partner_obs = obs_flat[:, self.ego_state_idx : self.partner_obs_idx]
 
-        if self.vbd_in_obs:
-            # Extract the VBD predictions (last 455 elements)
-            vbd_predictions = obs_flat[:, -self.vbd_size :]
-
-            # The rest (excluding ego_state and partner_obs) is the road graph
-            roadgraph_obs = obs_flat[:, self.partner_obs_idx : -self.vbd_size]
-        else:
-            # Without VBD, all remaining elements are road graph observations
-            roadgraph_obs = obs_flat[:, self.partner_obs_idx :]
+        ego_state = obs_flat[:, :self.ego_state_idx]
+        partner_obs = obs_flat[:, self.ego_state_idx:self.partner_obs_idx]
+        roadgraph_start = self.partner_obs_idx
+        roadgraph_end = ego_state.shape[1] - (self.vbd_size if self.vbd_in_obs else 0) - (self.oracle_total_conditioning_size if self.oracle_mode else 0)
+        roadgraph_obs = obs_flat[:, roadgraph_start:roadgraph_end]
 
         road_objects = partner_obs.view(
             -1, self.max_observable_agents, constants.PARTNER_FEAT_DIM
@@ -288,7 +276,20 @@ class NeuralNet(
             -1, TOP_K_ROAD_POINTS, constants.ROAD_GRAPH_FEAT_DIM
         )
 
+        result = [ego_state, road_objects, road_graph]
+
+        vbd_predictions = oracle_conditioning = None
+        if self.vbd_in_obs and self.oracle_mode:
+            vbd_predictions = obs_flat[:, -(self.vbd_size + self.oracle_total_conditioning_size):-self.oracle_total_conditioning_size]
+            oracle_conditioning = obs_flat[:, -self.oracle_total_conditioning_size:]
+        elif self.vbd_in_obs:
+            vbd_predictions = obs_flat[:, -self.vbd_size:]
+        elif self.oracle_mode:
+            oracle_conditioning = obs_flat[:, -self.oracle_total_conditioning_size:]
+
         if self.vbd_in_obs:
-            return ego_state, road_objects, road_graph, vbd_predictions
-        else:
-            return ego_state, road_objects, road_graph
+            result.append(vbd_predictions)
+        if self.oracle_mode:
+            oracle_cond = oracle_conditioning.view(-1, self.oracle_max_co_players, self.oracle_conditioning_size)
+            result.append(oracle_cond)
+        return tuple(result)
