@@ -266,7 +266,7 @@ class NeuralNet(
         ego_state = obs_flat[:, :self.ego_state_idx]
         partner_obs = obs_flat[:, self.ego_state_idx:self.partner_obs_idx]
         roadgraph_start = self.partner_obs_idx
-        roadgraph_end = ego_state.shape[1] - (self.vbd_size if self.vbd_in_obs else 0) - (self.oracle_total_conditioning_size if self.oracle_mode else 0)
+        roadgraph_end = obs_flat.shape[-1] - (self.vbd_size if self.vbd_in_obs else 0) - (self.oracle_total_conditioning_size if self.oracle_mode else 0)
         roadgraph_obs = obs_flat[:, roadgraph_start:roadgraph_end]
 
         road_objects = partner_obs.view(
