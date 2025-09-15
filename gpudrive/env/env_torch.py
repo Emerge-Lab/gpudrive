@@ -71,7 +71,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         if ctype in ("entropy", "all"):
             self.entropy_tensor = (
                 torch.rand(self.num_worlds, self.max_cont_agents, device=self.device)
-                * (self.config.entropy_weight_up - self.config.entropy_weight_lb)
+                * (self.config.entropy_weight_ub - self.config.entropy_weight_lb)
                 + self.config.entropy_weight_lb
             )
         # Expose the index of entropy coefficient inside ego features for external losses

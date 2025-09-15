@@ -32,7 +32,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   condition_type: "all"
   oracle_mode: true
   condition_mode: 'random'
-  entropy_weight_up: 0.05
+  entropy_weight_ub: 0.05
 
 
   # Versatile Behavior Diffusion (VBD): This will slow down training
