@@ -15,7 +15,7 @@ from gpudrive.datatypes.observation import (
 from gpudrive.visualize.utils import img_from_fig
 from gpudrive.env.dataset import SceneDataLoader
 
-from pufferlib.environment import PufferEnv
+from pufferlib import PufferEnv
 from gpudrive import GPU_DRIVE_DATA_DIR
 
 
@@ -69,6 +69,8 @@ class PufferGPUDrive(PufferEnv):
         buf=None,
         condition_type="all",
         oracle_mode=False,
+        entropy_weight_lb=0.0,
+        entropy_weight_ub=1.0,
         **kwargs,
     ):
         assert buf is None, "GPUDrive set up only for --vec native"
@@ -141,6 +143,8 @@ class PufferGPUDrive(PufferEnv):
             vbd_trajectory_weight=vbd_trajectory_weight,
             condition_type=condition_type,
             oracle_mode=oracle_mode,
+            entropy_weight_lb=entropy_weight_lb,
+            entropy_weight_ub=entropy_weight_ub,
         )
 
         render_config = RenderConfig(

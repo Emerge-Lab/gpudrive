@@ -334,7 +334,7 @@ def train(data):
                     for observation,ent in zip(obs,entropy):
                         entropy_coef = observation[0][data.vecenv.env.entropy_index]
                         total_entropy += entropy_coef * ent
-                    entropy_loss  = total_entropy/len(obs)
+                    entropy_loss = total_entropy / len(obs)
 
                 else:
                     # Use a constant entropy coefficient
@@ -875,7 +875,3 @@ class ValidationEnvironment:
         self.experiment_config['k_trials'] = history_config.k_trials
 
 
-
-        
-
-   

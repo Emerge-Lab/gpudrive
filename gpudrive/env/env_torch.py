@@ -431,6 +431,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
             )
             self._set_reward_weights(env_idx_list, condition_mode=mode, agent_type=agent_type)
 
+        if getattr(self.config, "condition_type", "all") in ("entropy", "all"):
+            self.entropy_tensor = (
+                torch.rand(self.num_worlds, self.max_cont_agents, device=self.device)
+                * (self.config.entropy_weight_ub - self.config.entropy_weight_lb)
+                + self.config.entropy_weight_lb
+            )
+
         self.world_time_steps.zero_()
 
         # Advance the simulator with log playback if warmup steps are provided
@@ -1155,12 +1162,16 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         return components
 
     def get_co_player_conditioning(self, mask=None):
+        """Get conditioning information about co-players for oracle mode.
+        Returns conditioning values (reward weights, entropy coefficients) of other agents that the current agent can observe in oracle mode.
+        """
         ctype = getattr(self.config, "condition_type", "all")
         has_reward_conditioning = ctype in ("reward", "all")
         has_entropy_conditioning = ctype in ("entropy", "all")
         if (not has_reward_conditioning and not has_entropy_conditioning) or not self.cont_agent_mask.any():
             return None
 
+        # Find all active (controlled) agents across all worlds
         active_agent_positions = torch.nonzero(self.cont_agent_mask, as_tuple=False)
         world_indices = active_agent_positions[:, 0]
         agent_indices = active_agent_positions[:, 1]
@@ -1169,22 +1180,27 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
         num_agents_per_world = self.cont_agent_mask.shape[1]
 
         co_player_mask = self.cont_agent_mask[world_indices].clone()
+        # exclude self from co-players
         co_player_mask[torch.arange(num_active_agents, device=self.device), agent_indices] = False
 
         all_agent_ids = torch.arange(num_agents_per_world, device=self.device).unsqueeze(0).expand(num_active_agents, -1)
+        # Where co_player_mask is True, keep original ID; where False, add offset to make invalid
         masked_agent_ids = torch.where(co_player_mask, all_agent_ids, all_agent_ids + num_agents_per_world)
+        # Use topk with negative values to get smallest (valid) agent indices
         co_player_indices = torch.topk(-masked_agent_ids, k=max_co_players, dim=1).indices
         co_player_valid = co_player_mask.gather(1, co_player_indices)
 
         outputs = []
 
         if has_reward_conditioning and getattr(self, "reward_weights_tensor", None) is not None:
+            # reward_weights_tensor shape: (num_worlds, max_agents, 3) for [collision, goal, off_road]
             reward_weights = self.reward_weights_tensor[world_indices].gather(
                 1, co_player_indices.unsqueeze(-1).expand(num_active_agents, max_co_players, 3)
-            ) * co_player_valid.unsqueeze(-1)
+            ) * co_player_valid.unsqueeze(-1)  # Zero out invalid co-player positions
             outputs.append(reward_weights)
 
         if has_entropy_conditioning and getattr(self, "entropy_tensor", None) is not None:
+            # entropy_tensor shape: (num_worlds, max_agents) - single entropy coefficient per agent
             entropy_weights = (self.entropy_tensor[world_indices].gather(1, co_player_indices) * co_player_valid).unsqueeze(-1)
             outputs.append(entropy_weights)
 

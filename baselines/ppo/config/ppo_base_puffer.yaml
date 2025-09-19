@@ -8,7 +8,7 @@ model_cpt: null
 
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
-  num_worlds: 100 # Number of parallel environments
+  num_worlds: 400 # Number of parallel environments
   k_unique_scenes: 10000 # Number of unique scenes to sample from
   max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
   ego_state: true
@@ -32,7 +32,8 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   condition_type: "all"  # Options: "reward", "entropy", "all"
   oracle_mode: false # Enable oracle capabilities to observe co-player conditioning
   condition_mode: 'random'
-  entropy_weight_ub: 0.1
+  entropy_weight_lb: 0
+  entropy_weight_ub: 0.01
 
   # Versatile Behavior Diffusion (VBD): This will slow down training
   use_vbd: false
@@ -62,7 +63,7 @@ wandb:
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: PPO # Set dynamically in the script if needed
+  exp_id: PPO_0_0.1 # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cpu"  # Dynamically set to cuda if available, else cpu
@@ -80,8 +81,8 @@ train:
   # # # PPO # # #
   torch_deterministic: false
   total_timesteps: 4_000_000_000
-  batch_size: 524288
-  minibatch_size: 16384
+  batch_size: 32768
+  minibatch_size: 4096
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
