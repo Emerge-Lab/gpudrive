@@ -624,7 +624,7 @@ def process_data(args):
 
     if args.dataset == "all":
         datasets = ["training", "validation", "testing"]
-    elif args.dataset == "train":
+    elif args.dataset == "training":
         datasets = ["training"]
     elif args.dataset == "validation":
         datasets = ["validation"]
@@ -632,7 +632,7 @@ def process_data(args):
         datasets = ["testing"]
     else:
         raise ValueError(
-            "Invalid dataset name. Must be one of: 'all', 'train', 'validation', or 'testing'"
+            "Invalid dataset name. Must be one of: 'all', 'training', 'validation', or 'testing'"
         )
 
     for dataset in datasets:
