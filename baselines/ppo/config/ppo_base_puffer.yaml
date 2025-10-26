@@ -3,9 +3,8 @@ use_rnn: false
 eval_model_path: null
 baseline: false
 data_dir: data/processed/training
-continue_training: false
-model_cpt: null
-
+continue_training: true
+model_cpt: compatible_huggingface_model.pt
 environment: # Overrides default environment configs (see pygpudrive/env/config.py)
   name: "gpudrive"
   num_worlds: 25 # 并行环境数量
@@ -86,9 +85,12 @@ train:
     dropout: 0.01
     class_name: "NeuralNet"
     num_parameters: 0 # Total trainable parameters, to be filled at runtime
+    # 新增：观察融合网络配置
+    fusion_type: "attention" # 选项: "simple", "attention", "adaptive"
+    num_attention_heads: 4 # 注意力头数（仅在fusion_type="attention"时有效）
 
   # # # Checkpointing # # #
-  checkpoint_interval: 400 # Save policy every k iterations
+  checkpoint_interval: 100 # Save policy every k iterations
   checkpoint_path: "./runs"
 
   # # # Rendering # # #
