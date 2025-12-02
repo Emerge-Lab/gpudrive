@@ -38,13 +38,13 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
 
 wandb:
   entity: ""
-  project: "gpudrive"
-  group: "test"
+  project: "adv_filter"
+  group: "testing"
   mode: "online" # Options: online, offline, disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: PPO # Set dynamically in the script if needed
+  exp_id: adv_filter # Set dynamically in the script if needed
   seed: 42
   cpu_offload: false
   device: "cuda"  # Dynamically set to cuda if available, else cpu
@@ -63,7 +63,7 @@ train:
   torch_deterministic: false
   total_timesteps: 1_000_000_000
   batch_size: 131_072
-  minibatch_size: 8192
+  num_minibatches: 16
   learning_rate: 3e-4
   anneal_lr: false
   gamma: 0.99
@@ -78,6 +78,10 @@ train:
   max_grad_norm: 0.5
   target_kl: null
   log_window: 1000
+  # Advantage filtering
+  apply_advantage_filter: true
+  initial_th_factor: 0.01
+  beta: 0.25
 
   # # # Network # # #
   network:

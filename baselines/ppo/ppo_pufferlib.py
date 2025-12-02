@@ -144,7 +144,7 @@ def sweep(args, project="PPO", sweep_name="my_sweep"):
                     "max": 1e-1,
                 },
                 "batch_size": {"values": [512, 1024, 2048]},
-                "minibatch_size": {"values": [128, 256, 512]},
+                "num_minibatches": {"values": [4, 8, 16]},
             },
         ),
         project=project,
@@ -186,9 +186,13 @@ def run(
     ent_coef: Annotated[Optional[float], typer.Option(help="Entropy coefficient")] = None,
     update_epochs: Annotated[Optional[int], typer.Option(help="The number of epochs for updating the policy")] = None,
     batch_size: Annotated[Optional[int], typer.Option(help="The batch size for training")] = None,
-    minibatch_size: Annotated[Optional[int], typer.Option(help="The minibatch size for training")] = None,
+    num_minibatches: Annotated[Optional[int], typer.Option(help="The number of minibatches for training")] = None,
     gamma: Annotated[Optional[float], typer.Option(help="The discount factor for rewards")] = None,
     vf_coef: Annotated[Optional[float], typer.Option(help="Weight for vf_loss")] = None,
+    # Advantage filtering
+    apply_advantage_filter: Annotated[Optional[int], typer.Option(help="Whether to use advantage filter; 0 or 1")] = None,
+    initial_th_factor: Annotated[Optional[float], typer.Option(help="Initial threshold factor for training")] = None,
+    beta: Annotated[Optional[float], typer.Option(help="Beta parameter for training")] = None,
     # Wandb logging options
     project: Annotated[Optional[str], typer.Option(help="WandB project name")] = None,
     entity: Annotated[Optional[str], typer.Option(help="WandB entity name")] = None,
@@ -238,10 +242,13 @@ def run(
         "ent_coef": ent_coef,
         "update_epochs": update_epochs,
         "batch_size": batch_size,
-        "minibatch_size": minibatch_size,
+        "num_minibatches": num_minibatches,
         "render": None if render is None else bool(render),
         "gamma": gamma,
         "vf_coef": vf_coef,
+        "apply_advantage_filter": apply_advantage_filter,
+        "initial_th_factor": initial_th_factor,
+        "beta": beta,
     }
     config.train.update(
         {k: v for k, v in train_config.items() if v is not None}
