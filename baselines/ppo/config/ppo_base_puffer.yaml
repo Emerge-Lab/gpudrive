@@ -10,7 +10,7 @@ environment: # Overrides default environment configs (see pygpudrive/env/config.
   name: "gpudrive"
   num_worlds: 75 # Number of parallel environments
   k_unique_scenes: 75 # Number of unique scenes to sample from
-  max_controlled_agents: 64 # Maximum number of agents controlled by the model. Make sure this aligns with the variable kMaxAgentCount in src/consts.hpp
+  max_controlled_agents: 32 # arbitrary number between 1 and src/consts.hpp::kMaxAgentCount
   ego_state: true
   road_map_obs: true
   partner_obs: true
@@ -77,7 +77,7 @@ train:
   vf_coef: 0.3
   max_grad_norm: 0.5
   target_kl: null
-  log_window: 1000
+  log_window: 10
 
   # # # Network # # #
   network:
