@@ -90,6 +90,11 @@ namespace madrona_gpudrive
         int32_t reset;
     };
 
+    struct EpisodeLength
+    {
+        int32_t episode_length;
+    };
+
     struct ResetMap {
         int32_t reset;
     };   
@@ -337,15 +342,15 @@ namespace madrona_gpudrive
 
     struct Trajectory
     {
-        madrona::math::Vector2 positions[consts::kTrajectoryLength];
-        madrona::math::Vector2 velocities[consts::kTrajectoryLength];
-        float headings[consts::kTrajectoryLength];
-        float valids[consts::kTrajectoryLength];
-        Action inverseActions[consts::kTrajectoryLength];
+        madrona::math::Vector2 positions[consts::maxEpisodeLength];
+        madrona::math::Vector2 velocities[consts::maxEpisodeLength];
+        float headings[consts::maxEpisodeLength];
+        float valids[consts::maxEpisodeLength];
+        Action inverseActions[consts::maxEpisodeLength];
 
         static inline void zero(Trajectory& traj)
         {
-            for (int i = 0; i < consts::kTrajectoryLength; i++)
+            for (int i = 0; i < consts::maxEpisodeLength; i++)
             {
                 traj.positions[i] = {0, 0};
                 traj.velocities[i] = {0, 0};
@@ -356,7 +361,7 @@ namespace madrona_gpudrive
         }
     };
 
-    const size_t TrajectoryExportSize = 2 * 2 * consts::kTrajectoryLength + 2 * consts::kTrajectoryLength + ActionExportSize * consts::kTrajectoryLength;
+    const size_t TrajectoryExportSize = 2 * 2 * consts::maxEpisodeLength + 2 * consts::maxEpisodeLength + ActionExportSize * consts::maxEpisodeLength;
 
     static_assert(sizeof(Trajectory) == sizeof(float) * TrajectoryExportSize);
 
