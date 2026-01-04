@@ -318,6 +318,13 @@ void createPaddingEntities(Engine &ctx) {
         }
         auto &self_obs = ctx.get<SelfObservation>(agent_iface);
         self_obs = SelfObservation::zero();
+	
+        auto &abs_self_obs = ctx.get<AbsoluteSelfObservation>(agent_iface);
+        abs_self_obs.position = Vector3::zero();
+        abs_self_obs.rotation = AbsoluteRotation{.rotationAsQuat = Quat{1, 0, 0, 0}, .rotationFromAxis = 0};
+        abs_self_obs.goal = Goal{.position = {0, 0}};
+        abs_self_obs.vehicle_size = VehicleSize{.length = 0, .width = 0, .height = 0};
+        abs_self_obs.id = -1.0f;
 
         auto &partner_obs = ctx.get<PartnerObservations>(agent_iface);
         for (CountT i = 0; i < consts::kMaxAgentCount-1; i++) {
