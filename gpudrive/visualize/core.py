@@ -10,7 +10,6 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 from matplotlib.colors import ListedColormap
-from jaxlib.xla_extension import ArrayImpl
 import numpy as np
 import madrona_gpudrive
 from gpudrive.visualize import utils
@@ -78,10 +77,12 @@ class MatplotlibVisualizer:
         )
         self.controlled_agent_mask = controlled_agent_mask
 
-        if isinstance(controlled_agent_mask, ArrayImpl):
-            self.controlled_agent_mask = torch.from_numpy(
-                np.array(controlled_agent_mask)
-            )
+        if self.backend == "jax":
+            from jaxlib.xla_extension import ArrayImpl
+            if isinstance(controlled_agent_mask, ArrayImpl):
+                self.controlled_agent_mask = torch.from_numpy(
+                    np.array(controlled_agent_mask)
+                )
 
         self.controlled_agent_mask = self.controlled_agent_mask.to(self.device)
 
