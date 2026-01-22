@@ -101,6 +101,27 @@ class EnvConfig:
     reward_type: str = "sparse_on_goal_achieved"
     # Alternatively, "weighted_combination", "distance_to_logs", "distance_to_vdb_trajs", "reward_conditioned"
 
+    # --- weighted_combination 额外稠密项（用于避免“动几下就停”的局部最优） ---
+    # 每一步的时间成本（仅在 reward_type == "weighted_combination" 时生效）
+    # 建议从 0.001~0.005 试起；过大可能导致冒进/碰撞上升
+    time_penalty: float = 0.0
+
+    # 低速/怠速惩罚（仅在 reward_type == "weighted_combination" 时生效）
+    # 当 speed < idle_speed_threshold 且未完成/未终止时，额外扣 idle_penalty
+    idle_speed_threshold: float = 0.5
+    idle_penalty: float = 0.0
+
+    # 进度奖励：距离目标越近，每步获得的奖励越高（密集正向信号）
+    # reward += progress_reward_weight * exp(-dist_to_goal / progress_reward_scale)
+    # 建议 progress_reward_weight: 0.1~0.3, progress_reward_scale: 15~30
+    progress_reward_weight: float = 0.0  # 默认关闭
+    progress_reward_scale: float = 20.0  # 距离衰减因子
+    
+    # 转弯速度惩罚：转弯时速度过快会给予惩罚，减少碰撞
+    # 当速度超过阈值时，给予惩罚（转弯时应该减速）
+    turn_speed_penalty_weight: float = 0.0  # 默认关闭，建议值：0.05~0.15
+    turn_speed_threshold: float = 8.0  # 速度阈值（超过此速度时开始惩罚）
+
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 
     # Define upper and lower bounds for reward components if using reward_conditioned

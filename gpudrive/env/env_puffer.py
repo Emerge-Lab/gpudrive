@@ -239,6 +239,13 @@ class PufferGPUDrive(PufferEnv):
         Args:
             action: A numpy array of actions for the controlled agents. Shape:
                 (num_worlds, max_cont_agents_per_env)
+        执行一步环境交互：
+        1. 应用动作
+        2. 执行物理仿真
+        3. 计算奖励
+        4. 处理终止状态
+        5. 异步重置完成的环境
+        6. 返回新的观测
         """
 
         # Set the action for the controlled agents
