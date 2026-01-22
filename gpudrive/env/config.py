@@ -116,11 +116,6 @@ class EnvConfig:
     # 建议 progress_reward_weight: 0.1~0.3, progress_reward_scale: 15~30
     progress_reward_weight: float = 0.0  # 默认关闭
     progress_reward_scale: float = 20.0  # 距离衰减因子
-    
-    # 转弯速度惩罚：转弯时速度过快会给予惩罚，减少碰撞
-    # 当速度超过阈值时，给予惩罚（转弯时应该减速）
-    turn_speed_penalty_weight: float = 0.0  # 默认关闭，建议值：0.05~0.15
-    turn_speed_threshold: float = 8.0  # 速度阈值（超过此速度时开始惩罚）
 
     condition_mode: str = "random"  # Options: "random", "fixed", "preset"
 

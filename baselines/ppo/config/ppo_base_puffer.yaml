@@ -4,7 +4,7 @@ eval_model_path: null
 baseline: false
 data_dir: data/processed/training
 continue_training: true
-model_cpt: /home/wbk/gpudrive/runs/PPO__C__S_64__01_19_09_41_46_795_提高达成率/model_PPO__C__S_64__01_19_09_41_46_795_025817.pt
+model_cpt: /home/wbk/gpudrive/runs/PPO__C__S_72__01_20_15_12_22_098/model_PPO__C__S_72__01_20_15_12_22_098_027823.pt
 environment: # 覆盖环境配置（见 gpudrive/env/config.py）
   name: "gpudrive"
   num_worlds: 18 # 并行环境数量（进一步降低以减少重采样时显存峰值）
@@ -27,9 +27,6 @@ environment: # 覆盖环境配置（见 gpudrive/env/config.py）
   # 进度奖励：距离目标越近奖励越高（密集正向信号）
   progress_reward_weight: 0.1  # 降低：避免改变奖励scale太多
   progress_reward_scale: 20.0
-  # 转弯速度惩罚：转弯时速度过快会给予惩罚，减少碰撞
-  turn_speed_penalty_weight: 0.05  # 转弯速度惩罚权重
-  turn_speed_threshold: 8.0  # 速度阈值（超过此速度时开始惩罚）
   dynamics_model: "classic"
   collision_behavior: "remove" # 选项："remove"、"stop"、"ignore"
   dist_to_goal_threshold: 2.0
@@ -70,12 +67,12 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 450_000_000
+  total_timesteps: 500_000_000
   batch_size: 18432
   minibatch_size: 3072
-  # 降低学习率：策略已学会，现在需要精细调优
-  learning_rate: 1e-4  # 降低，让更新更平滑
-  anneal_lr: false     # 关闭衰减！
+  # 适度提高学习率：适应新的奖励函数（碰撞/越界惩罚提高）
+  learning_rate: 2e-4  # 从1e-4提高到2e-4，加快适应新奖励信号
+  anneal_lr: true     # 开启学习率衰减：从2e-4开始，随训练逐渐降低，先快速适应后精细调优
   gamma: 0.99
   gae_lambda: 0.95
   # 收紧更新：避免策略变化太大
