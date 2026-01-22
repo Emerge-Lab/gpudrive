@@ -491,6 +491,63 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 + off_road_weight * off_road
             )
 
+            # 稠密塑形：避免"停住最优"
+            # 仅对未 done 且未达成目标的 agent 生效（done/goal 后不再额外惩罚）
+            needs_shaping = (
+                self.config.time_penalty != 0.0
+                or self.config.idle_penalty != 0.0
+                or self.config.progress_reward_weight != 0.0
+            )
+            if needs_shaping or self.config.turn_speed_penalty_weight != 0.0:
+                done = (
+                    self.sim.done_tensor()
+                    .to_torch()
+                    .clone()
+                    .squeeze(dim=2)
+                    .to(weighted_rewards.device)
+                    .to(torch.float)
+                )
+                active = (1.0 - done) * (1.0 - goal_achieved)
+
+                if self.config.time_penalty != 0.0:
+                    weighted_rewards = weighted_rewards - self.config.time_penalty * active
+
+                # 获取速度（可能被多个惩罚项使用）
+                speed = None
+                if self.config.idle_penalty != 0.0 or self.config.turn_speed_penalty_weight != 0.0:
+                    speed = (
+                        self.sim.self_observation_tensor()
+                        .to_torch()
+                        .clone()[:, :, 0]
+                        .to(weighted_rewards.device)
+                        .to(torch.float)
+                    )
+
+                if self.config.idle_penalty != 0.0:
+                    is_idle = (speed < self.config.idle_speed_threshold).to(torch.float)
+                    weighted_rewards = weighted_rewards - self.config.idle_penalty * is_idle * active
+
+                # 进度奖励：距离目标越近，每步正奖励越高（密集引导信号）
+                if self.config.progress_reward_weight != 0.0:
+                    self_obs = self.sim.self_observation_tensor().to_torch().clone()
+                    rel_goal_x = self_obs[:, :, 4].to(weighted_rewards.device)
+                    rel_goal_y = self_obs[:, :, 5].to(weighted_rewards.device)
+                    dist_to_goal = torch.sqrt(rel_goal_x ** 2 + rel_goal_y ** 2 + 1e-6)
+                    progress_reward = self.config.progress_reward_weight * torch.exp(
+                        -dist_to_goal / self.config.progress_reward_scale
+                    )
+                    # 只给仍在行驶中的 agent
+                    weighted_rewards = weighted_rewards + progress_reward * active
+
+                # 转弯速度惩罚：速度过快时给予惩罚，减少转弯时的碰撞
+                if self.config.turn_speed_penalty_weight != 0.0:
+                    # 速度超过阈值时给予惩罚（鼓励转弯时减速）
+                    speed_penalty = torch.clamp(
+                        speed - self.config.turn_speed_threshold, 
+                        min=0.0
+                    ) * self.config.turn_speed_penalty_weight
+                    weighted_rewards = weighted_rewards - speed_penalty * active
+
             return weighted_rewards
 
         elif self.config.reward_type == "reward_conditioned":

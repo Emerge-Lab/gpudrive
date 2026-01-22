@@ -4,106 +4,121 @@ eval_model_path: null
 baseline: false
 data_dir: data/processed/training
 continue_training: true
-model_cpt: compatible_huggingface_model.pt
-environment: # Overrides default environment configs (see pygpudrive/env/config.py)
+model_cpt: /home/wbk/gpudrive/runs/PPO__C__S_64__01_19_09_41_46_795_提高达成率/model_PPO__C__S_64__01_19_09_41_46_795_025817.pt
+environment: # 覆盖环境配置（见 gpudrive/env/config.py）
   name: "gpudrive"
-  num_worlds: 25 # 并行环境数量
-  k_unique_scenes: 25 # 采样场景数量
-  max_controlled_agents: 64 # 最大控制代理数量，确保与src/consts.hpp中的变量kMaxAgentCount一致
+  num_worlds: 18 # 并行环境数量（进一步降低以减少重采样时显存峰值）
+  k_unique_scenes: 72 # 采样场景数量（减少单次负载）
+  max_controlled_agents: 64 # 最大控制代理数量（需与环境掩码维度一致）
   ego_state: true
   road_map_obs: true
   partner_obs: true
   norm_obs: true
-  remove_non_vehicles: true # 如果为false，则包括所有代理（车辆、行人、自行车）
-  lidar_obs: false # NOTE: Setting this to true currently turns of the other observation types
+  remove_non_vehicles: true # 如果为 false，则包括所有代理（车辆、行人、自行车）
+  lidar_obs: false # 注意：设为 true 会关闭其他观测类型
   reward_type: "weighted_combination"
-  collision_weight: -0.75
-  off_road_weight: -0.75
-  goal_achieved_weight: 1.0
+  collision_weight: -3.0  # 提高碰撞惩罚：减少转弯时的碰撞
+  off_road_weight: -3.0   # 降低：允许适度冒险
+  goal_achieved_weight: 1.0  # 大幅提高：让"到达"比"安全躲避"更有吸引力
+  # 避免"动几下就停"的塑形项（仅 weighted_combination 生效）
+  time_penalty: 0.005  # 提高：增强推进压力
+  idle_speed_threshold: 0.5
+  idle_penalty: 0.02   # 降低：避免惩罚过重
+  # 进度奖励：距离目标越近奖励越高（密集正向信号）
+  progress_reward_weight: 0.1  # 降低：避免改变奖励scale太多
+  progress_reward_scale: 20.0
+  # 转弯速度惩罚：转弯时速度过快会给予惩罚，减少碰撞
+  turn_speed_penalty_weight: 0.05  # 转弯速度惩罚权重
+  turn_speed_threshold: 8.0  # 速度阈值（超过此速度时开始惩罚）
   dynamics_model: "classic"
-  collision_behavior: "ignore" # Options: "remove", "stop", "ignore"
+  collision_behavior: "remove" # 选项："remove"、"stop"、"ignore"
   dist_to_goal_threshold: 2.0
-  polyline_reduction_threshold: 0.1 # 采样点率（0表示使用所有最近点，1表示最大稀疏度），需要与kMaxAgentMapObservationsCount平衡
-  sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
-  obs_radius: 50.0 # Visibility radius of the agents
+  polyline_reduction_threshold: 0.1 # 采样点率（0 表示使用所有最近点，1 表示最大稀疏度），需与 kMaxAgentMapObservationsCount 平衡
+  sampling_seed: 42 # 若设置则场景采样可复现；为 None 则随机
+  obs_radius: 50.0 # 智能体可见半径
   action_space_steer_disc: 13
   action_space_accel_disc: 7
-  # Versatile Behavior Diffusion (VBD): This will slow down training
+  # Versatile Behavior Diffusion (VBD)：开启会降低训练速度
   use_vbd: false
   vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
   init_steps: 11
-  vbd_trajectory_weight: 0.1 # Importance of distance to the vbd trajectories in the reward function
+  vbd_trajectory_weight: 0.1 # 奖励中 VBD 轨迹距离项的权重
   vbd_in_obs: false
 
 wandb:
   entity: ""
   project: "gpudrive"
   group: "test"
-  mode: "online" # Options: online, offline, disabled
+  mode: "online" # 选项：online、offline、disabled
   tags: ["ppo", "ff"]
 
 train:
-  exp_id: PPO # Set dynamically in the script if needed
+  exp_id: PPO # 如需可在脚本中动态设置
   seed: 42
   cpu_offload: false
-  device: "cuda"  # Dynamically set to cuda if available, else cpu
+  device: "cuda"  # 若可用则使用 cuda，否则使用 cpu
   bptt_horizon: 1
   compile: false
   compile_mode: "reduce-overhead"
 
-  # # # Data sampling # # #
-  resample_scenes: false
-  resample_dataset_size: 10_000 # Number of unique scenes to sample from
-  resample_interval: 2_000_000
+  # # # 数据采样 # # #
+  resample_scenes: false   # 开启重采样，提升泛化能力
+  resample_dataset_size: 10_000
+  resample_interval: 10_000_000  # 50M步训练约5次重采样，平衡稳定性和泛化
   sample_with_replacement: true
   shuffle_dataset: false
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 100_000_000
-  batch_size: 32_768
-  minibatch_size: 2048
-  learning_rate: 3e-4
-  anneal_lr: false
+  total_timesteps: 450_000_000
+  batch_size: 18432
+  minibatch_size: 3072
+  # 降低学习率：策略已学会，现在需要精细调优
+  learning_rate: 1e-4  # 降低，让更新更平滑
+  anneal_lr: false     # 关闭衰减！
   gamma: 0.99
   gae_lambda: 0.95
-  update_epochs: 4
+  # 收紧更新：避免策略变化太大
+  update_epochs: 3  # 减少更新次数
   norm_adv: true
-  clip_coef: 0.2
-  clip_vloss: false
+  clip_coef: 0.15   # 收紧clip，限制策略变化幅度
+  # value 更稳
+  clip_vloss: true
   vf_clip_coef: 0.2
-  ent_coef: 0.0001
+  # 降低探索：策略已学会走，现在需要更稳定（减少晃动）
+  ent_coef: 0.0003  # 从 0.001 降低到 0.0003
   vf_coef: 0.3
   max_grad_norm: 0.5
-  target_kl: null
+  # KL 早停，避免重采样后一次更新过猛导致震荡
+  target_kl: 0.02
   log_window: 1000
 
-  # # # Network # # #
+  # # # 网络 # # #
   network:
-    input_dim: 64 # Embedding of the input features
-    hidden_dim: 128 # Latent dimension
+    input_dim: 64 # 输入特征嵌入维度
+    hidden_dim: 128 # 潜在维度
     dropout: 0.01
     class_name: "NeuralNet"
-    num_parameters: 0 # Total trainable parameters, to be filled at runtime
+    num_parameters: 0 # 可训练参数数量（运行时填充）
     # 新增：观察融合网络配置
     fusion_type: "attention" # 选项: "simple", "attention", "adaptive"
     num_attention_heads: 4 # 注意力头数（仅在fusion_type="attention"时有效）
 
-  # # # Checkpointing # # #
-  checkpoint_interval: 100 # Save policy every k iterations
+  # # # 检查点保存 # # #
+  checkpoint_interval: 200 # 每隔 k 次迭代保存一次
   checkpoint_path: "./runs"
 
-  # # # Rendering # # #
-  render: false # Determines whether to render the environment (note: will slow down training)
-  render_3d: true # Render simulator state in 3d or 2d
-  render_interval: 1 # Render every k iterations
-  render_k_scenarios: 10 # Number of scenarios to render
-  render_format: "mp4" # Options: gif, mp4
-  render_fps: 15 # Frames per second
+  # # # 渲染 # # #
+  render: false # 是否渲染环境（开启会减慢训练）
+  render_3d: true # 渲染 3D 或 2D
+  render_interval: 1 # 每隔 k 次迭代渲染
+  render_k_scenarios: 0 # 训练期建议为 0，避免额外 IO/不确定性
+  render_format: "mp4" # 选项：gif、mp4
+  render_fps: 15 # 每秒帧数
   zoom_radius: 50
 
 vec:
-  backend: "native" # Only native is currently supported
+  backend: "native" # 目前仅支持 native
   num_workers: 1
   env_batch_size: 1
   zero_copy: false

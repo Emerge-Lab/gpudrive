@@ -361,7 +361,12 @@ def train(data):
 
     with profile.train_misc:
         if config.anneal_lr:
-            frac = 1.0 - data.global_step / config.total_timesteps
+            # 支持继续训练时从配置的学习率开始衰减
+            lr_start_step = getattr(data, 'lr_start_step', 0)
+            lr_total_steps = config.total_timesteps - lr_start_step
+            steps_since_start = data.global_step - lr_start_step
+            frac = 1.0 - steps_since_start / lr_total_steps
+            frac = max(0.0, frac)  # 防止负数
             lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
 
