@@ -100,6 +100,7 @@ class MatplotlibVisualizer:
         zoom_radius: int = 100,
         plot_log_replay_trajectory: bool = False,
         agent_positions: Optional[torch.Tensor] = None,
+        predicted_trajectories: Optional[torch.Tensor] = None,
         backward_goals: bool = False,
         policy_masks: Optional[Dict[int,Dict[str,torch.Tensor]]] = None,
     ):
@@ -431,6 +432,15 @@ class MatplotlibVisualizer:
                     cbar.ax.tick_params(labelsize=12 * marker_scale)
                 except Exception as e:
                     print(f"Warning: Could not add colorbar: {e}")
+
+            # 绘制预测轨迹（未来轨迹）
+            if predicted_trajectories is not None:
+                self._plot_predicted_trajectories(
+                    ax=ax,
+                    env_idx=env_idx,
+                    predicted_trajectories=predicted_trajectories,
+                    controlled_live=controlled_live,
+                )
 
             # Determine center point for zooming
             if center_agent_idx is not None:
@@ -1574,3 +1584,82 @@ class MatplotlibVisualizer:
         ax.set_yticks([])
 
         return fig
+
+    def _plot_predicted_trajectories(
+        self,
+        ax: matplotlib.axes.Axes,
+        env_idx: int,
+        predicted_trajectories: torch.Tensor,
+        controlled_live: torch.Tensor,
+    ) -> None:
+        """
+        绘制预测的未来轨迹
+        
+        Args:
+            ax: Matplotlib axis
+            env_idx: 环境索引
+            predicted_trajectories: [num_worlds, max_agents, horizon, 2] 预测轨迹
+            controlled_live: [max_agents] 受控且存活的智能体掩码
+        """
+        if predicted_trajectories is None:
+            return
+        
+        # 预测轨迹颜色（使用虚线表示预测）
+        pred_color = "#FF6B6B"  # 红色，表示预测
+        pred_alpha = 0.6
+        pred_linewidth = 2.0
+        
+        for agent_idx in range(predicted_trajectories.shape[1]):
+            if controlled_live[agent_idx]:
+                trajectory = predicted_trajectories[env_idx, agent_idx, :, :]  # [horizon, 2]
+                
+                # 过滤无效点
+                valid_mask = (
+                    (trajectory[:, 0] != 0)
+                    & (trajectory[:, 1] != 0)
+                    & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
+                    & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
+                )
+                valid_trajectory = trajectory[valid_mask]
+                
+                if len(valid_trajectory) > 1:
+                    points = valid_trajectory.cpu().numpy()
+                    
+                    if self.render_3d:
+                        # 3D 绘制
+                        trajectory_height = 0.1  # 稍微高一点以区分预测轨迹
+                        ax.plot(
+                            points[:, 0],
+                            points[:, 1],
+                            trajectory_height,
+                            color=pred_color,
+                            linestyle="--",
+                            linewidth=pred_linewidth,
+                            alpha=pred_alpha,
+                            zorder=2,
+                            label="Predicted" if agent_idx == 0 else "",
+                        )
+                    else:
+                        # 2D 绘制
+                        ax.plot(
+                            points[:, 0],
+                            points[:, 1],
+                            color=pred_color,
+                            linestyle="--",
+                            linewidth=pred_linewidth,
+                            alpha=pred_alpha,
+                            zorder=2,
+                            label="Predicted" if agent_idx == 0 else "",
+                        )
+                        
+                        # 在轨迹终点添加标记
+                        if len(points) > 0:
+                            ax.scatter(
+                                points[-1, 0],
+                                points[-1, 1],
+                                color=pred_color,
+                                marker="x",
+                                s=50,
+                                alpha=pred_alpha,
+                                zorder=3,
+                            )

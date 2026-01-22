@@ -35,6 +35,8 @@ class SceneDataLoader:
             )
 
         # Set the random seed for reproducibility
+        if self.seed is None:
+            self.seed = 42
         self.random_gen = random.Random(self.seed)
 
         # Create the dataset from valid files in the directory
@@ -84,8 +86,9 @@ class SceneDataLoader:
     def __next__(self) -> List[str]:
         if self.sample_with_replacement:
             # Ensure deterministic behavior
+            base_seed = 0 if self.seed is None else self.seed
             random_gen = random.Random(
-                self.seed + self.current_index
+                base_seed + self.current_index
             )  # Changing the seed per batch
 
             # Determine the batch size using the random generator to shuffle the indices

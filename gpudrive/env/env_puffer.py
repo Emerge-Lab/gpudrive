@@ -52,7 +52,7 @@ class PufferGPUDrive(PufferEnv):
         off_road_weight=-0.5,
         goal_achieved_weight=1,
         dist_to_goal_threshold=2.0,
-        polyline_reduction_threshold=0.1,
+        polyline_reduction_threshold=0.1, #折线简化阈值，是一个用于控制道路图观察点采样密度的参数。
         remove_non_vehicles=True,
         obs_radius=50.0,
         use_vbd=False,
@@ -60,16 +60,16 @@ class PufferGPUDrive(PufferEnv):
         vbd_trajectory_weight=0.1,
         render=False,
         render_3d=True,
-        render_interval=50,
-        render_k_scenarios=3,
+        render_interval=50, #渲染间隔，每隔多少步渲染一次
+        render_k_scenarios=3, #渲染场景数量
         render_agent_obs=False,
         render_format="mp4",
         render_fps=15,
         zoom_radius=50,
-        buf=None,
+        buf=None, #缓冲区，用于存储环境状态和动作
         **kwargs,
     ):
-        assert buf is None, "GPUDrive set up only for --vec native"
+        assert buf is None, "GPUDrive set up only for --vec native" #断言缓冲区为空，表示只支持原生环境
 
         if data_loader is None:
             data_loader = SceneDataLoader(
@@ -78,7 +78,7 @@ class PufferGPUDrive(PufferEnv):
                 dataset_size=loader_dataset_size,
                 sample_with_replacement=loader_sample_with_replacement,
                 shuffle=loader_shuffle,
-            )
+            ) #数据加载器，用于加载场景数据
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -239,6 +239,13 @@ class PufferGPUDrive(PufferEnv):
         Args:
             action: A numpy array of actions for the controlled agents. Shape:
                 (num_worlds, max_cont_agents_per_env)
+        执行一步环境交互：
+        1. 应用动作
+        2. 执行物理仿真
+        3. 计算奖励
+        4. 处理终止状态
+        5. 异步重置完成的环境
+        6. 返回新的观测
         """
 
         # Set the action for the controlled agents

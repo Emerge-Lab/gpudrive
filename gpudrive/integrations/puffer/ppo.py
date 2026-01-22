@@ -239,6 +239,20 @@ def train(data):
         dones_np = experience.dones_np[idxs]
         values_np = experience.values_np[idxs]
         rewards_np = experience.rewards_np[idxs]
+        
+        # 数值稳定性检查：检查输入数据
+        if np.isnan(dones_np).any() or np.isnan(values_np).any() or np.isnan(rewards_np).any():
+            print("Warning: NaN detected in GAE inputs, replacing with zeros")
+            dones_np = np.nan_to_num(dones_np, nan=0.0)
+            values_np = np.nan_to_num(values_np, nan=0.0)
+            rewards_np = np.nan_to_num(rewards_np, nan=0.0)
+        
+        # 检查是否有Inf值
+        if np.isinf(values_np).any() or np.isinf(rewards_np).any():
+            print("Warning: Inf detected in GAE inputs, clipping values")
+            values_np = np.clip(values_np, -1e6, 1e6)
+            rewards_np = np.clip(rewards_np, -1e6, 1e6)
+        
         advantages_np = compute_gae(
             dones_np, values_np, rewards_np, config.gamma, config.gae_lambda
         )
@@ -347,7 +361,12 @@ def train(data):
 
     with profile.train_misc:
         if config.anneal_lr:
-            frac = 1.0 - data.global_step / config.total_timesteps
+            # 支持继续训练时从配置的学习率开始衰减
+            lr_start_step = getattr(data, 'lr_start_step', 0)
+            lr_total_steps = config.total_timesteps - lr_start_step
+            steps_since_start = data.global_step - lr_start_step
+            frac = 1.0 - steps_since_start / lr_total_steps
+            frac = max(0.0, frac)  # 防止负数
             lrnow = float(frac) * float(config.learning_rate)
             data.optimizer.param_groups[0]["lr"] = lrnow
 
