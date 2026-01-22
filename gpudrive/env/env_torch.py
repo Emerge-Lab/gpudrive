@@ -498,7 +498,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 or self.config.idle_penalty != 0.0
                 or self.config.progress_reward_weight != 0.0
             )
-            if needs_shaping or self.config.turn_speed_penalty_weight != 0.0:
+            if needs_shaping:
                 done = (
                     self.sim.done_tensor()
                     .to_torch()
@@ -512,9 +512,8 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 if self.config.time_penalty != 0.0:
                     weighted_rewards = weighted_rewards - self.config.time_penalty * active
 
-                # 获取速度（可能被多个惩罚项使用）
-                speed = None
-                if self.config.idle_penalty != 0.0 or self.config.turn_speed_penalty_weight != 0.0:
+                # 获取速度（用于idle惩罚）
+                if self.config.idle_penalty != 0.0:
                     speed = (
                         self.sim.self_observation_tensor()
                         .to_torch()
@@ -522,8 +521,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                         .to(weighted_rewards.device)
                         .to(torch.float)
                     )
-
-                if self.config.idle_penalty != 0.0:
                     is_idle = (speed < self.config.idle_speed_threshold).to(torch.float)
                     weighted_rewards = weighted_rewards - self.config.idle_penalty * is_idle * active
 
@@ -538,15 +535,6 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                     )
                     # 只给仍在行驶中的 agent
                     weighted_rewards = weighted_rewards + progress_reward * active
-
-                # 转弯速度惩罚：速度过快时给予惩罚，减少转弯时的碰撞
-                if self.config.turn_speed_penalty_weight != 0.0:
-                    # 速度超过阈值时给予惩罚（鼓励转弯时减速）
-                    speed_penalty = torch.clamp(
-                        speed - self.config.turn_speed_threshold, 
-                        min=0.0
-                    ) * self.config.turn_speed_penalty_weight
-                    weighted_rewards = weighted_rewards - speed_penalty * active
 
             return weighted_rewards
 
