@@ -127,23 +127,17 @@ def add_trajectory_to_frame(fig, env, env_idx, control_mask, trajectories, curre
         if agent_idx_item not in trajectories[env_idx]:
             continue
         
-        # 只获取到当前时间步的轨迹
-        traj = [(x, y, step) for x, y, step in trajectories[env_idx][agent_idx_item] if step <= current_step]
+        # 只获取到当前时间步的轨迹（5-元组: x, y, yaw, speed, step）
+        traj = [t for t in trajectories[env_idx][agent_idx_item] if t[4] <= current_step]
         
-        if len(traj) < 2:  # 至少需要2个点才能画线
+        if len(traj) < 2:
             continue
         
-        # 提取x, y坐标，并过滤异常值
-        traj_x = []
-        traj_y = []
-        for point in traj:
-            x, y = point[0], point[1]
-            # 过滤异常位置值
-            if abs(x) < 10000 and abs(y) < 10000:
-                traj_x.append(x)
-                traj_y.append(y)
+        # 提取坐标并过滤异常值
+        traj_x = [t[0] for t in traj if abs(t[0]) < 10000 and abs(t[1]) < 10000]
+        traj_y = [t[1] for t in traj if abs(t[0]) < 10000 and abs(t[1]) < 10000]
         
-        if len(traj_x) < 2:  # 过滤后至少需要2个点才能画线
+        if len(traj_x) < 2:
             continue
         
         # 确定轨迹颜色（根据当前状态）
@@ -163,8 +157,8 @@ def add_trajectory_to_frame(fig, env, env_idx, control_mask, trajectories, curre
         except:
             color = colors[i % len(colors)]
         
-        # 绘制轨迹线（半透明，较细）
-        ax.plot(traj_x, traj_y, color=color, linewidth=1.0, alpha=0.5, zorder=3)
+        # 绘制原始轨迹线（SQP 对比图在仿真结束后单独生成）
+        ax.plot(traj_x, traj_y, color=color, linewidth=3.0, alpha=0.7, zorder=3)
 
 def add_front_wheel_visualization(fig, env, env_idx, control_mask, action_values_dict):
     """
@@ -250,15 +244,43 @@ def add_front_wheel_visualization(fig, env, env_idx, control_mask, action_values
 
 # ==================== 配置参数 ====================
 # 模型路径
-model_path = "/home/wbk/gpudrive/runs/PPO__C__S_72__01_30_19_06_17_932/model_PPO__C__S_72__01_30_19_06_17_932_036620.pt"
+model_path = "/home/wbk/gpudrive/runs/PPO__C__S_72__01_29_15_47_35_057/model_PPO__C__S_72__01_29_15_47_35_057_0339120.pt"
 
 # 预测轨迹开关
 ENABLE_TRAJECTORY_PREDICTION = True  # True: 绘制预测轨迹, False: 不绘制
 TRAJECTORY_HORIZON = 20  # 预测步数（仅在 ENABLE_TRAJECTORY_PREDICTION=True 时有效）
 
 # 预测轨迹平滑开关（对 x,y,yaw,speed 做一致性平滑）
-ENABLE_TRAJECTORY_SMOOTHING = True
+ENABLE_TRAJECTORY_SMOOTHING = False
 SMOOTH_WINDOW = 7  # 奇数，越大越平滑（建议 5~11）
+
+# 历史轨迹 SQP 平滑开关
+# True:  GIF 中画绿色 SQP 优化轨迹，并生成 v/yaw 对比图
+# False: GIF 中画红色原始轨迹（同样式，无 SQP 开销）
+ENABLE_SQP_TRAJECTORY_SMOOTHING = False
+SQP_MIN_POINTS = 8           # 轨迹至少有这么多点才进行平滑
+# -- 位置平滑权重 --
+SQP_W_POS_CURV = 10.0        # xy 曲率权重（2阶差分，越大路径越平滑）
+SQP_W_POS_JERK = 5.0         # xy 加加速度权重（3阶差分，越大曲率变化越平缓）
+# -- 航向角平滑权重 --
+SQP_W_YAW_RATE = 8.0         # 航向角变化率权重（1阶差分，越大转向越平缓）
+SQP_W_YAW_ACCEL = 3.0        # 航向角加速度权重（2阶差分，越大转向变化越柔和）
+# -- 速度平滑权重 --
+SQP_W_SPEED_ACCEL = 8.0      # 速度变化率权重（1阶差分，越大加减速越平缓）
+SQP_W_SPEED_JERK = 3.0       # 速度加加速度权重（2阶差分）
+# -- 运动学一致性 --
+SQP_W_KINEMATIC = 15.0       # 运动学约束权重（耦合 x,y 与 yaw,speed 的物理一致性）
+# -- 偏差权重 --
+SQP_W_DEV_XY = 1.0           # xy 保真权重
+SQP_W_DEV_YAW = 2.0          # yaw 保真权重
+SQP_W_DEV_SPEED = 2.0        # speed 保真权重
+# -- 偏差上限 --
+SQP_MAX_DEV_XY = 2.0         # xy 最大偏移（米）
+SQP_MAX_DEV_YAW = 0.3        # yaw 最大偏移（弧度 ≈ 17°）
+SQP_MAX_DEV_SPEED = 3.0      # speed 最大偏移（m/s）
+
+# 前轮转角可视化开关
+ENABLE_FRONT_WHEEL_VIS = False  # True: 在GIF中绘制前轮转角箭头和角度标签, False: 不绘制
 
 # 动作打印开关
 ENABLE_ACTION_PRINT = False  # True: 打印动作信息, False: 不打印
@@ -282,6 +304,9 @@ def main():
     print(f"预测轨迹绘制: {'✅ 开启' if ENABLE_TRAJECTORY_PREDICTION else '❌ 关闭'}")
     if ENABLE_TRAJECTORY_PREDICTION:
         print(f"预测步数: {TRAJECTORY_HORIZON} 步 ({TRAJECTORY_HORIZON * 0.1:.1f} 秒)")
+    print(f"SQP轨迹平滑: {'✅ 开启 (x,y,yaw,v 联合优化)' if ENABLE_SQP_TRAJECTORY_SMOOTHING else '❌ 关闭'}")
+    if ENABLE_SQP_TRAJECTORY_SMOOTHING:
+        print(f"  运动学一致性权重: {SQP_W_KINEMATIC}, 位置曲率权重: {SQP_W_POS_CURV}")
     print(f"动作打印: {'✅ 开启' if ENABLE_ACTION_PRINT else '❌ 关闭'}")
     if ENABLE_ACTION_PRINT:
         print(f"打印间隔: 每 {ACTION_PRINT_INTERVAL} 步打印一次")
@@ -317,7 +342,7 @@ def main():
     
     # 2. 设置参数
     max_agents = config.max_controlled_agents
-    num_envs = 4
+    num_envs = 5
     device = "cuda"  # 使用 CPU 避免 GPU 问题
     
     print(f"使用设备: {device}")
@@ -328,7 +353,7 @@ def main():
     # 4. 创建数据加载器
     print("\n3. 创建数据加载器...")
     try:
-        data_path = project_root / "data/processed/examples"
+        data_path = project_root / "data/processed/validation"
         train_loader = SceneDataLoader(
             root=str(data_path),
             batch_size=num_envs,
@@ -633,47 +658,59 @@ def main():
     
     # 3. 加载预训练模型
     print("\n2. 加载预训练模型...")
-    try:
-        # 加载.pt模型文件
-        print(f"正在加载模型: {model_path}")
-        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
-        
-        # 从checkpoint中提取模型架构信息
-        model_arch = checkpoint["model_arch"]
-        action_dim = checkpoint["action_dim"]
-        
-        print(f"模型架构: input_dim={model_arch['input_dim']} (每个模态), hidden_dim={model_arch['hidden_dim']}")
-        print(f"动作维度: {action_dim}")
-        print(f"最大控制智能体数: {config.max_controlled_agents}")
-        print(f"观察半径: {config.obs_radius}")
-        print(f"奖励类型: {config.reward_type}")
-        print(f"VBD功能: {'启用' if hasattr(config, 'vbd_in_obs') and config.vbd_in_obs else '禁用'}")
-        
-        # 创建NeuralNet模型，使用训练时的完整配置
-        # 注意：使用原始融合方式以兼容预训练模型
-        sim_agent = NeuralNet(
-            input_dim=model_arch["input_dim"],
-            action_dim=action_dim,
-            hidden_dim=model_arch["hidden_dim"],
-            dropout=model_arch["dropout"],
-            max_controlled_agents=config.max_controlled_agents,  # 使用训练配置
-            obs_dim=2984,  # 观察维度
-            config=config,  # 传递完整的环境配置
-            # fusion_type="attention",  # 使用注意力融合方式（与预训练模型匹配）
-            # num_attention_heads=4,  # 注意力头数
-        ).to(device)
-        
-        # 加载模型参数
-        sim_agent.load_state_dict(checkpoint["parameters"])
-        sim_agent.eval()
-        
-        print("预训练模型加载成功")
+    sim_agent = None
 
-    except Exception as e:
-        print(f"模型加载失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return
+    # 尝试加载本地 .pt 模型
+    if Path(model_path).exists():
+        try:
+            print(f"正在加载本地模型: {model_path}")
+            checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+            
+            model_arch = checkpoint["model_arch"]
+            action_dim = checkpoint["action_dim"]
+            
+            print(f"模型架构: input_dim={model_arch['input_dim']} (每个模态), hidden_dim={model_arch['hidden_dim']}")
+            print(f"动作维度: {action_dim}")
+            print(f"最大控制智能体数: {config.max_controlled_agents}")
+            print(f"观察半径: {config.obs_radius}")
+            print(f"奖励类型: {config.reward_type}")
+            print(f"VBD功能: {'启用' if hasattr(config, 'vbd_in_obs') and config.vbd_in_obs else '禁用'}")
+            
+            sim_agent = NeuralNet(
+                input_dim=model_arch["input_dim"],
+                action_dim=action_dim,
+                hidden_dim=model_arch["hidden_dim"],
+                dropout=model_arch["dropout"],
+                max_controlled_agents=config.max_controlled_agents,
+                obs_dim=2984,
+                config=config,
+            ).to(device)
+            
+            sim_agent.load_state_dict(checkpoint["parameters"])
+            sim_agent.eval()
+            print("✅ 本地模型加载成功")
+
+        except Exception as e:
+            print(f"⚠️ 本地模型加载失败: {e}")
+            sim_agent = None
+    else:
+        print(f"⚠️ 本地模型文件不存在: {model_path}")
+
+    # 本地模型不可用时，回退到 Hugging Face 预训练模型
+    if sim_agent is None:
+        HF_MODEL_NAME = "daphne-cornelisse/policy_S10_000_02_27"
+        print(f"\n  → 回退到 Hugging Face 模型: {HF_MODEL_NAME}")
+        try:
+            sim_agent = NeuralNet.from_pretrained(HF_MODEL_NAME)
+            sim_agent = sim_agent.to(device)
+            sim_agent.eval()
+            print(f"✅ Hugging Face 模型加载成功")
+            print(f"  动作维度: {sim_agent.action_dim}, 观察维度: {sim_agent.obs_dim}")
+        except Exception as e:
+            print(f"❌ Hugging Face 模型也加载失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return
         
     # 7. 运行仿真
     print("\n6. 开始仿真运行...")
@@ -686,7 +723,7 @@ def main():
         print(f"初始控制智能体数: {control_mask.sum().item()}")
         
         # 初始化统计变量
-        frames = {f"env_{i}": [] for i in range(num_envs)}
+        base_frame_data = {f"env_{i}": [] for i in range(num_envs)}  # 存储基础帧+坐标信息
         total_rewards = torch.zeros((num_envs, max_agents), device=device)
         collision_count = torch.zeros((num_envs, max_agents), dtype=torch.int32, device=device)
         off_road_count = torch.zeros((num_envs, max_agents), dtype=torch.int32, device=device)
@@ -850,16 +887,25 @@ def main():
                 predicted_trajectories=predicted_trajectories if ENABLE_TRAJECTORY_PREDICTION else None,
             )
             
-            # 在每个环境的图像上添加前轮转角可视化和轨迹
+            # 在每个环境的图像上添加前轮转角可视化（轨迹在仿真结束后统一叠加）
             for i in range(num_envs):
-                add_front_wheel_visualization(
-                    sim_states[i], env, i, control_mask, front_wheel_data
-                )
+                if ENABLE_FRONT_WHEEL_VIS:
+                    add_front_wheel_visualization(
+                        sim_states[i], env, i, control_mask, front_wheel_data
+                    )
                 
-                # 在当前帧上叠加轨迹（只显示到当前时间步的轨迹）
-                add_trajectory_to_frame(sim_states[i], env, i, control_mask, trajectories, time_step)
+                # 保存坐标轴范围（用于仿真结束后叠加轨迹）
+                ax_i = sim_states[i].axes[0]
+                xlim_i = ax_i.get_xlim()
+                ylim_i = ax_i.get_ylim()
                 
-                frames[f"env_{i}"].append(img_from_fig(sim_states[i]))
+                base_img = img_from_fig(sim_states[i])  # 注意: 此函数会 close fig
+                base_frame_data[f"env_{i}"].append({
+                    'img': base_img,
+                    'xlim': xlim_i,
+                    'ylim': ylim_i,
+                    'step': time_step,
+                })
             
             # 获取新的观察和奖励
             next_obs = env.get_obs()
@@ -868,11 +914,16 @@ def main():
             info = env.get_infos()
             
             # 记录智能体轨迹（只记录未完成的智能体）
+            # 获取全局状态（位置、航向角）
             agent_states = GlobalEgoState.from_tensor(
                 env.sim.absolute_self_observation_tensor(),
                 backend="torch",
                 device=device,
             )
+            # 获取速度（self_observation 的第 0 维）
+            _self_obs = env.sim.self_observation_tensor().to_torch().to(device)
+            _all_speeds = _self_obs[:, :, 0]  # [num_worlds, max_agents]
+            
             for env_idx in range(num_envs):
                 env_control_mask = control_mask[env_idx]
                 for agent_idx in torch.where(env_control_mask)[0]:
@@ -886,11 +937,13 @@ def main():
                     
                     pos_x = agent_states.pos_x[env_idx, agent_idx].item()
                     pos_y = agent_states.pos_y[env_idx, agent_idx].item()
+                    yaw_val = agent_states.rotation_angle[env_idx, agent_idx].item()
+                    speed_val = _all_speeds[env_idx, agent_idx].item()
                     
                     # 过滤异常位置值（kPaddingPosition通常是很大的值，如10000）
                     # 如果位置突然变化很大，可能是被重置到了padding位置
                     if agent_idx_item in trajectories[env_idx] and len(trajectories[env_idx][agent_idx_item]) > 0:
-                        last_x, last_y, _ = trajectories[env_idx][agent_idx_item][-1]
+                        last_x, last_y = trajectories[env_idx][agent_idx_item][-1][0:2]
                         # 如果位置变化超过1000米，可能是异常值，跳过
                         if abs(pos_x - last_x) > 1000 or abs(pos_y - last_y) > 1000:
                             continue
@@ -901,7 +954,9 @@ def main():
                     
                     if agent_idx_item not in trajectories[env_idx]:
                         trajectories[env_idx][agent_idx_item] = []
-                    trajectories[env_idx][agent_idx_item].append((pos_x, pos_y, time_step))
+                    trajectories[env_idx][agent_idx_item].append(
+                        (pos_x, pos_y, yaw_val, speed_val, time_step)
+                    )
             
             # 累积统计信息
             total_rewards += reward
@@ -1073,33 +1128,209 @@ def main():
         output_dir = Path(f"output/{model_name}_gif")
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 8. 保存结果
-        print("\n8. 保存可视化结果...")
+        # 8. SQP 轨迹优化 + 合成最终 GIF
+        print("\n8. 生成最终 GIF（含 SQP 轨迹对比）...")
         try:
             from PIL import Image
             import numpy as np
 
-            for i in range(num_envs):
-                # 处理每个环境的帧
-                images = []
-                for frame in frames[f"env_{i}"]:
-                    if frame.ndim == 3 and frame.shape[2] == 3:
-                        img = Image.fromarray(frame.astype(np.uint8))
-                    else:
-                        img = Image.fromarray(frame.astype(np.uint8)).convert('RGB')
-                    images.append(img)
+            # --- 8a. 对完整轨迹做一次 SQP 优化 ---
+            smoothed_trajectories = {}
+            if ENABLE_SQP_TRAJECTORY_SMOOTHING:
+                from gpudrive.utils.trajectory_sqp_smoothing import sqp_smooth_trajectory_xyav
+                print("  🔧 SQP 优化中...")
+                for env_idx in range(num_envs):
+                    smoothed_trajectories[env_idx] = {}
+                    for agent_idx, traj in trajectories[env_idx].items():
+                        traj_filtered = [
+                            t for t in traj
+                            if abs(t[0]) < 10000 and abs(t[1]) < 10000
+                        ]
+                        if len(traj_filtered) < SQP_MIN_POINTS:
+                            smoothed_trajectories[env_idx][agent_idx] = traj_filtered
+                            continue
+                        raw_states = np.array([
+                            [t[0], t[1], t[2], t[3]] for t in traj_filtered
+                        ])
+                        smooth_states = sqp_smooth_trajectory_xyav(
+                            raw_states,
+                            dt=0.1,
+                            w_pos_curv=SQP_W_POS_CURV,
+                            w_pos_jerk=SQP_W_POS_JERK,
+                            w_yaw_rate=SQP_W_YAW_RATE,
+                            w_yaw_accel=SQP_W_YAW_ACCEL,
+                            w_speed_accel=SQP_W_SPEED_ACCEL,
+                            w_speed_jerk=SQP_W_SPEED_JERK,
+                            w_kinematic=SQP_W_KINEMATIC,
+                            w_deviation_xy=SQP_W_DEV_XY,
+                            w_deviation_yaw=SQP_W_DEV_YAW,
+                            w_deviation_speed=SQP_W_DEV_SPEED,
+                            max_deviation_xy=SQP_MAX_DEV_XY,
+                            max_deviation_yaw=SQP_MAX_DEV_YAW,
+                            max_deviation_speed=SQP_MAX_DEV_SPEED,
+                        )
+                        steps = [t[4] for t in traj_filtered]
+                        smoothed_trajectories[env_idx][agent_idx] = [
+                            (smooth_states[k, 0], smooth_states[k, 1],
+                             smooth_states[k, 2], smooth_states[k, 3], steps[k])
+                            for k in range(len(steps))
+                        ]
+                print("  ✅ SQP 优化完成")
 
-                # 保存 GIF
-                output_file = output_dir / f"simulation_env_{i}.gif"
-                images[0].save(
+            # --- 8b. 合成每帧：基础图 + 红色原始轨迹 + 绿色优化轨迹 ---
+            print("  🎬 合成 GIF 帧...")
+            for env_idx in range(num_envs):
+                gif_images = []
+                frame_list = base_frame_data[f"env_{env_idx}"]
+
+                for frame_info in frame_list:
+                    base_img = frame_info['img']
+                    xlim = frame_info['xlim']
+                    ylim = frame_info['ylim']
+                    cur_step = frame_info['step']
+                    h, w = base_img.shape[:2]
+
+                    # 创建新 figure，用 imshow 铺底图（提高 DPI 以获得更清晰的线条）
+                    fig, ax = plt.subplots(1, 1, figsize=(15, 15), dpi=150)
+                    fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
+                    ax.imshow(
+                        base_img,
+                        extent=[xlim[0], xlim[1], ylim[0], ylim[1]],
+                        origin='upper', aspect='auto',
+                    )
+                    ax.set_xlim(xlim)
+                    ax.set_ylim(ylim)
+                    ax.axis('off')
+
+                    env_control_mask = control_mask[env_idx]
+                    controlled_agents = torch.where(env_control_mask)[0]
+
+                    # SQP 开启 → 绿色优化轨迹；关闭 → 红色原始轨迹（同样式）
+                    if ENABLE_SQP_TRAJECTORY_SMOOTHING:
+                        traj_source = smoothed_trajectories
+                        traj_color = 'limegreen'
+                    else:
+                        traj_source = trajectories
+                        traj_color = 'red'
+
+                    for agent_idx in controlled_agents:
+                        aid = agent_idx.item()
+                        src = traj_source.get(env_idx, {})
+                        if aid not in src:
+                            # SQP 模式下如果该智能体没有平滑结果，回退到原始
+                            src = trajectories.get(env_idx, {})
+                            if aid not in src:
+                                continue
+                            traj_color_this = 'red'
+                        else:
+                            traj_color_this = traj_color
+
+                        pts = [t for t in src[aid]
+                               if t[4] <= cur_step and abs(t[0]) < 10000 and abs(t[1]) < 10000]
+                        if len(pts) >= 2:
+                            ax.plot(
+                                [p[0] for p in pts], [p[1] for p in pts],
+                                color=traj_color_this, linewidth=4.0, alpha=0.9,
+                                zorder=5,
+                            )
+
+                    # 光栅化
+                    fig.canvas.draw()
+                    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                    composite_img = buf.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+                    plt.close(fig)
+
+                    gif_images.append(Image.fromarray(composite_img))
+
+                # --- 保存 GIF ---
+                output_file = output_dir / f"nosimulation_env_{env_idx}.gif"
+                gif_images[0].save(
                     str(output_file),
                     save_all=True,
-                    append_images=images[1:],
+                    append_images=gif_images[1:],
                     duration=67,  # 约15fps
-                    loop=0
+                    loop=0,
                 )
-                print(f"环境{i}的GIF已保存到: {output_file}")
+                print(f"  ✅ 环境{env_idx} GIF: {output_file}")
 
+            # --- 8c. 每个智能体的 v / yaw 优化前后对比图 ---
+            if ENABLE_SQP_TRAJECTORY_SMOOTHING:
+                print("  📊 生成 v / yaw 对比图...")
+                for env_idx in range(num_envs):
+                    env_control_mask = control_mask[env_idx]
+                    controlled_agents = torch.where(env_control_mask)[0]
+
+                    for agent_idx in controlled_agents:
+                        aid = agent_idx.item()
+                        if aid not in trajectories[env_idx]:
+                            continue
+                        if aid not in smoothed_trajectories.get(env_idx, {}):
+                            continue
+
+                        traj_orig = [
+                            t for t in trajectories[env_idx][aid]
+                            if abs(t[0]) < 10000 and abs(t[1]) < 10000
+                        ]
+                        traj_smooth = smoothed_trajectories[env_idx][aid]
+
+                        if len(traj_orig) < SQP_MIN_POINTS or len(traj_smooth) < SQP_MIN_POINTS:
+                            continue
+
+                        # 提取数据
+                        steps_orig = [t[4] for t in traj_orig]
+                        yaw_orig = [t[2] for t in traj_orig]
+                        speed_orig = [t[3] for t in traj_orig]
+                        time_orig = [s * 0.1 for s in steps_orig]
+
+                        steps_smooth = [t[4] for t in traj_smooth]
+                        yaw_smooth = [t[2] for t in traj_smooth]
+                        speed_smooth = [t[3] for t in traj_smooth]
+                        time_smooth = [s * 0.1 for s in steps_smooth]
+
+                        # yaw 转角度（更直观）
+                        yaw_orig_deg = [y * 180.0 / math.pi for y in yaw_orig]
+                        yaw_smooth_deg = [y * 180.0 / math.pi for y in yaw_smooth]
+
+                        # 创建 2 行 1 列子图
+                        fig, (ax_speed, ax_yaw) = plt.subplots(2, 1, figsize=(12, 8),
+                                                                dpi=120, sharex=True)
+                        fig.suptitle(
+                            f'Env {env_idx}  Agent {aid}  —  SQP Optimization',
+                            fontsize=14, fontweight='bold',
+                        )
+
+                        # ---- 速度对比 ----
+                        ax_speed.plot(time_orig, speed_orig,
+                                      color='red', linewidth=1.5, alpha=0.8,
+                                      linestyle='--', label='Original')
+                        ax_speed.plot(time_smooth, speed_smooth,
+                                      color='limegreen', linewidth=2.0, alpha=0.9,
+                                      label='SQP Smoothed')
+                        ax_speed.set_ylabel('Speed (m/s)', fontsize=12)
+                        ax_speed.legend(loc='upper right', fontsize=10)
+                        ax_speed.grid(True, alpha=0.3)
+                        ax_speed.set_title('Speed', fontsize=12)
+
+                        # ---- 航向角对比 ----
+                        ax_yaw.plot(time_orig, yaw_orig_deg,
+                                    color='red', linewidth=1.5, alpha=0.8,
+                                    linestyle='--', label='Original')
+                        ax_yaw.plot(time_smooth, yaw_smooth_deg,
+                                    color='limegreen', linewidth=2.0, alpha=0.9,
+                                    label='SQP Smoothed')
+                        ax_yaw.set_ylabel('Yaw (deg)', fontsize=12)
+                        ax_yaw.set_xlabel('Time (s)', fontsize=12)
+                        ax_yaw.legend(loc='upper right', fontsize=10)
+                        ax_yaw.grid(True, alpha=0.3)
+                        ax_yaw.set_title('Heading (Yaw)', fontsize=12)
+
+                        fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+                        out_file = output_dir / f"sqp_v_yaw_env{env_idx}_agent{aid}.png"
+                        fig.savefig(str(out_file), bbox_inches='tight')
+                        plt.close(fig)
+
+                print("  ✅ v / yaw 对比图全部保存完成")
 
         except Exception as e:
             print(f"保存结果失败: {e}")
