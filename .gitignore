@@ -257,3 +257,8 @@ models/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++
 GPUDrive_full/
+
+# large artifacts
+GPUDrive_full/
+output/
+policies/
