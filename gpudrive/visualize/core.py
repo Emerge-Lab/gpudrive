@@ -275,9 +275,11 @@ class MatplotlibVisualizer:
                 torch.abs(global_agent_states.pos_x[env_idx, :]) < 1_000
             )
 
-            is_offroad = (agent_infos[env_idx, :, 0] == 1) & controlled_live
+            is_offroad = (
+                agent_infos[env_idx, :, 0:2].sum(axis=1) >= 1
+            ) & controlled_live
             is_collided = (
-                agent_infos[env_idx, :, 1:3].sum(axis=1) == 1
+                agent_infos[env_idx, :, 2:4].sum(axis=1) >= 1
             ) & controlled_live
             is_ok = ~is_offroad & ~is_collided & controlled_live
 
@@ -1598,7 +1600,9 @@ class MatplotlibVisualizer:
         Args:
             ax: Matplotlib axis
             env_idx: 环境索引
-            predicted_trajectories: [num_worlds, max_agents, horizon, 2] 预测轨迹
+            predicted_trajectories: [num_worlds, max_agents, horizon, D] 预测轨迹
+                - 至少需要前两维为 (x, y)
+                - 允许额外维度（例如 yaw / vx / vy / speed），可视化会忽略
             controlled_live: [max_agents] 受控且存活的智能体掩码
         """
         if predicted_trajectories is None:
@@ -1611,16 +1615,17 @@ class MatplotlibVisualizer:
         
         for agent_idx in range(predicted_trajectories.shape[1]):
             if controlled_live[agent_idx]:
-                trajectory = predicted_trajectories[env_idx, agent_idx, :, :]  # [horizon, 2]
+                trajectory = predicted_trajectories[env_idx, agent_idx, :, :]
+                traj_xy = trajectory[:, :2]  # [horizon, 2]
                 
                 # 过滤无效点
                 valid_mask = (
-                    (trajectory[:, 0] != 0)
-                    & (trajectory[:, 1] != 0)
-                    & (torch.abs(trajectory[:, 0]) < OUT_OF_BOUNDS)
-                    & (torch.abs(trajectory[:, 1]) < OUT_OF_BOUNDS)
+                    (traj_xy[:, 0] != 0)
+                    & (traj_xy[:, 1] != 0)
+                    & (torch.abs(traj_xy[:, 0]) < OUT_OF_BOUNDS)
+                    & (torch.abs(traj_xy[:, 1]) < OUT_OF_BOUNDS)
                 )
-                valid_trajectory = trajectory[valid_mask]
+                valid_trajectory = traj_xy[valid_mask]
                 
                 if len(valid_trajectory) > 1:
                     points = valid_trajectory.cpu().numpy()

@@ -1,0 +1,112 @@
+# 终极保守配置 - 绝对不会OOM
+# 适用于 8GB GPU
+
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: data/processed/training
+continue_training: true
+model_cpt: compatible_huggingface_model.pt
+
+environment:
+  name: "gpudrive"
+  num_worlds: 12           # ✅ 进一步减少
+  k_unique_scenes: 48      # ✅ 保持4倍关系
+  max_controlled_agents: 64
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  norm_obs: true
+  remove_non_vehicles: true
+  lidar_obs: false
+  reward_type: "weighted_combination"
+  collision_weight: -0.75
+  off_road_weight: -0.75
+  goal_achieved_weight: 1.0
+  dynamics_model: "classic"
+  collision_behavior: "ignore"
+  dist_to_goal_threshold: 2.0
+  polyline_reduction_threshold: 0.1
+  sampling_seed: 42
+  obs_radius: 50.0
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  use_vbd: false
+  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+  init_steps: 11
+  vbd_trajectory_weight: 0.1
+  vbd_in_obs: false
+
+wandb:
+  entity: ""
+  project: "gpudrive"
+  group: "conservative"
+  mode: "online"
+  tags: ["ppo", "attention", "low_memory"]
+
+train:
+  exp_id: PPO_conservative
+  seed: 42
+  cpu_offload: false
+  device: "cuda"
+  bptt_horizon: 1
+  compile: false
+  compile_mode: "reduce-overhead"
+
+  # 保守的采样设置
+  resample_scenes: true
+  resample_dataset_size: 10_000
+  resample_interval: 5_000_000  # ✅ 更低频率
+  sample_with_replacement: true
+  shuffle_dataset: false
+
+  # PPO 设置
+  torch_deterministic: false
+  total_timesteps: 100_000_000
+  batch_size: 12_288        # ✅ 12 worlds × 1024
+  minibatch_size: 2048
+  learning_rate: 3e-4
+  anneal_lr: false
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0001
+  vf_coef: 0.3
+  max_grad_norm: 0.5
+  target_kl: null
+  log_window: 1000
+
+  # 网络配置
+  network:
+    input_dim: 64
+    hidden_dim: 128
+    dropout: 0.01
+    class_name: "NeuralNet"
+    num_parameters: 0
+    fusion_type: "attention"
+    num_attention_heads: 4
+
+  # Checkpointing
+  checkpoint_interval: 100
+  checkpoint_path: "./runs"
+
+  # Rendering
+  render: false
+  render_3d: true
+  render_interval: 1
+  render_k_scenarios: 10
+  render_format: "mp4"
+  render_fps: 15
+  zoom_radius: 50
+
+vec:
+  backend: "native"
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false
+

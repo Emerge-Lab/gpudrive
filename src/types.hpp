@@ -163,6 +163,7 @@ namespace madrona_gpudrive
     struct Info
     {
         int collidedWithRoad;
+        int collidedWithRoadEdge;  // 新增：专门标记碰撞RoadEdge
         int collidedWithVehicle;
         int collidedWithNonVehicle;
         int reachedGoal;
@@ -172,6 +173,7 @@ namespace madrona_gpudrive
         {
             return Info{
                 .collidedWithRoad = 0,
+                .collidedWithRoadEdge = 0,
                 .collidedWithVehicle = 0,
                 .collidedWithNonVehicle = 0,
                 .reachedGoal = 0,
@@ -179,7 +181,7 @@ namespace madrona_gpudrive
         }
     };
 
-    const size_t InfoExportSize = 5;
+    const size_t InfoExportSize = 6;
 
     static_assert(sizeof(Info) == sizeof(int) * InfoExportSize);
 

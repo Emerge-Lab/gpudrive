@@ -1,0 +1,9 @@
+启动uv虚拟环境
+source .venv/bin/activate
+
+export HF_ENDPOINT=https://hf-mirror.com
+
+进docker
+docker run --gpus all -it --rm --shm-size=20G -v ${PWD}:/workspace gpudrive:latest /bin/bash
+关闭进程号
+kill -9 11981

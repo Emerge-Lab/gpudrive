@@ -43,6 +43,7 @@ class EnvConfig:
     # Set the weights for the reward components
     # R = a * collided + b * goal_achieved + c * off_road
     collision_weight: float = -0.5
+    off_road_edge_weight: float = -0.5  # 碰撞RoadEdge的惩罚权重（默认与collision_weight相同）
     goal_achieved_weight: float = 1.0
     off_road_weight: float = -0.5
 

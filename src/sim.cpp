@@ -310,7 +310,7 @@ inline void movementSystem(Engine &e,
                 // This ensures the collision state is only true if the agent collided in the current timestep.
                 collisionEvent.hasCollided.store_relaxed(0); // Reset the collision state.
                 Info& info = e.get<Info>(agent_iface.e);
-                info.collidedWithRoad = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
+                info.collidedWithRoad = info.collidedWithRoadEdge = info.collidedWithVehicle = info.collidedWithNonVehicle = 0;
                 break;
         }
     }
@@ -706,6 +706,11 @@ void collisionDetectionSystem(Engine &ctx,
         if(bEntityType > EntityType::None && bEntityType <= EntityType::StopSign)
         {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
+            // 区分RoadEdge和其他道路线
+            if(bEntityType == EntityType::RoadEdge)
+            {
+                ctx.get<Info>(agent_iface).collidedWithRoadEdge = 1;
+            }
         }
         else if(bEntityType == EntityType::Vehicle)
         {
@@ -725,6 +730,11 @@ void collisionDetectionSystem(Engine &ctx,
         if(aEntityType > EntityType::None && aEntityType <= EntityType::StopSign)
         {
             ctx.get<Info>(agent_iface).collidedWithRoad = 1;
+            // 区分RoadEdge和其他道路线
+            if(aEntityType == EntityType::RoadEdge)
+            {
+                ctx.get<Info>(agent_iface).collidedWithRoadEdge = 1;
+            }
         }
         else if(aEntityType == EntityType::Vehicle)
         {

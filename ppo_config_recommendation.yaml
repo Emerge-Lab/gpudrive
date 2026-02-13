@@ -1,0 +1,146 @@
+# ==========================================
+# 推荐配置：注意力机制 + 迁移学习 + 场景多样性
+# ==========================================
+
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: data/processed/training
+continue_training: true
+model_cpt: compatible_huggingface_model.pt
+
+environment:
+  name: "gpudrive"
+  
+  # ✅ 场景配置（提高泛化能力）
+  num_worlds: 25              # 并行环境数（受GPU内存限制）
+  k_unique_scenes: 100        # ✅ 改为100（从25增加）
+  sampling_seed: 42           # 保持固定以便对比实验
+  
+  max_controlled_agents: 64
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  norm_obs: true
+  remove_non_vehicles: true
+  lidar_obs: false
+  
+  # 奖励配置
+  reward_type: "weighted_combination"
+  collision_weight: -0.75
+  off_road_weight: -0.75
+  goal_achieved_weight: 1.0
+  dist_to_goal_threshold: 2.0
+  
+  # 其他配置
+  dynamics_model: "classic"
+  collision_behavior: "ignore"
+  polyline_reduction_threshold: 0.1
+  obs_radius: 50.0
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  
+  # VBD (暂时禁用以加快训练)
+  use_vbd: false
+  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+  init_steps: 11
+  vbd_trajectory_weight: 0.1
+  vbd_in_obs: false
+
+wandb:
+  entity: ""
+  project: "gpudrive"
+  group: "attention_transfer_learning"  # ✅ 改为有意义的group名
+  mode: "online"
+  tags: ["ppo", "attention", "transfer_learning"]  # ✅ 添加有意义的tags
+
+train:
+  exp_id: PPO_attention  # ✅ 改为有意义的实验ID
+  seed: 42
+  cpu_offload: false
+  device: "cuda"
+  bptt_horizon: 1
+  compile: false
+  compile_mode: "reduce-overhead"
+
+  # ✅ 场景重采样（关键改动）
+  resample_scenes: true           # ✅ 启用场景重采样
+  resample_dataset_size: 5_000    # ✅ 从5000个场景中采样
+  resample_interval: 2_000_000    # ✅ 每2M步重新采样
+  sample_with_replacement: true
+  shuffle_dataset: false
+
+  # PPO超参数
+  torch_deterministic: false
+  total_timesteps: 20_000_000     # ✅ 先训练20M步（快速验证）
+  batch_size: 32_768
+  minibatch_size: 2048
+  learning_rate: 3e-4
+  anneal_lr: false
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0001
+  vf_coef: 0.3
+  max_grad_norm: 0.5
+  target_kl: null
+  log_window: 1000
+
+  # ✅ 网络配置（注意力机制）
+  network:
+    input_dim: 64
+    hidden_dim: 128
+    dropout: 0.01
+    class_name: "NeuralNet"
+    num_parameters: 0
+    fusion_type: "attention"      # ✅ 使用注意力融合
+    num_attention_heads: 4
+
+  # Checkpointing
+  checkpoint_interval: 100
+  checkpoint_path: "./runs"
+
+  # Rendering
+  render: false
+  render_3d: true
+  render_interval: 1
+  render_k_scenarios: 10
+  render_format: "mp4"
+  render_fps: 15
+  zoom_radius: 50
+
+vec:
+  backend: "native"
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false
+
+
+# ==========================================
+# 使用说明
+# ==========================================
+# 
+# 阶段1：快速验证（推荐先执行）
+# - total_timesteps: 20_000_000
+# - k_unique_scenes: 100
+# - 预计训练时间：根据您的GPU，约2-4小时
+# - 目标：验证注意力机制是否有效
+#
+# 阶段2：提高泛化（如果阶段1效果好）
+# - total_timesteps: 50_000_000
+# - k_unique_scenes: 300
+# - resample_interval: 1_000_000
+#
+# 阶段3：最终训练（追求最优性能）
+# - total_timesteps: 100_000_000
+# - k_unique_scenes: 500
+# - sampling_seed: null  # 随机采样
+# - resample_interval: 1_000_000
+#
+# ==========================================
+

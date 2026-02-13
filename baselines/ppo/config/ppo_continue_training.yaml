@@ -1,0 +1,149 @@
+# ==========================================
+# 继续训练优化配置
+# 专门用于从预训练模型继续训练
+# ==========================================
+
+mode: "train"
+use_rnn: false
+eval_model_path: null
+baseline: false
+data_dir: data/processed/training
+continue_training: true
+model_cpt: wandb/run-20251026_173705-PPO__C__R_10000__10_26_17_36_08_782/files/runs/PPO__C__R_10000__10_26_17_36_08_782/model_PPO__C__R_10000__10_26_17_36_08_782_000184.pt
+
+environment:
+  name: "gpudrive"
+  num_worlds: 16
+  k_unique_scenes: 64
+  max_controlled_agents: 64
+  ego_state: true
+  road_map_obs: true
+  partner_obs: true
+  norm_obs: true
+  remove_non_vehicles: true
+  lidar_obs: false
+  reward_type: "weighted_combination"
+  collision_weight: -0.75
+  off_road_weight: -0.75
+  goal_achieved_weight: 1.0
+  dynamics_model: "classic"
+  collision_behavior: "ignore"
+  dist_to_goal_threshold: 2.0
+  polyline_reduction_threshold: 0.1
+  sampling_seed: 42
+  obs_radius: 50.0
+  action_space_steer_disc: 13
+  action_space_accel_disc: 7
+  use_vbd: false
+  vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+  init_steps: 11
+  vbd_trajectory_weight: 0.1
+  vbd_in_obs: false
+
+wandb:
+  entity: ""
+  project: "gpudrive"
+  group: "continue_training_fixed"  # ✅ 新的实验组
+  mode: "online"
+  tags: ["ppo", "continue_training", "optimizer_fixed"]  # ✅ 标记
+
+train:
+  exp_id: PPO_continue_fixed  # ✅ 新的实验ID
+  seed: 42
+  cpu_offload: false
+  device: "cuda"
+  bptt_horizon: 1
+  compile: false
+  compile_mode: "reduce-overhead"
+
+  # Data sampling
+  resample_scenes: true
+  resample_dataset_size: 10_000
+  resample_interval: 3_000_000  # ✅ 增加到3M，降低重采样频率
+  sample_with_replacement: true
+  shuffle_dataset: false
+
+  # PPO hyperparameters - 针对继续训练优化
+  torch_deterministic: false
+  total_timesteps: 103_000_000  # ✅ 3M(已训练) + 100M(新训练) = 103M
+  batch_size: 16_384
+  minibatch_size: 2048
+  learning_rate: 1e-4  # ✅ 降低学习率（从3e-4降到1e-4）
+  anneal_lr: true      # ✅ 启用学习率衰减
+  gamma: 0.99
+  gae_lambda: 0.95
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.15      # ✅ 从0.2降到0.15（更保守的更新）
+  clip_vloss: false
+  vf_clip_coef: 0.2
+  ent_coef: 0.0005     # ✅ 增加探索（从0.0001增加到0.0005）
+  vf_coef: 0.3
+  max_grad_norm: 0.5
+  target_kl: null
+  log_window: 1000
+
+  # Network
+  network:
+    input_dim: 64
+    hidden_dim: 128
+    dropout: 0.01
+    class_name: "NeuralNet"
+    num_parameters: 0
+    fusion_type: "attention"
+    num_attention_heads: 4
+
+  # Checkpointing
+  checkpoint_interval: 200  # ✅ 增加间隔以减少IO
+  checkpoint_path: "./runs"
+
+  # Rendering
+  render: false
+  render_3d: true
+  render_interval: 1
+  render_k_scenarios: 0
+  render_format: "mp4"
+  render_fps: 15
+  zoom_radius: 50
+
+vec:
+  backend: "native"
+  num_workers: 1
+  env_batch_size: 1
+  zero_copy: false
+
+
+# ==========================================
+# 继续训练关键配置说明
+# ==========================================
+#
+# 1. learning_rate: 1e-4 (降低3倍)
+#    - 预训练模型已经收敛
+#    - 需要更温和的微调
+#    - 避免破坏已学到的参数
+#
+# 2. anneal_lr: true
+#    - 随训练进行进一步降低lr
+#    - 最终收敛到更好的局部最优
+#
+# 3. clip_coef: 0.15 (从0.2降低)
+#    - 更保守的策略更新
+#    - Trust region更小
+#    - 适合微调阶段
+#
+# 4. ent_coef: 0.0005 (增加5倍)
+#    - 鼓励探索新场景
+#    - 避免过早收敛
+#    - 提高适应性
+#
+# 5. resample_interval: 3M (从2M增加)
+#    - 降低重采样频率
+#    - 减少显存峰值
+#    - 每个场景池训练更充分
+#
+# 6. total_timesteps: 103M
+#    - 3M(已训练) + 100M(新训练)
+#    - 确保学习率调度正确
+#
+# ==========================================
+

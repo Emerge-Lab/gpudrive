@@ -474,12 +474,13 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
-        off_road = info_tensor[:, :, 0].to(torch.float)
-
-        # True if the vehicle is in collision with another road object
-        # (i.e. a cyclist or pedestrian)
-        collided = info_tensor[:, :, 1:3].to(torch.float).sum(axis=2)
-        goal_achieved = info_tensor[:, :, 3].to(torch.float)
+        off_road = info_tensor[:, :, 0:2].sum(axis=2)
+        collided = info_tensor[:, :, 2:4].sum(axis=2)
+        off_road_with_road_edge = info_tensor[:, :, 1]
+        goal_achieved = info_tensor[:, :, 4]
+        off_road_edge_weight = getattr(
+                self.config, 'off_road_edge_weight', collision_weight
+            )
 
         if self.config.reward_type == "sparse_on_goal_achieved":
             return self.sim.reward_tensor().to_torch().clone().squeeze(dim=2)
@@ -489,6 +490,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
+                + off_road_edge_weight * off_road_with_road_edge
             )
 
             # 稠密塑形：避免"停住最优"
@@ -562,6 +564,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
                 collision_weight * collided
                 + goal_achieved_weight * goal_achieved
                 + off_road_weight * off_road
+                + off_road_edge_weight * off_road_with_road_edge
             )
 
             agent_states = GlobalEgoState.from_tensor(
