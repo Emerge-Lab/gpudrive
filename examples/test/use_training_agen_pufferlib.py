@@ -244,10 +244,10 @@ def add_front_wheel_visualization(fig, env, env_idx, control_mask, action_values
 
 # ==================== 配置参数 ====================
 # 模型路径
-model_path = "/home/wbk/gpudrive/runs/PPO__C__S_72__01_29_15_47_35_057/model_PPO__C__S_72__01_29_15_47_35_057_0339120.pt"
+model_path = "/home/wbk/gpudrive/runs/PPO__C__S_72__01_30_19_06_17_932/model_PPO__C__S_72__01_30_19_06_17_932_036620.pt"
 
 # 预测轨迹开关
-ENABLE_TRAJECTORY_PREDICTION = True  # True: 绘制预测轨迹, False: 不绘制
+ENABLE_TRAJECTORY_PREDICTION = False  # True: 绘制预测轨迹, False: 不绘制
 TRAJECTORY_HORIZON = 20  # 预测步数（仅在 ENABLE_TRAJECTORY_PREDICTION=True 时有效）
 
 # 预测轨迹平滑开关（对 x,y,yaw,speed 做一致性平滑）
@@ -258,6 +258,9 @@ SMOOTH_WINDOW = 7  # 奇数，越大越平滑（建议 5~11）
 # True:  GIF 中画绿色 SQP 优化轨迹，并生成 v/yaw 对比图
 # False: GIF 中画红色原始轨迹（同样式，无 SQP 开销）
 ENABLE_SQP_TRAJECTORY_SMOOTHING = False
+
+# 红色历史轨迹开关（仅控制最终 GIF 里的红线叠加）
+ENABLE_RED_TRAJECTORY = False  # True: 绘制红色历史轨迹, False: 不绘制
 SQP_MIN_POINTS = 8           # 轨迹至少有这么多点才进行平滑
 # -- 位置平滑权重 --
 SQP_W_POS_CURV = 10.0        # xy 曲率权重（2阶差分，越大路径越平滑）
@@ -307,6 +310,7 @@ def main():
     print(f"SQP轨迹平滑: {'✅ 开启 (x,y,yaw,v 联合优化)' if ENABLE_SQP_TRAJECTORY_SMOOTHING else '❌ 关闭'}")
     if ENABLE_SQP_TRAJECTORY_SMOOTHING:
         print(f"  运动学一致性权重: {SQP_W_KINEMATIC}, 位置曲率权重: {SQP_W_POS_CURV}")
+    print(f"红色历史轨迹: {'✅ 开启' if ENABLE_RED_TRAJECTORY else '❌ 关闭'}")
     print(f"动作打印: {'✅ 开启' if ENABLE_ACTION_PRINT else '❌ 关闭'}")
     if ENABLE_ACTION_PRINT:
         print(f"打印间隔: 每 {ACTION_PRINT_INTERVAL} 步打印一次")
@@ -332,7 +336,7 @@ def main():
     # 1. 加载配置
     print("\n1. 加载配置...")
     try:
-        config_path = project_root / "examples/experimental/config/reliable_agents_params"
+        config_path = project_root / "examples/experimental/config/reliable_agents_params_sb3"
         config = load_config(str(config_path))
         print("配置加载成功")
         print(f"最大控制智能体数: {config.max_controlled_agents}")
@@ -342,7 +346,7 @@ def main():
     
     # 2. 设置参数
     max_agents = config.max_controlled_agents
-    num_envs = 5
+    num_envs = 4
     device = "cuda"  # 使用 CPU 避免 GPU 问题
     
     print(f"使用设备: {device}")
@@ -353,7 +357,7 @@ def main():
     # 4. 创建数据加载器
     print("\n3. 创建数据加载器...")
     try:
-        data_path = project_root / "data/processed/validation"
+        data_path = project_root / "data/processed/examples"
         train_loader = SceneDataLoader(
             root=str(data_path),
             batch_size=num_envs,
@@ -1205,27 +1209,36 @@ def main():
                     env_control_mask = control_mask[env_idx]
                     controlled_agents = torch.where(env_control_mask)[0]
 
-                    # SQP 开启 → 绿色优化轨迹；关闭 → 红色原始轨迹（同样式）
-                    if ENABLE_SQP_TRAJECTORY_SMOOTHING:
-                        traj_source = smoothed_trajectories
-                        traj_color = 'limegreen'
-                    else:
-                        traj_source = trajectories
-                        traj_color = 'red'
-
+                    # 轨迹绘制规则：
+                    # 1) SQP 开启时优先绘制绿色优化轨迹
+                    # 2) 若无优化轨迹且开启红色开关，则回退绘制红色原始轨迹
+                    # 3) SQP 关闭时仅在红色开关开启时绘制红色原始轨迹
                     for agent_idx in controlled_agents:
                         aid = agent_idx.item()
-                        src = traj_source.get(env_idx, {})
-                        if aid not in src:
-                            # SQP 模式下如果该智能体没有平滑结果，回退到原始
-                            src = trajectories.get(env_idx, {})
-                            if aid not in src:
-                                continue
-                            traj_color_this = 'red'
-                        else:
-                            traj_color_this = traj_color
 
-                        pts = [t for t in src[aid]
+                        traj_to_draw = None
+                        traj_color_this = None
+
+                        if ENABLE_SQP_TRAJECTORY_SMOOTHING:
+                            smooth_src = smoothed_trajectories.get(env_idx, {})
+                            if aid in smooth_src:
+                                traj_to_draw = smooth_src[aid]
+                                traj_color_this = 'limegreen'
+                            elif ENABLE_RED_TRAJECTORY:
+                                raw_src = trajectories.get(env_idx, {})
+                                if aid in raw_src:
+                                    traj_to_draw = raw_src[aid]
+                                    traj_color_this = 'red'
+                        elif ENABLE_RED_TRAJECTORY:
+                            raw_src = trajectories.get(env_idx, {})
+                            if aid in raw_src:
+                                traj_to_draw = raw_src[aid]
+                                traj_color_this = 'red'
+
+                        if traj_to_draw is None:
+                            continue
+
+                        pts = [t for t in traj_to_draw
                                if t[4] <= cur_step and abs(t[0]) < 10000 and abs(t[1]) < 10000]
                         if len(pts) >= 2:
                             ax.plot(
@@ -1243,7 +1256,7 @@ def main():
                     gif_images.append(Image.fromarray(composite_img))
 
                 # --- 保存 GIF ---
-                output_file = output_dir / f"nosimulation_env_{env_idx}.gif"
+                output_file = output_dir / f"example_nosimulation_env_{env_idx}.gif"
                 gif_images[0].save(
                     str(output_file),
                     save_all=True,
