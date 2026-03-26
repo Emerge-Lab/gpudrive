@@ -189,6 +189,10 @@ def sqp_smooth_trajectory_xyav(
     max_deviation_yaw: float = 0.3,
     max_deviation_speed: float = 3.0,
     fix_endpoints: bool = True,
+    obstacle_points: Optional[np.ndarray] = None,
+    w_obstacle: float = 0.0,
+    obstacle_safe_radius: float = 3.0,
+    obstacle_end_weight: float = 1.0,
     max_iter: int = 300,
 ) -> np.ndarray:
     """Smooth a 4-D kinematic trajectory ``(x, y, ψ, v)`` via SQP.
@@ -217,6 +221,14 @@ def sqp_smooth_trajectory_xyav(
         Fidelity weights for each channel.
     max_deviation_xy / max_deviation_yaw / max_deviation_speed :
         Per-axis box bounds on each channel.
+    obstacle_points : (M, 2), optional
+        障碍物点云（世界坐标），用于对轨迹施加软避障代价。
+    w_obstacle :
+        障碍物软惩罚权重（0 表示关闭）。
+    obstacle_safe_radius :
+        安全半径，轨迹点进入该半径后会被惩罚。
+    obstacle_end_weight :
+        时间加权终点系数（>1 时后段避障更强）。
     fix_endpoints :
         Pin first / last waypoints.
     max_iter :
@@ -257,6 +269,20 @@ def sqp_smooth_trajectory_xyav(
     if D3 is not None and w_speed_jerk > 0:
         H_v = H_v + w_speed_jerk * (D2.T @ D2)
 
+    # ---- Obstacle preprocessing ----
+    obs_xy: Optional[np.ndarray] = None
+    obs_time_weights = np.ones(N, dtype=np.float64)
+    if obstacle_end_weight != 1.0:
+        obs_time_weights = np.linspace(1.0, obstacle_end_weight, N, dtype=np.float64)
+
+    if obstacle_points is not None and w_obstacle > 0.0 and obstacle_safe_radius > 0.0:
+        obs_xy_raw = np.asarray(obstacle_points, dtype=np.float64).reshape(-1, 2)
+        if obs_xy_raw.size > 0:
+            finite_mask = np.isfinite(obs_xy_raw).all(axis=1)
+            obs_xy_raw = obs_xy_raw[finite_mask]
+            if obs_xy_raw.shape[0] > 0:
+                obs_xy = obs_xy_raw
+
     # ---- Objective ----
     def objective(z: np.ndarray) -> float:
         x  = z[0*N : 1*N]
@@ -290,6 +316,15 @@ def sqp_smooth_trajectory_xyav(
         ex = (x[1:] - x[:-1]) - v_h * cos_psi * dt
         ey = (y[1:] - y[:-1]) - v_h * sin_psi * dt
         cost += w_kinematic * (ex @ ex + ey @ ey)
+
+        # Obstacle clearance penalty (soft hinge)
+        if obs_xy is not None:
+            dx_obs = x[:, None] - obs_xy[None, :, 0]
+            dy_obs = y[:, None] - obs_xy[None, :, 1]
+            dist_obs = np.sqrt(dx_obs * dx_obs + dy_obs * dy_obs + 1e-9)
+            margin = obstacle_safe_radius - dist_obs
+            hinge = np.maximum(0.0, margin)
+            cost += w_obstacle * np.sum(obs_time_weights[:, None] * (hinge * hinge))
 
         # Fidelity
         cost += (w_deviation_xy    * ((x - x0) @ (x - x0) + (y - y0) @ (y - y0))
@@ -330,6 +365,20 @@ def sqp_smooth_trajectory_xyav(
         gv[:-1] += -2.0 * w_kinematic * dt * (
             ex * cos_psi + ey * sin_psi
         )
+
+        # Obstacle clearance gradient
+        if obs_xy is not None:
+            dx_obs = x[:, None] - obs_xy[None, :, 0]
+            dy_obs = y[:, None] - obs_xy[None, :, 1]
+            dist_obs = np.sqrt(dx_obs * dx_obs + dy_obs * dy_obs + 1e-9)
+            margin = obstacle_safe_radius - dist_obs
+            active = margin > 0.0
+            if np.any(active):
+                base = np.zeros_like(dist_obs)
+                base[active] = -2.0 * w_obstacle * margin[active] / dist_obs[active]
+                weighted = base * obs_time_weights[:, None]
+                gx += np.sum(weighted * dx_obs, axis=1)
+                gy += np.sum(weighted * dy_obs, axis=1)
 
         return np.concatenate([gx, gy, gpsi, gv])
 

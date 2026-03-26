@@ -474,7 +474,7 @@ class GPUDriveTorchEnv(GPUDriveGymEnv):
 
         # Return the weighted combination of the reward components
         info_tensor = self.sim.info_tensor().to_torch().clone()
-        off_road = info_tensor[:, :, 0:2].sum(axis=2)
+        off_road = info_tensor[:, :, 0]  # base road collision only; edge kept as separate extra term
         collided = info_tensor[:, :, 2:4].sum(axis=2)
         off_road_with_road_edge = info_tensor[:, :, 1]
         goal_achieved = info_tensor[:, :, 4]

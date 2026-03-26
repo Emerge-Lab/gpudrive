@@ -50,7 +50,13 @@ class PufferGPUDrive(PufferEnv):
         collision_behavior="ignore",
         collision_weight=-0.5,
         off_road_weight=-0.5,
+        off_road_edge_weight=-0.5,
         goal_achieved_weight=1,
+        time_penalty=0.0,
+        idle_speed_threshold=0.5,
+        idle_penalty=0.0,
+        progress_reward_weight=0.0,
+        progress_reward_scale=20.0,
         dist_to_goal_threshold=2.0,
         polyline_reduction_threshold=0.1, #折线简化阈值，是一个用于控制道路图观察点采样密度的参数。
         remove_non_vehicles=True,
@@ -88,6 +94,7 @@ class PufferGPUDrive(PufferEnv):
         self.max_cont_agents_per_env = max_controlled_agents
         self.collision_weight = collision_weight
         self.off_road_weight = off_road_weight
+        self.off_road_edge_weight = off_road_edge_weight
         self.goal_achieved_weight = goal_achieved_weight
 
         self.render = render
@@ -116,6 +123,15 @@ class PufferGPUDrive(PufferEnv):
             ego_state=ego_state,
             road_map_obs=road_map_obs,
             partner_obs=partner_obs,
+            collision_weight=collision_weight,
+            off_road_weight=off_road_weight,
+            off_road_edge_weight=off_road_edge_weight,
+            goal_achieved_weight=goal_achieved_weight,
+            time_penalty=time_penalty,
+            idle_speed_threshold=idle_speed_threshold,
+            idle_penalty=idle_penalty,
+            progress_reward_weight=progress_reward_weight,
+            progress_reward_scale=progress_reward_scale,
             reward_type=reward_type,
             norm_obs=norm_obs,
             bev_obs=bev_obs,
@@ -299,14 +315,79 @@ class PufferGPUDrive(PufferEnv):
             ~self.offroad_in_episode.bool(),
             torch.logical_and(
                 ~self.collided_in_episode.bool(),
-                ~self.env.get_infos().goal_achieved.bool(),
+                ~info.goal_achieved.bool(),
             ),
         )
+
+        # Step-level reward decomposition for diagnostics (no effect on training)
+        off_road_edge_weight = getattr(
+            self.env.config, "off_road_edge_weight", self.collision_weight
+        )
+        done_float = terminal.to(torch.float)
+        goal_achieved = info.goal_achieved.to(torch.float)
+        active = (1.0 - done_float) * (1.0 - goal_achieved)
+
+        collision_term = self.collision_weight * info.collided.to(torch.float)
+        off_road_term = self.off_road_weight * info.off_road.to(torch.float)
+        off_road_edge_term = (
+            off_road_edge_weight * info.off_road_with_road_edge.to(torch.float)
+        )
+        goal_term = self.goal_achieved_weight * goal_achieved
+
+        time_term = torch.zeros_like(goal_term)
+        idle_term = torch.zeros_like(goal_term)
+        progress_term = torch.zeros_like(goal_term)
+
+        if self.env.config.time_penalty != 0.0:
+            time_term = -self.env.config.time_penalty * active
+
+        if self.env.config.idle_penalty != 0.0:
+            speed = (
+                self.env.sim.self_observation_tensor()
+                .to_torch()
+                .clone()[:, :, 0]
+                .to(torch.float)
+            )
+            is_idle = (speed < self.env.config.idle_speed_threshold).to(torch.float)
+            idle_term = -self.env.config.idle_penalty * is_idle * active
+
+        if self.env.config.progress_reward_weight != 0.0:
+            self_obs = self.env.sim.self_observation_tensor().to_torch().clone()
+            rel_goal_x = self_obs[:, :, 4].to(torch.float)
+            rel_goal_y = self_obs[:, :, 5].to(torch.float)
+            dist_to_goal = torch.sqrt(rel_goal_x ** 2 + rel_goal_y ** 2 + 1e-6)
+            progress_term = (
+                self.env.config.progress_reward_weight
+                * torch.exp(-dist_to_goal / self.env.config.progress_reward_scale)
+                * active
+            )
+
+        controlled = self.controlled_agent_mask
+        step_total = (
+            collision_term
+            + off_road_term
+            + off_road_edge_term
+            + goal_term
+            + time_term
+            + idle_term
+            + progress_term
+        )
+
+        step_reward_metrics = {
+            "reward_collision_step": collision_term[controlled].mean().item(),
+            "reward_off_road_step": off_road_term[controlled].mean().item(),
+            "reward_off_road_edge_step": off_road_edge_term[controlled].mean().item(),
+            "reward_goal_step": goal_term[controlled].mean().item(),
+            "reward_time_step": time_term[controlled].mean().item(),
+            "reward_idle_step": idle_term[controlled].mean().item(),
+            "reward_progress_step": progress_term[controlled].mean().item(),
+            "reward_total_step": step_total[controlled].mean().item(),
+        }
 
         # Flatten
         terminal = terminal[self.controlled_agent_mask]
 
-        info_lst = []
+        info_lst = [step_reward_metrics]
         if len(done_worlds) > 0:
 
             if self.render:
@@ -340,9 +421,7 @@ class PufferGPUDrive(PufferEnv):
                 / num_finished_agents
             )
             goal_achieved_rate = (
-                self.env.get_infos()
-                .goal_achieved[done_worlds, :][controlled_mask]
-                .sum()
+                info.goal_achieved[done_worlds, :][controlled_mask].sum()
                 / num_finished_agents
             )
 

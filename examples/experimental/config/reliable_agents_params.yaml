@@ -10,17 +10,17 @@ lidar_obs: false # NOTE: Setting this to true currently turns of the other obser
 reward_type: "weighted_combination"
 # 奖励权重：必须与训练配置一致
 collision_weight: -1.0  # 与训练配置一致（从-0.75更新）
-off_road_edge_weight: -5.0  # 新增：碰撞RoadEdge的惩罚（训练配置中有）
+off_road_edge_weight: -2.0  # 与当前训练配置一致
 off_road_weight: -1.0  # 与训练配置一致（从-0.75更新）
-goal_achieved_weight: 1.0
+goal_achieved_weight: 2.0
 # 奖励塑形项（与训练配置一致）
-time_penalty: 0.005
+time_penalty: 0.0015
 idle_speed_threshold: 0.5
-idle_penalty: 0.02
-progress_reward_weight: 0.1
-progress_reward_scale: 20.0
+idle_penalty: 0.005
+progress_reward_weight: 0.03
+progress_reward_scale: 15.0
 dynamics_model: "classic"
-collision_behavior: "ignore"  # 与训练配置一致（从"ignore"更新）
+collision_behavior: "ignore"  # 与当前训练配置一致
 dist_to_goal_threshold: 2.0
 polyline_reduction_threshold: 0.1 # Rate at which to sample points from the polyline (0 is use all closest points, 1 maximum sparsity), needs to be balanced with kMaxAgentMapObservationsCount
 sampling_seed: 42 # If given, the set of scenes to sample from will be deterministic, if None, the set of scenes will be random
@@ -28,4 +28,8 @@ obs_radius: 50.0 # Visibility radius of the agents
 action_space_steer_disc: 13
 action_space_accel_disc: 7
 init_mode: all_non_trivial
+use_vbd: false
+vbd_model_path: "gpudrive/integrations/vbd/weights/epoch=18.ckpt"
+# init_steps: 11
+vbd_trajectory_weight: 0.1
 vbd_in_obs: false # If true, the VBD is included in the observation

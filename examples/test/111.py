@@ -31,49 +31,34 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import warnings
 
-# ==================== 函数目录（快速导航） ====================
-# 1) 配置与初始化
-#    - configure_matplotlib_font: 配置中文字体与字体告警抑制
-#    - setup_environment: 自动定位项目根目录并注入 sys.path
-#    - build_env_config_from_runtime: 将 YAML 参数映射到 EnvConfig
-# 2) 运行时控制
-#    - resolve_runtime_single_agent: 解析命令行单智能体覆盖参数
-#    - print_runtime_switches: 打印本次运行开关
-#    - normalize_action_tensor: 统一动作张量形状并做 NaN 防护
-#    - build_action_template: 组装 [num_envs, max_agents] 动作模板
-# 3) 轨迹与可视化
-#    - predict_trajectory: 闭环预测轨迹（支持候选重打分避障）
-#    - rescore_actions_to_follow_predicted_trajectory: 实际控制跟踪预测轨迹线
-#    - add_trajectory_to_frame / add_front_wheel_visualization: 渲染叠加
-# ============================================================
+# 尝试设置中文字体，如果失败则使用默认字体（避免警告）
+try:
+    # 尝试使用系统中文字体
+    chinese_fonts = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Micro Hei', 'STHeiti', 'Arial Unicode MS']
+    font_found = False
+    for font_name in chinese_fonts:
+        try:
+            # 检查字体是否存在
+            available_fonts = [f.name for f in fm.fontManager.ttflist]
+            if font_name in available_fonts:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                plt.rcParams['axes.unicode_minus'] = False
+                font_found = True
+                break
+        except:
+            continue
+    
+    # 如果没有找到中文字体，使用DejaVu Sans（支持基本字符）
+    if not font_found:
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans'] + plt.rcParams['font.sans-serif']
+        plt.rcParams['axes.unicode_minus'] = False
+except Exception as e:
+    # 如果无法设置字体，使用默认设置
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
 
-def configure_matplotlib_font():
-    """配置中文字体与字体告警抑制（可单独复用）。"""
-    try:
-        chinese_fonts = ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei", "STHeiti", "Arial Unicode MS"]
-        font_found = False
-        for font_name in chinese_fonts:
-            try:
-                available_fonts = [f.name for f in fm.fontManager.ttflist]
-                if font_name in available_fonts:
-                    plt.rcParams["font.sans-serif"] = [font_name] + plt.rcParams["font.sans-serif"]
-                    plt.rcParams["axes.unicode_minus"] = False
-                    font_found = True
-                    break
-            except Exception:
-                continue
-
-        if not font_found:
-            plt.rcParams["font.sans-serif"] = ["DejaVu Sans"] + plt.rcParams["font.sans-serif"]
-            plt.rcParams["axes.unicode_minus"] = False
-    except Exception:
-        plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
-        plt.rcParams["axes.unicode_minus"] = False
-
-    warnings.filterwarnings("ignore", category=UserWarning, message=".*Glyph.*missing.*")
-
-
-configure_matplotlib_font()
+# 抑制字体相关的警告
+warnings.filterwarnings('ignore', category=UserWarning, message='.*Glyph.*missing.*')
 
 def steering_to_front_wheel(steering):
     """
@@ -317,26 +302,12 @@ SQP_W_DEV_SPEED = 2.0        # speed 保真权重
 SQP_MAX_DEV_XY = 2.0         # xy 最大偏移（米）
 SQP_MAX_DEV_YAW = 0.3        # yaw 最大偏移（弧度 ≈ 17°）
 SQP_MAX_DEV_SPEED = 3.0      # speed 最大偏移（m/s）
-# -- SQP 软避障（新增） --
-ENABLE_SQP_OBSTACLE_AVOIDANCE = True   # True: 在SQP目标函数里加入障碍软惩罚
-SQP_W_OBSTACLE = 60.0                  # 障碍惩罚权重（越大越绕障）
-SQP_OBSTACLE_SAFE_RADIUS = 2.5         # 安全半径（米）
-SQP_OBSTACLE_END_WEIGHT = 1.8          # 越接近轨迹后段，避障权重越大
-SQP_OBS_MAX_POINTS = 512               # 参与SQP的障碍点上限（防止优化过慢）
-
-# -- SQP 对比图字体（新增） --
-SQP_PLOT_TITLE_FONT_SIZE = 18      # 总标题
-SQP_PLOT_SUBTITLE_FONT_SIZE = 16   # 子图标题
-SQP_PLOT_LABEL_FONT_SIZE = 15      # 坐标轴标签
-SQP_PLOT_TICK_FONT_SIZE = 13       # 刻度字体
-SQP_PLOT_LEGEND_FONT_SIZE = 14     # 图例字体
-
 
 # 前轮转角可视化开关
 ENABLE_FRONT_WHEEL_VIS = False  # True: 在GIF中绘制前轮转角箭头和角度标签, False: 不绘制
 
 # 智能体 ID 标注开关（仅控制最终 GIF 里的 ID 文本）
-ENABLE_AGENT_ID_LABEL = False  # True: 显示智能体ID, False: 不显示
+ENABLE_AGENT_ID_LABEL = True  # True: 显示智能体ID, False: 不显示
 AGENT_ID_FONT_SIZE = 9         # ID 字体大小
 
 # 单智能体仿真（可选）
@@ -355,12 +326,11 @@ RESCORE_AVOID_RADIUS = 5.0
 RESCORE_COLLISION_RADIUS = 2.8
 RESCORE_AVOID_WEIGHT = 1.5
 RESCORE_COLLISION_WEIGHT = 8.0
-
 RESCORE_STEER_CHANGE_WEIGHT = 0.15
 RESCORE_STEER_MAG_WEIGHT = 0.05
 RESCORE_ACCEL_CHANGE_WEIGHT = 0.04
 
-# Track real control to follow predicted trajectory 跟踪预测轨迹
+# Track real control to follow predicted trajectory
 ENABLE_TRACK_PREDICTED_TRAJECTORY = True
 TRACK_LOOKAHEAD_STEP = 3
 TRACK_CANDIDATE_TOPK = 9
@@ -385,122 +355,29 @@ def setup_environment():
     sys.path.insert(0, str(current))
     return current
 
-def resolve_runtime_single_agent(default_spec):
-    """解析运行时单智能体参数（命令行可覆盖配置值）。"""
-    runtime_single_agent = default_spec
-    if len(sys.argv) >= 2 and sys.argv[1].lower().startswith("env"):
-        runtime_single_agent = sys.argv[1]
-    return runtime_single_agent
-
-
-def print_runtime_switches(runtime_single_agent):
-    """打印核心开关，便于每次运行快速核对配置。"""
+def main():
     print("=== GPUDrive 预训练模型使用脚本 ===")
     print(f"预测轨迹绘制: {'✅ 开启' if ENABLE_TRAJECTORY_PREDICTION else '❌ 关闭'}")
     if ENABLE_TRAJECTORY_PREDICTION:
         print(f"预测步数: {TRAJECTORY_HORIZON} 步 ({TRAJECTORY_HORIZON * 0.1:.1f} 秒)")
     print(f"候选动作重打分避障: {'✅ 开启' if ENABLE_CANDIDATE_ACTION_RESCORING else '❌ 关闭'}")
-    print("候选动作平滑代价: ❌ 关闭" if (RESCORE_STEER_CHANGE_WEIGHT == 0 and RESCORE_STEER_MAG_WEIGHT == 0 and RESCORE_ACCEL_CHANGE_WEIGHT == 0) else "候选动作平滑代价: ✅ 开启")
     print("控制跟踪预测线: ✅ 开启" if ENABLE_TRACK_PREDICTED_TRAJECTORY else "控制跟踪预测线: ❌ 关闭")
     print(f"SQP轨迹平滑: {'✅ 开启 (x,y,yaw,v 联合优化)' if ENABLE_SQP_TRAJECTORY_SMOOTHING else '❌ 关闭'}")
     if ENABLE_SQP_TRAJECTORY_SMOOTHING:
         print(f"  运动学一致性权重: {SQP_W_KINEMATIC}, 位置曲率权重: {SQP_W_POS_CURV}")
-        print(f"  SQP软避障: {'✅ 开启' if ENABLE_SQP_OBSTACLE_AVOIDANCE else '❌ 关闭'}")
-        if ENABLE_SQP_OBSTACLE_AVOIDANCE:
-            print(f"  避障权重: {SQP_W_OBSTACLE}, 安全半径: {SQP_OBSTACLE_SAFE_RADIUS}m, 后段系数: {SQP_OBSTACLE_END_WEIGHT}")
     print(f"红色历史轨迹: {'✅ 开启' if ENABLE_RED_TRAJECTORY else '❌ 关闭'}")
     print(f"智能体ID标注: {'✅ 开启' if ENABLE_AGENT_ID_LABEL else '❌ 关闭'}")
     print(f"动作打印: {'✅ 开启' if ENABLE_ACTION_PRINT else '❌ 关闭'}")
     if ENABLE_ACTION_PRINT:
         print(f"打印间隔: 每 {ACTION_PRINT_INTERVAL} 步打印一次")
-    print(f"单智能体模式: {'✅ ' + runtime_single_agent if runtime_single_agent else '❌ 关闭'}")
 
+    runtime_single_agent = TARGET_SINGLE_AGENT
+    if len(sys.argv) >= 2 and sys.argv[1].lower().startswith("env"):
+        runtime_single_agent = sys.argv[1]
 
-def build_env_config_from_runtime(config):
-    """将外部配置对象映射为 EnvConfig（集中管理可调参数）。"""
-    return dataclasses.replace(
-        EnvConfig(),
-        ego_state=config.ego_state,
-        road_map_obs=config.road_map_obs,
-        partner_obs=config.partner_obs,
-        reward_type=config.reward_type,
-        norm_obs=config.norm_obs,
-        collision_weight=config.collision_weight,
-        off_road_weight=config.off_road_weight,
-        off_road_edge_weight=getattr(config, "off_road_edge_weight", EnvConfig().off_road_edge_weight),
-        goal_achieved_weight=config.goal_achieved_weight,
-        time_penalty=getattr(config, "time_penalty", 0.0),
-        idle_speed_threshold=getattr(config, "idle_speed_threshold", 0.5),
-        idle_penalty=getattr(config, "idle_penalty", 0.0),
-        progress_reward_weight=getattr(config, "progress_reward_weight", 0.0),
-        progress_reward_scale=getattr(config, "progress_reward_scale", 20.0),
-        dynamics_model=config.dynamics_model,
-        collision_behavior=config.collision_behavior,
-        dist_to_goal_threshold=config.dist_to_goal_threshold,
-        polyline_reduction_threshold=config.polyline_reduction_threshold,
-        init_mode=getattr(config, "init_mode", "all_non_trivial"),
-        use_vbd=getattr(config, "use_vbd", False),
-        vbd_model_path=getattr(config, "vbd_model_path", None),
-        init_steps=getattr(config, "init_steps", 0),
-        vbd_trajectory_weight=getattr(config, "vbd_trajectory_weight", 0.1),
-        vbd_in_obs=getattr(config, "vbd_in_obs", False),
-        remove_non_vehicles=config.remove_non_vehicles,
-        lidar_obs=config.lidar_obs,
-        disable_classic_obs=config.lidar_obs,
-        obs_radius=config.obs_radius,
-        steer_actions=torch.round(
-            torch.linspace(-torch.pi, torch.pi, config.action_space_steer_disc), decimals=3
-        ),
-        accel_actions=torch.round(
-            torch.linspace(-4.0, 4.0, config.action_space_accel_disc), decimals=3
-        ),
+    print(
+        f"单智能体模式: {'✅ ' + runtime_single_agent if runtime_single_agent else '❌ 关闭'}"
     )
-
-
-def normalize_action_tensor(action, expected_actions, device):
-    """统一动作张量形状并校验数量一致性。"""
-    action = torch.as_tensor(action, device=device)
-    if action.dim() == 0:
-        action = action.unsqueeze(0)
-    else:
-        action = action.reshape(-1)
-    action = torch.nan_to_num(action, nan=0).long()
-
-    if action.numel() != expected_actions:
-        raise RuntimeError(
-            f"动作数量与控制智能体数不一致: action={action.numel()}, expected={expected_actions}"
-        )
-    return action
-
-
-def build_action_template(
-    num_envs,
-    max_agents,
-    control_mask,
-    action,
-    single_agent_mode,
-    freeze_other_agents_with_noop,
-    noop_action_idx,
-    device,
-):
-    """组装最终下发到环境的动作模板 [num_envs, max_agents]。"""
-    if single_agent_mode and freeze_other_agents_with_noop:
-        action_template = torch.full(
-            (num_envs, max_agents),
-            fill_value=noop_action_idx,
-            dtype=torch.int64,
-            device=device,
-        )
-    else:
-        action_template = torch.zeros((num_envs, max_agents), dtype=torch.int64, device=device)
-
-    action_template[control_mask] = action.to(device)
-    return action_template
-
-def main():
-    runtime_single_agent = resolve_runtime_single_agent(TARGET_SINGLE_AGENT)
-    print_runtime_switches(runtime_single_agent)
-
 
     # 设置环境
     project_root = setup_environment()
@@ -560,7 +437,43 @@ def main():
     # 5. 创建环境配置
     print("\n4. 创建环境配置...")
     try:
-        env_config = build_env_config_from_runtime(config)
+        env_config = dataclasses.replace(
+            EnvConfig(),
+            ego_state=config.ego_state,
+            road_map_obs=config.road_map_obs,
+            partner_obs=config.partner_obs,
+            reward_type=config.reward_type,
+            norm_obs=config.norm_obs,
+            collision_weight=config.collision_weight,
+            off_road_weight=config.off_road_weight,
+            off_road_edge_weight=config.off_road_edge_weight,
+            goal_achieved_weight=config.goal_achieved_weight,
+            time_penalty=getattr(config, "time_penalty", 0.0),
+            idle_speed_threshold=getattr(config, "idle_speed_threshold", 0.5),
+            idle_penalty=getattr(config, "idle_penalty", 0.0),
+            progress_reward_weight=getattr(config, "progress_reward_weight", 0.0),
+            progress_reward_scale=getattr(config, "progress_reward_scale", 20.0),
+            dynamics_model=config.dynamics_model,
+            collision_behavior=config.collision_behavior,
+            dist_to_goal_threshold=config.dist_to_goal_threshold,
+            polyline_reduction_threshold=config.polyline_reduction_threshold,
+            init_mode=getattr(config, "init_mode", "all_non_trivial"),
+            use_vbd=getattr(config, "use_vbd", False),
+            vbd_model_path=getattr(config, "vbd_model_path", None),
+            init_steps=getattr(config, "init_steps", 0),
+            vbd_trajectory_weight=getattr(config, "vbd_trajectory_weight", 0.1),
+            vbd_in_obs=getattr(config, "vbd_in_obs", False),
+            remove_non_vehicles=config.remove_non_vehicles,
+            lidar_obs=config.lidar_obs,
+            disable_classic_obs=config.lidar_obs,
+            obs_radius=config.obs_radius,
+            steer_actions=torch.round(
+                torch.linspace(-torch.pi, torch.pi, config.action_space_steer_disc), decimals=3
+            ),
+            accel_actions=torch.round(
+                torch.linspace(-4.0, 4.0, config.action_space_accel_disc), decimals=3
+            ),
+        )
         print("环境配置创建成功")
     except Exception as e:
         print(f"环境配置创建失败: {e}")
@@ -814,13 +727,11 @@ def main():
 
                     avoid_pen = RESCORE_AVOID_WEIGHT * torch.relu(RESCORE_AVOID_RADIUS - min_dist) ** 2
                     collision_pen = RESCORE_COLLISION_WEIGHT * torch.relu(RESCORE_COLLISION_RADIUS - min_dist) ** 2
-                    smooth_pen = torch.zeros_like(a)
-                    if (RESCORE_STEER_CHANGE_WEIGHT > 0) or (RESCORE_STEER_MAG_WEIGHT > 0) or (RESCORE_ACCEL_CHANGE_WEIGHT > 0):
-                        smooth_pen = (
-                            RESCORE_STEER_CHANGE_WEIGHT * torch.abs(st - prev_steer[i])
-                            + RESCORE_STEER_MAG_WEIGHT * torch.abs(st)
-                            + RESCORE_ACCEL_CHANGE_WEIGHT * torch.abs(a - prev_accel[i])
-                        )
+                    smooth_pen = (
+                        RESCORE_STEER_CHANGE_WEIGHT * torch.abs(st - prev_steer[i])
+                        + RESCORE_STEER_MAG_WEIGHT * torch.abs(st)
+                        + RESCORE_ACCEL_CHANGE_WEIGHT * torch.abs(a - prev_accel[i])
+                    )
                     score = progress_score + goal_bonus - avoid_pen - collision_pen - smooth_pen
                     rescored[i] = cand_idx[torch.argmax(score)]
 
@@ -1199,8 +1110,19 @@ def main():
                     next_obs[control_mask], deterministic=False
                 )
 
+            # 统一动作张量形状：单智能体时模型可能返回 0 维标量
+            action = torch.as_tensor(action, device=device)
+            if action.dim() == 0:
+                action = action.unsqueeze(0)
+            else:
+                action = action.reshape(-1)
+            action = torch.nan_to_num(action, nan=0).long()
+
             expected_actions = int(control_mask.sum().item())
-            action = normalize_action_tensor(action, expected_actions, device)
+            if action.numel() != expected_actions:
+                raise RuntimeError(
+                    f"动作数量与控制智能体数不一致: action={action.numel()}, expected={expected_actions}"
+                )
             if ENABLE_TRACK_PREDICTED_TRAJECTORY and last_predicted_trajectories is not None:
                 action = rescore_actions_to_follow_predicted_trajectory(
                     env=env,
@@ -1215,16 +1137,18 @@ def main():
                     accel_change_weight=TRACK_ACCEL_CHANGE_WEIGHT,
                     prev_action_indices=last_controlled_action,
                 )
-            action_template = build_action_template(
-                num_envs=num_envs,
-                max_agents=max_agents,
-                control_mask=control_mask,
-                action=action,
-                single_agent_mode=single_agent_mode,
-                freeze_other_agents_with_noop=FREEZE_OTHER_AGENTS_WITH_NOOP,
-                noop_action_idx=noop_action_idx,
-                device=device,
-            )
+            if single_agent_mode and FREEZE_OTHER_AGENTS_WITH_NOOP:
+                action_template = torch.full(
+                    (num_envs, max_agents),
+                    fill_value=noop_action_idx,
+                    dtype=torch.int64,
+                    device=device,
+                )
+            else:
+                action_template = torch.zeros(
+                    (num_envs, max_agents), dtype=torch.int64, device=device
+                )
+            action_template[control_mask] = action.to(device)
             
             # 打印动作信息
             if ENABLE_ACTION_PRINT and (time_step % ACTION_PRINT_INTERVAL == 0 or time_step < 5):
@@ -1321,7 +1245,7 @@ def main():
                         horizon=TRAJECTORY_HORIZON, device=device
                     )
 
-                    # 预测轨迹平滑（可选，不影响候选重打分避障逻辑）
+                    # 平滑处理：对 x,y,yaw,speed 做一致性平滑（不影响可视化接口，仍然用前两维画线）
                     if ENABLE_TRAJECTORY_SMOOTHING and predicted_trajectories is not None:
                         from gpudrive.utils.trajectory_smoothing import (
                             smooth_predicted_trajectories_xy_yaw_speed,
@@ -1623,31 +1547,8 @@ def main():
             if ENABLE_SQP_TRAJECTORY_SMOOTHING:
                 from gpudrive.utils.trajectory_sqp_smoothing import sqp_smooth_trajectory_xyav
                 print("  🔧 SQP 优化中...")
-                sqp_agent_states = GlobalEgoState.from_tensor(
-                    env.sim.absolute_self_observation_tensor(),
-                    backend="torch",
-                    device=device,
-                )
-
                 for env_idx in range(num_envs):
                     smoothed_trajectories[env_idx] = {}
-                    env_obstacle_points = None
-                    if ENABLE_SQP_OBSTACLE_AVOIDANCE:
-                        env_x = sqp_agent_states.pos_x[env_idx]
-                        env_y = sqp_agent_states.pos_y[env_idx]
-                        valid_mask = (
-                            torch.isfinite(env_x)
-                            & torch.isfinite(env_y)
-                            & (torch.abs(env_x) < 1e4)
-                            & (torch.abs(env_y) < 1e4)
-                        )
-                        obstacle_mask = valid_mask & (~control_mask[env_idx])
-                        if obstacle_mask.any():
-                            obs_xy = torch.stack((env_x[obstacle_mask], env_y[obstacle_mask]), dim=1)
-                            if SQP_OBS_MAX_POINTS > 0 and obs_xy.shape[0] > SQP_OBS_MAX_POINTS:
-                                obs_xy = obs_xy[:SQP_OBS_MAX_POINTS]
-                            env_obstacle_points = obs_xy.detach().cpu().numpy()
-
                     for agent_idx, traj in trajectories[env_idx].items():
                         traj_filtered = [
                             t for t in traj
@@ -1675,10 +1576,6 @@ def main():
                             max_deviation_xy=SQP_MAX_DEV_XY,
                             max_deviation_yaw=SQP_MAX_DEV_YAW,
                             max_deviation_speed=SQP_MAX_DEV_SPEED,
-                            obstacle_points=env_obstacle_points,
-                            w_obstacle=SQP_W_OBSTACLE if ENABLE_SQP_OBSTACLE_AVOIDANCE else 0.0,
-                            obstacle_safe_radius=SQP_OBSTACLE_SAFE_RADIUS,
-                            obstacle_end_weight=SQP_OBSTACLE_END_WEIGHT,
                         )
                         steps = [t[4] for t in traj_filtered]
                         smoothed_trajectories[env_idx][agent_idx] = [
@@ -1843,7 +1740,7 @@ def main():
                                                                 dpi=120, sharex=True)
                         fig.suptitle(
                             f'Env {env_idx}  Agent {aid}  —  SQP Optimization',
-                            fontsize=SQP_PLOT_TITLE_FONT_SIZE, fontweight='bold',
+                            fontsize=14, fontweight='bold',
                         )
 
                         # ---- 速度对比 ----
@@ -1853,11 +1750,10 @@ def main():
                         ax_speed.plot(time_smooth, speed_smooth,
                                       color='limegreen', linewidth=2.0, alpha=0.9,
                                       label='SQP Smoothed')
-                        ax_speed.set_ylabel('Speed (m/s)', fontsize=SQP_PLOT_LABEL_FONT_SIZE)
-                        ax_speed.legend(loc='upper right', fontsize=SQP_PLOT_LEGEND_FONT_SIZE)
+                        ax_speed.set_ylabel('Speed (m/s)', fontsize=12)
+                        ax_speed.legend(loc='upper right', fontsize=10)
                         ax_speed.grid(True, alpha=0.3)
-                        ax_speed.set_title('Speed', fontsize=SQP_PLOT_SUBTITLE_FONT_SIZE)
-                        ax_speed.tick_params(axis='both', labelsize=SQP_PLOT_TICK_FONT_SIZE)
+                        ax_speed.set_title('Speed', fontsize=12)
 
                         # ---- 航向角对比 ----
                         ax_yaw.plot(time_orig, yaw_orig_deg,
@@ -1866,12 +1762,11 @@ def main():
                         ax_yaw.plot(time_smooth, yaw_smooth_deg,
                                     color='limegreen', linewidth=2.0, alpha=0.9,
                                     label='SQP Smoothed')
-                        ax_yaw.set_ylabel('Yaw (deg)', fontsize=SQP_PLOT_LABEL_FONT_SIZE)
-                        ax_yaw.set_xlabel('Time (s)', fontsize=SQP_PLOT_LABEL_FONT_SIZE)
-                        ax_yaw.legend(loc='upper right', fontsize=SQP_PLOT_LEGEND_FONT_SIZE)
+                        ax_yaw.set_ylabel('Yaw (deg)', fontsize=12)
+                        ax_yaw.set_xlabel('Time (s)', fontsize=12)
+                        ax_yaw.legend(loc='upper right', fontsize=10)
                         ax_yaw.grid(True, alpha=0.3)
-                        ax_yaw.set_title('Heading (Yaw)', fontsize=SQP_PLOT_SUBTITLE_FONT_SIZE)
-                        ax_yaw.tick_params(axis='both', labelsize=SQP_PLOT_TICK_FONT_SIZE)
+                        ax_yaw.set_title('Heading (Yaw)', fontsize=12)
 
                         fig.tight_layout(rect=[0, 0, 1, 0.95])
 

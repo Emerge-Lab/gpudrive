@@ -291,7 +291,7 @@ inline void movementSystem(Engine &e,
                            Position &position,
                            Velocity &velocity,
                            CollisionDetectionEvent& collisionEvent,
-                           const ResponseType &responseType) {
+                           ResponseType &responseType) {
     if (collisionEvent.hasCollided.load_relaxed()) {
         switch (e.data().params.collisionBehaviour) {
             case CollisionBehaviour::AgentStop:
@@ -317,9 +317,12 @@ inline void movementSystem(Engine &e,
 
     const auto &controlledState = e.get<ControlledState>(agent_iface.e);
 
+    // 用 Interface 的 responseType 驱动实体 responseType，避免索引不一致
+    responseType = e.get<ResponseType>(agent_iface.e);
+
     if (responseType == ResponseType::Static) {
-        // Do nothing. The agent is static.
-        // Agent can only be static if isStaticAgentControlled is set to true.
+        // 静态障碍物：不做运动更新，并强制清零速度避免残余滑移
+        agentZeroVelSystem(e, velocity);
         return;
     }
 

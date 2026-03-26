@@ -4,7 +4,7 @@ eval_model_path: null
 baseline: false
 data_dir: data/processed/training
 continue_training: true
-model_cpt: /home/wbk/gpudrive/runs/PPO__C__S_72__01_29_15_47_35_057/model_PPO__C__S_72__01_29_15_47_35_057_033920.pt
+model_cpt: /home/wbk/gpudrive/runs/PPO__C__S_72__03_24_15_49_23_490/model_PPO__C__S_72__03_24_15_49_23_490_038866.pt
 environment: # 覆盖环境配置（见 gpudrive/env/config.py）
   name: "gpudrive"
   num_worlds: 18 # 并行环境数量（进一步降低以减少重采样时显存峰值）
@@ -18,16 +18,16 @@ environment: # 覆盖环境配置（见 gpudrive/env/config.py）
   lidar_obs: false # 注意：设为 true 会关闭其他观测类型
   reward_type: "weighted_combination"
   collision_weight: -1.0  # 碰撞其他道路线（RoadLine, RoadLane等）的惩罚
-  off_road_edge_weight: -5.0  # 碰撞RoadEdge（道路边缘）的惩罚，比普通碰撞更严重
+  off_road_edge_weight: -2.0  # 碰撞RoadEdge（道路边缘）的惩罚，比普通碰撞更严重
   off_road_weight: -1.0   # 降低：允许适度冒险
-  goal_achieved_weight: 1.0  # 大幅提高：让"到达"比"安全躲避"更有吸引力
+  goal_achieved_weight: 2.0  # 大幅提高：让"到达"比"安全躲避"更有吸引力
   # 避免"动几下就停"的塑形项（仅 weighted_combination 生效）
-  time_penalty: 0.005  # 提高：增强推进压力
+  time_penalty: 0.0015  # 提高：增强推进压力
   idle_speed_threshold: 0.5
-  idle_penalty: 0.02   # 降低：避免惩罚过重
+  idle_penalty: 0.005   # 降低：避免惩罚过重
   # 进度奖励：距离目标越近奖励越高（密集正向信号）
-  progress_reward_weight: 0.1  # 降低：避免改变奖励scale太多
-  progress_reward_scale: 20.0
+  progress_reward_weight: 0.03  # 降低：避免改变奖励scale太多
+  progress_reward_scale: 15.0
   dynamics_model: "classic"
   collision_behavior: "remove" # 选项："remove"、"stop"、"ignore"
   dist_to_goal_threshold: 2.0
@@ -67,18 +67,18 @@ train:
 
   # # # PPO # # #
   torch_deterministic: false
-  total_timesteps: 600_000_000
+  total_timesteps: 700_000_000
   batch_size: 18432
   minibatch_size: 3072
   # 降低学习率：提高稳定性，减少策略震荡
-  learning_rate: 5e-5  # 从1e-4降低到5e-5，更保守的更新
+  learning_rate: 6.5e-5  # 从1e-4降低到5e-5，更保守的更新
   anneal_lr: true     # 开启学习率衰减：从5e-5开始，随训练逐渐降低
   gamma: 0.99
   gae_lambda: 0.95
   # 收紧更新：避免策略变化太大
   update_epochs: 4  # 从3增加到4，更充分的优化
   norm_adv: true
-  clip_coef: 0.1   # 从0.15收紧到0.1，更保守的策略更新
+  clip_coef: 0.12   # 从0.15收紧到0.1，更保守的策略更新
   # value 更稳
   clip_vloss: true
   vf_clip_coef: 0.2
